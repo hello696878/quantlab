@@ -57,7 +57,13 @@ function CustomTooltip({
 }
 
 export default function EquityCurveChart({ data }: Props) {
-  if (!data.length) return null;
+  if (!data.length) {
+    return (
+      <div className="flex h-[340px] items-center justify-center text-sm text-slate-400">
+        No equity curve data was returned for this backtest.
+      </div>
+    );
+  }
 
   const yearTicks = buildYearTicks(data);
   const initialCapital = data[0].strategy; // both start at same value

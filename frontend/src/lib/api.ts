@@ -17,22 +17,54 @@ export class BacktestApiError extends Error {
   }
 }
 
+function formatBackendDetail(detail: unknown): string | null {
+  if (typeof detail === "string") return detail;
+  if (!Array.isArray(detail)) return null;
+
+  const messages = detail
+    .map((d) => {
+      if (!d || typeof d !== "object") return null;
+      const item = d as { loc?: unknown[]; msg?: unknown };
+      if (typeof item.msg !== "string") return null;
+      const field =
+        Array.isArray(item.loc) && item.loc.length > 0
+          ? String(item.loc[item.loc.length - 1])
+          : null;
+      return field ? `${field}: ${item.msg}` : item.msg;
+    })
+    .filter((msg): msg is string => Boolean(msg));
+
+  return messages.length > 0 ? messages.join("; ") : null;
+}
+
+function backendUnavailableMessage(status: number): string {
+  return (
+    `Backend request failed (HTTP ${status}). ` +
+    "Make sure the FastAPI backend is running at BACKEND_URL, " +
+    "or http://localhost:8000 by default."
+  );
+}
+
 export async function runBacktest(
   params: BacktestRequest,
 ): Promise<BacktestResponse> {
-  const res = await fetch("/api/backtest/sma-crossover", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(params),
-  });
+  let res: Response;
+  try {
+    res = await fetch("/api/backtest/sma-crossover", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
 
   if (!res.ok) {
-    let message = `HTTP ${res.status}`;
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
     try {
       const body = await res.json();
-      if (typeof body?.detail === "string") message = body.detail;
-      else if (Array.isArray(body?.detail))
-        message = body.detail.map((d: { msg: string }) => d.msg).join("; ");
+      message = formatBackendDetail(body?.detail) ?? message;
     } catch {
       // keep the HTTP status message
     }

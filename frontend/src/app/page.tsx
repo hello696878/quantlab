@@ -27,6 +27,8 @@ export default function HomePage() {
   const [error, setError] = useState<string | null>(null);
 
   async function handleRun() {
+    if (loading) return;
+
     setLoading(true);
     setError(null);
     setResult(null);

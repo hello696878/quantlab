@@ -86,7 +86,13 @@ export default function DrawdownChart({ data }: Props) {
     }));
   }, [data]);
 
-  if (!drawdown.length) return null;
+  if (!drawdown.length) {
+    return (
+      <div className="flex h-[240px] items-center justify-center text-sm text-slate-400">
+        No equity curve data is available to compute drawdown.
+      </div>
+    );
+  }
 
   const yearTicks = buildYearTicks(drawdown);
 

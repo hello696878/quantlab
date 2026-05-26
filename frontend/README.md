@@ -26,6 +26,7 @@ frontend/
 │       ├── api.ts               Fetch wrapper for POST /api/backtest/sma-crossover
 │       └── format.ts            Number/date formatters used across components
 ├── .env.local                   BACKEND_URL env var (default: http://localhost:8000)
+├── .env.example                 Example backend URL configuration
 ├── next.config.js               /api/* → backend rewrite (no CORS needed)
 ├── package.json
 ├── tailwind.config.ts
@@ -39,6 +40,7 @@ frontend/
 ```powershell
 cd C:\quantlab\frontend
 npm install
+Copy-Item .env.example .env.local
 ```
 
 ---
@@ -58,6 +60,12 @@ npm run dev
 
 Open **http://localhost:3000** in your browser.
 
+The frontend calls the backend through Next.js rewrites:
+
+- Browser request: `POST /api/backtest/sma-crossover`
+- Backend request: `POST /backtest/sma-crossover`
+- Default backend base URL: `http://localhost:8000`
+
 ---
 
 ## Environment variables
@@ -66,7 +74,9 @@ Open **http://localhost:3000** in your browser.
 |---|---|---|
 | `BACKEND_URL` | `http://localhost:8000` | Backend base URL used by Next.js rewrites |
 
-Edit `frontend/.env.local` to override.
+Copy `frontend/.env.example` to `frontend/.env.local`, then edit
+`BACKEND_URL` only if your FastAPI server runs somewhere other than
+`http://localhost:8000`.
 
 ---
 
