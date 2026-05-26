@@ -59,8 +59,9 @@ def compute_metrics(
     # -----------------------------------------------------------------------
     # CAGR
     # -----------------------------------------------------------------------
-    n_days = len(equity_curve)  # includes the starting day
-    n_years = n_days / TRADING_DAYS_PER_YEAR
+    n_days = len(equity_curve)  # observations, including the starting day
+    n_return_periods = len(daily_returns)
+    n_years = n_return_periods / TRADING_DAYS_PER_YEAR
     if n_years > 0 and equity_curve.iloc[0] > 0:
         cagr = float(equity_curve.iloc[-1] / equity_curve.iloc[0]) ** (1.0 / n_years) - 1.0
     else:
@@ -86,15 +87,12 @@ def compute_metrics(
     # -----------------------------------------------------------------------
     # Sortino ratio  (downside deviation only)
     # -----------------------------------------------------------------------
-    downside = excess_returns[excess_returns < 0]
-    if len(downside) > 1:
-        downside_std = float(downside.std())
-        if downside_std > 1e-12:
-            sortino_ratio = float(excess_returns.mean() / downside_std) * np.sqrt(
-                TRADING_DAYS_PER_YEAR
-            )
-        else:
-            sortino_ratio = 0.0
+    downside_returns = excess_returns.clip(upper=0.0)
+    downside_deviation = float(np.sqrt((downside_returns**2).mean()))
+    if downside_deviation > 1e-12:
+        sortino_ratio = float(excess_returns.mean() / downside_deviation) * np.sqrt(
+            TRADING_DAYS_PER_YEAR
+        )
     else:
         sortino_ratio = 0.0
 

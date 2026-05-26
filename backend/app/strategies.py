@@ -53,7 +53,7 @@ def sma_crossover_signals(
     raw_signal = (sma_fast > sma_slow).astype(int)
 
     # *** Shift by 1 to prevent lookahead bias ***
-    # position[T] = raw_signal[T-1]  →  trade executed at T's open/close
+    # position[T] = raw_signal[T-1], held over close[T-1] -> close[T].
     position = raw_signal.shift(1).fillna(0).astype(int)
 
     return position.rename("position")

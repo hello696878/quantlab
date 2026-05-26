@@ -93,6 +93,73 @@ def test_cost_reduces_equity_when_trades_occur():
         assert eq_low.iloc[-1] > eq_high.iloc[-1]
 
 
+def test_entry_cost_is_paid_before_interval_return():
+    """
+    A position of 1 on day 1 is held over close[0] -> close[1].
+    Entry cost is deducted before that interval's return is earned.
+    """
+    close = make_close([100.0, 110.0])
+    pos = pd.Series([0.0, 1.0], index=close.index, name="position")
+
+    strat_eq, _, trades = run_backtest(
+        close,
+        pos,
+        transaction_cost_bps=100.0,
+        initial_capital=INITIAL,
+    )
+
+    expected = INITIAL * (1.0 - 0.01) * (110.0 / 100.0)
+    assert strat_eq.iloc[-1] == pytest.approx(expected)
+    assert trades == [
+        {
+            "date": str(close.index[0].date()),
+            "action": "BUY",
+            "price": 100.0,
+            "shares": 990.0,
+            "cost": 1000.0,
+        }
+    ]
+
+
+def test_exit_trade_logs_previous_close_execution_price():
+    """
+    If position drops to 0 on day 2, the sale happens at close[1].
+    The strategy is then flat over close[1] -> close[2].
+    """
+    close = make_close([100.0, 110.0, 121.0])
+    pos = pd.Series([0.0, 1.0, 0.0], index=close.index, name="position")
+
+    strat_eq, _, trades = run_backtest(
+        close,
+        pos,
+        transaction_cost_bps=0.0,
+        initial_capital=INITIAL,
+    )
+
+    assert strat_eq.iloc[-1] == pytest.approx(110_000.0)
+    assert trades[0]["date"] == str(close.index[0].date())
+    assert trades[0]["price"] == 100.0
+    assert trades[0]["shares"] == 1000.0
+    assert trades[1]["date"] == str(close.index[1].date())
+    assert trades[1]["price"] == 110.0
+    assert trades[1]["shares"] == 1000.0
+
+
+def test_sparse_position_is_forward_filled():
+    """Missing position dates mean keep the last known exposure, not go flat."""
+    close = make_close([100.0, 110.0, 121.0])
+    sparse_pos = pd.Series([1.0], index=[close.index[0]], name="position")
+
+    strat_eq, _, _ = run_backtest(
+        close,
+        sparse_pos,
+        transaction_cost_bps=0.0,
+        initial_capital=INITIAL,
+    )
+
+    assert strat_eq.iloc[-1] == pytest.approx(121_000.0)
+
+
 # ---------------------------------------------------------------------------
 # Benchmark
 # ---------------------------------------------------------------------------

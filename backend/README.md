@@ -94,7 +94,7 @@ Run a long-only SMA crossover backtest.
 | `end_date` | string | YYYY-MM-DD, after start | `"2023-12-31"` |
 | `fast_window` | int | ≥ 2, < slow_window | `50` |
 | `slow_window` | int | ≥ 2 | `200` |
-| `transaction_cost_bps` | float | ≥ 0 | `10.0` |
+| `transaction_cost_bps` | float | one-way bps, ≥ 0 and < 10,000 | `10.0` |
 | `initial_capital` | float | > 0 | `100000.0` |
 
 **Response** includes:
@@ -137,7 +137,7 @@ pytest tests/test_backtest.py -v
 
 | Risk | Mitigation |
 |---|---|
-| **Lookahead bias** | Signal from day T is shifted to become position for day T+1 (`signal.shift(1)`) |
+| **Lookahead bias** | Signal from day T is shifted to become the close-to-close position for day T+1 (`signal.shift(1)`) |
 | **Incorrect benchmark** | Benchmark is always 100 % long from day 1 with no transaction costs |
 | **Wrong return calculation** | Uses `pct_change()` on adjusted close; tested against known values |
 | **Transaction cost omission** | Costs charged on every position change (both entry and exit) |

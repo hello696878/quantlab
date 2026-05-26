@@ -37,7 +37,8 @@ class BacktestRequest(BaseModel):
     transaction_cost_bps: float = Field(
         default=10.0,
         ge=0.0,
-        description="Round-trip transaction cost in basis points (10 bps = 0.10%).",
+        lt=10_000.0,
+        description="One-way transaction cost in basis points (10 bps = 0.10%).",
     )
     initial_capital: float = Field(
         default=100_000.0,

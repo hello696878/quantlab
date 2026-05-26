@@ -61,6 +61,15 @@ def test_cagr_matches_total_return_roughly_one_year():
     assert abs(m["cagr"] - m["total_return"]) < 0.02
 
 
+def test_cagr_uses_return_periods_not_observation_count():
+    """Day-0 plus 252 daily returns is exactly one trading year."""
+    returns = [0.10 / TRADING_DAYS_PER_YEAR] * TRADING_DAYS_PER_YEAR
+    equity = make_equity(returns)
+    expected = float(equity.iloc[-1] / equity.iloc[0]) - 1.0
+    m = compute_metrics(equity)
+    assert m["cagr"] == pytest.approx(round(expected, 6))
+
+
 # ---------------------------------------------------------------------------
 # Drawdown
 # ---------------------------------------------------------------------------
@@ -128,6 +137,20 @@ def test_sharpe_negative_for_downtrend():
     equity = make_equity(returns)
     m = compute_metrics(equity)
     assert m["sharpe_ratio"] < 0.0
+
+
+# ---------------------------------------------------------------------------
+# Sortino ratio
+# ---------------------------------------------------------------------------
+
+def test_sortino_uses_downside_deviation_not_negative_return_std():
+    """
+    Equal negative days still have downside risk.
+    The ratio should be finite and negative, not forced to zero.
+    """
+    equity = make_equity([-0.001] * 20)
+    m = compute_metrics(equity)
+    assert m["sortino_ratio"] < 0.0
 
 
 # ---------------------------------------------------------------------------
