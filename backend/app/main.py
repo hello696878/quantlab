@@ -5,6 +5,7 @@ Endpoints
 ---------
 GET  /health                          — liveness check
 POST /backtest/sma-crossover          — run an SMA crossover backtest
+POST /backtest/rsi-mean-reversion     — run an RSI mean-reversion backtest
 """
 
 from fastapi import FastAPI, HTTPException
@@ -18,9 +19,10 @@ from app.schemas import (
     BacktestResponse,
     EquityPoint,
     PerformanceMetrics,
+    RsiBacktestRequest,
     TradeRecord,
 )
-from app.strategies import sma_crossover_signals
+from app.strategies import rsi_mean_reversion_signals, sma_crossover_signals
 from app.utils import validate_date_format
 
 # ---------------------------------------------------------------------------
@@ -31,10 +33,10 @@ app = FastAPI(
     title="QuantLab API",
     description=(
         "Quantitative backtesting engine — Phase 1 MVP.\n\n"
-        "Implements a long-only SMA crossover strategy with transaction costs, "
-        "a buy-and-hold benchmark, performance metrics, and a full trade log."
+        "Strategies: SMA Crossover, RSI Mean Reversion.\n"
+        "All strategies use a one-day signal shift to prevent lookahead bias."
     ),
-    version="0.1.0",
+    version="0.2.0",
 )
 
 app.add_middleware(
@@ -46,85 +48,60 @@ app.add_middleware(
 
 
 # ---------------------------------------------------------------------------
-# Routes
+# Shared helpers
 # ---------------------------------------------------------------------------
 
-
-@app.get("/health", tags=["ops"])
-def health_check():
-    """Return a simple 200 OK to confirm the server is running."""
-    return {"status": "ok", "version": "0.1.0"}
-
-
-@app.post(
-    "/backtest/sma-crossover",
-    response_model=BacktestResponse,
-    tags=["backtest"],
-    summary="Run an SMA crossover backtest",
-    description=(
-        "Runs a long-only, fully-invested SMA crossover strategy on daily "
-        "adjusted close prices from Yahoo Finance.  "
-        "The signal is shifted by one day to prevent lookahead bias: "
-        "the position for day T is determined by prices up to day T-1."
-    ),
-)
-def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
-    # ---- input validation --------------------------------------------------
-    if not validate_date_format(request.start_date):
+def _validate_common(ticker: str, start_date: str, end_date: str) -> None:
+    """Raise HTTPException for invalid common request fields."""
+    if not validate_date_format(start_date):
         raise HTTPException(status_code=422, detail="start_date must be YYYY-MM-DD.")
-    if not validate_date_format(request.end_date):
+    if not validate_date_format(end_date):
         raise HTTPException(status_code=422, detail="end_date must be YYYY-MM-DD.")
-    if request.start_date >= request.end_date:
+    if start_date >= end_date:
         raise HTTPException(status_code=422, detail="start_date must be before end_date.")
-    if request.fast_window >= request.slow_window:
-        raise HTTPException(
-            status_code=422,
-            detail=f"fast_window ({request.fast_window}) must be less than "
-                   f"slow_window ({request.slow_window}).",
-        )
+    if not ticker.strip():
+        raise HTTPException(status_code=422, detail="ticker must not be empty.")
 
-    # ---- fetch data --------------------------------------------------------
+
+def _fetch(ticker: str, start_date: str, end_date: str):
+    """Download OHLCV data, raising appropriate HTTP errors."""
     try:
-        df = fetch_ohlcv(request.ticker, request.start_date, request.end_date)
+        return fetch_ohlcv(ticker, start_date, end_date)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(
-            status_code=502, detail=f"Data fetch failed: {exc}"
-        ) from exc
+        raise HTTPException(status_code=502, detail=f"Data fetch failed: {exc}") from exc
 
-    min_bars_needed = request.slow_window + 2  # +2 for the shift + one valid return
-    if len(df) < min_bars_needed:
-        raise HTTPException(
-            status_code=422,
-            detail=(
-                f"Only {len(df)} trading days available; need at least "
-                f"{min_bars_needed} for a {request.slow_window}-day slow SMA."
-            ),
-        )
 
-    close = df["Close"]
-
-    # ---- strategy signals --------------------------------------------------
-    position = sma_crossover_signals(
-        close,
-        fast_window=request.fast_window,
-        slow_window=request.slow_window,
-    )
-
-    # ---- backtest ----------------------------------------------------------
+def _build_response(
+    *,
+    request_ticker: str,
+    start_date: str,
+    end_date: str,
+    transaction_cost_bps: float,
+    initial_capital: float,
+    close,
+    position,
+    strategy: str,
+    # SMA-specific (0 when not applicable)
+    fast_window: int = 0,
+    slow_window: int = 0,
+    # RSI-specific (None when not applicable)
+    rsi_window=None,
+    oversold_threshold=None,
+    exit_threshold=None,
+) -> BacktestResponse:
+    """Run backtest + metrics and assemble the unified response."""
     strategy_equity, benchmark_equity, trades = run_backtest(
         close=close,
         position=position,
-        transaction_cost_bps=request.transaction_cost_bps,
-        initial_capital=request.initial_capital,
+        transaction_cost_bps=transaction_cost_bps,
+        initial_capital=initial_capital,
     )
 
-    # ---- metrics -----------------------------------------------------------
     strategy_metrics_dict = compute_metrics(strategy_equity)
     benchmark_metrics_dict = compute_metrics(benchmark_equity)
 
-    # ---- build response ----------------------------------------------------
     equity_curve = [
         EquityPoint(
             date=str(d.date()) if hasattr(d, "date") else str(d),
@@ -135,16 +112,138 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
     ]
 
     return BacktestResponse(
-        ticker=request.ticker.upper(),
-        start_date=request.start_date,
-        end_date=request.end_date,
-        fast_window=request.fast_window,
-        slow_window=request.slow_window,
-        transaction_cost_bps=request.transaction_cost_bps,
-        initial_capital=request.initial_capital,
+        ticker=request_ticker.upper(),
+        start_date=start_date,
+        end_date=end_date,
+        strategy=strategy,
+        fast_window=fast_window,
+        slow_window=slow_window,
+        rsi_window=rsi_window,
+        oversold_threshold=oversold_threshold,
+        exit_threshold=exit_threshold,
+        transaction_cost_bps=transaction_cost_bps,
+        initial_capital=initial_capital,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
         equity_curve=equity_curve,
         trades=[TradeRecord(**t) for t in trades],
         num_trades=len(trades),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Routes
+# ---------------------------------------------------------------------------
+
+
+@app.get("/health", tags=["ops"])
+def health_check():
+    """Return a simple 200 OK to confirm the server is running."""
+    return {"status": "ok", "version": "0.2.0"}
+
+
+@app.post(
+    "/backtest/sma-crossover",
+    response_model=BacktestResponse,
+    tags=["backtest"],
+    summary="Run an SMA crossover backtest",
+    description=(
+        "Long-only, fully-invested strategy.  "
+        "Position = 1 when fast SMA > slow SMA, else 0.  "
+        "Signal is shifted one day forward to prevent lookahead bias."
+    ),
+)
+def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
+    _validate_common(request.ticker, request.start_date, request.end_date)
+
+    if request.fast_window >= request.slow_window:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"fast_window ({request.fast_window}) must be less than "
+                f"slow_window ({request.slow_window})."
+            ),
+        )
+
+    df = _fetch(request.ticker, request.start_date, request.end_date)
+
+    min_bars = request.slow_window + 2
+    if len(df) < min_bars:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(df)} trading days available; need at least "
+                f"{min_bars} for a {request.slow_window}-day slow SMA."
+            ),
+        )
+
+    close = df["Close"]
+    position = sma_crossover_signals(
+        close,
+        fast_window=request.fast_window,
+        slow_window=request.slow_window,
+    )
+
+    return _build_response(
+        request_ticker=request.ticker,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+        close=close,
+        position=position,
+        strategy="sma_crossover",
+        fast_window=request.fast_window,
+        slow_window=request.slow_window,
+    )
+
+
+@app.post(
+    "/backtest/rsi-mean-reversion",
+    response_model=BacktestResponse,
+    tags=["backtest"],
+    summary="Run an RSI mean-reversion backtest",
+    description=(
+        "Long-only mean-reversion strategy.  "
+        "Enters long when RSI falls below the oversold threshold.  "
+        "Exits when RSI rises to or above the exit threshold.  "
+        "Signal is shifted one day forward to prevent lookahead bias."
+    ),
+)
+def backtest_rsi_mean_reversion(request: RsiBacktestRequest) -> BacktestResponse:
+    _validate_common(request.ticker, request.start_date, request.end_date)
+
+    df = _fetch(request.ticker, request.start_date, request.end_date)
+
+    # RSI needs rsi_window bars to warm up, +1 for the shift, +1 for first return.
+    min_bars = request.rsi_window + 5
+    if len(df) < min_bars:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(df)} trading days available; need at least "
+                f"{min_bars} for a {request.rsi_window}-period RSI."
+            ),
+        )
+
+    close = df["Close"]
+    position = rsi_mean_reversion_signals(
+        close,
+        rsi_window=request.rsi_window,
+        oversold_threshold=request.oversold_threshold,
+        exit_threshold=request.exit_threshold,
+    )
+
+    return _build_response(
+        request_ticker=request.ticker,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+        close=close,
+        position=position,
+        strategy="rsi_mean_reversion",
+        rsi_window=request.rsi_window,
+        oversold_threshold=request.oversold_threshold,
+        exit_threshold=request.exit_threshold,
     )

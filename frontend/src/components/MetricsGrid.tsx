@@ -5,8 +5,7 @@ interface Props {
   strategy: PerformanceMetrics;
   benchmark: PerformanceMetrics;
   ticker: string;
-  fastWindow: number;
-  slowWindow: number;
+  strategyLabel: string;
 }
 
 // Describes how each metric is displayed and compared.
@@ -103,8 +102,7 @@ export default function MetricsGrid({
   strategy,
   benchmark,
   ticker,
-  fastWindow,
-  slowWindow,
+  strategyLabel,
 }: Props) {
   return (
     <div className="card overflow-hidden">
@@ -115,7 +113,7 @@ export default function MetricsGrid({
         </div>
         <div className="px-6 py-3 text-center min-w-[130px]">
           <span className="text-xs font-semibold text-blue-700 bg-blue-50 px-2 py-0.5 rounded-full whitespace-nowrap">
-            SMA {fastWindow}/{slowWindow}
+            {strategyLabel}
           </span>
         </div>
         <div className="px-6 py-3 text-center min-w-[130px]">

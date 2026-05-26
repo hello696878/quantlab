@@ -2,16 +2,18 @@
 Pydantic request / response schemas for the QuantLab backtesting API.
 """
 
-from typing import List
+from typing import List, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
-# ---------------------------------------------------------------------------
-# Request
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Requests
+# ===========================================================================
 
 class BacktestRequest(BaseModel):
+    """Parameters for the SMA crossover backtest endpoint."""
+
     ticker: str = Field(
         default="SPY",
         description="Yahoo Finance ticker symbol (e.g. SPY, AAPL, BTC-USD).",
@@ -47,9 +49,64 @@ class BacktestRequest(BaseModel):
     )
 
 
-# ---------------------------------------------------------------------------
+class RsiBacktestRequest(BaseModel):
+    """Parameters for the RSI mean-reversion backtest endpoint."""
+
+    ticker: str = Field(
+        default="SPY",
+        description="Yahoo Finance ticker symbol (e.g. SPY, AAPL, BTC-USD).",
+    )
+    start_date: str = Field(
+        default="2015-01-01",
+        description="Backtest start date in YYYY-MM-DD format.",
+    )
+    end_date: str = Field(
+        default="2023-12-31",
+        description="Backtest end date in YYYY-MM-DD format (exclusive in yfinance).",
+    )
+    rsi_window: int = Field(
+        default=14,
+        ge=2,
+        le=500,
+        description="RSI look-back window in trading days (Wilder default: 14).",
+    )
+    oversold_threshold: float = Field(
+        default=30.0,
+        ge=1.0,
+        lt=100.0,
+        description="Enter long when RSI falls strictly below this level.",
+    )
+    exit_threshold: float = Field(
+        default=50.0,
+        gt=1.0,
+        le=100.0,
+        description="Exit long when RSI rises to or above this level.",
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="One-way transaction cost in basis points.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0,
+        gt=0,
+        description="Starting capital in USD.",
+    )
+
+    @model_validator(mode="after")
+    def check_thresholds(self) -> "RsiBacktestRequest":
+        if self.oversold_threshold >= self.exit_threshold:
+            raise ValueError(
+                f"oversold_threshold ({self.oversold_threshold}) must be less than "
+                f"exit_threshold ({self.exit_threshold})."
+            )
+        return self
+
+
+# ===========================================================================
 # Response building blocks
-# ---------------------------------------------------------------------------
+# ===========================================================================
 
 class PerformanceMetrics(BaseModel):
     """Annualised and total performance statistics for one equity curve."""
@@ -82,16 +139,46 @@ class EquityPoint(BaseModel):
     benchmark: float = Field(description="Buy-and-hold portfolio value in USD.")
 
 
-# ---------------------------------------------------------------------------
-# Full response
-# ---------------------------------------------------------------------------
+# ===========================================================================
+# Full response  (shared by both SMA and RSI endpoints)
+# ===========================================================================
 
 class BacktestResponse(BaseModel):
+    """
+    Universal backtest response.
+
+    Strategy identification
+    -----------------------
+    ``strategy`` identifies which strategy produced this result.
+    SMA-specific fields (``fast_window``, ``slow_window``) are 0 for RSI.
+    RSI-specific fields (``rsi_window``, ``oversold_threshold``,
+    ``exit_threshold``) are None for SMA.
+
+    Backward compatibility
+    ----------------------
+    Adding ``strategy`` and RSI fields as defaults means the existing SMA
+    endpoint response is unchanged for clients that were already reading it.
+    """
+
     ticker: str
     start_date: str
     end_date: str
-    fast_window: int
-    slow_window: int
+
+    # Which strategy produced this result.
+    strategy: str = Field(
+        default="sma_crossover",
+        description="Strategy identifier: 'sma_crossover' or 'rsi_mean_reversion'.",
+    )
+
+    # SMA params — set to 0 when strategy is not SMA.
+    fast_window: int = Field(default=0)
+    slow_window: int = Field(default=0)
+
+    # RSI params — None when strategy is not RSI.
+    rsi_window: Optional[int] = Field(default=None)
+    oversold_threshold: Optional[float] = Field(default=None)
+    exit_threshold: Optional[float] = Field(default=None)
+
     transaction_cost_bps: float
     initial_capital: float
     strategy_metrics: PerformanceMetrics

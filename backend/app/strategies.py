@@ -4,6 +4,7 @@ Strategy signal generation.
 Current strategies
 ------------------
 * SMA crossover (long-only)
+* RSI mean reversion (long-only)
 
 Lookahead-bias rule
 -------------------
@@ -15,6 +16,10 @@ before deciding today's position.
 
 import pandas as pd
 
+
+# ===========================================================================
+# SMA Crossover
+# ===========================================================================
 
 def sma_crossover_signals(
     close: pd.Series,
@@ -57,3 +62,127 @@ def sma_crossover_signals(
     position = raw_signal.shift(1).fillna(0).astype(int)
 
     return position.rename("position")
+
+
+# ===========================================================================
+# RSI helpers + mean reversion
+# ===========================================================================
+
+def compute_rsi(close: pd.Series, window: int = 14) -> pd.Series:
+    """
+    Compute RSI (Relative Strength Index) using Wilder's exponential smoothing.
+
+    RSI ∈ [0, 100].  Traditionally, values below 30 signal oversold conditions
+    and values above 70 signal overbought conditions.
+
+    Parameters
+    ----------
+    close : pd.Series
+        Adjusted daily closing prices (no NaN).
+    window : int
+        Look-back period in trading days (Wilder's default: 14).
+
+    Returns
+    -------
+    pd.Series named "rsi".
+        NaN for the first ``window`` bars (insufficient history).
+        Values in [0, 100] thereafter.
+
+    Notes
+    -----
+    Wilder's smoothing uses alpha = 1/window, which maps to
+    ``pandas.Series.ewm(com=window-1, adjust=False)``.
+
+    Edge cases
+    ----------
+    * Pure gains (avg_loss ≈ 0, avg_gain > 0)  → RSI ≈ 100.
+    * Pure losses (avg_gain = 0, avg_loss > 0) → RSI = 0.
+    * Both ≈ 0 (perfectly flat price)           → RSI ≈ 0
+      (theoretical; does not arise with real data).
+    """
+    if window < 2:
+        raise ValueError(f"RSI window must be at least 2; got {window}.")
+
+    delta = close.diff()
+    gains = delta.clip(lower=0.0)
+    losses = (-delta).clip(lower=0.0)
+
+    # Wilder's exponential smoothing  (alpha = 1/window → com = window - 1)
+    avg_gain = gains.ewm(com=window - 1, min_periods=window, adjust=False).mean()
+    avg_loss = losses.ewm(com=window - 1, min_periods=window, adjust=False).mean()
+
+    # Avoid division by zero: tiny epsilon keeps RSI in [0, 100] range.
+    # When avg_loss → 0 and avg_gain > 0:  RS → ∞  →  RSI → 100  ✓
+    rs = avg_gain / (avg_loss + 1e-10)
+    rsi = 100.0 - 100.0 / (1.0 + rs)
+
+    return rsi.rename("rsi")
+
+
+def rsi_mean_reversion_signals(
+    close: pd.Series,
+    rsi_window: int = 14,
+    oversold_threshold: float = 30.0,
+    exit_threshold: float = 50.0,
+) -> pd.Series:
+    """
+    Generate long-only positions from a RSI mean-reversion rule.
+
+    Rules
+    -----
+    * Enter long (1) when RSI falls **strictly below** ``oversold_threshold``.
+    * Exit  flat (0) when RSI rises **to or above** ``exit_threshold``.
+    * Hold the current position between entry and exit (state machine).
+    * The raw signal is **shifted by one period** to prevent lookahead bias.
+
+    Parameters
+    ----------
+    close : pd.Series
+        Adjusted daily closing prices with a DatetimeIndex.
+    rsi_window : int
+        RSI look-back period in trading days (Wilder default: 14).
+    oversold_threshold : float
+        Enter long when RSI drops below this level (e.g. 30).
+    exit_threshold : float
+        Exit long when RSI rises to or above this level (e.g. 50).
+        Must be strictly greater than ``oversold_threshold``.
+
+    Returns
+    -------
+    pd.Series
+        Integer position series (0 or 1) with the same index as *close*,
+        named "position".  No NaN values.
+    """
+    if oversold_threshold >= exit_threshold:
+        raise ValueError(
+            f"oversold_threshold ({oversold_threshold}) must be less than "
+            f"exit_threshold ({exit_threshold})."
+        )
+
+    rsi = compute_rsi(close, rsi_window)
+
+    # Stateful signal loop — must run sequentially because each bar depends
+    # on whether we were already in a position on the previous bar.
+    in_position = False
+    raw: list[int] = []
+
+    for val in rsi:
+        if pd.isna(val):
+            # Warm-up period: RSI not yet computable → stay flat.
+            raw.append(0)
+            continue
+
+        v = float(val)
+        if not in_position and v < oversold_threshold:
+            in_position = True    # RSI crossed below oversold → enter long
+        elif in_position and v >= exit_threshold:
+            in_position = False   # RSI crossed above exit → exit
+
+        raw.append(1 if in_position else 0)
+
+    # *** Shift by 1 to prevent lookahead bias ***
+    # position[T] = raw_signal[T-1], held over close[T-1] -> close[T].
+    position = pd.Series(raw, index=close.index, name="position")
+    position = position.shift(1).fillna(0).astype(int)
+
+    return position

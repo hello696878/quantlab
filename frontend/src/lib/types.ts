@@ -3,6 +3,12 @@
 // Keep these in sync when the backend changes.
 // ---------------------------------------------------------------------------
 
+export type StrategyType = "sma_crossover" | "rsi_mean_reversion";
+
+// ---------------------------------------------------------------------------
+// Requests
+// ---------------------------------------------------------------------------
+
 export interface BacktestRequest {
   ticker: string;
   start_date: string;
@@ -12,6 +18,30 @@ export interface BacktestRequest {
   transaction_cost_bps: number;
   initial_capital: number;
 }
+
+export interface RsiBacktestRequest {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  rsi_window: number;
+  oversold_threshold: number;
+  exit_threshold: number;
+  transaction_cost_bps: number;
+  initial_capital: number;
+}
+
+/** Fields shared by every backtest request type. */
+export interface CommonParams {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  transaction_cost_bps: number;
+  initial_capital: number;
+}
+
+// ---------------------------------------------------------------------------
+// Response building blocks
+// ---------------------------------------------------------------------------
 
 export interface PerformanceMetrics {
   total_return: number;
@@ -38,12 +68,27 @@ export interface EquityPoint {
   benchmark: number;
 }
 
+// ---------------------------------------------------------------------------
+// Unified response  (both SMA and RSI endpoints return this shape)
+// ---------------------------------------------------------------------------
+
 export interface BacktestResponse {
   ticker: string;
   start_date: string;
   end_date: string;
+
+  /** Which strategy produced this result. */
+  strategy: StrategyType;
+
+  /** SMA params — 0 when strategy is not sma_crossover. */
   fast_window: number;
   slow_window: number;
+
+  /** RSI params — null when strategy is not rsi_mean_reversion. */
+  rsi_window: number | null;
+  oversold_threshold: number | null;
+  exit_threshold: number | null;
+
   transaction_cost_bps: number;
   initial_capital: number;
   strategy_metrics: PerformanceMetrics;

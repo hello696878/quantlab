@@ -6,11 +6,19 @@ import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
-import { runBacktest } from "@/lib/api";
-import type { BacktestRequest, BacktestResponse } from "@/lib/types";
+import { runBacktest, runRsiBacktest } from "@/lib/api";
+import type {
+  BacktestRequest,
+  BacktestResponse,
+  RsiBacktestRequest,
+  StrategyType,
+} from "@/lib/types";
 
-// Default parameters shown in the form on first load.
-const DEFAULT_PARAMS: BacktestRequest = {
+// ---------------------------------------------------------------------------
+// Default parameters
+// ---------------------------------------------------------------------------
+
+const DEFAULT_SMA_PARAMS: BacktestRequest = {
   ticker: "SPY",
   start_date: "2015-01-01",
   end_date: "2023-12-31",
@@ -20,8 +28,68 @@ const DEFAULT_PARAMS: BacktestRequest = {
   initial_capital: 100_000,
 };
 
+const DEFAULT_RSI_PARAMS: RsiBacktestRequest = {
+  ticker: "SPY",
+  start_date: "2015-01-01",
+  end_date: "2023-12-31",
+  rsi_window: 14,
+  oversold_threshold: 30,
+  exit_threshold: 50,
+  transaction_cost_bps: 10,
+  initial_capital: 100_000,
+};
+
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+/** Build a human-readable label from the backtest response. */
+function strategyLabel(r: BacktestResponse): string {
+  if (r.strategy === "sma_crossover") {
+    return `SMA ${r.fast_window}/${r.slow_window}`;
+  }
+  if (r.strategy === "rsi_mean_reversion") {
+    return `RSI(${r.rsi_window ?? 14}) ${r.oversold_threshold}→${r.exit_threshold}`;
+  }
+  return r.strategy;
+}
+
+/** Build a short param summary line shown beside the ticker. */
+function paramSummary(r: BacktestResponse): string {
+  if (r.strategy === "sma_crossover") {
+    return `SMA ${r.fast_window}/${r.slow_window} · ${r.transaction_cost_bps} bps · ${r.num_trades} trade events`;
+  }
+  return `RSI(${r.rsi_window ?? 14}) OB=${r.oversold_threshold} Exit=${r.exit_threshold} · ${r.transaction_cost_bps} bps · ${r.num_trades} trade events`;
+}
+
+const STRATEGY_HEADINGS: Record<
+  StrategyType,
+  { title: string; description: string }
+> = {
+  sma_crossover: {
+    title: "SMA Crossover Backtest",
+    description:
+      "Long-only strategy that buys when the fast SMA crosses above the slow " +
+      "SMA and exits when it crosses below. Signal is shifted one day forward " +
+      "to prevent lookahead bias.",
+  },
+  rsi_mean_reversion: {
+    title: "RSI Mean Reversion Backtest",
+    description:
+      "Long-only mean-reversion strategy that enters when RSI dips below the " +
+      "oversold threshold and exits when RSI recovers to the exit threshold. " +
+      "Signal is shifted one day forward to prevent lookahead bias.",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
+
 export default function HomePage() {
-  const [params, setParams] = useState<BacktestRequest>(DEFAULT_PARAMS);
+  const [strategy, setStrategy] = useState<StrategyType>("sma_crossover");
+  const [smaParams, setSmaParams] = useState<BacktestRequest>(DEFAULT_SMA_PARAMS);
+  const [rsiParams, setRsiParams] = useState<RsiBacktestRequest>(DEFAULT_RSI_PARAMS);
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -34,33 +102,45 @@ export default function HomePage() {
     setResult(null);
 
     try {
-      const data = await runBacktest(params);
+      const data =
+        strategy === "sma_crossover"
+          ? await runBacktest(smaParams)
+          : await runRsiBacktest(rsiParams);
       setResult(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "An unexpected error occurred.");
+      setError(
+        err instanceof Error ? err.message : "An unexpected error occurred.",
+      );
     } finally {
       setLoading(false);
     }
   }
 
+  const heading = STRATEGY_HEADINGS[strategy];
+
   return (
     <div className="space-y-8">
       {/* ── Strategy heading ─────────────────────────────────────────── */}
       <div>
-        <h1 className="text-2xl font-bold text-slate-900">
-          SMA Crossover Backtest
-        </h1>
+        <h1 className="text-2xl font-bold text-slate-900">{heading.title}</h1>
         <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-          Long-only strategy that buys when the fast SMA crosses above the slow
-          SMA and exits when it crosses below. Signal is shifted one day forward
-          to prevent lookahead bias.
+          {heading.description}
         </p>
       </div>
 
       {/* ── Parameter form ───────────────────────────────────────────── */}
       <BacktestForm
-        params={params}
-        onChange={setParams}
+        strategy={strategy}
+        onStrategyChange={(s) => {
+          setStrategy(s);
+          // Clear stale results when the strategy changes.
+          setResult(null);
+          setError(null);
+        }}
+        smaParams={smaParams}
+        onSmaParamsChange={setSmaParams}
+        rsiParams={rsiParams}
+        onRsiParamsChange={setRsiParams}
         onSubmit={handleRun}
         loading={loading}
       />
@@ -111,16 +191,12 @@ export default function HomePage() {
         <>
           {/* Summary header */}
           <div className="flex flex-wrap items-baseline gap-2">
-            <h2 className="text-lg font-bold text-slate-900">
-              {result.ticker}
-            </h2>
+            <h2 className="text-lg font-bold text-slate-900">{result.ticker}</h2>
             <span className="text-slate-400 text-sm">
               {result.start_date} → {result.end_date}
             </span>
             <span className="ml-auto text-xs text-slate-400">
-              SMA {result.fast_window}/{result.slow_window} ·{" "}
-              {result.transaction_cost_bps} bps cost ·{" "}
-              {result.num_trades} trade events
+              {paramSummary(result)}
             </span>
           </div>
 
@@ -129,8 +205,7 @@ export default function HomePage() {
             strategy={result.strategy_metrics}
             benchmark={result.benchmark_metrics}
             ticker={result.ticker}
-            fastWindow={result.fast_window}
-            slowWindow={result.slow_window}
+            strategyLabel={strategyLabel(result)}
           />
 
           {/* Equity curve */}

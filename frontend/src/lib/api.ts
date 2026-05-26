@@ -5,7 +5,7 @@
  * (see next.config.js).  This avoids any browser-level CORS concerns.
  */
 
-import type { BacktestRequest, BacktestResponse } from "./types";
+import type { BacktestRequest, BacktestResponse, RsiBacktestRequest } from "./types";
 
 export class BacktestApiError extends Error {
   constructor(
@@ -45,12 +45,13 @@ function backendUnavailableMessage(status: number): string {
   );
 }
 
-export async function runBacktest(
-  params: BacktestRequest,
+async function postBacktest(
+  endpoint: string,
+  params: BacktestRequest | RsiBacktestRequest,
 ): Promise<BacktestResponse> {
   let res: Response;
   try {
-    res = await fetch("/api/backtest/sma-crossover", {
+    res = await fetch(endpoint, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(params),
@@ -72,6 +73,20 @@ export async function runBacktest(
   }
 
   return res.json() as Promise<BacktestResponse>;
+}
+
+/** POST /api/backtest/sma-crossover */
+export async function runBacktest(
+  params: BacktestRequest,
+): Promise<BacktestResponse> {
+  return postBacktest("/api/backtest/sma-crossover", params);
+}
+
+/** POST /api/backtest/rsi-mean-reversion */
+export async function runRsiBacktest(
+  params: RsiBacktestRequest,
+): Promise<BacktestResponse> {
+  return postBacktest("/api/backtest/rsi-mean-reversion", params);
 }
 
 export async function checkHealth(): Promise<boolean> {
