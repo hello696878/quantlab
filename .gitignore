@@ -12,3 +12,7 @@ fe_out.txt
 
 fe_err.txt
 fe_out.txt
+
+frontend/.next/
+frontend/node_modules/
+frontend/.env.local
