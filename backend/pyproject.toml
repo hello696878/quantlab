@@ -1,0 +1,6 @@
+[tool.pytest.ini_options]
+# Make the `backend/` directory the Python path root so `app.*` imports work.
+pythonpath = ["."]
+testpaths   = ["tests"]
+# Show short tracebacks and extra summary for failures and errors.
+addopts     = "-v --tb=short -q"
