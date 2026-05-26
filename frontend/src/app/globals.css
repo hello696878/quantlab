@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+      "Segoe UI", Roboto, sans-serif;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-900 antialiased;
+  }
+}
+
+@layer components {
+  /* Reusable card shell */
+  .card {
+    @apply bg-white rounded-xl border border-slate-200 shadow-sm;
+  }
+
+  /* Section heading inside a card */
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-wider text-slate-500;
+  }
+
+  /* Numeric values that benefit from tabular figures */
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+}

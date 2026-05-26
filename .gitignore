@@ -7,3 +7,8 @@ node_modules/
 dist/
 build/
 .DS_Store
+fe_err.txt
+fe_out.txt
+
+fe_err.txt
+fe_out.txt
