@@ -121,12 +121,6 @@ export default function SmaSweepTable({ rows }: Props) {
     return sortDir === "asc" ? av - bv : bv - av;
   });
 
-  // Pre-compute Sharpe range for heat-colouring.
-  const sharpes = rows.map((r) => r.sharpe_ratio);
-  const minSharpe = Math.min(...sharpes);
-  const maxSharpe = Math.max(...sharpes);
-  const sharpeSpan = maxSharpe - minSharpe;
-
   if (rows.length === 0) {
     return (
       <p className="text-center text-slate-400 text-sm py-8">
@@ -134,6 +128,12 @@ export default function SmaSweepTable({ rows }: Props) {
       </p>
     );
   }
+
+  // Pre-compute Sharpe range for heat-colouring.
+  const sharpes = rows.map((r) => r.sharpe_ratio);
+  const minSharpe = Math.min(...sharpes);
+  const maxSharpe = Math.max(...sharpes);
+  const sharpeSpan = maxSharpe - minSharpe;
 
   return (
     <div className="overflow-x-auto">

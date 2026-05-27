@@ -95,6 +95,7 @@ export default function SmaSweepPanel() {
     fastWindows !== null &&
     slowWindows !== null &&
     fastWindows.length * slowWindows.length <= 100;
+  const moneyOk = costBps >= 0 && costBps < 10_000 && capital > 0;
 
   const formInvalid =
     !ticker.trim() ||
@@ -102,6 +103,7 @@ export default function SmaSweepPanel() {
     fastWindows === null ||
     slowWindows === null ||
     !combsOk ||
+    !moneyOk ||
     loading;
 
   // Human-readable validation messages
@@ -118,6 +120,10 @@ export default function SmaSweepPanel() {
       "Slow windows must be 1–10 comma-separated integers, each ≥ 2.";
   } else if (!combsOk) {
     validationMsg = `Too many combinations (${fastWindows.length} × ${slowWindows.length} = ${fastWindows.length * slowWindows.length}).  Maximum is 100.`;
+  } else if (costBps < 0 || costBps >= 10_000) {
+    validationMsg = "Transaction cost must be at least 0 and less than 10,000 bps.";
+  } else if (capital <= 0) {
+    validationMsg = "Initial capital must be greater than 0.";
   }
 
   // ------------------------------------------------------------------
@@ -277,6 +283,7 @@ export default function SmaSweepPanel() {
               className={inputCls}
               value={costBps}
               min={0}
+              max={9999}
               step={1}
               onChange={(e) => setCostBps(parseFloat(e.target.value) || 0)}
               disabled={loading}

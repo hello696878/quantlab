@@ -578,11 +578,13 @@ def sma_parameter_sweep(request: SmaSweepRequest) -> SmaSweepResponse:
     close = df["Close"]
 
     rows: list = []
+    valid_pairs = 0
     for fast in sorted(set(request.fast_windows)):
         for slow in sorted(set(request.slow_windows)):
             # Skip invalid (fast >= slow) combinations silently.
             if fast >= slow:
                 continue
+            valid_pairs += 1
             # Skip combinations that need more bars than are available.
             if len(close) < slow + 2:
                 continue
@@ -610,6 +612,22 @@ def sma_parameter_sweep(request: SmaSweepRequest) -> SmaSweepResponse:
                     num_trades=len(trades),
                 )
             )
+
+    if valid_pairs > 0 and not rows:
+        max_slow = max(
+            slow
+            for fast in set(request.fast_windows)
+            for slow in set(request.slow_windows)
+            if fast < slow
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(close)} trading days available; no valid SMA "
+                f"combination can run. Requested slow windows require up to "
+                f"{max_slow + 2} trading days."
+            ),
+        )
 
     return SmaSweepResponse(
         ticker=request.ticker.strip().upper(),

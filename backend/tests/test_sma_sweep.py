@@ -8,6 +8,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from app.backtest import run_backtest
+from app.metrics import compute_metrics
+from app.strategies import sma_crossover_signals
+
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
 main_module = pytest.importorskip("app.main")
 
@@ -76,6 +80,69 @@ def test_sweep_result_rows_have_all_metric_fields(monkeypatch):
         assert key in row, f"Missing field: {key}"
 
 
+def test_sweep_row_matches_direct_sma_backtest(monkeypatch):
+    """A sweep row should equal running the same shifted SMA backtest directly."""
+    df = make_df(300)
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
+    client = TestClient(main_module.app)
+
+    fast = 20
+    slow = 100
+    cost = 5.0
+    capital = 50_000.0
+    resp = client.post(
+        "/research/sma-parameter-sweep",
+        json={
+            **_BASE_PAYLOAD,
+            "fast_windows": [fast],
+            "slow_windows": [slow],
+            "transaction_cost_bps": cost,
+            "initial_capital": capital,
+        },
+    )
+
+    assert resp.status_code == 200
+    row = resp.json()["results"][0]
+    position = sma_crossover_signals(df["Close"], fast_window=fast, slow_window=slow)
+    strategy_equity, _benchmark, trades = run_backtest(
+        df["Close"],
+        position,
+        transaction_cost_bps=cost,
+        initial_capital=capital,
+    )
+    expected = compute_metrics(strategy_equity)
+
+    assert row["total_return"] == pytest.approx(expected["total_return"])
+    assert row["cagr"] == pytest.approx(expected["cagr"])
+    assert row["sharpe_ratio"] == pytest.approx(expected["sharpe_ratio"])
+    assert row["sortino_ratio"] == pytest.approx(expected["sortino_ratio"])
+    assert row["max_drawdown"] == pytest.approx(expected["max_drawdown"])
+    assert row["volatility"] == pytest.approx(expected["volatility"])
+    assert row["num_trades"] == len(trades)
+
+
+def test_sweep_fetches_price_data_once(monkeypatch):
+    """The sweep should fetch OHLCV once, then reuse that series for all rows."""
+    calls = 0
+
+    def fake_fetch(ticker, start, end):
+        nonlocal calls
+        calls += 1
+        return make_df(300)
+
+    monkeypatch.setattr(main_module, "_fetch", fake_fetch)
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-parameter-sweep",
+        json={**_BASE_PAYLOAD, "fast_windows": [10, 20], "slow_windows": [50, 100]},
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["num_combinations"] == 4
+    assert calls == 1
+
+
 def test_sweep_ticker_always_uppercased(monkeypatch):
     """Ticker is always returned upper-cased."""
     monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: make_df(300))
@@ -122,6 +189,20 @@ def test_sweep_all_combinations_invalid_returns_empty(monkeypatch):
     body = resp.json()
     assert body["num_combinations"] == 0
     assert body["results"] == []
+
+
+def test_sweep_no_runnable_valid_combinations_returns_422(monkeypatch):
+    """If fast < slow pairs exist but data is too short, return a useful error."""
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: make_df(40))
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-parameter-sweep",
+        json={**_BASE_PAYLOAD, "fast_windows": [10, 20], "slow_windows": [50, 100]},
+    )
+
+    assert resp.status_code == 422
+    assert "no valid SMA combination can run" in resp.json()["detail"]
 
 
 def test_sweep_results_ordered_fast_then_slow(monkeypatch):

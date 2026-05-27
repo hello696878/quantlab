@@ -20,7 +20,9 @@ frontend/
 │   │   ├── MetricsGrid.tsx      Strategy vs benchmark comparison table
 │   │   ├── EquityCurveChart.tsx Equity curve (strategy + benchmark overlay)
 │   │   ├── DrawdownChart.tsx    Drawdown area chart (strategy + benchmark)
-│   │   └── TradeTable.tsx       Paginated trade log table
+│   │   ├── TradeTable.tsx       Paginated trade log table
+│   │   ├── SmaSweepPanel.tsx    SMA parameter sweep form + result state
+│   │   └── SmaSweepTable.tsx    Sortable SMA sweep result table
 │   └── lib/
 │       ├── types.ts             TypeScript interfaces (mirrors backend schemas)
 │       ├── api.ts               Fetch wrappers for /api/backtest/* endpoints
@@ -72,6 +74,10 @@ The frontend calls the backend through Next.js rewrites:
 - Backend request: `POST /backtest/momentum`
 - Browser request: `POST /api/backtest/volatility-breakout`
 - Backend request: `POST /backtest/volatility-breakout`
+- Browser request: `POST /api/backtest/pairs`
+- Backend request: `POST /backtest/pairs`
+- Browser request: `POST /api/research/sma-parameter-sweep`
+- Backend request: `POST /research/sma-parameter-sweep`
 - Default backend base URL: `http://localhost:8000`
 
 ---
@@ -93,7 +99,8 @@ Copy `frontend/.env.example` to `frontend/.env.local`, then edit
 `next.config.js` rewrites every request to `/api/*` → `http://localhost:8000/*`.
 
 The frontend therefore calls relative URLs such as
-**`/api/backtest/volatility-breakout`**. Next.js forwards them to the backend
+**`/api/backtest/volatility-breakout`** and
+**`/api/research/sma-parameter-sweep`**. Next.js forwards them to the backend
 transparently — no CORS headers needed in the browser, no hard-coded
 `localhost:8000` in client-side code.
 
@@ -108,6 +115,7 @@ transparently — no CORS headers needed in the browser, no hard-coded
 | **Equity Curve** | `equity_curve[].strategy` and `.benchmark` |
 | **Drawdown Chart** | Computed client-side from `equity_curve` (running peak) |
 | **Trade Log** | `trades[]` from API — paginated 20 per page |
+| **SMA Parameter Sweep** | `POST /research/sma-parameter-sweep`; sortable result rows from `results[]` |
 
 ---
 
