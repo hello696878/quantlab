@@ -10,6 +10,7 @@ import {
   runBacktest,
   runBbBacktest,
   runMomentumBacktest,
+  runPairsBacktest,
   runRsiBacktest,
   runVbBacktest,
 } from "@/lib/api";
@@ -18,6 +19,7 @@ import type {
   BacktestResponse,
   BbBacktestRequest,
   MomentumBacktestRequest,
+  PairsBacktestRequest,
   RsiBacktestRequest,
   StrategyType,
   VbBacktestRequest,
@@ -81,6 +83,18 @@ const DEFAULT_VB_PARAMS: VbBacktestRequest = {
   initial_capital: 100_000,
 };
 
+const DEFAULT_PAIRS_PARAMS: PairsBacktestRequest = {
+  asset_y: "KO",
+  asset_x: "PEP",
+  start_date: "2015-01-01",
+  end_date: "2023-12-31",
+  lookback_window: 60,
+  entry_z_score: 2.0,
+  exit_z_score: 0.5,
+  transaction_cost_bps: 10,
+  initial_capital: 100_000,
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -106,6 +120,13 @@ function strategyLabel(r: BacktestResponse): string {
     return (
       `VolBreakout(${r.vb_lookback_window ?? 20}, ` +
       `${r.vb_breakout_multiplier ?? 1}x range, exit:${r.vb_exit_window ?? 10})`
+    );
+  }
+  if (r.strategy === "pairs") {
+    return (
+      `Pairs ${r.pairs_asset_y ?? ""}/${r.pairs_asset_x ?? ""} ` +
+      `Z(${r.pairs_lookback_window ?? 60}) ` +
+      `entry:${r.pairs_entry_z_score ?? 2} exit:${r.pairs_exit_z_score ?? 0.5}`
     );
   }
   return r.strategy;
@@ -142,6 +163,14 @@ function paramSummary(r: BacktestResponse): string {
       `VolBreakout lookback:${r.vb_lookback_window ?? 20} ` +
       `mult:${r.vb_breakout_multiplier ?? 1}x range ` +
       `exit mean:${r.vb_exit_window ?? 10} · ${cost} · ${trades}`
+    );
+  }
+  if (r.strategy === "pairs") {
+    return (
+      `Spread ${r.pairs_asset_y ?? ""}/${r.pairs_asset_x ?? ""} ` +
+      `lookback:${r.pairs_lookback_window ?? 60} ` +
+      `entry:|z|>${r.pairs_entry_z_score ?? 2} ` +
+      `exit:|z|<${r.pairs_exit_z_score ?? 0.5} · ${cost} · ${trades}`
     );
   }
   return `${cost} · ${trades}`;
@@ -190,6 +219,16 @@ const STRATEGY_HEADINGS: Record<
       "when price falls below the rolling mean exit level. Signal is shifted " +
       "one day forward to prevent lookahead bias.",
   },
+  pairs: {
+    title: "Pairs Trading Backtest",
+    description:
+      "Dollar-neutral statistical arbitrage on two correlated assets. Spread = " +
+      "log(Y) − log(X). Enters long-spread (long Y / short X) when z-score " +
+      "falls below −entry_z, short-spread (short Y / long X) when it rises " +
+      "above +entry_z, and exits when |z-score| < exit_z. Each leg gets 50 % " +
+      "of capital. Benchmark is equal-weight buy-and-hold. Signal shifted one " +
+      "day forward to prevent lookahead bias.",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -205,6 +244,9 @@ export default function HomePage() {
     DEFAULT_MOMENTUM_PARAMS,
   );
   const [vbParams, setVbParams] = useState<VbBacktestRequest>(DEFAULT_VB_PARAMS);
+  const [pairsParams, setPairsParams] = useState<PairsBacktestRequest>(
+    DEFAULT_PAIRS_PARAMS,
+  );
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -226,7 +268,9 @@ export default function HomePage() {
               ? await runBbBacktest(bbParams)
               : strategy === "momentum"
                 ? await runMomentumBacktest(momentumParams)
-                : await runVbBacktest(vbParams);
+                : strategy === "volatility_breakout"
+                  ? await runVbBacktest(vbParams)
+                  : await runPairsBacktest(pairsParams);
       setResult(data);
     } catch (err) {
       setError(
@@ -268,6 +312,8 @@ export default function HomePage() {
         onMomentumParamsChange={setMomentumParams}
         vbParams={vbParams}
         onVbParamsChange={setVbParams}
+        pairsParams={pairsParams}
+        onPairsParamsChange={setPairsParams}
         onSubmit={handleRun}
         loading={loading}
       />

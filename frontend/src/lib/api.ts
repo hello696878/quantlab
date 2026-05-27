@@ -10,6 +10,7 @@ import type {
   BacktestResponse,
   BbBacktestRequest,
   MomentumBacktestRequest,
+  PairsBacktestRequest,
   RsiBacktestRequest,
   VbBacktestRequest,
 } from "./types";
@@ -59,7 +60,8 @@ async function postBacktest(
     | RsiBacktestRequest
     | BbBacktestRequest
     | MomentumBacktestRequest
-    | VbBacktestRequest,
+    | VbBacktestRequest
+    | PairsBacktestRequest,
 ): Promise<BacktestResponse> {
   let res: Response;
   try {
@@ -120,6 +122,13 @@ export async function runVbBacktest(
   params: VbBacktestRequest,
 ): Promise<BacktestResponse> {
   return postBacktest("/api/backtest/volatility-breakout", params);
+}
+
+/** POST /api/backtest/pairs */
+export async function runPairsBacktest(
+  params: PairsBacktestRequest,
+): Promise<BacktestResponse> {
+  return postBacktest("/api/backtest/pairs", params);
 }
 
 export async function checkHealth(): Promise<boolean> {

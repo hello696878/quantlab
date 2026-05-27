@@ -4,13 +4,22 @@ import type {
   BacktestRequest,
   BbBacktestRequest,
   MomentumBacktestRequest,
+  PairsBacktestRequest,
   RsiBacktestRequest,
   StrategyType,
   VbBacktestRequest,
 } from "@/lib/types";
 
-// Quick-pick tickers
+// Quick-pick tickers (single-asset strategies only)
 const POPULAR_TICKERS = ["SPY", "QQQ", "AAPL", "MSFT", "GLD", "BTC-USD"];
+
+// Quick-pick pairs (pairs strategy)
+const POPULAR_PAIRS: { y: string; x: string }[] = [
+  { y: "KO", x: "PEP" },
+  { y: "C", x: "JPM" },
+  { y: "GS", x: "MS" },
+  { y: "XOM", x: "CVX" },
+];
 
 interface Props {
   strategy: StrategyType;
@@ -25,6 +34,8 @@ interface Props {
   onMomentumParamsChange: (p: MomentumBacktestRequest) => void;
   vbParams: VbBacktestRequest;
   onVbParamsChange: (p: VbBacktestRequest) => void;
+  pairsParams: PairsBacktestRequest;
+  onPairsParamsChange: (p: PairsBacktestRequest) => void;
   onSubmit: () => void;
   loading: boolean;
 }
@@ -95,6 +106,12 @@ const STRATEGIES: { id: StrategyType; label: string; description: string }[] = [
     description:
       "Enters above the prior range breakout level; exits below the rolling mean.",
   },
+  {
+    id: "pairs",
+    label: "Pairs Trading",
+    description:
+      "Dollar-neutral: long Y / short X when spread z-score diverges; exits on reversion.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -114,10 +131,15 @@ export default function BacktestForm({
   onMomentumParamsChange,
   vbParams,
   onVbParamsChange,
+  pairsParams,
+  onPairsParamsChange,
   onSubmit,
   loading,
 }: Props) {
-  // Active params (common fields) come from whichever strategy is selected.
+  // Active single-asset params used for the common fields section.
+  // For the pairs strategy we fall back to vbParams because both share the same
+  // common field keys (start_date, end_date, cost, capital) and setCommon keeps
+  // all params in sync.
   const active =
     strategy === "sma_crossover"
       ? smaParams
@@ -127,13 +149,15 @@ export default function BacktestForm({
           ? bbParams
           : strategy === "momentum"
             ? momentumParams
-            : vbParams;
+            : vbParams; // covers "volatility_breakout" AND "pairs"
 
+  /** Update every strategy's common fields simultaneously so switching strategy
+   *  never loses a date or cost setting.  Skips "ticker" for pairs since
+   *  PairsBacktestRequest uses asset_y / asset_x instead. */
   function setCommon<K extends keyof typeof active>(
     key: K,
     value: (typeof active)[K],
   ) {
-    // Update all five request objects so common fields stay in sync when switching.
     onSmaParamsChange({ ...smaParams, [key]: value } as BacktestRequest);
     onRsiParamsChange({ ...rsiParams, [key]: value } as RsiBacktestRequest);
     onBbParamsChange({ ...bbParams, [key]: value } as BbBacktestRequest);
@@ -142,6 +166,13 @@ export default function BacktestForm({
       [key]: value,
     } as MomentumBacktestRequest);
     onVbParamsChange({ ...vbParams, [key]: value } as VbBacktestRequest);
+    // Pairs shares start_date / end_date / cost / capital but NOT ticker.
+    if (key !== "ticker") {
+      onPairsParamsChange({
+        ...pairsParams,
+        [key]: value,
+      } as PairsBacktestRequest);
+    }
   }
 
   function setSma<K extends keyof BacktestRequest>(
@@ -179,7 +210,16 @@ export default function BacktestForm({
     onVbParamsChange({ ...vbParams, [key]: value });
   }
 
+  function setPairs<K extends keyof PairsBacktestRequest>(
+    key: K,
+    value: PairsBacktestRequest[K],
+  ) {
+    onPairsParamsChange({ ...pairsParams, [key]: value });
+  }
+
+  // ---------------------------------------------------------------------------
   // Validation
+  // ---------------------------------------------------------------------------
   const dateInvalid = active.start_date >= active.end_date;
   const smaInvalid =
     strategy === "sma_crossover" &&
@@ -203,16 +243,30 @@ export default function BacktestForm({
     (vbParams.lookback_window < 2 ||
       vbParams.breakout_multiplier <= 0 ||
       vbParams.exit_window < 1);
+  const pairsInvalid =
+    strategy === "pairs" &&
+    (pairsParams.lookback_window < 10 ||
+      pairsParams.entry_z_score <= pairsParams.exit_z_score ||
+      pairsParams.exit_z_score < 0 ||
+      pairsParams.asset_y.trim().toUpperCase() ===
+        pairsParams.asset_x.trim().toUpperCase());
+
+  const tickerOk =
+    strategy === "pairs"
+      ? pairsParams.asset_y.trim().length > 0 &&
+        pairsParams.asset_x.trim().length > 0
+      : active.ticker.trim().length > 0;
 
   const canSubmit =
     !loading &&
-    active.ticker.trim().length > 0 &&
+    tickerOk &&
     !dateInvalid &&
     !smaInvalid &&
     !rsiInvalid &&
     !bbInvalid &&
     !momentumInvalid &&
-    !vbInvalid;
+    !vbInvalid &&
+    !pairsInvalid;
 
   return (
     <div className="card overflow-hidden">
@@ -241,40 +295,42 @@ export default function BacktestForm({
       </div>
 
       <div className="p-6">
-        {/* ── Ticker ───────────────────────────────────────────────────── */}
-        <div className="mb-5">
-          <Field label="Ticker symbol">
-            <div className="flex gap-2 flex-wrap">
-              <input
-                type="text"
-                className={`${inputCls} w-32 uppercase`}
-                value={active.ticker}
-                onChange={(e) => setCommon("ticker", e.target.value.toUpperCase())}
-                placeholder="SPY"
-                disabled={loading}
-                maxLength={12}
-              />
-              <div className="flex gap-1 flex-wrap">
-                {POPULAR_TICKERS.map((t) => (
-                  <button
-                    key={t}
-                    type="button"
-                    disabled={loading}
-                    onClick={() => setCommon("ticker", t)}
-                    className={
-                      "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors " +
-                      (active.ticker === t
-                        ? "bg-blue-600 text-white border-blue-600"
-                        : "bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600")
-                    }
-                  >
-                    {t}
-                  </button>
-                ))}
+        {/* ── Ticker (single-asset strategies only) ────────────────────── */}
+        {strategy !== "pairs" && (
+          <div className="mb-5">
+            <Field label="Ticker symbol">
+              <div className="flex gap-2 flex-wrap">
+                <input
+                  type="text"
+                  className={`${inputCls} w-32 uppercase`}
+                  value={active.ticker}
+                  onChange={(e) => setCommon("ticker", e.target.value.toUpperCase())}
+                  placeholder="SPY"
+                  disabled={loading}
+                  maxLength={12}
+                />
+                <div className="flex gap-1 flex-wrap">
+                  {POPULAR_TICKERS.map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setCommon("ticker", t)}
+                      className={
+                        "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors " +
+                        (active.ticker === t
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : "bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600")
+                      }
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-          </Field>
-        </div>
+            </Field>
+          </div>
+        )}
 
         {/* ── Common fields ─────────────────────────────────────────────── */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
@@ -403,7 +459,6 @@ export default function BacktestForm({
               </Field>
             </div>
           ) : strategy === "bollinger_band" ? (
-            /* Bollinger Band fields */
             <div className="grid grid-cols-3 gap-4">
               <Field label="BB Window" hint="days">
                 <input
@@ -448,7 +503,6 @@ export default function BacktestForm({
               </Field>
             </div>
           ) : strategy === "momentum" ? (
-            /* Momentum fields */
             <div className="grid grid-cols-3 gap-4">
               <Field label="Lookback" hint="days">
                 <input
@@ -502,8 +556,7 @@ export default function BacktestForm({
                 />
               </Field>
             </div>
-          ) : (
-            /* Volatility Breakout fields */
+          ) : strategy === "volatility_breakout" ? (
             <div className="grid grid-cols-3 gap-4">
               <Field label="Lookback" hint="days">
                 <input
@@ -551,11 +604,125 @@ export default function BacktestForm({
                 />
               </Field>
             </div>
+          ) : (
+            /* ── Pairs Trading fields ───────────────────────────────────── */
+            <div className="space-y-4">
+              {/* Asset inputs + quick-picks */}
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Asset Y" hint="long / short leg">
+                  <input
+                    type="text"
+                    className={`${inputCls} uppercase`}
+                    value={pairsParams.asset_y}
+                    onChange={(e) =>
+                      setPairs("asset_y", e.target.value.toUpperCase())
+                    }
+                    placeholder="KO"
+                    disabled={loading}
+                    maxLength={12}
+                  />
+                </Field>
+                <Field label="Asset X" hint="short / long leg">
+                  <input
+                    type="text"
+                    className={`${inputCls} uppercase`}
+                    value={pairsParams.asset_x}
+                    onChange={(e) =>
+                      setPairs("asset_x", e.target.value.toUpperCase())
+                    }
+                    placeholder="PEP"
+                    disabled={loading}
+                    maxLength={12}
+                  />
+                </Field>
+              </div>
+              {/* Popular pair quick-picks */}
+              <div className="flex gap-2 flex-wrap">
+                {POPULAR_PAIRS.map(({ y, x }) => (
+                  <button
+                    key={`${y}/${x}`}
+                    type="button"
+                    disabled={loading}
+                    onClick={() =>
+                      onPairsParamsChange({ ...pairsParams, asset_y: y, asset_x: x })
+                    }
+                    className={
+                      "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors " +
+                      (pairsParams.asset_y === y && pairsParams.asset_x === x
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600")
+                    }
+                  >
+                    {y}/{x}
+                  </button>
+                ))}
+              </div>
+              {/* Strategy-specific params */}
+              <div className="grid grid-cols-3 gap-4">
+                <Field label="Lookback" hint="days">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={pairsParams.lookback_window}
+                    min={10}
+                    max={500}
+                    step={1}
+                    onChange={(e) =>
+                      setPairs(
+                        "lookback_window",
+                        parseInt(e.target.value, 10) || 60,
+                      )
+                    }
+                    disabled={loading}
+                  />
+                </Field>
+                <Field label="Entry Z-Score" hint="|z| ≥ enter">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={pairsParams.entry_z_score}
+                    min={0.1}
+                    max={5}
+                    step={0.1}
+                    onChange={(e) =>
+                      setPairs(
+                        "entry_z_score",
+                        parseFloat(e.target.value) || 2.0,
+                      )
+                    }
+                    disabled={loading}
+                  />
+                </Field>
+                <Field label="Exit Z-Score" hint="|z| ≤ exit">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={pairsParams.exit_z_score}
+                    min={0}
+                    max={4.9}
+                    step={0.1}
+                    onChange={(e) =>
+                      setPairs(
+                        "exit_z_score",
+                        parseFloat(e.target.value) || 0.5,
+                      )
+                    }
+                    disabled={loading}
+                  />
+                </Field>
+              </div>
+            </div>
           )}
         </div>
 
         {/* ── Inline validation ─────────────────────────────────────────── */}
-        {(dateInvalid || smaInvalid || rsiInvalid || bbInvalid || momentumInvalid || vbInvalid) && (
+        {(dateInvalid ||
+          smaInvalid ||
+          rsiInvalid ||
+          bbInvalid ||
+          momentumInvalid ||
+          vbInvalid ||
+          pairsInvalid) && (
           <div className="mb-4 space-y-1">
             {dateInvalid && (
               <p className="text-xs text-red-600">
@@ -579,12 +746,20 @@ export default function BacktestForm({
             )}
             {momentumInvalid && (
               <p className="text-xs text-red-600">
-                ⚠ Momentum lookback must be ≥ 1, thresholds must be between -1 and 1, and entry must be ≥ exit.
+                ⚠ Momentum lookback must be ≥ 1, thresholds must be between -1
+                and 1, and entry must be ≥ exit.
               </p>
             )}
             {vbInvalid && (
               <p className="text-xs text-red-600">
-                ⚠ Lookback must be ≥ 2, multiplier must be &gt; 0, hold bars must be ≥ 1.
+                ⚠ Lookback must be ≥ 2, multiplier must be &gt; 0, hold bars
+                must be ≥ 1.
+              </p>
+            )}
+            {pairsInvalid && (
+              <p className="text-xs text-red-600">
+                ⚠ Assets must differ, lookback ≥ 10, and entry Z-score must be
+                strictly greater than exit Z-score ≥ 0.
               </p>
             )}
           </div>
@@ -607,8 +782,19 @@ export default function BacktestForm({
             {loading ? (
               <>
                 <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+                  <circle
+                    className="opacity-25"
+                    cx="12"
+                    cy="12"
+                    r="10"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  <path
+                    className="opacity-75"
+                    fill="currentColor"
+                    d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                  />
                 </svg>
                 Running…
               </>

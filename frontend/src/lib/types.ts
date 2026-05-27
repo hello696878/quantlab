@@ -8,7 +8,8 @@ export type StrategyType =
   | "rsi_mean_reversion"
   | "bollinger_band"
   | "momentum"
-  | "volatility_breakout";
+  | "volatility_breakout"
+  | "pairs";
 
 // ---------------------------------------------------------------------------
 // Requests
@@ -68,6 +69,18 @@ export interface VbBacktestRequest {
   initial_capital: number;
 }
 
+export interface PairsBacktestRequest {
+  asset_y: string;
+  asset_x: string;
+  start_date: string;
+  end_date: string;
+  lookback_window: number;
+  entry_z_score: number;
+  exit_z_score: number;
+  transaction_cost_bps: number;
+  initial_capital: number;
+}
+
 /** Fields shared by every backtest request type. */
 export interface CommonParams {
   ticker: string;
@@ -94,7 +107,8 @@ export interface PerformanceMetrics {
 
 export interface TradeRecord {
   date: string;
-  action: "BUY" | "SELL";
+  /** Single-asset: "BUY" | "SELL".  Pairs: "LONG SPREAD" | "SHORT SPREAD" | "EXIT". */
+  action: "BUY" | "SELL" | "LONG SPREAD" | "SHORT SPREAD" | "EXIT";
   price: number;
   shares: number;
   cost: number;
@@ -141,6 +155,13 @@ export interface BacktestResponse {
   vb_lookback_window: number | null;
   vb_breakout_multiplier: number | null;
   vb_exit_window: number | null;
+
+  /** Pairs Trading params — null when strategy is not pairs. */
+  pairs_asset_y: string | null;
+  pairs_asset_x: string | null;
+  pairs_lookback_window: number | null;
+  pairs_entry_z_score: number | null;
+  pairs_exit_z_score: number | null;
 
   transaction_cost_bps: number;
   initial_capital: number;

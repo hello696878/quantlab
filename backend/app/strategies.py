@@ -8,6 +8,7 @@ Current strategies
 * Bollinger Band mean reversion (long-only)
 * Time-series momentum (long-only)
 * Volatility breakout (long-only)
+* Pairs trading / statistical arbitrage (long-short, two assets)
 
 Lookahead-bias rule
 -------------------
@@ -17,6 +18,7 @@ position for day T+1.  The strategy therefore never "knows" today's close
 before deciding today's position.
 """
 
+import numpy as np
 import pandas as pd
 
 
@@ -603,3 +605,128 @@ def volatility_breakout_signals(
     position = position.shift(1).fillna(0).astype(int)
 
     return position
+
+
+# ===========================================================================
+# Pairs Trading / Statistical Arbitrage
+# ===========================================================================
+
+def compute_spread_zscore(spread: pd.Series, window: int) -> pd.Series:
+    """
+    Compute the rolling z-score of a spread series.
+
+    z_score[T] = (spread[T] - rolling_mean[T]) / rolling_std[T]
+
+    Parameters
+    ----------
+    spread : pd.Series
+        Any spread series (e.g. log-price ratio of two assets).
+    window : int
+        Rolling look-back period (must be >= 2).
+
+    Returns
+    -------
+    pd.Series named "zscore".
+        NaN for the first ``window - 1`` bars (insufficient history).
+        When the rolling std is zero (perfectly flat spread), z-score is 0.
+    """
+    if window < 2:
+        raise ValueError(
+            f"lookback_window must be at least 2; got {window}."
+        )
+    rolling = spread.rolling(window=window, min_periods=window)
+    mean = rolling.mean()
+    std = rolling.std(ddof=1)
+    # raw_z is NaN both during warm-up (std is NaN) and when std == 0.
+    # We want to preserve warm-up NaNs but replace std==0 with 0.0 (no signal).
+    raw_z = (spread - mean) / std
+    zscore = raw_z.where(std.isna() | (std > 0), 0.0)
+    return zscore.rename("zscore")
+
+
+def pairs_signals(
+    close_y: pd.Series,
+    close_x: pd.Series,
+    lookback_window: int = 60,
+    entry_z_score: float = 2.0,
+    exit_z_score: float = 0.5,
+) -> pd.Series:
+    """
+    Generate pairs-trading signals from the log-ratio spread of two assets.
+
+    Spread definition
+    -----------------
+    spread[T] = log(close_y[T]) - log(close_x[T])
+
+    This is the log-price ratio of the two assets.  A positive spread means
+    *y* has become expensive relative to *x*; a negative spread means *y*
+    is cheap relative to *x*.
+
+    Signal rules
+    ------------
+    * z_score > +entry_z_score  -> signal = -1 (SHORT spread: short y, long x)
+    * z_score < -entry_z_score  -> signal = +1 (LONG  spread: long  y, short x)
+    * |z_score| < exit_z_score  -> signal =  0 (EXIT to flat, while in position)
+    * Positions are maintained between entry and exit (hysteresis).
+    * The raw signal is **shifted by one period** to prevent lookahead bias.
+
+    Parameters
+    ----------
+    close_y : pd.Series
+        Adjusted close prices for asset Y.
+    close_x : pd.Series
+        Adjusted close prices for asset X.
+        Must share the same DatetimeIndex as *close_y* (already aligned).
+    lookback_window : int
+        Rolling window for the z-score in trading days (>= 2, default: 60).
+    entry_z_score : float
+        Enter a position when |z_score| exceeds this threshold (> 0).
+        Must be strictly greater than ``exit_z_score``.
+    exit_z_score : float
+        Exit the position when |z_score| falls below this threshold (>= 0).
+
+    Returns
+    -------
+    pd.Series of int (-1, 0, +1) with the same index as *close_y*,
+        named "signal".  No NaN values.
+    """
+    if entry_z_score <= exit_z_score:
+        raise ValueError(
+            f"entry_z_score ({entry_z_score}) must be strictly greater than "
+            f"exit_z_score ({exit_z_score})."
+        )
+    if exit_z_score < 0.0:
+        raise ValueError(
+            f"exit_z_score must be >= 0; got {exit_z_score}."
+        )
+
+    # Log-ratio spread (handles any positive close prices).
+    spread = (np.log(close_y) - np.log(close_x)).rename("spread")
+    zscore = compute_spread_zscore(spread, lookback_window)
+
+    in_position = 0   # 0 = flat, +1 = long spread, -1 = short spread
+    raw: list[int] = []
+
+    for z in zscore:
+        if pd.isna(z):
+            # Warm-up: not enough history for the z-score.
+            raw.append(0)
+            continue
+
+        v = float(z)
+        if in_position == 0:
+            if v > entry_z_score:
+                in_position = -1   # y expensive vs x -> short spread
+            elif v < -entry_z_score:
+                in_position = +1   # y cheap vs x -> long spread
+        else:
+            if abs(v) < exit_z_score:
+                in_position = 0    # spread mean-reverted -> exit
+
+        raw.append(in_position)
+
+    # *** Shift by 1 to prevent lookahead bias ***
+    signal = pd.Series(raw, index=close_y.index, name="signal")
+    signal = signal.shift(1).fillna(0).astype(int)
+
+    return signal

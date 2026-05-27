@@ -216,6 +216,85 @@ class MomentumBacktestRequest(BaseModel):
         return self
 
 
+class PairsBacktestRequest(BaseModel):
+    """Parameters for the pairs trading / statistical arbitrage endpoint."""
+
+    asset_y: str = Field(
+        default="KO",
+        description=(
+            "Yahoo Finance ticker for asset Y (the 'dependent' leg, e.g. KO). "
+            "A positive spread means Y is expensive relative to X."
+        ),
+    )
+    asset_x: str = Field(
+        default="PEP",
+        description=(
+            "Yahoo Finance ticker for asset X (the 'independent' leg, e.g. PEP)."
+        ),
+    )
+    start_date: str = Field(
+        default="2015-01-01",
+        description="Backtest start date in YYYY-MM-DD format.",
+    )
+    end_date: str = Field(
+        default="2023-12-31",
+        description="Backtest end date in YYYY-MM-DD format.",
+    )
+    lookback_window: int = Field(
+        default=60,
+        ge=10,
+        le=500,
+        description=(
+            "Rolling window for the z-score of the log-ratio spread "
+            "(default: 60 trading days ~ 3 months)."
+        ),
+    )
+    entry_z_score: float = Field(
+        default=2.0,
+        gt=0.0,
+        le=5.0,
+        description=(
+            "Enter a position when |z-score| exceeds this threshold "
+            "(default: 2.0).  Must be > exit_z_score."
+        ),
+    )
+    exit_z_score: float = Field(
+        default=0.5,
+        ge=0.0,
+        lt=5.0,
+        description=(
+            "Exit the position when |z-score| falls below this threshold "
+            "(default: 0.5).  Must be < entry_z_score."
+        ),
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="One-way transaction cost per leg in basis points.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0,
+        gt=0,
+        description="Starting capital in USD.",
+    )
+
+    @model_validator(mode="after")
+    def check_z_scores(self) -> "PairsBacktestRequest":
+        if self.entry_z_score <= self.exit_z_score:
+            raise ValueError(
+                f"entry_z_score ({self.entry_z_score}) must be strictly greater "
+                f"than exit_z_score ({self.exit_z_score})."
+            )
+        return self
+
+    @model_validator(mode="after")
+    def check_assets_differ(self) -> "PairsBacktestRequest":
+        if self.asset_y.strip().upper() == self.asset_x.strip().upper():
+            raise ValueError("asset_y and asset_x must be different tickers.")
+        return self
+
+
 class VbBacktestRequest(BaseModel):
     """Parameters for the volatility breakout backtest endpoint."""
 
@@ -329,6 +408,9 @@ class BacktestResponse(BaseModel):
                  ``momentum_exit_threshold`` (None otherwise).
     * VB       : ``vb_lookback_window``, ``vb_breakout_multiplier``,
                  ``vb_exit_window`` (None otherwise).
+    * Pairs    : ``pairs_asset_y``, ``pairs_asset_x``,
+                 ``pairs_lookback_window``, ``pairs_entry_z_score``,
+                 ``pairs_exit_z_score`` (None otherwise).
 
     Backward compatibility
     ----------------------
@@ -345,7 +427,7 @@ class BacktestResponse(BaseModel):
         default="sma_crossover",
         description=(
             "Strategy identifier: 'sma_crossover', 'rsi_mean_reversion', "
-            "'bollinger_band', 'momentum', or 'volatility_breakout'."
+            "'bollinger_band', 'momentum', 'volatility_breakout', or 'pairs'."
         ),
     )
 
@@ -372,6 +454,13 @@ class BacktestResponse(BaseModel):
     vb_lookback_window: Optional[int] = Field(default=None)
     vb_breakout_multiplier: Optional[float] = Field(default=None)
     vb_exit_window: Optional[int] = Field(default=None)
+
+    # Pairs Trading params — None when strategy is not pairs.
+    pairs_asset_y: Optional[str] = Field(default=None)
+    pairs_asset_x: Optional[str] = Field(default=None)
+    pairs_lookback_window: Optional[int] = Field(default=None)
+    pairs_entry_z_score: Optional[float] = Field(default=None)
+    pairs_exit_z_score: Optional[float] = Field(default=None)
 
     transaction_cost_bps: float
     initial_capital: float

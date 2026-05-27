@@ -9,13 +9,14 @@ POST /backtest/rsi-mean-reversion     — run an RSI mean-reversion backtest
 POST /backtest/bollinger-band         — run a Bollinger Band mean-reversion backtest
 POST /backtest/momentum               — run a time-series momentum backtest
 POST /backtest/volatility-breakout    — run a volatility breakout backtest
+POST /backtest/pairs                  — run a pairs trading backtest
 """
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.backtest import run_backtest
-from app.data import fetch_ohlcv
+from app.backtest import run_backtest, run_pairs_backtest
+from app.data import fetch_ohlcv, fetch_pairs_close
 from app.metrics import compute_metrics
 from app.schemas import (
     BacktestRequest,
@@ -23,6 +24,7 @@ from app.schemas import (
     BbBacktestRequest,
     EquityPoint,
     MomentumBacktestRequest,
+    PairsBacktestRequest,
     PerformanceMetrics,
     RsiBacktestRequest,
     TradeRecord,
@@ -31,6 +33,7 @@ from app.schemas import (
 from app.strategies import (
     bollinger_band_signals,
     momentum_signals,
+    pairs_signals,
     rsi_mean_reversion_signals,
     sma_crossover_signals,
     volatility_breakout_signals,
@@ -47,10 +50,10 @@ app = FastAPI(
         "Quantitative backtesting engine.\n\n"
         "Strategies: SMA Crossover, RSI Mean Reversion, "
         "Bollinger Band Mean Reversion, Time-Series Momentum, "
-        "Volatility Breakout.\n"
+        "Volatility Breakout, Pairs Trading.\n"
         "All strategies use a one-day signal shift to prevent lookahead bias."
     ),
-    version="0.5.0",
+    version="0.6.0",
 )
 
 app.add_middleware(
@@ -174,7 +177,7 @@ def _build_response(
 @app.get("/health", tags=["ops"])
 def health_check():
     """Return a simple 200 OK to confirm the server is running."""
-    return {"status": "ok", "version": "0.5.0"}
+    return {"status": "ok", "version": "0.6.0"}
 
 
 @app.post(
@@ -440,4 +443,106 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         vb_lookback_window=request.lookback_window,
         vb_breakout_multiplier=request.breakout_multiplier,
         vb_exit_window=request.exit_window,
+    )
+
+
+@app.post(
+    "/backtest/pairs",
+    response_model=BacktestResponse,
+    tags=["backtest"],
+    summary="Run a pairs trading backtest",
+    description=(
+        "Dollar-neutral statistical arbitrage strategy on two assets.  "
+        "Spread = log(close_y) - log(close_x).  "
+        "Enters long-spread (long Y / short X) when the z-score of the spread "
+        "falls below -entry_z_score, and short-spread (short Y / long X) when "
+        "it rises above +entry_z_score.  "
+        "Exits when |z-score| < exit_z_score.  "
+        "Each leg receives 50% of capital; benchmark is equal-weight buy-and-hold.  "
+        "Signal is shifted one day forward to prevent lookahead bias."
+    ),
+)
+def backtest_pairs(request: PairsBacktestRequest) -> BacktestResponse:
+    asset_y = request.asset_y.strip()
+    asset_x = request.asset_x.strip()
+
+    if not asset_y:
+        raise HTTPException(status_code=422, detail="asset_y must not be empty.")
+    if not asset_x:
+        raise HTTPException(status_code=422, detail="asset_x must not be empty.")
+
+    # Reuse common date/format validation (ticker param is ignored for dates check).
+    _validate_common(asset_y, request.start_date, request.end_date)
+
+    # Fetch and align both price series.
+    try:
+        close_y, close_x = fetch_pairs_close(
+            asset_y, asset_x, request.start_date, request.end_date
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502, detail=f"Data fetch failed: {exc}"
+        ) from exc
+
+    min_bars = request.lookback_window + 5
+    if len(close_y) < min_bars:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(close_y)} common trading days available; need at least "
+                f"{min_bars} for a {request.lookback_window}-day lookback window."
+            ),
+        )
+
+    # Generate signals.
+    signal = pairs_signals(
+        close_y,
+        close_x,
+        lookback_window=request.lookback_window,
+        entry_z_score=request.entry_z_score,
+        exit_z_score=request.exit_z_score,
+    )
+
+    # Run the pairs-specific backtest engine.
+    strategy_equity, benchmark_equity, trades = run_pairs_backtest(
+        close_y=close_y,
+        close_x=close_x,
+        signal=signal,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+    )
+
+    strategy_metrics_dict = compute_metrics(strategy_equity)
+    benchmark_metrics_dict = compute_metrics(benchmark_equity)
+
+    equity_curve = [
+        EquityPoint(
+            date=str(d.date()) if hasattr(d, "date") else str(d),
+            strategy=round(float(s), 2),
+            benchmark=round(float(b), 2),
+        )
+        for d, s, b in zip(strategy_equity.index, strategy_equity, benchmark_equity)
+    ]
+
+    ticker_label = f"{asset_y.upper()}/{asset_x.upper()}"
+
+    return BacktestResponse(
+        ticker=ticker_label,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        strategy="pairs",
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+        pairs_asset_y=asset_y.upper(),
+        pairs_asset_x=asset_x.upper(),
+        pairs_lookback_window=request.lookback_window,
+        pairs_entry_z_score=request.entry_z_score,
+        pairs_exit_z_score=request.exit_z_score,
+        strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
+        benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
+        equity_curve=equity_curve,
+        trades=[TradeRecord(**t) for t in trades],
+        num_trades=len(trades),
     )

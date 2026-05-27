@@ -59,10 +59,18 @@ export default function TradeTable({ trades }: Props) {
           <tbody className="divide-y divide-slate-100">
             {visible.map((trade, idx) => {
               const globalIdx = page * PAGE_SIZE + idx + 1;
-              const isBuy = trade.action === "BUY";
+              const isLongEntry =
+                trade.action === "BUY" || trade.action === "LONG SPREAD";
+              const isShortEntry = trade.action === "SHORT SPREAD";
+              const pillCls = isLongEntry
+                ? "bg-green-100 text-green-700"
+                : isShortEntry
+                  ? "bg-blue-100 text-blue-700"
+                  : "bg-red-100 text-red-700"; // SELL or EXIT
+              const arrow = isLongEntry ? "▲ " : isShortEntry ? "▼ " : "● ";
               return (
                 <tr
-                  key={`${trade.date}-${trade.action}`}
+                  key={globalIdx}
                   className="hover:bg-slate-50 transition-colors"
                 >
                   <td className="px-4 py-2.5 text-xs text-slate-400 tabular">
@@ -81,12 +89,10 @@ export default function TradeTable({ trades }: Props) {
                     <span
                       className={
                         "inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold " +
-                        (isBuy
-                          ? "bg-green-100 text-green-700"
-                          : "bg-red-100 text-red-700")
+                        pillCls
                       }
                     >
-                      {isBuy ? "▲ BUY" : "▼ SELL"}
+                      {arrow}{trade.action}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right tabular text-slate-800 font-medium">

@@ -27,6 +27,7 @@ from __future__ import annotations
 from typing import Dict, List, Tuple
 
 import pandas as pd
+import numpy as np
 
 
 def run_backtest(
@@ -161,5 +162,124 @@ def run_backtest(
                 }
             )
             buy_shares = 0.0
+
+    return strategy_equity, benchmark_equity, trades
+
+
+def run_pairs_backtest(
+    close_y: pd.Series,
+    close_x: pd.Series,
+    signal: pd.Series,
+    transaction_cost_bps: float = 10.0,
+    initial_capital: float = 100_000.0,
+) -> Tuple[pd.Series, pd.Series, List[Dict]]:
+    """
+    Run a dollar-neutral pairs backtest and return equity curves + trade log.
+
+    Position model
+    --------------
+    Each leg receives 50 % of the portfolio capital:
+    * signal = +1  : long  $cap/2 in Y, short $cap/2 in X
+    * signal = -1  : short $cap/2 in Y, long  $cap/2 in X
+    * signal =  0  : flat
+
+    Daily P&L formula
+    -----------------
+    spread_return[T] = signal[T] * (ret_y[T] - ret_x[T]) / 2
+
+    The signal already accounts for one-day lookahead prevention (shift(1)).
+
+    Transaction cost model
+    ----------------------
+    Cost = |signal_change| * cost_rate * equity_before_trade
+
+    A signal move of |1| (e.g. 0->+1) opens two legs at 50 % each, so the
+    total cost is proportional to the full portfolio (same formula as the
+    single-asset engine).  A reversal (|2|, e.g. +1->-1) closes and
+    re-opens both legs, doubling the cost.
+
+    Benchmark
+    ---------
+    Equal-weight buy-and-hold of both assets (50 % Y + 50 % X from day 1,
+    no rebalancing, no transaction costs).
+
+    Parameters
+    ----------
+    close_y, close_x : pd.Series
+        Adjusted daily close prices, aligned to the same DatetimeIndex.
+    signal : pd.Series
+        Pre-shifted signal series (-1, 0, +1), same index as close_y/close_x.
+    transaction_cost_bps : float
+        One-way cost per leg in bps.  Charged on both entry and exit.
+    initial_capital : float
+        Starting portfolio value in USD.
+
+    Returns
+    -------
+    strategy_equity : pd.Series
+    benchmark_equity : pd.Series
+    trades : list of dict (date, action, price, shares, cost)
+    """
+    if len(close_y) < 2:
+        raise ValueError("Need at least 2 price observations to run a backtest.")
+
+    cost_rate = transaction_cost_bps / 10_000.0
+
+    # Align to signal index.
+    close_y = close_y.reindex(signal.index)
+    close_x = close_x.reindex(signal.index)
+
+    ret_y: pd.Series = close_y.pct_change().fillna(0.0)
+    ret_x: pd.Series = close_x.pct_change().fillna(0.0)
+
+    # Dollar-neutral spread return (50 % each leg).
+    spread_return: pd.Series = signal * 0.5 * (ret_y - ret_x)
+
+    # Transaction cost: proportional to magnitude of signal change.
+    sig_change: pd.Series = signal.diff().fillna(signal.iloc[0])
+    cost_mult: pd.Series = 1.0 - sig_change.abs() * cost_rate
+    strategy_return: pd.Series = cost_mult * (1.0 + spread_return) - 1.0
+
+    # Equity curves.
+    strategy_equity: pd.Series = initial_capital * (1.0 + strategy_return).cumprod()
+    bench_return: pd.Series = 0.5 * (ret_y + ret_x)
+    benchmark_equity: pd.Series = initial_capital * (1.0 + bench_return).cumprod()
+
+    # Trade log — one record per signal transition.
+    trades: List[Dict] = []
+    for i, (_, chg) in enumerate(sig_change.items()):
+        if abs(float(chg)) < 0.5:   # no state change
+            continue
+
+        new_sig = int(signal.iloc[i])
+        exec_i = max(i - 1, 0)
+        exec_date = signal.index[exec_i]
+        date_str = (
+            str(exec_date.date()) if hasattr(exec_date, "date") else str(exec_date)
+        )
+        price_y = float(close_y.iloc[exec_i])
+        equity_before = float(strategy_equity.iloc[i - 1]) if i > 0 else initial_capital
+        cost_usd = equity_before * abs(float(chg)) * cost_rate
+
+        if new_sig == 1:
+            action = "LONG SPREAD"   # long Y / short X
+        elif new_sig == -1:
+            action = "SHORT SPREAD"  # short Y / long X
+        else:
+            action = "EXIT"
+
+        # "Shares" approximated as the dollar amount of the Y leg divided by
+        # the Y price — gives the user a concrete feel for position size.
+        shares_y = (equity_before * 0.5) / price_y if price_y > 0 else 0.0
+
+        trades.append(
+            {
+                "date": date_str,
+                "action": action,
+                "price": round(price_y, 4),
+                "shares": round(shares_y, 4),
+                "cost": round(cost_usd, 4),
+            }
+        )
 
     return strategy_equity, benchmark_equity, trades
