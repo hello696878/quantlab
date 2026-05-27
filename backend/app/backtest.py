@@ -200,8 +200,8 @@ def run_pairs_backtest(
 
     Benchmark
     ---------
-    Equal-weight buy-and-hold of both assets (50 % Y + 50 % X from day 1,
-    no rebalancing, no transaction costs).
+    Equal-weight benchmark return:
+    benchmark_return[T] = 0.5 * ret_y[T] + 0.5 * ret_x[T]
 
     Parameters
     ----------
@@ -222,12 +222,28 @@ def run_pairs_backtest(
     """
     if len(close_y) < 2:
         raise ValueError("Need at least 2 price observations to run a backtest.")
+    if not close_y.index.equals(close_x.index):
+        raise ValueError("close_y and close_x must share the same index.")
+    if transaction_cost_bps < 0:
+        raise ValueError("transaction_cost_bps must be non-negative.")
+    if transaction_cost_bps >= 10_000:
+        raise ValueError("transaction_cost_bps must be less than 10,000 bps.")
+    if initial_capital <= 0:
+        raise ValueError("initial_capital must be positive.")
+    if close_y.isna().any() or close_x.isna().any():
+        raise ValueError("pairs close series must not contain NaN values.")
+    if (close_y <= 0).any() or (close_x <= 0).any():
+        raise ValueError("pairs close prices must be positive.")
+    if not close_y.index.is_monotonic_increasing:
+        raise ValueError("pairs close index must be sorted in increasing order.")
 
     cost_rate = transaction_cost_bps / 10_000.0
 
-    # Align to signal index.
-    close_y = close_y.reindex(signal.index)
-    close_x = close_x.reindex(signal.index)
+    signal = signal.reindex(close_y.index).ffill().fillna(0.0)
+    if signal.isna().any():
+        raise ValueError("signal must not contain NaN values after alignment.")
+    if not set(signal.unique()).issubset({-1, 0, 1}):
+        raise ValueError("pairs signal must contain only -1, 0, or 1.")
 
     ret_y: pd.Series = close_y.pct_change().fillna(0.0)
     ret_x: pd.Series = close_x.pct_change().fillna(0.0)

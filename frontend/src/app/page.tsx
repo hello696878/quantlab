@@ -170,7 +170,7 @@ function paramSummary(r: BacktestResponse): string {
       `Spread ${r.pairs_asset_y ?? ""}/${r.pairs_asset_x ?? ""} ` +
       `lookback:${r.pairs_lookback_window ?? 60} ` +
       `entry:|z|>${r.pairs_entry_z_score ?? 2} ` +
-      `exit:|z|<${r.pairs_exit_z_score ?? 0.5} · ${cost} · ${trades}`
+      `exit z→±${r.pairs_exit_z_score ?? 0.5} · ${cost} · ${trades}`
     );
   }
   return `${cost} · ${trades}`;
@@ -225,9 +225,10 @@ const STRATEGY_HEADINGS: Record<
       "Dollar-neutral statistical arbitrage on two correlated assets. Spread = " +
       "log(Y) − log(X). Enters long-spread (long Y / short X) when z-score " +
       "falls below −entry_z, short-spread (short Y / long X) when it rises " +
-      "above +entry_z, and exits when |z-score| < exit_z. Each leg gets 50 % " +
-      "of capital. Benchmark is equal-weight buy-and-hold. Signal shifted one " +
-      "day forward to prevent lookahead bias.",
+      "above +entry_z. Long-spread exits when z-score crosses above −exit_z; " +
+      "short-spread exits when it crosses below +exit_z. Each leg gets 50 % of " +
+      "capital. Benchmark is an equal-weight pair benchmark. Signal shifted one day " +
+      "forward to prevent lookahead bias.",
   },
 };
 

@@ -263,8 +263,9 @@ class PairsBacktestRequest(BaseModel):
         ge=0.0,
         lt=5.0,
         description=(
-            "Exit the position when |z-score| falls below this threshold "
-            "(default: 0.5).  Must be < entry_z_score."
+            "Mean-reversion exit threshold around zero: long-spread exits when "
+            "z-score > -exit_z_score; short-spread exits when z-score < "
+            "+exit_z_score (default: 0.5).  Must be < entry_z_score."
         ),
     )
     transaction_cost_bps: float = Field(
@@ -367,10 +368,10 @@ class PerformanceMetrics(BaseModel):
 
 
 class TradeRecord(BaseModel):
-    """A single BUY or SELL event."""
+    """A single trade event."""
 
     date: str = Field(description="Trade date in YYYY-MM-DD format.")
-    action: str = Field(description="'BUY' or 'SELL'.")
+    action: str = Field(description="'BUY', 'SELL', 'LONG SPREAD', 'SHORT SPREAD', or 'EXIT'.")
     price: float = Field(description="Execution price (adjusted close).")
     shares: float = Field(description="Approximate number of shares traded.")
     cost: float = Field(description="Estimated transaction cost in USD.")
@@ -385,7 +386,7 @@ class EquityPoint(BaseModel):
 
 
 # ===========================================================================
-# Full response  (shared by all five strategy endpoints)
+# Full response  (shared by all six strategy endpoints)
 # ===========================================================================
 
 class BacktestResponse(BaseModel):
@@ -396,7 +397,7 @@ class BacktestResponse(BaseModel):
     -----------------------
     ``strategy`` identifies which strategy produced this result:
     ``"sma_crossover"``, ``"rsi_mean_reversion"``, ``"bollinger_band"``,
-    ``"momentum"``, or ``"volatility_breakout"``.
+    ``"momentum"``, ``"volatility_breakout"``, or ``"pairs"``.
 
     Strategy-specific fields
     ------------------------
@@ -468,4 +469,4 @@ class BacktestResponse(BaseModel):
     benchmark_metrics: PerformanceMetrics
     equity_curve: List[EquityPoint]
     trades: List[TradeRecord]
-    num_trades: int = Field(description="Total number of BUY + SELL trade events.")
+    num_trades: int = Field(description="Total number of trade events.")

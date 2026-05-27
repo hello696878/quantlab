@@ -457,7 +457,8 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         "Enters long-spread (long Y / short X) when the z-score of the spread "
         "falls below -entry_z_score, and short-spread (short Y / long X) when "
         "it rises above +entry_z_score.  "
-        "Exits when |z-score| < exit_z_score.  "
+        "Long-spread exits when z-score > -exit_z_score; short-spread exits "
+        "when z-score < +exit_z_score.  "
         "Each leg receives 50% of capital; benchmark is equal-weight buy-and-hold.  "
         "Signal is shifted one day forward to prevent lookahead bias."
     ),

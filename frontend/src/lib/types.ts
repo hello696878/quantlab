@@ -121,7 +121,7 @@ export interface EquityPoint {
 }
 
 // ---------------------------------------------------------------------------
-// Unified response  (all five strategy endpoints return this shape)
+// Unified response  (all six strategy endpoints return this shape)
 // ---------------------------------------------------------------------------
 
 export interface BacktestResponse {

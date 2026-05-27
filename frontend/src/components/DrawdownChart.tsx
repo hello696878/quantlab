@@ -148,7 +148,7 @@ export default function DrawdownChart({ data }: Props) {
         <Area
           type="monotone"
           dataKey="benchmark"
-          name="Buy & Hold DD"
+          name="Benchmark DD"
           stroke="#f97316"
           strokeWidth={1.5}
           strokeDasharray="4 3"

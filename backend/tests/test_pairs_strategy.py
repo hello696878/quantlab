@@ -17,7 +17,8 @@ import pandas as pd
 import pytest
 import numpy as np
 
-from app.strategies import compute_spread_zscore, pairs_signals
+import app.strategies as strategies
+from app.strategies import compute_pairs_spread, compute_spread_zscore, pairs_signals
 
 
 # ---------------------------------------------------------------------------
@@ -56,6 +57,33 @@ def diverging_pair(n: int = 100, base: float = 100.0, diverge_start: int = 30,
 # ===========================================================================
 # compute_spread_zscore tests
 # ===========================================================================
+
+class TestComputePairsSpread:
+
+    def test_spread_is_log_y_minus_log_x(self):
+        close_y = make_close([100.0, 110.0, 121.0])
+        close_x = make_close([50.0, 55.0, 60.5])
+
+        spread = compute_pairs_spread(close_y, close_x)
+        expected = np.log(close_y) - np.log(close_x)
+
+        assert spread.name == "spread"
+        pd.testing.assert_series_equal(spread, expected.rename("spread"))
+
+    def test_spread_rejects_misaligned_indexes(self):
+        close_y = make_close([100.0, 101.0], start="2020-01-01")
+        close_x = make_close([100.0, 101.0], start="2020-01-02")
+
+        with pytest.raises(ValueError, match="same index"):
+            compute_pairs_spread(close_y, close_x)
+
+    def test_spread_rejects_non_positive_prices(self):
+        close_y = make_close([100.0, 0.0, 101.0])
+        close_x = make_close([100.0, 100.0, 100.0])
+
+        with pytest.raises(ValueError, match="positive"):
+            compute_pairs_spread(close_y, close_x)
+
 
 class TestComputeSpreadZscore:
 
@@ -97,6 +125,14 @@ class TestComputeSpreadZscore:
         spread = make_close(values)
         z = compute_spread_zscore(spread, LB_WIN)
         assert abs(float(z.dropna().mean())) < 0.5
+
+    def test_zscore_matches_manual_rolling_value(self):
+        spread = make_close([1.0, 2.0, 4.0, 7.0, 11.0])
+        z = compute_spread_zscore(spread, window=3)
+
+        window = spread.iloc[2:5]
+        expected = (window.iloc[-1] - window.mean()) / window.std(ddof=1)
+        assert z.iloc[-1] == pytest.approx(expected)
 
     def test_invalid_window_raises(self):
         spread = make_close([1.0] * 30)
@@ -202,6 +238,62 @@ class TestPairsSignals:
         sig = pairs_signals(close_y, close_x, lookback_window=LB_WIN,
                             entry_z_score=100.0, exit_z_score=50.0)
         assert (sig == 0).all()
+
+    def test_long_spread_exit_uses_negative_exit_threshold(self, monkeypatch):
+        """Long spread exits only after z-score crosses above -exit_z."""
+        close_y, close_x = identical_pair(n=7)
+        z_values = [np.nan, np.nan, -2.1, -0.5, -0.49, 0.0, 0.0]
+
+        def fake_zscore(spread, window):
+            return pd.Series(z_values, index=spread.index, name="zscore")
+
+        monkeypatch.setattr(strategies, "compute_spread_zscore", fake_zscore)
+        sig = pairs_signals(
+            close_y,
+            close_x,
+            lookback_window=LB_WIN,
+            entry_z_score=2.0,
+            exit_z_score=0.5,
+        )
+
+        assert sig.tolist() == [0, 0, 0, 1, 1, 0, 0]
+
+    def test_short_spread_exit_uses_positive_exit_threshold(self, monkeypatch):
+        """Short spread exits only after z-score crosses below +exit_z."""
+        close_y, close_x = identical_pair(n=7)
+        z_values = [np.nan, np.nan, 2.1, 0.5, 0.49, 0.0, 0.0]
+
+        def fake_zscore(spread, window):
+            return pd.Series(z_values, index=spread.index, name="zscore")
+
+        monkeypatch.setattr(strategies, "compute_spread_zscore", fake_zscore)
+        sig = pairs_signals(
+            close_y,
+            close_x,
+            lookback_window=LB_WIN,
+            entry_z_score=2.0,
+            exit_z_score=0.5,
+        )
+
+        assert sig.tolist() == [0, 0, 0, -1, -1, 0, 0]
+
+    def test_entry_threshold_equality_does_not_enter(self, monkeypatch):
+        close_y, close_x = identical_pair(n=5)
+        z_values = [np.nan, np.nan, 2.0, -2.0, 0.0]
+
+        def fake_zscore(spread, window):
+            return pd.Series(z_values, index=spread.index, name="zscore")
+
+        monkeypatch.setattr(strategies, "compute_spread_zscore", fake_zscore)
+        sig = pairs_signals(
+            close_y,
+            close_x,
+            lookback_window=LB_WIN,
+            entry_z_score=2.0,
+            exit_z_score=0.5,
+        )
+
+        assert sig.tolist() == [0, 0, 0, 0, 0]
 
     # ── Validation ───────────────────────────────────────────────────────────
 

@@ -112,7 +112,7 @@ export default function EquityCurveChart({ data }: Props) {
         <Line
           type="monotone"
           dataKey="benchmark"
-          name="Buy & Hold"
+          name="Benchmark"
           stroke="#94a3b8"
           strokeWidth={1.5}
           strokeDasharray="5 3"
@@ -124,7 +124,7 @@ export default function EquityCurveChart({ data }: Props) {
         <Line
           type="monotone"
           dataKey="strategy"
-          name="SMA Strategy"
+          name="Strategy"
           stroke="#2563eb"
           strokeWidth={2}
           dot={false}

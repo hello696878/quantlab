@@ -611,6 +611,22 @@ def volatility_breakout_signals(
 # Pairs Trading / Statistical Arbitrage
 # ===========================================================================
 
+def compute_pairs_spread(close_y: pd.Series, close_x: pd.Series) -> pd.Series:
+    """
+    Compute the log-ratio spread for a two-asset pairs trade.
+
+    spread[T] = log(close_y[T]) - log(close_x[T])
+    """
+    if not close_y.index.equals(close_x.index):
+        raise ValueError("close_y and close_x must share the same index.")
+    if close_y.isna().any() or close_x.isna().any():
+        raise ValueError("pairs close series must not contain NaN values.")
+    if (close_y <= 0).any() or (close_x <= 0).any():
+        raise ValueError("pairs close prices must be positive.")
+
+    return (np.log(close_y) - np.log(close_x)).rename("spread")
+
+
 def compute_spread_zscore(spread: pd.Series, window: int) -> pd.Series:
     """
     Compute the rolling z-score of a spread series.
@@ -666,7 +682,8 @@ def pairs_signals(
     ------------
     * z_score > +entry_z_score  -> signal = -1 (SHORT spread: short y, long x)
     * z_score < -entry_z_score  -> signal = +1 (LONG  spread: long  y, short x)
-    * |z_score| < exit_z_score  -> signal =  0 (EXIT to flat, while in position)
+    * LONG exits when z_score > -exit_z_score.
+    * SHORT exits when z_score < +exit_z_score.
     * Positions are maintained between entry and exit (hysteresis).
     * The raw signal is **shifted by one period** to prevent lookahead bias.
 
@@ -683,7 +700,9 @@ def pairs_signals(
         Enter a position when |z_score| exceeds this threshold (> 0).
         Must be strictly greater than ``exit_z_score``.
     exit_z_score : float
-        Exit the position when |z_score| falls below this threshold (>= 0).
+        Exit threshold around zero (>= 0).  Long-spread positions exit after
+        z_score crosses above ``-exit_z_score``; short-spread positions exit
+        after z_score crosses below ``+exit_z_score``.
 
     Returns
     -------
@@ -700,8 +719,7 @@ def pairs_signals(
             f"exit_z_score must be >= 0; got {exit_z_score}."
         )
 
-    # Log-ratio spread (handles any positive close prices).
-    spread = (np.log(close_y) - np.log(close_x)).rename("spread")
+    spread = compute_pairs_spread(close_y, close_x)
     zscore = compute_spread_zscore(spread, lookback_window)
 
     in_position = 0   # 0 = flat, +1 = long spread, -1 = short spread
@@ -719,9 +737,12 @@ def pairs_signals(
                 in_position = -1   # y expensive vs x -> short spread
             elif v < -entry_z_score:
                 in_position = +1   # y cheap vs x -> long spread
-        else:
-            if abs(v) < exit_z_score:
-                in_position = 0    # spread mean-reverted -> exit
+        elif in_position == 1:
+            if v > -exit_z_score:
+                in_position = 0    # long spread mean-reverted -> exit
+        elif in_position == -1:
+            if v < exit_z_score:
+                in_position = 0    # short spread mean-reverted -> exit
 
         raw.append(in_position)
 

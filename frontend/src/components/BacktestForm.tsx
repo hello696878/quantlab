@@ -110,7 +110,7 @@ const STRATEGIES: { id: StrategyType; label: string; description: string }[] = [
     id: "pairs",
     label: "Pairs Trading",
     description:
-      "Dollar-neutral: long Y / short X when spread z-score diverges; exits on reversion.",
+      "Dollar-neutral: trades Y versus X when spread z-score diverges; exits on reversion.",
   },
 ];
 
@@ -676,7 +676,7 @@ export default function BacktestForm({
                     disabled={loading}
                   />
                 </Field>
-                <Field label="Entry Z-Score" hint="|z| ≥ enter">
+                <Field label="Entry Z-Score" hint="strict">
                   <input
                     type="number"
                     className={inputCls}
@@ -693,7 +693,7 @@ export default function BacktestForm({
                     disabled={loading}
                   />
                 </Field>
-                <Field label="Exit Z-Score" hint="|z| ≤ exit">
+                <Field label="Exit Z-Score" hint="reversion">
                   <input
                     type="number"
                     className={inputCls}

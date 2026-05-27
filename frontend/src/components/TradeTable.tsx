@@ -19,8 +19,8 @@ export default function TradeTable({ trades }: Props) {
         No trades were generated in this backtest period.
         <br />
         <span className="text-xs mt-1 block">
-          This usually means the fast SMA never crossed the slow SMA within the
-          selected date range.
+          This usually means the selected strategy did not trigger an entry
+          within the selected date range.
         </span>
       </div>
     );
