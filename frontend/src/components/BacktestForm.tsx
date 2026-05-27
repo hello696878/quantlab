@@ -3,6 +3,7 @@
 import type {
   BacktestRequest,
   BbBacktestRequest,
+  MomentumBacktestRequest,
   RsiBacktestRequest,
   StrategyType,
 } from "@/lib/types";
@@ -19,6 +20,8 @@ interface Props {
   onRsiParamsChange: (p: RsiBacktestRequest) => void;
   bbParams: BbBacktestRequest;
   onBbParamsChange: (p: BbBacktestRequest) => void;
+  momentumParams: MomentumBacktestRequest;
+  onMomentumParamsChange: (p: MomentumBacktestRequest) => void;
   onSubmit: () => void;
   loading: boolean;
 }
@@ -77,6 +80,12 @@ const STRATEGIES: { id: StrategyType; label: string; description: string }[] = [
     description:
       "Long when price breaks below the lower band; exits at middle or upper band.",
   },
+  {
+    id: "momentum",
+    label: "Momentum",
+    description:
+      "Long when the trailing N-day return exceeds an entry threshold; hysteresis optional.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -92,6 +101,8 @@ export default function BacktestForm({
   onRsiParamsChange,
   bbParams,
   onBbParamsChange,
+  momentumParams,
+  onMomentumParamsChange,
   onSubmit,
   loading,
 }: Props) {
@@ -101,16 +112,22 @@ export default function BacktestForm({
       ? smaParams
       : strategy === "rsi_mean_reversion"
         ? rsiParams
-        : bbParams;
+        : strategy === "bollinger_band"
+          ? bbParams
+          : momentumParams;
 
   function setCommon<K extends keyof typeof active>(
     key: K,
     value: (typeof active)[K],
   ) {
-    // Update all three request objects so common fields stay in sync when switching.
+    // Update all four request objects so common fields stay in sync when switching.
     onSmaParamsChange({ ...smaParams, [key]: value } as BacktestRequest);
     onRsiParamsChange({ ...rsiParams, [key]: value } as RsiBacktestRequest);
     onBbParamsChange({ ...bbParams, [key]: value } as BbBacktestRequest);
+    onMomentumParamsChange({
+      ...momentumParams,
+      [key]: value,
+    } as MomentumBacktestRequest);
   }
 
   function setSma<K extends keyof BacktestRequest>(
@@ -134,6 +151,13 @@ export default function BacktestForm({
     onBbParamsChange({ ...bbParams, [key]: value });
   }
 
+  function setMomentum<K extends keyof MomentumBacktestRequest>(
+    key: K,
+    value: MomentumBacktestRequest[K],
+  ) {
+    onMomentumParamsChange({ ...momentumParams, [key]: value });
+  }
+
   // Validation
   const dateInvalid = active.start_date >= active.end_date;
   const smaInvalid =
@@ -145,6 +169,9 @@ export default function BacktestForm({
   const bbInvalid =
     strategy === "bollinger_band" &&
     (bbParams.bb_window < 2 || bbParams.num_std <= 0);
+  const momentumInvalid =
+    strategy === "momentum" &&
+    momentumParams.entry_threshold < momentumParams.exit_threshold;
 
   const canSubmit =
     !loading &&
@@ -152,7 +179,8 @@ export default function BacktestForm({
     !dateInvalid &&
     !smaInvalid &&
     !rsiInvalid &&
-    !bbInvalid;
+    !bbInvalid &&
+    !momentumInvalid;
 
   return (
     <div className="card overflow-hidden">
@@ -342,7 +370,7 @@ export default function BacktestForm({
                 />
               </Field>
             </div>
-          ) : (
+          ) : strategy === "bollinger_band" ? (
             /* Bollinger Band fields */
             <div className="grid grid-cols-3 gap-4">
               <Field label="BB Window" hint="days">
@@ -387,11 +415,66 @@ export default function BacktestForm({
                 </select>
               </Field>
             </div>
+          ) : (
+            /* Momentum fields */
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="Lookback" hint="days">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={momentumParams.momentum_window}
+                  min={1}
+                  max={1000}
+                  step={1}
+                  onChange={(e) =>
+                    setMomentum(
+                      "momentum_window",
+                      parseInt(e.target.value, 10) || 126,
+                    )
+                  }
+                  disabled={loading}
+                />
+              </Field>
+              <Field label="Entry threshold" hint="decimal">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={momentumParams.entry_threshold}
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  onChange={(e) =>
+                    setMomentum(
+                      "entry_threshold",
+                      parseFloat(e.target.value) || 0,
+                    )
+                  }
+                  disabled={loading}
+                />
+              </Field>
+              <Field label="Exit threshold" hint="decimal">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={momentumParams.exit_threshold}
+                  min={-1}
+                  max={1}
+                  step={0.01}
+                  onChange={(e) =>
+                    setMomentum(
+                      "exit_threshold",
+                      parseFloat(e.target.value) || 0,
+                    )
+                  }
+                  disabled={loading}
+                />
+              </Field>
+            </div>
           )}
         </div>
 
         {/* ── Inline validation ─────────────────────────────────────────── */}
-        {(dateInvalid || smaInvalid || rsiInvalid || bbInvalid) && (
+        {(dateInvalid || smaInvalid || rsiInvalid || bbInvalid || momentumInvalid) && (
           <div className="mb-4 space-y-1">
             {dateInvalid && (
               <p className="text-xs text-red-600">
@@ -411,6 +494,11 @@ export default function BacktestForm({
             {bbInvalid && (
               <p className="text-xs text-red-600">
                 ⚠ BB window must be ≥ 2 and std dev must be &gt; 0.
+              </p>
+            )}
+            {momentumInvalid && (
+              <p className="text-xs text-red-600">
+                ⚠ Entry threshold must be ≥ exit threshold.
               </p>
             )}
           </div>

@@ -152,6 +152,70 @@ class BbBacktestRequest(BaseModel):
     )
 
 
+class MomentumBacktestRequest(BaseModel):
+    """Parameters for the time-series momentum backtest endpoint."""
+
+    ticker: str = Field(
+        default="SPY",
+        description="Yahoo Finance ticker symbol (e.g. SPY, AAPL, BTC-USD).",
+    )
+    start_date: str = Field(
+        default="2015-01-01",
+        description="Backtest start date in YYYY-MM-DD format.",
+    )
+    end_date: str = Field(
+        default="2023-12-31",
+        description="Backtest end date in YYYY-MM-DD format (exclusive in yfinance).",
+    )
+    momentum_window: int = Field(
+        default=126,
+        ge=1,
+        le=1000,
+        description=(
+            "Trailing return look-back period in trading days "
+            "(default: 126 ≈ 6 months)."
+        ),
+    )
+    entry_threshold: float = Field(
+        default=0.0,
+        ge=-1.0,
+        le=1.0,
+        description=(
+            "Enter long when the trailing return strictly exceeds this value "
+            "(decimal, e.g. 0.05 = 5 %).  Default 0.0 → any positive momentum."
+        ),
+    )
+    exit_threshold: float = Field(
+        default=0.0,
+        ge=-1.0,
+        le=1.0,
+        description=(
+            "Exit long when the trailing return falls to or below this value "
+            "(decimal, e.g. -0.02 = −2 %).  Must be ≤ entry_threshold."
+        ),
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="One-way transaction cost in basis points.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0,
+        gt=0,
+        description="Starting capital in USD.",
+    )
+
+    @model_validator(mode="after")
+    def check_thresholds(self) -> "MomentumBacktestRequest":
+        if self.entry_threshold < self.exit_threshold:
+            raise ValueError(
+                f"entry_threshold ({self.entry_threshold}) must be >= "
+                f"exit_threshold ({self.exit_threshold})."
+            )
+        return self
+
+
 # ===========================================================================
 # Response building blocks
 # ===========================================================================
@@ -188,7 +252,7 @@ class EquityPoint(BaseModel):
 
 
 # ===========================================================================
-# Full response  (shared by SMA, RSI, and Bollinger Band endpoints)
+# Full response  (shared by all four strategy endpoints)
 # ===========================================================================
 
 class BacktestResponse(BaseModel):
@@ -198,13 +262,17 @@ class BacktestResponse(BaseModel):
     Strategy identification
     -----------------------
     ``strategy`` identifies which strategy produced this result:
-    ``"sma_crossover"``, ``"rsi_mean_reversion"``, or ``"bollinger_band"``.
+    ``"sma_crossover"``, ``"rsi_mean_reversion"``, ``"bollinger_band"``,
+    or ``"momentum"``.
 
     Strategy-specific fields
     ------------------------
-    * SMA  : ``fast_window``, ``slow_window`` (0 for other strategies).
-    * RSI  : ``rsi_window``, ``oversold_threshold``, ``exit_threshold`` (None otherwise).
-    * BB   : ``bb_window``, ``bb_num_std``, ``bb_exit_band`` (None otherwise).
+    * SMA      : ``fast_window``, ``slow_window`` (0 for other strategies).
+    * RSI      : ``rsi_window``, ``oversold_threshold``, ``exit_threshold``
+                 (None otherwise).
+    * BB       : ``bb_window``, ``bb_num_std``, ``bb_exit_band`` (None otherwise).
+    * Momentum : ``momentum_window``, ``momentum_entry_threshold``,
+                 ``momentum_exit_threshold`` (None otherwise).
 
     Backward compatibility
     ----------------------
@@ -221,7 +289,7 @@ class BacktestResponse(BaseModel):
         default="sma_crossover",
         description=(
             "Strategy identifier: 'sma_crossover', 'rsi_mean_reversion', "
-            "or 'bollinger_band'."
+            "'bollinger_band', or 'momentum'."
         ),
     )
 
@@ -238,6 +306,11 @@ class BacktestResponse(BaseModel):
     bb_window: Optional[int] = Field(default=None)
     bb_num_std: Optional[float] = Field(default=None)
     bb_exit_band: Optional[str] = Field(default=None)
+
+    # Momentum params — None when strategy is not momentum.
+    momentum_window: Optional[int] = Field(default=None)
+    momentum_entry_threshold: Optional[float] = Field(default=None)
+    momentum_exit_threshold: Optional[float] = Field(default=None)
 
     transaction_cost_bps: float
     initial_capital: float

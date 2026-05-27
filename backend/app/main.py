@@ -7,6 +7,7 @@ GET  /health                          — liveness check
 POST /backtest/sma-crossover          — run an SMA crossover backtest
 POST /backtest/rsi-mean-reversion     — run an RSI mean-reversion backtest
 POST /backtest/bollinger-band         — run a Bollinger Band mean-reversion backtest
+POST /backtest/momentum               — run a time-series momentum backtest
 """
 
 from fastapi import FastAPI, HTTPException
@@ -20,12 +21,14 @@ from app.schemas import (
     BacktestResponse,
     BbBacktestRequest,
     EquityPoint,
+    MomentumBacktestRequest,
     PerformanceMetrics,
     RsiBacktestRequest,
     TradeRecord,
 )
 from app.strategies import (
     bollinger_band_signals,
+    momentum_signals,
     rsi_mean_reversion_signals,
     sma_crossover_signals,
 )
@@ -39,10 +42,11 @@ app = FastAPI(
     title="QuantLab API",
     description=(
         "Quantitative backtesting engine.\n\n"
-        "Strategies: SMA Crossover, RSI Mean Reversion, Bollinger Band Mean Reversion.\n"
+        "Strategies: SMA Crossover, RSI Mean Reversion, "
+        "Bollinger Band Mean Reversion, Time-Series Momentum.\n"
         "All strategies use a one-day signal shift to prevent lookahead bias."
     ),
-    version="0.3.0",
+    version="0.4.0",
 )
 
 app.add_middleware(
@@ -100,6 +104,10 @@ def _build_response(
     bb_window=None,
     bb_num_std=None,
     bb_exit_band=None,
+    # Momentum-specific (None when not applicable)
+    momentum_window=None,
+    momentum_entry_threshold=None,
+    momentum_exit_threshold=None,
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response."""
     strategy_equity, benchmark_equity, trades = run_backtest(
@@ -134,6 +142,9 @@ def _build_response(
         bb_window=bb_window,
         bb_num_std=bb_num_std,
         bb_exit_band=bb_exit_band,
+        momentum_window=momentum_window,
+        momentum_entry_threshold=momentum_entry_threshold,
+        momentum_exit_threshold=momentum_exit_threshold,
         transaction_cost_bps=transaction_cost_bps,
         initial_capital=initial_capital,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
@@ -152,7 +163,7 @@ def _build_response(
 @app.get("/health", tags=["ops"])
 def health_check():
     """Return a simple 200 OK to confirm the server is running."""
-    return {"status": "ok", "version": "0.3.0"}
+    return {"status": "ok", "version": "0.4.0"}
 
 
 @app.post(
@@ -311,4 +322,58 @@ def backtest_bollinger_band(request: BbBacktestRequest) -> BacktestResponse:
         bb_window=request.bb_window,
         bb_num_std=request.num_std,
         bb_exit_band=request.exit_band,
+    )
+
+
+@app.post(
+    "/backtest/momentum",
+    response_model=BacktestResponse,
+    tags=["backtest"],
+    summary="Run a time-series momentum backtest",
+    description=(
+        "Long-only time-series momentum strategy.  "
+        "Enters long when the trailing N-day return exceeds the entry threshold.  "
+        "Exits when the trailing return falls to or below the exit threshold.  "
+        "Default thresholds of 0.0 implement the classical binary momentum rule "
+        "(long when past return > 0, flat otherwise).  "
+        "Signal is shifted one day forward to prevent lookahead bias."
+    ),
+)
+def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
+    _validate_common(request.ticker, request.start_date, request.end_date)
+
+    df = _fetch(request.ticker, request.start_date, request.end_date)
+
+    # Momentum needs momentum_window bars to compute the first return value,
+    # +1 for the shift, +1 for the first equity return.
+    min_bars = request.momentum_window + 5
+    if len(df) < min_bars:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(df)} trading days available; need at least "
+                f"{min_bars} for a {request.momentum_window}-day momentum window."
+            ),
+        )
+
+    close = df["Close"]
+    position = momentum_signals(
+        close,
+        momentum_window=request.momentum_window,
+        entry_threshold=request.entry_threshold,
+        exit_threshold=request.exit_threshold,
+    )
+
+    return _build_response(
+        request_ticker=request.ticker,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+        close=close,
+        position=position,
+        strategy="momentum",
+        momentum_window=request.momentum_window,
+        momentum_entry_threshold=request.entry_threshold,
+        momentum_exit_threshold=request.exit_threshold,
     )

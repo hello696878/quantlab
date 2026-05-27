@@ -6,6 +6,7 @@ Current strategies
 * SMA crossover (long-only)
 * RSI mean reversion (long-only)
 * Bollinger Band mean reversion (long-only)
+* Time-series momentum (long-only)
 
 Lookahead-bias rule
 -------------------
@@ -181,7 +182,6 @@ def rsi_mean_reversion_signals(
         raw.append(1 if in_position else 0)
 
     # *** Shift by 1 to prevent lookahead bias ***
-    # position[T] = raw_signal[T-1], held over close[T-1] -> close[T].
     position = pd.Series(raw, index=close.index, name="position")
     position = position.shift(1).fillna(0).astype(int)
 
@@ -306,6 +306,123 @@ def bollinger_band_signals(
             )
             if p >= exit_level:
                 in_position = False  # Price recovered to exit band → exit
+
+        raw.append(1 if in_position else 0)
+
+    # *** Shift by 1 to prevent lookahead bias ***
+    # position[T] = raw_signal[T-1], held over close[T-1] -> close[T].
+    position = pd.Series(raw, index=close.index, name="position")
+    position = position.shift(1).fillna(0).astype(int)
+
+    return position
+
+
+# ===========================================================================
+# Time-series momentum
+# ===========================================================================
+
+def compute_momentum(close: pd.Series, window: int = 126) -> pd.Series:
+    """
+    Compute the trailing N-day simple return (time-series momentum signal).
+
+    Defined as  ``close[t] / close[t - window] - 1``,  which equals the
+    percentage price change over the look-back period expressed as a decimal
+    (e.g. 0.05 = 5 %).
+
+    Parameters
+    ----------
+    close : pd.Series
+        Adjusted daily closing prices with a DatetimeIndex.
+    window : int
+        Look-back period in trading days (default: 126 ≈ 6 months).
+        Must be ≥ 1.
+
+    Returns
+    -------
+    pd.Series named "momentum".
+        NaN for the first ``window`` bars (insufficient history).
+        Decimal returns (not percentages) thereafter.
+    """
+    if window < 1:
+        raise ValueError(f"momentum_window must be at least 1; got {window}.")
+
+    return close.pct_change(periods=window).rename("momentum")
+
+
+def momentum_signals(
+    close: pd.Series,
+    momentum_window: int = 126,
+    entry_threshold: float = 0.0,
+    exit_threshold: float = 0.0,
+) -> pd.Series:
+    """
+    Generate long-only positions from a time-series momentum rule.
+
+    Rules
+    -----
+    * Enter long (1) when the trailing return rises **strictly above**
+      ``entry_threshold``.
+    * Exit  flat (0) when the trailing return falls **to or below**
+      ``exit_threshold``.
+    * Hold the current position between the two thresholds (hysteresis).
+    * The raw signal is **shifted by one period** to prevent lookahead bias.
+
+    Default parameters (both thresholds = 0.0)
+    -------------------------------------------
+    Enter when any positive trailing return is observed.
+    Exit immediately when the trailing return turns flat or negative.
+    This is the classical binary time-series momentum rule.
+
+    Hysteresis band (``entry_threshold > exit_threshold``)
+    -------------------------------------------------------
+    Example: entry=0.05, exit=-0.02.
+    Only enter on 5 %+ momentum; hold until momentum falls below −2 %.
+    Reduces turn-over in choppy markets at the cost of slower entries.
+
+    Parameters
+    ----------
+    close : pd.Series
+        Adjusted daily closing prices with a DatetimeIndex.
+    momentum_window : int
+        Trailing return look-back period in trading days (default: 126).
+    entry_threshold : float
+        Enter long when momentum **strictly exceeds** this decimal return
+        (default: 0.0 → any positive momentum triggers entry).
+    exit_threshold : float
+        Exit long when momentum **falls to or below** this decimal return
+        (default: 0.0 → zero or negative momentum triggers exit).
+        Must be ≤ ``entry_threshold``.
+
+    Returns
+    -------
+    pd.Series
+        Integer position series (0 or 1) with the same index as *close*,
+        named "position".  No NaN values.
+    """
+    if entry_threshold < exit_threshold:
+        raise ValueError(
+            f"entry_threshold ({entry_threshold}) must be >= exit_threshold "
+            f"({exit_threshold}).  Set entry >= exit to form a valid "
+            "hysteresis band (equal values → no gap, i.e. enter above "
+            "threshold and exit at-or-below the same threshold)."
+        )
+
+    momentum = compute_momentum(close, momentum_window)
+
+    in_position = False
+    raw: list = []
+
+    for val in momentum:
+        if pd.isna(val):
+            # Warm-up period: not enough history → stay flat.
+            raw.append(0)
+            continue
+
+        v = float(val)
+        if not in_position and v > entry_threshold:
+            in_position = True     # Momentum crossed above entry threshold
+        elif in_position and v <= exit_threshold:
+            in_position = False    # Momentum fell to or below exit threshold
 
         raw.append(1 if in_position else 0)
 

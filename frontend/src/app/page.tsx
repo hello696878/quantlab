@@ -6,11 +6,12 @@ import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
-import { runBacktest, runBbBacktest, runRsiBacktest } from "@/lib/api";
+import { runBacktest, runBbBacktest, runMomentumBacktest, runRsiBacktest } from "@/lib/api";
 import type {
   BacktestRequest,
   BacktestResponse,
   BbBacktestRequest,
+  MomentumBacktestRequest,
   RsiBacktestRequest,
   StrategyType,
 } from "@/lib/types";
@@ -51,6 +52,17 @@ const DEFAULT_BB_PARAMS: BbBacktestRequest = {
   initial_capital: 100_000,
 };
 
+const DEFAULT_MOMENTUM_PARAMS: MomentumBacktestRequest = {
+  ticker: "SPY",
+  start_date: "2015-01-01",
+  end_date: "2023-12-31",
+  momentum_window: 126,
+  entry_threshold: 0.0,
+  exit_threshold: 0.0,
+  transaction_cost_bps: 10,
+  initial_capital: 100_000,
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -66,6 +78,11 @@ function strategyLabel(r: BacktestResponse): string {
   if (r.strategy === "bollinger_band") {
     const exit = r.bb_exit_band === "upper" ? "Upper" : "Mid";
     return `BB(${r.bb_window ?? 20}, ${r.bb_num_std ?? 2}σ) exit:${exit}`;
+  }
+  if (r.strategy === "momentum") {
+    const entry = r.momentum_entry_threshold ?? 0;
+    const exit = r.momentum_exit_threshold ?? 0;
+    return `Momentum(${r.momentum_window ?? 126}) entry:${entry} exit:${exit}`;
   }
   return r.strategy;
 }
@@ -87,6 +104,13 @@ function paramSummary(r: BacktestResponse): string {
     return (
       `BB(${r.bb_window ?? 20}, ${r.bb_num_std ?? 2}σ) ` +
       `exit:${r.bb_exit_band ?? "middle"} · ${cost} · ${trades}`
+    );
+  }
+  if (r.strategy === "momentum") {
+    return (
+      `Momentum(${r.momentum_window ?? 126}) ` +
+      `entry:${r.momentum_entry_threshold ?? 0} ` +
+      `exit:${r.momentum_exit_threshold ?? 0} · ${cost} · ${trades}`
     );
   }
   return `${cost} · ${trades}`;
@@ -118,6 +142,15 @@ const STRATEGY_HEADINGS: Record<
       "recovers to the selected exit band. Signal is shifted one day forward to " +
       "prevent lookahead bias.",
   },
+  momentum: {
+    title: "Time-Series Momentum Backtest",
+    description:
+      "Long-only trend-following strategy. Enters when the trailing N-day return " +
+      "exceeds the entry threshold and exits when it falls to or below the exit " +
+      "threshold. An entry > exit gap creates a hysteresis band that reduces " +
+      "turnover in choppy markets. Signal is shifted one day forward to prevent " +
+      "lookahead bias.",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -129,6 +162,9 @@ export default function HomePage() {
   const [smaParams, setSmaParams] = useState<BacktestRequest>(DEFAULT_SMA_PARAMS);
   const [rsiParams, setRsiParams] = useState<RsiBacktestRequest>(DEFAULT_RSI_PARAMS);
   const [bbParams, setBbParams] = useState<BbBacktestRequest>(DEFAULT_BB_PARAMS);
+  const [momentumParams, setMomentumParams] = useState<MomentumBacktestRequest>(
+    DEFAULT_MOMENTUM_PARAMS,
+  );
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -146,7 +182,9 @@ export default function HomePage() {
           ? await runBacktest(smaParams)
           : strategy === "rsi_mean_reversion"
             ? await runRsiBacktest(rsiParams)
-            : await runBbBacktest(bbParams);
+            : strategy === "bollinger_band"
+              ? await runBbBacktest(bbParams)
+              : await runMomentumBacktest(momentumParams);
       setResult(data);
     } catch (err) {
       setError(
@@ -184,6 +222,8 @@ export default function HomePage() {
         onRsiParamsChange={setRsiParams}
         bbParams={bbParams}
         onBbParamsChange={setBbParams}
+        momentumParams={momentumParams}
+        onMomentumParamsChange={setMomentumParams}
         onSubmit={handleRun}
         loading={loading}
       />

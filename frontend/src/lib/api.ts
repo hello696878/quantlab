@@ -9,6 +9,7 @@ import type {
   BacktestRequest,
   BacktestResponse,
   BbBacktestRequest,
+  MomentumBacktestRequest,
   RsiBacktestRequest,
 } from "./types";
 
@@ -52,7 +53,11 @@ function backendUnavailableMessage(status: number): string {
 
 async function postBacktest(
   endpoint: string,
-  params: BacktestRequest | RsiBacktestRequest | BbBacktestRequest,
+  params:
+    | BacktestRequest
+    | RsiBacktestRequest
+    | BbBacktestRequest
+    | MomentumBacktestRequest,
 ): Promise<BacktestResponse> {
   let res: Response;
   try {
@@ -99,6 +104,13 @@ export async function runBbBacktest(
   params: BbBacktestRequest,
 ): Promise<BacktestResponse> {
   return postBacktest("/api/backtest/bollinger-band", params);
+}
+
+/** POST /api/backtest/momentum */
+export async function runMomentumBacktest(
+  params: MomentumBacktestRequest,
+): Promise<BacktestResponse> {
+  return postBacktest("/api/backtest/momentum", params);
 }
 
 export async function checkHealth(): Promise<boolean> {

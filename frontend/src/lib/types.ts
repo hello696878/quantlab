@@ -3,7 +3,11 @@
 // Keep these in sync when the backend changes.
 // ---------------------------------------------------------------------------
 
-export type StrategyType = "sma_crossover" | "rsi_mean_reversion" | "bollinger_band";
+export type StrategyType =
+  | "sma_crossover"
+  | "rsi_mean_reversion"
+  | "bollinger_band"
+  | "momentum";
 
 // ---------------------------------------------------------------------------
 // Requests
@@ -37,6 +41,17 @@ export interface BbBacktestRequest {
   bb_window: number;
   num_std: number;
   exit_band: "middle" | "upper";
+  transaction_cost_bps: number;
+  initial_capital: number;
+}
+
+export interface MomentumBacktestRequest {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  momentum_window: number;
+  entry_threshold: number;
+  exit_threshold: number;
   transaction_cost_bps: number;
   initial_capital: number;
 }
@@ -80,7 +95,7 @@ export interface EquityPoint {
 }
 
 // ---------------------------------------------------------------------------
-// Unified response  (SMA, RSI, and Bollinger Band endpoints return this shape)
+// Unified response  (all four strategy endpoints return this shape)
 // ---------------------------------------------------------------------------
 
 export interface BacktestResponse {
@@ -104,6 +119,11 @@ export interface BacktestResponse {
   bb_window: number | null;
   bb_num_std: number | null;
   bb_exit_band: "middle" | "upper" | null;
+
+  /** Momentum params — null when strategy is not momentum. */
+  momentum_window: number | null;
+  momentum_entry_threshold: number | null;
+  momentum_exit_threshold: number | null;
 
   transaction_cost_bps: number;
   initial_capital: number;
