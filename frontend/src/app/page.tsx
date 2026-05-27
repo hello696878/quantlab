@@ -6,6 +6,7 @@ import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
+import SmaSweepPanel from "@/components/SmaSweepPanel";
 import {
   runBacktest,
   runBbBacktest,
@@ -236,7 +237,10 @@ const STRATEGY_HEADINGS: Record<
 // Page
 // ---------------------------------------------------------------------------
 
+type PageMode = "backtest" | "sweep";
+
 export default function HomePage() {
+  const [mode, setMode] = useState<PageMode>("backtest");
   const [strategy, setStrategy] = useState<StrategyType>("sma_crossover");
   const [smaParams, setSmaParams] = useState<BacktestRequest>(DEFAULT_SMA_PARAMS);
   const [rsiParams, setRsiParams] = useState<RsiBacktestRequest>(DEFAULT_RSI_PARAMS);
@@ -286,6 +290,52 @@ export default function HomePage() {
 
   return (
     <div className="space-y-8">
+
+      {/* ── Mode tabs ────────────────────────────────────────────────── */}
+      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+        {(
+          [
+            { id: "backtest", label: "Backtest" },
+            { id: "sweep",    label: "SMA Parameter Sweep" },
+          ] as const
+        ).map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => setMode(id)}
+            className={
+              "px-4 py-1.5 rounded-lg text-sm font-medium transition-colors " +
+              (mode === id
+                ? "bg-white text-slate-900 shadow-sm"
+                : "text-slate-500 hover:text-slate-700")
+            }
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── SMA Parameter Sweep mode ─────────────────────────────────── */}
+      {mode === "sweep" && (
+        <>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">
+              SMA Crossover Parameter Sweep
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+              Test every combination of fast and slow SMA windows on the same
+              asset and date range.  Compare Sharpe ratio, CAGR, and max
+              drawdown to identify robust parameter regions and avoid
+              over-fitted outliers.
+            </p>
+          </div>
+          <SmaSweepPanel />
+        </>
+      )}
+
+      {/* ── Backtest mode ────────────────────────────────────────────── */}
+      {mode === "backtest" && (
+        <>
       {/* ── Strategy heading ─────────────────────────────────────────── */}
       <div>
         <h1 className="text-2xl font-bold text-slate-900">{heading.title}</h1>
@@ -405,6 +455,8 @@ export default function HomePage() {
             <TradeTable trades={result.trades} />
           </div>
         </>
+      )}
+    </> /* end backtest mode */
       )}
     </div>
   );

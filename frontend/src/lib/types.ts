@@ -176,3 +176,42 @@ export interface BacktestResponse {
 export interface ApiError {
   detail: string;
 }
+
+// ---------------------------------------------------------------------------
+// Research — SMA Parameter Sweep
+// ---------------------------------------------------------------------------
+
+export interface SmaSweepRequest {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  /** 1–10 values, each >= 2. */
+  fast_windows: number[];
+  /** 1–10 values, each >= 2. */
+  slow_windows: number[];
+  transaction_cost_bps: number;
+  initial_capital: number;
+}
+
+export interface SmaSweepRow {
+  fast_window: number;
+  slow_window: number;
+  total_return: number;
+  cagr: number;
+  sharpe_ratio: number;
+  sortino_ratio: number;
+  max_drawdown: number;
+  volatility: number;
+  num_trades: number;
+}
+
+export interface SmaSweepResponse {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  transaction_cost_bps: number;
+  initial_capital: number;
+  /** Number of valid (fast < slow) combinations that were run. */
+  num_combinations: number;
+  results: SmaSweepRow[];
+}

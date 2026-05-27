@@ -470,3 +470,110 @@ class BacktestResponse(BaseModel):
     equity_curve: List[EquityPoint]
     trades: List[TradeRecord]
     num_trades: int = Field(description="Total number of trade events.")
+
+
+# ===========================================================================
+# Research — SMA Parameter Sweep
+# ===========================================================================
+
+
+class SmaSweepRequest(BaseModel):
+    """Parameters for the SMA crossover parameter-sweep endpoint."""
+
+    ticker: str = Field(
+        default="SPY",
+        description="Yahoo Finance ticker symbol.",
+    )
+    start_date: str = Field(
+        default="2015-01-01",
+        description="Backtest start date in YYYY-MM-DD format.",
+    )
+    end_date: str = Field(
+        default="2023-12-31",
+        description="Backtest end date in YYYY-MM-DD format.",
+    )
+    fast_windows: List[int] = Field(
+        default=[10, 20, 30, 50],
+        min_length=1,
+        max_length=10,
+        description=(
+            "Fast SMA window lengths to test.  Each value must be >= 2.  "
+            "Maximum 10 values."
+        ),
+    )
+    slow_windows: List[int] = Field(
+        default=[50, 100, 150, 200],
+        min_length=1,
+        max_length=10,
+        description=(
+            "Slow SMA window lengths to test.  Each value must be >= 2.  "
+            "Maximum 10 values."
+        ),
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="One-way transaction cost in basis points.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0,
+        gt=0,
+        description="Starting capital in USD.",
+    )
+
+    @model_validator(mode="after")
+    def check_windows(self) -> "SmaSweepRequest":
+        for fw in self.fast_windows:
+            if fw < 2:
+                raise ValueError(
+                    f"All fast_windows must be >= 2; got {fw}."
+                )
+        for sw in self.slow_windows:
+            if sw < 2:
+                raise ValueError(
+                    f"All slow_windows must be >= 2; got {sw}."
+                )
+        total = len(self.fast_windows) * len(self.slow_windows)
+        if total > 100:
+            raise ValueError(
+                f"Total combinations (len(fast_windows) × len(slow_windows)) "
+                f"must be ≤ 100; got {total}."
+            )
+        return self
+
+
+class SmaSweepRow(BaseModel):
+    """One row in the SMA parameter-sweep result table."""
+
+    fast_window: int = Field(description="Fast SMA window (days).")
+    slow_window: int = Field(description="Slow SMA window (days).")
+    total_return: float = Field(description="Total return as a decimal.")
+    cagr: float = Field(description="Compound annual growth rate as a decimal.")
+    sharpe_ratio: float = Field(description="Annualised Sharpe ratio.")
+    sortino_ratio: float = Field(description="Annualised Sortino ratio.")
+    max_drawdown: float = Field(description="Maximum drawdown (negative decimal).")
+    volatility: float = Field(description="Annualised volatility as a decimal.")
+    num_trades: int = Field(description="Total BUY + SELL trade events.")
+
+
+class SmaSweepResponse(BaseModel):
+    """Full response for an SMA parameter-sweep request."""
+
+    ticker: str
+    start_date: str
+    end_date: str
+    transaction_cost_bps: float
+    initial_capital: float
+    num_combinations: int = Field(
+        description=(
+            "Number of valid (fast < slow) combinations actually run.  "
+            "Pairs where fast >= slow are silently skipped."
+        )
+    )
+    results: List[SmaSweepRow] = Field(
+        description=(
+            "One row per valid (fast, slow) combination, "
+            "ordered by fast_window then slow_window."
+        )
+    )

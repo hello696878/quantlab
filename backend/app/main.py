@@ -10,6 +10,7 @@ POST /backtest/bollinger-band         — run a Bollinger Band mean-reversion ba
 POST /backtest/momentum               — run a time-series momentum backtest
 POST /backtest/volatility-breakout    — run a volatility breakout backtest
 POST /backtest/pairs                  — run a pairs trading backtest
+POST /research/sma-parameter-sweep   — sweep fast/slow SMA window combinations
 """
 
 from fastapi import FastAPI, HTTPException
@@ -27,6 +28,9 @@ from app.schemas import (
     PairsBacktestRequest,
     PerformanceMetrics,
     RsiBacktestRequest,
+    SmaSweepRequest,
+    SmaSweepResponse,
+    SmaSweepRow,
     TradeRecord,
     VbBacktestRequest,
 )
@@ -53,7 +57,7 @@ app = FastAPI(
         "Volatility Breakout, Pairs Trading.\n"
         "All strategies use a one-day signal shift to prevent lookahead bias."
     ),
-    version="0.6.0",
+    version="0.7.0",
 )
 
 app.add_middleware(
@@ -177,7 +181,7 @@ def _build_response(
 @app.get("/health", tags=["ops"])
 def health_check():
     """Return a simple 200 OK to confirm the server is running."""
-    return {"status": "ok", "version": "0.6.0"}
+    return {"status": "ok", "version": "0.7.0"}
 
 
 @app.post(
@@ -546,4 +550,73 @@ def backtest_pairs(request: PairsBacktestRequest) -> BacktestResponse:
         equity_curve=equity_curve,
         trades=[TradeRecord(**t) for t in trades],
         num_trades=len(trades),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Research endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/research/sma-parameter-sweep",
+    response_model=SmaSweepResponse,
+    tags=["research"],
+    summary="SMA Crossover parameter sweep",
+    description=(
+        "Run a grid search over all requested (fast, slow) SMA window "
+        "combinations for a single asset.  Pairs where fast >= slow are "
+        "silently skipped.  Data is fetched once and each combination is "
+        "backtested with the same costs and capital.  "
+        "Maximum 10 × 10 = 100 combinations per request."
+    ),
+)
+def sma_parameter_sweep(request: SmaSweepRequest) -> SmaSweepResponse:
+    _validate_common(request.ticker, request.start_date, request.end_date)
+
+    df = _fetch(request.ticker, request.start_date, request.end_date)
+    close = df["Close"]
+
+    rows: list = []
+    for fast in sorted(set(request.fast_windows)):
+        for slow in sorted(set(request.slow_windows)):
+            # Skip invalid (fast >= slow) combinations silently.
+            if fast >= slow:
+                continue
+            # Skip combinations that need more bars than are available.
+            if len(close) < slow + 2:
+                continue
+
+            position = sma_crossover_signals(
+                close, fast_window=fast, slow_window=slow
+            )
+            strategy_equity, _bench, trades = run_backtest(
+                close=close,
+                position=position,
+                transaction_cost_bps=request.transaction_cost_bps,
+                initial_capital=request.initial_capital,
+            )
+            m = compute_metrics(strategy_equity)
+            rows.append(
+                SmaSweepRow(
+                    fast_window=fast,
+                    slow_window=slow,
+                    total_return=m["total_return"],
+                    cagr=m["cagr"],
+                    sharpe_ratio=m["sharpe_ratio"],
+                    sortino_ratio=m["sortino_ratio"],
+                    max_drawdown=m["max_drawdown"],
+                    volatility=m["volatility"],
+                    num_trades=len(trades),
+                )
+            )
+
+    return SmaSweepResponse(
+        ticker=request.ticker.strip().upper(),
+        start_date=request.start_date,
+        end_date=request.end_date,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+        num_combinations=len(rows),
+        results=rows,
     )
