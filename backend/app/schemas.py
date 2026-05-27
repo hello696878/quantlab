@@ -216,6 +216,61 @@ class MomentumBacktestRequest(BaseModel):
         return self
 
 
+class VbBacktestRequest(BaseModel):
+    """Parameters for the volatility breakout backtest endpoint."""
+
+    ticker: str = Field(
+        default="SPY",
+        description="Yahoo Finance ticker symbol (e.g. SPY, AAPL, BTC-USD).",
+    )
+    start_date: str = Field(
+        default="2015-01-01",
+        description="Backtest start date in YYYY-MM-DD format.",
+    )
+    end_date: str = Field(
+        default="2023-12-31",
+        description="Backtest end date in YYYY-MM-DD format (exclusive in yfinance).",
+    )
+    lookback_window: int = Field(
+        default=20,
+        ge=2,
+        le=500,
+        description=(
+            "Rolling window for the volatility estimate in trading days (default: 20). "
+            "Must be ≥ 2."
+        ),
+    )
+    breakout_multiplier: float = Field(
+        default=1.0,
+        gt=0.0,
+        le=10.0,
+        description=(
+            "Entry threshold: a breakout fires when today's daily return exceeds "
+            "this multiple of the rolling volatility (default: 1.0 = one σ)."
+        ),
+    )
+    exit_window: int = Field(
+        default=10,
+        ge=1,
+        le=500,
+        description=(
+            "Number of bars to hold after entry before exiting (default: 10). "
+            "A new breakout while in position resets this timer."
+        ),
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="One-way transaction cost in basis points.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0,
+        gt=0,
+        description="Starting capital in USD.",
+    )
+
+
 # ===========================================================================
 # Response building blocks
 # ===========================================================================
@@ -273,6 +328,8 @@ class BacktestResponse(BaseModel):
     * BB       : ``bb_window``, ``bb_num_std``, ``bb_exit_band`` (None otherwise).
     * Momentum : ``momentum_window``, ``momentum_entry_threshold``,
                  ``momentum_exit_threshold`` (None otherwise).
+    * VB       : ``vb_lookback_window``, ``vb_breakout_multiplier``,
+                 ``vb_exit_window`` (None otherwise).
 
     Backward compatibility
     ----------------------
@@ -311,6 +368,11 @@ class BacktestResponse(BaseModel):
     momentum_window: Optional[int] = Field(default=None)
     momentum_entry_threshold: Optional[float] = Field(default=None)
     momentum_exit_threshold: Optional[float] = Field(default=None)
+
+    # Volatility Breakout params — None when strategy is not volatility_breakout.
+    vb_lookback_window: Optional[int] = Field(default=None)
+    vb_breakout_multiplier: Optional[float] = Field(default=None)
+    vb_exit_window: Optional[int] = Field(default=None)
 
     transaction_cost_bps: float
     initial_capital: float

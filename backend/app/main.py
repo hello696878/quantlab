@@ -8,6 +8,7 @@ POST /backtest/sma-crossover          — run an SMA crossover backtest
 POST /backtest/rsi-mean-reversion     — run an RSI mean-reversion backtest
 POST /backtest/bollinger-band         — run a Bollinger Band mean-reversion backtest
 POST /backtest/momentum               — run a time-series momentum backtest
+POST /backtest/volatility-breakout    — run a volatility breakout backtest
 """
 
 from fastapi import FastAPI, HTTPException
@@ -25,12 +26,14 @@ from app.schemas import (
     PerformanceMetrics,
     RsiBacktestRequest,
     TradeRecord,
+    VbBacktestRequest,
 )
 from app.strategies import (
     bollinger_band_signals,
     momentum_signals,
     rsi_mean_reversion_signals,
     sma_crossover_signals,
+    volatility_breakout_signals,
 )
 from app.utils import validate_date_format
 
@@ -43,10 +46,11 @@ app = FastAPI(
     description=(
         "Quantitative backtesting engine.\n\n"
         "Strategies: SMA Crossover, RSI Mean Reversion, "
-        "Bollinger Band Mean Reversion, Time-Series Momentum.\n"
+        "Bollinger Band Mean Reversion, Time-Series Momentum, "
+        "Volatility Breakout.\n"
         "All strategies use a one-day signal shift to prevent lookahead bias."
     ),
-    version="0.4.0",
+    version="0.5.0",
 )
 
 app.add_middleware(
@@ -108,6 +112,10 @@ def _build_response(
     momentum_window=None,
     momentum_entry_threshold=None,
     momentum_exit_threshold=None,
+    # Volatility Breakout-specific (None when not applicable)
+    vb_lookback_window=None,
+    vb_breakout_multiplier=None,
+    vb_exit_window=None,
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response."""
     strategy_equity, benchmark_equity, trades = run_backtest(
@@ -145,6 +153,9 @@ def _build_response(
         momentum_window=momentum_window,
         momentum_entry_threshold=momentum_entry_threshold,
         momentum_exit_threshold=momentum_exit_threshold,
+        vb_lookback_window=vb_lookback_window,
+        vb_breakout_multiplier=vb_breakout_multiplier,
+        vb_exit_window=vb_exit_window,
         transaction_cost_bps=transaction_cost_bps,
         initial_capital=initial_capital,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
@@ -163,7 +174,7 @@ def _build_response(
 @app.get("/health", tags=["ops"])
 def health_check():
     """Return a simple 200 OK to confirm the server is running."""
-    return {"status": "ok", "version": "0.4.0"}
+    return {"status": "ok", "version": "0.5.0"}
 
 
 @app.post(
@@ -376,4 +387,59 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         momentum_window=request.momentum_window,
         momentum_entry_threshold=request.entry_threshold,
         momentum_exit_threshold=request.exit_threshold,
+    )
+
+
+@app.post(
+    "/backtest/volatility-breakout",
+    response_model=BacktestResponse,
+    tags=["backtest"],
+    summary="Run a volatility breakout backtest",
+    description=(
+        "Long-only trend-following strategy.  "
+        "Enters long when the daily return exceeds a multiple of the rolling "
+        "volatility (std of daily returns over the lookback window).  "
+        "Exits automatically after a fixed number of bars (exit_window).  "
+        "A new breakout while in a position resets the exit timer.  "
+        "Signal is shifted one day forward to prevent lookahead bias."
+    ),
+)
+def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse:
+    _validate_common(request.ticker, request.start_date, request.end_date)
+
+    df = _fetch(request.ticker, request.start_date, request.end_date)
+
+    # Need lookback_window + 1 bars for the first valid volatility reading,
+    # +exit_window for the exit logic, +5 for the shift and first equity return.
+    min_bars = request.lookback_window + request.exit_window + 5
+    if len(df) < min_bars:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(df)} trading days available; need at least "
+                f"{min_bars} for a {request.lookback_window}-day lookback and "
+                f"{request.exit_window}-bar exit window."
+            ),
+        )
+
+    close = df["Close"]
+    position = volatility_breakout_signals(
+        close,
+        lookback_window=request.lookback_window,
+        breakout_multiplier=request.breakout_multiplier,
+        exit_window=request.exit_window,
+    )
+
+    return _build_response(
+        request_ticker=request.ticker,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+        close=close,
+        position=position,
+        strategy="volatility_breakout",
+        vb_lookback_window=request.lookback_window,
+        vb_breakout_multiplier=request.breakout_multiplier,
+        vb_exit_window=request.exit_window,
     )

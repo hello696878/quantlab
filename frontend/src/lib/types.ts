@@ -7,7 +7,8 @@ export type StrategyType =
   | "sma_crossover"
   | "rsi_mean_reversion"
   | "bollinger_band"
-  | "momentum";
+  | "momentum"
+  | "volatility_breakout";
 
 // ---------------------------------------------------------------------------
 // Requests
@@ -56,6 +57,17 @@ export interface MomentumBacktestRequest {
   initial_capital: number;
 }
 
+export interface VbBacktestRequest {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  lookback_window: number;
+  breakout_multiplier: number;
+  exit_window: number;
+  transaction_cost_bps: number;
+  initial_capital: number;
+}
+
 /** Fields shared by every backtest request type. */
 export interface CommonParams {
   ticker: string;
@@ -95,7 +107,7 @@ export interface EquityPoint {
 }
 
 // ---------------------------------------------------------------------------
-// Unified response  (all four strategy endpoints return this shape)
+// Unified response  (all five strategy endpoints return this shape)
 // ---------------------------------------------------------------------------
 
 export interface BacktestResponse {
@@ -124,6 +136,11 @@ export interface BacktestResponse {
   momentum_window: number | null;
   momentum_entry_threshold: number | null;
   momentum_exit_threshold: number | null;
+
+  /** Volatility Breakout params — null when strategy is not volatility_breakout. */
+  vb_lookback_window: number | null;
+  vb_breakout_multiplier: number | null;
+  vb_exit_window: number | null;
 
   transaction_cost_bps: number;
   initial_capital: number;

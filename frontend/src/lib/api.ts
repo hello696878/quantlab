@@ -11,6 +11,7 @@ import type {
   BbBacktestRequest,
   MomentumBacktestRequest,
   RsiBacktestRequest,
+  VbBacktestRequest,
 } from "./types";
 
 export class BacktestApiError extends Error {
@@ -57,7 +58,8 @@ async function postBacktest(
     | BacktestRequest
     | RsiBacktestRequest
     | BbBacktestRequest
-    | MomentumBacktestRequest,
+    | MomentumBacktestRequest
+    | VbBacktestRequest,
 ): Promise<BacktestResponse> {
   let res: Response;
   try {
@@ -111,6 +113,13 @@ export async function runMomentumBacktest(
   params: MomentumBacktestRequest,
 ): Promise<BacktestResponse> {
   return postBacktest("/api/backtest/momentum", params);
+}
+
+/** POST /api/backtest/volatility-breakout */
+export async function runVbBacktest(
+  params: VbBacktestRequest,
+): Promise<BacktestResponse> {
+  return postBacktest("/api/backtest/volatility-breakout", params);
 }
 
 export async function checkHealth(): Promise<boolean> {

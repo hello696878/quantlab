@@ -6,7 +6,13 @@ import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
-import { runBacktest, runBbBacktest, runMomentumBacktest, runRsiBacktest } from "@/lib/api";
+import {
+  runBacktest,
+  runBbBacktest,
+  runMomentumBacktest,
+  runRsiBacktest,
+  runVbBacktest,
+} from "@/lib/api";
 import type {
   BacktestRequest,
   BacktestResponse,
@@ -14,6 +20,7 @@ import type {
   MomentumBacktestRequest,
   RsiBacktestRequest,
   StrategyType,
+  VbBacktestRequest,
 } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
@@ -63,6 +70,17 @@ const DEFAULT_MOMENTUM_PARAMS: MomentumBacktestRequest = {
   initial_capital: 100_000,
 };
 
+const DEFAULT_VB_PARAMS: VbBacktestRequest = {
+  ticker: "SPY",
+  start_date: "2015-01-01",
+  end_date: "2023-12-31",
+  lookback_window: 20,
+  breakout_multiplier: 1.0,
+  exit_window: 10,
+  transaction_cost_bps: 10,
+  initial_capital: 100_000,
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
@@ -83,6 +101,12 @@ function strategyLabel(r: BacktestResponse): string {
     const entry = r.momentum_entry_threshold ?? 0;
     const exit = r.momentum_exit_threshold ?? 0;
     return `Momentum(${r.momentum_window ?? 126}) entry:${entry} exit:${exit}`;
+  }
+  if (r.strategy === "volatility_breakout") {
+    return (
+      `VolBreakout(${r.vb_lookback_window ?? 20}, ` +
+      `${r.vb_breakout_multiplier ?? 1}σ, hold:${r.vb_exit_window ?? 10})`
+    );
   }
   return r.strategy;
 }
@@ -111,6 +135,13 @@ function paramSummary(r: BacktestResponse): string {
       `Momentum(${r.momentum_window ?? 126}) ` +
       `entry:${r.momentum_entry_threshold ?? 0} ` +
       `exit:${r.momentum_exit_threshold ?? 0} · ${cost} · ${trades}`
+    );
+  }
+  if (r.strategy === "volatility_breakout") {
+    return (
+      `VolBreakout lookback:${r.vb_lookback_window ?? 20} ` +
+      `mult:${r.vb_breakout_multiplier ?? 1}σ ` +
+      `hold:${r.vb_exit_window ?? 10} · ${cost} · ${trades}`
     );
   }
   return `${cost} · ${trades}`;
@@ -151,6 +182,15 @@ const STRATEGY_HEADINGS: Record<
       "turnover in choppy markets. Signal is shifted one day forward to prevent " +
       "lookahead bias.",
   },
+  volatility_breakout: {
+    title: "Volatility Breakout Backtest",
+    description:
+      "Long-only trend-following strategy. Enters when the daily return exceeds a " +
+      "multiple of the rolling volatility (std of daily returns over the lookback " +
+      "window), indicating an unusually large positive move. Exits automatically " +
+      "after a fixed number of bars. A new breakout while in a position resets the " +
+      "hold timer. Signal is shifted one day forward to prevent lookahead bias.",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -165,6 +205,7 @@ export default function HomePage() {
   const [momentumParams, setMomentumParams] = useState<MomentumBacktestRequest>(
     DEFAULT_MOMENTUM_PARAMS,
   );
+  const [vbParams, setVbParams] = useState<VbBacktestRequest>(DEFAULT_VB_PARAMS);
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -184,7 +225,9 @@ export default function HomePage() {
             ? await runRsiBacktest(rsiParams)
             : strategy === "bollinger_band"
               ? await runBbBacktest(bbParams)
-              : await runMomentumBacktest(momentumParams);
+              : strategy === "momentum"
+                ? await runMomentumBacktest(momentumParams)
+                : await runVbBacktest(vbParams);
       setResult(data);
     } catch (err) {
       setError(
@@ -224,6 +267,8 @@ export default function HomePage() {
         onBbParamsChange={setBbParams}
         momentumParams={momentumParams}
         onMomentumParamsChange={setMomentumParams}
+        vbParams={vbParams}
+        onVbParamsChange={setVbParams}
         onSubmit={handleRun}
         loading={loading}
       />

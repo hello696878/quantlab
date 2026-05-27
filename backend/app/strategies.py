@@ -7,6 +7,7 @@ Current strategies
 * RSI mean reversion (long-only)
 * Bollinger Band mean reversion (long-only)
 * Time-series momentum (long-only)
+* Volatility breakout (long-only)
 
 Lookahead-bias rule
 -------------------
@@ -423,6 +424,144 @@ def momentum_signals(
             in_position = True     # Momentum crossed above entry threshold
         elif in_position and v <= exit_threshold:
             in_position = False    # Momentum fell to or below exit threshold
+
+        raw.append(1 if in_position else 0)
+
+    # *** Shift by 1 to prevent lookahead bias ***
+    # position[T] = raw_signal[T-1], held over close[T-1] -> close[T].
+    position = pd.Series(raw, index=close.index, name="position")
+    position = position.shift(1).fillna(0).astype(int)
+
+    return position
+
+
+# ===========================================================================
+# Volatility Breakout
+# ===========================================================================
+
+def compute_volatility(close: pd.Series, window: int = 20) -> pd.Series:
+    """
+    Compute rolling close-to-close volatility as the standard deviation of
+    daily percentage returns over ``window`` bars.
+
+    Parameters
+    ----------
+    close : pd.Series
+        Adjusted daily closing prices with a DatetimeIndex.
+    window : int
+        Rolling look-back period in trading days (default: 20).
+        Must be ≥ 2 (need at least two return observations).
+
+    Returns
+    -------
+    pd.Series named "volatility".
+        NaN for the first ``window`` bars (insufficient history).
+        Positive decimal values thereafter (e.g. 0.01 = 1 % daily std).
+
+    Notes
+    -----
+    Uses sample standard deviation (ddof=1).  The first pct_change value is
+    always NaN, so the earliest valid reading appears at index ``window``
+    (requiring ``window + 1`` total price observations).
+    """
+    if window < 2:
+        raise ValueError(f"lookback_window must be at least 2; got {window}.")
+
+    daily_ret = close.pct_change()
+    return (
+        daily_ret.rolling(window=window, min_periods=window)
+        .std(ddof=1)
+        .rename("volatility")
+    )
+
+
+def volatility_breakout_signals(
+    close: pd.Series,
+    lookback_window: int = 20,
+    breakout_multiplier: float = 1.0,
+    exit_window: int = 10,
+) -> pd.Series:
+    """
+    Generate long-only positions from a volatility breakout rule.
+
+    Rules
+    -----
+    * Compute the rolling standard deviation of daily returns over
+      ``lookback_window`` bars as the volatility estimate.
+    * A **breakout** fires on bar T when::
+
+          daily_return[T] > breakout_multiplier × volatility[T]
+
+      i.e., today's move is an unusually large positive return relative
+      to recent typical daily swings.
+    * Enter long (1) immediately on a breakout.
+    * **Time-based exit**: exit flat (0) after holding ``exit_window`` bars.
+    * If a fresh breakout fires while already in a position, the exit timer
+      is **reset** — the position extends for another ``exit_window`` bars
+      from the new signal.
+    * The raw signal is **shifted by one period** to prevent lookahead bias.
+
+    Default parameters
+    ------------------
+    ``lookback_window=20, breakout_multiplier=1.0, exit_window=10``
+
+    With these defaults the strategy enters whenever a daily gain exceeds one
+    rolling standard deviation and holds for two trading weeks.
+
+    Parameters
+    ----------
+    close : pd.Series
+        Adjusted daily closing prices with a DatetimeIndex.
+    lookback_window : int
+        Rolling window for the volatility estimate in trading days (≥ 2).
+    breakout_multiplier : float
+        Threshold multiplier on volatility for the breakout condition (> 0).
+        Higher values require a larger move to trigger entry (fewer trades).
+    exit_window : int
+        Number of bars to hold the position before exiting (≥ 1).
+
+    Returns
+    -------
+    pd.Series
+        Integer position series (0 or 1) with the same index as *close*,
+        named "position".  No NaN values.
+    """
+    if breakout_multiplier <= 0.0:
+        raise ValueError(
+            f"breakout_multiplier must be > 0; got {breakout_multiplier}."
+        )
+    if exit_window < 1:
+        raise ValueError(f"exit_window must be at least 1; got {exit_window}.")
+
+    volatility = compute_volatility(close, lookback_window)
+    daily_ret = close.pct_change()
+
+    in_position = False
+    bars_held = 0
+    raw: list[int] = []
+
+    for i in range(len(close)):
+        vol = volatility.iloc[i]
+        ret = daily_ret.iloc[i]
+
+        if pd.isna(vol) or pd.isna(ret):
+            # Warm-up period: not enough history → stay flat.
+            raw.append(0)
+            continue
+
+        if in_position:
+            bars_held += 1
+            if bars_held >= exit_window:
+                # Time-based exit: held long enough, return to flat.
+                in_position = False
+                bars_held = 0
+            elif float(ret) > float(vol) * breakout_multiplier:
+                # New breakout while in position — reset the exit timer.
+                bars_held = 0
+        else:
+            if float(ret) > float(vol) * breakout_multiplier:
+                in_position = True
+                bars_held = 0  # bars_held counts bars *after* the entry bar
 
         raw.append(1 if in_position else 0)
 

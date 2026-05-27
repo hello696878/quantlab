@@ -6,6 +6,7 @@ import type {
   MomentumBacktestRequest,
   RsiBacktestRequest,
   StrategyType,
+  VbBacktestRequest,
 } from "@/lib/types";
 
 // Quick-pick tickers
@@ -22,6 +23,8 @@ interface Props {
   onBbParamsChange: (p: BbBacktestRequest) => void;
   momentumParams: MomentumBacktestRequest;
   onMomentumParamsChange: (p: MomentumBacktestRequest) => void;
+  vbParams: VbBacktestRequest;
+  onVbParamsChange: (p: VbBacktestRequest) => void;
   onSubmit: () => void;
   loading: boolean;
 }
@@ -86,6 +89,12 @@ const STRATEGIES: { id: StrategyType; label: string; description: string }[] = [
     description:
       "Long when the trailing N-day return exceeds an entry threshold; hysteresis optional.",
   },
+  {
+    id: "volatility_breakout",
+    label: "Vol Breakout",
+    description:
+      "Enters on an unusually large daily move (> multiplier × rolling σ); time-based exit.",
+  },
 ];
 
 // ---------------------------------------------------------------------------
@@ -103,6 +112,8 @@ export default function BacktestForm({
   onBbParamsChange,
   momentumParams,
   onMomentumParamsChange,
+  vbParams,
+  onVbParamsChange,
   onSubmit,
   loading,
 }: Props) {
@@ -114,13 +125,15 @@ export default function BacktestForm({
         ? rsiParams
         : strategy === "bollinger_band"
           ? bbParams
-          : momentumParams;
+          : strategy === "momentum"
+            ? momentumParams
+            : vbParams;
 
   function setCommon<K extends keyof typeof active>(
     key: K,
     value: (typeof active)[K],
   ) {
-    // Update all four request objects so common fields stay in sync when switching.
+    // Update all five request objects so common fields stay in sync when switching.
     onSmaParamsChange({ ...smaParams, [key]: value } as BacktestRequest);
     onRsiParamsChange({ ...rsiParams, [key]: value } as RsiBacktestRequest);
     onBbParamsChange({ ...bbParams, [key]: value } as BbBacktestRequest);
@@ -128,6 +141,7 @@ export default function BacktestForm({
       ...momentumParams,
       [key]: value,
     } as MomentumBacktestRequest);
+    onVbParamsChange({ ...vbParams, [key]: value } as VbBacktestRequest);
   }
 
   function setSma<K extends keyof BacktestRequest>(
@@ -158,6 +172,13 @@ export default function BacktestForm({
     onMomentumParamsChange({ ...momentumParams, [key]: value });
   }
 
+  function setVb<K extends keyof VbBacktestRequest>(
+    key: K,
+    value: VbBacktestRequest[K],
+  ) {
+    onVbParamsChange({ ...vbParams, [key]: value });
+  }
+
   // Validation
   const dateInvalid = active.start_date >= active.end_date;
   const smaInvalid =
@@ -177,6 +198,11 @@ export default function BacktestForm({
       momentumParams.exit_threshold < -1 ||
       momentumParams.exit_threshold > 1 ||
       momentumParams.entry_threshold < momentumParams.exit_threshold);
+  const vbInvalid =
+    strategy === "volatility_breakout" &&
+    (vbParams.lookback_window < 2 ||
+      vbParams.breakout_multiplier <= 0 ||
+      vbParams.exit_window < 1);
 
   const canSubmit =
     !loading &&
@@ -185,7 +211,8 @@ export default function BacktestForm({
     !smaInvalid &&
     !rsiInvalid &&
     !bbInvalid &&
-    !momentumInvalid;
+    !momentumInvalid &&
+    !vbInvalid;
 
   return (
     <div className="card overflow-hidden">
@@ -420,7 +447,7 @@ export default function BacktestForm({
                 </select>
               </Field>
             </div>
-          ) : (
+          ) : strategy === "momentum" ? (
             /* Momentum fields */
             <div className="grid grid-cols-3 gap-4">
               <Field label="Lookback" hint="days">
@@ -475,11 +502,60 @@ export default function BacktestForm({
                 />
               </Field>
             </div>
+          ) : (
+            /* Volatility Breakout fields */
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="Lookback" hint="days">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={vbParams.lookback_window}
+                  min={2}
+                  max={500}
+                  step={1}
+                  onChange={(e) =>
+                    setVb("lookback_window", parseInt(e.target.value, 10) || 20)
+                  }
+                  disabled={loading}
+                />
+              </Field>
+              <Field label="Multiplier" hint="× σ">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={vbParams.breakout_multiplier}
+                  min={0.1}
+                  max={10}
+                  step={0.1}
+                  onChange={(e) =>
+                    setVb(
+                      "breakout_multiplier",
+                      parseFloat(e.target.value) || 1.0,
+                    )
+                  }
+                  disabled={loading}
+                />
+              </Field>
+              <Field label="Hold bars" hint="exit after">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={vbParams.exit_window}
+                  min={1}
+                  max={500}
+                  step={1}
+                  onChange={(e) =>
+                    setVb("exit_window", parseInt(e.target.value, 10) || 10)
+                  }
+                  disabled={loading}
+                />
+              </Field>
+            </div>
           )}
         </div>
 
         {/* ── Inline validation ─────────────────────────────────────────── */}
-        {(dateInvalid || smaInvalid || rsiInvalid || bbInvalid || momentumInvalid) && (
+        {(dateInvalid || smaInvalid || rsiInvalid || bbInvalid || momentumInvalid || vbInvalid) && (
           <div className="mb-4 space-y-1">
             {dateInvalid && (
               <p className="text-xs text-red-600">
@@ -504,6 +580,11 @@ export default function BacktestForm({
             {momentumInvalid && (
               <p className="text-xs text-red-600">
                 ⚠ Momentum lookback must be ≥ 1, thresholds must be between -1 and 1, and entry must be ≥ exit.
+              </p>
+            )}
+            {vbInvalid && (
+              <p className="text-xs text-red-600">
+                ⚠ Lookback must be ≥ 2, multiplier must be &gt; 0, hold bars must be ≥ 1.
               </p>
             )}
           </div>
