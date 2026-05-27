@@ -11,6 +11,7 @@ POST /backtest/momentum               — run a time-series momentum backtest
 POST /backtest/volatility-breakout    — run a volatility breakout backtest
 POST /backtest/pairs                  — run a pairs trading backtest
 POST /research/sma-parameter-sweep   — sweep fast/slow SMA window combinations
+POST /research/sma-train-test        — SMA train/test out-of-sample validation
 """
 
 from fastapi import FastAPI, HTTPException
@@ -31,6 +32,8 @@ from app.schemas import (
     SmaSweepRequest,
     SmaSweepResponse,
     SmaSweepRow,
+    SmaTrainTestRequest,
+    SmaTrainTestResponse,
     TradeRecord,
     VbBacktestRequest,
 )
@@ -637,4 +640,220 @@ def sma_parameter_sweep(request: SmaSweepRequest) -> SmaSweepResponse:
         initial_capital=request.initial_capital,
         num_combinations=len(rows),
         results=rows,
+    )
+
+
+@app.post(
+    "/research/sma-train-test",
+    response_model=SmaTrainTestResponse,
+    tags=["research"],
+    summary="SMA Train/Test Out-of-Sample Validation",
+    description=(
+        "Split the date range into in-sample (IS) and out-of-sample (OOS) "
+        "periods at split_date.  Run a parameter sweep on IS data only, pick "
+        "the best (fast, slow) pair by the chosen selection metric, then "
+        "evaluate those parameters on OOS data.  Reports IS metrics, OOS "
+        "metrics, degradation, and an oos_collapsed warning flag.  "
+        "No data leakage: OOS data is never used during parameter selection."
+    ),
+)
+def sma_train_test(request: SmaTrainTestRequest) -> SmaTrainTestResponse:
+    import pandas as pd  # local import keeps top-level clean
+
+    # Pydantic has already validated date ordering and format; call the shared
+    # helper only for ticker emptiness and start/end date checks.
+    _validate_common(request.ticker, request.start_date, request.end_date)
+
+    # Fetch the full price history once.
+    df = _fetch(request.ticker, request.start_date, request.end_date)
+    close_all = df["Close"]
+
+    # Split: IS = [start_date, split_date)  |  OOS = [split_date, end_date]
+    split_ts = pd.Timestamp(request.split_date)
+    close_is = close_all[close_all.index < split_ts]
+    close_oos = close_all[close_all.index >= split_ts]
+
+    if len(close_is) < 3:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"In-sample period has only {len(close_is)} trading days "
+                "(need at least 3).  Move split_date later."
+            ),
+        )
+    if len(close_oos) < 3:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Out-of-sample period has only {len(close_oos)} trading days "
+                "(need at least 3).  Move split_date earlier or extend end_date."
+            ),
+        )
+
+    # ── In-sample parameter sweep (IS data only — no leakage) ─────────────
+    is_rows: list = []
+    valid_pairs = 0
+    for fast in sorted(set(request.fast_windows)):
+        for slow in sorted(set(request.slow_windows)):
+            if fast >= slow:
+                continue
+            valid_pairs += 1
+            if len(close_is) < slow + 2:
+                continue
+
+            position = sma_crossover_signals(
+                close_is, fast_window=fast, slow_window=slow
+            )
+            strategy_equity, _bench, trades = run_backtest(
+                close=close_is,
+                position=position,
+                transaction_cost_bps=request.transaction_cost_bps,
+                initial_capital=request.initial_capital,
+            )
+            m = compute_metrics(strategy_equity)
+            is_rows.append(
+                SmaSweepRow(
+                    fast_window=fast,
+                    slow_window=slow,
+                    total_return=m["total_return"],
+                    cagr=m["cagr"],
+                    sharpe_ratio=m["sharpe_ratio"],
+                    sortino_ratio=m["sortino_ratio"],
+                    max_drawdown=m["max_drawdown"],
+                    volatility=m["volatility"],
+                    num_trades=len(trades),
+                )
+            )
+
+    if valid_pairs > 0 and not is_rows:
+        max_slow = max(
+            slow
+            for fast in set(request.fast_windows)
+            for slow in set(request.slow_windows)
+            if fast < slow
+        )
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"In-sample period has only {len(close_is)} trading days; "
+                f"no valid SMA combination can run.  Requested slow windows "
+                f"require up to {max_slow + 2} trading days.  Move split_date "
+                f"later or choose smaller window values."
+            ),
+        )
+    if not is_rows:
+        raise HTTPException(
+            status_code=422,
+            detail="No valid (fast < slow) window combinations found.",
+        )
+
+    # ── Select best in-sample parameters ──────────────────────────────────
+    def _row_score(row: SmaSweepRow) -> float:
+        if request.selection_metric == "sharpe_ratio":
+            return row.sharpe_ratio
+        if request.selection_metric == "cagr":
+            return row.cagr
+        # calmar_ratio: computed inline (not stored in SmaSweepRow)
+        return (
+            row.cagr / abs(row.max_drawdown)
+            if abs(row.max_drawdown) > 1e-12
+            else 0.0
+        )
+
+    best_row = max(is_rows, key=_row_score)
+    best_fast = best_row.fast_window
+    best_slow = best_row.slow_window
+
+    # ── Verify OOS has enough bars for the selected windows ───────────────
+    min_oos_bars = best_slow + 2
+    if len(close_oos) < min_oos_bars:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Out-of-sample period has only {len(close_oos)} trading days, "
+                f"but the best in-sample parameters (fast={best_fast}, "
+                f"slow={best_slow}) require at least {min_oos_bars}.  "
+                f"Move split_date earlier or extend end_date."
+            ),
+        )
+
+    # ── Re-run IS backtest for best params → full PerformanceMetrics ──────
+    is_position = sma_crossover_signals(
+        close_is, fast_window=best_fast, slow_window=best_slow
+    )
+    is_strategy_equity, _is_bench, _is_trades = run_backtest(
+        close=close_is,
+        position=is_position,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+    )
+    is_metrics_dict = compute_metrics(is_strategy_equity)
+    is_metrics = PerformanceMetrics(**is_metrics_dict)
+
+    # ── OOS backtest with the selected parameters ─────────────────────────
+    oos_position = sma_crossover_signals(
+        close_oos, fast_window=best_fast, slow_window=best_slow
+    )
+    oos_strategy_equity, oos_bench_equity, oos_trades = run_backtest(
+        close=close_oos,
+        position=oos_position,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+    )
+    oos_metrics_dict = compute_metrics(oos_strategy_equity)
+    oos_bench_metrics_dict = compute_metrics(oos_bench_equity)
+    oos_metrics = PerformanceMetrics(**oos_metrics_dict)
+    oos_bench_metrics = PerformanceMetrics(**oos_bench_metrics_dict)
+
+    # ── Build OOS equity curve ─────────────────────────────────────────────
+    oos_equity_curve = [
+        EquityPoint(
+            date=str(d.date()) if hasattr(d, "date") else str(d),
+            strategy=round(float(s), 2),
+            benchmark=round(float(b), 2),
+        )
+        for d, s, b in zip(
+            oos_strategy_equity.index, oos_strategy_equity, oos_bench_equity
+        )
+    ]
+
+    # ── Degradation (OOS − IS; negative = performance deteriorated) ───────
+    sharpe_degradation = round(
+        oos_metrics_dict["sharpe_ratio"] - is_metrics_dict["sharpe_ratio"], 4
+    )
+    cagr_degradation = round(
+        oos_metrics_dict["cagr"] - is_metrics_dict["cagr"], 6
+    )
+
+    # oos_collapsed: OOS Sharpe < 0, or OOS Sharpe < 50 % of IS Sharpe
+    # (only triggered when IS Sharpe > 0.1 to avoid noise on flat strategies).
+    oos_sharpe = oos_metrics_dict["sharpe_ratio"]
+    is_sharpe = is_metrics_dict["sharpe_ratio"]
+    oos_collapsed = bool(
+        oos_sharpe < 0
+        or (is_sharpe > 0.1 and oos_sharpe < is_sharpe * 0.5)
+    )
+
+    return SmaTrainTestResponse(
+        ticker=request.ticker.strip().upper(),
+        start_date=request.start_date,
+        split_date=request.split_date,
+        end_date=request.end_date,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+        selection_metric=request.selection_metric,
+        in_sample_days=int(len(close_is)),
+        out_of_sample_days=int(len(close_oos)),
+        best_fast_window=best_fast,
+        best_slow_window=best_slow,
+        in_sample_metrics=is_metrics,
+        out_of_sample_metrics=oos_metrics,
+        out_of_sample_benchmark_metrics=oos_bench_metrics,
+        out_of_sample_equity_curve=oos_equity_curve,
+        out_of_sample_trades=[TradeRecord(**t) for t in oos_trades],
+        out_of_sample_num_trades=len(oos_trades),
+        sharpe_degradation=sharpe_degradation,
+        cagr_degradation=cagr_degradation,
+        oos_collapsed=oos_collapsed,
+        all_in_sample_results=is_rows,
     )

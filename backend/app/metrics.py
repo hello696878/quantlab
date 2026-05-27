@@ -108,6 +108,12 @@ def compute_metrics(
     # -----------------------------------------------------------------------
     win_rate = float((daily_returns > 0).sum() / len(daily_returns)) if len(daily_returns) > 0 else 0.0
 
+    # -----------------------------------------------------------------------
+    # Calmar ratio  (CAGR / |max_drawdown|)
+    # 0.0 when there is no drawdown (undefined, use conservative default).
+    # -----------------------------------------------------------------------
+    calmar_ratio = round(cagr / abs(max_drawdown), 4) if abs(max_drawdown) > 1e-12 else 0.0
+
     return {
         "total_return": round(total_return, 6),
         "cagr": round(cagr, 6),
@@ -115,6 +121,7 @@ def compute_metrics(
         "sortino_ratio": round(sortino_ratio, 4),
         "max_drawdown": round(max_drawdown, 6),
         "volatility": round(volatility, 6),
+        "calmar_ratio": calmar_ratio,
         "win_rate": round(win_rate, 4),
         "num_days": int(n_days),
     }

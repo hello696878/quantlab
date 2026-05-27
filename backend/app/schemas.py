@@ -363,6 +363,9 @@ class PerformanceMetrics(BaseModel):
     sortino_ratio: float = Field(description="Annualised Sortino ratio (rf = 0%).")
     max_drawdown: float = Field(description="Maximum peak-to-trough drawdown as a decimal (negative).")
     volatility: float = Field(description="Annualised volatility as a decimal.")
+    calmar_ratio: float = Field(
+        description="Calmar ratio (CAGR / |max_drawdown|).  0.0 when max_drawdown is zero."
+    )
     win_rate: float = Field(description="Fraction of trading days with a positive return.")
     num_days: int = Field(description="Number of trading days in the period.")
 
@@ -577,3 +580,150 @@ class SmaSweepResponse(BaseModel):
             "ordered by fast_window then slow_window."
         )
     )
+
+
+# ===========================================================================
+# Research — SMA Train/Test Out-of-Sample Validation
+# ===========================================================================
+
+_DATE_RE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+
+
+class SmaTrainTestRequest(BaseModel):
+    """Parameters for the SMA crossover train/test validation endpoint."""
+
+    ticker: str = Field(
+        default="SPY",
+        description="Yahoo Finance ticker symbol.",
+    )
+    start_date: str = Field(
+        default="2010-01-01",
+        description="Start of the in-sample period (YYYY-MM-DD).",
+    )
+    split_date: str = Field(
+        default="2018-01-01",
+        description=(
+            "Split point: dates before this are in-sample; "
+            "dates from this point onward are out-of-sample (YYYY-MM-DD)."
+        ),
+    )
+    end_date: str = Field(
+        default="2023-12-31",
+        description="End of the out-of-sample period (YYYY-MM-DD).",
+    )
+    fast_windows: List[int] = Field(
+        default=[10, 20, 30, 50],
+        min_length=1,
+        max_length=10,
+        description="Fast SMA window lengths to sweep (each >= 2, max 10 values).",
+    )
+    slow_windows: List[int] = Field(
+        default=[100, 150, 200],
+        min_length=1,
+        max_length=10,
+        description="Slow SMA window lengths to sweep (each >= 2, max 10 values).",
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="One-way transaction cost in basis points.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0,
+        gt=0,
+        description="Starting capital in USD.",
+    )
+    selection_metric: Literal["sharpe_ratio", "cagr", "calmar_ratio"] = Field(
+        default="sharpe_ratio",
+        description=(
+            "Metric used to pick the best in-sample parameter pair.  "
+            "One of: 'sharpe_ratio', 'cagr', 'calmar_ratio'."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def check_dates(self) -> "SmaTrainTestRequest":
+        import re
+        for name, val in [
+            ("start_date", self.start_date),
+            ("split_date", self.split_date),
+            ("end_date", self.end_date),
+        ]:
+            if not re.match(_DATE_RE_PATTERN, val):
+                raise ValueError(f"{name} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.split_date:
+            raise ValueError("start_date must be strictly before split_date.")
+        if self.split_date >= self.end_date:
+            raise ValueError("split_date must be strictly before end_date.")
+        return self
+
+    @model_validator(mode="after")
+    def check_windows(self) -> "SmaTrainTestRequest":
+        for fw in self.fast_windows:
+            if fw < 2:
+                raise ValueError(f"All fast_windows must be >= 2; got {fw}.")
+        for sw in self.slow_windows:
+            if sw < 2:
+                raise ValueError(f"All slow_windows must be >= 2; got {sw}.")
+        total = len(self.fast_windows) * len(self.slow_windows)
+        if total > 100:
+            raise ValueError(
+                f"Total combinations (len(fast_windows) × len(slow_windows)) "
+                f"must be ≤ 100; got {total}."
+            )
+        return self
+
+
+class SmaTrainTestResponse(BaseModel):
+    """Full response for the SMA train/test out-of-sample validation endpoint."""
+
+    # Identity
+    ticker: str
+    start_date: str
+    split_date: str
+    end_date: str
+    transaction_cost_bps: float
+    initial_capital: float
+    selection_metric: str
+
+    # Period lengths
+    in_sample_days: int = Field(description="Number of in-sample trading days.")
+    out_of_sample_days: int = Field(description="Number of out-of-sample trading days.")
+
+    # Best parameters (selected on in-sample data only)
+    best_fast_window: int
+    best_slow_window: int
+
+    # Metrics for the best-param pair on each period
+    in_sample_metrics: PerformanceMetrics
+    out_of_sample_metrics: PerformanceMetrics
+    out_of_sample_benchmark_metrics: PerformanceMetrics = Field(
+        description="Buy-and-hold benchmark over the out-of-sample period."
+    )
+
+    # Out-of-sample equity curve
+    out_of_sample_equity_curve: List[EquityPoint]
+
+    # Out-of-sample trades
+    out_of_sample_trades: List[TradeRecord]
+    out_of_sample_num_trades: int
+
+    # Degradation  (OOS value − IS value; negative = deteriorated)
+    sharpe_degradation: float = Field(
+        description="out_of_sample_sharpe − in_sample_sharpe.  Negative = OOS is worse."
+    )
+    cagr_degradation: float = Field(
+        description="out_of_sample_cagr − in_sample_cagr.  Negative = OOS is worse."
+    )
+
+    # Warning flag
+    oos_collapsed: bool = Field(
+        description=(
+            "True when OOS Sharpe < 0, or when OOS Sharpe is less than half "
+            "of the in-sample Sharpe (large degradation signal)."
+        )
+    )
+
+    # All in-sample sweep rows (for reference / display)
+    all_in_sample_results: List[SmaSweepRow]

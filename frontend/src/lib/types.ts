@@ -101,6 +101,7 @@ export interface PerformanceMetrics {
   sortino_ratio: number;
   max_drawdown: number;
   volatility: number;
+  calmar_ratio: number;
   win_rate: number;
   num_days: number;
 }
@@ -214,4 +215,57 @@ export interface SmaSweepResponse {
   /** Number of valid (fast < slow) combinations that were run. */
   num_combinations: number;
   results: SmaSweepRow[];
+}
+
+// ---------------------------------------------------------------------------
+// Research — SMA Train/Test Out-of-Sample Validation
+// ---------------------------------------------------------------------------
+
+export interface SmaTrainTestRequest {
+  ticker: string;
+  start_date: string;
+  split_date: string;
+  end_date: string;
+  /** 1–10 values, each >= 2. */
+  fast_windows: number[];
+  /** 1–10 values, each >= 2. */
+  slow_windows: number[];
+  transaction_cost_bps: number;
+  initial_capital: number;
+  selection_metric: "sharpe_ratio" | "cagr" | "calmar_ratio";
+}
+
+export interface SmaTrainTestResponse {
+  ticker: string;
+  start_date: string;
+  split_date: string;
+  end_date: string;
+  transaction_cost_bps: number;
+  initial_capital: number;
+  selection_metric: string;
+
+  in_sample_days: number;
+  out_of_sample_days: number;
+
+  best_fast_window: number;
+  best_slow_window: number;
+
+  in_sample_metrics: PerformanceMetrics;
+  out_of_sample_metrics: PerformanceMetrics;
+  out_of_sample_benchmark_metrics: PerformanceMetrics;
+
+  out_of_sample_equity_curve: EquityPoint[];
+  out_of_sample_trades: TradeRecord[];
+  out_of_sample_num_trades: number;
+
+  /** OOS Sharpe − IS Sharpe.  Negative = OOS is worse. */
+  sharpe_degradation: number;
+  /** OOS CAGR − IS CAGR.  Negative = OOS is worse. */
+  cagr_degradation: number;
+
+  /** True when OOS Sharpe < 0 or OOS Sharpe < 50 % of IS Sharpe. */
+  oos_collapsed: boolean;
+
+  /** All IS sweep rows for reference display. */
+  all_in_sample_results: SmaSweepRow[];
 }

@@ -7,6 +7,7 @@ import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
 import SmaSweepPanel from "@/components/SmaSweepPanel";
+import SmaTrainTestPanel from "@/components/SmaTrainTestPanel";
 import {
   runBacktest,
   runBbBacktest,
@@ -237,10 +238,12 @@ const STRATEGY_HEADINGS: Record<
 // Page
 // ---------------------------------------------------------------------------
 
-type PageMode = "backtest" | "sweep";
+type PageMode = "backtest" | "research";
+type ResearchTab = "sweep" | "train-test";
 
 export default function HomePage() {
   const [mode, setMode] = useState<PageMode>("backtest");
+  const [researchTab, setResearchTab] = useState<ResearchTab>("sweep");
   const [strategy, setStrategy] = useState<StrategyType>("sma_crossover");
   const [smaParams, setSmaParams] = useState<BacktestRequest>(DEFAULT_SMA_PARAMS);
   const [rsiParams, setRsiParams] = useState<RsiBacktestRequest>(DEFAULT_RSI_PARAMS);
@@ -291,12 +294,12 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
 
-      {/* ── Mode tabs ────────────────────────────────────────────────── */}
+      {/* ── Top-level mode tabs ──────────────────────────────────────── */}
       <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
         {(
           [
-            { id: "backtest", label: "Backtest" },
-            { id: "sweep",    label: "SMA Parameter Sweep" },
+            { id: "backtest",  label: "Backtest" },
+            { id: "research",  label: "Research Tools" },
           ] as const
         ).map(({ id, label }) => (
           <button
@@ -315,21 +318,75 @@ export default function HomePage() {
         ))}
       </div>
 
-      {/* ── SMA Parameter Sweep mode ─────────────────────────────────── */}
-      {mode === "sweep" && (
+      {/* ── Research Tools mode ──────────────────────────────────────── */}
+      {mode === "research" && (
         <>
           <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              SMA Crossover Parameter Sweep
-            </h1>
+            <h1 className="text-2xl font-bold text-slate-900">Research Tools</h1>
             <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-              Test every combination of fast and slow SMA windows on the same
-              asset and date range.  Compare Sharpe ratio, CAGR, and max
-              drawdown to identify robust parameter regions and avoid
-              over-fitted outliers.
+              Quantitative tools for parameter exploration and out-of-sample
+              validation.
             </p>
           </div>
-          <SmaSweepPanel />
+
+          {/* Research sub-tabs */}
+          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
+            {(
+              [
+                { id: "sweep",      label: "SMA Parameter Sweep" },
+                { id: "train-test", label: "SMA Train/Test Validation" },
+              ] as const
+            ).map(({ id, label }) => (
+              <button
+                key={id}
+                type="button"
+                onClick={() => setResearchTab(id)}
+                className={
+                  "px-4 py-1.5 rounded-lg text-sm font-medium transition-colors " +
+                  (researchTab === id
+                    ? "bg-white text-slate-900 shadow-sm"
+                    : "text-slate-500 hover:text-slate-700")
+                }
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {researchTab === "sweep" && (
+            <>
+              <div>
+                <h2 className="text-xl font-semibold text-slate-800">
+                  SMA Crossover Parameter Sweep
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+                  Test every combination of fast and slow SMA windows on the
+                  same asset and date range.  Compare Sharpe ratio, CAGR, and
+                  max drawdown to identify robust parameter regions and avoid
+                  over-fitted outliers.
+                </p>
+              </div>
+              <SmaSweepPanel />
+            </>
+          )}
+
+          {researchTab === "train-test" && (
+            <>
+              <div>
+                <h2 className="text-xl font-semibold text-slate-800">
+                  SMA Train/Test Out-of-Sample Validation
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+                  Split your date range into in-sample (IS) and out-of-sample
+                  (OOS) periods.  Run a parameter sweep on IS data only, select
+                  the best parameters by your chosen metric, then evaluate them
+                  on unseen OOS data.  Reveals whether IS performance is genuine
+                  or a product of over-fitting.
+                </p>
+              </div>
+              <SmaTrainTestPanel />
+            </>
+          )}
         </>
       )}
 
