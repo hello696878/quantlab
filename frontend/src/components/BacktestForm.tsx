@@ -93,7 +93,7 @@ const STRATEGIES: { id: StrategyType; label: string; description: string }[] = [
     id: "volatility_breakout",
     label: "Vol Breakout",
     description:
-      "Enters on an unusually large daily move (> multiplier × rolling σ); time-based exit.",
+      "Enters above the prior range breakout level; exits below the rolling mean.",
   },
 ];
 
@@ -519,7 +519,7 @@ export default function BacktestForm({
                   disabled={loading}
                 />
               </Field>
-              <Field label="Multiplier" hint="× σ">
+              <Field label="Multiplier" hint="× range">
                 <input
                   type="number"
                   className={inputCls}
@@ -536,7 +536,7 @@ export default function BacktestForm({
                   disabled={loading}
                 />
               </Field>
-              <Field label="Hold bars" hint="exit after">
+              <Field label="Exit mean" hint="days">
                 <input
                   type="number"
                   className={inputCls}

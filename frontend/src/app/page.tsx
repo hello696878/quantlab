@@ -105,7 +105,7 @@ function strategyLabel(r: BacktestResponse): string {
   if (r.strategy === "volatility_breakout") {
     return (
       `VolBreakout(${r.vb_lookback_window ?? 20}, ` +
-      `${r.vb_breakout_multiplier ?? 1}σ, hold:${r.vb_exit_window ?? 10})`
+      `${r.vb_breakout_multiplier ?? 1}x range, exit:${r.vb_exit_window ?? 10})`
     );
   }
   return r.strategy;
@@ -140,8 +140,8 @@ function paramSummary(r: BacktestResponse): string {
   if (r.strategy === "volatility_breakout") {
     return (
       `VolBreakout lookback:${r.vb_lookback_window ?? 20} ` +
-      `mult:${r.vb_breakout_multiplier ?? 1}σ ` +
-      `hold:${r.vb_exit_window ?? 10} · ${cost} · ${trades}`
+      `mult:${r.vb_breakout_multiplier ?? 1}x range ` +
+      `exit mean:${r.vb_exit_window ?? 10} · ${cost} · ${trades}`
     );
   }
   return `${cost} · ${trades}`;
@@ -185,11 +185,10 @@ const STRATEGY_HEADINGS: Record<
   volatility_breakout: {
     title: "Volatility Breakout Backtest",
     description:
-      "Long-only trend-following strategy. Enters when the daily return exceeds a " +
-      "multiple of the rolling volatility (std of daily returns over the lookback " +
-      "window), indicating an unusually large positive move. Exits automatically " +
-      "after a fixed number of bars. A new breakout while in a position resets the " +
-      "hold timer. Signal is shifted one day forward to prevent lookahead bias.",
+      "Long-only trend-following strategy. Enters when price breaks above the " +
+      "prior rolling high plus a multiple of the prior high-low range. Exits " +
+      "when price falls below the rolling mean exit level. Signal is shifted " +
+      "one day forward to prevent lookahead bias.",
   },
 };
 

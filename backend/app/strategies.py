@@ -439,40 +439,82 @@ def momentum_signals(
 # Volatility Breakout
 # ===========================================================================
 
-def compute_volatility(close: pd.Series, window: int = 20) -> pd.Series:
+def compute_volatility_breakout_levels(
+    close: pd.Series,
+    lookback_window: int = 20,
+    breakout_multiplier: float = 1.0,
+    exit_window: int = 10,
+) -> tuple[pd.Series, pd.Series]:
     """
-    Compute rolling close-to-close volatility as the standard deviation of
-    daily percentage returns over ``window`` bars.
+    Compute price-channel breakout and rolling-mean exit levels.
+
+    The breakout threshold for bar T is based only on information available
+    through bar T-1:
+
+        rolling_high[T-1] + breakout_multiplier * rolling_range[T-1]
+
+    where rolling_range = rolling_high - rolling_low over ``lookback_window``.
 
     Parameters
     ----------
     close : pd.Series
         Adjusted daily closing prices with a DatetimeIndex.
-    window : int
-        Rolling look-back period in trading days (default: 20).
-        Must be ≥ 2 (need at least two return observations).
+    lookback_window : int
+        Rolling high/low look-back period in trading days (default: 20).
+    breakout_multiplier : float
+        Multiplier applied to the prior rolling high-low range.
+    exit_window : int
+        Rolling mean window for the exit level.
 
     Returns
     -------
-    pd.Series named "volatility".
-        NaN for the first ``window`` bars (insufficient history).
-        Positive decimal values thereafter (e.g. 0.01 = 1 % daily std).
-
-    Notes
-    -----
-    Uses sample standard deviation (ddof=1).  The first pct_change value is
-    always NaN, so the earliest valid reading appears at index ``window``
-    (requiring ``window + 1`` total price observations).
+    (breakout_level, exit_level) : tuple of pd.Series
+        ``breakout_level`` is shifted by one bar to avoid using today's close
+        in today's entry threshold. ``exit_level`` is the rolling mean ending
+        at the current bar and must still be signal-shifted before trading.
     """
-    if window < 2:
-        raise ValueError(f"lookback_window must be at least 2; got {window}.")
+    if lookback_window < 2:
+        raise ValueError(
+            f"lookback_window must be at least 2; got {lookback_window}."
+        )
+    if breakout_multiplier <= 0.0:
+        raise ValueError(
+            f"breakout_multiplier must be > 0; got {breakout_multiplier}."
+        )
+    if exit_window < 1:
+        raise ValueError(f"exit_window must be at least 1; got {exit_window}.")
 
-    daily_ret = close.pct_change()
-    return (
-        daily_ret.rolling(window=window, min_periods=window)
-        .std(ddof=1)
-        .rename("volatility")
+    rolling_high = close.rolling(
+        window=lookback_window, min_periods=lookback_window
+    ).max()
+    rolling_low = close.rolling(
+        window=lookback_window, min_periods=lookback_window
+    ).min()
+    rolling_range = rolling_high - rolling_low
+
+    breakout_level = (
+        rolling_high.shift(1) + breakout_multiplier * rolling_range.shift(1)
+    ).rename("breakout_level")
+    exit_level = close.rolling(
+        window=exit_window, min_periods=exit_window
+    ).mean().rename("exit_level")
+
+    return breakout_level, exit_level
+
+
+def compute_volatility(close: pd.Series, window: int = 20) -> pd.Series:
+    """
+    Backward-compatible alias for the breakout entry level.
+
+    Prefer ``compute_volatility_breakout_levels`` for new code.
+    """
+    breakout_level, _ = compute_volatility_breakout_levels(
+        close,
+        lookback_window=window,
+        breakout_multiplier=1.0,
+        exit_window=1,
     )
+    return breakout_level.rename("volatility")
 
 
 def volatility_breakout_signals(
@@ -482,43 +524,34 @@ def volatility_breakout_signals(
     exit_window: int = 10,
 ) -> pd.Series:
     """
-    Generate long-only positions from a volatility breakout rule.
+    Generate long-only positions from a price-channel volatility breakout rule.
 
     Rules
     -----
-    * Compute the rolling standard deviation of daily returns over
-      ``lookback_window`` bars as the volatility estimate.
-    * A **breakout** fires on bar T when::
-
-          daily_return[T] > breakout_multiplier × volatility[T]
-
-      i.e., today's move is an unusually large positive return relative
-      to recent typical daily swings.
-    * Enter long (1) immediately on a breakout.
-    * **Time-based exit**: exit flat (0) after holding ``exit_window`` bars.
-    * If a fresh breakout fires while already in a position, the exit timer
-      is **reset** — the position extends for another ``exit_window`` bars
-      from the new signal.
+    * rolling_high[T] = max(close[T-lookback_window+1 : T])
+    * rolling_low[T] = min(close[T-lookback_window+1 : T])
+    * breakout_level[T] = rolling_high[T-1]
+                          + breakout_multiplier * rolling_range[T-1]
+    * exit_level[T] = rolling_mean(close, exit_window)[T]
+    * Enter long (1) when close[T] is strictly above breakout_level[T].
+    * Exit flat (0) when close[T] is strictly below exit_level[T].
+    * Maintain the current position between entry and exit.
     * The raw signal is **shifted by one period** to prevent lookahead bias.
 
     Default parameters
     ------------------
     ``lookback_window=20, breakout_multiplier=1.0, exit_window=10``
 
-    With these defaults the strategy enters whenever a daily gain exceeds one
-    rolling standard deviation and holds for two trading weeks.
-
     Parameters
     ----------
     close : pd.Series
         Adjusted daily closing prices with a DatetimeIndex.
     lookback_window : int
-        Rolling window for the volatility estimate in trading days (≥ 2).
+        Rolling high/low lookback window in trading days (≥ 2).
     breakout_multiplier : float
-        Threshold multiplier on volatility for the breakout condition (> 0).
-        Higher values require a larger move to trigger entry (fewer trades).
+        Multiplier applied to the prior rolling high-low range (> 0).
     exit_window : int
-        Number of bars to hold the position before exiting (≥ 1).
+        Rolling mean window for the exit level (≥ 1).
 
     Returns
     -------
@@ -533,35 +566,34 @@ def volatility_breakout_signals(
     if exit_window < 1:
         raise ValueError(f"exit_window must be at least 1; got {exit_window}.")
 
-    volatility = compute_volatility(close, lookback_window)
-    daily_ret = close.pct_change()
+    breakout_level, exit_level = compute_volatility_breakout_levels(
+        close,
+        lookback_window=lookback_window,
+        breakout_multiplier=breakout_multiplier,
+        exit_window=exit_window,
+    )
 
     in_position = False
-    bars_held = 0
     raw: list[int] = []
 
     for i in range(len(close)):
-        vol = volatility.iloc[i]
-        ret = daily_ret.iloc[i]
+        entry_level = breakout_level.iloc[i]
+        exit_ma = exit_level.iloc[i]
+        price = float(close.iloc[i])
 
-        if pd.isna(vol) or pd.isna(ret):
-            # Warm-up period: not enough history → stay flat.
+        if pd.isna(entry_level):
+            # Warm-up period: not enough history for prior breakout channel.
             raw.append(0)
             continue
 
         if in_position:
-            bars_held += 1
-            if bars_held >= exit_window:
-                # Time-based exit: held long enough, return to flat.
+            if not pd.isna(exit_ma) and price < float(exit_ma):
                 in_position = False
-                bars_held = 0
-            elif float(ret) > float(vol) * breakout_multiplier:
-                # New breakout while in position — reset the exit timer.
-                bars_held = 0
-        else:
-            if float(ret) > float(vol) * breakout_multiplier:
+            elif price > float(entry_level):
                 in_position = True
-                bars_held = 0  # bars_held counts bars *after* the entry bar
+        else:
+            if price > float(entry_level):
+                in_position = True
 
         raw.append(1 if in_position else 0)
 

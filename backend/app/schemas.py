@@ -236,7 +236,7 @@ class VbBacktestRequest(BaseModel):
         ge=2,
         le=500,
         description=(
-            "Rolling window for the volatility estimate in trading days (default: 20). "
+            "Rolling high/low lookback window in trading days (default: 20). "
             "Must be ≥ 2."
         ),
     )
@@ -245,8 +245,8 @@ class VbBacktestRequest(BaseModel):
         gt=0.0,
         le=10.0,
         description=(
-            "Entry threshold: a breakout fires when today's daily return exceeds "
-            "this multiple of the rolling volatility (default: 1.0 = one σ)."
+            "Entry threshold: prior rolling high plus this multiple of the "
+            "prior rolling high-low range."
         ),
     )
     exit_window: int = Field(
@@ -254,8 +254,7 @@ class VbBacktestRequest(BaseModel):
         ge=1,
         le=500,
         description=(
-            "Number of bars to hold after entry before exiting (default: 10). "
-            "A new breakout while in position resets this timer."
+            "Rolling mean window for the exit level (default: 10)."
         ),
     )
     transaction_cost_bps: float = Field(
@@ -307,7 +306,7 @@ class EquityPoint(BaseModel):
 
 
 # ===========================================================================
-# Full response  (shared by all four strategy endpoints)
+# Full response  (shared by all five strategy endpoints)
 # ===========================================================================
 
 class BacktestResponse(BaseModel):
@@ -318,7 +317,7 @@ class BacktestResponse(BaseModel):
     -----------------------
     ``strategy`` identifies which strategy produced this result:
     ``"sma_crossover"``, ``"rsi_mean_reversion"``, ``"bollinger_band"``,
-    or ``"momentum"``.
+    ``"momentum"``, or ``"volatility_breakout"``.
 
     Strategy-specific fields
     ------------------------
@@ -346,7 +345,7 @@ class BacktestResponse(BaseModel):
         default="sma_crossover",
         description=(
             "Strategy identifier: 'sma_crossover', 'rsi_mean_reversion', "
-            "'bollinger_band', or 'momentum'."
+            "'bollinger_band', 'momentum', or 'volatility_breakout'."
         ),
     )
 

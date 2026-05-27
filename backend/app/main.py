@@ -397,10 +397,9 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
     summary="Run a volatility breakout backtest",
     description=(
         "Long-only trend-following strategy.  "
-        "Enters long when the daily return exceeds a multiple of the rolling "
-        "volatility (std of daily returns over the lookback window).  "
-        "Exits automatically after a fixed number of bars (exit_window).  "
-        "A new breakout while in a position resets the exit timer.  "
+        "Enters long when close breaks above the prior rolling high plus a "
+        "multiple of the prior rolling high-low range.  "
+        "Exits when close falls below the rolling mean exit level.  "
         "Signal is shifted one day forward to prevent lookahead bias."
     ),
 )
@@ -409,16 +408,15 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
 
     df = _fetch(request.ticker, request.start_date, request.end_date)
 
-    # Need lookback_window + 1 bars for the first valid volatility reading,
-    # +exit_window for the exit logic, +5 for the shift and first equity return.
-    min_bars = request.lookback_window + request.exit_window + 5
+    # Need lookback_window bars for the prior channel, plus one shift bar.
+    min_bars = max(request.lookback_window + 2, request.exit_window + 2)
     if len(df) < min_bars:
         raise HTTPException(
             status_code=422,
             detail=(
                 f"Only {len(df)} trading days available; need at least "
                 f"{min_bars} for a {request.lookback_window}-day lookback and "
-                f"{request.exit_window}-bar exit window."
+                f"{request.exit_window}-day exit mean."
             ),
         )
 
