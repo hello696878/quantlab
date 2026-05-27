@@ -6,10 +6,11 @@ import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
-import { runBacktest, runRsiBacktest } from "@/lib/api";
+import { runBacktest, runBbBacktest, runRsiBacktest } from "@/lib/api";
 import type {
   BacktestRequest,
   BacktestResponse,
+  BbBacktestRequest,
   RsiBacktestRequest,
   StrategyType,
 } from "@/lib/types";
@@ -39,11 +40,22 @@ const DEFAULT_RSI_PARAMS: RsiBacktestRequest = {
   initial_capital: 100_000,
 };
 
+const DEFAULT_BB_PARAMS: BbBacktestRequest = {
+  ticker: "SPY",
+  start_date: "2015-01-01",
+  end_date: "2023-12-31",
+  bb_window: 20,
+  num_std: 2.0,
+  exit_band: "middle",
+  transaction_cost_bps: 10,
+  initial_capital: 100_000,
+};
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Build a human-readable label from the backtest response. */
+/** Build a human-readable strategy label from the backtest response. */
 function strategyLabel(r: BacktestResponse): string {
   if (r.strategy === "sma_crossover") {
     return `SMA ${r.fast_window}/${r.slow_window}`;
@@ -51,15 +63,33 @@ function strategyLabel(r: BacktestResponse): string {
   if (r.strategy === "rsi_mean_reversion") {
     return `RSI(${r.rsi_window ?? 14}) ${r.oversold_threshold}→${r.exit_threshold}`;
   }
+  if (r.strategy === "bollinger_band") {
+    const exit = r.bb_exit_band === "upper" ? "Upper" : "Mid";
+    return `BB(${r.bb_window ?? 20}, ${r.bb_num_std ?? 2}σ) exit:${exit}`;
+  }
   return r.strategy;
 }
 
-/** Build a short param summary line shown beside the ticker. */
+/** Build a compact param summary shown beside the ticker in the results header. */
 function paramSummary(r: BacktestResponse): string {
+  const cost = `${r.transaction_cost_bps} bps`;
+  const trades = `${r.num_trades} trade events`;
   if (r.strategy === "sma_crossover") {
-    return `SMA ${r.fast_window}/${r.slow_window} · ${r.transaction_cost_bps} bps · ${r.num_trades} trade events`;
+    return `SMA ${r.fast_window}/${r.slow_window} · ${cost} · ${trades}`;
   }
-  return `RSI(${r.rsi_window ?? 14}) OB=${r.oversold_threshold} Exit>${r.exit_threshold} · ${r.transaction_cost_bps} bps · ${r.num_trades} trade events`;
+  if (r.strategy === "rsi_mean_reversion") {
+    return (
+      `RSI(${r.rsi_window ?? 14}) OB=${r.oversold_threshold} ` +
+      `Exit=${r.exit_threshold} · ${cost} · ${trades}`
+    );
+  }
+  if (r.strategy === "bollinger_band") {
+    return (
+      `BB(${r.bb_window ?? 20}, ${r.bb_num_std ?? 2}σ) ` +
+      `exit:${r.bb_exit_band ?? "middle"} · ${cost} · ${trades}`
+    );
+  }
+  return `${cost} · ${trades}`;
 }
 
 const STRATEGY_HEADINGS: Record<
@@ -80,6 +110,14 @@ const STRATEGY_HEADINGS: Record<
       "oversold threshold and exits when RSI recovers above the exit threshold. " +
       "Signal is shifted one day forward to prevent lookahead bias.",
   },
+  bollinger_band: {
+    title: "Bollinger Band Mean Reversion Backtest",
+    description:
+      "Long-only mean-reversion strategy that enters when price falls below the " +
+      "lower Bollinger Band (≥ 2σ below the rolling SMA) and exits when price " +
+      "recovers to the selected exit band. Signal is shifted one day forward to " +
+      "prevent lookahead bias.",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -90,6 +128,7 @@ export default function HomePage() {
   const [strategy, setStrategy] = useState<StrategyType>("sma_crossover");
   const [smaParams, setSmaParams] = useState<BacktestRequest>(DEFAULT_SMA_PARAMS);
   const [rsiParams, setRsiParams] = useState<RsiBacktestRequest>(DEFAULT_RSI_PARAMS);
+  const [bbParams, setBbParams] = useState<BbBacktestRequest>(DEFAULT_BB_PARAMS);
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +144,9 @@ export default function HomePage() {
       const data =
         strategy === "sma_crossover"
           ? await runBacktest(smaParams)
-          : await runRsiBacktest(rsiParams);
+          : strategy === "rsi_mean_reversion"
+            ? await runRsiBacktest(rsiParams)
+            : await runBbBacktest(bbParams);
       setResult(data);
     } catch (err) {
       setError(
@@ -141,6 +182,8 @@ export default function HomePage() {
         onSmaParamsChange={setSmaParams}
         rsiParams={rsiParams}
         onRsiParamsChange={setRsiParams}
+        bbParams={bbParams}
+        onBbParamsChange={setBbParams}
         onSubmit={handleRun}
         loading={loading}
       />

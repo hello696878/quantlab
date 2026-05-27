@@ -2,6 +2,7 @@
 
 import type {
   BacktestRequest,
+  BbBacktestRequest,
   RsiBacktestRequest,
   StrategyType,
 } from "@/lib/types";
@@ -16,6 +17,8 @@ interface Props {
   onSmaParamsChange: (p: BacktestRequest) => void;
   rsiParams: RsiBacktestRequest;
   onRsiParamsChange: (p: RsiBacktestRequest) => void;
+  bbParams: BbBacktestRequest;
+  onBbParamsChange: (p: BbBacktestRequest) => void;
   onSubmit: () => void;
   loading: boolean;
 }
@@ -60,14 +63,19 @@ const STRATEGIES: { id: StrategyType; label: string; description: string }[] = [
   {
     id: "sma_crossover",
     label: "SMA Crossover",
-    description:
-      "Long when fast SMA > slow SMA. Classic trend-following approach.",
+    description: "Long when fast SMA > slow SMA. Classic trend-following approach.",
   },
   {
     id: "rsi_mean_reversion",
     label: "RSI Mean Reversion",
     description:
-      "Long when RSI drops below an oversold level; exits above recovery.",
+      "Long when RSI drops below an oversold level; exits when RSI recovers.",
+  },
+  {
+    id: "bollinger_band",
+    label: "Bollinger Bands",
+    description:
+      "Long when price breaks below the lower band; exits at middle or upper band.",
   },
 ];
 
@@ -82,19 +90,27 @@ export default function BacktestForm({
   onSmaParamsChange,
   rsiParams,
   onRsiParamsChange,
+  bbParams,
+  onBbParamsChange,
   onSubmit,
   loading,
 }: Props) {
   // Active params (common fields) come from whichever strategy is selected.
-  const active = strategy === "sma_crossover" ? smaParams : rsiParams;
+  const active =
+    strategy === "sma_crossover"
+      ? smaParams
+      : strategy === "rsi_mean_reversion"
+        ? rsiParams
+        : bbParams;
 
   function setCommon<K extends keyof typeof active>(
     key: K,
     value: (typeof active)[K],
   ) {
-    // Update both request objects so common fields stay in sync when switching.
+    // Update all three request objects so common fields stay in sync when switching.
     onSmaParamsChange({ ...smaParams, [key]: value } as BacktestRequest);
     onRsiParamsChange({ ...rsiParams, [key]: value } as RsiBacktestRequest);
+    onBbParamsChange({ ...bbParams, [key]: value } as BbBacktestRequest);
   }
 
   function setSma<K extends keyof BacktestRequest>(
@@ -111,6 +127,13 @@ export default function BacktestForm({
     onRsiParamsChange({ ...rsiParams, [key]: value });
   }
 
+  function setBb<K extends keyof BbBacktestRequest>(
+    key: K,
+    value: BbBacktestRequest[K],
+  ) {
+    onBbParamsChange({ ...bbParams, [key]: value });
+  }
+
   // Validation
   const dateInvalid = active.start_date >= active.end_date;
   const smaInvalid =
@@ -119,13 +142,17 @@ export default function BacktestForm({
   const rsiInvalid =
     strategy === "rsi_mean_reversion" &&
     rsiParams.oversold_threshold >= rsiParams.exit_threshold;
+  const bbInvalid =
+    strategy === "bollinger_band" &&
+    (bbParams.bb_window < 2 || bbParams.num_std <= 0);
 
   const canSubmit =
     !loading &&
     active.ticker.trim().length > 0 &&
     !dateInvalid &&
     !smaInvalid &&
-    !rsiInvalid;
+    !rsiInvalid &&
+    !bbInvalid;
 
   return (
     <div className="card overflow-hidden">
@@ -270,7 +297,7 @@ export default function BacktestForm({
                 />
               </Field>
             </div>
-          ) : (
+          ) : strategy === "rsi_mean_reversion" ? (
             <div className="grid grid-cols-3 gap-4">
               <Field label="RSI window" hint="days">
                 <input
@@ -300,7 +327,7 @@ export default function BacktestForm({
                   disabled={loading}
                 />
               </Field>
-              <Field label="Exit" hint="exit >">
+              <Field label="Exit" hint="exit ≥">
                 <input
                   type="number"
                   className={inputCls}
@@ -315,11 +342,56 @@ export default function BacktestForm({
                 />
               </Field>
             </div>
+          ) : (
+            /* Bollinger Band fields */
+            <div className="grid grid-cols-3 gap-4">
+              <Field label="BB Window" hint="days">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={bbParams.bb_window}
+                  min={2}
+                  max={500}
+                  step={1}
+                  onChange={(e) =>
+                    setBb("bb_window", parseInt(e.target.value, 10) || 20)
+                  }
+                  disabled={loading}
+                />
+              </Field>
+              <Field label="Std Dev" hint="σ">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={bbParams.num_std}
+                  min={0.1}
+                  max={10}
+                  step={0.1}
+                  onChange={(e) =>
+                    setBb("num_std", parseFloat(e.target.value) || 2.0)
+                  }
+                  disabled={loading}
+                />
+              </Field>
+              <Field label="Exit band">
+                <select
+                  className={inputCls}
+                  value={bbParams.exit_band}
+                  onChange={(e) =>
+                    setBb("exit_band", e.target.value as "middle" | "upper")
+                  }
+                  disabled={loading}
+                >
+                  <option value="middle">Middle (SMA)</option>
+                  <option value="upper">Upper band</option>
+                </select>
+              </Field>
+            </div>
           )}
         </div>
 
         {/* ── Inline validation ─────────────────────────────────────────── */}
-        {(dateInvalid || smaInvalid || rsiInvalid) && (
+        {(dateInvalid || smaInvalid || rsiInvalid || bbInvalid) && (
           <div className="mb-4 space-y-1">
             {dateInvalid && (
               <p className="text-xs text-red-600">
@@ -334,6 +406,11 @@ export default function BacktestForm({
             {rsiInvalid && (
               <p className="text-xs text-red-600">
                 ⚠ Oversold threshold must be less than exit threshold.
+              </p>
+            )}
+            {bbInvalid && (
+              <p className="text-xs text-red-600">
+                ⚠ BB window must be ≥ 2 and std dev must be &gt; 0.
               </p>
             )}
           </div>

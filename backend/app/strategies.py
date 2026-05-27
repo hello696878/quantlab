@@ -5,6 +5,7 @@ Current strategies
 ------------------
 * SMA crossover (long-only)
 * RSI mean reversion (long-only)
+* Bollinger Band mean reversion (long-only)
 
 Lookahead-bias rule
 -------------------
@@ -176,6 +177,135 @@ def rsi_mean_reversion_signals(
             in_position = True    # RSI crossed below oversold → enter long
         elif in_position and v > exit_threshold:
             in_position = False   # RSI crossed above exit -> exit
+
+        raw.append(1 if in_position else 0)
+
+    # *** Shift by 1 to prevent lookahead bias ***
+    # position[T] = raw_signal[T-1], held over close[T-1] -> close[T].
+    position = pd.Series(raw, index=close.index, name="position")
+    position = position.shift(1).fillna(0).astype(int)
+
+    return position
+
+
+# ===========================================================================
+# Bollinger Band helpers + mean reversion
+# ===========================================================================
+
+def compute_bollinger_bands(
+    close: pd.Series,
+    window: int = 20,
+    num_std: float = 2.0,
+) -> tuple:
+    """
+    Compute Bollinger Bands for a price series.
+
+    Bollinger Bands place an upper and lower envelope around a simple moving
+    average at a distance of ``num_std`` standard deviations.  Approximately
+    95 % of prices fall within ±2σ bands under the normality assumption.
+
+    Parameters
+    ----------
+    close : pd.Series
+        Adjusted daily closing prices (no NaN).
+    window : int
+        Rolling look-back period in trading days (default: 20).
+    num_std : float
+        Number of standard deviations for the envelope width (default: 2.0).
+
+    Returns
+    -------
+    (middle, upper, lower) : tuple of three pd.Series
+        All three series share the same index as *close*.
+        The first ``window - 1`` values are NaN (insufficient history).
+        Series are named "bb_middle", "bb_upper", "bb_lower".
+
+    Notes
+    -----
+    * Uses sample standard deviation (``ddof=1``), which is conventional.
+    * The bands are perfectly symmetric around the middle band.
+    """
+    if window < 2:
+        raise ValueError(f"bb_window must be at least 2; got {window}.")
+    if num_std <= 0.0:
+        raise ValueError(f"num_std must be positive; got {num_std}.")
+
+    middle = close.rolling(window=window, min_periods=window).mean()
+    rolling_std = close.rolling(window=window, min_periods=window).std(ddof=1)
+    upper = middle + num_std * rolling_std
+    lower = middle - num_std * rolling_std
+
+    return (
+        middle.rename("bb_middle"),
+        upper.rename("bb_upper"),
+        lower.rename("bb_lower"),
+    )
+
+
+def bollinger_band_signals(
+    close: pd.Series,
+    bb_window: int = 20,
+    num_std: float = 2.0,
+    exit_band: str = "middle",
+) -> pd.Series:
+    """
+    Generate long-only positions from a Bollinger Band mean-reversion rule.
+
+    Rules
+    -----
+    * Enter long (1) when close falls **strictly below** the lower Bollinger Band.
+    * Exit  flat (0) when close rises **to or above** the selected exit band:
+        - ``exit_band="middle"`` → exit when close ≥ middle band (default).
+        - ``exit_band="upper"``  → exit when close ≥ upper band (holds longer).
+    * Hold the current position between entry and exit (stateful loop).
+    * The raw signal is **shifted by one period** to prevent lookahead bias.
+
+    Parameters
+    ----------
+    close : pd.Series
+        Adjusted daily closing prices with a DatetimeIndex.
+    bb_window : int
+        Bollinger Band look-back period in trading days (default: 20).
+    num_std : float
+        Width of the bands in standard deviations (default: 2.0).
+    exit_band : str
+        Which band to use as the exit target: ``"middle"`` or ``"upper"``.
+
+    Returns
+    -------
+    pd.Series
+        Integer position series (0 or 1) with the same index as *close*,
+        named "position".  No NaN values.
+    """
+    if exit_band not in ("middle", "upper"):
+        raise ValueError(
+            f"exit_band must be 'middle' or 'upper'; got {exit_band!r}."
+        )
+
+    middle, upper, lower = compute_bollinger_bands(close, bb_window, num_std)
+
+    in_position = False
+    raw: list = []
+
+    for i in range(len(close)):
+        lb = lower.iloc[i]
+
+        if pd.isna(lb):
+            # Warm-up period: bands not yet computable → stay flat.
+            raw.append(0)
+            continue
+
+        p = float(close.iloc[i])
+
+        if not in_position and p < float(lb):
+            in_position = True    # Price breached lower band → enter long
+        elif in_position:
+            exit_level = (
+                float(middle.iloc[i]) if exit_band == "middle"
+                else float(upper.iloc[i])
+            )
+            if p >= exit_level:
+                in_position = False  # Price recovered to exit band → exit
 
         raw.append(1 if in_position else 0)
 

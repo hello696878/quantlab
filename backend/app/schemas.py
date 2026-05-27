@@ -2,7 +2,7 @@
 Pydantic request / response schemas for the QuantLab backtesting API.
 """
 
-from typing import List, Optional
+from typing import List, Literal, Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -104,6 +104,54 @@ class RsiBacktestRequest(BaseModel):
         return self
 
 
+class BbBacktestRequest(BaseModel):
+    """Parameters for the Bollinger Band mean-reversion backtest endpoint."""
+
+    ticker: str = Field(
+        default="SPY",
+        description="Yahoo Finance ticker symbol (e.g. SPY, AAPL, BTC-USD).",
+    )
+    start_date: str = Field(
+        default="2015-01-01",
+        description="Backtest start date in YYYY-MM-DD format.",
+    )
+    end_date: str = Field(
+        default="2023-12-31",
+        description="Backtest end date in YYYY-MM-DD format (exclusive in yfinance).",
+    )
+    bb_window: int = Field(
+        default=20,
+        ge=2,
+        le=500,
+        description="Bollinger Band rolling look-back window in trading days.",
+    )
+    num_std: float = Field(
+        default=2.0,
+        gt=0.0,
+        le=10.0,
+        description="Width of the bands in standard deviations (typical: 2.0).",
+    )
+    exit_band: Literal["middle", "upper"] = Field(
+        default="middle",
+        description=(
+            "Which band to target for exit: "
+            "'middle' exits when price recovers to the SMA (default); "
+            "'upper' holds until price reaches the upper band."
+        ),
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="One-way transaction cost in basis points.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0,
+        gt=0,
+        description="Starting capital in USD.",
+    )
+
+
 # ===========================================================================
 # Response building blocks
 # ===========================================================================
@@ -149,15 +197,19 @@ class BacktestResponse(BaseModel):
 
     Strategy identification
     -----------------------
-    ``strategy`` identifies which strategy produced this result.
-    SMA-specific fields (``fast_window``, ``slow_window``) are 0 for RSI.
-    RSI-specific fields (``rsi_window``, ``oversold_threshold``,
-    ``exit_threshold``) are None for SMA.
+    ``strategy`` identifies which strategy produced this result:
+    ``"sma_crossover"``, ``"rsi_mean_reversion"``, or ``"bollinger_band"``.
+
+    Strategy-specific fields
+    ------------------------
+    * SMA  : ``fast_window``, ``slow_window`` (0 for other strategies).
+    * RSI  : ``rsi_window``, ``oversold_threshold``, ``exit_threshold`` (None otherwise).
+    * BB   : ``bb_window``, ``bb_num_std``, ``bb_exit_band`` (None otherwise).
 
     Backward compatibility
     ----------------------
-    Adding ``strategy`` and RSI fields as defaults means the existing SMA
-    endpoint response is unchanged for clients that were already reading it.
+    All strategy-specific fields carry safe defaults so existing clients that
+    read only the fields they care about continue to work without changes.
     """
 
     ticker: str
@@ -167,7 +219,10 @@ class BacktestResponse(BaseModel):
     # Which strategy produced this result.
     strategy: str = Field(
         default="sma_crossover",
-        description="Strategy identifier: 'sma_crossover' or 'rsi_mean_reversion'.",
+        description=(
+            "Strategy identifier: 'sma_crossover', 'rsi_mean_reversion', "
+            "or 'bollinger_band'."
+        ),
     )
 
     # SMA params — set to 0 when strategy is not SMA.
@@ -178,6 +233,11 @@ class BacktestResponse(BaseModel):
     rsi_window: Optional[int] = Field(default=None)
     oversold_threshold: Optional[float] = Field(default=None)
     exit_threshold: Optional[float] = Field(default=None)
+
+    # Bollinger Band params — None when strategy is not bollinger_band.
+    bb_window: Optional[int] = Field(default=None)
+    bb_num_std: Optional[float] = Field(default=None)
+    bb_exit_band: Optional[str] = Field(default=None)
 
     transaction_cost_bps: float
     initial_capital: float

@@ -6,6 +6,7 @@ Endpoints
 GET  /health                          — liveness check
 POST /backtest/sma-crossover          — run an SMA crossover backtest
 POST /backtest/rsi-mean-reversion     — run an RSI mean-reversion backtest
+POST /backtest/bollinger-band         — run a Bollinger Band mean-reversion backtest
 """
 
 from fastapi import FastAPI, HTTPException
@@ -17,12 +18,17 @@ from app.metrics import compute_metrics
 from app.schemas import (
     BacktestRequest,
     BacktestResponse,
+    BbBacktestRequest,
     EquityPoint,
     PerformanceMetrics,
     RsiBacktestRequest,
     TradeRecord,
 )
-from app.strategies import rsi_mean_reversion_signals, sma_crossover_signals
+from app.strategies import (
+    bollinger_band_signals,
+    rsi_mean_reversion_signals,
+    sma_crossover_signals,
+)
 from app.utils import validate_date_format
 
 # ---------------------------------------------------------------------------
@@ -32,11 +38,11 @@ from app.utils import validate_date_format
 app = FastAPI(
     title="QuantLab API",
     description=(
-        "Quantitative backtesting engine — Phase 1 MVP.\n\n"
-        "Strategies: SMA Crossover, RSI Mean Reversion.\n"
+        "Quantitative backtesting engine.\n\n"
+        "Strategies: SMA Crossover, RSI Mean Reversion, Bollinger Band Mean Reversion.\n"
         "All strategies use a one-day signal shift to prevent lookahead bias."
     ),
-    version="0.2.0",
+    version="0.3.0",
 )
 
 app.add_middleware(
@@ -90,6 +96,10 @@ def _build_response(
     rsi_window=None,
     oversold_threshold=None,
     exit_threshold=None,
+    # Bollinger Band-specific (None when not applicable)
+    bb_window=None,
+    bb_num_std=None,
+    bb_exit_band=None,
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response."""
     strategy_equity, benchmark_equity, trades = run_backtest(
@@ -121,6 +131,9 @@ def _build_response(
         rsi_window=rsi_window,
         oversold_threshold=oversold_threshold,
         exit_threshold=exit_threshold,
+        bb_window=bb_window,
+        bb_num_std=bb_num_std,
+        bb_exit_band=bb_exit_band,
         transaction_cost_bps=transaction_cost_bps,
         initial_capital=initial_capital,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
@@ -139,7 +152,7 @@ def _build_response(
 @app.get("/health", tags=["ops"])
 def health_check():
     """Return a simple 200 OK to confirm the server is running."""
-    return {"status": "ok", "version": "0.2.0"}
+    return {"status": "ok", "version": "0.3.0"}
 
 
 @app.post(
@@ -246,4 +259,56 @@ def backtest_rsi_mean_reversion(request: RsiBacktestRequest) -> BacktestResponse
         rsi_window=request.rsi_window,
         oversold_threshold=request.oversold_threshold,
         exit_threshold=request.exit_threshold,
+    )
+
+
+@app.post(
+    "/backtest/bollinger-band",
+    response_model=BacktestResponse,
+    tags=["backtest"],
+    summary="Run a Bollinger Band mean-reversion backtest",
+    description=(
+        "Long-only mean-reversion strategy.  "
+        "Enters long when price falls below the lower Bollinger Band.  "
+        "Exits when price recovers to or above the selected exit band "
+        "('middle' = SMA, 'upper' = upper band).  "
+        "Signal is shifted one day forward to prevent lookahead bias."
+    ),
+)
+def backtest_bollinger_band(request: BbBacktestRequest) -> BacktestResponse:
+    _validate_common(request.ticker, request.start_date, request.end_date)
+
+    df = _fetch(request.ticker, request.start_date, request.end_date)
+
+    # BB needs bb_window bars to warm up, +1 for the shift, +1 for first return.
+    min_bars = request.bb_window + 5
+    if len(df) < min_bars:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(df)} trading days available; need at least "
+                f"{min_bars} for a {request.bb_window}-period Bollinger Band."
+            ),
+        )
+
+    close = df["Close"]
+    position = bollinger_band_signals(
+        close,
+        bb_window=request.bb_window,
+        num_std=request.num_std,
+        exit_band=request.exit_band,
+    )
+
+    return _build_response(
+        request_ticker=request.ticker,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+        close=close,
+        position=position,
+        strategy="bollinger_band",
+        bb_window=request.bb_window,
+        bb_num_std=request.num_std,
+        bb_exit_band=request.exit_band,
     )
