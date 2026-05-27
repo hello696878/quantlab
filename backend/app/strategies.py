@@ -70,7 +70,7 @@ def sma_crossover_signals(
 
 def compute_rsi(close: pd.Series, window: int = 14) -> pd.Series:
     """
-    Compute RSI (Relative Strength Index) using Wilder's exponential smoothing.
+    Compute RSI (Relative Strength Index) using rolling average gains/losses.
 
     RSI ∈ [0, 100].  Traditionally, values below 30 signal oversold conditions
     and values above 70 signal overbought conditions.
@@ -80,7 +80,7 @@ def compute_rsi(close: pd.Series, window: int = 14) -> pd.Series:
     close : pd.Series
         Adjusted daily closing prices (no NaN).
     window : int
-        Look-back period in trading days (Wilder's default: 14).
+        Look-back period in trading days (default: 14).
 
     Returns
     -------
@@ -90,15 +90,15 @@ def compute_rsi(close: pd.Series, window: int = 14) -> pd.Series:
 
     Notes
     -----
-    Wilder's smoothing uses alpha = 1/window, which maps to
-    ``pandas.Series.ewm(com=window-1, adjust=False)``.
+    Uses the simple rolling RSI definition:
+    avg_gain = rolling mean of positive deltas, avg_loss = rolling mean of
+    negative deltas over ``window`` bars.
 
     Edge cases
     ----------
-    * Pure gains (avg_loss ≈ 0, avg_gain > 0)  → RSI ≈ 100.
+    * Pure gains (avg_loss = 0, avg_gain > 0)  → RSI = 100.
     * Pure losses (avg_gain = 0, avg_loss > 0) → RSI = 0.
-    * Both ≈ 0 (perfectly flat price)           → RSI ≈ 0
-      (theoretical; does not arise with real data).
+    * Both = 0 (perfectly flat price)           → RSI = 100.
     """
     if window < 2:
         raise ValueError(f"RSI window must be at least 2; got {window}.")
@@ -107,14 +107,13 @@ def compute_rsi(close: pd.Series, window: int = 14) -> pd.Series:
     gains = delta.clip(lower=0.0)
     losses = (-delta).clip(lower=0.0)
 
-    # Wilder's exponential smoothing  (alpha = 1/window → com = window - 1)
-    avg_gain = gains.ewm(com=window - 1, min_periods=window, adjust=False).mean()
-    avg_loss = losses.ewm(com=window - 1, min_periods=window, adjust=False).mean()
+    avg_gain = gains.rolling(window=window, min_periods=window).mean()
+    avg_loss = losses.rolling(window=window, min_periods=window).mean()
 
-    # Avoid division by zero: tiny epsilon keeps RSI in [0, 100] range.
-    # When avg_loss → 0 and avg_gain > 0:  RS → ∞  →  RSI → 100  ✓
-    rs = avg_gain / (avg_loss + 1e-10)
+    rs = avg_gain / avg_loss
     rsi = 100.0 - 100.0 / (1.0 + rs)
+    rsi = rsi.mask(avg_loss == 0.0, 100.0)
+    rsi = rsi.mask((avg_gain == 0.0) & (avg_loss > 0.0), 0.0)
 
     return rsi.rename("rsi")
 
@@ -131,7 +130,7 @@ def rsi_mean_reversion_signals(
     Rules
     -----
     * Enter long (1) when RSI falls **strictly below** ``oversold_threshold``.
-    * Exit  flat (0) when RSI rises **to or above** ``exit_threshold``.
+    * Exit  flat (0) when RSI rises **above** ``exit_threshold``.
     * Hold the current position between entry and exit (state machine).
     * The raw signal is **shifted by one period** to prevent lookahead bias.
 
@@ -140,11 +139,11 @@ def rsi_mean_reversion_signals(
     close : pd.Series
         Adjusted daily closing prices with a DatetimeIndex.
     rsi_window : int
-        RSI look-back period in trading days (Wilder default: 14).
+        RSI look-back period in trading days (default: 14).
     oversold_threshold : float
         Enter long when RSI drops below this level (e.g. 30).
     exit_threshold : float
-        Exit long when RSI rises to or above this level (e.g. 50).
+        Exit long when RSI rises above this level (e.g. 50).
         Must be strictly greater than ``oversold_threshold``.
 
     Returns
@@ -175,8 +174,8 @@ def rsi_mean_reversion_signals(
         v = float(val)
         if not in_position and v < oversold_threshold:
             in_position = True    # RSI crossed below oversold → enter long
-        elif in_position and v >= exit_threshold:
-            in_position = False   # RSI crossed above exit → exit
+        elif in_position and v > exit_threshold:
+            in_position = False   # RSI crossed above exit -> exit
 
         raw.append(1 if in_position else 0)
 

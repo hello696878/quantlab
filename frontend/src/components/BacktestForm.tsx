@@ -67,7 +67,7 @@ const STRATEGIES: { id: StrategyType; label: string; description: string }[] = [
     id: "rsi_mean_reversion",
     label: "RSI Mean Reversion",
     description:
-      "Long when RSI drops below an oversold level; exits when RSI recovers.",
+      "Long when RSI drops below an oversold level; exits above recovery.",
   },
 ];
 
@@ -300,7 +300,7 @@ export default function BacktestForm({
                   disabled={loading}
                 />
               </Field>
-              <Field label="Exit" hint="exit ≥">
+              <Field label="Exit" hint="exit >">
                 <input
                   type="number"
                   className={inputCls}

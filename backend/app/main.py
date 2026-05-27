@@ -206,7 +206,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
     description=(
         "Long-only mean-reversion strategy.  "
         "Enters long when RSI falls below the oversold threshold.  "
-        "Exits when RSI rises to or above the exit threshold.  "
+        "Exits when RSI rises above the exit threshold.  "
         "Signal is shifted one day forward to prevent lookahead bias."
     ),
 )

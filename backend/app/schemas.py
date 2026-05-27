@@ -68,7 +68,7 @@ class RsiBacktestRequest(BaseModel):
         default=14,
         ge=2,
         le=500,
-        description="RSI look-back window in trading days (Wilder default: 14).",
+        description="RSI look-back window in trading days.",
     )
     oversold_threshold: float = Field(
         default=30.0,
@@ -80,7 +80,7 @@ class RsiBacktestRequest(BaseModel):
         default=50.0,
         gt=1.0,
         le=100.0,
-        description="Exit long when RSI rises to or above this level.",
+        description="Exit long when RSI rises above this level.",
     )
     transaction_cost_bps: float = Field(
         default=10.0,

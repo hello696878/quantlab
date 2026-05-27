@@ -59,7 +59,7 @@ function paramSummary(r: BacktestResponse): string {
   if (r.strategy === "sma_crossover") {
     return `SMA ${r.fast_window}/${r.slow_window} · ${r.transaction_cost_bps} bps · ${r.num_trades} trade events`;
   }
-  return `RSI(${r.rsi_window ?? 14}) OB=${r.oversold_threshold} Exit=${r.exit_threshold} · ${r.transaction_cost_bps} bps · ${r.num_trades} trade events`;
+  return `RSI(${r.rsi_window ?? 14}) OB=${r.oversold_threshold} Exit>${r.exit_threshold} · ${r.transaction_cost_bps} bps · ${r.num_trades} trade events`;
 }
 
 const STRATEGY_HEADINGS: Record<
@@ -77,7 +77,7 @@ const STRATEGY_HEADINGS: Record<
     title: "RSI Mean Reversion Backtest",
     description:
       "Long-only mean-reversion strategy that enters when RSI dips below the " +
-      "oversold threshold and exits when RSI recovers to the exit threshold. " +
+      "oversold threshold and exits when RSI recovers above the exit threshold. " +
       "Signal is shifted one day forward to prevent lookahead bias.",
   },
 };

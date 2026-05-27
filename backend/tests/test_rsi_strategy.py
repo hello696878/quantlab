@@ -16,6 +16,7 @@ Design of synthetic price series
 import pandas as pd
 import pytest
 
+import app.strategies as strategies
 from app.strategies import compute_rsi, rsi_mean_reversion_signals
 
 # ---------------------------------------------------------------------------
@@ -82,8 +83,8 @@ class TestComputeRsi:
 
     def test_warmup_nans_at_start(self):
         """
-        Because delta = close.diff() produces NaN at index 0, the EWM with
-        min_periods=window delivers its first non-NaN at index *window*
+        Because delta = close.diff() produces NaN at index 0, rolling means
+        with min_periods=window deliver the first non-NaN at index *window*
         (positions 0 … window-1 are NaN).
         """
         close = make_close([100.0 + i for i in range(50)])
@@ -91,20 +92,34 @@ class TestComputeRsi:
         assert rsi.iloc[:RSI_WIN].isna().all()
         assert pd.notna(rsi.iloc[RSI_WIN])
 
-    def test_pure_gains_rsi_near_100(self):
-        """After many consecutive up days, avg_loss → 0 and RSI → 100."""
-        # 50 days of steady gains should saturate RSI near 100
+    def test_known_rolling_rsi_values(self):
+        """Pin RSI to the requested rolling mean gain/loss formula."""
+        close = make_close([100.0, 102.0, 101.0, 103.0, 102.0])
+        rsi = compute_rsi(close, window=3)
+        assert rsi.iloc[:3].isna().all()
+        assert rsi.iloc[3] == pytest.approx(80.0)
+        assert rsi.iloc[4] == pytest.approx(50.0)
+
+    def test_pure_gains_rsi_is_100(self):
+        """When avg_loss is zero, RSI must be exactly 100."""
         close = make_close([100.0 * (1.02 ** i) for i in range(60)])
         rsi = compute_rsi(close, RSI_WIN)
         last_rsi = float(rsi.dropna().iloc[-1])
-        assert last_rsi > 90.0, f"Expected RSI > 90 for pure gains; got {last_rsi:.1f}"
+        assert last_rsi == pytest.approx(100.0)
 
-    def test_pure_losses_rsi_near_0(self):
-        """After many consecutive down days, avg_gain → 0 and RSI → 0."""
+    def test_pure_losses_rsi_is_0(self):
+        """When avg_gain is zero and avg_loss is positive, RSI must be zero."""
         close = make_close([100.0 * (0.98 ** i) for i in range(60)])
         rsi = compute_rsi(close, RSI_WIN)
         last_rsi = float(rsi.dropna().iloc[-1])
-        assert last_rsi < 10.0, f"Expected RSI < 10 for pure losses; got {last_rsi:.1f}"
+        assert last_rsi == pytest.approx(0.0)
+
+    def test_flat_price_rsi_is_100_after_warmup(self):
+        """Flat prices have avg_loss = 0, so they should not create entries."""
+        close = make_close([100.0] * 60)
+        rsi = compute_rsi(close, RSI_WIN)
+        valid = rsi.dropna()
+        assert (valid == 100.0).all()
 
     def test_invalid_window_raises(self):
         close = make_close([100.0] * 30)
@@ -122,7 +137,7 @@ class TestComputeRsi:
         close = make_close(prices)
         rsi = compute_rsi(close, RSI_WIN)
         last_rsi = float(rsi.dropna().iloc[-1])
-        # RSI should settle near 50 (±15 tolerance for EWM transients)
+        # RSI should settle near 50.
         assert 35.0 < last_rsi < 65.0, f"Expected RSI ≈ 50; got {last_rsi:.1f}"
 
 
@@ -177,6 +192,30 @@ class TestRsiMeanReversionSignals:
         pos2 = rsi_mean_reversion_signals(make_close(modified))
 
         assert (pos1.iloc[:-1].values == pos2.iloc[:-1].values).all()
+
+    def test_state_machine_maintains_position_and_exits_only_above_threshold(
+        self, monkeypatch
+    ):
+        """RSI equal to the exit threshold should not close the position."""
+        close = make_close([100.0, 99.0, 98.0, 99.0, 100.0, 101.0, 102.0])
+        rsi_values = pd.Series(
+            [None, 35.0, 29.0, 40.0, 50.0, 51.0, 35.0],
+            index=close.index,
+            name="rsi",
+            dtype=float,
+        )
+
+        monkeypatch.setattr(strategies, "compute_rsi", lambda close, window: rsi_values)
+
+        pos = strategies.rsi_mean_reversion_signals(
+            close,
+            rsi_window=RSI_WIN,
+            oversold_threshold=30.0,
+            exit_threshold=50.0,
+        )
+
+        expected = pd.Series([0, 0, 0, 1, 1, 1, 0], index=close.index, name="position")
+        pd.testing.assert_series_equal(pos, expected)
 
     # ── Economic behaviour ───────────────────────────────────────────────────
 
