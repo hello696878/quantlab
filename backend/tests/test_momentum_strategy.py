@@ -17,6 +17,7 @@ Design of synthetic price series
 import pandas as pd
 import pytest
 
+import app.strategies as strategies
 from app.strategies import compute_momentum, momentum_signals
 
 # ---------------------------------------------------------------------------
@@ -113,6 +114,13 @@ class TestComputeMomentum:
         assert pd.isna(mom.iloc[1])
         assert abs(float(mom.iloc[2]) - 0.21) < 1e-9
 
+    def test_known_series_matches_close_over_shifted_close(self):
+        """Pin momentum[t] to close[t] / close[t - window] - 1."""
+        close = make_close([100.0, 110.0, 121.0, 100.0, 50.0])
+        mom = compute_momentum(close, window=2)
+        expected = (close / close.shift(2) - 1.0).rename("momentum")
+        pd.testing.assert_series_equal(mom, expected)
+
     def test_flat_price_zero_momentum(self):
         """Constant price → pct_change = 0 after warm-up."""
         close = make_close([100.0] * 50)
@@ -208,8 +216,8 @@ class TestMomentumSignals:
         """
         close = uptrend_close(200)
         pos = momentum_signals(close, momentum_window=MOM_WIN)
-        # After shift, indices 0..MOM_WIN are flat (NaN → 0 and first raw = 0).
-        assert (pos.iloc[: MOM_WIN] == 0).all()
+        # After shift, indices 0..MOM_WIN are flat (NaN -> 0 and first raw = 0).
+        assert (pos.iloc[: MOM_WIN + 1] == 0).all()
 
     # ── Economic behaviour ────────────────────────────────────────────────────
 
@@ -249,6 +257,33 @@ class TestMomentumSignals:
         changes = pos.diff().dropna()
         # There must be exactly one entry (0→1 transition).
         assert (changes == 1).sum() == 1
+        assert pos.iloc[MOM_WIN] == 0
+        assert pos.iloc[MOM_WIN + 1] == 1
+
+    def test_state_machine_holds_until_exit_threshold(self, monkeypatch):
+        """Momentum equal to neither threshold should maintain prior state."""
+        close = make_close([100.0, 101.0, 102.0, 103.0, 102.0, 101.0, 104.0])
+        momentum_values = pd.Series(
+            [None, None, 0.06, 0.03, -0.01, -0.03, 0.07],
+            index=close.index,
+            name="momentum",
+            dtype=float,
+        )
+        monkeypatch.setattr(
+            strategies,
+            "compute_momentum",
+            lambda close, window: momentum_values,
+        )
+
+        pos = strategies.momentum_signals(
+            close,
+            momentum_window=MOM_WIN,
+            entry_threshold=0.05,
+            exit_threshold=-0.02,
+        )
+
+        expected = pd.Series([0, 0, 0, 1, 1, 1, 0], index=close.index, name="position")
+        pd.testing.assert_series_equal(pos, expected)
 
     def test_hysteresis_reduces_trade_count(self):
         """

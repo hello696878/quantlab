@@ -171,7 +171,12 @@ export default function BacktestForm({
     (bbParams.bb_window < 2 || bbParams.num_std <= 0);
   const momentumInvalid =
     strategy === "momentum" &&
-    momentumParams.entry_threshold < momentumParams.exit_threshold;
+    (momentumParams.momentum_window < 1 ||
+      momentumParams.entry_threshold < -1 ||
+      momentumParams.entry_threshold > 1 ||
+      momentumParams.exit_threshold < -1 ||
+      momentumParams.exit_threshold > 1 ||
+      momentumParams.entry_threshold < momentumParams.exit_threshold);
 
   const canSubmit =
     !loading &&
@@ -498,7 +503,7 @@ export default function BacktestForm({
             )}
             {momentumInvalid && (
               <p className="text-xs text-red-600">
-                ⚠ Entry threshold must be ≥ exit threshold.
+                ⚠ Momentum lookback must be ≥ 1, thresholds must be between -1 and 1, and entry must be ≥ exit.
               </p>
             )}
           </div>

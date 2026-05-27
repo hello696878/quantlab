@@ -68,6 +68,8 @@ The frontend calls the backend through Next.js rewrites:
 - Backend request: `POST /backtest/rsi-mean-reversion`
 - Browser request: `POST /api/backtest/bollinger-band`
 - Backend request: `POST /backtest/bollinger-band`
+- Browser request: `POST /api/backtest/momentum`
+- Backend request: `POST /backtest/momentum`
 - Default backend base URL: `http://localhost:8000`
 
 ---
@@ -89,7 +91,7 @@ Copy `frontend/.env.example` to `frontend/.env.local`, then edit
 `next.config.js` rewrites every request to `/api/*` → `http://localhost:8000/*`.
 
 The frontend therefore calls relative URLs such as
-**`/api/backtest/bollinger-band`**. Next.js forwards them to the backend
+**`/api/backtest/momentum`**. Next.js forwards them to the backend
 transparently — no CORS headers needed in the browser, no hard-coded
 `localhost:8000` in client-side code.
 
