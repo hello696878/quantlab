@@ -188,7 +188,7 @@ class EquityPoint(BaseModel):
 
 
 # ===========================================================================
-# Full response  (shared by both SMA and RSI endpoints)
+# Full response  (shared by SMA, RSI, and Bollinger Band endpoints)
 # ===========================================================================
 
 class BacktestResponse(BaseModel):

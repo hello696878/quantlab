@@ -18,6 +18,7 @@ Design of synthetic price series
 import pandas as pd
 import pytest
 
+import app.strategies as strategies
 from app.strategies import bollinger_band_signals, compute_bollinger_bands
 
 # ---------------------------------------------------------------------------
@@ -123,6 +124,20 @@ class TestComputeBollingerBands:
         valid = middle.dropna().index
         assert (upper.loc[valid] == middle.loc[valid]).all()
         assert (lower.loc[valid] == middle.loc[valid]).all()
+
+    def test_known_rolling_band_values(self):
+        """Pin bands to rolling mean ± num_std × rolling std."""
+        close = make_close([1.0, 2.0, 3.0, 4.0, 5.0])
+        middle, upper, lower = compute_bollinger_bands(close, window=3, num_std=2.0)
+
+        expected_middle = close.rolling(3).mean()
+        expected_std = close.rolling(3).std()
+        expected_upper = expected_middle + 2.0 * expected_std
+        expected_lower = expected_middle - 2.0 * expected_std
+
+        pd.testing.assert_series_equal(middle, expected_middle.rename("bb_middle"))
+        pd.testing.assert_series_equal(upper, expected_upper.rename("bb_upper"))
+        pd.testing.assert_series_equal(lower, expected_lower.rename("bb_lower"))
 
     # ── Warm-up NaNs ─────────────────────────────────────────────────────────
 
@@ -277,21 +292,42 @@ class TestBollingerBandSignals:
         # After shift(1), warmup positions cover indices 0..BB_WIN-1.
         assert (pos.iloc[: BB_WIN] == 0).all()
 
-    def test_position_held_continuously_within_trade(self):
+    def test_state_machine_holds_until_selected_exit_band(self, monkeypatch):
         """
-        Once entered (0→1), the position must stay 1 until the exit (1→0).
-        There must be no spurious 0 inside a trade.
+        Once entered, raw signal stays long until price reaches the selected
+        exit band. Returned position is shifted by one bar.
         """
-        close = spike_v_close(n_stable=30, spike_low=70.0, n_recover=80)
-        pos = bollinger_band_signals(close, exit_band="upper")
-        in_trade = False
-        for val in pos:
-            if not in_trade and val == 1:
-                in_trade = True
-            elif in_trade and val == 0:
-                in_trade = False
-            # If we were in trade and val==0 the loop already exits in_trade,
-            # which is fine — we just verify there's no "1 after 0 inside a trade".
+        close = make_close([100.0, 99.0, 98.0, 96.0, 95.0, 97.0, 98.0, 99.0])
+        index = close.index
+        middle = pd.Series(
+            [None, None, 100.0, 100.0, 100.0, 97.0, 97.0, 97.0],
+            index=index,
+            name="bb_middle",
+            dtype=float,
+        )
+        upper = pd.Series(
+            [None, None, 105.0, 105.0, 105.0, 102.0, 102.0, 102.0],
+            index=index,
+            name="bb_upper",
+            dtype=float,
+        )
+        lower = pd.Series(
+            [None, None, 99.0, 94.0, 94.0, 94.0, 94.0, 94.0],
+            index=index,
+            name="bb_lower",
+            dtype=float,
+        )
+
+        monkeypatch.setattr(
+            strategies,
+            "compute_bollinger_bands",
+            lambda close, window, num_std: (middle, upper, lower),
+        )
+
+        pos = strategies.bollinger_band_signals(close, exit_band="middle")
+
+        expected = pd.Series([0, 0, 0, 1, 1, 1, 0, 0], index=index, name="position")
+        pd.testing.assert_series_equal(pos, expected)
 
     # ── Validation ───────────────────────────────────────────────────────────
 

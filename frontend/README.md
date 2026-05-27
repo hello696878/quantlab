@@ -23,7 +23,7 @@ frontend/
 │   │   └── TradeTable.tsx       Paginated trade log table
 │   └── lib/
 │       ├── types.ts             TypeScript interfaces (mirrors backend schemas)
-│       ├── api.ts               Fetch wrapper for POST /api/backtest/sma-crossover
+│       ├── api.ts               Fetch wrappers for /api/backtest/* endpoints
 │       └── format.ts            Number/date formatters used across components
 ├── .env.local                   BACKEND_URL env var (default: http://localhost:8000)
 ├── .env.example                 Example backend URL configuration
@@ -64,6 +64,10 @@ The frontend calls the backend through Next.js rewrites:
 
 - Browser request: `POST /api/backtest/sma-crossover`
 - Backend request: `POST /backtest/sma-crossover`
+- Browser request: `POST /api/backtest/rsi-mean-reversion`
+- Backend request: `POST /backtest/rsi-mean-reversion`
+- Browser request: `POST /api/backtest/bollinger-band`
+- Backend request: `POST /backtest/bollinger-band`
 - Default backend base URL: `http://localhost:8000`
 
 ---
@@ -84,9 +88,10 @@ Copy `frontend/.env.example` to `frontend/.env.local`, then edit
 
 `next.config.js` rewrites every request to `/api/*` → `http://localhost:8000/*`.
 
-The frontend therefore calls **`/api/backtest/sma-crossover`** (relative URL).
-Next.js forwards it to the backend transparently — no CORS headers needed in
-the browser, no hard-coded `localhost:8000` in client-side code.
+The frontend therefore calls relative URLs such as
+**`/api/backtest/bollinger-band`**. Next.js forwards them to the backend
+transparently — no CORS headers needed in the browser, no hard-coded
+`localhost:8000` in client-side code.
 
 ---
 

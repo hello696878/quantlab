@@ -114,7 +114,7 @@ const STRATEGY_HEADINGS: Record<
     title: "Bollinger Band Mean Reversion Backtest",
     description:
       "Long-only mean-reversion strategy that enters when price falls below the " +
-      "lower Bollinger Band (≥ 2σ below the rolling SMA) and exits when price " +
+      "lower Bollinger Band and exits when price " +
       "recovers to the selected exit band. Signal is shifted one day forward to " +
       "prevent lookahead bias.",
   },

@@ -103,7 +103,7 @@ export interface BacktestResponse {
   /** Bollinger Band params — null when strategy is not bollinger_band. */
   bb_window: number | null;
   bb_num_std: number | null;
-  bb_exit_band: string | null;
+  bb_exit_band: "middle" | "upper" | null;
 
   transaction_cost_bps: number;
   initial_capital: number;
