@@ -1,14 +1,114 @@
 # QuantLab
 
-Interactive quantitative research and backtesting platform.
+An interactive quantitative research and backtesting platform built for learning, exploration, and portfolio demonstration.
 
-Built with **FastAPI · Python 3.11 · Next.js 14 · React 18 · Tailwind CSS · Recharts**.
+QuantLab lets you select a strategy, choose an asset and date range, tune parameters, and instantly see equity curves, drawdown charts, performance metrics, and trade logs — all computed on real historical price data with no lookahead bias.
 
 ---
 
-## Quick start — Docker (recommended)
+## Tech Stack
 
-Requires Docker Desktop (or Docker Engine + Docker Compose V2).
+| Layer | Technology |
+|---|---|
+| Backend API | FastAPI · Python 3.11 · Pydantic v2 |
+| Data | yfinance (OHLCV daily) |
+| Backtest engine | NumPy · pandas (vectorised) |
+| Frontend | Next.js 14 · React 18 · TypeScript |
+| Styling | Tailwind CSS |
+| Charts | Recharts |
+| Testing | pytest (325+ tests, synthetic data) |
+| CI | GitHub Actions |
+| Containerisation | Docker · Docker Compose |
+
+---
+
+## Features
+
+### Strategies
+
+| Strategy | Type | Parameters |
+|---|---|---|
+| SMA Crossover | Trend-following | Fast window, slow window |
+| RSI Mean Reversion | Mean-reversion | RSI window, oversold threshold, exit threshold |
+| Bollinger Band Mean Reversion | Mean-reversion | Window, std multiplier, exit band |
+| Time-Series Momentum | Trend-following | Momentum window, entry/exit thresholds |
+| Volatility Breakout | Trend-following | Lookback window, breakout multiplier, exit window |
+| Pairs Trading | Statistical arbitrage | Asset Y, asset X, lookback window, entry/exit z-score |
+
+All strategies apply a **one-day signal shift** — the position derived from day T's close prices is applied on day T+1. This prevents lookahead bias by construction.
+
+### Research Tools
+
+| Tool | Purpose |
+|---|---|
+| SMA Parameter Sweep | Grid search over fast/slow window combinations; ranks by Sharpe, CAGR, or Calmar |
+| SMA Train/Test Validation | Splits data at a user-defined date; selects parameters in-sample, evaluates out-of-sample; reports degradation and an `oos_collapsed` flag |
+| SMA Walk-Forward Optimization | Rolls a training window forward, re-selects parameters each fold, stitches OOS windows into a continuous equity curve |
+| Strategy Comparison | Runs all five single-asset strategies on the same ticker/period with default parameters and ranks them |
+
+### Performance Metrics
+
+Total return · CAGR · Sharpe ratio · Sortino ratio · Calmar ratio · Max drawdown · Annualised volatility · Win rate · Trade count
+
+Benchmark: buy-and-hold with no transaction costs.
+
+### Engineering
+
+- Vectorised backtest engine (no Python loops over price series)
+- Transaction cost model: flat bps charged on each position change
+- Pydantic v2 request/response schemas with full validation
+- 325+ pytest tests using synthetic data (no network calls)
+- GitHub Actions CI: backend tests + frontend build on every push/PR
+- Docker Compose: one command to start the full stack
+
+---
+
+## Screenshots
+
+_Screenshots will be added after the first public deployment._
+
+See [`docs/screenshots/README.md`](docs/screenshots/README.md) for the list of planned captures.
+
+---
+
+## Architecture
+
+```
+Browser
+  │
+  │  http://localhost:3000
+  ▼
+Next.js Frontend  (React 18, Tailwind, Recharts)
+  │  BacktestForm → SmaSweepPanel → StrategyComparisonPanel → …
+  │
+  │  /api/*  (proxied at build time via next.config.js rewrites)
+  ▼
+FastAPI Backend  (Python 3.11, Pydantic v2)
+  │  /backtest/*  /research/*  /health
+  │
+  ├── data.py        yfinance OHLCV download + alignment
+  ├── strategies.py  Signal generation (all shift-by-1)
+  ├── backtest.py    Vectorised engine, trade log, benchmark
+  ├── metrics.py     Sharpe, CAGR, drawdown, Sortino, Calmar, …
+  └── schemas.py     Pydantic request / response models
+```
+
+In Docker, the browser never calls the backend directly:
+
+```
+Browser  →  localhost:3000/api/*
+                │
+          Next.js server (frontend container)
+                │  rewrites /api/* → http://backend:8000/*
+                ▼
+          FastAPI server (backend container, internal DNS)
+```
+
+---
+
+## Quick Start — Docker (recommended)
+
+Requires Docker Desktop (or Docker Engine + Compose V2).
 
 ```bash
 docker compose up --build
@@ -20,168 +120,64 @@ docker compose up --build
 | Backend API | http://localhost:8000 |
 | Interactive API docs | http://localhost:8000/docs |
 
-The first build pulls base images and installs all dependencies; subsequent
-`docker compose up` reuses cached layers and starts in seconds.
+The first build pulls base images and installs all dependencies. Subsequent starts reuse cached layers.
 
-### Stop
-
-```
-Ctrl+C
-```
-
-then clean up containers:
+**Stop:**
 
 ```bash
+# Ctrl+C, then:
 docker compose down
 ```
 
 ---
 
-## Quick start — local development (no Docker)
+## Quick Start — Local Development
 
 ### Prerequisites
 
 - Python 3.11+
 - Node.js 20+
-- A virtual environment at `.venv/` (or activate your own)
 
-### 1 — Backend
+### Backend
 
 ```powershell
-# activate the virtual environment (Windows PowerShell)
+# create and activate a virtual environment (Windows PowerShell)
+python -m venv .venv
 .venv\Scripts\Activate.ps1
 
-# install Python dependencies
+# install dependencies
 pip install -r backend\requirements.txt
 
 # start the API server
 cd backend
-uvicorn app.main:app --reload --port 8000
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
-Backend is now at http://localhost:8000  
-Swagger docs at http://localhost:8000/docs
+Backend: http://localhost:8000  
+Swagger docs: http://localhost:8000/docs
 
-### 2 — Frontend
+### Frontend
 
 Open a second terminal:
 
 ```powershell
 cd frontend
-npm install           # first time only
+npm install        # first time only
 npm run dev
 ```
 
-Frontend is now at http://localhost:3000
+Frontend: http://localhost:3000
 
 ---
 
-## Running the backend test suite
+## Testing
 
 ```powershell
 cd backend
 python -m pytest -q
 ```
 
-All tests use synthetic price data — no network calls are made.
-
----
-
-## Project layout
-
-```
-quantlab/
-├── backend/
-│   ├── app/
-│   │   ├── main.py          FastAPI routes
-│   │   ├── strategies.py    Signal generation (lookahead-bias-free)
-│   │   ├── backtest.py      Vectorised backtest engine
-│   │   ├── metrics.py       Sharpe, CAGR, drawdown, …
-│   │   ├── schemas.py       Pydantic request/response models
-│   │   ├── data.py          yfinance OHLCV download layer
-│   │   └── utils.py         Shared helpers
-│   ├── tests/               pytest test suite (325+ tests)
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   └── requirements.txt
-├── frontend/
-│   ├── src/
-│   │   ├── app/             Next.js App Router pages
-│   │   ├── components/      React components
-│   │   └── lib/             API client, types, formatters
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   └── package.json
-├── .github/
-│   └── workflows/
-│       └── ci.yml           GitHub Actions: backend tests + frontend build
-├── docker-compose.yml
-└── README.md
-```
-
----
-
-## How Docker networking works
-
-```
-Browser  →  http://localhost:3000/api/*
-               │
-         Next.js server (frontend container)
-               │  rewrites /api/* → http://backend:8000/*
-               │  (Docker-internal DNS resolves "backend")
-               ▼
-         FastAPI server (backend container)
-               │  port 8000 (not exposed to browser directly)
-               ▼
-         Response flows back to browser
-```
-
-The browser never calls the backend directly.
-`BACKEND_URL=http://backend:8000` is baked into the Next.js production build
-at `docker compose up --build` time via a Docker `ARG`.
-
----
-
-## Troubleshooting
-
-### Port 3000 is already in use
-
-```bash
-# find and kill the process using the port (macOS/Linux)
-lsof -ti:3000 | xargs kill
-
-# Windows PowerShell
-Stop-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess -Force
-```
-
-Or change the port mapping in `docker-compose.yml`:
-
-```yaml
-ports:
-  - "3001:3000"   # host:container
-```
-
-### Port 8000 is already in use
-
-Same approach as above, substituting `8000`.
-
-### Frontend shows "Backend request failed"
-
-1. Confirm both containers are running: `docker compose ps`
-2. Confirm the backend is healthy: `curl http://localhost:8000/health`
-3. Check container logs: `docker compose logs backend`
-4. If you changed `docker-compose.yml`, rebuild: `docker compose up --build`
-
-### Changes to source code are not reflected
-
-The Docker image is built once.  After editing source code, rebuild:
-
-```bash
-docker compose up --build
-```
-
-For a faster inner loop, use the local development workflow (`npm run dev` +
-`uvicorn --reload`) instead of Docker.
+All 325+ tests use synthetic price data — no network calls, no yfinance dependency at test time.
 
 ---
 
@@ -189,7 +185,112 @@ For a faster inner loop, use the local development workflow (`npm run dev` +
 
 GitHub Actions runs on every push and pull request to `main`:
 
-- **backend-tests** — installs Python deps, runs `pytest -q`
-- **frontend-build** — installs Node deps, runs `next build`
+| Job | What it does |
+|---|---|
+| `backend-tests` | Installs Python 3.11 deps, runs `pytest -q` |
+| `frontend-build` | Installs Node 20 deps via `npm ci`, runs `next build` |
 
-See `.github/workflows/ci.yml`.
+See [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
+
+---
+
+## Project Layout
+
+```
+quantlab/
+├── backend/
+│   ├── app/
+│   │   ├── main.py          FastAPI routes (backtest + research endpoints)
+│   │   ├── strategies.py    Signal generation — all shift by 1 day
+│   │   ├── backtest.py      Vectorised backtest engine + trade log
+│   │   ├── metrics.py       Sharpe, CAGR, drawdown, Sortino, Calmar, …
+│   │   ├── schemas.py       Pydantic v2 request / response models
+│   │   ├── data.py          yfinance OHLCV download layer
+│   │   └── utils.py         Shared helpers (date validation, etc.)
+│   ├── tests/               pytest suite (325+ tests, synthetic data)
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   └── requirements.txt
+├── frontend/
+│   ├── src/
+│   │   ├── app/             Next.js App Router pages
+│   │   ├── components/      React components (BacktestForm, charts, panels)
+│   │   └── lib/             API client, TypeScript types, formatters
+│   ├── Dockerfile
+│   ├── .dockerignore
+│   └── package.json
+├── docs/
+│   ├── PROJECT_OVERVIEW.md  Module descriptions and data flow
+│   ├── ROADMAP.md           Completed phases and future plans
+│   ├── LIMITATIONS.md       Known constraints and caveats
+│   └── screenshots/         Screenshot placeholders
+├── .github/
+│   └── workflows/
+│       └── ci.yml           GitHub Actions CI
+├── docker-compose.yml
+└── README.md
+```
+
+---
+
+## Known Limitations
+
+See [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) for the full list. Key points:
+
+- Price data from yfinance may have gaps, splits, or quality issues
+- No survivorship-bias-free database
+- No intraday data or live trading
+- Annualisation assumes 252 trading days (equities convention)
+- Parameter sweeps can overfit in-sample — always check out-of-sample results
+
+---
+
+## Roadmap
+
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full phase plan. Completed phases:
+
+- Phase 0 — project setup and structure
+- Phase 1 — backend MVP (backtest engine + metrics)
+- Phase 2 — frontend dashboard
+- Phase 3 — strategy expansion (RSI, Bollinger, Momentum, VB, Pairs)
+- Phase 4 — research tools (sweep, train/test, walk-forward, comparison)
+- Phase 5 — engineering infrastructure (CI, Docker, numeric input UX)
+
+---
+
+## Educational Disclaimer
+
+QuantLab is a learning and research tool. **Nothing on this platform constitutes investment advice.** Strategy backtests reflect historical simulated performance only. Past performance is not indicative of future results. Real trading involves costs, market impact, execution risk, and other factors not modelled here.
+
+---
+
+## Troubleshooting
+
+### Port already in use
+
+```powershell
+# Windows — free port 3000
+Stop-Process -Id (Get-NetTCPConnection -LocalPort 3000).OwningProcess -Force
+
+# macOS / Linux
+lsof -ti:3000 | xargs kill
+```
+
+Substitute `8000` for the backend port.
+
+### Frontend shows "Backend request failed"
+
+1. Confirm both containers are running: `docker compose ps`
+2. Check backend health: `curl http://localhost:8000/health`
+3. Check logs: `docker compose logs backend`
+4. After editing source code, rebuild: `docker compose up --build`
+
+### Changes not reflected after editing source
+
+The Docker image is built once. After editing source code:
+
+```bash
+docker compose up --build
+```
+
+For faster iteration, use the local dev workflow (`npm run dev` + `uvicorn --reload`).
