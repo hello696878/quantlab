@@ -555,6 +555,7 @@ class SmaSweepRow(BaseModel):
     cagr: float = Field(description="Compound annual growth rate as a decimal.")
     sharpe_ratio: float = Field(description="Annualised Sharpe ratio.")
     sortino_ratio: float = Field(description="Annualised Sortino ratio.")
+    calmar_ratio: float = Field(description="CAGR divided by absolute max drawdown.")
     max_drawdown: float = Field(description="Maximum drawdown (negative decimal).")
     volatility: float = Field(description="Annualised volatility as a decimal.")
     num_trades: int = Field(description="Total BUY + SELL trade events.")
@@ -715,6 +716,15 @@ class SmaTrainTestResponse(BaseModel):
     )
     cagr_degradation: float = Field(
         description="out_of_sample_cagr − in_sample_cagr.  Negative = OOS is worse."
+    )
+    calmar_degradation: float = Field(
+        description="out_of_sample_calmar − in_sample_calmar.  Negative = OOS is worse."
+    )
+    max_drawdown_worsening: float = Field(
+        description=(
+            "abs(out_of_sample_max_drawdown) − abs(in_sample_max_drawdown).  "
+            "Positive = OOS drawdown is deeper."
+        )
     )
 
     # Warning flag

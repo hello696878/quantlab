@@ -559,6 +559,39 @@ export default function SmaTrainTestPanel() {
               </table>
             </div>
 
+            {/* Degradation summary */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+              {[
+                {
+                  label: "Sharpe degradation",
+                  value: fmtRatio(result.sharpe_degradation),
+                  bad: result.sharpe_degradation < 0,
+                },
+                {
+                  label: "CAGR degradation",
+                  value: fmtPct(result.cagr_degradation),
+                  bad: result.cagr_degradation < 0,
+                },
+                {
+                  label: "Calmar degradation",
+                  value: fmtRatio(result.calmar_degradation),
+                  bad: result.calmar_degradation < 0,
+                },
+                {
+                  label: "Drawdown worsening",
+                  value: fmtPct(result.max_drawdown_worsening),
+                  bad: result.max_drawdown_worsening > 0,
+                },
+              ].map(({ label, value, bad }) => (
+                <div key={label} className="rounded-lg border border-slate-200 p-3">
+                  <p className="text-xs text-slate-500">{label}</p>
+                  <p className={`text-sm font-semibold ${bad ? "text-red-600" : "text-emerald-600"}`}>
+                    {value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
             {/* OOS benchmark comparison */}
             <div className="mt-4 pt-4 border-t border-slate-100">
               <p className="text-xs font-medium text-slate-500 mb-2">

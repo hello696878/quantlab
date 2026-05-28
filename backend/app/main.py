@@ -610,6 +610,7 @@ def sma_parameter_sweep(request: SmaSweepRequest) -> SmaSweepResponse:
                     cagr=m["cagr"],
                     sharpe_ratio=m["sharpe_ratio"],
                     sortino_ratio=m["sortino_ratio"],
+                    calmar_ratio=m["calmar_ratio"],
                     max_drawdown=m["max_drawdown"],
                     volatility=m["volatility"],
                     num_trades=len(trades),
@@ -658,6 +659,7 @@ def sma_parameter_sweep(request: SmaSweepRequest) -> SmaSweepResponse:
     ),
 )
 def sma_train_test(request: SmaTrainTestRequest) -> SmaTrainTestResponse:
+    import math
     import pandas as pd  # local import keeps top-level clean
 
     # Pydantic has already validated date ordering and format; call the shared
@@ -668,8 +670,14 @@ def sma_train_test(request: SmaTrainTestRequest) -> SmaTrainTestResponse:
     df = _fetch(request.ticker, request.start_date, request.end_date)
     close_all = df["Close"]
 
-    # Split: IS = [start_date, split_date)  |  OOS = [split_date, end_date]
+    # Trim defensively even when a data provider or test double returns rows
+    # outside the requested interval.
+    start_ts = pd.Timestamp(request.start_date)
     split_ts = pd.Timestamp(request.split_date)
+    end_ts = pd.Timestamp(request.end_date)
+    close_all = close_all[(close_all.index >= start_ts) & (close_all.index <= end_ts)]
+
+    # Split: IS = [start_date, split_date)  |  OOS = [split_date, end_date]
     close_is = close_all[close_all.index < split_ts]
     close_oos = close_all[close_all.index >= split_ts]
 
@@ -719,6 +727,7 @@ def sma_train_test(request: SmaTrainTestRequest) -> SmaTrainTestResponse:
                     cagr=m["cagr"],
                     sharpe_ratio=m["sharpe_ratio"],
                     sortino_ratio=m["sortino_ratio"],
+                    calmar_ratio=m["calmar_ratio"],
                     max_drawdown=m["max_drawdown"],
                     volatility=m["volatility"],
                     num_trades=len(trades),
@@ -750,17 +759,18 @@ def sma_train_test(request: SmaTrainTestRequest) -> SmaTrainTestResponse:
     # ── Select best in-sample parameters ──────────────────────────────────
     def _row_score(row: SmaSweepRow) -> float:
         if request.selection_metric == "sharpe_ratio":
-            return row.sharpe_ratio
-        if request.selection_metric == "cagr":
-            return row.cagr
-        # calmar_ratio: computed inline (not stored in SmaSweepRow)
-        return (
-            row.cagr / abs(row.max_drawdown)
-            if abs(row.max_drawdown) > 1e-12
-            else 0.0
-        )
+            score = row.sharpe_ratio
+        elif request.selection_metric == "cagr":
+            score = row.cagr
+        else:
+            score = row.calmar_ratio
+        return float(score) if math.isfinite(float(score)) else float("-inf")
 
-    best_row = max(is_rows, key=_row_score)
+    # Deterministic ties: prefer smaller fast, then smaller slow.
+    best_row = max(
+        is_rows,
+        key=lambda row: (_row_score(row), -row.fast_window, -row.slow_window),
+    )
     best_fast = best_row.fast_window
     best_slow = best_row.slow_window
 
@@ -824,6 +834,13 @@ def sma_train_test(request: SmaTrainTestRequest) -> SmaTrainTestResponse:
     cagr_degradation = round(
         oos_metrics_dict["cagr"] - is_metrics_dict["cagr"], 6
     )
+    calmar_degradation = round(
+        oos_metrics_dict["calmar_ratio"] - is_metrics_dict["calmar_ratio"], 4
+    )
+    max_drawdown_worsening = round(
+        abs(oos_metrics_dict["max_drawdown"]) - abs(is_metrics_dict["max_drawdown"]),
+        6,
+    )
 
     # oos_collapsed: OOS Sharpe < 0, or OOS Sharpe < 50 % of IS Sharpe
     # (only triggered when IS Sharpe > 0.1 to avoid noise on flat strategies).
@@ -854,6 +871,8 @@ def sma_train_test(request: SmaTrainTestRequest) -> SmaTrainTestResponse:
         out_of_sample_num_trades=len(oos_trades),
         sharpe_degradation=sharpe_degradation,
         cagr_degradation=cagr_degradation,
+        calmar_degradation=calmar_degradation,
+        max_drawdown_worsening=max_drawdown_worsening,
         oos_collapsed=oos_collapsed,
         all_in_sample_results=is_rows,
     )

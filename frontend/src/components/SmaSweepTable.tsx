@@ -53,6 +53,13 @@ const COLUMNS: Column[] = [
     align: "right",
   },
   {
+    key: "calmar_ratio",
+    label: "Calmar",
+    title: "CAGR divided by absolute max drawdown",
+    fmt: (v) => fmtRatio(v),
+    align: "right",
+  },
+  {
     key: "total_return",
     label: "Total Return",
     title: "Total return over the full period",

@@ -201,6 +201,7 @@ export interface SmaSweepRow {
   cagr: number;
   sharpe_ratio: number;
   sortino_ratio: number;
+  calmar_ratio: number;
   max_drawdown: number;
   volatility: number;
   num_trades: number;
@@ -262,6 +263,10 @@ export interface SmaTrainTestResponse {
   sharpe_degradation: number;
   /** OOS CAGR − IS CAGR.  Negative = OOS is worse. */
   cagr_degradation: number;
+  /** OOS Calmar − IS Calmar.  Negative = OOS is worse. */
+  calmar_degradation: number;
+  /** abs(OOS max drawdown) − abs(IS max drawdown). Positive = deeper OOS drawdown. */
+  max_drawdown_worsening: number;
 
   /** True when OOS Sharpe < 0 or OOS Sharpe < 50 % of IS Sharpe. */
   oos_collapsed: boolean;

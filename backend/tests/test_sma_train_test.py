@@ -88,7 +88,8 @@ def test_train_test_smoke(monkeypatch):
         "out_of_sample_benchmark_metrics",
         "out_of_sample_equity_curve", "out_of_sample_trades",
         "out_of_sample_num_trades",
-        "sharpe_degradation", "cagr_degradation", "oos_collapsed",
+        "sharpe_degradation", "cagr_degradation", "calmar_degradation",
+        "max_drawdown_worsening", "oos_collapsed",
         "all_in_sample_results",
     ):
         assert key in body, f"Missing top-level key: {key}"
@@ -190,7 +191,7 @@ def test_train_test_cagr_selection(monkeypatch):
 
 
 def test_train_test_calmar_selection(monkeypatch):
-    """selection_metric=calmar_ratio returns 200 and selects a valid IS pair."""
+    """selection_metric=calmar_ratio selects the IS row with the highest Calmar."""
     monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: make_df())
     client = TestClient(main_module.app)
 
@@ -201,11 +202,14 @@ def test_train_test_calmar_selection(monkeypatch):
 
     assert resp.status_code == 200
     body = resp.json()
-    assert body["best_fast_window"] < body["best_slow_window"]
+    best = (body["best_fast_window"], body["best_slow_window"])
+    is_rows = body["all_in_sample_results"]
+    max_calmar_row = max(is_rows, key=lambda r: r["calmar_ratio"])
+    assert best == (max_calmar_row["fast_window"], max_calmar_row["slow_window"])
 
 
 def test_train_test_degradation_computed_correctly(monkeypatch):
-    """sharpe_degradation == OOS Sharpe − IS Sharpe (rounded to 4 dp)."""
+    """Degradation fields equal OOS metric minus IS metric."""
     monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: make_df())
     client = TestClient(main_module.app)
 
@@ -226,6 +230,92 @@ def test_train_test_degradation_computed_correctly(monkeypatch):
         6,
     )
     assert body["cagr_degradation"] == pytest.approx(expected_cagr_deg, abs=1e-5)
+
+    expected_calmar_deg = round(
+        body["out_of_sample_metrics"]["calmar_ratio"]
+        - body["in_sample_metrics"]["calmar_ratio"],
+        4,
+    )
+    assert body["calmar_degradation"] == pytest.approx(
+        expected_calmar_deg,
+        abs=1e-4,
+    )
+
+    expected_dd_worsening = round(
+        abs(body["out_of_sample_metrics"]["max_drawdown"])
+        - abs(body["in_sample_metrics"]["max_drawdown"]),
+        6,
+    )
+    assert body["max_drawdown_worsening"] == pytest.approx(
+        expected_dd_worsening,
+        abs=1e-6,
+    )
+
+
+def test_train_test_split_trims_to_requested_dates_no_leakage(monkeypatch):
+    """Rows before start_date and after end_date must not enter IS/OOS counts."""
+    df = make_df(n=900, start="2009-01-01")
+    start_date = str(df.index[100].date())
+    split_date = str(df.index[500].date())
+    end_date = str(df.index[750].date())
+
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-train-test",
+        json={
+            **_BASE_PAYLOAD,
+            "start_date": start_date,
+            "split_date": split_date,
+            "end_date": end_date,
+            "fast_windows": [10],
+            "slow_windows": [50],
+        },
+    )
+
+    assert resp.status_code == 200
+    body = resp.json()
+    expected_is = ((df.index >= pd.Timestamp(start_date)) & (df.index < pd.Timestamp(split_date))).sum()
+    expected_oos = ((df.index >= pd.Timestamp(split_date)) & (df.index <= pd.Timestamp(end_date))).sum()
+    assert body["in_sample_days"] == int(expected_is)
+    assert body["out_of_sample_days"] == int(expected_oos)
+    assert len(body["out_of_sample_equity_curve"]) == int(expected_oos)
+
+
+def test_train_test_oos_backtest_matches_selected_params_only(monkeypatch):
+    """OOS curve should equal a direct OOS-only backtest with selected params."""
+    df = make_df()
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
+    client = TestClient(main_module.app)
+
+    resp = client.post("/research/sma-train-test", json=_BASE_PAYLOAD)
+
+    assert resp.status_code == 200
+    body = resp.json()
+    close_oos = df["Close"][
+        (df.index >= pd.Timestamp(body["split_date"]))
+        & (df.index <= pd.Timestamp(body["end_date"]))
+    ]
+    position = sma_crossover_signals(
+        close_oos,
+        fast_window=body["best_fast_window"],
+        slow_window=body["best_slow_window"],
+    )
+    strategy_equity, benchmark_equity, trades = run_backtest(
+        close_oos,
+        position,
+        transaction_cost_bps=body["transaction_cost_bps"],
+        initial_capital=body["initial_capital"],
+    )
+
+    assert body["out_of_sample_equity_curve"][-1]["strategy"] == pytest.approx(
+        round(float(strategy_equity.iloc[-1]), 2)
+    )
+    assert body["out_of_sample_equity_curve"][-1]["benchmark"] == pytest.approx(
+        round(float(benchmark_equity.iloc[-1]), 2)
+    )
+    assert body["out_of_sample_num_trades"] == len(trades)
 
 
 def test_train_test_oos_equity_curve_non_empty(monkeypatch):
@@ -397,6 +487,32 @@ def test_train_test_rejects_fast_window_below_2():
     )
 
     assert resp.status_code == 422
+
+
+def test_train_test_rejects_slow_window_below_2():
+    """slow_windows with a value < 2 → 422."""
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-train-test",
+        json={**_BASE_PAYLOAD, "slow_windows": [1, 50]},
+    )
+
+    assert resp.status_code == 422
+
+
+def test_train_test_no_valid_parameter_pairs_returns_422(monkeypatch):
+    """If every pair has fast >= slow, selection cannot proceed."""
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: make_df())
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-train-test",
+        json={**_BASE_PAYLOAD, "fast_windows": [100, 200], "slow_windows": [50]},
+    )
+
+    assert resp.status_code == 422
+    assert "No valid" in resp.json()["detail"]
 
 
 def test_train_test_rejects_combinations_over_100():

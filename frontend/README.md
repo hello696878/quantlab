@@ -22,7 +22,8 @@ frontend/
 │   │   ├── DrawdownChart.tsx    Drawdown area chart (strategy + benchmark)
 │   │   ├── TradeTable.tsx       Paginated trade log table
 │   │   ├── SmaSweepPanel.tsx    SMA parameter sweep form + result state
-│   │   └── SmaSweepTable.tsx    Sortable SMA sweep result table
+│   │   ├── SmaSweepTable.tsx    Sortable SMA sweep result table
+│   │   └── SmaTrainTestPanel.tsx SMA train/test validation UI
 │   └── lib/
 │       ├── types.ts             TypeScript interfaces (mirrors backend schemas)
 │       ├── api.ts               Fetch wrappers for /api/backtest/* endpoints
@@ -78,6 +79,8 @@ The frontend calls the backend through Next.js rewrites:
 - Backend request: `POST /backtest/pairs`
 - Browser request: `POST /api/research/sma-parameter-sweep`
 - Backend request: `POST /research/sma-parameter-sweep`
+- Browser request: `POST /api/research/sma-train-test`
+- Backend request: `POST /research/sma-train-test`
 - Default backend base URL: `http://localhost:8000`
 
 ---
@@ -100,7 +103,7 @@ Copy `frontend/.env.example` to `frontend/.env.local`, then edit
 
 The frontend therefore calls relative URLs such as
 **`/api/backtest/volatility-breakout`** and
-**`/api/research/sma-parameter-sweep`**. Next.js forwards them to the backend
+**`/api/research/sma-train-test`**. Next.js forwards them to the backend
 transparently — no CORS headers needed in the browser, no hard-coded
 `localhost:8000` in client-side code.
 
@@ -116,6 +119,7 @@ transparently — no CORS headers needed in the browser, no hard-coded
 | **Drawdown Chart** | Computed client-side from `equity_curve` (running peak) |
 | **Trade Log** | `trades[]` from API — paginated 20 per page |
 | **SMA Parameter Sweep** | `POST /research/sma-parameter-sweep`; sortable result rows from `results[]` |
+| **SMA Train/Test** | `POST /research/sma-train-test`; IS selection, OOS equity curve, degradation summary |
 
 ---
 
