@@ -8,6 +8,7 @@ import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
 import SmaSweepPanel from "@/components/SmaSweepPanel";
 import SmaTrainTestPanel from "@/components/SmaTrainTestPanel";
+import SmaWalkForwardPanel from "@/components/SmaWalkForwardPanel";
 import {
   runBacktest,
   runBbBacktest,
@@ -239,7 +240,7 @@ const STRATEGY_HEADINGS: Record<
 // ---------------------------------------------------------------------------
 
 type PageMode = "backtest" | "research";
-type ResearchTab = "sweep" | "train-test";
+type ResearchTab = "sweep" | "train-test" | "walk-forward";
 
 export default function HomePage() {
   const [mode, setMode] = useState<PageMode>("backtest");
@@ -333,8 +334,9 @@ export default function HomePage() {
           <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
             {(
               [
-                { id: "sweep",      label: "SMA Parameter Sweep" },
-                { id: "train-test", label: "SMA Train/Test Validation" },
+                { id: "sweep",        label: "SMA Parameter Sweep" },
+                { id: "train-test",   label: "SMA Train/Test Validation" },
+                { id: "walk-forward", label: "SMA Walk-Forward" },
               ] as const
             ).map(({ id, label }) => (
               <button
@@ -385,6 +387,25 @@ export default function HomePage() {
                 </p>
               </div>
               <SmaTrainTestPanel />
+            </>
+          )}
+
+          {researchTab === "walk-forward" && (
+            <>
+              <div>
+                <h2 className="text-xl font-semibold text-slate-800">
+                  SMA Walk-Forward Optimization
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+                  Repeatedly roll a training window forward, sweep SMA parameters
+                  in-sample, select the best pair, and evaluate it on the
+                  immediately following out-of-sample window.  The out-of-sample
+                  results are stitched together to form a realistic equity curve
+                  that avoids look-ahead bias.  Parameter stability analysis shows
+                  whether the strategy requires stable parameters or adapts erratically.
+                </p>
+              </div>
+              <SmaWalkForwardPanel />
             </>
           )}
         </>

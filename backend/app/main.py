@@ -12,6 +12,7 @@ POST /backtest/volatility-breakout    — run a volatility breakout backtest
 POST /backtest/pairs                  — run a pairs trading backtest
 POST /research/sma-parameter-sweep   — sweep fast/slow SMA window combinations
 POST /research/sma-train-test        — SMA train/test out-of-sample validation
+POST /research/sma-walk-forward      — SMA walk-forward optimization
 """
 
 from fastapi import FastAPI, HTTPException
@@ -34,6 +35,11 @@ from app.schemas import (
     SmaSweepRow,
     SmaTrainTestRequest,
     SmaTrainTestResponse,
+    SmaWalkForwardBestParams,
+    SmaWalkForwardParamStability,
+    SmaWalkForwardRequest,
+    SmaWalkForwardResponse,
+    SmaWalkForwardWindow,
     TradeRecord,
     VbBacktestRequest,
 )
@@ -174,6 +180,82 @@ def _build_response(
         trades=[TradeRecord(**t) for t in trades],
         num_trades=len(trades),
     )
+
+
+# ---------------------------------------------------------------------------
+# Private research helpers  (reused by sweep, train-test, walk-forward)
+# ---------------------------------------------------------------------------
+
+
+def _sweep_rows(
+    close,
+    fast_windows: list,
+    slow_windows: list,
+    transaction_cost_bps: float,
+    initial_capital: float,
+) -> tuple:
+    """
+    Run an SMA parameter sweep on *close* and return (rows, valid_pairs).
+
+    ``rows``        — list of :class:`SmaSweepRow` objects for every
+                      (fast < slow) pair that had sufficient bars.
+    ``valid_pairs`` — number of (fast < slow) pairs attempted (before the
+                      bar-length check).  Used to distinguish "all-invalid
+                      grid" from "data too short" in callers.
+    """
+    rows: list = []
+    valid_pairs = 0
+    for fast in sorted(set(fast_windows)):
+        for slow in sorted(set(slow_windows)):
+            if fast >= slow:
+                continue
+            valid_pairs += 1
+            if len(close) < slow + 2:
+                continue
+            position = sma_crossover_signals(close, fast_window=fast, slow_window=slow)
+            strategy_equity, _bench, trades = run_backtest(
+                close=close,
+                position=position,
+                transaction_cost_bps=transaction_cost_bps,
+                initial_capital=initial_capital,
+            )
+            m = compute_metrics(strategy_equity)
+            rows.append(
+                SmaSweepRow(
+                    fast_window=fast,
+                    slow_window=slow,
+                    total_return=m["total_return"],
+                    cagr=m["cagr"],
+                    sharpe_ratio=m["sharpe_ratio"],
+                    sortino_ratio=m["sortino_ratio"],
+                    calmar_ratio=m["calmar_ratio"],
+                    max_drawdown=m["max_drawdown"],
+                    volatility=m["volatility"],
+                    num_trades=len(trades),
+                )
+            )
+    return rows, valid_pairs
+
+
+def _best_row(rows: list, selection_metric: str) -> "SmaSweepRow":
+    """
+    Return the best :class:`SmaSweepRow` by *selection_metric*.
+
+    Ties broken deterministically: prefer smaller fast_window, then
+    smaller slow_window.
+    """
+    import math
+
+    def _score(row) -> float:
+        if selection_metric == "sharpe_ratio":
+            v = row.sharpe_ratio
+        elif selection_metric == "cagr":
+            v = row.cagr
+        else:
+            v = row.calmar_ratio
+        return float(v) if math.isfinite(float(v)) else float("-inf")
+
+    return max(rows, key=lambda r: (_score(r), -r.fast_window, -r.slow_window))
 
 
 # ---------------------------------------------------------------------------
@@ -875,4 +957,246 @@ def sma_train_test(request: SmaTrainTestRequest) -> SmaTrainTestResponse:
         max_drawdown_worsening=max_drawdown_worsening,
         oos_collapsed=oos_collapsed,
         all_in_sample_results=is_rows,
+    )
+
+
+@app.post(
+    "/research/sma-walk-forward",
+    response_model=SmaWalkForwardResponse,
+    tags=["research"],
+    summary="SMA Walk-Forward Optimization",
+    description=(
+        "Repeatedly roll a training window forward, run an SMA parameter sweep "
+        "on that window, select the best (fast, slow) pair, then evaluate it on "
+        "the following out-of-sample test window.  The test windows are stitched "
+        "together into a single OOS equity curve.  Reports per-window metrics, "
+        "aggregate statistics, and a parameter-stability summary.  "
+        "No future data ever leaks into the training window."
+    ),
+)
+def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
+    import math
+    import pandas as pd
+    from collections import Counter
+
+    _validate_common(request.ticker, request.start_date, request.end_date)
+
+    df = _fetch(request.ticker, request.start_date, request.end_date)
+    close_all = df["Close"]
+
+    # Trim to the requested date range.
+    start_ts = pd.Timestamp(request.start_date)
+    end_ts = pd.Timestamp(request.end_date)
+    close_all = close_all[(close_all.index >= start_ts) & (close_all.index <= end_ts)]
+
+    n = len(close_all)
+    train_w = request.train_window_days
+    test_w = request.test_window_days
+    step = request.step_days
+
+    # Need at least one complete (train + test) window.
+    if n < train_w + test_w:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {n} trading days available; need at least "
+                f"{train_w + test_w} "
+                f"(train_window_days={train_w} + test_window_days={test_w})."
+            ),
+        )
+
+    # Verify at least one valid (fast < slow) pair exists.
+    has_valid_pair = any(
+        f < s
+        for f in request.fast_windows
+        for s in request.slow_windows
+    )
+    if not has_valid_pair:
+        raise HTTPException(
+            status_code=422,
+            detail="No valid (fast < slow) window combinations found.",
+        )
+
+    # ── Walk-forward loop ─────────────────────────────────────────────────
+    completed_windows: list = []
+    stitched_strat_series: list = []   # pd.Series per test window
+    stitched_bench_series: list = []   # pd.Series per test window
+
+    current_capital = request.initial_capital
+    current_bench_capital = request.initial_capital
+    train_start_idx = 0
+
+    while True:
+        train_end_idx = train_start_idx + train_w
+        test_start_idx = train_end_idx
+        test_end_idx = test_start_idx + test_w
+
+        if test_end_idx > n:
+            break
+        if len(completed_windows) >= 200:   # safety cap
+            break
+
+        close_train = close_all.iloc[train_start_idx:train_end_idx]
+        close_test = close_all.iloc[test_start_idx:test_end_idx]
+
+        # ── IS sweep on training window ──────────────────────────────────
+        sweep, valid_pairs = _sweep_rows(
+            close=close_train,
+            fast_windows=request.fast_windows,
+            slow_windows=request.slow_windows,
+            transaction_cost_bps=request.transaction_cost_bps,
+            initial_capital=request.initial_capital,
+        )
+
+        if not sweep:
+            # Training window too short for all (fast < slow) combos → skip.
+            train_start_idx += step
+            continue
+
+        chosen = _best_row(sweep, request.selection_metric)
+        best_fast = chosen.fast_window
+        best_slow = chosen.slow_window
+
+        # Skip if the test window has too few bars for the chosen slow window.
+        if len(close_test) < best_slow + 2:
+            train_start_idx += step
+            continue
+
+        # ── Re-run train backtest for best params → full train_metrics ───
+        train_pos = sma_crossover_signals(
+            close_train, fast_window=best_fast, slow_window=best_slow
+        )
+        train_eq, _train_bench, _train_trades = run_backtest(
+            close=close_train,
+            position=train_pos,
+            transaction_cost_bps=request.transaction_cost_bps,
+            initial_capital=request.initial_capital,
+        )
+        train_metrics_dict = compute_metrics(train_eq)
+
+        # ── OOS backtest on test window (chained capital) ────────────────
+        test_pos = sma_crossover_signals(
+            close_test, fast_window=best_fast, slow_window=best_slow
+        )
+        test_strat_eq, test_bench_eq_raw, test_trades = run_backtest(
+            close=close_test,
+            position=test_pos,
+            transaction_cost_bps=request.transaction_cost_bps,
+            initial_capital=current_capital,
+        )
+        # Scale benchmark to start from its own chained capital.
+        bench_scale = current_bench_capital / current_capital if current_capital > 0 else 1.0
+        test_bench_eq = test_bench_eq_raw * bench_scale
+
+        test_metrics_dict = compute_metrics(test_strat_eq)
+        test_bench_metrics_dict = compute_metrics(test_bench_eq)
+
+        # ── Store window result ──────────────────────────────────────────
+        completed_windows.append(
+            SmaWalkForwardWindow(
+                window_index=len(completed_windows),
+                train_start_date=str(close_train.index[0].date()),
+                train_end_date=str(close_train.index[-1].date()),
+                test_start_date=str(close_test.index[0].date()),
+                test_end_date=str(close_test.index[-1].date()),
+                train_days=len(close_train),
+                test_days=len(close_test),
+                best_fast_window=best_fast,
+                best_slow_window=best_slow,
+                train_metrics=PerformanceMetrics(**train_metrics_dict),
+                test_metrics=PerformanceMetrics(**test_metrics_dict),
+                test_benchmark_metrics=PerformanceMetrics(**test_bench_metrics_dict),
+                num_trades=len(test_trades),
+            )
+        )
+        stitched_strat_series.append(test_strat_eq)
+        stitched_bench_series.append(test_bench_eq)
+
+        # Advance chained capital.
+        current_capital = float(test_strat_eq.iloc[-1])
+        current_bench_capital = float(test_bench_eq.iloc[-1])
+
+        train_start_idx += step
+
+    if not completed_windows:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                "No walk-forward windows could be completed.  "
+                "The date range may be too short, or all parameter combinations "
+                "require more bars than are available in the training window.  "
+                "Try a shorter train_window_days or larger date range."
+            ),
+        )
+
+    # ── Stitch equity curves ──────────────────────────────────────────────
+    stitched_strat = pd.concat(stitched_strat_series)
+    stitched_bench = pd.concat(stitched_bench_series)
+
+    # Remove duplicate timestamps (can occur when step_days < test_window_days).
+    stitched_strat = stitched_strat[~stitched_strat.index.duplicated(keep="first")]
+    stitched_bench = stitched_bench[~stitched_bench.index.duplicated(keep="first")]
+
+    stitched_equity_curve = [
+        EquityPoint(
+            date=str(d.date()) if hasattr(d, "date") else str(d),
+            strategy=round(float(s), 2),
+            benchmark=round(float(b), 2),
+        )
+        for d, s, b in zip(stitched_strat.index, stitched_strat, stitched_bench)
+    ]
+
+    # ── Aggregate metrics on stitched OOS performance ─────────────────────
+    agg_metrics_dict = (
+        compute_metrics(stitched_strat) if len(stitched_strat) >= 2
+        else {k: 0.0 for k in (
+            "total_return", "cagr", "sharpe_ratio", "sortino_ratio",
+            "max_drawdown", "volatility", "calmar_ratio", "win_rate",
+        )} | {"num_days": len(stitched_strat)}
+    )
+    agg_bench_metrics_dict = (
+        compute_metrics(stitched_bench) if len(stitched_bench) >= 2
+        else agg_metrics_dict.copy()
+    )
+
+    # ── Parameter stability ───────────────────────────────────────────────
+    selected_pairs = [
+        (w.best_fast_window, w.best_slow_window) for w in completed_windows
+    ]
+    pair_counter: Counter = Counter(selected_pairs)
+    most_common_pair, most_common_count = pair_counter.most_common(1)[0]
+    unique_count = len(pair_counter)
+    n_windows = len(completed_windows)
+    parameters_unstable = (most_common_count / n_windows) < 0.5
+
+    return SmaWalkForwardResponse(
+        ticker=request.ticker.strip().upper(),
+        start_date=request.start_date,
+        end_date=request.end_date,
+        train_window_days=request.train_window_days,
+        test_window_days=request.test_window_days,
+        step_days=request.step_days,
+        selection_metric=request.selection_metric,
+        initial_capital=request.initial_capital,
+        transaction_cost_bps=request.transaction_cost_bps,
+        num_windows=n_windows,
+        windows=completed_windows,
+        stitched_equity_curve=stitched_equity_curve,
+        aggregate_metrics=PerformanceMetrics(**agg_metrics_dict),
+        aggregate_benchmark_metrics=PerformanceMetrics(**agg_bench_metrics_dict),
+        parameter_stability=SmaWalkForwardParamStability(
+            num_windows=n_windows,
+            unique_parameter_sets=unique_count,
+            most_common_fast_window=most_common_pair[0],
+            most_common_slow_window=most_common_pair[1],
+            most_common_count=most_common_count,
+            all_selected_params=[
+                SmaWalkForwardBestParams(
+                    fast_window=w.best_fast_window,
+                    slow_window=w.best_slow_window,
+                )
+                for w in completed_windows
+            ],
+            parameters_unstable=parameters_unstable,
+        ),
     )

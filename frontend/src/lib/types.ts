@@ -274,3 +274,74 @@ export interface SmaTrainTestResponse {
   /** All IS sweep rows for reference display. */
   all_in_sample_results: SmaSweepRow[];
 }
+
+// ---------------------------------------------------------------------------
+// Research — SMA Walk-Forward Optimization
+// ---------------------------------------------------------------------------
+
+export interface SmaWalkForwardRequest {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  train_window_days: number;
+  test_window_days: number;
+  step_days: number;
+  fast_windows: number[];
+  slow_windows: number[];
+  selection_metric: "sharpe_ratio" | "cagr" | "calmar_ratio";
+  initial_capital: number;
+  transaction_cost_bps: number;
+}
+
+export interface SmaWalkForwardBestParams {
+  fast_window: number;
+  slow_window: number;
+}
+
+export interface SmaWalkForwardWindow {
+  window_index: number;
+  train_start_date: string;
+  train_end_date: string;
+  test_start_date: string;
+  test_end_date: string;
+  train_days: number;
+  test_days: number;
+  best_fast_window: number;
+  best_slow_window: number;
+  train_metrics: PerformanceMetrics;
+  test_metrics: PerformanceMetrics;
+  test_benchmark_metrics: PerformanceMetrics;
+  num_trades: number;
+}
+
+export interface SmaWalkForwardParamStability {
+  num_windows: number;
+  unique_parameter_sets: number;
+  most_common_fast_window: number;
+  most_common_slow_window: number;
+  most_common_count: number;
+  all_selected_params: SmaWalkForwardBestParams[];
+  parameters_unstable: boolean;
+}
+
+export interface SmaWalkForwardResponse {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  train_window_days: number;
+  test_window_days: number;
+  step_days: number;
+  selection_metric: string;
+  initial_capital: number;
+  transaction_cost_bps: number;
+
+  num_windows: number;
+  windows: SmaWalkForwardWindow[];
+
+  stitched_equity_curve: EquityPoint[];
+
+  aggregate_metrics: PerformanceMetrics;
+  aggregate_benchmark_metrics: PerformanceMetrics;
+
+  parameter_stability: SmaWalkForwardParamStability;
+}

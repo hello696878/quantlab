@@ -737,3 +737,202 @@ class SmaTrainTestResponse(BaseModel):
 
     # All in-sample sweep rows (for reference / display)
     all_in_sample_results: List[SmaSweepRow]
+
+
+# ===========================================================================
+# Research — SMA Walk-Forward Optimization
+# ===========================================================================
+
+
+class SmaWalkForwardRequest(BaseModel):
+    """Parameters for the SMA walk-forward optimization endpoint."""
+
+    ticker: str = Field(
+        default="SPY",
+        description="Yahoo Finance ticker symbol.",
+    )
+    start_date: str = Field(
+        default="2010-01-01",
+        description="Start of the full data range (YYYY-MM-DD).",
+    )
+    end_date: str = Field(
+        default="2023-12-31",
+        description="End of the full data range (YYYY-MM-DD).",
+    )
+    train_window_days: int = Field(
+        default=756,
+        ge=10,
+        description=(
+            "Number of trading days in each rolling training (in-sample) window. "
+            "Default 756 ≈ 3 years."
+        ),
+    )
+    test_window_days: int = Field(
+        default=126,
+        ge=5,
+        description=(
+            "Number of trading days in each out-of-sample test window. "
+            "Default 126 ≈ 6 months."
+        ),
+    )
+    step_days: int = Field(
+        default=126,
+        ge=1,
+        description=(
+            "Number of trading days to advance the window each step. "
+            "When step_days == test_window_days the test windows are non-overlapping. "
+            "Default 126."
+        ),
+    )
+    fast_windows: List[int] = Field(
+        default=[10, 20, 30, 40, 50],
+        min_length=1,
+        max_length=10,
+        description="Fast SMA window lengths to sweep (each >= 2, max 10 values).",
+    )
+    slow_windows: List[int] = Field(
+        default=[100, 150, 200, 250],
+        min_length=1,
+        max_length=10,
+        description="Slow SMA window lengths to sweep (each >= 2, max 10 values).",
+    )
+    selection_metric: Literal["sharpe_ratio", "cagr", "calmar_ratio"] = Field(
+        default="sharpe_ratio",
+        description="Metric used to select best parameters on each training window.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0,
+        gt=0,
+        description="Starting capital in USD.",
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="One-way transaction cost in basis points.",
+    )
+
+    @model_validator(mode="after")
+    def check_dates(self) -> "SmaWalkForwardRequest":
+        import re
+        for name, val in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, val):
+                raise ValueError(f"{name} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be strictly before end_date.")
+        return self
+
+    @model_validator(mode="after")
+    def check_windows(self) -> "SmaWalkForwardRequest":
+        for fw in self.fast_windows:
+            if fw < 2:
+                raise ValueError(f"All fast_windows must be >= 2; got {fw}.")
+        for sw in self.slow_windows:
+            if sw < 2:
+                raise ValueError(f"All slow_windows must be >= 2; got {sw}.")
+        total = len(self.fast_windows) * len(self.slow_windows)
+        if total > 100:
+            raise ValueError(
+                f"Total combinations (len(fast_windows) × len(slow_windows)) "
+                f"must be ≤ 100; got {total}."
+            )
+        return self
+
+
+class SmaWalkForwardBestParams(BaseModel):
+    """The (fast, slow) parameter pair selected for one walk-forward window."""
+
+    fast_window: int = Field(description="Selected fast SMA window (days).")
+    slow_window: int = Field(description="Selected slow SMA window (days).")
+
+
+class SmaWalkForwardWindow(BaseModel):
+    """Results for one walk-forward train/test window."""
+
+    window_index: int = Field(description="0-based window index.")
+    train_start_date: str = Field(description="First date of the training period.")
+    train_end_date: str = Field(description="Last date of the training period.")
+    test_start_date: str = Field(description="First date of the test period.")
+    test_end_date: str = Field(description="Last date of the test period.")
+    train_days: int = Field(description="Number of training-period trading days.")
+    test_days: int = Field(description="Number of test-period trading days.")
+    best_fast_window: int = Field(description="Fast window selected on training data.")
+    best_slow_window: int = Field(description="Slow window selected on training data.")
+    train_metrics: PerformanceMetrics = Field(
+        description="Performance of the best params on the training window."
+    )
+    test_metrics: PerformanceMetrics = Field(
+        description="Performance of the selected params on the test window."
+    )
+    test_benchmark_metrics: PerformanceMetrics = Field(
+        description="Buy-and-hold performance on the test window."
+    )
+    num_trades: int = Field(description="Trade events in the test window.")
+
+
+class SmaWalkForwardParamStability(BaseModel):
+    """Summary of how stable the parameter selection is across windows."""
+
+    num_windows: int = Field(description="Total number of completed walk-forward windows.")
+    unique_parameter_sets: int = Field(
+        description="Number of distinct (fast, slow) pairs selected across windows."
+    )
+    most_common_fast_window: int = Field(
+        description="Most frequently selected fast window across all windows."
+    )
+    most_common_slow_window: int = Field(
+        description="Most frequently selected slow window across all windows."
+    )
+    most_common_count: int = Field(
+        description="How many windows chose the most common parameter set."
+    )
+    all_selected_params: List[SmaWalkForwardBestParams] = Field(
+        description="The (fast, slow) pair chosen in each window, in order."
+    )
+    parameters_unstable: bool = Field(
+        description=(
+            "True when no single parameter set was chosen in more than 50 % "
+            "of windows — a sign that the strategy is sensitive to the "
+            "optimisation window."
+        )
+    )
+
+
+class SmaWalkForwardResponse(BaseModel):
+    """Full response for the SMA walk-forward optimization endpoint."""
+
+    # Identity
+    ticker: str
+    start_date: str
+    end_date: str
+    train_window_days: int
+    test_window_days: int
+    step_days: int
+    selection_metric: str
+    initial_capital: float
+    transaction_cost_bps: float
+
+    # Window-level results
+    num_windows: int = Field(description="Number of completed walk-forward windows.")
+    windows: List[SmaWalkForwardWindow] = Field(
+        description="Per-window results, ordered by window_index."
+    )
+
+    # Stitched out-of-sample equity curve (strategy chained across test windows)
+    stitched_equity_curve: List[EquityPoint] = Field(
+        description=(
+            "Stitched out-of-sample equity curve: strategy and benchmark "
+            "equity compounded across all test windows."
+        )
+    )
+
+    # Aggregate metrics on the full stitched OOS performance
+    aggregate_metrics: PerformanceMetrics = Field(
+        description="Performance metrics computed on the full stitched OOS equity curve."
+    )
+    aggregate_benchmark_metrics: PerformanceMetrics = Field(
+        description="Buy-and-hold metrics on the full stitched OOS period."
+    )
+
+    # Parameter stability
+    parameter_stability: SmaWalkForwardParamStability

@@ -1,6 +1,6 @@
-# QuantLab Backend — Phase 1 MVP
+# QuantLab Backend
 
-A **correct** FastAPI backtesting engine for a long-only SMA crossover strategy.
+A **correct** FastAPI backtesting and research engine for quantitative trading strategies.
 
 ---
 
@@ -9,19 +9,28 @@ A **correct** FastAPI backtesting engine for a long-only SMA crossover strategy.
 ```
 backend/
 ├── app/
-│   ├── __init__.py       package marker
-│   ├── main.py           FastAPI app, routes, input validation
-│   ├── schemas.py        Pydantic request / response models
-│   ├── data.py           yfinance OHLCV download layer
-│   ├── strategies.py     SMA crossover signal generation (lookahead-bias-free)
-│   ├── backtest.py       vectorised backtest engine + transaction costs
-│   ├── metrics.py        Sharpe, Sortino, CAGR, drawdown, win-rate, …
-│   └── utils.py          shared helpers
+│   ├── __init__.py         package marker
+│   ├── main.py             FastAPI app, routes, input validation
+│   ├── schemas.py          Pydantic request / response models
+│   ├── data.py             yfinance OHLCV download layer
+│   ├── strategies.py       signal generation (lookahead-bias-free)
+│   ├── backtest.py         vectorised backtest engine + transaction costs
+│   ├── metrics.py          Sharpe, Sortino, CAGR, drawdown, Calmar, win-rate, …
+│   └── utils.py            shared helpers
 ├── tests/
-│   ├── test_metrics.py   25 unit tests for metrics
-│   ├── test_strategies.py  signal shape / bias / economic behaviour tests
-│   └── test_backtest.py  equity curve, trades, benchmark tests
-├── pyproject.toml        pytest config (pythonpath, testpaths)
+│   ├── test_metrics.py           unit tests for metrics
+│   ├── test_strategies.py        signal shape / bias / economic behaviour tests
+│   ├── test_backtest.py          equity curve, trades, benchmark tests
+│   ├── test_api_sma.py           SMA crossover API integration tests
+│   ├── test_api_rsi.py           RSI mean reversion API tests
+│   ├── test_api_bb.py            Bollinger Band API tests
+│   ├── test_api_momentum.py      Momentum API tests
+│   ├── test_api_vb.py            Volatility Breakout API tests
+│   ├── test_api_pairs.py         Pairs Trading API tests
+│   ├── test_sma_sweep.py         SMA Parameter Sweep research tests
+│   ├── test_sma_train_test.py    SMA Train/Test Validation research tests
+│   └── test_sma_walk_forward.py  SMA Walk-Forward Optimization research tests
+├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
 
@@ -69,47 +78,144 @@ Liveness check.
 
 ---
 
-### `POST /backtest/sma-crossover`
+### Backtest Endpoints
 
-Run a long-only SMA crossover backtest.
+All backtest endpoints accept `POST` and return a unified `BacktestResponse` containing
+`strategy_metrics`, `benchmark_metrics`, `equity_curve`, and `trades`.
 
-**Request body** (all fields have defaults):
+| Endpoint | Strategy |
+|---|---|
+| `POST /backtest/sma-crossover` | Long-only SMA crossover |
+| `POST /backtest/rsi-mean-reversion` | RSI mean reversion |
+| `POST /backtest/bollinger-band` | Bollinger Band mean reversion |
+| `POST /backtest/momentum` | Time-series momentum |
+| `POST /backtest/volatility-breakout` | Volatility breakout |
+| `POST /backtest/pairs` | Pairs trading (dollar-neutral) |
+
+Common fields shared by all backtest requests:
+
+| Field | Type | Default |
+|---|---|---|
+| `ticker` | string | `"SPY"` |
+| `start_date` | string (YYYY-MM-DD) | `"2015-01-01"` |
+| `end_date` | string (YYYY-MM-DD) | `"2023-12-31"` |
+| `transaction_cost_bps` | float | `10.0` |
+| `initial_capital` | float | `100000.0` |
+
+---
+
+### Research Endpoints
+
+#### `POST /research/sma-parameter-sweep`
+
+Runs every valid (fast < slow) combination of SMA windows over a single date range.
+Returns a results table sorted by the best Sharpe ratio.
 
 ```json
 {
-  "ticker":               "SPY",
-  "start_date":           "2015-01-01",
-  "end_date":             "2023-12-31",
-  "fast_window":          50,
-  "slow_window":          200,
+  "ticker": "SPY",
+  "start_date": "2015-01-01",
+  "end_date": "2023-12-31",
+  "fast_windows": [10, 20, 50],
+  "slow_windows": [100, 150, 200],
   "transaction_cost_bps": 10.0,
-  "initial_capital":      100000.0
+  "initial_capital": 100000.0
 }
 ```
 
-| Field | Type | Constraint | Default |
-|---|---|---|---|
-| `ticker` | string | valid Yahoo Finance symbol | `"SPY"` |
-| `start_date` | string | YYYY-MM-DD | `"2015-01-01"` |
-| `end_date` | string | YYYY-MM-DD, after start | `"2023-12-31"` |
-| `fast_window` | int | ≥ 2, < slow_window | `50` |
-| `slow_window` | int | ≥ 2 | `200` |
-| `transaction_cost_bps` | float | one-way bps, ≥ 0 and < 10,000 | `10.0` |
-| `initial_capital` | float | > 0 | `100000.0` |
+Useful for identifying which parameter regions produce robust performance and
+which are isolated hot-spots likely caused by overfitting.
 
-**Response** includes:
+---
 
-- `strategy_metrics` / `benchmark_metrics` — total_return, CAGR, Sharpe, Sortino, max_drawdown, volatility, win_rate
-- `equity_curve` — daily `{ date, strategy, benchmark }` values
-- `trades` — list of `{ date, action, price, shares, cost }` records
+#### `POST /research/sma-train-test`
 
-**Quick test with curl:**
+Splits the date range at a `split_date` into in-sample (IS) and out-of-sample
+(OOS) periods.  Runs a parameter sweep on IS data only, selects the best
+(fast, slow) pair by `selection_metric`, then applies it to the OOS period.
 
-```bash
-curl -X POST http://localhost:8000/backtest/sma-crossover \
-  -H "Content-Type: application/json" \
-  -d '{"ticker":"SPY","start_date":"2015-01-01","end_date":"2023-12-31"}'
+```json
+{
+  "ticker": "SPY",
+  "start_date": "2010-01-01",
+  "split_date": "2018-01-01",
+  "end_date": "2023-12-31",
+  "fast_windows": [10, 20, 50],
+  "slow_windows": [100, 150, 200],
+  "selection_metric": "sharpe_ratio",
+  "transaction_cost_bps": 10.0,
+  "initial_capital": 100000.0
+}
 ```
+
+Returns IS metrics, OOS metrics, degradation statistics (`sharpe_degradation`,
+`cagr_degradation`, `calmar_degradation`, `max_drawdown_worsening`), and a flag
+`oos_collapsed` when OOS Sharpe is negative or less than 50 % of IS Sharpe.
+
+---
+
+#### `POST /research/sma-walk-forward`
+
+Walk-forward optimization repeatedly advances a rolling training window across
+the full date range.  In each step it:
+
+1. Sweeps SMA parameters inside the training window (in-sample).
+2. Selects the best (fast, slow) pair by `selection_metric`.
+3. Applies that pair to the immediately following test window (out-of-sample).
+4. Advances by `step_days` and repeats.
+
+The out-of-sample results from all windows are stitched together (capital
+chained) to form a realistic equity curve covering the entire period.
+
+```json
+{
+  "ticker": "SPY",
+  "start_date": "2010-01-01",
+  "end_date": "2023-12-31",
+  "train_window_days": 756,
+  "test_window_days": 126,
+  "step_days": 126,
+  "fast_windows": [10, 20, 30, 50],
+  "slow_windows": [100, 150, 200],
+  "selection_metric": "sharpe_ratio",
+  "transaction_cost_bps": 10.0,
+  "initial_capital": 100000.0
+}
+```
+
+| Field | Constraint | Default |
+|---|---|---|
+| `train_window_days` | ≥ 10 trading days | `756` (~3 years) |
+| `test_window_days` | ≥ 5 trading days | `126` (~6 months) |
+| `step_days` | ≥ 1 trading day | `126` |
+| `fast_windows` | 1–10 values, each ≥ 2 | `[10,20,30,40,50]` |
+| `slow_windows` | 1–10 values, each ≥ 2 | `[100,150,200,250]` |
+| `selection_metric` | `sharpe_ratio` \| `cagr` \| `calmar_ratio` | `"sharpe_ratio"` |
+
+**Response includes:**
+
+- `windows` — per-window details (train/test dates, selected params, IS and OOS metrics)
+- `stitched_equity_curve` — compounded OOS equity curve across all windows
+- `aggregate_metrics` / `aggregate_benchmark_metrics` — performance over the full stitched period
+- `parameter_stability` — how often the same (fast, slow) pair is selected:
+  - `parameters_unstable = true` when no single pair wins more than 50 % of windows — a sign that the strategy may not have a stable edge
+
+**Why walk-forward matters:**
+
+A single train/test split can be lucky: the split date might happen to precede
+a favourable regime for the selected parameters.  Walk-forward optimization
+tests parameters on many non-overlapping OOS windows, reducing the chance that
+any single window drives the conclusion.  Consistent OOS performance across
+many windows is much stronger evidence of a genuine edge than a single OOS
+period.
+
+**Overfitting and unstable parameters:**
+
+If `parameters_unstable` is `true`, the optimizer picks different parameter
+pairs in different market regimes.  This is not necessarily wrong — regime
+adaptation can be a feature — but it also means the strategy's behaviour is
+hard to predict going forward.  Treat stable parameters as a weak positive
+signal; treat unstable parameters as a reason for additional scrutiny.
 
 ---
 
@@ -120,15 +226,13 @@ cd C:\quantlab\backend
 pytest
 ```
 
-All tests are unit tests; they use synthetic price series and do **not** make network calls.  
-Expected output: **~35 tests, all passing, < 5 seconds**.
-
-To run a specific file:
+All tests use synthetic price series and make **no network calls**.
 
 ```powershell
-pytest tests/test_metrics.py -v
-pytest tests/test_strategies.py -v
-pytest tests/test_backtest.py -v
+# Verbose output for a specific test file
+pytest tests/test_sma_walk_forward.py -v
+pytest tests/test_sma_train_test.py -v
+pytest tests/test_sma_sweep.py -v
 ```
 
 ---
@@ -137,19 +241,20 @@ pytest tests/test_backtest.py -v
 
 | Risk | Mitigation |
 |---|---|
-| **Lookahead bias** | Signal from day T is shifted to become the close-to-close position for day T+1 (`signal.shift(1)`) |
-| **Incorrect benchmark** | Benchmark is always 100 % long from day 1 with no transaction costs |
+| **Lookahead bias** | Signal from day T is shifted to become the position for day T+1 (`signal.shift(1)`) |
+| **Data leakage in walk-forward** | Each test window starts strictly after the corresponding training window ends; test data is never seen during parameter selection |
+| **Incorrect benchmark** | Benchmark is always 100 % long from day 1 with no transaction costs; benchmark capital is independently chained in walk-forward |
 | **Wrong return calculation** | Uses `pct_change()` on adjusted close; tested against known values |
 | **Transaction cost omission** | Costs charged on every position change (both entry and exit) |
-| **Overfitting warning** | Single in-sample window only; walk-forward is a Phase 2 feature |
+| **Overfitting bias** | Walk-forward OOS stitching and parameter stability analysis make overfitting visible |
 
 ---
 
 ## Phase roadmap
 
-- **Phase 0** ✅ Project scaffold, folder structure, clean repo  
-- **Phase 1** ✅ SMA crossover backtest engine (this README)  
-- **Phase 2** 🔲 Additional strategies (EMA, RSI, Bollinger Bands)  
-- **Phase 3** 🔲 Frontend (React + Recharts)  
-- **Phase 4** 🔲 Walk-forward testing, parameter sweeps  
+- **Phase 0** ✅ Project scaffold, folder structure, clean repo
+- **Phase 1** ✅ SMA crossover backtest engine
+- **Phase 2** ✅ Additional strategies (RSI, Bollinger Bands, Momentum, Volatility Breakout, Pairs)
+- **Phase 3** ✅ React + Recharts frontend
+- **Phase 4** ✅ Research tools: SMA Parameter Sweep, Train/Test Validation, Walk-Forward Optimization
 - **Phase 5** 🔲 User accounts, saved backtests, CSV upload

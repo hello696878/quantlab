@@ -1,6 +1,6 @@
-# QuantLab Frontend — Phase 2
+# QuantLab Frontend
 
-Interactive backtesting dashboard built with **Next.js 14 · React 18 · Tailwind CSS 3 · Recharts 2**.
+Interactive backtesting and research dashboard built with **Next.js 14 · React 18 · Tailwind CSS 3 · Recharts 2**.
 
 All displayed results come from the FastAPI backend — no fake data.
 
@@ -12,25 +12,26 @@ All displayed results come from the FastAPI backend — no fake data.
 frontend/
 ├── src/
 │   ├── app/
-│   │   ├── globals.css          Tailwind directives + shared component classes
-│   │   ├── layout.tsx           Root layout: nav bar, footer, metadata
-│   │   └── page.tsx             Main page: state, form → results
+│   │   ├── globals.css               Tailwind directives + shared component classes
+│   │   ├── layout.tsx                Root layout: nav bar, footer, metadata
+│   │   └── page.tsx                  Main page: mode tabs, backtest state, research tabs
 │   ├── components/
-│   │   ├── BacktestForm.tsx     Parameter inputs + Run button + validation
-│   │   ├── MetricsGrid.tsx      Strategy vs benchmark comparison table
-│   │   ├── EquityCurveChart.tsx Equity curve (strategy + benchmark overlay)
-│   │   ├── DrawdownChart.tsx    Drawdown area chart (strategy + benchmark)
-│   │   ├── TradeTable.tsx       Paginated trade log table
-│   │   ├── SmaSweepPanel.tsx    SMA parameter sweep form + result state
-│   │   ├── SmaSweepTable.tsx    Sortable SMA sweep result table
-│   │   └── SmaTrainTestPanel.tsx SMA train/test validation UI
+│   │   ├── BacktestForm.tsx          Parameter inputs + Run button + validation
+│   │   ├── MetricsGrid.tsx           Strategy vs benchmark comparison table
+│   │   ├── EquityCurveChart.tsx      Equity curve (strategy + benchmark overlay)
+│   │   ├── DrawdownChart.tsx         Drawdown area chart (strategy + benchmark)
+│   │   ├── TradeTable.tsx            Paginated trade log table
+│   │   ├── SmaSweepPanel.tsx         SMA parameter sweep form + result table
+│   │   ├── SmaSweepTable.tsx         Sortable SMA sweep result table
+│   │   ├── SmaTrainTestPanel.tsx     SMA train/test out-of-sample validation UI
+│   │   └── SmaWalkForwardPanel.tsx   SMA walk-forward optimization UI
 │   └── lib/
-│       ├── types.ts             TypeScript interfaces (mirrors backend schemas)
-│       ├── api.ts               Fetch wrappers for /api/backtest/* endpoints
-│       └── format.ts            Number/date formatters used across components
-├── .env.local                   BACKEND_URL env var (default: http://localhost:8000)
-├── .env.example                 Example backend URL configuration
-├── next.config.js               /api/* → backend rewrite (no CORS needed)
+│       ├── types.ts                  TypeScript interfaces (mirrors backend schemas)
+│       ├── api.ts                    Fetch wrappers for all backend endpoints
+│       └── format.ts                 Number/date formatters used across components
+├── .env.local                        BACKEND_URL env var (default: http://localhost:8000)
+├── .env.example                      Example backend URL configuration
+├── next.config.js                    /api/* → backend rewrite (no CORS needed)
 ├── package.json
 ├── tailwind.config.ts
 └── tsconfig.json
@@ -63,25 +64,25 @@ npm run dev
 
 Open **http://localhost:3000** in your browser.
 
-The frontend calls the backend through Next.js rewrites:
+---
 
-- Browser request: `POST /api/backtest/sma-crossover`
-- Backend request: `POST /backtest/sma-crossover`
-- Browser request: `POST /api/backtest/rsi-mean-reversion`
-- Backend request: `POST /backtest/rsi-mean-reversion`
-- Browser request: `POST /api/backtest/bollinger-band`
-- Backend request: `POST /backtest/bollinger-band`
-- Browser request: `POST /api/backtest/momentum`
-- Backend request: `POST /backtest/momentum`
-- Browser request: `POST /api/backtest/volatility-breakout`
-- Backend request: `POST /backtest/volatility-breakout`
-- Browser request: `POST /api/backtest/pairs`
-- Backend request: `POST /backtest/pairs`
-- Browser request: `POST /api/research/sma-parameter-sweep`
-- Backend request: `POST /research/sma-parameter-sweep`
-- Browser request: `POST /api/research/sma-train-test`
-- Backend request: `POST /research/sma-train-test`
-- Default backend base URL: `http://localhost:8000`
+## API routing
+
+The frontend calls relative URLs; Next.js rewrites them to the backend transparently — no CORS headers needed.
+
+| Browser request | Backend request |
+|---|---|
+| `POST /api/backtest/sma-crossover` | `POST /backtest/sma-crossover` |
+| `POST /api/backtest/rsi-mean-reversion` | `POST /backtest/rsi-mean-reversion` |
+| `POST /api/backtest/bollinger-band` | `POST /backtest/bollinger-band` |
+| `POST /api/backtest/momentum` | `POST /backtest/momentum` |
+| `POST /api/backtest/volatility-breakout` | `POST /backtest/volatility-breakout` |
+| `POST /api/backtest/pairs` | `POST /backtest/pairs` |
+| `POST /api/research/sma-parameter-sweep` | `POST /research/sma-parameter-sweep` |
+| `POST /api/research/sma-train-test` | `POST /research/sma-train-test` |
+| `POST /api/research/sma-walk-forward` | `POST /research/sma-walk-forward` |
+
+Default backend base URL: `http://localhost:8000`
 
 ---
 
@@ -97,29 +98,44 @@ Copy `frontend/.env.example` to `frontend/.env.local`, then edit
 
 ---
 
-## How the proxy works
-
-`next.config.js` rewrites every request to `/api/*` → `http://localhost:8000/*`.
-
-The frontend therefore calls relative URLs such as
-**`/api/backtest/volatility-breakout`** and
-**`/api/research/sma-train-test`**. Next.js forwards them to the backend
-transparently — no CORS headers needed in the browser, no hard-coded
-`localhost:8000` in client-side code.
-
----
-
 ## UI sections
 
-| Section | Source |
+### Backtest mode
+
+| Section | Description |
 |---|---|
-| **Parameter form** | User input; validated before submit |
-| **Performance Summary** | `strategy_metrics` / `benchmark_metrics` from API |
-| **Equity Curve** | `equity_curve[].strategy` and `.benchmark` |
-| **Drawdown Chart** | Computed client-side from `equity_curve` (running peak) |
-| **Trade Log** | `trades[]` from API — paginated 20 per page |
-| **SMA Parameter Sweep** | `POST /research/sma-parameter-sweep`; sortable result rows from `results[]` |
-| **SMA Train/Test** | `POST /research/sma-train-test`; IS selection, OOS equity curve, degradation summary |
+| **Strategy selector** | SMA Crossover, RSI, Bollinger Band, Momentum, Volatility Breakout, Pairs |
+| **Parameter form** | Strategy-specific inputs; validated before submit |
+| **Performance Summary** | `strategy_metrics` vs `benchmark_metrics` side-by-side |
+| **Equity Curve** | Daily `strategy` and `benchmark` equity values from API |
+| **Drawdown Chart** | Running-peak drawdown computed client-side from equity curve |
+| **Trade Log** | Paginated trade events from API (20 per page) |
+
+### Research Tools mode
+
+| Tab | Endpoint | Description |
+|---|---|---|
+| **SMA Parameter Sweep** | `POST /research/sma-parameter-sweep` | Sweep all (fast, slow) combinations over a single period; sortable result table |
+| **SMA Train/Test Validation** | `POST /research/sma-train-test` | IS parameter selection + OOS evaluation; degradation stats, collapse flag |
+| **SMA Walk-Forward** | `POST /research/sma-walk-forward` | Rolling IS sweep → OOS test → stitch; aggregate metrics, parameter stability analysis |
+
+#### Walk-Forward panel details
+
+The Walk-Forward panel exposes:
+
+- **Window settings** — training window length, test window length, step size (trading days)
+- **Parameter grid** — comma-separated fast and slow SMA windows (up to 10 each, ≤ 100 combinations)
+- **Selection metric** — Sharpe ratio, CAGR, or Calmar ratio used to pick the best IS pair
+- **Results:**
+  - Amber warning banner when parameters are unstable across windows
+  - Aggregate OOS metrics table (strategy vs benchmark)
+  - Stitched OOS equity curve chart (capital compounded across all windows)
+  - Parameter stability card — stat boxes + colour-coded chip array (emerald = most-selected pair, slate = others)
+  - Per-window table — train/test periods, selected (fast, slow), IS Sharpe, OOS Sharpe, OOS CAGR, OOS max drawdown, trades
+
+**Interpreting parameter stability:**
+
+Parameters are flagged as **unstable** when no single (fast, slow) pair is chosen in more than 50 % of the windows.  Instability is not a definitive failure — it may reflect genuine regime adaptation — but it means the strategy's future behaviour is harder to predict and warrants additional scrutiny.
 
 ---
 

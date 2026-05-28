@@ -16,6 +16,8 @@ import type {
   SmaSweepResponse,
   SmaTrainTestRequest,
   SmaTrainTestResponse,
+  SmaWalkForwardRequest,
+  SmaWalkForwardResponse,
   VbBacktestRequest,
 } from "./types";
 
@@ -193,6 +195,36 @@ export async function runSmaTrainTest(
   }
 
   return res.json() as Promise<SmaTrainTestResponse>;
+}
+
+/** POST /api/research/sma-walk-forward */
+export async function runSmaWalkForward(
+  params: SmaWalkForwardRequest,
+): Promise<SmaWalkForwardResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/research/sma-walk-forward", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+
+  if (!res.ok) {
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = formatBackendDetail(body?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+
+  return res.json() as Promise<SmaWalkForwardResponse>;
 }
 
 export async function checkHealth(): Promise<boolean> {
