@@ -1,0 +1,27 @@
+services:
+  # ── FastAPI backtesting engine ─────────────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+    ports:
+      - "8000:8000"
+
+  # ── Next.js research dashboard ────────────────────────────────────────────
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Passed at build time so next.config.js rewrites() bakes the correct
+        # Docker-internal backend address into .next/routes-manifest.json.
+        BACKEND_URL: http://backend:8000
+    ports:
+      - "3000:3000"
+    environment:
+      # Runtime copy (documents the value; also used if Next.js ever re-reads
+      # next.config.js at startup in a future version).
+      BACKEND_URL: http://backend:8000
+      # Public URL the browser can reach the backend on (for direct calls or
+      # tooling that inspects this variable).
+      NEXT_PUBLIC_API_BASE_URL: http://localhost:8000
+    depends_on:
+      - backend

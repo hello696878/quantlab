@@ -2,18 +2,14 @@
 __pycache__/
 *.pyc
 .env
+.env.local
 .pytest_cache/
 node_modules/
+.next/
 dist/
 build/
 .DS_Store
 fe_err.txt
 fe_out.txt
 
-fe_err.txt
-fe_out.txt
-
-frontend/.next/
-frontend/node_modules/
-frontend/.env.local
 frontend/tsconfig.tsbuildinfo
