@@ -940,3 +940,119 @@ class SmaWalkForwardResponse(BaseModel):
 
     # Parameter stability
     parameter_stability: SmaWalkForwardParamStability
+
+
+# ===========================================================================
+# Research — Strategy Comparison
+# ===========================================================================
+
+
+class StrategyComparisonRequest(BaseModel):
+    """
+    Parameters for the multi-strategy comparison endpoint.
+
+    All five single-asset strategies (SMA Crossover, RSI Mean Reversion,
+    Bollinger Band, Momentum, Volatility Breakout) are run with fixed default
+    parameters on the same ticker and date range.  Pairs Trading is excluded
+    because it requires two assets.
+    """
+
+    ticker: str = Field(
+        default="SPY",
+        description="Yahoo Finance ticker symbol.",
+    )
+    start_date: str = Field(
+        default="2015-01-01",
+        description="Backtest start date in YYYY-MM-DD format.",
+    )
+    end_date: str = Field(
+        default="2023-12-31",
+        description="Backtest end date in YYYY-MM-DD format.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0,
+        gt=0,
+        description="Starting capital in USD.",
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="One-way transaction cost in basis points, applied to all strategies.",
+    )
+
+    @model_validator(mode="after")
+    def check_dates(self) -> "StrategyComparisonRequest":
+        import re
+        for name, val in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, val):
+                raise ValueError(f"{name} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be strictly before end_date.")
+        return self
+
+
+class StrategyResultItem(BaseModel):
+    """Results for one strategy within a multi-strategy comparison."""
+
+    strategy: str = Field(
+        description=(
+            "Strategy identifier: 'sma_crossover', 'rsi_mean_reversion', "
+            "'bollinger_band', 'momentum', or 'volatility_breakout'."
+        )
+    )
+    display_name: str = Field(description="Human-readable strategy name.")
+    params: dict = Field(description="Default parameter values used for this strategy run.")
+    metrics: PerformanceMetrics = Field(description="Performance metrics over the full period.")
+    equity_curve: List[EquityPoint] = Field(description="Daily portfolio value.")
+    num_trades: int = Field(description="Number of trade events.")
+
+
+class StrategyComparisonRanking(BaseModel):
+    """Identifies the best-performing strategy for each ranking criterion."""
+
+    best_by_sharpe: str = Field(
+        description="Display name of the strategy with the highest Sharpe ratio."
+    )
+    best_by_cagr: str = Field(
+        description="Display name of the strategy with the highest CAGR."
+    )
+    best_by_calmar: str = Field(
+        description="Display name of the strategy with the highest Calmar ratio."
+    )
+    lowest_drawdown: str = Field(
+        description=(
+            "Display name of the strategy with the smallest absolute max drawdown "
+            "(i.e. the least negative max_drawdown value)."
+        )
+    )
+
+
+class StrategyComparisonResponse(BaseModel):
+    """Full response for the strategy comparison endpoint."""
+
+    ticker: str
+    start_date: str
+    end_date: str
+    initial_capital: float
+    transaction_cost_bps: float
+
+    strategies: List[StrategyResultItem] = Field(
+        description=(
+            "Results for each of the five compared strategies, in a fixed order: "
+            "SMA Crossover, RSI Mean Reversion, Bollinger Band, Momentum, "
+            "Volatility Breakout."
+        )
+    )
+
+    benchmark: List[EquityPoint] = Field(
+        description=(
+            "Buy-and-hold benchmark equity curve.  Both the 'strategy' and "
+            "'benchmark' fields of each point carry the benchmark value."
+        )
+    )
+    benchmark_metrics: PerformanceMetrics = Field(
+        description="Performance metrics for the buy-and-hold benchmark."
+    )
+
+    ranking: StrategyComparisonRanking

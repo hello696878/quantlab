@@ -24,7 +24,8 @@ frontend/
 │   │   ├── SmaSweepPanel.tsx         SMA parameter sweep form + result table
 │   │   ├── SmaSweepTable.tsx         Sortable SMA sweep result table
 │   │   ├── SmaTrainTestPanel.tsx     SMA train/test out-of-sample validation UI
-│   │   └── SmaWalkForwardPanel.tsx   SMA walk-forward optimization UI
+│   │   ├── SmaWalkForwardPanel.tsx   SMA walk-forward optimization UI
+│   │   └── StrategyComparisonPanel.tsx  Multi-strategy comparison UI
 │   └── lib/
 │       ├── types.ts                  TypeScript interfaces (mirrors backend schemas)
 │       ├── api.ts                    Fetch wrappers for all backend endpoints
@@ -81,6 +82,7 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/research/sma-parameter-sweep` | `POST /research/sma-parameter-sweep` |
 | `POST /api/research/sma-train-test` | `POST /research/sma-train-test` |
 | `POST /api/research/sma-walk-forward` | `POST /research/sma-walk-forward` |
+| `POST /api/research/strategy-comparison` | `POST /research/strategy-comparison` |
 
 Default backend base URL: `http://localhost:8000`
 
@@ -118,6 +120,7 @@ Copy `frontend/.env.example` to `frontend/.env.local`, then edit
 | **SMA Parameter Sweep** | `POST /research/sma-parameter-sweep` | Sweep all (fast, slow) combinations over a single period; sortable result table |
 | **SMA Train/Test Validation** | `POST /research/sma-train-test` | IS parameter selection + OOS evaluation; degradation stats, collapse flag |
 | **SMA Walk-Forward** | `POST /research/sma-walk-forward` | Rolling IS sweep → OOS test → stitch; aggregate metrics, parameter stability analysis |
+| **Strategy Comparison** | `POST /research/strategy-comparison` | Five strategies on same ticker/dates with fixed defaults; ranking, comparison table, multi-line equity curve |
 
 #### Walk-Forward panel details
 
@@ -132,6 +135,27 @@ The Walk-Forward panel exposes:
   - Stitched OOS equity curve chart (capital compounded across all windows)
   - Parameter stability card — stat boxes + colour-coded chip array (emerald = most-selected pair, slate = others)
   - Per-window table — train/test periods, selected (fast, slow), IS Sharpe, OOS Sharpe, OOS CAGR, OOS max drawdown, trades
+
+#### Strategy Comparison panel details
+
+The Strategy Comparison panel exposes:
+
+- **Inputs** — ticker, start/end dates, transaction cost (bps), initial capital
+- **Fixed-params note** — a visible reminder of the default parameters used per strategy
+- **Results:**
+  - Ranking cards (Best Sharpe, Best CAGR, Best Calmar, Lowest Max Drawdown)
+  - Comparison table — all five strategies + benchmark row (CAGR, Total Return, Sharpe, Sortino, Calmar, Max DD, Vol, Trades); best-Sharpe row highlighted
+  - Multi-line equity curve — each strategy in a distinct colour plus a dashed benchmark line
+  - Default-parameters reference cards — one per strategy showing the exact params used
+  - Disclaimer — interpretation guidance and limitations notice
+
+**Limitations:**
+
+- Uses fixed default parameters; per-strategy customisation is not supported in this version
+- Pairs Trading is excluded (two-asset strategy incompatible with single-asset comparison)
+- Single in-sample period only — validate any findings with the Train/Test or Walk-Forward tools before drawing conclusions
+
+---
 
 **Interpreting parameter stability:**
 

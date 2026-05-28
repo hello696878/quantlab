@@ -18,6 +18,8 @@ import type {
   SmaTrainTestResponse,
   SmaWalkForwardRequest,
   SmaWalkForwardResponse,
+  StrategyComparisonRequest,
+  StrategyComparisonResponse,
   VbBacktestRequest,
 } from "./types";
 
@@ -225,6 +227,36 @@ export async function runSmaWalkForward(
   }
 
   return res.json() as Promise<SmaWalkForwardResponse>;
+}
+
+/** POST /api/research/strategy-comparison */
+export async function runStrategyComparison(
+  params: StrategyComparisonRequest,
+): Promise<StrategyComparisonResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/research/strategy-comparison", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+
+  if (!res.ok) {
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = formatBackendDetail(body?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+
+  return res.json() as Promise<StrategyComparisonResponse>;
 }
 
 export async function checkHealth(): Promise<boolean> {

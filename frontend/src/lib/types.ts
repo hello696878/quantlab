@@ -345,3 +345,44 @@ export interface SmaWalkForwardResponse {
 
   parameter_stability: SmaWalkForwardParamStability;
 }
+
+// ---------------------------------------------------------------------------
+// Research — Strategy Comparison
+// ---------------------------------------------------------------------------
+
+export interface StrategyComparisonRequest {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  transaction_cost_bps: number;
+}
+
+export interface StrategyResultItem {
+  strategy: string;
+  display_name: string;
+  params: Record<string, number | string>;
+  metrics: PerformanceMetrics;
+  equity_curve: EquityPoint[];
+  num_trades: number;
+}
+
+export interface StrategyComparisonRanking {
+  best_by_sharpe: string;
+  best_by_cagr: string;
+  best_by_calmar: string;
+  lowest_drawdown: string;
+}
+
+export interface StrategyComparisonResponse {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  transaction_cost_bps: number;
+  strategies: StrategyResultItem[];
+  /** Buy-and-hold equity curve — strategy and benchmark fields both carry the benchmark value. */
+  benchmark: EquityPoint[];
+  benchmark_metrics: PerformanceMetrics;
+  ranking: StrategyComparisonRanking;
+}

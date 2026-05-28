@@ -9,6 +9,7 @@ import TradeTable from "@/components/TradeTable";
 import SmaSweepPanel from "@/components/SmaSweepPanel";
 import SmaTrainTestPanel from "@/components/SmaTrainTestPanel";
 import SmaWalkForwardPanel from "@/components/SmaWalkForwardPanel";
+import StrategyComparisonPanel from "@/components/StrategyComparisonPanel";
 import {
   runBacktest,
   runBbBacktest,
@@ -240,7 +241,7 @@ const STRATEGY_HEADINGS: Record<
 // ---------------------------------------------------------------------------
 
 type PageMode = "backtest" | "research";
-type ResearchTab = "sweep" | "train-test" | "walk-forward";
+type ResearchTab = "sweep" | "train-test" | "walk-forward" | "comparison";
 
 export default function HomePage() {
   const [mode, setMode] = useState<PageMode>("backtest");
@@ -334,9 +335,10 @@ export default function HomePage() {
           <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
             {(
               [
-                { id: "sweep",        label: "SMA Parameter Sweep" },
-                { id: "train-test",   label: "SMA Train/Test Validation" },
+                { id: "sweep",      label: "SMA Parameter Sweep" },
+                { id: "train-test", label: "SMA Train/Test Validation" },
                 { id: "walk-forward", label: "SMA Walk-Forward" },
+                { id: "comparison", label: "Strategy Comparison" },
               ] as const
             ).map(({ id, label }) => (
               <button
@@ -406,6 +408,24 @@ export default function HomePage() {
                 </p>
               </div>
               <SmaWalkForwardPanel />
+            </>
+          )}
+
+          {researchTab === "comparison" && (
+            <>
+              <div>
+                <h2 className="text-xl font-semibold text-slate-800">
+                  Strategy Comparison
+                </h2>
+                <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+                  Run five single-asset strategies on the same ticker and date
+                  range using fixed default parameters.  Compare their equity
+                  curves, risk-adjusted returns, and drawdowns side-by-side to
+                  understand which strategy styles suited different market
+                  environments.  Pairs Trading is excluded (requires two assets).
+                </p>
+              </div>
+              <StrategyComparisonPanel />
             </>
           )}
         </>

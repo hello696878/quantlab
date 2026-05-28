@@ -154,6 +154,49 @@ Returns IS metrics, OOS metrics, degradation statistics (`sharpe_degradation`,
 
 ---
 
+#### `POST /research/strategy-comparison`
+
+Runs five single-asset strategies on the same ticker and date range using
+fixed default parameters, then returns per-strategy metrics, equity curves,
+a benchmark, and a ranking.
+
+```json
+{
+  "ticker": "SPY",
+  "start_date": "2015-01-01",
+  "end_date": "2023-12-31",
+  "initial_capital": 100000.0,
+  "transaction_cost_bps": 10.0
+}
+```
+
+**Strategies included (fixed default parameters):**
+
+| Strategy | Parameters |
+|---|---|
+| SMA Crossover | fast=50, slow=200 |
+| RSI Mean Reversion | window=14, oversold=30, exit=50 |
+| Bollinger Band | window=20, 2σ, exit=middle band |
+| Momentum | window=126, entry/exit threshold=0 |
+| Volatility Breakout | lookback=20, multiplier=1.0×, exit_window=10 |
+
+**Pairs Trading is excluded** — it requires two tickers and cannot be compared on a single asset.
+
+**Response includes:**
+
+- `strategies` — per-strategy metrics, equity curve, and params for all five strategies
+- `benchmark` — buy-and-hold benchmark equity curve
+- `benchmark_metrics` — benchmark performance metrics
+- `ranking` — display name of the best strategy by `best_by_sharpe`, `best_by_cagr`, `best_by_calmar`, and `lowest_drawdown`
+
+**Limitations:**
+
+- First version uses fixed default parameters; parameter customisation is not yet supported
+- A single in-sample period is used — results are sensitive to the chosen date range
+- Rankings should be validated out-of-sample before drawing any conclusions; use the Train/Test or Walk-Forward tools for that
+
+---
+
 #### `POST /research/sma-walk-forward`
 
 Walk-forward optimization repeatedly advances a rolling training window across
@@ -256,5 +299,5 @@ pytest tests/test_sma_sweep.py -v
 - **Phase 1** ✅ SMA crossover backtest engine
 - **Phase 2** ✅ Additional strategies (RSI, Bollinger Bands, Momentum, Volatility Breakout, Pairs)
 - **Phase 3** ✅ React + Recharts frontend
-- **Phase 4** ✅ Research tools: SMA Parameter Sweep, Train/Test Validation, Walk-Forward Optimization
+- **Phase 4** ✅ Research tools: SMA Parameter Sweep, Train/Test Validation, Walk-Forward Optimization, Strategy Comparison
 - **Phase 5** 🔲 User accounts, saved backtests, CSV upload
