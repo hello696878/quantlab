@@ -891,7 +891,7 @@ class SmaWalkForwardParamStability(BaseModel):
     )
     parameters_unstable: bool = Field(
         description=(
-            "True when no single parameter set was chosen in more than 50 % "
+            "True when no single parameter set was chosen in more than 50% "
             "of windows — a sign that the strategy is sensitive to the "
             "optimisation window."
         )
@@ -922,7 +922,11 @@ class SmaWalkForwardResponse(BaseModel):
     stitched_equity_curve: List[EquityPoint] = Field(
         description=(
             "Stitched out-of-sample equity curve: strategy and benchmark "
-            "equity compounded across all test windows."
+            "equity compounded across all test windows. For overlapping test "
+            "windows, each date is included once using the earliest completed "
+            "window that covers it. If step_days is larger than test_window_days, "
+            "calendar gaps between test windows are intentionally left out of "
+            "the stitched curve."
         )
     )
 

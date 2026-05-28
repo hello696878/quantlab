@@ -12,6 +12,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from app.backtest import run_backtest
+from app.metrics import compute_metrics
+from app.schemas import SmaSweepRow
+from app.strategies import sma_crossover_signals
+
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
 main_module = pytest.importorskip("app.main")
 
@@ -94,12 +99,31 @@ def test_walk_forward_correct_window_count(monkeypatch):
     assert resp.status_code == 200
     body = resp.json()
     n = len(df)
-    # Expected windows = floor((n - train_w - test_w) / step) + 1
-    # BUT some windows may be skipped if test_w < best_slow + 2 → use >= check
-    expected_min = 1
     expected_max = (n - train_w - test_w) // step + 1
-    assert expected_min <= body["num_windows"] <= expected_max
+    assert body["num_windows"] == expected_max
     assert body["num_windows"] == len(body["windows"])
+
+
+def test_walk_forward_allows_slow_window_longer_than_test_window(monkeypatch):
+    """OOS signals may use trailing training history without using future data."""
+    df = make_df(900)
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-walk-forward",
+        json=make_payload(
+            df,
+            train_window_days=300,
+            test_window_days=63,
+            step_days=63,
+            fast_windows=[10],
+            slow_windows=[250],
+        ),
+    )
+
+    assert resp.status_code == 200
+    assert resp.json()["num_windows"] >= 1
 
 
 def test_walk_forward_window_fields(monkeypatch):
@@ -198,6 +222,30 @@ def test_walk_forward_stitched_equity_curve_non_empty(monkeypatch):
     assert "date" in pt and "strategy" in pt and "benchmark" in pt
 
 
+def test_walk_forward_stitched_dates_are_monotonic_unique_with_overlap(monkeypatch):
+    """step_days < test_window_days should not create duplicate stitched dates."""
+    df = make_df(650)
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-walk-forward",
+        json=make_payload(
+            df,
+            train_window_days=252,
+            test_window_days=84,
+            step_days=21,
+            fast_windows=[10],
+            slow_windows=[50],
+        ),
+    )
+
+    assert resp.status_code == 200
+    dates = [p["date"] for p in resp.json()["stitched_equity_curve"]]
+    assert dates == sorted(dates)
+    assert len(dates) == len(set(dates))
+
+
 def test_walk_forward_stitched_curve_starts_at_initial_capital(monkeypatch):
     """Stitched equity curve's first strategy value equals initial_capital."""
     df = make_df()
@@ -232,6 +280,31 @@ def test_walk_forward_aggregate_metrics_present(monkeypatch):
         assert key in m, f"aggregate_metrics missing: {key}"
 
 
+def test_walk_forward_aggregate_metrics_match_stitched_curve(monkeypatch):
+    """Aggregate metrics must be computed from stitched OOS equity only."""
+    df = make_df()
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
+    client = TestClient(main_module.app)
+
+    resp = client.post("/research/sma-walk-forward", json=make_payload(df))
+
+    assert resp.status_code == 200
+    body = resp.json()
+    stitched = pd.Series(
+        [p["strategy"] for p in body["stitched_equity_curve"]],
+        index=pd.to_datetime([p["date"] for p in body["stitched_equity_curve"]]),
+    )
+    expected = compute_metrics(stitched)
+    assert body["aggregate_metrics"]["total_return"] == pytest.approx(
+        expected["total_return"],
+        abs=1e-4,
+    )
+    assert body["aggregate_metrics"]["max_drawdown"] == pytest.approx(
+        expected["max_drawdown"],
+        abs=1e-4,
+    )
+
+
 def test_walk_forward_parameter_stability_present(monkeypatch):
     """parameter_stability object has all required fields."""
     df = make_df()
@@ -263,6 +336,62 @@ def test_walk_forward_param_stability_consistent(monkeypatch):
     ps = body["parameter_stability"]
     assert ps["num_windows"] == body["num_windows"]
     assert len(ps["all_selected_params"]) == body["num_windows"]
+
+
+def test_walk_forward_parameter_stability_tie_is_unstable(monkeypatch):
+    """A 50/50 tie means no parameter set appears in more than half the windows."""
+    df = make_df(500)
+
+    def fake_sweep(close, *args, **kwargs):
+        if close.index[0] == df.index[0]:
+            row = SmaSweepRow(
+                fast_window=10,
+                slow_window=50,
+                total_return=0.1,
+                cagr=0.1,
+                sharpe_ratio=1.0,
+                sortino_ratio=1.0,
+                calmar_ratio=1.0,
+                max_drawdown=-0.1,
+                volatility=0.1,
+                num_trades=1,
+            )
+        else:
+            row = SmaSweepRow(
+                fast_window=20,
+                slow_window=60,
+                total_return=0.2,
+                cagr=0.2,
+                sharpe_ratio=2.0,
+                sortino_ratio=2.0,
+                calmar_ratio=2.0,
+                max_drawdown=-0.1,
+                volatility=0.1,
+                num_trades=1,
+            )
+        return [row], 1
+
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
+    monkeypatch.setattr(main_module, "_sweep_rows", fake_sweep)
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-walk-forward",
+        json=make_payload(
+            df,
+            train_window_days=200,
+            test_window_days=50,
+            step_days=200,
+            fast_windows=[10, 20],
+            slow_windows=[50, 60],
+        ),
+    )
+
+    assert resp.status_code == 200
+    stability = resp.json()["parameter_stability"]
+    assert resp.json()["num_windows"] == 2
+    assert stability["unique_parameter_sets"] == 2
+    assert stability["parameters_unstable"] is True
 
 
 def test_walk_forward_single_param_pair_is_stable(monkeypatch):
@@ -302,7 +431,7 @@ def test_walk_forward_fetches_data_once(monkeypatch):
 
 
 def test_walk_forward_sharpe_selection(monkeypatch):
-    """selection_metric=sharpe_ratio — best params in window 0 equal max IS Sharpe."""
+    """selection_metric=sharpe_ratio picks max IS Sharpe in window 0."""
     df = make_df()
     monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
     client = TestClient(main_module.app)
@@ -313,13 +442,25 @@ def test_walk_forward_sharpe_selection(monkeypatch):
     )
 
     assert resp.status_code == 200
-    # Just verify it runs successfully and returns valid params
-    w0 = resp.json()["windows"][0]
-    assert w0["best_fast_window"] < w0["best_slow_window"]
+    body = resp.json()
+    w0 = body["windows"][0]
+    train = df["Close"].iloc[: body["train_window_days"]]
+    rows, _ = main_module._sweep_rows(
+        train,
+        [10, 20],
+        [50, 100],
+        body["transaction_cost_bps"],
+        body["initial_capital"],
+    )
+    expected = main_module._best_row(rows, "sharpe_ratio")
+    assert (w0["best_fast_window"], w0["best_slow_window"]) == (
+        expected.fast_window,
+        expected.slow_window,
+    )
 
 
 def test_walk_forward_cagr_selection(monkeypatch):
-    """selection_metric=cagr returns 200 with valid window params."""
+    """selection_metric=cagr picks max IS CAGR in window 0."""
     df = make_df()
     monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
     client = TestClient(main_module.app)
@@ -330,11 +471,25 @@ def test_walk_forward_cagr_selection(monkeypatch):
     )
 
     assert resp.status_code == 200
-    assert resp.json()["num_windows"] >= 1
+    body = resp.json()
+    w0 = body["windows"][0]
+    train = df["Close"].iloc[: body["train_window_days"]]
+    rows, _ = main_module._sweep_rows(
+        train,
+        [10, 20],
+        [50, 100],
+        body["transaction_cost_bps"],
+        body["initial_capital"],
+    )
+    expected = main_module._best_row(rows, "cagr")
+    assert (w0["best_fast_window"], w0["best_slow_window"]) == (
+        expected.fast_window,
+        expected.slow_window,
+    )
 
 
 def test_walk_forward_calmar_selection(monkeypatch):
-    """selection_metric=calmar_ratio returns 200."""
+    """selection_metric=calmar_ratio picks max IS Calmar in window 0."""
     df = make_df()
     monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
     client = TestClient(main_module.app)
@@ -345,6 +500,82 @@ def test_walk_forward_calmar_selection(monkeypatch):
     )
 
     assert resp.status_code == 200
+    body = resp.json()
+    w0 = body["windows"][0]
+    train = df["Close"].iloc[: body["train_window_days"]]
+    rows, _ = main_module._sweep_rows(
+        train,
+        [10, 20],
+        [50, 100],
+        body["transaction_cost_bps"],
+        body["initial_capital"],
+    )
+    expected = main_module._best_row(rows, "calmar_ratio")
+    assert (w0["best_fast_window"], w0["best_slow_window"]) == (
+        expected.fast_window,
+        expected.slow_window,
+    )
+
+
+def test_walk_forward_selection_ignores_test_window_data(monkeypatch):
+    """Changing only test-window data must not alter window-0 selected params."""
+    df = make_df()
+    modified = df.copy()
+    train_w = 252
+    modified.iloc[train_w: train_w + 63, modified.columns.get_loc("Close")] *= 50.0
+
+    client = TestClient(main_module.app)
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
+    base_resp = client.post("/research/sma-walk-forward", json=make_payload(df))
+
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: modified)
+    modified_resp = client.post("/research/sma-walk-forward", json=make_payload(df))
+
+    assert base_resp.status_code == 200
+    assert modified_resp.status_code == 200
+    base_w0 = base_resp.json()["windows"][0]
+    modified_w0 = modified_resp.json()["windows"][0]
+    assert (base_w0["best_fast_window"], base_w0["best_slow_window"]) == (
+        modified_w0["best_fast_window"],
+        modified_w0["best_slow_window"],
+    )
+
+
+def test_walk_forward_test_metrics_match_selected_params_only(monkeypatch):
+    """Window test metrics should match direct OOS backtest with selected params."""
+    df = make_df()
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
+    client = TestClient(main_module.app)
+
+    resp = client.post("/research/sma-walk-forward", json=make_payload(df))
+
+    assert resp.status_code == 200
+    body = resp.json()
+    w0 = body["windows"][0]
+    train_w = body["train_window_days"]
+    test_w = body["test_window_days"]
+    context = df["Close"].iloc[: train_w + test_w]
+    close_test = df["Close"].iloc[train_w: train_w + test_w]
+    context_pos = sma_crossover_signals(
+        context,
+        fast_window=w0["best_fast_window"],
+        slow_window=w0["best_slow_window"],
+    )
+    test_pos = context_pos.reindex(close_test.index).fillna(0).astype(int)
+    strategy_equity, _benchmark_equity, trades = run_backtest(
+        close_test,
+        test_pos,
+        transaction_cost_bps=body["transaction_cost_bps"],
+        initial_capital=body["initial_capital"],
+    )
+    expected = compute_metrics(strategy_equity)
+
+    assert w0["test_metrics"]["sharpe_ratio"] == pytest.approx(
+        expected["sharpe_ratio"],
+        abs=1e-4,
+    )
+    assert w0["test_metrics"]["cagr"] == pytest.approx(expected["cagr"], abs=1e-6)
+    assert w0["num_trades"] == len(trades)
 
 
 def test_walk_forward_ticker_uppercased(monkeypatch):
@@ -460,6 +691,90 @@ def test_walk_forward_rejects_fast_window_below_2():
             "test_window_days": 63,
             "step_days": 63,
             "fast_windows": [1, 20],
+            "slow_windows": [50],
+        },
+    )
+
+    assert resp.status_code == 422
+
+
+def test_walk_forward_rejects_slow_window_below_2():
+    """slow_windows with value < 2 → 422."""
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-walk-forward",
+        json={
+            "ticker": "SPY",
+            "start_date": "2010-01-01",
+            "end_date": "2023-12-31",
+            "train_window_days": 252,
+            "test_window_days": 63,
+            "step_days": 63,
+            "fast_windows": [10],
+            "slow_windows": [1, 50],
+        },
+    )
+
+    assert resp.status_code == 422
+
+
+def test_walk_forward_rejects_invalid_train_window_days():
+    """train_window_days below minimum → 422."""
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-walk-forward",
+        json={
+            "ticker": "SPY",
+            "start_date": "2010-01-01",
+            "end_date": "2023-12-31",
+            "train_window_days": 0,
+            "test_window_days": 63,
+            "step_days": 63,
+            "fast_windows": [10],
+            "slow_windows": [50],
+        },
+    )
+
+    assert resp.status_code == 422
+
+
+def test_walk_forward_rejects_invalid_test_window_days():
+    """test_window_days below minimum → 422."""
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-walk-forward",
+        json={
+            "ticker": "SPY",
+            "start_date": "2010-01-01",
+            "end_date": "2023-12-31",
+            "train_window_days": 252,
+            "test_window_days": 0,
+            "step_days": 63,
+            "fast_windows": [10],
+            "slow_windows": [50],
+        },
+    )
+
+    assert resp.status_code == 422
+
+
+def test_walk_forward_rejects_invalid_step_days():
+    """step_days below minimum → 422."""
+    client = TestClient(main_module.app)
+
+    resp = client.post(
+        "/research/sma-walk-forward",
+        json={
+            "ticker": "SPY",
+            "start_date": "2010-01-01",
+            "end_date": "2023-12-31",
+            "train_window_days": 252,
+            "test_window_days": 63,
+            "step_days": 0,
+            "fast_windows": [10],
             "slow_windows": [50],
         },
     )

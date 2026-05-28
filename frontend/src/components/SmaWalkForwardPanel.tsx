@@ -423,7 +423,9 @@ export default function SmaWalkForwardPanel() {
             <p className="section-title">Aggregate Out-of-Sample Metrics</p>
             <p className="text-xs text-slate-500">
               Computed on the full stitched OOS equity curve — all test windows
-              compounded together. Benchmark is buy-and-hold for the same OOS period.
+              compounded together. Overlapping dates are included once; gaps are
+              left out when the step is larger than the test window. Benchmark is
+              buy-and-hold for the same stitched OOS dates.
             </p>
             <div className="overflow-x-auto">
               <table className="w-full text-sm border-collapse">

@@ -975,7 +975,6 @@ def sma_train_test(request: SmaTrainTestRequest) -> SmaTrainTestResponse:
     ),
 )
 def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
-    import math
     import pandas as pd
     from collections import Counter
 
@@ -1019,11 +1018,13 @@ def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
 
     # ── Walk-forward loop ─────────────────────────────────────────────────
     completed_windows: list = []
-    stitched_strat_series: list = []   # pd.Series per test window
-    stitched_bench_series: list = []   # pd.Series per test window
+    stitched_dates: list = []
+    stitched_strategy_values: list = []
+    stitched_benchmark_values: list = []
 
     current_capital = request.initial_capital
     current_bench_capital = request.initial_capital
+    last_stitched_date = None
     train_start_idx = 0
 
     while True:
@@ -1049,18 +1050,24 @@ def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
         )
 
         if not sweep:
-            # Training window too short for all (fast < slow) combos → skip.
-            train_start_idx += step
-            continue
+            max_slow = max(
+                slow
+                for fast in set(request.fast_windows)
+                for slow in set(request.slow_windows)
+                if fast < slow
+            )
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Training window has only {len(close_train)} trading days; "
+                    f"no valid SMA combination can run. Requested slow windows "
+                    f"require up to {max_slow + 2} trading days."
+                ),
+            )
 
         chosen = _best_row(sweep, request.selection_metric)
         best_fast = chosen.fast_window
         best_slow = chosen.slow_window
-
-        # Skip if the test window has too few bars for the chosen slow window.
-        if len(close_test) < best_slow + 2:
-            train_start_idx += step
-            continue
 
         # ── Re-run train backtest for best params → full train_metrics ───
         train_pos = sma_crossover_signals(
@@ -1074,19 +1081,22 @@ def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
         )
         train_metrics_dict = compute_metrics(train_eq)
 
-        # ── OOS backtest on test window (chained capital) ────────────────
-        test_pos = sma_crossover_signals(
-            close_test, fast_window=best_fast, slow_window=best_slow
+        # Build the test signal with trailing training history available.
+        # This avoids an artificial SMA warm-up inside each OOS slice while
+        # still using only data dated before or inside the current test window.
+        signal_context = close_all.iloc[train_start_idx:test_end_idx]
+        context_pos = sma_crossover_signals(
+            signal_context, fast_window=best_fast, slow_window=best_slow
         )
-        test_strat_eq, test_bench_eq_raw, test_trades = run_backtest(
+        test_pos = context_pos.reindex(close_test.index).fillna(0).astype(int)
+
+        # ── OOS backtest on test window ──────────────────────────────────
+        test_strat_eq, test_bench_eq, test_trades = run_backtest(
             close=close_test,
             position=test_pos,
             transaction_cost_bps=request.transaction_cost_bps,
-            initial_capital=current_capital,
+            initial_capital=request.initial_capital,
         )
-        # Scale benchmark to start from its own chained capital.
-        bench_scale = current_bench_capital / current_capital if current_capital > 0 else 1.0
-        test_bench_eq = test_bench_eq_raw * bench_scale
 
         test_metrics_dict = compute_metrics(test_strat_eq)
         test_bench_metrics_dict = compute_metrics(test_bench_eq)
@@ -1109,12 +1119,21 @@ def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
                 num_trades=len(test_trades),
             )
         )
-        stitched_strat_series.append(test_strat_eq)
-        stitched_bench_series.append(test_bench_eq)
 
-        # Advance chained capital.
-        current_capital = float(test_strat_eq.iloc[-1])
-        current_bench_capital = float(test_bench_eq.iloc[-1])
+        # Stitch only dates not already owned by an earlier test window. This
+        # keeps overlapping windows from double-counting returns while allowing
+        # step_days < test_window_days.
+        test_strategy_returns = test_strat_eq.pct_change().fillna(0.0)
+        test_benchmark_returns = test_bench_eq.pct_change().fillna(0.0)
+        for dt in close_test.index:
+            if last_stitched_date is not None and dt <= last_stitched_date:
+                continue
+            current_capital *= 1.0 + float(test_strategy_returns.loc[dt])
+            current_bench_capital *= 1.0 + float(test_benchmark_returns.loc[dt])
+            stitched_dates.append(dt)
+            stitched_strategy_values.append(current_capital)
+            stitched_benchmark_values.append(current_bench_capital)
+            last_stitched_date = dt
 
         train_start_idx += step
 
@@ -1130,12 +1149,8 @@ def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
         )
 
     # ── Stitch equity curves ──────────────────────────────────────────────
-    stitched_strat = pd.concat(stitched_strat_series)
-    stitched_bench = pd.concat(stitched_bench_series)
-
-    # Remove duplicate timestamps (can occur when step_days < test_window_days).
-    stitched_strat = stitched_strat[~stitched_strat.index.duplicated(keep="first")]
-    stitched_bench = stitched_bench[~stitched_bench.index.duplicated(keep="first")]
+    stitched_strat = pd.Series(stitched_strategy_values, index=stitched_dates)
+    stitched_bench = pd.Series(stitched_benchmark_values, index=stitched_dates)
 
     stitched_equity_curve = [
         EquityPoint(
@@ -1164,10 +1179,13 @@ def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
         (w.best_fast_window, w.best_slow_window) for w in completed_windows
     ]
     pair_counter: Counter = Counter(selected_pairs)
-    most_common_pair, most_common_count = pair_counter.most_common(1)[0]
+    most_common_pair, most_common_count = min(
+        pair_counter.items(),
+        key=lambda item: (-item[1], item[0][0], item[0][1]),
+    )
     unique_count = len(pair_counter)
     n_windows = len(completed_windows)
-    parameters_unstable = (most_common_count / n_windows) < 0.5
+    parameters_unstable = (most_common_count / n_windows) <= 0.5
 
     return SmaWalkForwardResponse(
         ticker=request.ticker.strip().upper(),
