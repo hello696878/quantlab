@@ -292,8 +292,12 @@ export default function StrategyComparisonPanel() {
   const [ticker, setTicker] = useState(DEFAULT_PARAMS.ticker);
   const [startDate, setStartDate] = useState(DEFAULT_PARAMS.start_date);
   const [endDate, setEndDate] = useState(DEFAULT_PARAMS.end_date);
-  const [capital, setCapital] = useState(DEFAULT_PARAMS.initial_capital);
-  const [costBps, setCostBps] = useState(DEFAULT_PARAMS.transaction_cost_bps);
+  const [capitalStr, setCapitalStr] = useState(String(DEFAULT_PARAMS.initial_capital));
+  const [costBpsStr, setCostBpsStr] = useState(String(DEFAULT_PARAMS.transaction_cost_bps));
+
+  // Derived numbers — parsed at render time so the input can hold partial strings
+  const capital = parseFloat(capitalStr);
+  const costBps = parseFloat(costBpsStr);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -301,7 +305,7 @@ export default function StrategyComparisonPanel() {
 
   // ── Validation ────────────────────────────────────────────────────────
   const datesOk = startDate < endDate;
-  const moneyOk = costBps >= 0 && costBps < 10_000 && capital > 0;
+  const moneyOk = !isNaN(costBps) && costBps >= 0 && costBps < 10_000 && !isNaN(capital) && capital > 0;
   const formInvalid = !ticker.trim() || !datesOk || !moneyOk || loading;
 
   let validationMsg: string | null = null;
@@ -309,8 +313,12 @@ export default function StrategyComparisonPanel() {
     validationMsg = "Ticker is required.";
   } else if (startDate >= endDate) {
     validationMsg = "Start date must be before end date.";
+  } else if (isNaN(costBps)) {
+    validationMsg = "Transaction cost must be a valid number (≥ 0 bps).";
   } else if (costBps < 0 || costBps >= 10_000) {
     validationMsg = "Transaction cost must be between 0 and 9,999 bps.";
+  } else if (isNaN(capital)) {
+    validationMsg = "Initial capital must be a valid number (> 0).";
   } else if (capital <= 0) {
     validationMsg = "Initial capital must be greater than 0.";
   }
@@ -413,11 +421,11 @@ export default function StrategyComparisonPanel() {
             <input
               type="number"
               className={inputCls}
-              value={costBps}
+              value={costBpsStr}
               min={0}
               max={9999}
               step={1}
-              onChange={(e) => setCostBps(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setCostBpsStr(e.target.value)}
               disabled={loading}
             />
           </div>
@@ -426,10 +434,10 @@ export default function StrategyComparisonPanel() {
             <input
               type="number"
               className={inputCls}
-              value={capital}
+              value={capitalStr}
               min={1}
               step={10000}
-              onChange={(e) => setCapital(parseFloat(e.target.value) || 100_000)}
+              onChange={(e) => setCapitalStr(e.target.value)}
               disabled={loading}
             />
           </div>

@@ -92,16 +92,23 @@ export default function SmaWalkForwardPanel() {
   const [ticker, setTicker] = useState(DEFAULT_PARAMS.ticker);
   const [startDate, setStartDate] = useState(DEFAULT_PARAMS.start_date);
   const [endDate, setEndDate] = useState(DEFAULT_PARAMS.end_date);
-  const [trainDays, setTrainDays] = useState(DEFAULT_PARAMS.train_window_days);
-  const [testDays, setTestDays] = useState(DEFAULT_PARAMS.test_window_days);
-  const [stepDays, setStepDays] = useState(DEFAULT_PARAMS.step_days);
+  const [trainDaysStr, setTrainDaysStr] = useState(String(DEFAULT_PARAMS.train_window_days));
+  const [testDaysStr, setTestDaysStr] = useState(String(DEFAULT_PARAMS.test_window_days));
+  const [stepDaysStr, setStepDaysStr] = useState(String(DEFAULT_PARAMS.step_days));
   const [fastRaw, setFastRaw] = useState(windowsToString(DEFAULT_PARAMS.fast_windows));
   const [slowRaw, setSlowRaw] = useState(windowsToString(DEFAULT_PARAMS.slow_windows));
   const [selectionMetric, setSelectionMetric] = useState<
     SmaWalkForwardRequest["selection_metric"]
   >(DEFAULT_PARAMS.selection_metric);
-  const [costBps, setCostBps] = useState(DEFAULT_PARAMS.transaction_cost_bps);
-  const [capital, setCapital] = useState(DEFAULT_PARAMS.initial_capital);
+  const [costBpsStr, setCostBpsStr] = useState(String(DEFAULT_PARAMS.transaction_cost_bps));
+  const [capitalStr, setCapitalStr] = useState(String(DEFAULT_PARAMS.initial_capital));
+
+  // Derived numbers — parsed at render time so inputs can hold partial strings
+  const trainDays = parseInt(trainDaysStr, 10);
+  const testDays = parseInt(testDaysStr, 10);
+  const stepDays = parseInt(stepDaysStr, 10);
+  const costBps = parseFloat(costBpsStr);
+  const capital = parseFloat(capitalStr);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -111,12 +118,12 @@ export default function SmaWalkForwardPanel() {
   const fastWindows = parseWindows(fastRaw);
   const slowWindows = parseWindows(slowRaw);
   const datesOk = startDate < endDate;
-  const windowsOk = trainDays >= 10 && testDays >= 5 && stepDays >= 1;
+  const windowsOk = !isNaN(trainDays) && trainDays >= 10 && !isNaN(testDays) && testDays >= 5 && !isNaN(stepDays) && stepDays >= 1;
   const combsOk =
     fastWindows !== null &&
     slowWindows !== null &&
     fastWindows.length * slowWindows.length <= 100;
-  const moneyOk = costBps >= 0 && costBps < 10_000 && capital > 0;
+  const moneyOk = !isNaN(costBps) && costBps >= 0 && costBps < 10_000 && !isNaN(capital) && capital > 0;
 
   const formInvalid =
     !ticker.trim() ||
@@ -133,10 +140,16 @@ export default function SmaWalkForwardPanel() {
     validationMsg = "Ticker is required.";
   } else if (!datesOk) {
     validationMsg = "Start date must be before end date.";
+  } else if (isNaN(trainDays)) {
+    validationMsg = "Train window must be a valid number.";
   } else if (trainDays < 10) {
     validationMsg = "Train window must be at least 10 days.";
+  } else if (isNaN(testDays)) {
+    validationMsg = "Test window must be a valid number.";
   } else if (testDays < 5) {
     validationMsg = "Test window must be at least 5 days.";
+  } else if (isNaN(stepDays)) {
+    validationMsg = "Step must be a valid number.";
   } else if (stepDays < 1) {
     validationMsg = "Step must be at least 1 day.";
   } else if (fastWindows === null) {
@@ -146,8 +159,12 @@ export default function SmaWalkForwardPanel() {
   } else if (!combsOk) {
     const total = (fastWindows?.length ?? 0) * (slowWindows?.length ?? 0);
     validationMsg = `Too many combinations (${total}). Maximum is 100.`;
+  } else if (isNaN(costBps)) {
+    validationMsg = "Transaction cost must be a valid number (≥ 0 bps).";
   } else if (costBps < 0 || costBps >= 10_000) {
     validationMsg = "Transaction cost must be 0 to < 10,000 bps.";
+  } else if (isNaN(capital)) {
+    validationMsg = "Initial capital must be a valid number (> 0).";
   } else if (capital <= 0) {
     validationMsg = "Initial capital must be greater than 0.";
   }
@@ -248,20 +265,20 @@ export default function SmaWalkForwardPanel() {
         <div className="grid grid-cols-3 gap-4">
           <div>
             <label className={labelCls}>Train Window (days)</label>
-            <input type="number" className={inputCls} value={trainDays} min={10} step={63}
-              onChange={(e) => setTrainDays(parseInt(e.target.value) || 252)} disabled={loading} />
+            <input type="number" className={inputCls} value={trainDaysStr} min={10} step={63}
+              onChange={(e) => setTrainDaysStr(e.target.value)} disabled={loading} />
             <p className="text-xs text-slate-400 mt-1">Min 10. Default 756 ≈ 3 yrs.</p>
           </div>
           <div>
             <label className={labelCls}>Test Window (days)</label>
-            <input type="number" className={inputCls} value={testDays} min={5} step={21}
-              onChange={(e) => setTestDays(parseInt(e.target.value) || 63)} disabled={loading} />
+            <input type="number" className={inputCls} value={testDaysStr} min={5} step={21}
+              onChange={(e) => setTestDaysStr(e.target.value)} disabled={loading} />
             <p className="text-xs text-slate-400 mt-1">Min 5. Default 126 ≈ 6 mo.</p>
           </div>
           <div>
             <label className={labelCls}>Step (days)</label>
-            <input type="number" className={inputCls} value={stepDays} min={1} step={21}
-              onChange={(e) => setStepDays(parseInt(e.target.value) || 63)} disabled={loading} />
+            <input type="number" className={inputCls} value={stepDaysStr} min={1} step={21}
+              onChange={(e) => setStepDaysStr(e.target.value)} disabled={loading} />
             <p className="text-xs text-slate-400 mt-1">How far to roll each step.</p>
           </div>
         </div>
@@ -310,13 +327,13 @@ export default function SmaWalkForwardPanel() {
           </div>
           <div>
             <label className={labelCls}>Transaction Cost (bps, one-way)</label>
-            <input type="number" className={inputCls} value={costBps} min={0} max={9999} step={1}
-              onChange={(e) => setCostBps(parseFloat(e.target.value) || 0)} disabled={loading} />
+            <input type="number" className={inputCls} value={costBpsStr} min={0} max={9999} step={1}
+              onChange={(e) => setCostBpsStr(e.target.value)} disabled={loading} />
           </div>
           <div>
             <label className={labelCls}>Initial Capital ($)</label>
-            <input type="number" className={inputCls} value={capital} min={1} step={10000}
-              onChange={(e) => setCapital(parseFloat(e.target.value) || 100_000)} disabled={loading} />
+            <input type="number" className={inputCls} value={capitalStr} min={1} step={10000}
+              onChange={(e) => setCapitalStr(e.target.value)} disabled={loading} />
           </div>
         </div>
 

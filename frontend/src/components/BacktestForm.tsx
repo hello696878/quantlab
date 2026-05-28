@@ -9,6 +9,7 @@ import type {
   StrategyType,
   VbBacktestRequest,
 } from "@/lib/types";
+import { useState } from "react";
 
 // Quick-pick tickers (single-asset strategies only)
 const POPULAR_TICKERS = ["SPY", "QQQ", "AAPL", "MSFT", "GLD", "BTC-USD"];
@@ -136,6 +137,57 @@ export default function BacktestForm({
   onSubmit,
   loading,
 }: Props) {
+  // ── String states for every numeric input ─────────────────────────────────
+  // Storing as strings lets users type partial values ("0.", "-", "12")
+  // without the field auto-resetting on each keystroke.  Parsing happens at
+  // validation/submit time only.  The parent state is kept in sync via the
+  // setter calls below (only called when the parsed value is a finite number).
+  // Common (shared across all strategies)
+  const [costBpsStr, setCostBpsStr] = useState(String(smaParams.transaction_cost_bps));
+  const [capitalStr, setCapitalStr] = useState(String(smaParams.initial_capital));
+  // SMA Crossover
+  const [smaFastStr, setSmaFastStr] = useState(String(smaParams.fast_window));
+  const [smaSlowStr, setSmaSlowStr] = useState(String(smaParams.slow_window));
+  // RSI Mean Reversion
+  const [rsiWindowStr, setRsiWindowStr] = useState(String(rsiParams.rsi_window));
+  const [rsiOversoldStr, setRsiOversoldStr] = useState(String(rsiParams.oversold_threshold));
+  const [rsiExitStr, setRsiExitStr] = useState(String(rsiParams.exit_threshold));
+  // Bollinger Band
+  const [bbWindowStr, setBbWindowStr] = useState(String(bbParams.bb_window));
+  const [bbNumStdStr, setBbNumStdStr] = useState(String(bbParams.num_std));
+  // Momentum
+  const [momWindowStr, setMomWindowStr] = useState(String(momentumParams.momentum_window));
+  const [momEntryStr, setMomEntryStr] = useState(String(momentumParams.entry_threshold));
+  const [momExitStr, setMomExitStr] = useState(String(momentumParams.exit_threshold));
+  // Volatility Breakout
+  const [vbLookbackStr, setVbLookbackStr] = useState(String(vbParams.lookback_window));
+  const [vbMultStr, setVbMultStr] = useState(String(vbParams.breakout_multiplier));
+  const [vbExitWindowStr, setVbExitWindowStr] = useState(String(vbParams.exit_window));
+  // Pairs Trading
+  const [pairsLookbackStr, setPairsLookbackStr] = useState(String(pairsParams.lookback_window));
+  const [pairsEntryZStr, setPairsEntryZStr] = useState(String(pairsParams.entry_z_score));
+  const [pairsExitZStr, setPairsExitZStr] = useState(String(pairsParams.exit_z_score));
+
+  // Derived numbers — parsed from string states
+  const costBps = parseFloat(costBpsStr);
+  const capital = parseFloat(capitalStr);
+  const smaFast = parseInt(smaFastStr, 10);
+  const smaSlow = parseInt(smaSlowStr, 10);
+  const rsiWindow = parseInt(rsiWindowStr, 10);
+  const rsiOversold = parseFloat(rsiOversoldStr);
+  const rsiExit = parseFloat(rsiExitStr);
+  const bbWindow = parseInt(bbWindowStr, 10);
+  const bbNumStd = parseFloat(bbNumStdStr);
+  const momWindow = parseInt(momWindowStr, 10);
+  const momEntry = parseFloat(momEntryStr);
+  const momExit = parseFloat(momExitStr);
+  const vbLookback = parseInt(vbLookbackStr, 10);
+  const vbMult = parseFloat(vbMultStr);
+  const vbExitWindow = parseInt(vbExitWindowStr, 10);
+  const pairsLookback = parseInt(pairsLookbackStr, 10);
+  const pairsEntryZ = parseFloat(pairsEntryZStr);
+  const pairsExitZ = parseFloat(pairsExitZStr);
+
   // Active single-asset params used for the common fields section.
   // For the pairs strategy we fall back to vbParams because both share the same
   // common field keys (start_date, end_date, cost, capital) and setCommon keeps
@@ -221,33 +273,35 @@ export default function BacktestForm({
   // Validation
   // ---------------------------------------------------------------------------
   const dateInvalid = active.start_date >= active.end_date;
+  const commonNumericOk =
+    !isNaN(costBps) && costBps >= 0 && !isNaN(capital) && capital > 0;
   const smaInvalid =
     strategy === "sma_crossover" &&
-    smaParams.fast_window >= smaParams.slow_window;
+    (isNaN(smaFast) || isNaN(smaSlow) || smaFast >= smaSlow);
   const rsiInvalid =
     strategy === "rsi_mean_reversion" &&
-    rsiParams.oversold_threshold >= rsiParams.exit_threshold;
+    (isNaN(rsiWindow) || rsiWindow < 2 ||
+      isNaN(rsiOversold) || isNaN(rsiExit) ||
+      rsiOversold >= rsiExit);
   const bbInvalid =
     strategy === "bollinger_band" &&
-    (bbParams.bb_window < 2 || bbParams.num_std <= 0);
+    (isNaN(bbWindow) || bbWindow < 2 || isNaN(bbNumStd) || bbNumStd <= 0);
   const momentumInvalid =
     strategy === "momentum" &&
-    (momentumParams.momentum_window < 1 ||
-      momentumParams.entry_threshold < -1 ||
-      momentumParams.entry_threshold > 1 ||
-      momentumParams.exit_threshold < -1 ||
-      momentumParams.exit_threshold > 1 ||
-      momentumParams.entry_threshold < momentumParams.exit_threshold);
+    (isNaN(momWindow) || momWindow < 1 ||
+      isNaN(momEntry) || momEntry < -1 || momEntry > 1 ||
+      isNaN(momExit) || momExit < -1 || momExit > 1 ||
+      momEntry < momExit);
   const vbInvalid =
     strategy === "volatility_breakout" &&
-    (vbParams.lookback_window < 2 ||
-      vbParams.breakout_multiplier <= 0 ||
-      vbParams.exit_window < 1);
+    (isNaN(vbLookback) || vbLookback < 2 ||
+      isNaN(vbMult) || vbMult <= 0 ||
+      isNaN(vbExitWindow) || vbExitWindow < 1);
   const pairsInvalid =
     strategy === "pairs" &&
-    (pairsParams.lookback_window < 10 ||
-      pairsParams.entry_z_score <= pairsParams.exit_z_score ||
-      pairsParams.exit_z_score < 0 ||
+    (isNaN(pairsLookback) || pairsLookback < 10 ||
+      isNaN(pairsEntryZ) || isNaN(pairsExitZ) ||
+      pairsEntryZ <= pairsExitZ || pairsExitZ < 0 ||
       pairsParams.asset_y.trim().toUpperCase() ===
         pairsParams.asset_x.trim().toUpperCase());
 
@@ -261,6 +315,7 @@ export default function BacktestForm({
     !loading &&
     tickerOk &&
     !dateInvalid &&
+    commonNumericOk &&
     !smaInvalid &&
     !rsiInvalid &&
     !bbInvalid &&
@@ -356,13 +411,15 @@ export default function BacktestForm({
             <input
               type="number"
               className={inputCls}
-              value={active.transaction_cost_bps}
+              value={costBpsStr}
               min={0}
               max={200}
               step={1}
-              onChange={(e) =>
-                setCommon("transaction_cost_bps", parseFloat(e.target.value) || 0)
-              }
+              onChange={(e) => {
+                setCostBpsStr(e.target.value);
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v)) setCommon("transaction_cost_bps", v);
+              }}
               disabled={loading}
             />
           </Field>
@@ -370,12 +427,14 @@ export default function BacktestForm({
             <input
               type="number"
               className={inputCls}
-              value={active.initial_capital}
+              value={capitalStr}
               min={1}
               step={1000}
-              onChange={(e) =>
-                setCommon("initial_capital", parseFloat(e.target.value) || 100_000)
-              }
+              onChange={(e) => {
+                setCapitalStr(e.target.value);
+                const v = parseFloat(e.target.value);
+                if (!isNaN(v)) setCommon("initial_capital", v);
+              }}
               disabled={loading}
             />
           </Field>
@@ -389,13 +448,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={smaParams.fast_window}
+                  value={smaFastStr}
                   min={2}
                   max={smaParams.slow_window - 1}
                   step={1}
-                  onChange={(e) =>
-                    setSma("fast_window", parseInt(e.target.value, 10) || 2)
-                  }
+                  onChange={(e) => {
+                    setSmaFastStr(e.target.value);
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v)) setSma("fast_window", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -403,12 +464,14 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={smaParams.slow_window}
+                  value={smaSlowStr}
                   min={smaParams.fast_window + 1}
                   step={1}
-                  onChange={(e) =>
-                    setSma("slow_window", parseInt(e.target.value, 10) || 2)
-                  }
+                  onChange={(e) => {
+                    setSmaSlowStr(e.target.value);
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v)) setSma("slow_window", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -419,13 +482,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={rsiParams.rsi_window}
+                  value={rsiWindowStr}
                   min={2}
                   max={100}
                   step={1}
-                  onChange={(e) =>
-                    setRsi("rsi_window", parseInt(e.target.value, 10) || 14)
-                  }
+                  onChange={(e) => {
+                    setRsiWindowStr(e.target.value);
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v)) setRsi("rsi_window", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -433,13 +498,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={rsiParams.oversold_threshold}
+                  value={rsiOversoldStr}
                   min={1}
                   max={rsiParams.exit_threshold - 1}
                   step={1}
-                  onChange={(e) =>
-                    setRsi("oversold_threshold", parseFloat(e.target.value) || 30)
-                  }
+                  onChange={(e) => {
+                    setRsiOversoldStr(e.target.value);
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) setRsi("oversold_threshold", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -447,13 +514,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={rsiParams.exit_threshold}
+                  value={rsiExitStr}
                   min={rsiParams.oversold_threshold + 1}
                   max={100}
                   step={1}
-                  onChange={(e) =>
-                    setRsi("exit_threshold", parseFloat(e.target.value) || 50)
-                  }
+                  onChange={(e) => {
+                    setRsiExitStr(e.target.value);
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) setRsi("exit_threshold", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -464,13 +533,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={bbParams.bb_window}
+                  value={bbWindowStr}
                   min={2}
                   max={500}
                   step={1}
-                  onChange={(e) =>
-                    setBb("bb_window", parseInt(e.target.value, 10) || 20)
-                  }
+                  onChange={(e) => {
+                    setBbWindowStr(e.target.value);
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v)) setBb("bb_window", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -478,13 +549,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={bbParams.num_std}
+                  value={bbNumStdStr}
                   min={0.1}
                   max={10}
                   step={0.1}
-                  onChange={(e) =>
-                    setBb("num_std", parseFloat(e.target.value) || 2.0)
-                  }
+                  onChange={(e) => {
+                    setBbNumStdStr(e.target.value);
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) setBb("num_std", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -508,16 +581,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={momentumParams.momentum_window}
+                  value={momWindowStr}
                   min={1}
                   max={1000}
                   step={1}
-                  onChange={(e) =>
-                    setMomentum(
-                      "momentum_window",
-                      parseInt(e.target.value, 10) || 126,
-                    )
-                  }
+                  onChange={(e) => {
+                    setMomWindowStr(e.target.value);
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v)) setMomentum("momentum_window", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -525,16 +597,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={momentumParams.entry_threshold}
+                  value={momEntryStr}
                   min={-1}
                   max={1}
                   step={0.01}
-                  onChange={(e) =>
-                    setMomentum(
-                      "entry_threshold",
-                      parseFloat(e.target.value) || 0,
-                    )
-                  }
+                  onChange={(e) => {
+                    setMomEntryStr(e.target.value);
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) setMomentum("entry_threshold", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -542,16 +613,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={momentumParams.exit_threshold}
+                  value={momExitStr}
                   min={-1}
                   max={1}
                   step={0.01}
-                  onChange={(e) =>
-                    setMomentum(
-                      "exit_threshold",
-                      parseFloat(e.target.value) || 0,
-                    )
-                  }
+                  onChange={(e) => {
+                    setMomExitStr(e.target.value);
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) setMomentum("exit_threshold", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -562,13 +632,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={vbParams.lookback_window}
+                  value={vbLookbackStr}
                   min={2}
                   max={500}
                   step={1}
-                  onChange={(e) =>
-                    setVb("lookback_window", parseInt(e.target.value, 10) || 20)
-                  }
+                  onChange={(e) => {
+                    setVbLookbackStr(e.target.value);
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v)) setVb("lookback_window", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -576,16 +648,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={vbParams.breakout_multiplier}
+                  value={vbMultStr}
                   min={0.1}
                   max={10}
                   step={0.1}
-                  onChange={(e) =>
-                    setVb(
-                      "breakout_multiplier",
-                      parseFloat(e.target.value) || 1.0,
-                    )
-                  }
+                  onChange={(e) => {
+                    setVbMultStr(e.target.value);
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) setVb("breakout_multiplier", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -593,13 +664,15 @@ export default function BacktestForm({
                 <input
                   type="number"
                   className={inputCls}
-                  value={vbParams.exit_window}
+                  value={vbExitWindowStr}
                   min={1}
                   max={500}
                   step={1}
-                  onChange={(e) =>
-                    setVb("exit_window", parseInt(e.target.value, 10) || 10)
-                  }
+                  onChange={(e) => {
+                    setVbExitWindowStr(e.target.value);
+                    const v = parseInt(e.target.value, 10);
+                    if (!isNaN(v)) setVb("exit_window", v);
+                  }}
                   disabled={loading}
                 />
               </Field>
@@ -663,16 +736,15 @@ export default function BacktestForm({
                   <input
                     type="number"
                     className={inputCls}
-                    value={pairsParams.lookback_window}
+                    value={pairsLookbackStr}
                     min={10}
                     max={500}
                     step={1}
-                    onChange={(e) =>
-                      setPairs(
-                        "lookback_window",
-                        parseInt(e.target.value, 10) || 60,
-                      )
-                    }
+                    onChange={(e) => {
+                      setPairsLookbackStr(e.target.value);
+                      const v = parseInt(e.target.value, 10);
+                      if (!isNaN(v)) setPairs("lookback_window", v);
+                    }}
                     disabled={loading}
                   />
                 </Field>
@@ -680,16 +752,15 @@ export default function BacktestForm({
                   <input
                     type="number"
                     className={inputCls}
-                    value={pairsParams.entry_z_score}
+                    value={pairsEntryZStr}
                     min={0.1}
                     max={5}
                     step={0.1}
-                    onChange={(e) =>
-                      setPairs(
-                        "entry_z_score",
-                        parseFloat(e.target.value) || 2.0,
-                      )
-                    }
+                    onChange={(e) => {
+                      setPairsEntryZStr(e.target.value);
+                      const v = parseFloat(e.target.value);
+                      if (!isNaN(v)) setPairs("entry_z_score", v);
+                    }}
                     disabled={loading}
                   />
                 </Field>
@@ -697,16 +768,15 @@ export default function BacktestForm({
                   <input
                     type="number"
                     className={inputCls}
-                    value={pairsParams.exit_z_score}
+                    value={pairsExitZStr}
                     min={0}
                     max={4.9}
                     step={0.1}
-                    onChange={(e) =>
-                      setPairs(
-                        "exit_z_score",
-                        parseFloat(e.target.value) || 0.5,
-                      )
-                    }
+                    onChange={(e) => {
+                      setPairsExitZStr(e.target.value);
+                      const v = parseFloat(e.target.value);
+                      if (!isNaN(v)) setPairs("exit_z_score", v);
+                    }}
                     disabled={loading}
                   />
                 </Field>
@@ -716,7 +786,8 @@ export default function BacktestForm({
         </div>
 
         {/* ── Inline validation ─────────────────────────────────────────── */}
-        {(dateInvalid ||
+        {(!commonNumericOk ||
+          dateInvalid ||
           smaInvalid ||
           rsiInvalid ||
           bbInvalid ||
@@ -724,6 +795,17 @@ export default function BacktestForm({
           vbInvalid ||
           pairsInvalid) && (
           <div className="mb-4 space-y-1">
+            {!commonNumericOk && (
+              <p className="text-xs text-red-600">
+                ⚠ {isNaN(costBps)
+                  ? "Transaction cost must be a valid number (≥ 0)."
+                  : costBps < 0
+                    ? "Transaction cost must be ≥ 0."
+                    : isNaN(capital)
+                      ? "Initial capital must be a valid number (> 0)."
+                      : "Initial capital must be greater than 0."}
+              </p>
+            )}
             {dateInvalid && (
               <p className="text-xs text-red-600">
                 ⚠ Start date must be before end date.
@@ -731,35 +813,44 @@ export default function BacktestForm({
             )}
             {smaInvalid && (
               <p className="text-xs text-red-600">
-                ⚠ Fast SMA window must be less than slow SMA window.
+                ⚠ {(isNaN(smaFast) || isNaN(smaSlow))
+                  ? "SMA windows must be valid numbers."
+                  : "Fast SMA window must be less than slow SMA window."}
               </p>
             )}
             {rsiInvalid && (
               <p className="text-xs text-red-600">
-                ⚠ Oversold threshold must be less than exit threshold.
+                ⚠ {(isNaN(rsiWindow) || isNaN(rsiOversold) || isNaN(rsiExit))
+                  ? "RSI fields must be valid numbers."
+                  : "Oversold threshold must be less than exit threshold."}
               </p>
             )}
             {bbInvalid && (
               <p className="text-xs text-red-600">
-                ⚠ BB window must be ≥ 2 and std dev must be &gt; 0.
+                ⚠ {(isNaN(bbWindow) || isNaN(bbNumStd))
+                  ? "BB fields must be valid numbers."
+                  : "BB window must be ≥ 2 and std dev must be > 0."}
               </p>
             )}
             {momentumInvalid && (
               <p className="text-xs text-red-600">
-                ⚠ Momentum lookback must be ≥ 1, thresholds must be between -1
-                and 1, and entry must be ≥ exit.
+                ⚠ {(isNaN(momWindow) || isNaN(momEntry) || isNaN(momExit))
+                  ? "Momentum fields must be valid numbers."
+                  : "Momentum lookback must be ≥ 1, thresholds must be between -1 and 1, and entry must be ≥ exit."}
               </p>
             )}
             {vbInvalid && (
               <p className="text-xs text-red-600">
-                ⚠ Lookback must be ≥ 2, multiplier must be &gt; 0, hold bars
-                must be ≥ 1.
+                ⚠ {(isNaN(vbLookback) || isNaN(vbMult) || isNaN(vbExitWindow))
+                  ? "Volatility Breakout fields must be valid numbers."
+                  : "Lookback must be ≥ 2, multiplier must be > 0, hold bars must be ≥ 1."}
               </p>
             )}
             {pairsInvalid && (
               <p className="text-xs text-red-600">
-                ⚠ Assets must differ, lookback ≥ 10, and entry Z-score must be
-                strictly greater than exit Z-score ≥ 0.
+                ⚠ {(isNaN(pairsLookback) || isNaN(pairsEntryZ) || isNaN(pairsExitZ))
+                  ? "Pairs fields must be valid numbers."
+                  : "Assets must differ, lookback ≥ 10, and entry Z-score must be strictly greater than exit Z-score ≥ 0."}
               </p>
             )}
           </div>

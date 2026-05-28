@@ -122,8 +122,13 @@ export default function SmaTrainTestPanel() {
   const [endDate, setEndDate] = useState(DEFAULT_PARAMS.end_date);
   const [fastRaw, setFastRaw] = useState(windowsToString(DEFAULT_PARAMS.fast_windows));
   const [slowRaw, setSlowRaw] = useState(windowsToString(DEFAULT_PARAMS.slow_windows));
-  const [costBps, setCostBps] = useState(DEFAULT_PARAMS.transaction_cost_bps);
-  const [capital, setCapital] = useState(DEFAULT_PARAMS.initial_capital);
+  const [costBpsStr, setCostBpsStr] = useState(String(DEFAULT_PARAMS.transaction_cost_bps));
+  const [capitalStr, setCapitalStr] = useState(String(DEFAULT_PARAMS.initial_capital));
+
+  // Derived numbers — parsed at render time so the input can hold partial strings
+  const costBps = parseFloat(costBpsStr);
+  const capital = parseFloat(capitalStr);
+
   const [selectionMetric, setSelectionMetric] = useState<SmaTrainTestRequest["selection_metric"]>(
     DEFAULT_PARAMS.selection_metric,
   );
@@ -140,7 +145,7 @@ export default function SmaTrainTestPanel() {
     fastWindows !== null &&
     slowWindows !== null &&
     fastWindows.length * slowWindows.length <= 100;
-  const moneyOk = costBps >= 0 && costBps < 10_000 && capital > 0;
+  const moneyOk = !isNaN(costBps) && costBps >= 0 && costBps < 10_000 && !isNaN(capital) && capital > 0;
 
   const formInvalid =
     !ticker.trim() ||
@@ -164,8 +169,12 @@ export default function SmaTrainTestPanel() {
     validationMsg = "Slow windows must be 1–10 comma-separated integers, each ≥ 2.";
   } else if (!combsOk) {
     validationMsg = `Too many combinations (${fastWindows?.length ?? 0} × ${slowWindows?.length ?? 0} = ${(fastWindows?.length ?? 0) * (slowWindows?.length ?? 0)}).  Maximum is 100.`;
+  } else if (isNaN(costBps)) {
+    validationMsg = "Transaction cost must be a valid number (≥ 0 bps).";
   } else if (costBps < 0 || costBps >= 10_000) {
     validationMsg = "Transaction cost must be at least 0 and less than 10,000 bps.";
+  } else if (isNaN(capital)) {
+    validationMsg = "Initial capital must be a valid number (> 0).";
   } else if (capital <= 0) {
     validationMsg = "Initial capital must be greater than 0.";
   }
@@ -342,11 +351,11 @@ export default function SmaTrainTestPanel() {
             <input
               type="number"
               className={inputCls}
-              value={costBps}
+              value={costBpsStr}
               min={0}
               max={9999}
               step={1}
-              onChange={(e) => setCostBps(parseFloat(e.target.value) || 0)}
+              onChange={(e) => setCostBpsStr(e.target.value)}
               disabled={loading}
             />
           </div>
@@ -355,10 +364,10 @@ export default function SmaTrainTestPanel() {
             <input
               type="number"
               className={inputCls}
-              value={capital}
+              value={capitalStr}
               min={1}
               step={10000}
-              onChange={(e) => setCapital(parseFloat(e.target.value) || 100_000)}
+              onChange={(e) => setCapitalStr(e.target.value)}
               disabled={loading}
             />
           </div>

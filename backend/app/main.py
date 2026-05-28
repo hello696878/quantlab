@@ -1245,10 +1245,18 @@ def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
 )
 def strategy_comparison(request: StrategyComparisonRequest) -> StrategyComparisonResponse:
     import math
+    import pandas as pd
 
     _validate_common(request.ticker, request.start_date, request.end_date)
     df = _fetch(request.ticker, request.start_date, request.end_date)
     close = df["Close"]
+
+    # Defensive trim: data providers and tests may return a superset of the
+    # requested range. All strategies and the shared benchmark must compare the
+    # exact requested period only.
+    start_ts = pd.Timestamp(request.start_date)
+    end_ts = pd.Timestamp(request.end_date)
+    close = close[(close.index >= start_ts) & (close.index <= end_ts)]
 
     # SMA 50/200 is the most restrictive default: needs slow + 2 = 202 bars.
     min_bars = 202
@@ -1385,11 +1393,19 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         fv = float(v)
         return fv if math.isfinite(fv) else float("-inf")
 
-    best_sharpe = max(results, key=lambda r: _safe(r.metrics.sharpe_ratio)).display_name
-    best_cagr = max(results, key=lambda r: _safe(r.metrics.cagr)).display_name
-    best_calmar = max(results, key=lambda r: _safe(r.metrics.calmar_ratio)).display_name
+    order = {item.display_name: i for i, item in enumerate(results)}
+
+    def _rank(metric_getter):
+        return max(
+            results,
+            key=lambda r: (_safe(metric_getter(r)), -order[r.display_name]),
+        ).display_name
+
+    best_sharpe = _rank(lambda r: r.metrics.sharpe_ratio)
+    best_cagr = _rank(lambda r: r.metrics.cagr)
+    best_calmar = _rank(lambda r: r.metrics.calmar_ratio)
     # max_drawdown is negative; "lowest" = smallest absolute drawdown = closest to 0
-    lowest_dd = max(results, key=lambda r: _safe(r.metrics.max_drawdown)).display_name
+    lowest_dd = _rank(lambda r: r.metrics.max_drawdown)
 
     return StrategyComparisonResponse(
         ticker=request.ticker.strip().upper(),
