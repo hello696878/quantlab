@@ -65,9 +65,29 @@ Benchmark: buy-and-hold with no transaction costs.
 
 ## Screenshots
 
-_Screenshots will be added after the first public deployment._
+### Main Backtest Dashboard
 
-See [`docs/screenshots/README.md`](docs/screenshots/README.md) for the list of planned captures.
+![Main Backtest Dashboard](docs/screenshots/main-backtest-dashboard.png)
+
+### Strategy Comparison
+
+![Strategy Comparison](docs/screenshots/strategy-comparison.png)
+
+### SMA Parameter Sweep
+
+![SMA Parameter Sweep](docs/screenshots/sma-parameter-sweep.png)
+
+### Train/Test Validation
+
+![Train/Test Validation](docs/screenshots/train-test-validation.png)
+
+### Walk-Forward Optimization
+
+![Walk-Forward Optimization](docs/screenshots/walk-forward-optimization.png)
+
+### FastAPI Docs
+
+![FastAPI Docs](docs/screenshots/fastapi-docs.png)
 
 ---
 
