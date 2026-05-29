@@ -386,3 +386,53 @@ export interface StrategyComparisonResponse {
   benchmark_metrics: PerformanceMetrics;
   ranking: StrategyComparisonRanking;
 }
+
+// ---------------------------------------------------------------------------
+// Saved Backtests
+// ---------------------------------------------------------------------------
+
+export interface SavedBacktestCreate {
+  name: string;
+  ticker: string;
+  strategy: string;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  transaction_cost_bps: number;
+  params: Record<string, unknown>;
+  metrics: Record<string, unknown>;
+  equity_curve: EquityPoint[];
+  trades: TradeRecord[];
+  notes: string;
+}
+
+/** Lightweight list-view row — no large JSON blobs. */
+export interface SavedBacktestSummary {
+  id: number;
+  created_at: string;
+  name: string;
+  ticker: string;
+  strategy: string;
+  start_date: string;
+  end_date: string;
+  total_return: number | null;
+  cagr: number | null;
+  sharpe_ratio: number | null;
+  max_drawdown: number | null;
+  notes: string;
+}
+
+/** Full record including equity curve and trades. */
+export interface SavedBacktestFull extends SavedBacktestSummary {
+  initial_capital: number;
+  transaction_cost_bps: number;
+  params: Record<string, unknown>;
+  metrics: Record<string, unknown>;
+  equity_curve: EquityPoint[];
+  trades: TradeRecord[];
+}
+
+export interface DeleteResponse {
+  deleted: boolean;
+  id: number;
+}

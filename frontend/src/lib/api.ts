@@ -9,9 +9,13 @@ import type {
   BacktestRequest,
   BacktestResponse,
   BbBacktestRequest,
+  DeleteResponse,
   MomentumBacktestRequest,
   PairsBacktestRequest,
   RsiBacktestRequest,
+  SavedBacktestCreate,
+  SavedBacktestFull,
+  SavedBacktestSummary,
   SmaSweepRequest,
   SmaSweepResponse,
   SmaTrainTestRequest,
@@ -266,4 +270,72 @@ export async function checkHealth(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Saved Backtests
+// ---------------------------------------------------------------------------
+
+async function savedBacktestsRequest<T>(
+  endpoint: string,
+  options: RequestInit = {},
+): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(endpoint, {
+      headers: { "Content-Type": "application/json" },
+      ...options,
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+
+  if (!res.ok) {
+    let message =
+      res.status >= 500
+        ? backendUnavailableMessage(res.status)
+        : `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = formatBackendDetail(body?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+
+  return res.json() as Promise<T>;
+}
+
+/** POST /api/saved-backtests */
+export async function createSavedBacktest(
+  data: SavedBacktestCreate,
+): Promise<SavedBacktestFull> {
+  return savedBacktestsRequest<SavedBacktestFull>("/api/saved-backtests", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/** GET /api/saved-backtests */
+export async function listSavedBacktests(): Promise<SavedBacktestSummary[]> {
+  return savedBacktestsRequest<SavedBacktestSummary[]>("/api/saved-backtests", {
+    method: "GET",
+  });
+}
+
+/** GET /api/saved-backtests/{id} */
+export async function getSavedBacktest(id: number): Promise<SavedBacktestFull> {
+  return savedBacktestsRequest<SavedBacktestFull>(
+    `/api/saved-backtests/${id}`,
+    { method: "GET" },
+  );
+}
+
+/** DELETE /api/saved-backtests/{id} */
+export async function deleteSavedBacktest(id: number): Promise<DeleteResponse> {
+  return savedBacktestsRequest<DeleteResponse>(
+    `/api/saved-backtests/${id}`,
+    { method: "DELETE" },
+  );
 }

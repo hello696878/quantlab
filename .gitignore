@@ -13,3 +13,6 @@ fe_err.txt
 fe_out.txt
 
 frontend/tsconfig.tsbuildinfo
+
+# Local SQLite database — lives on disk, never commit it
+backend/data/*.db

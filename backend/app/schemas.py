@@ -1056,3 +1056,109 @@ class StrategyComparisonResponse(BaseModel):
     )
 
     ranking: StrategyComparisonRanking
+
+
+# ===========================================================================
+# Saved Backtests
+# ===========================================================================
+
+
+class SavedBacktestCreate(BaseModel):
+    """Request body for POST /saved-backtests."""
+
+    name: str = Field(
+        min_length=1,
+        description="Display name for the saved backtest (non-empty).",
+    )
+    ticker: str = Field(
+        min_length=1,
+        description="Ticker symbol, e.g. SPY (non-empty).",
+    )
+    strategy: str = Field(
+        min_length=1,
+        description="Strategy identifier, e.g. sma_crossover (non-empty).",
+    )
+    start_date: str = Field(description="Backtest start date (YYYY-MM-DD).")
+    end_date: str = Field(description="Backtest end date (YYYY-MM-DD).")
+    initial_capital: float = Field(gt=0, description="Starting capital in USD.")
+    transaction_cost_bps: float = Field(
+        ge=0.0, description="One-way transaction cost in basis points."
+    )
+    params: dict = Field(
+        default_factory=dict,
+        description="Strategy parameters used for this run.",
+    )
+    metrics: dict = Field(
+        default_factory=dict,
+        description="Performance metrics dict (keys match PerformanceMetrics).",
+    )
+    equity_curve: list = Field(
+        default_factory=list,
+        description="List of EquityPoint dicts {date, strategy, benchmark}.",
+    )
+    trades: list = Field(
+        default_factory=list,
+        description="List of TradeRecord dicts.",
+    )
+    notes: str = Field(default="", description="Optional free-text notes.")
+
+    @model_validator(mode="after")
+    def check_dates(self) -> "SavedBacktestCreate":
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be before end_date.")
+        return self
+
+
+class SavedBacktestSummary(BaseModel):
+    """
+    Lightweight summary row returned by GET /saved-backtests.
+
+    Omits the large JSON blobs (equity_curve, trades, params, metrics) so
+    list responses are cheap to serialise and transfer.  The four headline
+    metrics are extracted from the stored metrics JSON.
+    """
+
+    id: int
+    created_at: str = Field(description="ISO-8601 UTC timestamp of creation.")
+    name: str
+    ticker: str
+    strategy: str
+    start_date: str
+    end_date: str
+    total_return: Optional[float] = Field(
+        default=None, description="Total return as a decimal (from stored metrics)."
+    )
+    cagr: Optional[float] = Field(
+        default=None, description="CAGR as a decimal (from stored metrics)."
+    )
+    sharpe_ratio: Optional[float] = Field(
+        default=None, description="Annualised Sharpe ratio (from stored metrics)."
+    )
+    max_drawdown: Optional[float] = Field(
+        default=None, description="Max drawdown as a decimal ≤ 0 (from stored metrics)."
+    )
+    notes: str
+
+
+class SavedBacktestFull(SavedBacktestSummary):
+    """
+    Full record returned by GET /saved-backtests/{id} and
+    POST /saved-backtests.
+
+    Extends SavedBacktestSummary with the four large JSON fields and the
+    common parameters.
+    """
+
+    initial_capital: float
+    transaction_cost_bps: float
+    params: dict = Field(description="Strategy parameters.")
+    metrics: dict = Field(description="Full performance metrics dict.")
+    equity_curve: list = Field(description="Daily equity curve data points.")
+    trades: list = Field(description="Trade log.")
+
+
+class DeleteResponse(BaseModel):
+    """Response body for DELETE /saved-backtests/{id}."""
+
+    deleted: bool = Field(description="True if the record existed and was deleted.")
+    id: int = Field(description="ID of the deleted record.")

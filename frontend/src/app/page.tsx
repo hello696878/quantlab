@@ -10,6 +10,9 @@ import SmaSweepPanel from "@/components/SmaSweepPanel";
 import SmaTrainTestPanel from "@/components/SmaTrainTestPanel";
 import SmaWalkForwardPanel from "@/components/SmaWalkForwardPanel";
 import StrategyComparisonPanel from "@/components/StrategyComparisonPanel";
+import SaveBacktestModal from "@/components/SaveBacktestModal";
+import SavedBacktestsList from "@/components/SavedBacktestsList";
+import SavedBacktestDetail from "@/components/SavedBacktestDetail";
 import {
   runBacktest,
   runBbBacktest,
@@ -240,12 +243,16 @@ const STRATEGY_HEADINGS: Record<
 // Page
 // ---------------------------------------------------------------------------
 
-type PageMode = "backtest" | "research";
+type PageMode = "backtest" | "research" | "saved";
 type ResearchTab = "sweep" | "train-test" | "walk-forward" | "comparison";
 
 export default function HomePage() {
   const [mode, setMode] = useState<PageMode>("backtest");
   const [researchTab, setResearchTab] = useState<ResearchTab>("sweep");
+  // Saved backtests state
+  const [showSaveForm, setShowSaveForm] = useState(false);
+  const [savedRefreshKey, setSavedRefreshKey] = useState(0);
+  const [savedDetailId, setSavedDetailId] = useState<number | null>(null);
   const [strategy, setStrategy] = useState<StrategyType>("sma_crossover");
   const [smaParams, setSmaParams] = useState<BacktestRequest>(DEFAULT_SMA_PARAMS);
   const [rsiParams, setRsiParams] = useState<RsiBacktestRequest>(DEFAULT_RSI_PARAMS);
@@ -267,6 +274,7 @@ export default function HomePage() {
     setLoading(true);
     setError(null);
     setResult(null);
+    setShowSaveForm(false);
 
     try {
       const data =
@@ -300,14 +308,20 @@ export default function HomePage() {
       <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
         {(
           [
-            { id: "backtest",  label: "Backtest" },
-            { id: "research",  label: "Research Tools" },
+            { id: "backtest", label: "Backtest" },
+            { id: "research", label: "Research Tools" },
+            { id: "saved",    label: "Saved Backtests" },
           ] as const
         ).map(({ id, label }) => (
           <button
             key={id}
             type="button"
-            onClick={() => setMode(id)}
+            onClick={() => {
+              setMode(id);
+              if (id !== "saved") {
+                setSavedDetailId(null);
+              }
+            }}
             className={
               "px-4 py-1.5 rounded-lg text-sm font-medium transition-colors " +
               (mode === id
@@ -431,6 +445,33 @@ export default function HomePage() {
         </>
       )}
 
+      {/* ── Saved Backtests mode ─────────────────────────────────────── */}
+      {mode === "saved" && (
+        <>
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">
+              Saved Backtests
+            </h1>
+            <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+              Backtests you have saved are stored locally in a SQLite database.
+              Click any row to view the full result, equity curve, and trade log.
+            </p>
+          </div>
+
+          {savedDetailId !== null ? (
+            <SavedBacktestDetail
+              id={savedDetailId}
+              onBack={() => setSavedDetailId(null)}
+            />
+          ) : (
+            <SavedBacktestsList
+              refreshKey={savedRefreshKey}
+              onSelect={(id) => setSavedDetailId(id)}
+            />
+          )}
+        </>
+      )}
+
       {/* ── Backtest mode ────────────────────────────────────────────── */}
       {mode === "backtest" && (
         <>
@@ -511,16 +552,42 @@ export default function HomePage() {
       {/* ── Results ──────────────────────────────────────────────────── */}
       {result && !loading && (
         <>
-          {/* Summary header */}
+          {/* Summary header + Save button */}
           <div className="flex flex-wrap items-baseline gap-2">
             <h2 className="text-lg font-bold text-slate-900">{result.ticker}</h2>
             <span className="text-slate-400 text-sm">
               {result.start_date} → {result.end_date}
             </span>
-            <span className="ml-auto text-xs text-slate-400">
+            <span className="text-xs text-slate-400">
               {paramSummary(result)}
             </span>
+            <span className="ml-auto">
+              {!showSaveForm && (
+                <button
+                  type="button"
+                  onClick={() => setShowSaveForm(true)}
+                  className="px-3 py-1 rounded-lg text-xs font-semibold text-blue-700
+                             border border-blue-200 hover:bg-blue-50 transition-colors"
+                >
+                  Save backtest
+                </button>
+              )}
+            </span>
           </div>
+
+          {/* Save form */}
+          {showSaveForm && (
+            <SaveBacktestModal
+              result={result}
+              onSaved={(id) => {
+                setShowSaveForm(false);
+                setSavedRefreshKey((k) => k + 1);
+                setSavedDetailId(id);
+                setMode("saved");
+              }}
+              onCancel={() => setShowSaveForm(false)}
+            />
+          )}
 
           {/* Metric cards */}
           <MetricsGrid

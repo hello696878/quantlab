@@ -16,21 +16,34 @@ POST /research/sma-walk-forward        — SMA walk-forward optimization
 POST /research/strategy-comparison     — compare five single-asset strategies
 """
 
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.backtest import run_backtest, run_pairs_backtest
 from app.data import fetch_ohlcv, fetch_pairs_close
+from app.db import init_db
 from app.metrics import compute_metrics
+from app.saved_backtests import (
+    create_saved_backtest as db_create,
+    delete_saved_backtest as db_delete,
+    get_saved_backtest as db_get,
+    list_saved_backtests as db_list,
+)
 from app.schemas import (
     BacktestRequest,
     BacktestResponse,
     BbBacktestRequest,
+    DeleteResponse,
     EquityPoint,
     MomentumBacktestRequest,
     PairsBacktestRequest,
     PerformanceMetrics,
     RsiBacktestRequest,
+    SavedBacktestCreate,
+    SavedBacktestFull,
+    SavedBacktestSummary,
     SmaSweepRequest,
     SmaSweepResponse,
     SmaSweepRow,
@@ -62,6 +75,14 @@ from app.utils import validate_date_format
 # App setup
 # ---------------------------------------------------------------------------
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialise the SQLite database on startup."""
+    init_db()
+    yield
+
+
 app = FastAPI(
     title="QuantLab API",
     description=(
@@ -72,6 +93,7 @@ app = FastAPI(
         "All strategies use a one-day signal shift to prevent lookahead bias."
     ),
     version="0.8.0",
+    lifespan=lifespan,
 )
 
 app.add_middleware(
@@ -1423,3 +1445,73 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
             lowest_drawdown=lowest_dd,
         ),
     )
+
+
+# ---------------------------------------------------------------------------
+# Saved Backtests endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/saved-backtests",
+    response_model=SavedBacktestFull,
+    tags=["saved"],
+    summary="Save a backtest result",
+    description=(
+        "Persist a completed backtest result to the local SQLite database.  "
+        "Accepts the full result payload (metrics, equity curve, trades) from "
+        "any backtest endpoint.  Returns the saved record with its assigned "
+        "``id`` and ``created_at`` timestamp."
+    ),
+)
+def create_saved_backtest_endpoint(request: SavedBacktestCreate) -> SavedBacktestFull:
+    record = db_create(request.model_dump())
+    return SavedBacktestFull(**record)
+
+
+@app.get(
+    "/saved-backtests",
+    response_model=list[SavedBacktestSummary],
+    tags=["saved"],
+    summary="List saved backtests",
+    description=(
+        "Return all saved backtest records as lightweight summary rows "
+        "(no equity curve, trades, or full params blobs).  "
+        "Ordered newest-first by creation timestamp."
+    ),
+)
+def list_saved_backtests_endpoint() -> list[SavedBacktestSummary]:
+    rows = db_list()
+    return [SavedBacktestSummary(**row) for row in rows]
+
+
+@app.get(
+    "/saved-backtests/{id}",
+    response_model=SavedBacktestFull,
+    tags=["saved"],
+    summary="Get a saved backtest",
+    description="Return the full saved backtest record including equity curve and trades.",
+)
+def get_saved_backtest_endpoint(id: int) -> SavedBacktestFull:
+    record = db_get(id)
+    if record is None:
+        raise HTTPException(
+            status_code=404, detail=f"Saved backtest {id} not found."
+        )
+    return SavedBacktestFull(**record)
+
+
+@app.delete(
+    "/saved-backtests/{id}",
+    response_model=DeleteResponse,
+    tags=["saved"],
+    summary="Delete a saved backtest",
+    description="Permanently delete a saved backtest record by id.",
+)
+def delete_saved_backtest_endpoint(id: int) -> DeleteResponse:
+    deleted = db_delete(id)
+    if not deleted:
+        raise HTTPException(
+            status_code=404, detail=f"Saved backtest {id} not found."
+        )
+    return DeleteResponse(deleted=True, id=id)
