@@ -185,6 +185,54 @@ def test_csv_missing_date_column_rejected(client):
     assert "date column" in resp.json()["detail"]
 
 
+def test_csv_missing_close_column_rejected(client):
+    df = pd.DataFrame(
+        {"date": pd.date_range("2020-01-01", periods=300, freq="B").strftime("%Y-%m-%d")}
+    )
+    resp = post_csv(
+        client,
+        strategy="sma_crossover",
+        params={"fast_window": 20, "slow_window": 50},
+        csv_bytes=df.to_csv(index=False).encode(),
+    )
+    assert resp.status_code == 422
+    assert "close price column" in resp.json()["detail"]
+
+
+def test_csv_non_numeric_close_rows_are_dropped(client):
+    dates = pd.date_range("2020-01-01", periods=300, freq="B").strftime("%Y-%m-%d")
+    closes: list[float | str] = [100.0 + i for i in range(300)]
+    closes[10] = "oops"
+    df = pd.DataFrame({"date": dates, "close": closes})
+
+    resp = post_csv(
+        client,
+        strategy="sma_crossover",
+        params={"fast_window": 20, "slow_window": 50},
+        csv_bytes=df.to_csv(index=False).encode(),
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert len(resp.json()["equity_curve"]) == 299
+
+
+def test_csv_zero_prices_rejected(client):
+    df = pd.DataFrame(
+        {
+            "date": pd.date_range("2020-01-01", periods=250, freq="B").strftime("%Y-%m-%d"),
+            "close": [100.0 + i for i in range(249)] + [0.0],
+        }
+    )
+    resp = post_csv(
+        client,
+        strategy="sma_crossover",
+        params={"fast_window": 20, "slow_window": 50},
+        csv_bytes=df.to_csv(index=False).encode(),
+    )
+    assert resp.status_code == 422
+    assert "positive" in resp.json()["detail"]
+
+
 def test_csv_invalid_params_fast_ge_slow(client):
     resp = post_csv(
         client,
@@ -226,6 +274,31 @@ def test_csv_bad_params_json(client):
     )
     assert resp.status_code == 422
     assert "JSON" in resp.json()["detail"]
+
+
+def test_csv_malformed_file_rejected(client):
+    resp = post_csv(
+        client,
+        strategy="sma_crossover",
+        params={"fast_window": 20, "slow_window": 50},
+        csv_bytes=b'date,close\n"2020-01-01,100\n2020-01-02,101\n',
+    )
+    assert resp.status_code == 422
+    assert "parse CSV" in resp.json()["detail"]
+
+
+def test_csv_upload_not_written_to_working_directory(client, tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+
+    resp = post_csv(
+        client,
+        strategy="sma_crossover",
+        params={"fast_window": 20, "slow_window": 50},
+        filename="uploaded.csv",
+    )
+
+    assert resp.status_code == 200, resp.text
+    assert not (tmp_path / "uploaded.csv").exists()
 
 
 def test_csv_negative_prices_rejected(client):

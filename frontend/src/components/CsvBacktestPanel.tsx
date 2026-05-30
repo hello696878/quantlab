@@ -112,9 +112,12 @@ function Field({
 
 /** Parse a numeric string; return null when empty / not finite. */
 function parseNum(raw: string, kind: "int" | "float"): number | null {
-  if (raw.trim() === "") return null;
-  const v = kind === "int" ? parseInt(raw, 10) : parseFloat(raw);
-  return Number.isFinite(v) ? v : null;
+  const trimmed = raw.trim();
+  if (trimmed === "") return null;
+  const v = Number(trimmed);
+  if (!Number.isFinite(v)) return null;
+  if (kind === "int" && !Number.isInteger(v)) return null;
+  return v;
 }
 
 // ---------------------------------------------------------------------------
@@ -305,7 +308,7 @@ export default function CsvBacktestPanel() {
         </Field>
 
         {/* Strategy-specific params */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           {specs.map((spec) => (
             <Field key={spec.key} label={spec.label} hint={spec.hint}>
               {spec.kind === "select" ? (
@@ -335,7 +338,7 @@ export default function CsvBacktestPanel() {
         </div>
 
         {/* Common params */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <Field label="Transaction Cost" hint="bps">
             <input
               type="number"

@@ -18,6 +18,7 @@ this single-asset, close-only version.
 from __future__ import annotations
 
 import io
+import warnings
 
 import pandas as pd
 
@@ -79,7 +80,13 @@ def parse_price_csv(content: bytes) -> pd.Series:
             "'Adjusted Close')."
         )
 
-    dates = pd.to_datetime(df[date_col], errors="coerce")
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore",
+            message="Could not infer format.*",
+            category=UserWarning,
+        )
+        dates = pd.to_datetime(df[date_col], errors="coerce")
     closes = pd.to_numeric(df[close_col], errors="coerce")
 
     series = pd.Series(closes.to_numpy(), index=pd.DatetimeIndex(dates))
@@ -99,8 +106,9 @@ def parse_price_csv(content: bytes) -> pd.Series:
     series.index = pd.to_datetime(idx.date)
     series.index.name = "Date"
 
+    # Keep the last uploaded row for duplicate dates, then sort chronologically.
+    series = series[~series.index.duplicated(keep="last")]
     series = series.sort_index()
-    series = series[~series.index.duplicated(keep="last")]  # last value per date
     series = series.astype(float)
     series.name = "Close"
 

@@ -4,6 +4,8 @@ Unit tests for app.csv_data.parse_price_csv.
 
 from __future__ import annotations
 
+import warnings
+
 import pandas as pd
 import pytest
 
@@ -126,6 +128,18 @@ def test_duplicate_dates_keep_last():
     assert s.loc["2020-01-01"] == pytest.approx(99.0)
 
 
+def test_unsorted_duplicate_dates_keep_last_uploaded_row():
+    df = pd.DataFrame(
+        {
+            "date": ["2020-01-02", "2020-01-01", "2020-01-02"],
+            "close": [20.0, 10.0, 99.0],
+        }
+    )
+    s = parse_price_csv(df.to_csv(index=False).encode())
+    assert list(s.index.strftime("%Y-%m-%d")) == ["2020-01-01", "2020-01-02"]
+    assert s.loc["2020-01-02"] == pytest.approx(99.0)
+
+
 def test_unsorted_dates_are_sorted():
     df = pd.DataFrame(
         {"date": ["2020-01-03", "2020-01-01", "2020-01-02"], "close": [30, 10, 20]}
@@ -159,6 +173,24 @@ def test_missing_close_column_raises():
 def test_all_invalid_rows_raises():
     df = pd.DataFrame({"date": ["x", "y"], "close": ["a", "b"]})
     with pytest.raises(ValueError):
+        parse_price_csv(df.to_csv(index=False).encode())
+
+
+def test_invalid_dates_do_not_emit_pandas_inference_warning():
+    df = pd.DataFrame({"date": ["x", "y"], "close": [10, 11]})
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        with pytest.raises(ValueError):
+            parse_price_csv(df.to_csv(index=False).encode())
+
+    assert not any("Could not infer format" in str(w.message) for w in caught)
+
+
+def test_zero_close_raises():
+    df = pd.DataFrame(
+        {"date": ["2020-01-01", "2020-01-02"], "close": [100.0, 0.0]}
+    )
+    with pytest.raises(ValueError, match="positive"):
         parse_price_csv(df.to_csv(index=False).encode())
 
 
