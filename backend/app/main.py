@@ -11,6 +11,7 @@ POST /backtest/momentum                 — run a time-series momentum backtest
 POST /backtest/volatility-breakout      — run a volatility breakout backtest
 POST /backtest/pairs                    — run a pairs trading backtest
 POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
+POST /backtest/custom                   — run a no-code custom rule-based strategy
 POST /research/sma-parameter-sweep     — sweep fast/slow SMA window combinations
 POST /research/sma-train-test          — SMA train/test out-of-sample validation
 POST /research/sma-walk-forward        — SMA walk-forward optimization
@@ -26,6 +27,7 @@ from pydantic import ValidationError
 
 from app.backtest import run_backtest, run_pairs_backtest
 from app.csv_data import parse_price_csv
+from app.custom_strategy import custom_strategy_signals, required_window
 from app.data import fetch_ohlcv, fetch_pairs_close
 from app.db import init_db
 from app.metrics import compute_metrics
@@ -39,6 +41,7 @@ from app.schemas import (
     BacktestRequest,
     BacktestResponse,
     BbBacktestRequest,
+    CustomStrategyRequest,
     DeleteResponse,
     EquityPoint,
     MomentumBacktestRequest,
@@ -1777,3 +1780,67 @@ async def backtest_csv(
         raise HTTPException(status_code=422, detail="params must be a JSON object.")
 
     return _run_csv_single_asset(close, strategy, params_dict, _csv_label(file.filename))
+
+
+# ---------------------------------------------------------------------------
+# Custom Strategy Builder
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/backtest/custom",
+    response_model=BacktestResponse,
+    tags=["backtest"],
+    summary="Run a no-code custom rule-based strategy",
+    description=(
+        "Build a long-only, single-asset strategy from predefined technical "
+        "indicator rules (SMA, RSI, Bollinger Bands, Momentum, close, and "
+        "numeric constants).  The position enters when the entry rules hold "
+        "(combined by `entry_logic`) and exits when the exit rules hold "
+        "(combined by `exit_logic`).  Rules are evaluated with vectorised "
+        "pandas operations — no user code is ever executed.  The position is "
+        "shifted one bar forward to prevent lookahead bias."
+    ),
+)
+def backtest_custom(request: CustomStrategyRequest) -> BacktestResponse:
+    _validate_common(request.ticker, request.start_date, request.end_date)
+
+    df = _fetch(request.ticker, request.start_date, request.end_date)
+    close = df["Close"]
+
+    # Warm-up: enough bars for the longest indicator window, +1 shift, +returns.
+    max_window = max(
+        required_window(request.entry_rules),
+        required_window(request.exit_rules),
+    )
+    min_bars = max_window + 5
+    if len(df) < min_bars:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(df)} trading days available; need at least "
+                f"{min_bars} for the longest indicator window ({max_window})."
+            ),
+        )
+
+    try:
+        position = custom_strategy_signals(
+            close,
+            entry_rules=request.entry_rules,
+            entry_logic=request.entry_logic,
+            exit_rules=request.exit_rules,
+            exit_logic=request.exit_logic,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return _build_response(
+        request_ticker=request.ticker,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        transaction_cost_bps=request.transaction_cost_bps,
+        initial_capital=request.initial_capital,
+        close=close,
+        position=position,
+        strategy="custom",
+    )

@@ -16,6 +16,7 @@ const ICONS: Record<string, string> = {
   saved:
     "M5 3h11l3 3v15H5V3Zm3 0v6h7V3M8 14h8M8 17h8",
   upload: "M12 16V4m0 0L7 9m5-5 5 5M5 20h14",
+  builder: "M4 7h7v7H4V7Zm9 3h7v7h-7v-7ZM7 4h10M16 14v6",
 };
 
 function Icon({ name, size = 17 }: { name: string; size?: number }) {
@@ -88,6 +89,7 @@ function Logo() {
 export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "backtest", label: "Backtest", icon: "backtest" },
   { id: "csv", label: "CSV Backtest", icon: "upload" },
+  { id: "builder", label: "Strategy Builder", icon: "builder" },
   { id: "sweep", label: "Parameter Sweep", icon: "sweep" },
   { id: "train-test", label: "Train/Test Validation", icon: "research" },
   { id: "walk-forward", label: "Walk-Forward", icon: "walkfwd" },

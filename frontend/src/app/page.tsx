@@ -12,6 +12,7 @@ import SmaTrainTestPanel from "@/components/SmaTrainTestPanel";
 import SmaWalkForwardPanel from "@/components/SmaWalkForwardPanel";
 import StrategyComparisonPanel from "@/components/StrategyComparisonPanel";
 import CsvBacktestPanel from "@/components/CsvBacktestPanel";
+import StrategyBuilderPanel from "@/components/StrategyBuilderPanel";
 import SaveBacktestModal from "@/components/SaveBacktestModal";
 import SavedBacktestsList from "@/components/SavedBacktestsList";
 import SavedBacktestDetail from "@/components/SavedBacktestDetail";
@@ -250,6 +251,10 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
+  },
+  builder: {
+    title: "Strategy Builder",
+    subtitle: "Compose a long-only strategy from indicator rules — no code.",
   },
   sweep: {
     title: "Parameter Sweep",
@@ -526,6 +531,20 @@ export default function HomePage() {
               columns are ignored. Pairs Trading is not available for uploads.
             </SectionIntro>
             <CsvBacktestPanel />
+          </>
+        )}
+
+        {/* ── Strategy Builder ─────────────────────────────────────────── */}
+        {view === "builder" && (
+          <>
+            <SectionIntro title="Custom Strategy Builder">
+              Compose a long-only, single-asset strategy from predefined
+              indicator rules (SMA, RSI, Bollinger Bands, Momentum, close, and
+              constants). Define when to enter and when to exit — no code, no
+              short selling, no leverage. Rules are evaluated safely on the
+              server with vectorised math.
+            </SectionIntro>
+            <StrategyBuilderPanel />
           </>
         )}
 

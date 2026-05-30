@@ -9,6 +9,7 @@ import type {
   BacktestRequest,
   BacktestResponse,
   BbBacktestRequest,
+  CustomStrategyRequest,
   DeleteResponse,
   MomentumBacktestRequest,
   PairsBacktestRequest,
@@ -141,6 +142,36 @@ export async function runPairsBacktest(
   params: PairsBacktestRequest,
 ): Promise<BacktestResponse> {
   return postBacktest("/api/backtest/pairs", params);
+}
+
+/** POST /api/backtest/custom — no-code custom rule strategy */
+export async function runCustomBacktest(
+  params: CustomStrategyRequest,
+): Promise<BacktestResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/backtest/custom", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+
+  if (!res.ok) {
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = formatBackendDetail(body?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+
+  return res.json() as Promise<BacktestResponse>;
 }
 
 /** POST /api/research/sma-parameter-sweep */

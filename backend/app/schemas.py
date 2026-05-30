@@ -3,7 +3,7 @@ Pydantic request / response schemas for the QuantLab backtesting API.
 """
 
 from datetime import date
-from typing import List, Literal, Optional
+from typing import Annotated, List, Literal, Optional, Union
 
 from pydantic import BaseModel, Field, field_validator, model_validator
 
@@ -1179,3 +1179,117 @@ class DeleteResponse(BaseModel):
 
     deleted: bool = Field(description="True if the record existed and was deleted.")
     id: int = Field(description="ID of the deleted record.")
+
+
+# ===========================================================================
+# Custom Strategy Builder (v1) — no-code rule builder
+# ===========================================================================
+
+# Indicator operand names.  bb_upper / bb_lower additionally require num_std.
+CustomIndicatorName = Literal[
+    "sma", "rsi", "bb_upper", "bb_middle", "bb_lower", "momentum"
+]
+CustomOperator = Literal[">", ">=", "<", "<="]
+
+
+class CustomCloseOperand(BaseModel):
+    """The adjusted close price at each bar."""
+
+    type: Literal["close"] = "close"
+
+
+class CustomConstantOperand(BaseModel):
+    """A fixed numeric constant compared against an indicator/price."""
+
+    type: Literal["constant"] = "constant"
+    value: float = Field(description="The constant value.")
+
+
+class CustomIndicatorParams(BaseModel):
+    """Parameters for an indicator operand."""
+
+    window: int = Field(
+        ge=1, le=1000, description="Look-back window in trading days."
+    )
+    num_std: Optional[float] = Field(
+        default=None,
+        gt=0.0,
+        le=10.0,
+        description="Standard-deviation multiplier (Bollinger bands only).",
+    )
+
+
+class CustomIndicatorOperand(BaseModel):
+    """A technical-indicator operand evaluated from the close price series."""
+
+    type: Literal["indicator"] = "indicator"
+    name: CustomIndicatorName
+    params: CustomIndicatorParams
+
+    @model_validator(mode="after")
+    def _check_num_std(self) -> "CustomIndicatorOperand":
+        if self.name in ("bb_upper", "bb_lower") and self.params.num_std is None:
+            raise ValueError(
+                f"Indicator '{self.name}' requires params.num_std."
+            )
+        return self
+
+
+# Discriminated union on the "type" field.
+CustomOperand = Annotated[
+    Union[CustomCloseOperand, CustomConstantOperand, CustomIndicatorOperand],
+    Field(discriminator="type"),
+]
+
+
+class CustomRule(BaseModel):
+    """A single comparison: ``left <operator> right``."""
+
+    left: CustomOperand
+    operator: CustomOperator
+    right: CustomOperand
+
+
+class CustomStrategyRequest(BaseModel):
+    """
+    Request body for the Custom Strategy Builder backtest.
+
+    Long-only, single-asset.  The position enters when the entry rules are
+    satisfied (combined by ``entry_logic``) and exits when the exit rules are
+    satisfied (combined by ``exit_logic``).  All comparisons use values known
+    at bar close; the resulting position is shifted one bar forward to prevent
+    lookahead bias.
+    """
+
+    ticker: str = Field(default="SPY", description="Yahoo Finance ticker symbol.")
+    start_date: str = Field(
+        default="2015-01-01", description="Backtest start date (YYYY-MM-DD)."
+    )
+    end_date: str = Field(
+        default="2023-12-31", description="Backtest end date (YYYY-MM-DD)."
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0, ge=0.0, lt=10_000.0,
+        description="One-way transaction cost in basis points.",
+    )
+    initial_capital: float = Field(
+        default=100_000.0, gt=0, description="Starting capital in USD."
+    )
+    entry_rules: List[CustomRule] = Field(
+        min_length=1,
+        max_length=10,
+        description="Rules that trigger entry into a long position.",
+    )
+    entry_logic: Literal["all", "any"] = Field(
+        default="all",
+        description="'all' = every entry rule must hold (AND); 'any' = at least one (OR).",
+    )
+    exit_rules: List[CustomRule] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Rules that trigger exit to cash. Empty = hold once entered.",
+    )
+    exit_logic: Literal["all", "any"] = Field(
+        default="any",
+        description="'all' = every exit rule must hold (AND); 'any' = at least one (OR).",
+    )

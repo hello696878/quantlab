@@ -79,6 +79,18 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - New **CSV Backtest** workspace in the dashboard with drag-and-drop upload
 - Full parser + API test coverage
 
+### Phase 6 — Custom Strategy Builder v1 ✅
+
+- `POST /backtest/custom` — no-code, long-only, single-asset rule builder
+- Operands: `close`, numeric constant, and indicators `sma` / `rsi` /
+  `bb_upper` / `bb_middle` / `bb_lower` / `momentum`; operators `> >= < <=`
+- Entry/exit rule lists combined with ALL (AND) or ANY (OR) logic; stateful
+  long/flat machine with a one-bar forward shift (no lookahead)
+- **Safe by construction**: operands resolved through a fixed dispatch table
+  and evaluated with vectorised pandas — no `eval`/`exec`, no user code run
+- Indicators reuse the built-in `compute_rsi` / `compute_bollinger_bands` math
+- New **Strategy Builder** dashboard workspace; full evaluator + API tests
+
 ---
 
 ## Future Phases

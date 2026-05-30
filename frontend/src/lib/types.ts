@@ -436,3 +436,44 @@ export interface DeleteResponse {
   deleted: boolean;
   id: number;
 }
+
+// ---------------------------------------------------------------------------
+// Custom Strategy Builder (v1)
+// ---------------------------------------------------------------------------
+
+export type CustomIndicatorName =
+  | "sma"
+  | "rsi"
+  | "bb_upper"
+  | "bb_middle"
+  | "bb_lower"
+  | "momentum";
+
+export type CustomOperator = ">" | ">=" | "<" | "<=";
+
+export type CustomOperand =
+  | { type: "close" }
+  | { type: "constant"; value: number }
+  | {
+      type: "indicator";
+      name: CustomIndicatorName;
+      params: { window: number; num_std?: number };
+    };
+
+export interface CustomRule {
+  left: CustomOperand;
+  operator: CustomOperator;
+  right: CustomOperand;
+}
+
+export interface CustomStrategyRequest {
+  ticker: string;
+  start_date: string;
+  end_date: string;
+  transaction_cost_bps: number;
+  initial_capital: number;
+  entry_rules: CustomRule[];
+  entry_logic: "all" | "any";
+  exit_rules: CustomRule[];
+  exit_logic: "all" | "any";
+}
