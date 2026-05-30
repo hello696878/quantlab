@@ -140,8 +140,6 @@ export default function SavedBacktestDetail({
   const m = record.metrics as Record<string, number>;
   const equityCurve = record.equity_curve as EquityPoint[];
   const trades = record.trades as TradeRecord[];
-  const hasEquity = equityCurve.length > 1;
-  const hasTrades = trades.length > 0;
 
   // Strategy params as key-value pairs for display
   const paramEntries = Object.entries(record.params).filter(
@@ -280,31 +278,25 @@ export default function SavedBacktestDetail({
       )}
 
       {/* Equity curve */}
-      {hasEquity && (
-        <>
-          <div className="card p-6">
-            <p className="section-title mb-4">Equity Curve</p>
-            <EquityCurveChart data={equityCurve} />
-          </div>
-          <div className="card p-6">
-            <p className="section-title mb-4">Drawdown</p>
-            <DrawdownChart data={equityCurve} />
-          </div>
-        </>
-      )}
+      <div className="card p-6">
+        <p className="section-title mb-4">Equity Curve</p>
+        <EquityCurveChart data={equityCurve} />
+      </div>
+      <div className="card p-6">
+        <p className="section-title mb-4">Drawdown</p>
+        <DrawdownChart data={equityCurve} />
+      </div>
 
       {/* Trades */}
-      {hasTrades && (
-        <div className="card p-6">
-          <p className="section-title mb-4">
-            Trade Log{" "}
-            <span className="normal-case font-normal text-slate-400 ml-1">
-              ({trades.length} events)
-            </span>
-          </p>
-          <TradeTable trades={trades} />
-        </div>
-      )}
+      <div className="card p-6">
+        <p className="section-title mb-4">
+          Trade Log{" "}
+          <span className="normal-case font-normal text-slate-400 ml-1">
+            ({trades.length} events)
+          </span>
+        </p>
+        <TradeTable trades={trades} />
+      </div>
     </div>
   );
 }

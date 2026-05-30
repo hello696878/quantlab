@@ -300,4 +300,5 @@ pytest tests/test_sma_sweep.py -v
 - **Phase 2** ✅ Additional strategies (RSI, Bollinger Bands, Momentum, Volatility Breakout, Pairs)
 - **Phase 3** ✅ React + Recharts frontend
 - **Phase 4** ✅ Research tools: SMA Parameter Sweep, Train/Test Validation, Walk-Forward Optimization, Strategy Comparison
-- **Phase 5** 🔲 User accounts, saved backtests, CSV upload
+- **Phase 4.5** ✅ Local SQLite saved backtests
+- **Phase 5** 🔲 User accounts, CSV upload

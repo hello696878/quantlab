@@ -2,9 +2,10 @@
 Pydantic request / response schemas for the QuantLab backtesting API.
 """
 
+from datetime import date
 from typing import List, Literal, Optional
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 
 # ===========================================================================
@@ -1102,9 +1103,25 @@ class SavedBacktestCreate(BaseModel):
     )
     notes: str = Field(default="", description="Optional free-text notes.")
 
+    @field_validator("name", "ticker", "strategy")
+    @classmethod
+    def strip_required_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("field must not be blank.")
+        return stripped
+
     @model_validator(mode="after")
     def check_dates(self) -> "SavedBacktestCreate":
-        if self.start_date >= self.end_date:
+        try:
+            start = date.fromisoformat(self.start_date)
+            end = date.fromisoformat(self.end_date)
+        except ValueError as exc:
+            raise ValueError(
+                "start_date and end_date must be valid YYYY-MM-DD dates."
+            ) from exc
+
+        if start >= end:
             raise ValueError("start_date must be before end_date.")
         return self
 

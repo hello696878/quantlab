@@ -63,6 +63,7 @@ export default function SavedBacktestsList({
   const [rows, setRows] = useState<SavedBacktestSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   useEffect(() => {
@@ -94,11 +95,12 @@ export default function SavedBacktestsList({
   async function handleDelete(id: number, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setDeletingId(id);
+    setDeleteError(null);
     try {
       await deleteSavedBacktest(id);
       setRows((prev) => prev.filter((r) => r.id !== id));
     } catch (err) {
-      alert(
+      setDeleteError(
         err instanceof Error ? err.message : "Delete failed. Please try again.",
       );
     } finally {
@@ -140,9 +142,16 @@ export default function SavedBacktestsList({
   // ── Table ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="card overflow-hidden">
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+    <div className="space-y-3">
+      {deleteError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          {deleteError}
+        </div>
+      )}
+
+      <div className="card overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50 text-xs font-semibold text-slate-500 uppercase tracking-wide">
               <th className="px-4 py-3 text-left">Name</th>
@@ -223,10 +232,11 @@ export default function SavedBacktestsList({
               </tr>
             ))}
           </tbody>
-        </table>
-      </div>
-      <div className="px-4 py-2 text-xs text-slate-400 border-t border-slate-50">
-        {rows.length} saved {rows.length === 1 ? "backtest" : "backtests"}
+          </table>
+        </div>
+        <div className="px-4 py-2 text-xs text-slate-400 border-t border-slate-50">
+          {rows.length} saved {rows.length === 1 ? "backtest" : "backtests"}
+        </div>
       </div>
     </div>
   );

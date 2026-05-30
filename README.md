@@ -16,6 +16,7 @@ QuantLab lets you select a strategy, choose an asset and date range, tune parame
 | Frontend | Next.js 14 · React 18 · TypeScript |
 | Styling | Tailwind CSS |
 | Charts | Recharts |
+| Local persistence | SQLite for saved backtests |
 | Testing | pytest (325+ tests, synthetic data) |
 | CI | GitHub Actions |
 | Containerisation | Docker · Docker Compose |
@@ -51,6 +52,12 @@ All strategies apply a **one-day signal shift** — the position derived from da
 Total return · CAGR · Sharpe ratio · Sortino ratio · Calmar ratio · Max drawdown · Annualised volatility · Win rate · Trade count
 
 Benchmark: buy-and-hold with no transaction costs.
+
+### Saved Backtests
+
+Completed backtest results can be saved to a local SQLite database and reopened from the Saved Backtests view. Saved records preserve the run name, notes, strategy parameters, metrics, equity curve, and trade log.
+
+The local database lives at `backend/data/quantlab.db`. The backend creates `backend/data/` automatically when needed, and `backend/data/*.db` is ignored by git so local research artifacts are not committed.
 
 ### Engineering
 
@@ -104,12 +111,14 @@ Next.js Frontend  (React 18, Tailwind, Recharts)
   │  /api/*  (proxied at build time via next.config.js rewrites)
   ▼
 FastAPI Backend  (Python 3.11, Pydantic v2)
-  │  /backtest/*  /research/*  /health
+  │  /backtest/*  /research/*  /saved-backtests  /health
   │
   ├── data.py        yfinance OHLCV download + alignment
   ├── strategies.py  Signal generation (all shift-by-1)
   ├── backtest.py    Vectorised engine, trade log, benchmark
   ├── metrics.py     Sharpe, CAGR, drawdown, Sortino, Calmar, …
+  ├── db.py          SQLite connection + schema initialisation
+  ├── saved_backtests.py  Saved-backtest CRUD helpers
   └── schemas.py     Pydantic request / response models
 ```
 
@@ -175,6 +184,8 @@ python -m uvicorn app.main:app --reload --port 8000
 
 Backend: http://localhost:8000  
 Swagger docs: http://localhost:8000/docs
+
+Saved backtests are persisted locally in `backend/data/quantlab.db`. Delete that file to reset local saved runs.
 
 ### Frontend
 

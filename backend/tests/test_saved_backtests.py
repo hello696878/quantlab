@@ -116,6 +116,16 @@ def test_init_db_is_idempotent(tmp_path, monkeypatch):
     db_module.init_db()  # second call — must not raise
 
 
+def test_tests_use_temp_database_not_real_database():
+    """The autouse fixture redirects DB access away from backend/data/quantlab.db."""
+    active_path = db_module.get_db_path()
+    default_path = db_module._DATA_DIR / "quantlab.db"
+
+    assert active_path != default_path
+    assert active_path.name == "test_quantlab.db"
+    assert active_path.exists()
+
+
 # ---------------------------------------------------------------------------
 # 2. Create
 # ---------------------------------------------------------------------------
@@ -252,11 +262,16 @@ def test_delete_missing_id_returns_404(client):
     "override,description",
     [
         ({"name": ""},           "empty name"),
+        ({"name": "   "},        "blank name"),
         ({"ticker": ""},         "empty ticker"),
+        ({"ticker": "   "},      "blank ticker"),
         ({"strategy": ""},       "empty strategy"),
+        ({"strategy": "   "},    "blank strategy"),
         ({"initial_capital": 0}, "capital = 0"),
         ({"initial_capital": -1000}, "negative capital"),
         ({"transaction_cost_bps": -1}, "negative cost bps"),
+        ({"start_date": "not-a-date"}, "invalid start date"),
+        ({"end_date": "not-a-date"}, "invalid end date"),
         ({"start_date": "2025-01-01", "end_date": "2020-01-01"}, "start >= end"),
         ({"start_date": "2020-01-01", "end_date": "2020-01-01"}, "start == end"),
     ],
