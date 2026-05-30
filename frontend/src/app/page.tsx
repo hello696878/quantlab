@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import AppShell, { type View } from "@/components/AppShell";
 import BacktestForm from "@/components/BacktestForm";
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
@@ -239,20 +240,66 @@ const STRATEGY_HEADINGS: Record<
   },
 };
 
+/** TopBar title + subtitle per workspace. */
+const VIEW_META: Record<View, { title: string; subtitle: string }> = {
+  backtest: {
+    title: "Backtest",
+    subtitle: "Run a single strategy on real historical market data.",
+  },
+  sweep: {
+    title: "Parameter Sweep",
+    subtitle: "Grid-search SMA fast/slow window combinations.",
+  },
+  "train-test": {
+    title: "Train/Test Validation",
+    subtitle: "In-sample parameter selection, out-of-sample evaluation.",
+  },
+  "walk-forward": {
+    title: "Walk-Forward Optimization",
+    subtitle: "Rolling re-optimisation with stitched out-of-sample equity.",
+  },
+  comparison: {
+    title: "Strategy Comparison",
+    subtitle: "Five single-asset strategies, one ticker, side by side.",
+  },
+  saved: {
+    title: "Saved Backtests",
+    subtitle: "Locally persisted results, stored in SQLite.",
+  },
+};
+
+// ---------------------------------------------------------------------------
+// Section heading inside content
+// ---------------------------------------------------------------------------
+
+function SectionIntro({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <h2 className="text-xl font-semibold text-slate-800">{title}</h2>
+      <p className="mt-1 text-sm text-slate-500 max-w-2xl">{children}</p>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
-type PageMode = "backtest" | "research" | "saved";
-type ResearchTab = "sweep" | "train-test" | "walk-forward" | "comparison";
-
 export default function HomePage() {
-  const [mode, setMode] = useState<PageMode>("backtest");
-  const [researchTab, setResearchTab] = useState<ResearchTab>("sweep");
+  const [view, setView] = useState<View>("backtest");
+
   // Saved backtests state
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [savedRefreshKey, setSavedRefreshKey] = useState(0);
   const [savedDetailId, setSavedDetailId] = useState<number | null>(null);
+
+  // Backtest state
   const [strategy, setStrategy] = useState<StrategyType>("sma_crossover");
   const [smaParams, setSmaParams] = useState<BacktestRequest>(DEFAULT_SMA_PARAMS);
   const [rsiParams, setRsiParams] = useState<RsiBacktestRequest>(DEFAULT_RSI_PARAMS);
@@ -299,330 +346,251 @@ export default function HomePage() {
     }
   }
 
+  function handleNav(next: View) {
+    setView(next);
+    if (next !== "saved") setSavedDetailId(null);
+  }
+
   const heading = STRATEGY_HEADINGS[strategy];
+  const meta = VIEW_META[view];
 
   return (
-    <div className="space-y-8">
+    <AppShell
+      active={view}
+      onNav={handleNav}
+      title={meta.title}
+      subtitle={meta.subtitle}
+    >
+      <div className="space-y-8">
+        {/* ── Backtest ─────────────────────────────────────────────────── */}
+        {view === "backtest" && (
+          <>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">
+                {heading.title}
+              </h1>
+              <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+                {heading.description}
+              </p>
+            </div>
 
-      {/* ── Top-level mode tabs ──────────────────────────────────────── */}
-      <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
-        {(
-          [
-            { id: "backtest", label: "Backtest" },
-            { id: "research", label: "Research Tools" },
-            { id: "saved",    label: "Saved Backtests" },
-          ] as const
-        ).map(({ id, label }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => {
-              setMode(id);
-              if (id !== "saved") {
-                setSavedDetailId(null);
-              }
-            }}
-            className={
-              "px-4 py-1.5 rounded-lg text-sm font-medium transition-colors " +
-              (mode === id
-                ? "bg-white text-slate-900 shadow-sm"
-                : "text-slate-500 hover:text-slate-700")
-            }
-          >
-            {label}
-          </button>
-        ))}
-      </div>
-
-      {/* ── Research Tools mode ──────────────────────────────────────── */}
-      {mode === "research" && (
-        <>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Research Tools</h1>
-            <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-              Quantitative tools for parameter exploration and out-of-sample
-              validation.
-            </p>
-          </div>
-
-          {/* Research sub-tabs */}
-          <div className="flex gap-1 p-1 bg-slate-100 rounded-xl w-fit">
-            {(
-              [
-                { id: "sweep",      label: "SMA Parameter Sweep" },
-                { id: "train-test", label: "SMA Train/Test Validation" },
-                { id: "walk-forward", label: "SMA Walk-Forward" },
-                { id: "comparison", label: "Strategy Comparison" },
-              ] as const
-            ).map(({ id, label }) => (
-              <button
-                key={id}
-                type="button"
-                onClick={() => setResearchTab(id)}
-                className={
-                  "px-4 py-1.5 rounded-lg text-sm font-medium transition-colors " +
-                  (researchTab === id
-                    ? "bg-white text-slate-900 shadow-sm"
-                    : "text-slate-500 hover:text-slate-700")
-                }
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-
-          {researchTab === "sweep" && (
-            <>
-              <div>
-                <h2 className="text-xl font-semibold text-slate-800">
-                  SMA Crossover Parameter Sweep
-                </h2>
-                <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-                  Test every combination of fast and slow SMA windows on the
-                  same asset and date range.  Compare Sharpe ratio, CAGR, and
-                  max drawdown to identify robust parameter regions and avoid
-                  over-fitted outliers.
-                </p>
-              </div>
-              <SmaSweepPanel />
-            </>
-          )}
-
-          {researchTab === "train-test" && (
-            <>
-              <div>
-                <h2 className="text-xl font-semibold text-slate-800">
-                  SMA Train/Test Out-of-Sample Validation
-                </h2>
-                <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-                  Split your date range into in-sample (IS) and out-of-sample
-                  (OOS) periods.  Run a parameter sweep on IS data only, select
-                  the best parameters by your chosen metric, then evaluate them
-                  on unseen OOS data.  Reveals whether IS performance is genuine
-                  or a product of over-fitting.
-                </p>
-              </div>
-              <SmaTrainTestPanel />
-            </>
-          )}
-
-          {researchTab === "walk-forward" && (
-            <>
-              <div>
-                <h2 className="text-xl font-semibold text-slate-800">
-                  SMA Walk-Forward Optimization
-                </h2>
-                <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-                  Repeatedly roll a training window forward, sweep SMA parameters
-                  in-sample, select the best pair, and evaluate it on the
-                  immediately following out-of-sample window.  The out-of-sample
-                  results are stitched together to form a realistic equity curve
-                  that avoids look-ahead bias.  Parameter stability analysis shows
-                  whether the strategy requires stable parameters or adapts erratically.
-                </p>
-              </div>
-              <SmaWalkForwardPanel />
-            </>
-          )}
-
-          {researchTab === "comparison" && (
-            <>
-              <div>
-                <h2 className="text-xl font-semibold text-slate-800">
-                  Strategy Comparison
-                </h2>
-                <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-                  Run five single-asset strategies on the same ticker and date
-                  range using fixed default parameters.  Compare their equity
-                  curves, risk-adjusted returns, and drawdowns side-by-side to
-                  understand which strategy styles suited different market
-                  environments.  Pairs Trading is excluded (requires two assets).
-                </p>
-              </div>
-              <StrategyComparisonPanel />
-            </>
-          )}
-        </>
-      )}
-
-      {/* ── Saved Backtests mode ─────────────────────────────────────── */}
-      {mode === "saved" && (
-        <>
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">
-              Saved Backtests
-            </h1>
-            <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-              Backtests you have saved are stored locally in a SQLite database.
-              Click any row to view the full result, equity curve, and trade log.
-            </p>
-          </div>
-
-          {savedDetailId !== null ? (
-            <SavedBacktestDetail
-              id={savedDetailId}
-              onBack={() => setSavedDetailId(null)}
-            />
-          ) : (
-            <SavedBacktestsList
-              refreshKey={savedRefreshKey}
-              onSelect={(id) => setSavedDetailId(id)}
-            />
-          )}
-        </>
-      )}
-
-      {/* ── Backtest mode ────────────────────────────────────────────── */}
-      {mode === "backtest" && (
-        <>
-      {/* ── Strategy heading ─────────────────────────────────────────── */}
-      <div>
-        <h1 className="text-2xl font-bold text-slate-900">{heading.title}</h1>
-        <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-          {heading.description}
-        </p>
-      </div>
-
-      {/* ── Parameter form ───────────────────────────────────────────── */}
-      <BacktestForm
-        strategy={strategy}
-        onStrategyChange={(s) => {
-          setStrategy(s);
-          // Clear stale results when the strategy changes.
-          setResult(null);
-          setError(null);
-        }}
-        smaParams={smaParams}
-        onSmaParamsChange={setSmaParams}
-        rsiParams={rsiParams}
-        onRsiParamsChange={setRsiParams}
-        bbParams={bbParams}
-        onBbParamsChange={setBbParams}
-        momentumParams={momentumParams}
-        onMomentumParamsChange={setMomentumParams}
-        vbParams={vbParams}
-        onVbParamsChange={setVbParams}
-        pairsParams={pairsParams}
-        onPairsParamsChange={setPairsParams}
-        onSubmit={handleRun}
-        loading={loading}
-      />
-
-      {/* ── Loading skeleton ─────────────────────────────────────────── */}
-      {loading && (
-        <div className="card p-8 text-center">
-          <div className="inline-flex items-center gap-3 text-slate-500">
-            <svg
-              className="animate-spin h-5 w-5 text-blue-600"
-              fill="none"
-              viewBox="0 0 24 24"
-            >
-              <circle
-                className="opacity-25"
-                cx="12"
-                cy="12"
-                r="10"
-                stroke="currentColor"
-                strokeWidth="4"
-              />
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
-              />
-            </svg>
-            <span className="text-sm font-medium">
-              Fetching data and running backtest…
-            </span>
-          </div>
-        </div>
-      )}
-
-      {/* ── Error banner ─────────────────────────────────────────────── */}
-      {error && !loading && (
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex gap-3">
-          <span className="text-red-500 mt-0.5 flex-shrink-0">⚠</span>
-          <div>
-            <p className="text-sm font-semibold text-red-700">Backtest failed</p>
-            <p className="text-sm text-red-600 mt-0.5">{error}</p>
-          </div>
-        </div>
-      )}
-
-      {/* ── Results ──────────────────────────────────────────────────── */}
-      {result && !loading && (
-        <>
-          {/* Summary header + Save button */}
-          <div className="flex flex-wrap items-baseline gap-2">
-            <h2 className="text-lg font-bold text-slate-900">{result.ticker}</h2>
-            <span className="text-slate-400 text-sm">
-              {result.start_date} → {result.end_date}
-            </span>
-            <span className="text-xs text-slate-400">
-              {paramSummary(result)}
-            </span>
-            <span className="ml-auto">
-              {!showSaveForm && (
-                <button
-                  type="button"
-                  onClick={() => setShowSaveForm(true)}
-                  className="px-3 py-1 rounded-lg text-xs font-semibold text-blue-700
-                             border border-blue-200 hover:bg-blue-50 transition-colors"
-                >
-                  Save backtest
-                </button>
-              )}
-            </span>
-          </div>
-
-          {/* Save form */}
-          {showSaveForm && (
-            <SaveBacktestModal
-              result={result}
-              onSaved={(id) => {
-                setShowSaveForm(false);
-                setSavedRefreshKey((k) => k + 1);
-                setSavedDetailId(id);
-                setMode("saved");
+            <BacktestForm
+              strategy={strategy}
+              onStrategyChange={(s) => {
+                setStrategy(s);
+                setResult(null);
+                setError(null);
               }}
-              onCancel={() => setShowSaveForm(false)}
+              smaParams={smaParams}
+              onSmaParamsChange={setSmaParams}
+              rsiParams={rsiParams}
+              onRsiParamsChange={setRsiParams}
+              bbParams={bbParams}
+              onBbParamsChange={setBbParams}
+              momentumParams={momentumParams}
+              onMomentumParamsChange={setMomentumParams}
+              vbParams={vbParams}
+              onVbParamsChange={setVbParams}
+              pairsParams={pairsParams}
+              onPairsParamsChange={setPairsParams}
+              onSubmit={handleRun}
+              loading={loading}
             />
-          )}
 
-          {/* Metric cards */}
-          <MetricsGrid
-            strategy={result.strategy_metrics}
-            benchmark={result.benchmark_metrics}
-            ticker={result.ticker}
-            strategyLabel={strategyLabel(result)}
-          />
+            {/* Loading skeleton */}
+            {loading && (
+              <div className="card p-8 text-center">
+                <div className="inline-flex items-center gap-3 text-slate-500">
+                  <svg
+                    className="animate-spin h-5 w-5 text-blue-600"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
+                  <span className="text-sm font-medium">
+                    Fetching data and running backtest…
+                  </span>
+                </div>
+              </div>
+            )}
 
-          {/* Equity curve */}
-          <div className="card p-6">
-            <p className="section-title mb-4">Equity Curve</p>
-            <EquityCurveChart data={result.equity_curve} />
-          </div>
+            {/* Error banner */}
+            {error && !loading && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-4 flex gap-3">
+                <span className="text-red-500 mt-0.5 flex-shrink-0">⚠</span>
+                <div>
+                  <p className="text-sm font-semibold text-red-700">
+                    Backtest failed
+                  </p>
+                  <p className="text-sm text-red-600 mt-0.5">{error}</p>
+                </div>
+              </div>
+            )}
 
-          {/* Drawdown */}
-          <div className="card p-6">
-            <p className="section-title mb-4">Drawdown</p>
-            <DrawdownChart data={result.equity_curve} />
-          </div>
+            {/* Results */}
+            {result && !loading && (
+              <>
+                <div className="flex flex-wrap items-baseline gap-2">
+                  <h2 className="text-lg font-bold text-slate-900">
+                    {result.ticker}
+                  </h2>
+                  <span className="text-slate-400 text-sm">
+                    {result.start_date} → {result.end_date}
+                  </span>
+                  <span className="text-xs text-slate-400">
+                    {paramSummary(result)}
+                  </span>
+                  <span className="ml-auto">
+                    {!showSaveForm && (
+                      <button
+                        type="button"
+                        onClick={() => setShowSaveForm(true)}
+                        className="px-3 py-1 rounded-lg text-xs font-semibold text-blue-700
+                                   border border-blue-200 hover:bg-blue-50 transition-colors"
+                      >
+                        Save backtest
+                      </button>
+                    )}
+                  </span>
+                </div>
 
-          {/* Trade log */}
-          <div className="card p-6">
-            <p className="section-title mb-4">
-              Trade Log{" "}
-              <span className="normal-case font-normal text-slate-400 ml-1">
-                ({result.num_trades} events)
-              </span>
-            </p>
-            <TradeTable trades={result.trades} />
-          </div>
-        </>
-      )}
-    </> /* end backtest mode */
-      )}
-    </div>
+                {showSaveForm && (
+                  <SaveBacktestModal
+                    result={result}
+                    onSaved={(id) => {
+                      setShowSaveForm(false);
+                      setSavedRefreshKey((k) => k + 1);
+                      setSavedDetailId(id);
+                      setView("saved");
+                    }}
+                    onCancel={() => setShowSaveForm(false)}
+                  />
+                )}
+
+                <MetricsGrid
+                  strategy={result.strategy_metrics}
+                  benchmark={result.benchmark_metrics}
+                  ticker={result.ticker}
+                  strategyLabel={strategyLabel(result)}
+                />
+
+                <div className="card p-6">
+                  <p className="section-title mb-4">Equity Curve</p>
+                  <EquityCurveChart data={result.equity_curve} />
+                </div>
+
+                <div className="card p-6">
+                  <p className="section-title mb-4">Drawdown</p>
+                  <DrawdownChart data={result.equity_curve} />
+                </div>
+
+                <div className="card p-6">
+                  <p className="section-title mb-4">
+                    Trade Log{" "}
+                    <span className="normal-case font-normal text-slate-400 ml-1">
+                      ({result.num_trades} events)
+                    </span>
+                  </p>
+                  <TradeTable trades={result.trades} />
+                </div>
+              </>
+            )}
+          </>
+        )}
+
+        {/* ── SMA Parameter Sweep ──────────────────────────────────────── */}
+        {view === "sweep" && (
+          <>
+            <SectionIntro title="SMA Crossover Parameter Sweep">
+              Test every combination of fast and slow SMA windows on the same
+              asset and date range. Compare Sharpe ratio, CAGR, and max drawdown
+              to identify robust parameter regions and avoid over-fitted
+              outliers.
+            </SectionIntro>
+            <SmaSweepPanel />
+          </>
+        )}
+
+        {/* ── SMA Train/Test Validation ────────────────────────────────── */}
+        {view === "train-test" && (
+          <>
+            <SectionIntro title="SMA Train/Test Out-of-Sample Validation">
+              Split your date range into in-sample (IS) and out-of-sample (OOS)
+              periods. Run a parameter sweep on IS data only, select the best
+              parameters by your chosen metric, then evaluate them on unseen OOS
+              data. Reveals whether IS performance is genuine or a product of
+              over-fitting.
+            </SectionIntro>
+            <SmaTrainTestPanel />
+          </>
+        )}
+
+        {/* ── SMA Walk-Forward ─────────────────────────────────────────── */}
+        {view === "walk-forward" && (
+          <>
+            <SectionIntro title="SMA Walk-Forward Optimization">
+              Repeatedly roll a training window forward, sweep SMA parameters
+              in-sample, select the best pair, and evaluate it on the
+              immediately following out-of-sample window. The out-of-sample
+              results are stitched together to form a realistic equity curve
+              that avoids look-ahead bias. Parameter stability analysis shows
+              whether the strategy requires stable parameters or adapts
+              erratically.
+            </SectionIntro>
+            <SmaWalkForwardPanel />
+          </>
+        )}
+
+        {/* ── Strategy Comparison ──────────────────────────────────────── */}
+        {view === "comparison" && (
+          <>
+            <SectionIntro title="Strategy Comparison">
+              Run five single-asset strategies on the same ticker and date range
+              using fixed default parameters. Compare their equity curves,
+              risk-adjusted returns, and drawdowns side-by-side to understand
+              which strategy styles suited different market environments. Pairs
+              Trading is excluded (requires two assets).
+            </SectionIntro>
+            <StrategyComparisonPanel />
+          </>
+        )}
+
+        {/* ── Saved Backtests ──────────────────────────────────────────── */}
+        {view === "saved" && (
+          <>
+            <SectionIntro title="Saved Backtests">
+              Backtests you have saved are stored locally in a SQLite database.
+              Click any row to view the full result, equity curve, and trade
+              log.
+            </SectionIntro>
+
+            {savedDetailId !== null ? (
+              <SavedBacktestDetail
+                id={savedDetailId}
+                onBack={() => setSavedDetailId(null)}
+              />
+            ) : (
+              <SavedBacktestsList
+                refreshKey={savedRefreshKey}
+                onSelect={(id) => setSavedDetailId(id)}
+              />
+            )}
+          </>
+        )}
+      </div>
+    </AppShell>
   );
 }

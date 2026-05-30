@@ -96,12 +96,15 @@ const COLUMNS: Column[] = [
   },
 ];
 
-/** Interpolate a 0–1 scalar to an amber → green background colour. */
+/**
+ * Interpolate a 0–1 scalar to a dark amber → dark emerald heatmap fill.
+ * Dark-toned so the light cell text remains readable on the dark theme.
+ */
 function sharpeColor(t: number): string {
-  // t=0 → amber-100 (#fef3c7),  t=1 → emerald-100 (#d1fae5)
-  const r = Math.round(254 - t * (254 - 209));
-  const g = Math.round(243 - t * (243 - 250));
-  const b = Math.round(199 - t * (199 - 229));
+  // t=0 → dark amber (74,52,20),  t=1 → dark emerald (19,64,44)
+  const r = Math.round(74 - t * (74 - 19));
+  const g = Math.round(52 + t * (64 - 52));
+  const b = Math.round(20 + t * (44 - 20));
   return `rgb(${r},${g},${b})`;
 }
 

@@ -117,21 +117,21 @@ export default function DrawdownChart({ data }: Props) {
           </linearGradient>
         </defs>
 
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
 
         <XAxis
           dataKey="date"
           ticks={yearTicks}
           tickFormatter={(v: string) => v.slice(0, 4)}
-          tick={{ fontSize: 11, fill: "#94a3b8" }}
-          axisLine={{ stroke: "#e2e8f0" }}
+          tick={{ fontSize: 11, fill: "#79839a" }}
+          axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
           tickLine={false}
         />
 
         <YAxis
           domain={[yMin, 0]}
           tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
-          tick={{ fontSize: 11, fill: "#94a3b8" }}
+          tick={{ fontSize: 11, fill: "#79839a" }}
           axisLine={false}
           tickLine={false}
           width={48}

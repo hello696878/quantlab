@@ -58,14 +58,14 @@ const STRATEGY_META: Record<
   string,
   { color: string; dash?: string; width?: number }
 > = {
-  sma_crossover:      { color: "#2563eb", width: 2 },
-  rsi_mean_reversion: { color: "#059669", width: 2 },
-  bollinger_band:     { color: "#7c3aed", width: 2 },
-  momentum:           { color: "#d97706", width: 2 },
-  volatility_breakout:{ color: "#dc2626", width: 2 },
+  sma_crossover:      { color: "#4d8bff", width: 2 },
+  rsi_mean_reversion: { color: "#34d399", width: 2 },
+  bollinger_band:     { color: "#a78bfa", width: 2 },
+  momentum:           { color: "#fbbf24", width: 2 },
+  volatility_breakout:{ color: "#f8717f", width: 2 },
 };
 
-const BENCHMARK_COLOR = "#94a3b8";
+const BENCHMARK_COLOR = "#8b95ab";
 
 // ---------------------------------------------------------------------------
 // Styling
@@ -147,13 +147,13 @@ function MultiStrategyChart({ result }: MultiStrategyChartProps) {
   return (
     <ResponsiveContainer width="100%" height={380}>
       <LineChart data={data} margin={{ top: 4, right: 16, bottom: 0, left: 16 }}>
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
         <XAxis
           dataKey="date"
           ticks={yearTicks}
           tickFormatter={(v: string) => v.slice(0, 4)}
-          tick={{ fontSize: 11, fill: "#94a3b8" }}
-          axisLine={{ stroke: "#e2e8f0" }}
+          tick={{ fontSize: 11, fill: "#79839a" }}
+          axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
           tickLine={false}
         />
         <YAxis

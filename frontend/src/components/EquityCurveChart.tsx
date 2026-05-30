@@ -74,20 +74,20 @@ export default function EquityCurveChart({ data }: Props) {
         data={data}
         margin={{ top: 4, right: 16, bottom: 0, left: 16 }}
       >
-        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
 
         <XAxis
           dataKey="date"
           ticks={yearTicks}
           tickFormatter={(v: string) => v.slice(0, 4)}
-          tick={{ fontSize: 11, fill: "#94a3b8" }}
-          axisLine={{ stroke: "#e2e8f0" }}
+          tick={{ fontSize: 11, fill: "#79839a" }}
+          axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
           tickLine={false}
         />
 
         <YAxis
           tickFormatter={fmtDollarTick}
-          tick={{ fontSize: 11, fill: "#94a3b8" }}
+          tick={{ fontSize: 11, fill: "#79839a" }}
           axisLine={false}
           tickLine={false}
           width={64}
@@ -103,7 +103,7 @@ export default function EquityCurveChart({ data }: Props) {
         {/* Initial capital reference line */}
         <ReferenceLine
           y={initialCapital}
-          stroke="#cbd5e1"
+          stroke="rgba(255,255,255,0.18)"
           strokeDasharray="4 4"
           strokeWidth={1}
         />
@@ -125,10 +125,10 @@ export default function EquityCurveChart({ data }: Props) {
           type="monotone"
           dataKey="strategy"
           name="Strategy"
-          stroke="#2563eb"
+          stroke="#4d8bff"
           strokeWidth={2}
           dot={false}
-          activeDot={{ r: 4, fill: "#2563eb" }}
+          activeDot={{ r: 4, fill: "#4d8bff" }}
         />
       </LineChart>
     </ResponsiveContainer>
