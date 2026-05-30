@@ -11,6 +11,8 @@ export type StrategyType =
   | "volatility_breakout"
   | "pairs";
 
+export type BacktestResponseStrategyType = StrategyType | "custom";
+
 // ---------------------------------------------------------------------------
 // Requests
 // ---------------------------------------------------------------------------
@@ -131,7 +133,7 @@ export interface BacktestResponse {
   end_date: string;
 
   /** Which strategy produced this result. */
-  strategy: StrategyType;
+  strategy: BacktestResponseStrategyType;
 
   /** SMA params — 0 when strategy is not sma_crossover. */
   fast_window: number;

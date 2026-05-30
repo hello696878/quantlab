@@ -193,6 +193,55 @@ def test_custom_window_out_of_range_rejected(client):
     assert resp.status_code == 422
 
 
+def test_custom_window_above_max_rejected(client):
+    bad = base_request()
+    bad["entry_rules"][0]["left"]["params"]["window"] = 1001
+    resp = client.post("/backtest/custom", json=bad)
+    assert resp.status_code == 422
+
+
+def test_custom_rsi_window_one_rejected(client):
+    bad = base_request()
+    bad["entry_rules"][0]["left"] = {
+        "type": "indicator",
+        "name": "rsi",
+        "params": {"window": 1},
+    }
+    resp = client.post("/backtest/custom", json=bad)
+    assert resp.status_code == 422
+    assert "window" in resp.text
+
+
+def test_custom_too_many_entry_rules_rejected(client):
+    one_rule = base_request()["entry_rules"][0]
+    resp = client.post(
+        "/backtest/custom",
+        json=base_request(entry_rules=[one_rule for _ in range(11)]),
+    )
+    assert resp.status_code == 422
+
+
+def test_custom_unknown_operand_type_rejected(client):
+    bad = base_request()
+    bad["entry_rules"][0]["left"] = {"type": "formula", "expr": "close > sma(20)"}
+    resp = client.post("/backtest/custom", json=bad)
+    assert resp.status_code == 422
+
+
+def test_custom_extra_indicator_param_rejected(client):
+    bad = base_request()
+    bad["entry_rules"][0]["left"]["params"]["unsafe"] = "ignored?"
+    resp = client.post("/backtest/custom", json=bad)
+    assert resp.status_code == 422
+
+
+def test_custom_extra_top_level_field_rejected(client):
+    bad = base_request()
+    bad["formula"] = "__import__('os').system('echo unsafe')"
+    resp = client.post("/backtest/custom", json=bad)
+    assert resp.status_code == 422
+
+
 def test_custom_too_few_bars(client, monkeypatch):
     # Only 30 rows but the strategy references a 50-day SMA (needs 55).
     monkeypatch.setattr(main_module, "_fetch", lambda *a, **k: make_df(n=30))

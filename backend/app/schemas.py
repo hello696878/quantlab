@@ -5,7 +5,7 @@ Pydantic request / response schemas for the QuantLab backtesting API.
 from datetime import date
 from typing import Annotated, List, Literal, Optional, Union
 
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 # ===========================================================================
@@ -401,7 +401,7 @@ class BacktestResponse(BaseModel):
     -----------------------
     ``strategy`` identifies which strategy produced this result:
     ``"sma_crossover"``, ``"rsi_mean_reversion"``, ``"bollinger_band"``,
-    ``"momentum"``, ``"volatility_breakout"``, or ``"pairs"``.
+    ``"momentum"``, ``"volatility_breakout"``, ``"pairs"``, or ``"custom"``.
 
     Strategy-specific fields
     ------------------------
@@ -432,7 +432,8 @@ class BacktestResponse(BaseModel):
         default="sma_crossover",
         description=(
             "Strategy identifier: 'sma_crossover', 'rsi_mean_reversion', "
-            "'bollinger_band', 'momentum', 'volatility_breakout', or 'pairs'."
+            "'bollinger_band', 'momentum', 'volatility_breakout', 'pairs', "
+            "or 'custom'."
         ),
     )
 
@@ -1195,18 +1196,24 @@ CustomOperator = Literal[">", ">=", "<", "<="]
 class CustomCloseOperand(BaseModel):
     """The adjusted close price at each bar."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["close"] = "close"
 
 
 class CustomConstantOperand(BaseModel):
     """A fixed numeric constant compared against an indicator/price."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["constant"] = "constant"
-    value: float = Field(description="The constant value.")
+    value: float = Field(allow_inf_nan=False, description="The constant value.")
 
 
 class CustomIndicatorParams(BaseModel):
     """Parameters for an indicator operand."""
+
+    model_config = ConfigDict(extra="forbid")
 
     window: int = Field(
         ge=1, le=1000, description="Look-back window in trading days."
@@ -1222,12 +1229,19 @@ class CustomIndicatorParams(BaseModel):
 class CustomIndicatorOperand(BaseModel):
     """A technical-indicator operand evaluated from the close price series."""
 
+    model_config = ConfigDict(extra="forbid")
+
     type: Literal["indicator"] = "indicator"
     name: CustomIndicatorName
     params: CustomIndicatorParams
 
     @model_validator(mode="after")
-    def _check_num_std(self) -> "CustomIndicatorOperand":
+    def _check_indicator_params(self) -> "CustomIndicatorOperand":
+        if self.name in ("rsi", "bb_upper", "bb_middle", "bb_lower"):
+            if self.params.window < 2:
+                raise ValueError(
+                    f"Indicator '{self.name}' requires params.window >= 2."
+                )
         if self.name in ("bb_upper", "bb_lower") and self.params.num_std is None:
             raise ValueError(
                 f"Indicator '{self.name}' requires params.num_std."
@@ -1245,6 +1259,8 @@ CustomOperand = Annotated[
 class CustomRule(BaseModel):
     """A single comparison: ``left <operator> right``."""
 
+    model_config = ConfigDict(extra="forbid")
+
     left: CustomOperand
     operator: CustomOperator
     right: CustomOperand
@@ -1260,6 +1276,8 @@ class CustomStrategyRequest(BaseModel):
     at bar close; the resulting position is shifted one bar forward to prevent
     lookahead bias.
     """
+
+    model_config = ConfigDict(extra="forbid")
 
     ticker: str = Field(default="SPY", description="Yahoo Finance ticker symbol.")
     start_date: str = Field(

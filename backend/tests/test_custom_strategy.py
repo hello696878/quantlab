@@ -11,6 +11,7 @@ import pytest
 
 from app.custom_strategy import (
     _operand_series,
+    _rule_boolean,
     custom_strategy_signals,
     required_window,
 )
@@ -21,7 +22,7 @@ from app.schemas import (
     CustomIndicatorParams,
     CustomRule,
 )
-from app.strategies import sma_crossover_signals
+from app.strategies import compute_bollinger_bands, compute_rsi, sma_crossover_signals
 
 
 # ---------------------------------------------------------------------------
@@ -70,12 +71,20 @@ def test_constant_operand():
     s = _operand_series(close, const(42.5))
     assert (s == 42.5).all()
     assert len(s) == len(close)
+    assert s.index.equals(close.index)
 
 
 def test_sma_operand_matches_rolling_mean():
     close = make_close(100)
     s = _operand_series(close, ind("sma", 10))
     expected = close.rolling(window=10, min_periods=10).mean()
+    pd.testing.assert_series_equal(s, expected)
+
+
+def test_rsi_operand_matches_existing_rsi():
+    close = make_close(100)
+    s = _operand_series(close, ind("rsi", 14))
+    expected = compute_rsi(close, 14)
     pd.testing.assert_series_equal(s, expected)
 
 
@@ -94,6 +103,66 @@ def test_bollinger_operands_order():
     valid = upper.dropna().index.intersection(lower.dropna().index)
     assert (upper.loc[valid] > middle.loc[valid]).all()
     assert (middle.loc[valid] > lower.loc[valid]).all()
+
+
+def test_bollinger_operands_match_existing_bands():
+    close = make_close(100)
+    middle, upper, lower = compute_bollinger_bands(close, 20, 2.0)
+
+    pd.testing.assert_series_equal(
+        _operand_series(close, ind("bb_middle", 20)), middle
+    )
+    pd.testing.assert_series_equal(
+        _operand_series(close, ind("bb_upper", 20, num_std=2.0)), upper
+    )
+    pd.testing.assert_series_equal(
+        _operand_series(close, ind("bb_lower", 20, num_std=2.0)), lower
+    )
+
+
+# ---------------------------------------------------------------------------
+# Rule evaluation
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    "op,expected",
+    [
+        (">", [False, False, True]),
+        (">=", [False, True, True]),
+        ("<", [True, False, False]),
+        ("<=", [True, True, False]),
+    ],
+)
+def test_all_comparison_operators(op, expected):
+    close = pd.Series(
+        [1.0, 2.0, 3.0],
+        index=pd.date_range("2020-01-01", periods=3),
+        name="Close",
+    )
+    out = _rule_boolean(close, rule(close_op(), op, const(2.0)))
+    assert out.tolist() == expected
+
+
+def test_indicator_vs_constant_and_constant_vs_indicator():
+    close = make_close(80)
+    indicator_rule = rule(ind("sma", 10), ">", const(0.0))
+    constant_rule = rule(const(1e12), ">", ind("sma", 10))
+
+    assert _rule_boolean(close, indicator_rule).iloc[10:].all()
+    constant_out = _rule_boolean(close, constant_rule)
+    assert constant_out.iloc[:9].eq(False).all()
+    assert constant_out.iloc[9:].all()
+
+
+def test_warmup_nan_comparisons_are_false():
+    close = make_close(80)
+    entry = [rule(ind("sma", 10), ">", const(0.0))]
+    pos = custom_strategy_signals(close, entry, "all", [], "any")
+
+    # SMA(10) is first available on row 9; the shifted position starts on row 10.
+    assert pos.iloc[:10].eq(0).all()
+    assert pos.iloc[10] == 1
 
 
 # ---------------------------------------------------------------------------
@@ -156,6 +225,15 @@ def test_empty_exit_rules_hold_position():
     pos = custom_strategy_signals(close, entry, "all", [], "any")
     # Once entered (bar 1), never exits.
     assert pos.iloc[-1] == 1
+
+
+def test_entry_and_exit_both_true_alternates_after_shift():
+    close = make_close(8)
+    always = [rule(close_op(), ">", const(0))]
+    pos = custom_strategy_signals(close, always, "all", always, "any")
+
+    # Raw state enters while flat, exits while long. The returned position is shifted.
+    assert pos.tolist() == [0, 1, 0, 1, 0, 1, 0, 1]
 
 
 def test_entry_logic_all_vs_any_differ():

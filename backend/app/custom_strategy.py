@@ -88,6 +88,8 @@ def _rule_boolean(close: pd.Series, rule) -> pd.Series:
 
 def _combine(bools: List[pd.Series], logic: str, index) -> pd.Series:
     """Combine boolean Series with 'all' (AND) or 'any' (OR)."""
+    if logic not in ("all", "any"):
+        raise ValueError(f"Unsupported rule logic '{logic}'.")
     if not bools:
         # No rules → condition is never satisfied.
         return pd.Series(False, index=index)
