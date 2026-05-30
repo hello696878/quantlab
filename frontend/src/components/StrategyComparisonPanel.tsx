@@ -391,7 +391,7 @@ export default function StrategyComparisonPanel() {
         </div>
 
         {/* Dates */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Start Date</label>
             <input
@@ -415,7 +415,7 @@ export default function StrategyComparisonPanel() {
         </div>
 
         {/* Cost + Capital */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Transaction Cost (bps, one-way)</label>
             <input
@@ -515,7 +515,7 @@ export default function StrategyComparisonPanel() {
           {/* ── Ranking cards ──────────────────────────────────────────── */}
           <div>
             <p className="section-title mb-3">Rankings</p>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:grid-cols-4">
               <RankingCard
                 label="Best Sharpe Ratio"
                 winner={result.ranking.best_by_sharpe}

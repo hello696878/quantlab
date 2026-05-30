@@ -388,7 +388,7 @@ export default function BacktestForm({
         )}
 
         {/* ── Common fields ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-5">
+        <div className="grid grid-cols-1 gap-4 mb-5 sm:grid-cols-2 lg:grid-cols-4">
           <Field label="Start date">
             <input
               type="date"
@@ -443,7 +443,7 @@ export default function BacktestForm({
         {/* ── Strategy-specific fields ───────────────────────────────────── */}
         <div className="mb-5 p-4 rounded-lg bg-blue-50/60 border border-blue-100">
           {strategy === "sma_crossover" ? (
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Fast SMA" hint="days">
                 <input
                   type="number"
@@ -477,7 +477,7 @@ export default function BacktestForm({
               </Field>
             </div>
           ) : strategy === "rsi_mean_reversion" ? (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Field label="RSI window" hint="days">
                 <input
                   type="number"
@@ -528,7 +528,7 @@ export default function BacktestForm({
               </Field>
             </div>
           ) : strategy === "bollinger_band" ? (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Field label="BB Window" hint="days">
                 <input
                   type="number"
@@ -576,7 +576,7 @@ export default function BacktestForm({
               </Field>
             </div>
           ) : strategy === "momentum" ? (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Field label="Lookback" hint="days">
                 <input
                   type="number"
@@ -627,7 +627,7 @@ export default function BacktestForm({
               </Field>
             </div>
           ) : strategy === "volatility_breakout" ? (
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <Field label="Lookback" hint="days">
                 <input
                   type="number"
@@ -681,7 +681,7 @@ export default function BacktestForm({
             /* ── Pairs Trading fields ───────────────────────────────────── */
             <div className="space-y-4">
               {/* Asset inputs + quick-picks */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 <Field label="Asset Y" hint="long / short leg">
                   <input
                     type="text"
@@ -731,7 +731,7 @@ export default function BacktestForm({
                 ))}
               </div>
               {/* Strategy-specific params */}
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                 <Field label="Lookback" hint="days">
                   <input
                     type="number"

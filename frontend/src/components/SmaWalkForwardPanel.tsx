@@ -248,7 +248,7 @@ export default function SmaWalkForwardPanel() {
         </div>
 
         {/* Date range */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Start Date</label>
             <input type="date" className={inputCls} value={startDate}
@@ -262,7 +262,7 @@ export default function SmaWalkForwardPanel() {
         </div>
 
         {/* Window settings */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <label className={labelCls}>Train Window (days)</label>
             <input type="number" className={inputCls} value={trainDaysStr} min={10} step={63}
@@ -284,7 +284,7 @@ export default function SmaWalkForwardPanel() {
         </div>
 
         {/* Window grids */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Fast Windows (comma-separated)</label>
             <input type="text" className={`${inputCls} font-mono`} value={fastRaw}
@@ -313,7 +313,7 @@ export default function SmaWalkForwardPanel() {
         )}
 
         {/* Selection metric + cost + capital */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <label className={labelCls}>Selection Metric</label>
             <select className={inputCls} value={selectionMetric} disabled={loading}

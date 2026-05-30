@@ -105,7 +105,8 @@ export default function MetricsGrid({
   strategyLabel,
 }: Props) {
   return (
-    <div className="card overflow-hidden">
+    <div className="card overflow-x-auto">
+      <div className="min-w-[560px]">
       {/* Header row */}
       <div className="grid grid-cols-[1fr_auto_auto] items-center gap-0 border-b border-slate-100">
         <div className="px-6 py-3">
@@ -174,6 +175,7 @@ export default function MetricsGrid({
           <span className="text-red-500 font-semibold">▼</span> strategy
           underperforms
         </span>
+      </div>
       </div>
     </div>
   );

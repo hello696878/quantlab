@@ -215,7 +215,7 @@ export default function SmaSweepPanel() {
         </div>
 
         {/* Date range */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Start Date</label>
             <input
@@ -239,7 +239,7 @@ export default function SmaSweepPanel() {
         </div>
 
         {/* Window grids */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Fast Windows (days, comma-separated)</label>
             <input
@@ -283,7 +283,7 @@ export default function SmaSweepPanel() {
         )}
 
         {/* Cost / capital */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Transaction Cost (bps, one-way)</label>
             <input

@@ -101,20 +101,19 @@ interface SidebarProps {
 export default function Sidebar({ active, onNav }: SidebarProps) {
   return (
     <aside
-      className="fixed left-0 top-0 z-30 flex h-screen w-56 flex-col px-3.5 py-5"
+      className="shell-sidebar fixed bottom-0 left-0 right-0 z-30 flex h-16 w-full items-center gap-2 overflow-x-auto px-3 py-2 md:top-0 md:bottom-auto md:h-screen md:w-56 md:flex-col md:items-stretch md:overflow-visible md:px-3.5 md:py-5"
       style={{
-        borderRight: "1px solid var(--line)",
         background: "rgba(8,11,20,0.55)",
         backdropFilter: "blur(8px)",
         WebkitBackdropFilter: "blur(8px)",
       }}
     >
-      <div className="px-2 pb-6 pt-0.5">
+      <div className="hidden px-2 pb-6 pt-0.5 md:block">
         <Logo />
       </div>
 
-      <nav className="flex flex-col gap-1">
-        <div className="uplabel px-2 pb-1.5">Workspaces</div>
+      <nav className="flex w-full items-center gap-1 md:flex-col md:items-stretch">
+        <div className="uplabel hidden px-2 pb-1.5 md:block">Workspaces</div>
         {NAV.map((n) => (
           <button
             key={n.id}
@@ -130,7 +129,7 @@ export default function Sidebar({ active, onNav }: SidebarProps) {
         ))}
       </nav>
 
-      <div className="mt-auto flex flex-col gap-2.5">
+      <div className="mt-auto hidden flex-col gap-2.5 md:flex">
         <div className="glass px-3 py-2.5" style={{ borderRadius: 12 }}>
           <div className="mb-1.5 flex items-center gap-2">
             <span className="livedot" />

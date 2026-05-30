@@ -256,7 +256,7 @@ export default function SmaTrainTestPanel() {
         </div>
 
         {/* Date range — 3 columns */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <label className={labelCls}>Start Date (IS begins)</label>
             <input
@@ -290,7 +290,7 @@ export default function SmaTrainTestPanel() {
         </div>
 
         {/* Window grids */}
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
           <div>
             <label className={labelCls}>Fast Windows (days, comma-separated)</label>
             <input
@@ -330,7 +330,7 @@ export default function SmaTrainTestPanel() {
         )}
 
         {/* Selection metric + cost + capital */}
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <div>
             <label className={labelCls}>Selection Metric</label>
             <select
@@ -569,7 +569,7 @@ export default function SmaTrainTestPanel() {
             </div>
 
             {/* Degradation summary */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2">
+            <div className="grid grid-cols-1 gap-3 pt-2 sm:grid-cols-2 md:grid-cols-4">
               {[
                 {
                   label: "Sharpe degradation",
