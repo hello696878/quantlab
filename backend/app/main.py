@@ -10,18 +10,22 @@ POST /backtest/bollinger-band           — run a Bollinger Band mean-reversion 
 POST /backtest/momentum                 — run a time-series momentum backtest
 POST /backtest/volatility-breakout      — run a volatility breakout backtest
 POST /backtest/pairs                    — run a pairs trading backtest
+POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
 POST /research/sma-parameter-sweep     — sweep fast/slow SMA window combinations
 POST /research/sma-train-test          — SMA train/test out-of-sample validation
 POST /research/sma-walk-forward        — SMA walk-forward optimization
 POST /research/strategy-comparison     — compare five single-asset strategies
 """
 
+import json
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import ValidationError
 
 from app.backtest import run_backtest, run_pairs_backtest
+from app.csv_data import parse_price_csv
 from app.data import fetch_ohlcv, fetch_pairs_close
 from app.db import init_db
 from app.metrics import compute_metrics
@@ -1515,3 +1519,261 @@ def delete_saved_backtest_endpoint(id: int) -> DeleteResponse:
             status_code=404, detail=f"Saved backtest {id} not found."
         )
     return DeleteResponse(deleted=True, id=id)
+
+
+# ---------------------------------------------------------------------------
+# CSV upload backtesting
+# ---------------------------------------------------------------------------
+
+# Maximum accepted upload size (5 MB ~ decades of daily bars).
+_MAX_CSV_BYTES = 5 * 1024 * 1024
+
+# Single-asset strategies supported for CSV upload.  Each maps to the existing
+# request model so all field constraints and cross-field validators are reused.
+_CSV_PARAM_MODELS = {
+    "sma_crossover": BacktestRequest,
+    "rsi_mean_reversion": RsiBacktestRequest,
+    "bollinger_band": BbBacktestRequest,
+    "momentum": MomentumBacktestRequest,
+    "volatility_breakout": VbBacktestRequest,
+}
+
+
+def _format_validation_error(exc: ValidationError) -> str:
+    """Flatten a Pydantic ValidationError into a single human-readable string."""
+    parts = []
+    for err in exc.errors():
+        loc = err.get("loc", ())
+        field = loc[-1] if loc else ""
+        msg = err.get("msg", "invalid value")
+        parts.append(f"{field}: {msg}" if field else str(msg))
+    return "; ".join(parts) or "Invalid parameters."
+
+
+def _csv_label(filename: str | None) -> str:
+    """Derive a short display label from the uploaded filename."""
+    if not filename:
+        return "UPLOAD"
+    base = filename.rsplit("/", 1)[-1].rsplit("\\", 1)[-1]
+    if "." in base:
+        base = base.rsplit(".", 1)[0]
+    base = base.strip()
+    return base[:24] if base else "UPLOAD"
+
+
+def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> BacktestResponse:
+    """
+    Validate params, generate signals, and build a unified BacktestResponse
+    for an uploaded-CSV single-asset backtest.
+
+    Mirrors the per-strategy yfinance endpoints exactly, but sources ``close``
+    from the parsed CSV and derives the date range from its index.
+    """
+    if strategy == "pairs":
+        raise HTTPException(
+            status_code=422,
+            detail="Pairs Trading is not supported for CSV upload (it requires two assets).",
+        )
+
+    model = _CSV_PARAM_MODELS.get(strategy)
+    if model is None:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Unknown strategy '{strategy}'. Supported CSV strategies: "
+                f"{', '.join(_CSV_PARAM_MODELS)}."
+            ),
+        )
+
+    # Ignore any identity fields a client may send — identity comes from the CSV.
+    clean = {k: v for k, v in params.items() if k not in ("ticker", "start_date", "end_date")}
+    try:
+        req = model(**clean)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=_format_validation_error(exc)) from exc
+
+    start_date = str(close.index[0].date())
+    end_date = str(close.index[-1].date())
+    n = len(close)
+
+    common = dict(
+        request_ticker=label,
+        start_date=start_date,
+        end_date=end_date,
+        transaction_cost_bps=req.transaction_cost_bps,
+        initial_capital=req.initial_capital,
+        close=close,
+    )
+
+    if strategy == "sma_crossover":
+        if req.fast_window >= req.slow_window:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"fast_window ({req.fast_window}) must be less than "
+                    f"slow_window ({req.slow_window})."
+                ),
+            )
+        min_bars = req.slow_window + 2
+        if n < min_bars:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Only {n} rows available; need at least {min_bars} for a "
+                    f"{req.slow_window}-day slow SMA."
+                ),
+            )
+        position = sma_crossover_signals(
+            close, fast_window=req.fast_window, slow_window=req.slow_window
+        )
+        return _build_response(
+            **common,
+            position=position,
+            strategy="sma_crossover",
+            fast_window=req.fast_window,
+            slow_window=req.slow_window,
+        )
+
+    if strategy == "rsi_mean_reversion":
+        min_bars = req.rsi_window + 5
+        if n < min_bars:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Only {n} rows available; need at least {min_bars} for a "
+                    f"{req.rsi_window}-period RSI."
+                ),
+            )
+        position = rsi_mean_reversion_signals(
+            close,
+            rsi_window=req.rsi_window,
+            oversold_threshold=req.oversold_threshold,
+            exit_threshold=req.exit_threshold,
+        )
+        return _build_response(
+            **common,
+            position=position,
+            strategy="rsi_mean_reversion",
+            rsi_window=req.rsi_window,
+            oversold_threshold=req.oversold_threshold,
+            exit_threshold=req.exit_threshold,
+        )
+
+    if strategy == "bollinger_band":
+        min_bars = req.bb_window + 5
+        if n < min_bars:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Only {n} rows available; need at least {min_bars} for a "
+                    f"{req.bb_window}-period Bollinger Band."
+                ),
+            )
+        position = bollinger_band_signals(
+            close,
+            bb_window=req.bb_window,
+            num_std=req.num_std,
+            exit_band=req.exit_band,
+        )
+        return _build_response(
+            **common,
+            position=position,
+            strategy="bollinger_band",
+            bb_window=req.bb_window,
+            bb_num_std=req.num_std,
+            bb_exit_band=req.exit_band,
+        )
+
+    if strategy == "momentum":
+        min_bars = req.momentum_window + 5
+        if n < min_bars:
+            raise HTTPException(
+                status_code=422,
+                detail=(
+                    f"Only {n} rows available; need at least {min_bars} for a "
+                    f"{req.momentum_window}-day momentum window."
+                ),
+            )
+        position = momentum_signals(
+            close,
+            momentum_window=req.momentum_window,
+            entry_threshold=req.entry_threshold,
+            exit_threshold=req.exit_threshold,
+        )
+        return _build_response(
+            **common,
+            position=position,
+            strategy="momentum",
+            momentum_window=req.momentum_window,
+            momentum_entry_threshold=req.entry_threshold,
+            momentum_exit_threshold=req.exit_threshold,
+        )
+
+    # volatility_breakout (only remaining supported strategy)
+    min_bars = max(req.lookback_window + 2, req.exit_window + 2)
+    if n < min_bars:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {n} rows available; need at least {min_bars} for a "
+                f"{req.lookback_window}-day lookback and {req.exit_window}-day exit mean."
+            ),
+        )
+    position = volatility_breakout_signals(
+        close,
+        lookback_window=req.lookback_window,
+        breakout_multiplier=req.breakout_multiplier,
+        exit_window=req.exit_window,
+    )
+    return _build_response(
+        **common,
+        position=position,
+        strategy="volatility_breakout",
+        vb_lookback_window=req.lookback_window,
+        vb_breakout_multiplier=req.breakout_multiplier,
+        vb_exit_window=req.exit_window,
+    )
+
+
+@app.post(
+    "/backtest/csv",
+    response_model=BacktestResponse,
+    tags=["backtest"],
+    summary="Run a single-asset backtest on an uploaded CSV",
+    description=(
+        "Upload a historical price CSV and run one of the single-asset "
+        "strategies (SMA Crossover, RSI Mean Reversion, Bollinger Band, "
+        "Time-Series Momentum, Volatility Breakout) on it.\n\n"
+        "The CSV must contain a date column (date / datetime / timestamp) and a "
+        "close column (close / adj_close / adjusted_close). Optional OHLCV "
+        "columns are ignored.  Strategy parameters are supplied as a JSON object "
+        "in the `params` form field.  Pairs Trading is not supported."
+    ),
+)
+async def backtest_csv(
+    file: UploadFile = File(..., description="Historical price CSV file."),
+    strategy: str = Form(..., description="Single-asset strategy identifier."),
+    params: str = Form("{}", description="Strategy parameters as a JSON object."),
+) -> BacktestResponse:
+    raw = await file.read()
+    if len(raw) > _MAX_CSV_BYTES:
+        raise HTTPException(
+            status_code=413,
+            detail=f"Uploaded file exceeds the {_MAX_CSV_BYTES // (1024 * 1024)} MB limit.",
+        )
+
+    try:
+        close = parse_price_csv(raw)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    try:
+        params_dict = json.loads(params) if params else {}
+    except json.JSONDecodeError as exc:
+        raise HTTPException(
+            status_code=422, detail=f"params must be a valid JSON object: {exc}"
+        ) from exc
+    if not isinstance(params_dict, dict):
+        raise HTTPException(status_code=422, detail="params must be a JSON object.")
+
+    return _run_csv_single_asset(close, strategy, params_dict, _csv_label(file.filename))

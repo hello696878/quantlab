@@ -263,6 +263,45 @@ export async function runStrategyComparison(
   return res.json() as Promise<StrategyComparisonResponse>;
 }
 
+/**
+ * POST /api/backtest/csv  (multipart upload)
+ *
+ * Uploads a price CSV plus a strategy id and a JSON params object, and runs a
+ * single-asset backtest on the uploaded data.  Do NOT set Content-Type — the
+ * browser sets the multipart boundary automatically for FormData.
+ */
+export async function runCsvBacktest(
+  file: File,
+  strategy: string,
+  params: Record<string, unknown>,
+): Promise<BacktestResponse> {
+  const form = new FormData();
+  form.append("file", file);
+  form.append("strategy", strategy);
+  form.append("params", JSON.stringify(params));
+
+  let res: Response;
+  try {
+    res = await fetch("/api/backtest/csv", { method: "POST", body: form });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+
+  if (!res.ok) {
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = formatBackendDetail(body?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+
+  return res.json() as Promise<BacktestResponse>;
+}
+
 export async function checkHealth(): Promise<boolean> {
   try {
     const res = await fetch("/api/health");

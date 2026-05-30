@@ -11,6 +11,7 @@ import SmaSweepPanel from "@/components/SmaSweepPanel";
 import SmaTrainTestPanel from "@/components/SmaTrainTestPanel";
 import SmaWalkForwardPanel from "@/components/SmaWalkForwardPanel";
 import StrategyComparisonPanel from "@/components/StrategyComparisonPanel";
+import CsvBacktestPanel from "@/components/CsvBacktestPanel";
 import SaveBacktestModal from "@/components/SaveBacktestModal";
 import SavedBacktestsList from "@/components/SavedBacktestsList";
 import SavedBacktestDetail from "@/components/SavedBacktestDetail";
@@ -245,6 +246,10 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
   backtest: {
     title: "Backtest",
     subtitle: "Run a single strategy on real historical market data.",
+  },
+  csv: {
+    title: "CSV Backtest",
+    subtitle: "Upload your own price history and run a single-asset strategy.",
   },
   sweep: {
     title: "Parameter Sweep",
@@ -508,6 +513,19 @@ export default function HomePage() {
                 </div>
               </>
             )}
+          </>
+        )}
+
+        {/* ── CSV Backtest ─────────────────────────────────────────────── */}
+        {view === "csv" && (
+          <>
+            <SectionIntro title="CSV Upload Backtest">
+              Upload your own historical price CSV and run any single-asset
+              strategy on it. The file needs a date column (date / datetime /
+              timestamp) and a close column (close / adj_close); optional OHLCV
+              columns are ignored. Pairs Trading is not available for uploads.
+            </SectionIntro>
+            <CsvBacktestPanel />
           </>
         )}
 

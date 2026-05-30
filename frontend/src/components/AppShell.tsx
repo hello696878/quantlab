@@ -7,6 +7,7 @@ import TopBar from "@/components/TopBar";
 /** The set of top-level workspaces, driven by the sidebar. */
 export type View =
   | "backtest"
+  | "csv"
   | "sweep"
   | "train-test"
   | "walk-forward"

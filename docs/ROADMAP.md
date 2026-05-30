@@ -68,6 +68,17 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - **Docker Compose**: `docker compose up --build` starts both services; `BACKEND_URL` baked at frontend build time for correct internal Docker DNS routing
 - **Comprehensive README and portfolio documentation**
 
+### Phase 6 — CSV Upload Backtesting ✅
+
+- `POST /backtest/csv` — upload a price CSV and run any single-asset strategy
+  (SMA Crossover, RSI, Bollinger Band, Momentum, Volatility Breakout)
+- Flexible column detection: date (`date` / `datetime` / `timestamp`) and
+  close (`close` / `adj_close` / `adjusted_close`); optional OHLCV ignored
+- Reuses the existing strategy + backtest + metrics stack unchanged; Pairs
+  Trading excluded (needs two assets)
+- New **CSV Backtest** workspace in the dashboard with drag-and-drop upload
+- Full parser + API test coverage
+
 ---
 
 ## Future Phases
@@ -86,11 +97,12 @@ The items below are planned but not yet started. Order and scope may change.
 - Per-user saved strategies and backtests
 - User dashboard
 
-### Phase 8 — CSV Upload
+### Phase 8 — CSV Upload (extensions)
 
-- Upload custom OHLCV price data as CSV
-- Run all existing strategies and research tools on uploaded data
-- Useful for assets not available via yfinance (private funds, crypto with custom history, etc.)
+- Single-asset CSV upload backtesting shipped — see "Phase 6 — CSV Upload
+  Backtesting" above.
+- Remaining: run the research tools (sweep, train/test, walk-forward,
+  comparison) on uploaded data, and two-asset CSV upload for Pairs Trading.
 
 ### Phase 9 — Multi-Asset Portfolio Backtesting
 

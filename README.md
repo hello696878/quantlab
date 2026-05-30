@@ -53,6 +53,10 @@ Total return · CAGR · Sharpe ratio · Sortino ratio · Calmar ratio · Max dra
 
 Benchmark: buy-and-hold with no transaction costs.
 
+### CSV Upload Backtesting
+
+The **CSV Backtest** workspace lets you upload your own historical price CSV and run any single-asset strategy on it (Pairs Trading excluded). Column detection is flexible: a date column (`date` / `datetime` / `timestamp`) and a close column (`close` / `adj_close` / `adjusted_close`) are required; optional OHLCV columns are ignored. The uploaded series flows through the same lookahead-bias-free strategy, backtest, and metrics stack as the yfinance endpoints (`POST /backtest/csv`).
+
 ### Saved Backtests
 
 Completed backtest results can be saved to a local SQLite database and reopened from the Saved Backtests view. Saved records preserve the run name, notes, strategy parameters, metrics, equity curve, and trade log.
