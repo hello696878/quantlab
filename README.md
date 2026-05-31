@@ -111,6 +111,20 @@ Example exported JSON:
 }
 ```
 
+#### Strategy Template Gallery
+
+The Strategy Builder includes a built-in **gallery** of curated, ready-to-use strategy templates (`GET /custom-strategy-gallery`). Open the **Gallery** from the Strategy Builder, browse the cards (each shows name, description, tags, difficulty, category, and a readable rule summary), then **Load** one into the builder to run it on any ticker/date range, or **Save to My Templates** to keep a local copy. Built-in templates are **static, pre-validated rule objects — not executable code** (no `eval`); they pass through the exact same whitelisted `CustomRule` validation as user-built strategies.
+
+Built-in templates:
+
+| Template | Category | Entry → Exit |
+|---|---|---|
+| SMA Trend Filter | trend | SMA(50) > SMA(200) → SMA(50) < SMA(200) |
+| RSI Mean Reversion | mean reversion | RSI(14) < 30 → RSI(14) > 50 |
+| Momentum + Trend | momentum | Momentum(126) > 0 **AND** SMA(50) > SMA(200) → Momentum(126) ≤ 0 **OR** SMA(50) < SMA(200) |
+| Bollinger Mean Reversion | mean reversion | Close < BB Lower(20, 2.0) → Close > BB Middle(20) |
+| Defensive Trend Strategy | trend | Close > SMA(200) → Close < SMA(200) |
+
 ### Saved Backtests
 
 Completed backtest results can be saved to a local SQLite database and reopened from the Saved Backtests view. Saved records preserve the run name, notes, strategy parameters, metrics, equity curve, and trade log.

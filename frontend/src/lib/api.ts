@@ -15,6 +15,7 @@ import type {
   CustomStrategyTemplateFull,
   CustomStrategyTemplateSummary,
   DeleteResponse,
+  GalleryTemplate,
   MomentumBacktestRequest,
   PairsBacktestRequest,
   RsiBacktestRequest,
@@ -490,5 +491,26 @@ export async function importCustomStrategyTemplate(
   return savedBacktestsRequest<CustomStrategyTemplateFull>(
     "/api/custom-strategies/import",
     { method: "POST", body: JSON.stringify(doc) },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Strategy Template Gallery (built-in, read-only)
+// ---------------------------------------------------------------------------
+
+/** GET /api/custom-strategy-gallery */
+export async function listStrategyGallery(): Promise<GalleryTemplate[]> {
+  return savedBacktestsRequest<GalleryTemplate[]>("/api/custom-strategy-gallery", {
+    method: "GET",
+  });
+}
+
+/** GET /api/custom-strategy-gallery/{template_id} */
+export async function getStrategyGalleryTemplate(
+  templateId: string,
+): Promise<GalleryTemplate> {
+  return savedBacktestsRequest<GalleryTemplate>(
+    `/api/custom-strategy-gallery/${encodeURIComponent(templateId)}`,
+    { method: "GET" },
   );
 }

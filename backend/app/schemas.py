@@ -1477,3 +1477,40 @@ class CustomStrategyTemplateImport(CustomStrategyTemplateBase):
     type: Literal["quantlab_custom_strategy_template"] = Field(
         description="Must be 'quantlab_custom_strategy_template'."
     )
+
+
+# ===========================================================================
+# Strategy Template Gallery (built-in, read-only)
+# ===========================================================================
+#
+# Gallery templates are curated, built-in custom strategy definitions.  They
+# are static data — NOT stored in SQLite — and reuse the same validated
+# CustomRule schema as the live builder, so only whitelisted indicators /
+# operators are ever expressible (no eval, no executable formula strings).
+
+GalleryDifficulty = Literal["beginner", "intermediate", "advanced"]
+GalleryCategory = Literal["trend", "mean_reversion", "momentum"]
+
+
+class GalleryTemplate(BaseModel):
+    """
+    A built-in, read-only strategy template.
+
+    Shares every field with a user-created template (name, logic, rules, tags)
+    plus a stable string ``id`` and presentation metadata (difficulty,
+    category).  Built-in templates always have at least one entry and one exit
+    rule.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(description="Stable slug identifier, e.g. 'sma-trend-filter'.")
+    name: str = Field(min_length=1)
+    description: str
+    entry_logic: CustomTemplateLogic
+    exit_logic: CustomTemplateLogic
+    entry_rules: List[CustomRule] = Field(min_length=1, max_length=10)
+    exit_rules: List[CustomRule] = Field(min_length=1, max_length=10)
+    tags: List[str]
+    difficulty: GalleryDifficulty
+    category: GalleryCategory

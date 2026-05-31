@@ -8,6 +8,7 @@ import {
   getCustomStrategyTemplate,
   importCustomStrategyTemplate,
   listCustomStrategyTemplates,
+  listStrategyGallery,
   runCustomBacktest,
   updateCustomStrategyTemplate,
 } from "@/lib/api";
@@ -20,6 +21,7 @@ import type {
   CustomStrategyRequest,
   CustomStrategyTemplateCreate,
   CustomStrategyTemplateSummary,
+  GalleryTemplate,
 } from "@/lib/types";
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
@@ -197,6 +199,24 @@ function operandLabel(op: UIOperand): string {
 
 function opSymbol(op: CustomOperator): string {
   return OPERATORS.find((o) => o.id === op)?.label ?? op;
+}
+
+/** Readable label for an API operand, e.g. "SMA(50)" / "close" / "30". */
+function apiOperandLabel(op: CustomOperand): string {
+  if (op.type === "close") return "close";
+  if (op.type === "constant") return String(op.value);
+  const meta = INDICATORS.find((i) => i.id === op.name);
+  const label = meta?.label ?? op.name;
+  return op.params.num_std != null
+    ? `${label}(${op.params.window}, ${op.params.num_std}σ)`
+    : `${label}(${op.params.window})`;
+}
+
+/** Readable label for an API rule, e.g. "SMA(50) > SMA(200)". */
+function apiRuleLabel(rule: CustomRule): string {
+  return `${apiOperandLabel(rule.left)} ${opSymbol(rule.operator)} ${apiOperandLabel(
+    rule.right,
+  )}`;
 }
 
 /** "SMA + RSI Filter" → "sma-rsi-filter" (for export filenames). */
@@ -601,6 +621,149 @@ function TemplateList({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Built-in gallery (data comes from the backend — never faked)
+// ---------------------------------------------------------------------------
+
+const CATEGORY_LABELS: Record<string, string> = {
+  trend: "Trend",
+  mean_reversion: "Mean Reversion",
+  momentum: "Momentum",
+};
+
+/** One entry/exit rule block rendered as readable lines with AND/OR joiners. */
+function RuleSummary({
+  label,
+  rules,
+  logic,
+}: {
+  label: string;
+  rules: CustomRule[];
+  logic: "AND" | "OR";
+}) {
+  return (
+    <div>
+      <span className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+        {label}
+      </span>
+      <div className="mono text-xs text-slate-600">
+        {rules.map((r, i) => (
+          <div key={i}>
+            {i > 0 && <span className="text-slate-400">{logic}&nbsp;</span>}
+            {apiRuleLabel(r)}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function GalleryPanel({
+  onLoad,
+  onSave,
+  savingName,
+  disabled,
+}: {
+  onLoad: (t: GalleryTemplate) => void;
+  onSave: (t: GalleryTemplate) => void;
+  savingName: string | null;
+  disabled: boolean;
+}) {
+  const [rows, setRows] = useState<GalleryTemplate[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setErr(null);
+    listStrategyGallery()
+      .then((d) => !cancelled && setRows(d))
+      .catch(
+        (e) =>
+          !cancelled &&
+          setErr(e instanceof Error ? e.message : "Failed to load gallery."),
+      )
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  if (loading) {
+    return <p className="text-xs text-slate-400 px-1 py-2">Loading gallery…</p>;
+  }
+  if (err) {
+    return <p className="text-xs text-red-600 px-1 py-2">⚠ {err}</p>;
+  }
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+      {rows.map((t) => (
+        <div
+          key={t.id}
+          className="rounded-xl border border-slate-200 p-4 space-y-3 flex flex-col"
+        >
+          <div>
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-sm font-semibold text-slate-800">{t.name}</h4>
+              <div className="flex items-center gap-1 flex-shrink-0">
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-50 text-blue-700 font-medium">
+                  {CATEGORY_LABELS[t.category] ?? t.category}
+                </span>
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 font-medium">
+                  {t.difficulty}
+                </span>
+              </div>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">{t.description}</p>
+          </div>
+
+          <div className="space-y-2">
+            <RuleSummary label="Entry" rules={t.entry_rules} logic={t.entry_logic} />
+            <RuleSummary label="Exit" rules={t.exit_rules} logic={t.exit_logic} />
+          </div>
+
+          {t.tags.length > 0 && (
+            <div className="flex flex-wrap gap-1">
+              {t.tags.map((tag) => (
+                <span
+                  key={tag}
+                  className="text-[10px] px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500"
+                >
+                  {tag}
+                </span>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2 mt-auto pt-1">
+            <button
+              type="button"
+              onClick={() => onLoad(t)}
+              disabled={disabled}
+              className="text-xs px-3 py-1.5 rounded-lg bg-blue-600 text-white font-semibold
+                         hover:bg-blue-700 transition-colors disabled:opacity-50"
+            >
+              Load
+            </button>
+            <button
+              type="button"
+              onClick={() => onSave(t)}
+              disabled={disabled || savingName === t.name}
+              className="text-xs px-3 py-1.5 rounded-lg border border-slate-300 text-slate-600
+                         font-medium hover:border-slate-400 transition-colors disabled:opacity-50"
+              title="Save a copy to your local templates"
+            >
+              {savingName === t.name ? "Saving…" : "Save to My Templates"}
+            </button>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function StrategyBuilderPanel() {
   const [ticker, setTicker] = useState("SPY");
   const [startDate, setStartDate] = useState("2015-01-01");
@@ -631,6 +794,65 @@ export default function StrategyBuilderPanel() {
   } | null>(null);
   const [importing, setImporting] = useState(false);
   const importInputRef = useRef<HTMLInputElement>(null);
+  const [showGallery, setShowGallery] = useState(false);
+  const [gallerySavingName, setGallerySavingName] = useState<string | null>(null);
+
+  /** Populate the builder from a template-like definition (gallery or saved). */
+  function populateFromDefinition(def: {
+    name: string;
+    description: string;
+    entry_logic: "AND" | "OR";
+    exit_logic: "AND" | "OR";
+    entry_rules: CustomRule[];
+    exit_rules: CustomRule[];
+    tags: string[];
+  }) {
+    setTemplateName(def.name);
+    setTemplateDesc(def.description);
+    setTagsStr(def.tags.join(", "));
+    setEntryLogic(def.entry_logic === "AND" ? "all" : "any");
+    setExitLogic(def.exit_logic === "AND" ? "all" : "any");
+    setEntryRules(def.entry_rules.map(apiRuleToUi));
+    setExitRules(def.exit_rules.map(apiRuleToUi));
+    setResult(null);
+    setError(null);
+  }
+
+  function handleLoadGalleryTemplate(t: GalleryTemplate) {
+    populateFromDefinition(t);
+    // A gallery load is a brand-new, unsaved local template.
+    setLoadedId(null);
+    setShowGallery(false);
+    setTplMsg({
+      kind: "info",
+      text: `Loaded “${t.name}” from the gallery. Run it, or save it to My Templates.`,
+    });
+  }
+
+  async function handleSaveGalleryTemplate(t: GalleryTemplate) {
+    setGallerySavingName(t.name);
+    setTplMsg(null);
+    try {
+      const created = await createCustomStrategyTemplate({
+        name: t.name,
+        description: t.description,
+        entry_logic: t.entry_logic,
+        exit_logic: t.exit_logic,
+        entry_rules: t.entry_rules,
+        exit_rules: t.exit_rules,
+        tags: t.tags,
+      });
+      setTplRefresh((k) => k + 1);
+      setTplMsg({ kind: "info", text: `Saved “${created.name}” to My Templates.` });
+    } catch (err) {
+      setTplMsg({
+        kind: "error",
+        text: err instanceof Error ? err.message : "Save failed.",
+      });
+    } finally {
+      setGallerySavingName(null);
+    }
+  }
 
   function buildTemplatePayload(): CustomStrategyTemplateCreate | null {
     if (templateName.trim() === "") return null;
@@ -852,6 +1074,19 @@ export default function StrategyBuilderPanel() {
             />
             <button
               type="button"
+              onClick={() => setShowGallery((s) => !s)}
+              className={
+                "px-2.5 py-1 rounded-md border font-medium transition-colors " +
+                (showGallery
+                  ? "border-blue-300 bg-blue-50 text-blue-700"
+                  : "border-slate-300 text-slate-600 hover:border-slate-400")
+              }
+              title="Browse the built-in strategy gallery"
+            >
+              {showGallery ? "Hide gallery" : "Gallery"}
+            </button>
+            <button
+              type="button"
               onClick={() => importInputRef.current?.click()}
               disabled={importing}
               className="px-2.5 py-1 rounded-md border border-slate-300 text-slate-600
@@ -871,6 +1106,21 @@ export default function StrategyBuilderPanel() {
             </button>
           </div>
         </div>
+
+        {showGallery && (
+          <div className="space-y-3">
+            <p className="text-xs text-slate-400">
+              Built-in templates — safe, validated rule definitions (not
+              executable code). Load one into the builder, then run or save it.
+            </p>
+            <GalleryPanel
+              onLoad={handleLoadGalleryTemplate}
+              onSave={handleSaveGalleryTemplate}
+              savingName={gallerySavingName}
+              disabled={savingTpl || gallerySavingName !== null}
+            />
+          </div>
+        )}
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <Field label="Template Name">

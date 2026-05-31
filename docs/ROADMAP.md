@@ -115,6 +115,21 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   file picker; imported templates appear in the saved list and can be run
 - Full export/import + round-trip + security test coverage
 
+### Phase 6 — Strategy Template Gallery ✅
+
+- `GET /custom-strategy-gallery` (+ `/{template_id}`) — built-in, read-only
+  curated strategy templates served as **static, pre-validated data** (not in
+  SQLite, not backtest results)
+- Five built-in templates: SMA Trend Filter, RSI Mean Reversion,
+  Momentum + Trend, Bollinger Mean Reversion, Defensive Trend Strategy
+- Each carries `difficulty` + `category` metadata and is constructed through
+  the same `CustomRule` schema as the live builder — **no `eval`, no
+  executable formula strings; unknown indicators/operators are impossible**
+- Strategy Builder **Gallery** panel: cards with rule summaries, Load (into
+  builder) and Save to My Templates
+- Tests assert every template validates, has entry+exit rules, generates
+  signals on deterministic data, and matches the saved-template shape
+
 ---
 
 ## Future Phases

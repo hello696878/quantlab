@@ -19,6 +19,8 @@ PUT  /custom-strategies/{id}            — update a custom strategy template
 DELETE /custom-strategies/{id}          — delete a custom strategy template
 GET  /custom-strategies/{id}/export     — export a template as portable JSON
 POST /custom-strategies/import          — import a template from portable JSON
+GET  /custom-strategy-gallery           — list built-in gallery templates
+GET  /custom-strategy-gallery/{template_id} — get one built-in gallery template
 POST /research/sma-parameter-sweep     — sweep fast/slow SMA window combinations
 POST /research/sma-train-test          — SMA train/test out-of-sample validation
 POST /research/sma-walk-forward        — SMA walk-forward optimization
@@ -44,6 +46,7 @@ from app.custom_strategy_templates import (
 )
 from app.data import fetch_ohlcv, fetch_pairs_close
 from app.db import init_db
+from app.strategy_gallery import get_gallery_template, list_gallery
 from app.metrics import compute_metrics
 from app.saved_backtests import (
     create_saved_backtest as db_create,
@@ -64,6 +67,7 @@ from app.schemas import (
     CustomStrategyTemplateUpdate,
     DeleteResponse,
     EquityPoint,
+    GalleryTemplate,
     MomentumBacktestRequest,
     PairsBacktestRequest,
     PerformanceMetrics,
@@ -2007,3 +2011,40 @@ def import_custom_strategy(
     # fields it needs (envelope markers are ignored).
     record = tpl_create(request.model_dump())
     return CustomStrategyTemplateFull(**record)
+
+
+# ---------------------------------------------------------------------------
+# Strategy Template Gallery (built-in, read-only)
+# ---------------------------------------------------------------------------
+
+
+@app.get(
+    "/custom-strategy-gallery",
+    response_model=list[GalleryTemplate],
+    tags=["custom-strategies"],
+    summary="List built-in strategy gallery templates",
+    description=(
+        "Return the curated, read-only gallery of built-in custom strategy "
+        "templates.  These are static, pre-validated rule definitions (not "
+        "stored in SQLite and not backtest results).  Each can be loaded into "
+        "the Custom Strategy Builder and optionally saved to local templates."
+    ),
+)
+def get_strategy_gallery() -> list[GalleryTemplate]:
+    return list_gallery()
+
+
+@app.get(
+    "/custom-strategy-gallery/{template_id}",
+    response_model=GalleryTemplate,
+    tags=["custom-strategies"],
+    summary="Get one built-in gallery template",
+    description="Return a single built-in gallery template by its slug id.",
+)
+def get_strategy_gallery_template(template_id: str) -> GalleryTemplate:
+    template = get_gallery_template(template_id)
+    if template is None:
+        raise HTTPException(
+            status_code=404, detail=f"Gallery template '{template_id}' not found."
+        )
+    return template

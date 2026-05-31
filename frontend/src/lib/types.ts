@@ -523,6 +523,20 @@ export interface CustomStrategyTemplateFull {
   tags: string[];
 }
 
+/** A built-in, read-only gallery template (same rule shape + presentation meta). */
+export interface GalleryTemplate {
+  id: string;
+  name: string;
+  description: string;
+  entry_logic: CustomTemplateLogic;
+  exit_logic: CustomTemplateLogic;
+  entry_rules: CustomRule[];
+  exit_rules: CustomRule[];
+  tags: string[];
+  difficulty: "beginner" | "intermediate" | "advanced";
+  category: "trend" | "mean_reversion" | "momentum";
+}
+
 /** Portable export/import envelope — no id / timestamps / local detail. */
 export interface CustomStrategyTemplateExport {
   schema_version: "1.0";
