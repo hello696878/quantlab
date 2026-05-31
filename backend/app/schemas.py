@@ -1331,8 +1331,14 @@ class CustomStrategyTemplateBase(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    name: str = Field(min_length=1, description="Template display name (non-empty).")
-    description: str = Field(default="", description="Free-text description.")
+    name: str = Field(
+        min_length=1,
+        max_length=120,
+        description="Template display name (non-empty).",
+    )
+    description: str = Field(
+        default="", max_length=1000, description="Free-text description."
+    )
     entry_logic: CustomTemplateLogic = Field(
         default="AND", description="How entry rules combine: 'AND' or 'OR'."
     )
@@ -1354,6 +1360,32 @@ class CustomStrategyTemplateBase(BaseModel):
         max_length=20,
         description="Optional free-text tags for organising templates.",
     )
+
+    @field_validator("name")
+    @classmethod
+    def strip_template_name(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("name must not be blank.")
+        return stripped
+
+    @field_validator("description")
+    @classmethod
+    def strip_template_description(cls, value: str) -> str:
+        return value.strip()
+
+    @field_validator("tags")
+    @classmethod
+    def strip_template_tags(cls, value: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        for tag in value:
+            stripped = tag.strip()
+            if not stripped:
+                continue
+            if len(stripped) > 40:
+                raise ValueError("each tag must be 40 characters or fewer.")
+            cleaned.append(stripped)
+        return cleaned
 
 
 class CustomStrategyTemplateCreate(CustomStrategyTemplateBase):

@@ -574,7 +574,10 @@ export default function StrategyBuilderPanel() {
   const [showTemplates, setShowTemplates] = useState(false);
   const [tplRefresh, setTplRefresh] = useState(0);
   const [savingTpl, setSavingTpl] = useState(false);
-  const [tplMsg, setTplMsg] = useState<string | null>(null);
+  const [tplMsg, setTplMsg] = useState<{
+    kind: "info" | "error";
+    text: string;
+  } | null>(null);
 
   function buildTemplatePayload(): CustomStrategyTemplateCreate | null {
     if (templateName.trim() === "") return null;
@@ -600,7 +603,10 @@ export default function StrategyBuilderPanel() {
   async function handleSaveTemplate(asNew: boolean) {
     const payload = buildTemplatePayload();
     if (!payload) {
-      setTplMsg("Enter a template name and complete every rule first.");
+      setTplMsg({
+        kind: "error",
+        text: "Enter a template name and complete every rule first.",
+      });
       return;
     }
     setSavingTpl(true);
@@ -608,15 +614,18 @@ export default function StrategyBuilderPanel() {
     try {
       if (loadedId !== null && !asNew) {
         const updated = await updateCustomStrategyTemplate(loadedId, payload);
-        setTplMsg(`Updated “${updated.name}”.`);
+        setTplMsg({ kind: "info", text: `Updated “${updated.name}”.` });
       } else {
         const created = await createCustomStrategyTemplate(payload);
         setLoadedId(created.id);
-        setTplMsg(`Saved “${created.name}”.`);
+        setTplMsg({ kind: "info", text: `Saved “${created.name}”.` });
       }
       setTplRefresh((k) => k + 1);
     } catch (err) {
-      setTplMsg(err instanceof Error ? err.message : "Save failed.");
+      setTplMsg({
+        kind: "error",
+        text: err instanceof Error ? err.message : "Save failed.",
+      });
     } finally {
       setSavingTpl(false);
     }
@@ -637,9 +646,15 @@ export default function StrategyBuilderPanel() {
       setResult(null);
       setError(null);
       setShowTemplates(false);
-      setTplMsg(`Loaded “${tpl.name}”. Edit and run, or save changes.`);
+      setTplMsg({
+        kind: "info",
+        text: `Loaded “${tpl.name}”. Edit and run, or save changes.`,
+      });
     } catch (err) {
-      setTplMsg(err instanceof Error ? err.message : "Load failed.");
+      setTplMsg({
+        kind: "error",
+        text: err instanceof Error ? err.message : "Load failed.",
+      });
     }
   }
 
@@ -820,7 +835,16 @@ export default function StrategyBuilderPanel() {
               Clear
             </button>
           )}
-          {tplMsg && <span className="text-xs text-slate-400">{tplMsg}</span>}
+          {tplMsg && (
+            <span
+              className={
+                "text-xs " +
+                (tplMsg.kind === "error" ? "text-red-600" : "text-emerald-600")
+              }
+            >
+              {tplMsg.text}
+            </span>
+          )}
         </div>
 
         {showTemplates && (

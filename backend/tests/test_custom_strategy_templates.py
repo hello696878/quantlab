@@ -14,6 +14,7 @@ import pytest
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
 main_module = pytest.importorskip("app.main")
 db_module = pytest.importorskip("app.db")
+tpl_module = pytest.importorskip("app.custom_strategy_templates")
 
 
 # ---------------------------------------------------------------------------
@@ -166,7 +167,42 @@ def test_get_missing_returns_404(client):
 # ---------------------------------------------------------------------------
 
 
-def test_update_template(client):
+def test_update_template(client, monkeypatch):
+    times = iter(
+        [
+            "2024-01-01T00:00:00.000000Z",
+            "2024-01-01T00:00:01.000000Z",
+        ]
+    )
+    monkeypatch.setattr(tpl_module, "_utc_now", lambda: next(times))
+    created = client.post("/custom-strategies", json=BASE_TEMPLATE).json()
+
+    tid = created["id"]
+    created_at = created["created_at"]
+
+    times = iter(["2024-01-01T00:00:01.000000Z"])
+    monkeypatch.setattr(tpl_module, "_utc_now", lambda: next(times))
+    updated = {
+        **BASE_TEMPLATE,
+        "name": "Renamed Strategy",
+        "entry_logic": "OR",
+        "entry_rules": [RSI_RULE],
+        "tags": ["updated"],
+    }
+    resp = client.put(f"/custom-strategies/{tid}", json=updated)
+
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["id"] == tid
+    assert data["name"] == "Renamed Strategy"
+    assert data["entry_logic"] == "OR"
+    assert len(data["entry_rules"]) == 1
+    assert data["tags"] == ["updated"]
+    assert data["created_at"] == created_at
+    assert data["updated_at"] > data["created_at"]
+
+
+def test_update_template_with_live_clock(client):
     tid = client.post("/custom-strategies", json=BASE_TEMPLATE).json()["id"]
 
     updated = {
@@ -184,7 +220,8 @@ def test_update_template(client):
     assert data["entry_logic"] == "OR"
     assert len(data["entry_rules"]) == 1
     assert data["tags"] == ["updated"]
-    # updated_at advances; created_at is preserved.
+    # Smoke-test the normal clock path; deterministic strict timestamp checks
+    # live in test_update_template.
     assert data["updated_at"] >= data["created_at"]
 
 
@@ -217,6 +254,28 @@ def test_delete_missing_returns_404(client):
 def test_empty_name_rejected(client):
     resp = client.post("/custom-strategies", json={**BASE_TEMPLATE, "name": ""})
     assert resp.status_code == 422
+
+
+def test_blank_name_rejected(client):
+    resp = client.post("/custom-strategies", json={**BASE_TEMPLATE, "name": "   "})
+    assert resp.status_code == 422
+
+
+def test_text_metadata_is_stripped(client):
+    resp = client.post(
+        "/custom-strategies",
+        json={
+            **BASE_TEMPLATE,
+            "name": "  Trimmed Name  ",
+            "description": "  useful note  ",
+            "tags": [" trend ", "", "  rsi  "],
+        },
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["name"] == "Trimmed Name"
+    assert data["description"] == "useful note"
+    assert data["tags"] == ["trend", "rsi"]
 
 
 def test_invalid_logic_rejected(client):
@@ -295,6 +354,37 @@ def test_unknown_operand_type_rejected(client):
         "entry_rules": [
             {
                 "left": {"type": "formula", "expr": "close > sma(20)"},
+                "operator": ">",
+                "right": {"type": "constant", "value": 0},
+            }
+        ],
+    }
+    assert client.post("/custom-strategies", json=bad).status_code == 422
+
+
+def test_extra_template_field_rejected(client):
+    bad = {**BASE_TEMPLATE, "python": "print('nope')"}
+    assert client.post("/custom-strategies", json=bad).status_code == 422
+
+
+def test_extra_rule_field_rejected(client):
+    bad = {
+        **BASE_TEMPLATE,
+        "entry_rules": [{**SMA_RULE, "formula": "close > sma(20)"}],
+    }
+    assert client.post("/custom-strategies", json=bad).status_code == 422
+
+
+def test_indicator_window_bound_rejected(client):
+    bad = {
+        **BASE_TEMPLATE,
+        "entry_rules": [
+            {
+                "left": {
+                    "type": "indicator",
+                    "name": "sma",
+                    "params": {"window": 1001},
+                },
                 "operator": ">",
                 "right": {"type": "constant", "value": 0},
             }
