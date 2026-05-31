@@ -193,14 +193,57 @@ def test_import_rejects_missing_schema_version(client):
     assert client.post("/custom-strategies/import", json=doc).status_code == 422
 
 
+def test_import_rejects_unsupported_schema_version(client):
+    resp = client.post(
+        "/custom-strategies/import",
+        json=valid_export(schema_version="2.0"),
+    )
+    assert resp.status_code == 422
+
+
 def test_import_rejects_missing_type(client):
     doc = valid_export()
     doc.pop("type")
     assert client.post("/custom-strategies/import", json=doc).status_code == 422
 
 
+def test_import_rejects_missing_name(client):
+    doc = valid_export()
+    doc.pop("name")
+    assert client.post("/custom-strategies/import", json=doc).status_code == 422
+
+
 def test_import_rejects_empty_name(client):
-    assert client.post("/custom-strategies/import", json=valid_export(name="")).status_code == 422
+    assert (
+        client.post("/custom-strategies/import", json=valid_export(name="")).status_code
+        == 422
+    )
+
+
+def test_import_rejects_blank_name(client):
+    assert (
+        client.post(
+            "/custom-strategies/import",
+            json=valid_export(name="   "),
+        ).status_code
+        == 422
+    )
+
+
+def test_import_strips_metadata(client):
+    resp = client.post(
+        "/custom-strategies/import",
+        json=valid_export(
+            name="  Portable Strategy  ",
+            description="  reusable rules  ",
+            tags=[" trend ", "", "  rsi  "],
+        ),
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["name"] == "Portable Strategy"
+    assert data["description"] == "reusable rules"
+    assert data["tags"] == ["trend", "rsi"]
 
 
 def test_import_rejects_invalid_logic(client):
@@ -233,6 +276,28 @@ def test_import_rejects_too_many_rules(client):
     assert client.post("/custom-strategies/import", json=bad).status_code == 422
 
 
+def test_import_rejects_too_many_exit_rules(client):
+    bad = valid_export(exit_rules=[EXIT_RULE for _ in range(11)])
+    assert client.post("/custom-strategies/import", json=bad).status_code == 422
+
+
+def test_import_rejects_invalid_indicator_params(client):
+    bad = valid_export(
+        entry_rules=[
+            {
+                "left": {"type": "close"},
+                "operator": "<",
+                "right": {
+                    "type": "indicator",
+                    "name": "bb_lower",
+                    "params": {"window": 20},
+                },
+            }
+        ]
+    )
+    assert client.post("/custom-strategies/import", json=bad).status_code == 422
+
+
 def test_import_rejects_string_constant_no_code_execution(client):
     bad = valid_export(
         entry_rules=[
@@ -255,9 +320,14 @@ def test_import_ignores_unknown_envelope_keys(client):
 
 def test_import_ignores_local_fields_if_present(client):
     """id / timestamps in an uploaded file must not leak into the new record."""
-    doc = valid_export(id=999, created_at="2000-01-01T00:00:00Z", updated_at="2000-01-01T00:00:00Z")
+    doc = valid_export(
+        id=999,
+        created_at="2000-01-01T00:00:00Z",
+        updated_at="2000-01-01T00:00:00Z",
+    )
     resp = client.post("/custom-strategies/import", json=doc)
     assert resp.status_code == 200, resp.text
     data = resp.json()
     assert data["id"] != 999
     assert data["created_at"] != "2000-01-01T00:00:00Z"
+    assert data["updated_at"] != "2000-01-01T00:00:00Z"

@@ -1445,7 +1445,7 @@ class CustomStrategyTemplateExport(BaseModel):
     detail — only the reusable definition plus self-describing markers.
     """
 
-    schema_version: str = Field(default=CUSTOM_TEMPLATE_SCHEMA_VERSION)
+    schema_version: Literal["1.0"] = Field(default=CUSTOM_TEMPLATE_SCHEMA_VERSION)
     type: Literal["quantlab_custom_strategy_template"] = Field(
         default=CUSTOM_TEMPLATE_EXPORT_TYPE
     )
@@ -1458,7 +1458,7 @@ class CustomStrategyTemplateExport(BaseModel):
     tags: List[str]
 
 
-class CustomStrategyTemplateImport(BaseModel):
+class CustomStrategyTemplateImport(CustomStrategyTemplateBase):
     """
     Request body for POST /custom-strategies/import.
 
@@ -1471,16 +1471,9 @@ class CustomStrategyTemplateImport(BaseModel):
 
     model_config = ConfigDict(extra="ignore")
 
-    schema_version: str = Field(
-        min_length=1, description="Export schema version (must be present)."
+    schema_version: Literal["1.0"] = Field(
+        description="Export schema version. Currently only '1.0' is supported."
     )
     type: Literal["quantlab_custom_strategy_template"] = Field(
         description="Must be 'quantlab_custom_strategy_template'."
     )
-    name: str = Field(min_length=1, description="Template name (non-empty).")
-    description: str = Field(default="")
-    entry_logic: CustomTemplateLogic = Field(default="AND")
-    exit_logic: CustomTemplateLogic = Field(default="OR")
-    entry_rules: List[CustomRule] = Field(default_factory=list, max_length=10)
-    exit_rules: List[CustomRule] = Field(default_factory=list, max_length=10)
-    tags: List[str] = Field(default_factory=list, max_length=20)

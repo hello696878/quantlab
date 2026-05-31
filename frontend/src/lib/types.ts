@@ -525,7 +525,7 @@ export interface CustomStrategyTemplateFull {
 
 /** Portable export/import envelope — no id / timestamps / local detail. */
 export interface CustomStrategyTemplateExport {
-  schema_version: string;
+  schema_version: "1.0";
   type: "quantlab_custom_strategy_template";
   name: string;
   description: string;
