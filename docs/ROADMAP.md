@@ -91,6 +91,18 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Indicators reuse the built-in `compute_rsi` / `compute_bollinger_bands` math
 - New **Strategy Builder** dashboard workspace; full evaluator + API tests
 
+### Phase 6 — Saved Custom Strategy Templates ✅
+
+- `custom_strategy_templates` SQLite table + `/custom-strategies` CRUD
+  (POST / GET list / GET id / PUT / DELETE)
+- Stores reusable **strategy definitions** (rules + AND/OR logic + name,
+  description, tags) — never backtest results
+- Reuses the validated `CustomRule` schema (max 10 entry / 10 exit rules,
+  whitelisted indicators/operators) — **no `eval`, no arbitrary code stored**
+- Strategy Builder integration: save, browse, load, update, delete templates;
+  loaded rules repopulate the builder and can be re-run on any ticker/dates
+- Full CRUD + validation + round-trip test coverage
+
 ---
 
 ## Future Phases

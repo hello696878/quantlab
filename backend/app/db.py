@@ -92,6 +92,23 @@ def init_db() -> None:
             )
             """
         )
+        # Reusable Custom Strategy Builder definitions (NOT backtest results).
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS custom_strategy_templates (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at        TEXT NOT NULL,
+                updated_at        TEXT NOT NULL,
+                name              TEXT NOT NULL,
+                description       TEXT NOT NULL DEFAULT '',
+                entry_logic       TEXT NOT NULL,
+                exit_logic        TEXT NOT NULL,
+                entry_rules_json  TEXT NOT NULL DEFAULT '[]',
+                exit_rules_json   TEXT NOT NULL DEFAULT '[]',
+                tags_json         TEXT NOT NULL DEFAULT '[]'
+            )
+            """
+        )
         conn.commit()
     finally:
         conn.close()

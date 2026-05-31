@@ -1311,3 +1311,84 @@ class CustomStrategyRequest(BaseModel):
         default="any",
         description="'all' = every exit rule must hold (AND); 'any' = at least one (OR).",
     )
+
+
+# ===========================================================================
+# Saved Custom Strategy Templates
+# ===========================================================================
+#
+# A *template* is a reusable strategy definition (rules + logic + metadata).
+# It deliberately stores NO backtest results — see saved_backtests.py for those.
+# Rules reuse the exact same validated CustomRule schema as the live builder,
+# so only whitelisted indicators/operators are ever accepted (no eval, no
+# arbitrary code).  Logic is expressed as "AND"/"OR" at the template layer.
+
+CustomTemplateLogic = Literal["AND", "OR"]
+
+
+class CustomStrategyTemplateBase(BaseModel):
+    """Shared fields for creating / updating a custom strategy template."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, description="Template display name (non-empty).")
+    description: str = Field(default="", description="Free-text description.")
+    entry_logic: CustomTemplateLogic = Field(
+        default="AND", description="How entry rules combine: 'AND' or 'OR'."
+    )
+    exit_logic: CustomTemplateLogic = Field(
+        default="OR", description="How exit rules combine: 'AND' or 'OR'."
+    )
+    entry_rules: List[CustomRule] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Entry rules (0–10). Reuses the Custom Strategy Builder schema.",
+    )
+    exit_rules: List[CustomRule] = Field(
+        default_factory=list,
+        max_length=10,
+        description="Exit rules (0–10). Reuses the Custom Strategy Builder schema.",
+    )
+    tags: List[str] = Field(
+        default_factory=list,
+        max_length=20,
+        description="Optional free-text tags for organising templates.",
+    )
+
+
+class CustomStrategyTemplateCreate(CustomStrategyTemplateBase):
+    """Request body for POST /custom-strategies."""
+
+
+class CustomStrategyTemplateUpdate(CustomStrategyTemplateBase):
+    """Request body for PUT /custom-strategies/{id} (full replace)."""
+
+
+class CustomStrategyTemplateSummary(BaseModel):
+    """Lightweight list row — omits the full rule arrays."""
+
+    id: int
+    created_at: str
+    updated_at: str
+    name: str
+    description: str
+    entry_logic: CustomTemplateLogic
+    exit_logic: CustomTemplateLogic
+    num_entry_rules: int = Field(description="Number of entry rules.")
+    num_exit_rules: int = Field(description="Number of exit rules.")
+    tags: List[str]
+
+
+class CustomStrategyTemplateFull(BaseModel):
+    """Full template record including the rule definitions."""
+
+    id: int
+    created_at: str
+    updated_at: str
+    name: str
+    description: str
+    entry_logic: CustomTemplateLogic
+    exit_logic: CustomTemplateLogic
+    entry_rules: List[CustomRule]
+    exit_rules: List[CustomRule]
+    tags: List[str]

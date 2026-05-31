@@ -12,6 +12,11 @@ POST /backtest/volatility-breakout      — run a volatility breakout backtest
 POST /backtest/pairs                    — run a pairs trading backtest
 POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
 POST /backtest/custom                   — run a no-code custom rule-based strategy
+POST /custom-strategies                 — save a reusable custom strategy template
+GET  /custom-strategies                 — list saved custom strategy templates
+GET  /custom-strategies/{id}            — get a full custom strategy template
+PUT  /custom-strategies/{id}            — update a custom strategy template
+DELETE /custom-strategies/{id}          — delete a custom strategy template
 POST /research/sma-parameter-sweep     — sweep fast/slow SMA window combinations
 POST /research/sma-train-test          — SMA train/test out-of-sample validation
 POST /research/sma-walk-forward        — SMA walk-forward optimization
@@ -28,6 +33,13 @@ from pydantic import ValidationError
 from app.backtest import run_backtest, run_pairs_backtest
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
+from app.custom_strategy_templates import (
+    create_template as tpl_create,
+    delete_template as tpl_delete,
+    get_template as tpl_get,
+    list_templates as tpl_list,
+    update_template as tpl_update,
+)
 from app.data import fetch_ohlcv, fetch_pairs_close
 from app.db import init_db
 from app.metrics import compute_metrics
@@ -42,6 +54,10 @@ from app.schemas import (
     BacktestResponse,
     BbBacktestRequest,
     CustomStrategyRequest,
+    CustomStrategyTemplateCreate,
+    CustomStrategyTemplateFull,
+    CustomStrategyTemplateSummary,
+    CustomStrategyTemplateUpdate,
     DeleteResponse,
     EquityPoint,
     MomentumBacktestRequest,
@@ -1844,3 +1860,94 @@ def backtest_custom(request: CustomStrategyRequest) -> BacktestResponse:
         position=position,
         strategy="custom",
     )
+
+
+# ---------------------------------------------------------------------------
+# Saved Custom Strategy Templates
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/custom-strategies",
+    response_model=CustomStrategyTemplateFull,
+    tags=["custom-strategies"],
+    summary="Save a reusable custom strategy template",
+    description=(
+        "Persist a reusable Custom Strategy Builder definition (entry/exit "
+        "rules, combine logic, name, description, tags) to the local SQLite "
+        "database.  Stores the definition only — never backtest results.  Rules "
+        "are validated against the same whitelisted schema as the live builder; "
+        "no user code is ever stored or executed."
+    ),
+)
+def create_custom_strategy(
+    request: CustomStrategyTemplateCreate,
+) -> CustomStrategyTemplateFull:
+    record = tpl_create(request.model_dump())
+    return CustomStrategyTemplateFull(**record)
+
+
+@app.get(
+    "/custom-strategies",
+    response_model=list[CustomStrategyTemplateSummary],
+    tags=["custom-strategies"],
+    summary="List saved custom strategy templates",
+    description=(
+        "Return all saved templates as lightweight summary rows (rule counts "
+        "instead of full rule arrays), most recently updated first."
+    ),
+)
+def list_custom_strategies() -> list[CustomStrategyTemplateSummary]:
+    return [CustomStrategyTemplateSummary(**row) for row in tpl_list()]
+
+
+@app.get(
+    "/custom-strategies/{id}",
+    response_model=CustomStrategyTemplateFull,
+    tags=["custom-strategies"],
+    summary="Get a full custom strategy template",
+    description="Return the full template definition including all rules.",
+)
+def get_custom_strategy(id: int) -> CustomStrategyTemplateFull:
+    record = tpl_get(id)
+    if record is None:
+        raise HTTPException(
+            status_code=404, detail=f"Custom strategy template {id} not found."
+        )
+    return CustomStrategyTemplateFull(**record)
+
+
+@app.put(
+    "/custom-strategies/{id}",
+    response_model=CustomStrategyTemplateFull,
+    tags=["custom-strategies"],
+    summary="Update a custom strategy template",
+    description=(
+        "Replace an existing template's rules, logic, and metadata.  Preserves "
+        "the original created_at and refreshes updated_at."
+    ),
+)
+def update_custom_strategy(
+    id: int, request: CustomStrategyTemplateUpdate
+) -> CustomStrategyTemplateFull:
+    record = tpl_update(id, request.model_dump())
+    if record is None:
+        raise HTTPException(
+            status_code=404, detail=f"Custom strategy template {id} not found."
+        )
+    return CustomStrategyTemplateFull(**record)
+
+
+@app.delete(
+    "/custom-strategies/{id}",
+    response_model=DeleteResponse,
+    tags=["custom-strategies"],
+    summary="Delete a custom strategy template",
+    description="Permanently delete a saved custom strategy template by id.",
+)
+def delete_custom_strategy(id: int) -> DeleteResponse:
+    if not tpl_delete(id):
+        raise HTTPException(
+            status_code=404, detail=f"Custom strategy template {id} not found."
+        )
+    return DeleteResponse(deleted=True, id=id)

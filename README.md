@@ -61,11 +61,24 @@ The **CSV Backtest** workspace lets you upload your own historical price CSV and
 
 The **Strategy Builder** workspace is a no-code rule builder for long-only, single-asset strategies (`POST /backtest/custom`). Compose entry and exit rules that compare two operands — `close`, a numeric constant, or an indicator (`sma`, `rsi`, `bb_upper`/`bb_middle`/`bb_lower`, `momentum`) — with `>`, `>=`, `<`, or `<=`. Rules are combined with ALL (AND) or ANY (OR) logic; the position is shifted one bar forward to avoid lookahead bias. Rules are evaluated entirely with vectorised pandas math — **no `eval`, no user code is ever executed**. Indicators reuse the exact formulas of the built-in strategies. No short selling, leverage, or pairs.
 
+### Saved Strategy Templates
+
+The Strategy Builder can **save reusable strategy definitions** (`/custom-strategies` CRUD endpoints). A template stores the rule definition only — entry/exit rules, combine logic, name, description, and tags — and can be loaded back into the builder and re-run on any ticker, date range, or (future) CSV upload. Templates are validated against the same whitelisted rule schema as the live builder, so **no arbitrary code is ever stored or executed** (no `eval`). Create, list, load, update, and delete templates directly from the Strategy Builder workspace.
+
+**Saved Backtests vs. Saved Strategy Templates** — these are distinct:
+
+| | Saved Backtests | Saved Strategy Templates |
+|---|---|---|
+| Stores | A completed **result** (metrics, equity curve, trades) frozen at run time | A reusable **strategy definition** (rules + logic + metadata) |
+| Tied to a ticker/date range | Yes — captures one specific run | No — re-runnable on any ticker/dates |
+| Table | `saved_backtests` | `custom_strategy_templates` |
+| Purpose | Review/compare past results | Reuse and iterate on a strategy idea |
+
 ### Saved Backtests
 
 Completed backtest results can be saved to a local SQLite database and reopened from the Saved Backtests view. Saved records preserve the run name, notes, strategy parameters, metrics, equity curve, and trade log.
 
-The local database lives at `backend/data/quantlab.db`. The backend creates `backend/data/` automatically when needed, and `backend/data/*.db` is ignored by git so local research artifacts are not committed.
+The local database lives at `backend/data/quantlab.db` (both `saved_backtests` and `custom_strategy_templates` tables). The backend creates `backend/data/` automatically when needed, and `backend/data/*.db` is ignored by git so local research artifacts are not committed.
 
 ### Engineering
 

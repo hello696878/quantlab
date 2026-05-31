@@ -1,7 +1,14 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { runCustomBacktest } from "@/lib/api";
+import { useEffect, useMemo, useState } from "react";
+import {
+  createCustomStrategyTemplate,
+  deleteCustomStrategyTemplate,
+  getCustomStrategyTemplate,
+  listCustomStrategyTemplates,
+  runCustomBacktest,
+  updateCustomStrategyTemplate,
+} from "@/lib/api";
 import type {
   BacktestResponse,
   CustomIndicatorName,
@@ -9,6 +16,8 @@ import type {
   CustomOperator,
   CustomRule,
   CustomStrategyRequest,
+  CustomStrategyTemplateCreate,
+  CustomStrategyTemplateSummary,
 } from "@/lib/types";
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
@@ -138,6 +147,40 @@ function ruleToApi(rule: UIRule): CustomRule | null {
   const right = operandToApi(rule.right);
   if (!left || !right) return null;
   return { left, operator: rule.operator, right };
+}
+
+/** Convert a list of UI rules to API rules; ok=false if any is incomplete. */
+function rulesToApiList(rules: UIRule[]): { ok: boolean; api: CustomRule[] } {
+  const api: CustomRule[] = [];
+  for (const r of rules) {
+    const a = ruleToApi(r);
+    if (!a) return { ok: false, api: [] };
+    api.push(a);
+  }
+  return { ok: true, api };
+}
+
+/** Reverse conversion: API operand → editable UI operand (strings preserved). */
+function apiOperandToUi(op: CustomOperand): UIOperand {
+  if (op.type === "close") return makeOperand({ kind: "close" });
+  if (op.type === "constant") {
+    return makeOperand({ kind: "constant", value: String(op.value) });
+  }
+  return makeOperand({
+    kind: "indicator",
+    name: op.name,
+    window: String(op.params.window),
+    numStd: op.params.num_std != null ? String(op.params.num_std) : "2",
+  });
+}
+
+function apiRuleToUi(rule: CustomRule): UIRule {
+  return {
+    id: nextId(),
+    left: apiOperandToUi(rule.left),
+    operator: rule.operator,
+    right: apiOperandToUi(rule.right),
+  };
 }
 
 /** Human-readable operand label, e.g. "SMA(50)" or "close" or "30". */
@@ -390,6 +433,123 @@ function Field({
 // Component
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Saved template list (data comes from the backend — never faked)
+// ---------------------------------------------------------------------------
+
+function TemplateList({
+  refreshKey,
+  activeId,
+  onLoad,
+  onDeleted,
+  disabled,
+}: {
+  refreshKey: number;
+  activeId: number | null;
+  onLoad: (id: number) => void;
+  onDeleted: (id: number) => void;
+  disabled: boolean;
+}) {
+  const [rows, setRows] = useState<CustomStrategyTemplateSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    setErr(null);
+    listCustomStrategyTemplates()
+      .then((d) => !cancelled && setRows(d))
+      .catch(
+        (e) =>
+          !cancelled &&
+          setErr(e instanceof Error ? e.message : "Failed to load templates."),
+      )
+      .finally(() => !cancelled && setLoading(false));
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshKey]);
+
+  async function del(id: number, name: string) {
+    if (!confirm(`Delete template "${name}"? This cannot be undone.`)) return;
+    setDeletingId(id);
+    try {
+      await deleteCustomStrategyTemplate(id);
+      setRows((p) => p.filter((r) => r.id !== id));
+      onDeleted(id);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Delete failed.");
+    } finally {
+      setDeletingId(null);
+    }
+  }
+
+  if (loading) {
+    return <p className="text-xs text-slate-400 px-1 py-2">Loading templates…</p>;
+  }
+  if (err) {
+    return (
+      <p className="text-xs text-red-600 px-1 py-2">⚠ {err}</p>
+    );
+  }
+  if (rows.length === 0) {
+    return (
+      <p className="text-xs text-slate-400 px-1 py-2">
+        No saved templates yet. Build a strategy and click “Save Template”.
+      </p>
+    );
+  }
+
+  return (
+    <div className="divide-y divide-slate-100 rounded-xl border border-slate-200">
+      {rows.map((t) => (
+        <div
+          key={t.id}
+          className={
+            "flex flex-wrap items-center gap-2 px-3 py-2 " +
+            (t.id === activeId ? "bg-blue-50" : "")
+          }
+        >
+          <div className="min-w-0 flex-1">
+            <div className="text-sm font-medium text-slate-800 truncate">
+              {t.name}
+              {t.id === activeId && (
+                <span className="ml-2 text-[10px] uppercase text-blue-700">loaded</span>
+              )}
+            </div>
+            <div className="text-xs text-slate-400 truncate">
+              {t.num_entry_rules} entry · {t.num_exit_rules} exit ·{" "}
+              {t.entry_logic}/{t.exit_logic}
+              {t.tags.length > 0 && <> · {t.tags.join(", ")}</>}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onLoad(t.id)}
+            disabled={disabled}
+            className="text-xs px-2.5 py-1 rounded-md border border-blue-200
+                       text-blue-700 hover:bg-blue-50 transition-colors font-medium"
+          >
+            Load
+          </button>
+          <button
+            type="button"
+            onClick={() => del(t.id, t.name)}
+            disabled={disabled || deletingId === t.id}
+            className="text-xs px-2.5 py-1 rounded-md border border-red-200
+                       text-red-600 hover:bg-red-50 transition-colors font-medium
+                       disabled:opacity-50"
+          >
+            {deletingId === t.id ? "…" : "Delete"}
+          </button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function StrategyBuilderPanel() {
   const [ticker, setTicker] = useState("SPY");
   const [startDate, setStartDate] = useState("2015-01-01");
@@ -405,6 +565,91 @@ export default function StrategyBuilderPanel() {
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // ── Template state ────────────────────────────────────────────────────────
+  const [templateName, setTemplateName] = useState("");
+  const [templateDesc, setTemplateDesc] = useState("");
+  const [tagsStr, setTagsStr] = useState("");
+  const [loadedId, setLoadedId] = useState<number | null>(null);
+  const [showTemplates, setShowTemplates] = useState(false);
+  const [tplRefresh, setTplRefresh] = useState(0);
+  const [savingTpl, setSavingTpl] = useState(false);
+  const [tplMsg, setTplMsg] = useState<string | null>(null);
+
+  function buildTemplatePayload(): CustomStrategyTemplateCreate | null {
+    if (templateName.trim() === "") return null;
+    const e = rulesToApiList(entryRules);
+    const x = rulesToApiList(exitRules);
+    if (!e.ok || !x.ok) return null;
+    return {
+      name: templateName.trim(),
+      description: templateDesc.trim(),
+      entry_logic: entryLogic === "all" ? "AND" : "OR",
+      exit_logic: exitLogic === "all" ? "AND" : "OR",
+      entry_rules: e.api,
+      exit_rules: x.api,
+      tags: tagsStr
+        .split(",")
+        .map((t) => t.trim())
+        .filter(Boolean),
+    };
+  }
+
+  const templateValid = buildTemplatePayload() !== null;
+
+  async function handleSaveTemplate(asNew: boolean) {
+    const payload = buildTemplatePayload();
+    if (!payload) {
+      setTplMsg("Enter a template name and complete every rule first.");
+      return;
+    }
+    setSavingTpl(true);
+    setTplMsg(null);
+    try {
+      if (loadedId !== null && !asNew) {
+        const updated = await updateCustomStrategyTemplate(loadedId, payload);
+        setTplMsg(`Updated “${updated.name}”.`);
+      } else {
+        const created = await createCustomStrategyTemplate(payload);
+        setLoadedId(created.id);
+        setTplMsg(`Saved “${created.name}”.`);
+      }
+      setTplRefresh((k) => k + 1);
+    } catch (err) {
+      setTplMsg(err instanceof Error ? err.message : "Save failed.");
+    } finally {
+      setSavingTpl(false);
+    }
+  }
+
+  async function handleLoadTemplate(id: number) {
+    setTplMsg(null);
+    try {
+      const tpl = await getCustomStrategyTemplate(id);
+      setTemplateName(tpl.name);
+      setTemplateDesc(tpl.description);
+      setTagsStr(tpl.tags.join(", "));
+      setEntryLogic(tpl.entry_logic === "AND" ? "all" : "any");
+      setExitLogic(tpl.exit_logic === "AND" ? "all" : "any");
+      setEntryRules(tpl.entry_rules.map(apiRuleToUi));
+      setExitRules(tpl.exit_rules.map(apiRuleToUi));
+      setLoadedId(id);
+      setResult(null);
+      setError(null);
+      setShowTemplates(false);
+      setTplMsg(`Loaded “${tpl.name}”. Edit and run, or save changes.`);
+    } catch (err) {
+      setTplMsg(err instanceof Error ? err.message : "Load failed.");
+    }
+  }
+
+  function handleNewTemplate() {
+    setLoadedId(null);
+    setTemplateName("");
+    setTemplateDesc("");
+    setTagsStr("");
+    setTplMsg(null);
+  }
 
   // ── Build + validate the request ────────────────────────────────────────
   const { request, validationMsg } = useMemo(() => {
@@ -488,6 +733,110 @@ export default function StrategyBuilderPanel() {
 
   return (
     <div className="space-y-6">
+      {/* ── Strategy templates ─────────────────────────────────────────── */}
+      <div className="card p-6 space-y-4">
+        <div className="flex items-center justify-between">
+          <p className="section-title">Strategy Templates</p>
+          <div className="flex items-center gap-2 text-xs">
+            {loadedId !== null && (
+              <span className="text-blue-700">Editing template #{loadedId}</span>
+            )}
+            <button
+              type="button"
+              onClick={() => setShowTemplates((s) => !s)}
+              className="px-2.5 py-1 rounded-md border border-slate-300 text-slate-600
+                         hover:border-slate-400 transition-colors font-medium"
+            >
+              {showTemplates ? "Hide saved" : "Browse saved"}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <Field label="Template Name">
+            <input
+              className={inputCls}
+              value={templateName}
+              onChange={(e) => setTemplateName(e.target.value)}
+              placeholder="e.g. SMA + RSI Trend Filter"
+              disabled={savingTpl}
+            />
+          </Field>
+          <Field label="Description" hint="optional">
+            <input
+              className={inputCls}
+              value={templateDesc}
+              onChange={(e) => setTemplateDesc(e.target.value)}
+              placeholder="What this strategy does"
+              disabled={savingTpl}
+            />
+          </Field>
+          <Field label="Tags" hint="comma-separated">
+            <input
+              className={inputCls}
+              value={tagsStr}
+              onChange={(e) => setTagsStr(e.target.value)}
+              placeholder="trend, rsi"
+              disabled={savingTpl}
+            />
+          </Field>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => handleSaveTemplate(false)}
+            disabled={!templateValid || savingTpl}
+            className="px-4 py-1.5 rounded-lg text-sm font-semibold text-white bg-blue-600
+                       hover:bg-blue-700 transition-colors disabled:opacity-50
+                       disabled:cursor-not-allowed"
+          >
+            {savingTpl
+              ? "Saving…"
+              : loadedId !== null
+                ? "Update Template"
+                : "Save Template"}
+          </button>
+          {loadedId !== null && (
+            <button
+              type="button"
+              onClick={() => handleSaveTemplate(true)}
+              disabled={!templateValid || savingTpl}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600
+                         border border-slate-300 hover:border-slate-400 transition-colors
+                         disabled:opacity-50"
+            >
+              Save as new
+            </button>
+          )}
+          {loadedId !== null && (
+            <button
+              type="button"
+              onClick={handleNewTemplate}
+              disabled={savingTpl}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium text-slate-500
+                         hover:text-slate-700 transition-colors"
+            >
+              Clear
+            </button>
+          )}
+          {tplMsg && <span className="text-xs text-slate-400">{tplMsg}</span>}
+        </div>
+
+        {showTemplates && (
+          <TemplateList
+            refreshKey={tplRefresh}
+            activeId={loadedId}
+            onLoad={handleLoadTemplate}
+            onDeleted={(id) => {
+              if (id === loadedId) setLoadedId(null);
+            }}
+            disabled={savingTpl}
+          />
+        )}
+      </div>
+
+      {/* ── Builder ────────────────────────────────────────────────────── */}
       <div className="card p-6 space-y-6">
         {/* Universe */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">

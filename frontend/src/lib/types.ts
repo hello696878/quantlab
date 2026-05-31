@@ -479,3 +479,46 @@ export interface CustomStrategyRequest {
   exit_rules: CustomRule[];
   exit_logic: "all" | "any";
 }
+
+// ---------------------------------------------------------------------------
+// Saved Custom Strategy Templates (reusable rule definitions, not results)
+// ---------------------------------------------------------------------------
+
+/** Template logic uses AND/OR (the builder uses all/any — map at the seam). */
+export type CustomTemplateLogic = "AND" | "OR";
+
+export interface CustomStrategyTemplateCreate {
+  name: string;
+  description: string;
+  entry_logic: CustomTemplateLogic;
+  exit_logic: CustomTemplateLogic;
+  entry_rules: CustomRule[];
+  exit_rules: CustomRule[];
+  tags: string[];
+}
+
+export interface CustomStrategyTemplateSummary {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  description: string;
+  entry_logic: CustomTemplateLogic;
+  exit_logic: CustomTemplateLogic;
+  num_entry_rules: number;
+  num_exit_rules: number;
+  tags: string[];
+}
+
+export interface CustomStrategyTemplateFull {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  name: string;
+  description: string;
+  entry_logic: CustomTemplateLogic;
+  exit_logic: CustomTemplateLogic;
+  entry_rules: CustomRule[];
+  exit_rules: CustomRule[];
+  tags: string[];
+}

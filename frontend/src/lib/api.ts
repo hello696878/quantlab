@@ -10,6 +10,9 @@ import type {
   BacktestResponse,
   BbBacktestRequest,
   CustomStrategyRequest,
+  CustomStrategyTemplateCreate,
+  CustomStrategyTemplateFull,
+  CustomStrategyTemplateSummary,
   DeleteResponse,
   MomentumBacktestRequest,
   PairsBacktestRequest,
@@ -406,6 +409,61 @@ export async function getSavedBacktest(id: number): Promise<SavedBacktestFull> {
 export async function deleteSavedBacktest(id: number): Promise<DeleteResponse> {
   return savedBacktestsRequest<DeleteResponse>(
     `/api/saved-backtests/${id}`,
+    { method: "DELETE" },
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Saved Custom Strategy Templates
+// ---------------------------------------------------------------------------
+
+/** POST /api/custom-strategies */
+export async function createCustomStrategyTemplate(
+  data: CustomStrategyTemplateCreate,
+): Promise<CustomStrategyTemplateFull> {
+  return savedBacktestsRequest<CustomStrategyTemplateFull>("/api/custom-strategies", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/** GET /api/custom-strategies */
+export async function listCustomStrategyTemplates(): Promise<
+  CustomStrategyTemplateSummary[]
+> {
+  return savedBacktestsRequest<CustomStrategyTemplateSummary[]>(
+    "/api/custom-strategies",
+    { method: "GET" },
+  );
+}
+
+/** GET /api/custom-strategies/{id} */
+export async function getCustomStrategyTemplate(
+  id: number,
+): Promise<CustomStrategyTemplateFull> {
+  return savedBacktestsRequest<CustomStrategyTemplateFull>(
+    `/api/custom-strategies/${id}`,
+    { method: "GET" },
+  );
+}
+
+/** PUT /api/custom-strategies/{id} */
+export async function updateCustomStrategyTemplate(
+  id: number,
+  data: CustomStrategyTemplateCreate,
+): Promise<CustomStrategyTemplateFull> {
+  return savedBacktestsRequest<CustomStrategyTemplateFull>(
+    `/api/custom-strategies/${id}`,
+    { method: "PUT", body: JSON.stringify(data) },
+  );
+}
+
+/** DELETE /api/custom-strategies/{id} */
+export async function deleteCustomStrategyTemplate(
+  id: number,
+): Promise<DeleteResponse> {
+  return savedBacktestsRequest<DeleteResponse>(
+    `/api/custom-strategies/${id}`,
     { method: "DELETE" },
   );
 }
