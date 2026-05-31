@@ -522,3 +522,16 @@ export interface CustomStrategyTemplateFull {
   exit_rules: CustomRule[];
   tags: string[];
 }
+
+/** Portable export/import envelope — no id / timestamps / local detail. */
+export interface CustomStrategyTemplateExport {
+  schema_version: string;
+  type: "quantlab_custom_strategy_template";
+  name: string;
+  description: string;
+  entry_logic: CustomTemplateLogic;
+  exit_logic: CustomTemplateLogic;
+  entry_rules: CustomRule[];
+  exit_rules: CustomRule[];
+  tags: string[];
+}

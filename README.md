@@ -74,6 +74,43 @@ The Strategy Builder can **save reusable strategy definitions** (`/custom-strate
 | Table | `saved_backtests` | `custom_strategy_templates` |
 | Purpose | Review/compare past results | Reuse and iterate on a strategy idea |
 
+#### Import / Export
+
+Templates are portable. **Export** any saved template to a self-describing JSON file (`GET /custom-strategies/{id}/export`, or the per-row **Export** button), and **import** one from a file (`POST /custom-strategies/import`, or the **Import Template** button). Exported files deliberately omit `id`, `created_at`, and `updated_at` so they are safe to share. On import the backend re-validates the document against the **same whitelisted rule schema** as the live builder — wrong `type`, missing `schema_version`, empty name, non-whitelisted indicator/operator, or more than 10 rules per list are rejected with HTTP 422. **Imported templates are validated data, never executed code** (no `eval`).
+
+Example exported JSON:
+
+```json
+{
+  "schema_version": "1.0",
+  "type": "quantlab_custom_strategy_template",
+  "name": "SMA + RSI Trend Filter",
+  "description": "Long when SMA trend is positive and RSI is not overbought.",
+  "entry_logic": "AND",
+  "exit_logic": "OR",
+  "entry_rules": [
+    {
+      "left": { "type": "indicator", "name": "sma", "params": { "window": 50 } },
+      "operator": ">",
+      "right": { "type": "indicator", "name": "sma", "params": { "window": 200 } }
+    },
+    {
+      "left": { "type": "indicator", "name": "rsi", "params": { "window": 14 } },
+      "operator": "<",
+      "right": { "type": "constant", "value": 70 }
+    }
+  ],
+  "exit_rules": [
+    {
+      "left": { "type": "indicator", "name": "sma", "params": { "window": 50 } },
+      "operator": "<=",
+      "right": { "type": "indicator", "name": "sma", "params": { "window": 200 } }
+    }
+  ],
+  "tags": ["trend", "rsi"]
+}
+```
+
 ### Saved Backtests
 
 Completed backtest results can be saved to a local SQLite database and reopened from the Saved Backtests view. Saved records preserve the run name, notes, strategy parameters, metrics, equity curve, and trade log.

@@ -1424,3 +1424,63 @@ class CustomStrategyTemplateFull(BaseModel):
     entry_rules: List[CustomRule]
     exit_rules: List[CustomRule]
     tags: List[str]
+
+
+# ---------------------------------------------------------------------------
+# Import / Export — portable strategy definitions
+# ---------------------------------------------------------------------------
+
+# Marker fields make exported files self-describing and let import reject
+# unrelated JSON.  Local-only fields (id, created_at, updated_at) are never
+# exported.
+CUSTOM_TEMPLATE_EXPORT_TYPE = "quantlab_custom_strategy_template"
+CUSTOM_TEMPLATE_SCHEMA_VERSION = "1.0"
+
+
+class CustomStrategyTemplateExport(BaseModel):
+    """
+    Portable export shape for a custom strategy template.
+
+    Deliberately omits id / created_at / updated_at and any local database
+    detail — only the reusable definition plus self-describing markers.
+    """
+
+    schema_version: str = Field(default=CUSTOM_TEMPLATE_SCHEMA_VERSION)
+    type: Literal["quantlab_custom_strategy_template"] = Field(
+        default=CUSTOM_TEMPLATE_EXPORT_TYPE
+    )
+    name: str
+    description: str
+    entry_logic: CustomTemplateLogic
+    exit_logic: CustomTemplateLogic
+    entry_rules: List[CustomRule]
+    exit_rules: List[CustomRule]
+    tags: List[str]
+
+
+class CustomStrategyTemplateImport(BaseModel):
+    """
+    Request body for POST /custom-strategies/import.
+
+    Validates the portable envelope (schema_version present, correct type) and
+    reuses the exact same whitelisted CustomRule schema as the live builder, so
+    no arbitrary code / non-whitelisted indicator or operator can ever be
+    imported.  Unknown envelope keys are ignored for forward compatibility;
+    rule objects remain strictly validated (extra fields forbidden).
+    """
+
+    model_config = ConfigDict(extra="ignore")
+
+    schema_version: str = Field(
+        min_length=1, description="Export schema version (must be present)."
+    )
+    type: Literal["quantlab_custom_strategy_template"] = Field(
+        description="Must be 'quantlab_custom_strategy_template'."
+    )
+    name: str = Field(min_length=1, description="Template name (non-empty).")
+    description: str = Field(default="")
+    entry_logic: CustomTemplateLogic = Field(default="AND")
+    exit_logic: CustomTemplateLogic = Field(default="OR")
+    entry_rules: List[CustomRule] = Field(default_factory=list, max_length=10)
+    exit_rules: List[CustomRule] = Field(default_factory=list, max_length=10)
+    tags: List[str] = Field(default_factory=list, max_length=20)

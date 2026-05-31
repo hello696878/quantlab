@@ -103,6 +103,18 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   loaded rules repopulate the builder and can be re-run on any ticker/dates
 - Full CRUD + validation + round-trip test coverage
 
+### Phase 6 — Import / Export Strategy Templates ✅
+
+- `GET /custom-strategies/{id}/export` — portable, self-describing JSON
+  (`schema_version` + `type` markers; excludes id / created_at / updated_at)
+- `POST /custom-strategies/import` — validates the envelope and reuses the
+  whitelisted `CustomRule` schema, then persists a new template
+- Rejects wrong `type`, missing `schema_version`, empty name, non-whitelisted
+  indicators/operators, and >10 rules per list — **validated data, never code**
+- Strategy Builder: per-template **Export** button + an **Import Template**
+  file picker; imported templates appear in the saved list and can be run
+- Full export/import + round-trip + security test coverage
+
 ---
 
 ## Future Phases

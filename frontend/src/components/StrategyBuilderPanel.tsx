@@ -1,10 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   createCustomStrategyTemplate,
   deleteCustomStrategyTemplate,
+  exportCustomStrategyTemplate,
   getCustomStrategyTemplate,
+  importCustomStrategyTemplate,
   listCustomStrategyTemplates,
   runCustomBacktest,
   updateCustomStrategyTemplate,
@@ -195,6 +197,31 @@ function operandLabel(op: UIOperand): string {
 
 function opSymbol(op: CustomOperator): string {
   return OPERATORS.find((o) => o.id === op)?.label ?? op;
+}
+
+/** "SMA + RSI Filter" → "sma-rsi-filter" (for export filenames). */
+function slugify(name: string): string {
+  return (
+    name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "") || "template"
+  );
+}
+
+/** Trigger a client-side download of a JSON object. */
+function downloadJson(filename: string, obj: unknown): void {
+  const blob = new Blob([JSON.stringify(obj, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 // ---------------------------------------------------------------------------
@@ -454,6 +481,19 @@ function TemplateList({
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [exportingId, setExportingId] = useState<number | null>(null);
+
+  async function exportOne(id: number, name: string) {
+    setExportingId(id);
+    try {
+      const doc = await exportCustomStrategyTemplate(id);
+      downloadJson(`quantlab-strategy-${slugify(name)}.json`, doc);
+    } catch (e) {
+      alert(e instanceof Error ? e.message : "Export failed.");
+    } finally {
+      setExportingId(null);
+    }
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -536,6 +576,17 @@ function TemplateList({
           </button>
           <button
             type="button"
+            onClick={() => exportOne(t.id, t.name)}
+            disabled={disabled || exportingId === t.id}
+            className="text-xs px-2.5 py-1 rounded-md border border-slate-300
+                       text-slate-600 hover:border-slate-400 transition-colors font-medium
+                       disabled:opacity-50"
+            title="Download this template as a portable JSON file"
+          >
+            {exportingId === t.id ? "…" : "Export"}
+          </button>
+          <button
+            type="button"
             onClick={() => del(t.id, t.name)}
             disabled={disabled || deletingId === t.id}
             className="text-xs px-2.5 py-1 rounded-md border border-red-200
@@ -578,6 +629,8 @@ export default function StrategyBuilderPanel() {
     kind: "info" | "error";
     text: string;
   } | null>(null);
+  const [importing, setImporting] = useState(false);
+  const importInputRef = useRef<HTMLInputElement>(null);
 
   function buildTemplatePayload(): CustomStrategyTemplateCreate | null {
     if (templateName.trim() === "") return null;
@@ -664,6 +717,37 @@ export default function StrategyBuilderPanel() {
     setTemplateDesc("");
     setTagsStr("");
     setTplMsg(null);
+  }
+
+  async function handleImportFile(file: File) {
+    setImporting(true);
+    setTplMsg(null);
+    try {
+      const text = await file.text();
+      let doc: unknown;
+      try {
+        doc = JSON.parse(text);
+      } catch {
+        setTplMsg({ kind: "error", text: "That file is not valid JSON." });
+        return;
+      }
+      // The backend performs all schema + security validation.
+      const created = await importCustomStrategyTemplate(doc);
+      setTplRefresh((k) => k + 1);
+      setShowTemplates(true);
+      setTplMsg({
+        kind: "info",
+        text: `Imported “${created.name}”. Click Load to edit and run it.`,
+      });
+    } catch (err) {
+      setTplMsg({
+        kind: "error",
+        text: err instanceof Error ? err.message : "Import failed.",
+      });
+    } finally {
+      setImporting(false);
+      if (importInputRef.current) importInputRef.current.value = "";
+    }
   }
 
   // ── Build + validate the request ────────────────────────────────────────
@@ -756,6 +840,27 @@ export default function StrategyBuilderPanel() {
             {loadedId !== null && (
               <span className="text-blue-700">Editing template #{loadedId}</span>
             )}
+            <input
+              ref={importInputRef}
+              type="file"
+              accept=".json,application/json"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleImportFile(f);
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => importInputRef.current?.click()}
+              disabled={importing}
+              className="px-2.5 py-1 rounded-md border border-slate-300 text-slate-600
+                         hover:border-slate-400 transition-colors font-medium
+                         disabled:opacity-50"
+              title="Import a strategy template from a JSON file"
+            >
+              {importing ? "Importing…" : "Import Template"}
+            </button>
             <button
               type="button"
               onClick={() => setShowTemplates((s) => !s)}

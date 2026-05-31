@@ -17,6 +17,8 @@ GET  /custom-strategies                 — list saved custom strategy templates
 GET  /custom-strategies/{id}            — get a full custom strategy template
 PUT  /custom-strategies/{id}            — update a custom strategy template
 DELETE /custom-strategies/{id}          — delete a custom strategy template
+GET  /custom-strategies/{id}/export     — export a template as portable JSON
+POST /custom-strategies/import          — import a template from portable JSON
 POST /research/sma-parameter-sweep     — sweep fast/slow SMA window combinations
 POST /research/sma-train-test          — SMA train/test out-of-sample validation
 POST /research/sma-walk-forward        — SMA walk-forward optimization
@@ -55,7 +57,9 @@ from app.schemas import (
     BbBacktestRequest,
     CustomStrategyRequest,
     CustomStrategyTemplateCreate,
+    CustomStrategyTemplateExport,
     CustomStrategyTemplateFull,
+    CustomStrategyTemplateImport,
     CustomStrategyTemplateSummary,
     CustomStrategyTemplateUpdate,
     DeleteResponse,
@@ -1951,3 +1955,55 @@ def delete_custom_strategy(id: int) -> DeleteResponse:
             status_code=404, detail=f"Custom strategy template {id} not found."
         )
     return DeleteResponse(deleted=True, id=id)
+
+
+@app.get(
+    "/custom-strategies/{id}/export",
+    response_model=CustomStrategyTemplateExport,
+    tags=["custom-strategies"],
+    summary="Export a template as portable JSON",
+    description=(
+        "Return a portable, self-describing export of a saved template "
+        "(schema_version + type markers + the reusable definition).  Local-only "
+        "fields (id, created_at, updated_at) are intentionally excluded so the "
+        "file is safe to share and re-import."
+    ),
+)
+def export_custom_strategy(id: int) -> CustomStrategyTemplateExport:
+    record = tpl_get(id)
+    if record is None:
+        raise HTTPException(
+            status_code=404, detail=f"Custom strategy template {id} not found."
+        )
+    return CustomStrategyTemplateExport(
+        name=record["name"],
+        description=record["description"],
+        entry_logic=record["entry_logic"],
+        exit_logic=record["exit_logic"],
+        entry_rules=record["entry_rules"],
+        exit_rules=record["exit_rules"],
+        tags=record["tags"],
+    )
+
+
+@app.post(
+    "/custom-strategies/import",
+    response_model=CustomStrategyTemplateFull,
+    tags=["custom-strategies"],
+    summary="Import a template from portable JSON",
+    description=(
+        "Validate a portable export envelope and persist it as a new saved "
+        "template.  Reuses the exact whitelisted CustomRule schema as the live "
+        "builder, so only known indicators/operators are accepted — no `eval`, "
+        "no arbitrary code, max 10 entry / 10 exit rules.  A wrong `type`, "
+        "missing `schema_version`, empty `name`, or invalid rule is rejected "
+        "with 422."
+    ),
+)
+def import_custom_strategy(
+    request: CustomStrategyTemplateImport,
+) -> CustomStrategyTemplateFull:
+    # model_dump() carries the validated definition; tpl_create reads only the
+    # fields it needs (envelope markers are ignored).
+    record = tpl_create(request.model_dump())
+    return CustomStrategyTemplateFull(**record)

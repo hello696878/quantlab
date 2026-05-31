@@ -11,6 +11,7 @@ import type {
   BbBacktestRequest,
   CustomStrategyRequest,
   CustomStrategyTemplateCreate,
+  CustomStrategyTemplateExport,
   CustomStrategyTemplateFull,
   CustomStrategyTemplateSummary,
   DeleteResponse,
@@ -465,5 +466,29 @@ export async function deleteCustomStrategyTemplate(
   return savedBacktestsRequest<DeleteResponse>(
     `/api/custom-strategies/${id}`,
     { method: "DELETE" },
+  );
+}
+
+/** GET /api/custom-strategies/{id}/export — portable JSON (no id/timestamps) */
+export async function exportCustomStrategyTemplate(
+  id: number,
+): Promise<CustomStrategyTemplateExport> {
+  return savedBacktestsRequest<CustomStrategyTemplateExport>(
+    `/api/custom-strategies/${id}/export`,
+    { method: "GET" },
+  );
+}
+
+/**
+ * POST /api/custom-strategies/import — validate a portable JSON document and
+ * persist it as a new template.  The backend performs all validation; `doc`
+ * is the parsed contents of an uploaded file.
+ */
+export async function importCustomStrategyTemplate(
+  doc: unknown,
+): Promise<CustomStrategyTemplateFull> {
+  return savedBacktestsRequest<CustomStrategyTemplateFull>(
+    "/api/custom-strategies/import",
+    { method: "POST", body: JSON.stringify(doc) },
   );
 }
