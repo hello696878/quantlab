@@ -860,3 +860,150 @@ def risk_dashboard(prices: pd.DataFrame) -> dict:
         "correlation_diagnostics": diagnostics,
         "risk_contribution": risk_contribution,
     }
+
+
+# ===========================================================================
+# Stress testing / historical scenario analysis
+# ===========================================================================
+
+
+def _scenario_stats(daily_returns: pd.Series, initial_capital: float, anchor_date):
+    """
+    Build a rebased equity curve + summary stats from a slice of daily returns.
+
+    The curve is anchored at ``initial_capital`` on ``anchor_date`` (the trading
+    day before the first counted return), then compounds each daily return.
+    Returns ``(equity_series, total_return, max_drawdown, ann_vol, worst, best)``.
+    """
+    dates = [anchor_date]
+    vals = [float(initial_capital)]
+    running = float(initial_capital)
+    for d, r in daily_returns.items():
+        running *= 1.0 + float(r)
+        dates.append(d)
+        vals.append(running)
+    equity = pd.Series(vals, index=dates)
+
+    total_return = float(equity.iloc[-1] / initial_capital - 1.0)
+    max_drawdown = float(drawdown_series(equity).min())
+    ann_vol = (
+        float(daily_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR))
+        if len(daily_returns) >= 2
+        else 0.0
+    )
+    worst = float(daily_returns.min()) if len(daily_returns) else 0.0
+    best = float(daily_returns.max()) if len(daily_returns) else 0.0
+    return equity, total_return, max_drawdown, ann_vol, worst, best
+
+
+def _curve_points(equity: pd.Series) -> List[dict]:
+    return [
+        {"date": _date_str(d), "value": round(float(v), 2)}
+        for d, v in zip(equity.index, equity)
+    ]
+
+
+def stress_test(
+    prices: pd.DataFrame,
+    benchmark_close: pd.Series,
+    weights: Dict[str, float],
+    scenarios: List[dict],
+    initial_capital: float = 100_000.0,
+    transaction_cost_bps: float = 0.0,
+) -> dict:
+    """
+    Static-weight, long-only stress test over historical scenario windows.
+
+    The portfolio holds fixed target weights (``portfolio_return[t] = Σ wᵢ·rᵢ``);
+    each scenario is sliced from the full daily-return series and rebased to
+    ``initial_capital`` for comparison against the benchmark.  No rebalancing or
+    leverage; ``transaction_cost_bps`` is accepted for API symmetry but does not
+    affect the buy-and-hold curves in v1.
+
+    ``prices`` (aligned, columns = tickers) and ``benchmark_close`` must share
+    the same DatetimeIndex.  Raises ``ValueError`` for a scenario that does not
+    overlap the data.
+    """
+    _validate_price_frame(prices)
+    tickers = list(prices.columns)
+    w = np.array([weights[t] for t in tickers], dtype=float)
+
+    asset_ret = prices.pct_change(fill_method=None)
+    port_ret_full = pd.Series(asset_ret.to_numpy() @ w, index=prices.index)
+    bench_ret_full = benchmark_close.pct_change(fill_method=None)
+
+    # ── Full-period curves + metrics ─────────────────────────────────────
+    full_equity, *_ = _scenario_stats(
+        port_ret_full.iloc[1:], initial_capital, prices.index[0]
+    )
+    bench_equity = initial_capital * (benchmark_close / float(benchmark_close.iloc[0]))
+    full_metrics = compute_metrics(full_equity)
+    bench_metrics = compute_metrics(bench_equity)
+
+    idx = prices.index
+    scenario_results: List[dict] = []
+
+    for scn in scenarios:
+        name = scn["name"]
+        s = pd.Timestamp(scn["start_date"])
+        e = pd.Timestamp(scn["end_date"])
+        positions = np.where((idx >= s) & (idx <= e))[0]
+        if len(positions) == 0:
+            raise ValueError(
+                f"Scenario '{name}' ({scn['start_date']} to {scn['end_date']}) "
+                f"does not overlap the available data "
+                f"({_date_str(idx[0])} to {_date_str(idx[-1])})."
+            )
+        i0, i1 = int(positions[0]), int(positions[-1])
+        ret_start = max(i0, 1)
+        if ret_start > i1:
+            raise ValueError(
+                f"Scenario '{name}' is too short — no return days inside the window."
+            )
+        sel = slice(ret_start, i1 + 1)
+        anchor_date = idx[ret_start - 1]
+
+        scn_port = port_ret_full.iloc[sel]
+        scn_bench = bench_ret_full.iloc[sel]
+
+        p_eq, p_tr, p_dd, p_vol, p_worst, p_best = _scenario_stats(
+            scn_port, initial_capital, anchor_date
+        )
+        b_eq, b_tr, b_dd, b_vol, b_worst, b_best = _scenario_stats(
+            scn_bench, initial_capital, anchor_date
+        )
+
+        win_corr = asset_ret.iloc[sel].corr().fillna(0.0)
+        corr_dict = {
+            ti: {tj: float(win_corr.loc[ti, tj]) for tj in tickers} for ti in tickers
+        }
+
+        scenario_results.append(
+            {
+                "name": name,
+                "start_date": scn["start_date"],
+                "end_date": scn["end_date"],
+                "total_return": p_tr,
+                "max_drawdown": p_dd,
+                "annualized_volatility": p_vol,
+                "worst_day_return": p_worst,
+                "best_day_return": p_best,
+                "benchmark_total_return": b_tr,
+                "benchmark_max_drawdown": b_dd,
+                "benchmark_worst_day_return": b_worst,
+                "benchmark_best_day_return": b_best,
+                "excess_return": p_tr - b_tr,
+                "correlation_matrix": corr_dict,
+                "portfolio_equity_curve": _curve_points(p_eq),
+                "benchmark_equity_curve": _curve_points(b_eq),
+            }
+        )
+
+    return {
+        "tickers": tickers,
+        "full_period_metrics": full_metrics,
+        "benchmark_full_period_metrics": bench_metrics,
+        "full_equity_curve": _curve_points(full_equity),
+        "benchmark_equity_curve": _curve_points(bench_equity),
+        "scenarios": scenario_results,
+    }

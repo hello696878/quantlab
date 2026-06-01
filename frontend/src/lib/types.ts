@@ -632,6 +632,60 @@ export interface EfficientFrontierResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Portfolio Stress Testing / Scenario Analysis
+// ---------------------------------------------------------------------------
+
+export interface StressScenarioInput {
+  name: string;
+  start_date: string;
+  end_date: string;
+}
+
+export interface StressTestRequest {
+  tickers: string[];
+  weights?: Record<string, number> | null;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  transaction_cost_bps: number;
+  scenarios: StressScenarioInput[];
+  benchmark_ticker: string;
+}
+
+export interface StressScenarioResult {
+  name: string;
+  start_date: string;
+  end_date: string;
+  total_return: number;
+  max_drawdown: number;
+  annualized_volatility: number;
+  worst_day_return: number;
+  best_day_return: number;
+  benchmark_total_return: number;
+  benchmark_max_drawdown: number;
+  benchmark_worst_day_return: number;
+  benchmark_best_day_return: number;
+  excess_return: number;
+  correlation_matrix: Record<string, Record<string, number>>;
+  portfolio_equity_curve: PortfolioOptEquityPoint[];
+  benchmark_equity_curve: PortfolioOptEquityPoint[];
+}
+
+export interface StressTestResponse {
+  tickers: string[];
+  weights: Record<string, number>;
+  start_date: string;
+  end_date: string;
+  benchmark_ticker: string;
+  full_period_metrics: PerformanceMetrics;
+  benchmark_full_period_metrics: PerformanceMetrics;
+  full_equity_curve: PortfolioOptEquityPoint[];
+  benchmark_equity_curve: PortfolioOptEquityPoint[];
+  scenarios: StressScenarioResult[];
+  historical_note: string;
+}
+
+// ---------------------------------------------------------------------------
 // Portfolio Risk Dashboard
 // ---------------------------------------------------------------------------
 

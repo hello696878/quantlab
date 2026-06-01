@@ -15,6 +15,7 @@ POST /portfolio/optimize                — optimize portfolio weights (min-vol 
 POST /portfolio/walk-forward-optimize   — rolling out-of-sample portfolio optimization
 POST /portfolio/efficient-frontier      — risk-return space of long-only portfolios
 POST /portfolio/risk-dashboard          — asset/portfolio risk diagnostics
+POST /portfolio/stress-test             — historical scenario / stress analysis
 POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
 POST /backtest/custom                   — run a no-code custom rule-based strategy
 POST /custom-strategies                 — save a reusable custom strategy template
@@ -64,6 +65,7 @@ from app.portfolio import (
     risk_dashboard,
     run_equal_weight_portfolio,
     run_walk_forward_optimization,
+    stress_test,
 )
 from app.strategy_gallery import get_gallery_template, list_gallery
 from app.metrics import compute_metrics
@@ -109,6 +111,9 @@ from app.schemas import (
     EqualWeightRiskSummary,
     RiskDashboardRequest,
     RiskDashboardResponse,
+    StressScenarioResult,
+    StressTestRequest,
+    StressTestResponse,
     MomentumBacktestRequest,
     PairsBacktestRequest,
     PerformanceMetrics,
@@ -1248,6 +1253,106 @@ def portfolio_risk_dashboard(request: RiskDashboardRequest) -> RiskDashboardResp
             least_correlated_pair=d["correlation_diagnostics"]["least_correlated_pair"],
         ),
         risk_contribution={t: round(v, 6) for t, v in d["risk_contribution"].items()},
+    )
+
+
+@app.post(
+    "/portfolio/stress-test",
+    response_model=StressTestResponse,
+    tags=["portfolio"],
+    summary="Portfolio stress testing / historical scenario analysis",
+    description=(
+        "Evaluate how a static long-only portfolio (given or equal weights) "
+        "would have moved through historical stress windows.  For each scenario "
+        "the portfolio and benchmark returns are sliced, rebased to the initial "
+        "capital, and summarised (total return, max drawdown, annualised "
+        "volatility, worst/best day, excess vs benchmark, and the asset "
+        "correlation matrix during the window).\n\n"
+        "v1 uses static weights with no rebalancing or leverage.  Results are "
+        "historical and do not guarantee or predict future behaviour.  Not "
+        "investment advice."
+    ),
+)
+def portfolio_stress_test(request: StressTestRequest) -> StressTestResponse:
+    tickers = request.tickers  # cleaned/uppercased/deduped by the schema
+    benchmark_ticker = request.benchmark_ticker
+
+    # Fetch assets + benchmark and align everything on common dates.
+    combined = {}
+    for ticker in tickers:
+        combined[ticker] = _fetch(ticker, request.start_date, request.end_date)["Close"]
+    if benchmark_ticker not in combined:
+        combined[benchmark_ticker] = _fetch(
+            benchmark_ticker, request.start_date, request.end_date
+        )["Close"]
+
+    aligned = align_prices(combined)
+    if len(aligned) < 3:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(aligned)} common trading day(s) across the assets "
+                f"and benchmark; need at least 3.  Try a wider date range or "
+                "assets with overlapping history."
+            ),
+        )
+
+    prices = aligned[tickers]
+    bench_close = aligned[benchmark_ticker]
+
+    weights = request.weights or {t: 1.0 / len(tickers) for t in tickers}
+
+    try:
+        result = stress_test(
+            prices,
+            bench_close,
+            weights,
+            [s.model_dump() for s in request.scenarios],
+            initial_capital=request.initial_capital,
+            transaction_cost_bps=request.transaction_cost_bps,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    def _to_points(curve: list) -> list[PortfolioOptEquityPoint]:
+        return [PortfolioOptEquityPoint(**p) for p in curve]
+
+    scenarios = [
+        StressScenarioResult(
+            name=s["name"],
+            start_date=s["start_date"],
+            end_date=s["end_date"],
+            total_return=round(s["total_return"], 6),
+            max_drawdown=round(s["max_drawdown"], 6),
+            annualized_volatility=round(s["annualized_volatility"], 6),
+            worst_day_return=round(s["worst_day_return"], 6),
+            best_day_return=round(s["best_day_return"], 6),
+            benchmark_total_return=round(s["benchmark_total_return"], 6),
+            benchmark_max_drawdown=round(s["benchmark_max_drawdown"], 6),
+            benchmark_worst_day_return=round(s["benchmark_worst_day_return"], 6),
+            benchmark_best_day_return=round(s["benchmark_best_day_return"], 6),
+            excess_return=round(s["excess_return"], 6),
+            correlation_matrix={
+                ti: {tj: round(v, 6) for tj, v in row.items()}
+                for ti, row in s["correlation_matrix"].items()
+            },
+            portfolio_equity_curve=_to_points(s["portfolio_equity_curve"]),
+            benchmark_equity_curve=_to_points(s["benchmark_equity_curve"]),
+        )
+        for s in result["scenarios"]
+    ]
+
+    return StressTestResponse(
+        tickers=tickers,
+        weights={t: round(float(weights[t]), 6) for t in tickers},
+        start_date=request.start_date,
+        end_date=request.end_date,
+        benchmark_ticker=benchmark_ticker,
+        full_period_metrics=PerformanceMetrics(**result["full_period_metrics"]),
+        benchmark_full_period_metrics=PerformanceMetrics(**result["benchmark_full_period_metrics"]),
+        full_equity_curve=_to_points(result["full_equity_curve"]),
+        benchmark_equity_curve=_to_points(result["benchmark_equity_curve"]),
+        scenarios=scenarios,
     )
 
 

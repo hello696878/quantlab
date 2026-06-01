@@ -214,6 +214,23 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Historical estimates may not persist; not investment advice
 - Full unit + API test coverage
 
+### Phase 7 — Portfolio Stress Testing / Scenario Analysis ✅
+
+- `POST /portfolio/stress-test` — static long-only portfolio (equal or custom
+  weights) evaluated across historical stress windows vs a benchmark
+- Per scenario: total return, max drawdown, annualised volatility, worst/best
+  day, excess return vs benchmark, scenario correlation matrix, and rebased
+  portfolio + benchmark equity curves
+- Built-in presets (COVID, 2022 rate hikes, 2018 Q4, 2011 Euro crisis, 2008
+  GFC) plus custom user-defined scenarios; full-period summary included
+- Validates weights (present for all tickers, ≥0, sum 1), scenario dates, and
+  rejects scenarios that don't overlap the data
+- Portfolio workspace gains a **Stress Test** tab: comparison table, selectable
+  scenario equity curve, correlation heatmap, full-period metrics
+- Static weights, no rebalancing/leverage; results are historical, not a
+  forecast or investment advice
+- Full unit + API test coverage
+
 ---
 
 ## Future Phases

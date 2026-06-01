@@ -178,6 +178,24 @@ The Portfolio workspace's **Risk Dashboard** tab (`POST /portfolio/risk-dashboar
 
 > ⚠️ All figures are **historical estimates** — correlations, volatilities, and risk contributions may not persist out-of-sample. Not investment advice.
 
+### Portfolio Stress Testing
+
+The Portfolio workspace's **Stress Test** tab (`POST /portfolio/stress-test`) shows how a static long-only portfolio (equal or custom weights) would have moved through specific **historical stress windows**, compared against a benchmark. For each scenario the portfolio and benchmark returns are sliced from the full-period series, rebased to the initial capital, and summarised: total return, max drawdown, annualised volatility, worst/best day, **excess return vs benchmark**, and the **asset correlation matrix during the window** (correlations often spike toward 1 in a crisis, which is when diversification helps least).
+
+Built-in scenario presets (add any, or define custom windows):
+
+| Scenario | Window |
+|---|---|
+| COVID Crash | 2020-02-19 → 2020-03-23 |
+| 2022 Rate-Hike Drawdown | 2022-01-03 → 2022-10-14 |
+| 2018 Q4 Selloff | 2018-09-20 → 2018-12-24 |
+| 2011 Debt Ceiling / Euro Crisis | 2011-07-22 → 2011-10-03 |
+| 2008 Global Financial Crisis | 2007-10-09 → 2009-03-09 (needs enough history) |
+
+v1 uses static weights with **no rebalancing or leverage**. The dashboard shows a scenario-comparison table, a selectable scenario equity curve vs benchmark, a correlation heatmap for the selected scenario, and a full-period summary.
+
+> ⚠️ Scenario results are **historical** — they show past behaviour through these windows and **do not guarantee or predict** how a portfolio will respond to future stress. Not investment advice.
+
 #### Strategy Template Gallery
 
 The Strategy Builder includes a built-in **gallery** of curated, ready-to-use strategy templates (`GET /custom-strategy-gallery`). Open the **Gallery** from the Strategy Builder, browse the cards (each shows name, description, tags, difficulty, category, and a readable rule summary), then **Load** one into the builder to run it on any ticker/date range, or **Save to My Templates** to keep a local copy. Built-in templates are **static, pre-validated rule objects — not executable code** (no `eval`); they pass through the exact same whitelisted `CustomRule` validation as user-built strategies.

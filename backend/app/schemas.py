@@ -2069,3 +2069,145 @@ class RiskDashboardResponse(BaseModel):
         ),
         description="Historical-estimate caveat.",
     )
+
+
+# ===========================================================================
+# Portfolio Stress Testing / Scenario Analysis
+# ===========================================================================
+
+
+class StressScenarioInput(BaseModel):
+    """One historical stress window to evaluate."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, description="Scenario label (non-empty).")
+    start_date: str = Field(description="Scenario start date (YYYY-MM-DD).")
+    end_date: str = Field(description="Scenario end date (YYYY-MM-DD).")
+
+    @model_validator(mode="after")
+    def _check_dates(self) -> "StressScenarioInput":
+        import re
+
+        for n, v in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, v):
+                raise ValueError(f"scenario {n} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError(
+                f"scenario '{self.name}': start_date must be before end_date."
+            )
+        return self
+
+
+class StressTestRequest(BaseModel):
+    """Request body for POST /portfolio/stress-test."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tickers: List[str] = Field(min_length=1, max_length=20)
+    weights: Optional[Dict[str, float]] = Field(
+        default=None,
+        description="Optional long-only weights summing to 1. Equal weight if omitted.",
+    )
+    start_date: str = Field(default="2007-01-01", description="Full data start (YYYY-MM-DD).")
+    end_date: str = Field(default="2023-12-31", description="Full data end (YYYY-MM-DD).")
+    initial_capital: float = Field(default=100_000.0, gt=0)
+    transaction_cost_bps: float = Field(default=0.0, ge=0.0, lt=10_000.0)
+    scenarios: List[StressScenarioInput] = Field(
+        min_length=1, max_length=20, description="Stress windows to evaluate."
+    )
+    benchmark_ticker: str = Field(
+        default="SPY", min_length=1, description="Benchmark ticker (non-empty)."
+    )
+
+    @field_validator("tickers")
+    @classmethod
+    def _clean_tickers(cls, value: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        seen: set[str] = set()
+        for raw in value:
+            sym = raw.strip().upper()
+            if not sym:
+                raise ValueError("ticker symbols must not be empty.")
+            if sym in seen:
+                raise ValueError(f"duplicate ticker after uppercasing: {sym}.")
+            seen.add(sym)
+            cleaned.append(sym)
+        return cleaned
+
+    @field_validator("benchmark_ticker")
+    @classmethod
+    def _clean_benchmark(cls, value: str) -> str:
+        sym = value.strip().upper()
+        if not sym:
+            raise ValueError("benchmark_ticker must not be empty.")
+        return sym
+
+    @model_validator(mode="after")
+    def _check(self) -> "StressTestRequest":
+        import re
+
+        for n, v in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, v):
+                raise ValueError(f"{n} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be strictly before end_date.")
+
+        if self.weights is not None:
+            cleaned: Dict[str, float] = {}
+            for raw, wt in self.weights.items():
+                sym = raw.strip().upper()
+                cleaned[sym] = float(wt)
+            if set(cleaned) != set(self.tickers):
+                raise ValueError("weights must include exactly the requested tickers.")
+            if any(wt < 0 for wt in cleaned.values()):
+                raise ValueError("weights must be non-negative (long-only).")
+            if abs(sum(cleaned.values()) - 1.0) > 1e-6:
+                raise ValueError("weights must sum to 1.")
+            self.weights = cleaned
+        return self
+
+
+class StressScenarioResult(BaseModel):
+    """Portfolio + benchmark performance over one stress window."""
+
+    name: str
+    start_date: str
+    end_date: str
+    total_return: float
+    max_drawdown: float
+    annualized_volatility: float
+    worst_day_return: float
+    best_day_return: float
+    benchmark_total_return: float
+    benchmark_max_drawdown: float
+    benchmark_worst_day_return: float
+    benchmark_best_day_return: float
+    excess_return: float = Field(description="Portfolio total return − benchmark total return.")
+    correlation_matrix: Dict[str, Dict[str, float]]
+    portfolio_equity_curve: List[PortfolioOptEquityPoint]
+    benchmark_equity_curve: List[PortfolioOptEquityPoint]
+
+
+class StressTestResponse(BaseModel):
+    """Full response for POST /portfolio/stress-test."""
+
+    tickers: List[str]
+    weights: Dict[str, float]
+    start_date: str
+    end_date: str
+    benchmark_ticker: str
+    full_period_metrics: PerformanceMetrics
+    benchmark_full_period_metrics: PerformanceMetrics
+    full_equity_curve: List[PortfolioOptEquityPoint]
+    benchmark_equity_curve: List[PortfolioOptEquityPoint]
+    scenarios: List[StressScenarioResult]
+
+    historical_note: str = Field(
+        default=(
+            "Scenario results are historical: they show how this static "
+            "portfolio would have moved through past stress windows and do not "
+            "guarantee or predict future behaviour. Not investment advice."
+        ),
+        description="Historical caveat.",
+    )

@@ -28,6 +28,8 @@ import type {
   EfficientFrontierResponse,
   RiskDashboardRequest,
   RiskDashboardResponse,
+  StressTestRequest,
+  StressTestResponse,
   RsiBacktestRequest,
   SavedBacktestCreate,
   SavedBacktestFull,
@@ -496,6 +498,36 @@ export async function runRiskDashboard(
   }
 
   return res.json() as Promise<RiskDashboardResponse>;
+}
+
+/** POST /api/portfolio/stress-test — historical scenario analysis */
+export async function runStressTest(
+  params: StressTestRequest,
+): Promise<StressTestResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/portfolio/stress-test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+
+  if (!res.ok) {
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = formatBackendDetail(body?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+
+  return res.json() as Promise<StressTestResponse>;
 }
 
 export async function checkHealth(): Promise<boolean> {
