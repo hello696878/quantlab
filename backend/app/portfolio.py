@@ -589,6 +589,22 @@ def portfolio_point(
     }
 
 
+def _moment_arrays(expected_returns: pd.Series, covariance: pd.DataFrame):
+    """Validate and return aligned moment arrays for frontier calculations."""
+    tickers = list(expected_returns.index)
+    if not tickers:
+        raise ValueError("expected_returns must contain at least one asset.")
+    if list(covariance.index) != tickers or list(covariance.columns) != tickers:
+        raise ValueError("covariance matrix must align with expected_returns.")
+    mu = expected_returns.to_numpy(dtype=float)
+    sigma = covariance.to_numpy(dtype=float)
+    if not np.isfinite(mu).all() or not np.isfinite(sigma).all():
+        raise ValueError("expected returns and covariance must be finite.")
+    if not np.allclose(sigma, sigma.T, rtol=1e-10, atol=1e-12):
+        raise ValueError("covariance matrix must be symmetric.")
+    return tickers, mu, sigma
+
+
 def random_portfolios(
     expected_returns: pd.Series,
     covariance: pd.DataFrame,
@@ -601,10 +617,13 @@ def random_portfolios(
     (Dirichlet(1,…,1)) and compute their annualised return / volatility /
     Sharpe.  Deterministic for a fixed ``seed``.
     """
-    tickers = list(expected_returns.index)
+    if not isinstance(num_portfolios, (int, np.integer)) or int(num_portfolios) <= 0:
+        raise ValueError("num_portfolios must be a positive integer.")
+    if not np.isfinite(risk_free_rate):
+        raise ValueError("risk_free_rate must be finite.")
+
+    tickers, mu, sigma = _moment_arrays(expected_returns, covariance)
     n = len(tickers)
-    mu = expected_returns.to_numpy()
-    sigma = covariance.to_numpy()
 
     rng = np.random.default_rng(seed)
     weights = rng.dirichlet(np.ones(n), size=num_portfolios)  # (num, n), rows sum to 1
@@ -612,7 +631,9 @@ def random_portfolios(
     rets = weights @ mu
     variances = np.einsum("ij,jk,ik->i", weights, sigma, weights).clip(min=0.0)
     vols = np.sqrt(variances)
-    sharpes = np.where(vols > _MIN_VOL, (rets - risk_free_rate) / vols, 0.0)
+    sharpes = np.zeros_like(rets, dtype=float)
+    nonzero_vol = vols > _MIN_VOL
+    sharpes[nonzero_vol] = (rets[nonzero_vol] - risk_free_rate) / vols[nonzero_vol]
 
     portfolios: List[dict] = []
     for i in range(num_portfolios):
@@ -636,13 +657,15 @@ def efficient_frontier_points(
     Trace the long-only efficient frontier: for a grid of target returns,
     minimise volatility subject to ``w'μ >= target``, ``sum(w) = 1``, ``w >= 0``.
 
-    Returns ``[{expected_return, volatility}, ...]`` sorted by volatility.
-    Points where the optimizer fails to converge are skipped.
+    The plotted frontier starts at the global minimum-volatility portfolio and
+    moves toward the highest-return long-only portfolio.  Points where the
+    optimizer fails to converge are skipped.
     """
-    tickers = list(expected_returns.index)
-    n = len(tickers)
-    mu = expected_returns.to_numpy()
-    sigma = covariance.to_numpy()
+    if not isinstance(num_points, (int, np.integer)) or int(num_points) <= 0:
+        raise ValueError("num_points must be a positive integer.")
+
+    _, mu, sigma = _moment_arrays(expected_returns, covariance)
+    n = len(mu)
 
     if n == 1:
         return [
@@ -652,17 +675,24 @@ def efficient_frontier_points(
             }
         ]
 
-    lo, hi = float(mu.min()), float(mu.max())
-    bounds = [(0.0, 1.0)] * n
-
     # Degenerate case: all expected returns equal → frontier is a single point.
-    if hi - lo <= _MIN_VOL:
+    if float(mu.max() - mu.min()) <= _MIN_VOL:
         w = optimize_weights(expected_returns, covariance, "min_volatility")
         ret, vol, _ = portfolio_stats(w, expected_returns, covariance)
         return [{"expected_return": ret, "volatility": vol}]
 
+    min_vol_weights = optimize_weights(expected_returns, covariance, "min_volatility")
+    min_ret, min_vol, _ = portfolio_stats(
+        min_vol_weights, expected_returns, covariance
+    )
+    hi = float(mu.max())
+    if hi - min_ret <= _MIN_VOL:
+        return [{"expected_return": min_ret, "volatility": min_vol}]
+
+    bounds = [(0.0, 1.0)] * n
     points: List[dict] = []
-    for target in np.linspace(lo, hi, num_points):
+    seen: set[tuple[float, float]] = set()
+    for target in np.linspace(min_ret, hi, num_points):
         constraints = (
             {"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)},
             {"type": "ineq", "fun": lambda w, t=target: float(w @ mu - t)},  # w'μ >= t
@@ -684,6 +714,14 @@ def efficient_frontier_points(
         w = w / total
         ret = float(w @ mu)
         vol = float(np.sqrt(max(w @ sigma @ w, 0.0)))
+        if not np.isfinite(ret) or not np.isfinite(vol):
+            continue
+        if ret + 1e-8 < float(target):
+            continue
+        key = (round(ret, 12), round(vol, 12))
+        if key in seen:
+            continue
+        seen.add(key)
         points.append({"expected_return": ret, "volatility": vol})
 
     points.sort(key=lambda p: p["volatility"])

@@ -10,7 +10,9 @@ import pytest
 
 from app.portfolio import (
     efficient_frontier_points,
+    optimize_weights,
     portfolio_point,
+    portfolio_stats,
     random_portfolios,
 )
 
@@ -63,6 +65,30 @@ def test_random_portfolio_stats_consistent():
         assert p["expected_return"] == pytest.approx(float(w @ mu.to_numpy()), abs=1e-9)
 
 
+def test_random_portfolios_zero_volatility_sharpe_is_finite():
+    mu = pd.Series({"A": 0.05, "B": 0.05})
+    cov = pd.DataFrame(0.0, index=mu.index, columns=mu.index)
+    ports = random_portfolios(mu, cov, 25, risk_free_rate=0.02)
+    for p in ports:
+        assert p["volatility"] == pytest.approx(0.0)
+        assert p["sharpe"] == pytest.approx(0.0)
+        assert np.isfinite(p["expected_return"])
+
+
+@pytest.mark.parametrize("num", [0, -1])
+def test_random_portfolios_rejects_invalid_count(num):
+    mu, cov = mu_cov({"A": 0.1, "B": 0.05}, {"A": 0.04, "B": 0.02})
+    with pytest.raises(ValueError, match="num_portfolios"):
+        random_portfolios(mu, cov, num)
+
+
+def test_random_portfolios_rejects_misaligned_covariance():
+    mu = pd.Series({"A": 0.1, "B": 0.05})
+    cov = pd.DataFrame([[0.04, 0.0], [0.0, 0.02]], index=["A", "C"], columns=["A", "C"])
+    with pytest.raises(ValueError, match="align"):
+        random_portfolios(mu, cov, 10)
+
+
 # ---------------------------------------------------------------------------
 # Frontier curve
 # ---------------------------------------------------------------------------
@@ -79,6 +105,18 @@ def test_frontier_points_monotone_and_bounded():
     assert vols == sorted(vols)
     for p in pts:
         assert p["volatility"] >= 0
+
+
+def test_frontier_starts_at_min_volatility_portfolio():
+    mu, cov = mu_cov(
+        {"A": 0.12, "B": 0.08, "C": 0.03}, {"A": 0.05, "B": 0.03, "C": 0.015}, corr=0.2
+    )
+    min_w = optimize_weights(mu, cov, "min_volatility")
+    min_ret, min_vol, _ = portfolio_stats(min_w, mu, cov)
+
+    pts = efficient_frontier_points(mu, cov, num_points=30)
+    assert pts[0]["volatility"] == pytest.approx(min_vol, abs=1e-8)
+    assert pts[0]["expected_return"] == pytest.approx(min_ret, abs=1e-8)
 
 
 def test_frontier_single_asset():
@@ -105,3 +143,10 @@ def test_frontier_min_vol_not_exceeding_random_min():
     frontier_min_vol = min(p["volatility"] for p in pts)
     random_min_vol = min(p["volatility"] for p in randoms)
     assert frontier_min_vol <= random_min_vol + 1e-6
+
+
+def test_frontier_rejects_non_symmetric_covariance():
+    mu = pd.Series({"A": 0.1, "B": 0.05})
+    cov = pd.DataFrame([[0.04, 0.03], [0.0, 0.02]], index=mu.index, columns=mu.index)
+    with pytest.raises(ValueError, match="symmetric"):
+        efficient_frontier_points(mu, cov)

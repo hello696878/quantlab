@@ -11,6 +11,8 @@ import math
 import pandas as pd
 import pytest
 
+from app.portfolio import align_prices, annualized_stats
+
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
 main_module = pytest.importorskip("app.main")
 
@@ -87,6 +89,26 @@ def test_expected_returns_and_covariance(client):
             assert cov[a][b] == pytest.approx(cov[b][a], rel=1e-6)
 
 
+def test_expected_returns_and_covariance_match_daily_return_estimates(client):
+    req = base_request()
+    data = client.post("/portfolio/efficient-frontier", json=req).json()
+    frames = {
+        ticker: _fake_fetch(ticker, req["start_date"], req["end_date"])["Close"]
+        for ticker in data["tickers"]
+    }
+    prices = align_prices(frames)
+    expected, covariance = annualized_stats(prices)
+
+    for ticker in data["tickers"]:
+        assert data["expected_returns"][ticker] == pytest.approx(
+            round(float(expected[ticker]), 6), abs=1e-9
+        )
+        for other in data["tickers"]:
+            assert data["covariance_matrix"][ticker][other] == pytest.approx(
+                round(float(covariance.loc[ticker, other]), 8), abs=1e-10
+            )
+
+
 def test_random_portfolios_generated_and_valid(client):
     data = client.post(
         "/portfolio/efficient-frontier", json=base_request(num_portfolios=750)
@@ -133,6 +155,8 @@ def test_frontier_points_generated(client):
     for p in pts:
         assert "expected_return" in p and "volatility" in p
         assert "weights" not in p  # curve points are lightweight
+        assert math.isfinite(p["expected_return"])
+        assert math.isfinite(p["volatility"])
 
 
 def test_deterministic_random_portfolios(client):
