@@ -40,8 +40,18 @@ def align_prices(frames: Dict[str, pd.Series]) -> pd.DataFrame:
     Columns preserve the insertion order of *frames* (i.e. request ticker
     order).  Any date where at least one asset is missing is dropped.
     """
-    df = pd.DataFrame(dict(frames))  # union index, NaN where an asset is missing
-    df = df.dropna(how="any")        # keep only fully-populated (common) dates
+    cleaned = {}
+    for ticker, series in frames.items():
+        # Keep the last observation for duplicate dates and enforce chronological
+        # order before return calculation.
+        s = series.copy()
+        s.index = pd.to_datetime(s.index)
+        s = s.sort_index()
+        s = s.groupby(level=0).last()
+        cleaned[ticker] = s
+
+    df = pd.DataFrame(cleaned)  # union index, NaN where an asset is missing
+    df = df.dropna(how="any")   # keep only fully-populated (common) dates
     return df
 
 
@@ -89,6 +99,12 @@ def run_equal_weight_portfolio(
     n = len(tickers)
     if n == 0:
         raise ValueError("prices must contain at least one ticker column.")
+    if len(prices) < 2:
+        raise ValueError("prices must contain at least two common dates.")
+    if prices.isna().any().any():
+        raise ValueError("prices must not contain missing values.")
+    if (prices <= 0).any().any():
+        raise ValueError("prices must be strictly positive.")
 
     dates = prices.index
     returns = prices.pct_change()

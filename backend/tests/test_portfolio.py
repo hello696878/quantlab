@@ -49,6 +49,18 @@ def test_align_prices_preserves_ticker_order():
     assert list(aligned.columns) == ["ZZZ", "AAA"]
 
 
+def test_align_prices_sorts_dates_and_keeps_last_duplicate():
+    idx = pd.to_datetime(["2020-01-03", "2020-01-01", "2020-01-01", "2020-01-02"])
+    a = pd.Series([103.0, 100.0, 101.0, 102.0], index=idx)
+    b = pd.Series([203.0, 200.0, 201.0, 202.0], index=idx)
+
+    aligned = align_prices({"A": a, "B": b})
+
+    assert list(aligned.index) == list(pd.date_range("2020-01-01", periods=3, freq="D"))
+    assert aligned.loc[pd.Timestamp("2020-01-01"), "A"] == 101.0
+    assert aligned.loc[pd.Timestamp("2020-01-01"), "B"] == 201.0
+
+
 # ---------------------------------------------------------------------------
 # Equity / weights basics
 # ---------------------------------------------------------------------------
@@ -58,6 +70,13 @@ def test_equity_starts_at_initial_capital():
     res = run_equal_weight_portfolio(make_prices(), initial_capital=100_000.0)
     assert res.equity.iloc[0] == pytest.approx(100_000.0)
     assert len(res.equity) == 260
+
+
+def test_invalid_price_frame_rejected():
+    prices = make_prices(5)
+    prices.iloc[2, 0] = 0.0
+    with pytest.raises(ValueError, match="strictly positive"):
+        run_equal_weight_portfolio(prices)
 
 
 def test_initial_weights_are_equal():
@@ -135,6 +154,29 @@ def test_quarterly_fewer_events_than_monthly():
     yearly = run_equal_weight_portfolio(make_prices(260), rebalance_frequency="yearly")
     assert len(quarterly.rebalance_events) < len(monthly.rebalance_events)
     assert len(yearly.rebalance_events) <= len(quarterly.rebalance_events)
+
+
+def test_rebalance_dates_are_first_trading_day_of_new_periods():
+    prices = make_prices(
+        90,
+        start="2020-01-27",
+        trends={"AAA": 0.004, "BBB": -0.001, "CCC": 0.0002},
+    )
+    monthly = run_equal_weight_portfolio(prices, rebalance_frequency="monthly")
+    quarterly = run_equal_weight_portfolio(prices, rebalance_frequency="quarterly")
+    yearly = run_equal_weight_portfolio(
+        make_prices(
+            280,
+            start="2020-12-28",
+            trends={"AAA": 0.004, "BBB": -0.001, "CCC": 0.0002},
+        ),
+        rebalance_frequency="yearly",
+    )
+
+    assert monthly.rebalance_events[0]["date"] == "2020-02-03"
+    assert monthly.rebalance_events[1]["date"] == "2020-03-02"
+    assert quarterly.rebalance_events[0]["date"] == "2020-04-01"
+    assert yearly.rebalance_events[0]["date"] == "2021-01-01"
 
 
 # ---------------------------------------------------------------------------

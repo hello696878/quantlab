@@ -118,6 +118,27 @@ def test_benchmark_when_spy_not_in_basket(client):
     assert len(data["equity_curve"]) > 0
 
 
+def test_benchmark_does_not_backfill_future_spy_data(client, monkeypatch):
+    """If separately fetched SPY starts late, do not bfill future prices backward."""
+
+    def late_spy_fetch(ticker: str, start: str, end: str) -> pd.DataFrame:
+        if ticker.upper() == "SPY":
+            idx = pd.date_range("2018-03-01", periods=80, freq="B")
+        else:
+            idx = pd.date_range("2018-01-01", periods=120, freq="B")
+        closes = [100.0 * (1.001 ** i) for i in range(len(idx))]
+        return pd.DataFrame({"Close": closes}, index=idx)
+
+    monkeypatch.setattr(main_module, "_fetch", late_spy_fetch)
+    data = client.post(
+        "/portfolio/backtest",
+        json=base_request(tickers=["QQQ", "GLD"], rebalance_frequency="none"),
+    ).json()
+
+    assert data["benchmark_ticker"] == "QQQ"
+    assert data["equity_curve"][0]["benchmark"] == pytest.approx(100000, abs=1.0)
+
+
 def test_benchmark_metrics_present(client):
     data = client.post("/portfolio/backtest", json=base_request()).json()
     m = data["benchmark_metrics"]
@@ -175,6 +196,20 @@ def test_zero_capital_rejected(client):
 def test_negative_cost_rejected(client):
     resp = client.post("/portfolio/backtest", json=base_request(transaction_cost_bps=-1))
     assert resp.status_code == 422
+
+
+def test_non_positive_price_returns_422(client, monkeypatch):
+    def bad_price_fetch(ticker: str, start: str, end: str) -> pd.DataFrame:
+        idx = pd.date_range("2018-01-01", periods=5, freq="B")
+        closes = [100.0, 101.0, 0.0, 103.0, 104.0]
+        return pd.DataFrame({"Close": closes}, index=idx)
+
+    monkeypatch.setattr(main_module, "_fetch", bad_price_fetch)
+    resp = client.post(
+        "/portfolio/backtest", json=base_request(tickers=["AAA", "BBB"])
+    )
+    assert resp.status_code == 422
+    assert "strictly positive" in resp.json()["detail"]
 
 
 # ---------------------------------------------------------------------------

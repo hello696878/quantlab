@@ -729,7 +729,10 @@ def _resolve_benchmark(prices, start_date: str, end_date: str, tickers: list):
 
     try:
         spy_close = _fetch("SPY", start_date, end_date)["Close"]
-        spy_close = spy_close.reindex(prices.index).ffill().bfill()
+        # Forward-fill only: carrying a future SPY price backward would leak
+        # information into earlier benchmark dates. If SPY cannot cover the
+        # portfolio's first date, fall back to the first held asset.
+        spy_close = spy_close.reindex(prices.index).ffill()
         if spy_close.notna().all() and len(spy_close) >= 2:
             return "SPY", spy_close
     except Exception:
@@ -774,12 +777,15 @@ def portfolio_backtest(request: PortfolioBacktestRequest) -> PortfolioBacktestRe
             ),
         )
 
-    result = run_equal_weight_portfolio(
-        prices,
-        initial_capital=request.initial_capital,
-        rebalance_frequency=request.rebalance_frequency,
-        transaction_cost_bps=request.transaction_cost_bps,
-    )
+    try:
+        result = run_equal_weight_portfolio(
+            prices,
+            initial_capital=request.initial_capital,
+            rebalance_frequency=request.rebalance_frequency,
+            transaction_cost_bps=request.transaction_cost_bps,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     # Benchmark aligned to the portfolio's dates.
     benchmark_ticker, bench_close = _resolve_benchmark(
