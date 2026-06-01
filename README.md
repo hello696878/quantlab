@@ -153,6 +153,18 @@ The response includes per-window detail (train/test dates, weights, train Sharpe
 
 > ⚠️ Walk-forward results are out-of-sample and far more honest than in-sample optimization, but they still rely on historical return/covariance assumptions and **do not predict future performance**. Not investment advice.
 
+### Efficient Frontier
+
+The Portfolio workspace's **Efficient Frontier** tab (`POST /portfolio/efficient-frontier`) visualises the risk–return space of a multi-asset, **long-only** universe. From annualised expected returns and covariance (252-day) it:
+
+- samples many random long-only portfolios (`w_i ≥ 0`, `Σw = 1`; `num_portfolios`, deterministic seed) and computes each one's expected return, volatility, and Sharpe;
+- locates the **equal-weight**, **minimum-volatility**, and **maximum-Sharpe** portfolios; and
+- traces the **efficient-frontier curve** (minimise volatility for each target return).
+
+The dashboard renders a Recharts scatter plot — x = volatility, y = expected return, hover for Sharpe and weights — with the three special portfolios highlighted, plus weight cards for each. **Expected return** = `wᵀμ`, **volatility** = `√(wᵀΣw)`, **Sharpe** = `(wᵀμ − r_f)/volatility`.
+
+> ⚠️ This is **historical, in-sample** analysis: expected returns and covariance are estimated from the selected window and may not persist. It is descriptive, **not a forecast or investment advice**.
+
 #### Strategy Template Gallery
 
 The Strategy Builder includes a built-in **gallery** of curated, ready-to-use strategy templates (`GET /custom-strategy-gallery`). Open the **Gallery** from the Strategy Builder, browse the cards (each shows name, description, tags, difficulty, category, and a readable rule summary), then **Load** one into the builder to run it on any ticker/date range, or **Save to My Templates** to keep a local copy. Built-in templates are **static, pre-validated rule objects — not executable code** (no `eval`); they pass through the exact same whitelisted `CustomRule` validation as user-built strategies.

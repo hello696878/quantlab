@@ -182,6 +182,21 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   dependent. Not investment advice.
 - Full unit (`portfolio.py` walk-forward) + API test coverage
 
+### Phase 7 — Efficient Frontier Visualization ✅
+
+- `POST /portfolio/efficient-frontier` — risk–return space of a long-only
+  universe from annualised expected returns + covariance (252-day)
+- Samples N random long-only portfolios (Dirichlet, deterministic seed),
+  locates equal-weight / min-volatility / max-Sharpe portfolios, and traces a
+  long-only efficient-frontier curve (min vol per target return, SLSQP)
+- Response: per-asset expected returns + covariance matrix, random portfolios
+  (return/vol/Sharpe/weights), the three special portfolios, and frontier curve
+- Portfolio workspace gains an **Efficient Frontier** tab — Recharts scatter
+  plot (x = volatility, y = return, Sharpe/weights in tooltip) with the special
+  portfolios highlighted, plus weight cards
+- **Historical, in-sample** — descriptive only, not a forecast or advice
+- Full unit + API test coverage
+
 ---
 
 ## Future Phases

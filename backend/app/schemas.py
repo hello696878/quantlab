@@ -1876,3 +1876,100 @@ class PortfolioWalkForwardResponse(BaseModel):
         ),
         description="Out-of-sample caveat.",
     )
+
+
+# ===========================================================================
+# Efficient Frontier Visualization
+# ===========================================================================
+#
+# Risk–return space of many long-only portfolios estimated from historical
+# returns.  In-sample / descriptive — not a forecast.
+
+
+class EfficientFrontierRequest(BaseModel):
+    """Request body for POST /portfolio/efficient-frontier."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tickers: List[str] = Field(min_length=1, max_length=20)
+    start_date: str = Field(default="2015-01-01", description="Start date (YYYY-MM-DD).")
+    end_date: str = Field(default="2023-12-31", description="End date (YYYY-MM-DD).")
+    risk_free_rate: float = Field(default=0.02, ge=0.0, le=1.0)
+    num_portfolios: int = Field(
+        default=2000,
+        ge=100,
+        le=10_000,
+        description="Number of random long-only portfolios to sample.",
+    )
+
+    @field_validator("tickers")
+    @classmethod
+    def _clean_tickers(cls, value: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        seen: set[str] = set()
+        for raw in value:
+            sym = raw.strip().upper()
+            if not sym:
+                raise ValueError("ticker symbols must not be empty.")
+            if sym in seen:
+                raise ValueError(f"duplicate ticker after uppercasing: {sym}.")
+            seen.add(sym)
+            cleaned.append(sym)
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_dates(self) -> "EfficientFrontierRequest":
+        import re
+
+        for name, val in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, val):
+                raise ValueError(f"{name} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be strictly before end_date.")
+        return self
+
+
+class FrontierPortfolioPoint(BaseModel):
+    """A portfolio in risk–return space with its weights."""
+
+    expected_return: float
+    volatility: float
+    sharpe: float
+    weights: Dict[str, float]
+
+
+class FrontierCurvePoint(BaseModel):
+    """A point on the efficient-frontier curve (no weights, for plotting)."""
+
+    expected_return: float
+    volatility: float
+
+
+class EfficientFrontierResponse(BaseModel):
+    """Full response for POST /portfolio/efficient-frontier."""
+
+    tickers: List[str]
+    start_date: str
+    end_date: str
+    risk_free_rate: float
+    num_portfolios: int
+
+    expected_returns: Dict[str, float] = Field(description="Annualised expected return per asset.")
+    covariance_matrix: Dict[str, Dict[str, float]] = Field(
+        description="Annualised covariance matrix (nested by ticker)."
+    )
+
+    random_portfolios: List[FrontierPortfolioPoint]
+    equal_weight: FrontierPortfolioPoint
+    min_volatility: FrontierPortfolioPoint
+    max_sharpe: FrontierPortfolioPoint
+    frontier_points: List[FrontierCurvePoint]
+
+    in_sample_note: str = Field(
+        default=(
+            "Expected returns and covariance are estimated from historical "
+            "data over the selected window (in-sample). They may not persist; "
+            "this is descriptive analysis, not a forecast or investment advice."
+        ),
+        description="Historical / in-sample caveat.",
+    )

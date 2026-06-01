@@ -24,6 +24,8 @@ import type {
   PortfolioOptimizeResponse,
   PortfolioWalkForwardRequest,
   PortfolioWalkForwardResponse,
+  EfficientFrontierRequest,
+  EfficientFrontierResponse,
   RsiBacktestRequest,
   SavedBacktestCreate,
   SavedBacktestFull,
@@ -432,6 +434,36 @@ export async function runPortfolioWalkForward(
   }
 
   return res.json() as Promise<PortfolioWalkForwardResponse>;
+}
+
+/** POST /api/portfolio/efficient-frontier — risk/return space of long-only portfolios */
+export async function runEfficientFrontier(
+  params: EfficientFrontierRequest,
+): Promise<EfficientFrontierResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/portfolio/efficient-frontier", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+
+  if (!res.ok) {
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = formatBackendDetail(body?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+
+  return res.json() as Promise<EfficientFrontierResponse>;
 }
 
 export async function checkHealth(): Promise<boolean> {

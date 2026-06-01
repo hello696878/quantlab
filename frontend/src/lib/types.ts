@@ -592,6 +592,46 @@ export interface PortfolioOptimizeResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Efficient Frontier
+// ---------------------------------------------------------------------------
+
+export interface EfficientFrontierRequest {
+  tickers: string[];
+  start_date: string;
+  end_date: string;
+  risk_free_rate: number;
+  num_portfolios: number;
+}
+
+export interface FrontierPortfolioPoint {
+  expected_return: number;
+  volatility: number;
+  sharpe: number;
+  weights: Record<string, number>;
+}
+
+export interface FrontierCurvePoint {
+  expected_return: number;
+  volatility: number;
+}
+
+export interface EfficientFrontierResponse {
+  tickers: string[];
+  start_date: string;
+  end_date: string;
+  risk_free_rate: number;
+  num_portfolios: number;
+  expected_returns: Record<string, number>;
+  covariance_matrix: Record<string, Record<string, number>>;
+  random_portfolios: FrontierPortfolioPoint[];
+  equal_weight: FrontierPortfolioPoint;
+  min_volatility: FrontierPortfolioPoint;
+  max_sharpe: FrontierPortfolioPoint;
+  frontier_points: FrontierCurvePoint[];
+  in_sample_note: string;
+}
+
+// ---------------------------------------------------------------------------
 // Walk-Forward Portfolio Optimization
 // ---------------------------------------------------------------------------
 

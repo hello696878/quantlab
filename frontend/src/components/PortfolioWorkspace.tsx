@@ -4,13 +4,15 @@ import { useState } from "react";
 import PortfolioBacktestPanel from "@/components/PortfolioBacktestPanel";
 import PortfolioOptimizePanel from "@/components/PortfolioOptimizePanel";
 import PortfolioWalkForwardPanel from "@/components/PortfolioWalkForwardPanel";
+import PortfolioFrontierPanel from "@/components/PortfolioFrontierPanel";
 
-type PortfolioTab = "backtest" | "optimize" | "walk-forward";
+type PortfolioTab = "backtest" | "optimize" | "walk-forward" | "frontier";
 
 const TABS: { id: PortfolioTab; label: string }[] = [
   { id: "backtest", label: "Equal-Weight Backtest" },
   { id: "optimize", label: "Static Optimization" },
   { id: "walk-forward", label: "Walk-Forward Optimization" },
+  { id: "frontier", label: "Efficient Frontier" },
 ];
 
 export default function PortfolioWorkspace() {
@@ -39,6 +41,7 @@ export default function PortfolioWorkspace() {
       {tab === "backtest" && <PortfolioBacktestPanel />}
       {tab === "optimize" && <PortfolioOptimizePanel />}
       {tab === "walk-forward" && <PortfolioWalkForwardPanel />}
+      {tab === "frontier" && <PortfolioFrontierPanel />}
     </div>
   );
 }

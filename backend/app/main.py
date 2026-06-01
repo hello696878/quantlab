@@ -13,6 +13,7 @@ POST /backtest/pairs                    — run a pairs trading backtest
 POST /portfolio/backtest                — equal-weight multi-asset portfolio backtest
 POST /portfolio/optimize                — optimize portfolio weights (min-vol / max-Sharpe)
 POST /portfolio/walk-forward-optimize   — rolling out-of-sample portfolio optimization
+POST /portfolio/efficient-frontier      — risk-return space of long-only portfolios
 POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
 POST /backtest/custom                   — run a no-code custom rule-based strategy
 POST /custom-strategies                 — save a reusable custom strategy template
@@ -54,8 +55,11 @@ from app.portfolio import (
     annualized_stats,
     buy_and_hold_equity,
     drawdown_series,
+    efficient_frontier_points,
     optimize_weights,
+    portfolio_point,
     portfolio_stats,
+    random_portfolios,
     run_equal_weight_portfolio,
     run_walk_forward_optimization,
 )
@@ -79,7 +83,11 @@ from app.schemas import (
     CustomStrategyTemplateSummary,
     CustomStrategyTemplateUpdate,
     DeleteResponse,
+    EfficientFrontierRequest,
+    EfficientFrontierResponse,
     EquityPoint,
+    FrontierCurvePoint,
+    FrontierPortfolioPoint,
     GalleryTemplate,
     PortfolioBacktestRequest,
     PortfolioBacktestResponse,
@@ -1075,6 +1083,96 @@ def portfolio_walk_forward_optimize(
         metrics=PerformanceMetrics(**compute_metrics(stitched)),
         benchmark_metrics=PerformanceMetrics(**compute_metrics(bench)),
         weight_stability=weight_stability,
+    )
+
+
+@app.post(
+    "/portfolio/efficient-frontier",
+    response_model=EfficientFrontierResponse,
+    tags=["portfolio"],
+    summary="Efficient frontier — risk/return space of long-only portfolios",
+    description=(
+        "Estimate annualised expected returns and covariance from historical "
+        "daily returns, then sample many random long-only portfolios "
+        "(w_i >= 0, sum = 1) and locate the equal-weight, minimum-volatility, "
+        "and maximum-Sharpe portfolios.  A long-only efficient-frontier curve "
+        "(minimise volatility per target return) is also returned.\n\n"
+        "**Historical / in-sample caveat:** expected returns and covariance are "
+        "estimated from the selected window and may not persist.  This is "
+        "descriptive analysis, not a forecast or investment advice."
+    ),
+)
+def portfolio_efficient_frontier(
+    request: EfficientFrontierRequest,
+) -> EfficientFrontierResponse:
+    tickers = request.tickers  # cleaned/uppercased/deduped by the schema
+
+    frames = {}
+    for ticker in tickers:
+        df = _fetch(ticker, request.start_date, request.end_date)
+        frames[ticker] = df["Close"]
+
+    prices = align_prices(frames)
+    if len(prices) < 3:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(prices)} common trading day(s) across "
+                f"{', '.join(tickers)}; need at least 3 to estimate returns and "
+                "covariance.  Try a wider date range or assets with overlapping "
+                "history."
+            ),
+        )
+
+    try:
+        expected_returns, covariance = annualized_stats(prices)
+        randoms = random_portfolios(
+            expected_returns,
+            covariance,
+            request.num_portfolios,
+            risk_free_rate=request.risk_free_rate,
+            seed=42,
+        )
+        equal_w = optimize_weights(expected_returns, covariance, "equal_weight")
+        min_vol_w = optimize_weights(expected_returns, covariance, "min_volatility")
+        max_sharpe_w = optimize_weights(
+            expected_returns, covariance, "max_sharpe", request.risk_free_rate
+        )
+        frontier = efficient_frontier_points(expected_returns, covariance, num_points=50)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    def _round_point(p: dict) -> FrontierPortfolioPoint:
+        return FrontierPortfolioPoint(
+            expected_return=round(p["expected_return"], 6),
+            volatility=round(p["volatility"], 6),
+            sharpe=round(p["sharpe"], 4),
+            weights={t: round(float(v), 6) for t, v in p["weights"].items()},
+        )
+
+    rf = request.risk_free_rate
+    return EfficientFrontierResponse(
+        tickers=tickers,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        risk_free_rate=rf,
+        num_portfolios=request.num_portfolios,
+        expected_returns={t: round(float(expected_returns[t]), 6) for t in tickers},
+        covariance_matrix={
+            ti: {tj: round(float(covariance.loc[ti, tj]), 8) for tj in tickers}
+            for ti in tickers
+        },
+        random_portfolios=[_round_point(p) for p in randoms],
+        equal_weight=_round_point(portfolio_point(equal_w, expected_returns, covariance, rf)),
+        min_volatility=_round_point(portfolio_point(min_vol_w, expected_returns, covariance, rf)),
+        max_sharpe=_round_point(portfolio_point(max_sharpe_w, expected_returns, covariance, rf)),
+        frontier_points=[
+            FrontierCurvePoint(
+                expected_return=round(p["expected_return"], 6),
+                volatility=round(p["volatility"], 6),
+            )
+            for p in frontier
+        ],
     )
 
 

@@ -566,3 +566,125 @@ def run_walk_forward_optimization(
         benchmark_equity=benchmark_equity,
         weight_stability=weight_stability,
     )
+
+
+# ===========================================================================
+# Efficient frontier (risk–return space, long-only, in-sample)
+# ===========================================================================
+
+
+def portfolio_point(
+    weights: Dict[str, float],
+    expected_returns: pd.Series,
+    covariance: pd.DataFrame,
+    risk_free_rate: float = 0.0,
+) -> dict:
+    """A single risk/return/Sharpe point with its weights (for the frontier)."""
+    ret, vol, sharpe = portfolio_stats(weights, expected_returns, covariance, risk_free_rate)
+    return {
+        "expected_return": ret,
+        "volatility": vol,
+        "sharpe": sharpe,
+        "weights": {t: float(weights[t]) for t in expected_returns.index},
+    }
+
+
+def random_portfolios(
+    expected_returns: pd.Series,
+    covariance: pd.DataFrame,
+    num_portfolios: int,
+    risk_free_rate: float = 0.0,
+    seed: int = 42,
+) -> List[dict]:
+    """
+    Sample ``num_portfolios`` long-only portfolios uniformly from the simplex
+    (Dirichlet(1,…,1)) and compute their annualised return / volatility /
+    Sharpe.  Deterministic for a fixed ``seed``.
+    """
+    tickers = list(expected_returns.index)
+    n = len(tickers)
+    mu = expected_returns.to_numpy()
+    sigma = covariance.to_numpy()
+
+    rng = np.random.default_rng(seed)
+    weights = rng.dirichlet(np.ones(n), size=num_portfolios)  # (num, n), rows sum to 1
+
+    rets = weights @ mu
+    variances = np.einsum("ij,jk,ik->i", weights, sigma, weights).clip(min=0.0)
+    vols = np.sqrt(variances)
+    sharpes = np.where(vols > _MIN_VOL, (rets - risk_free_rate) / vols, 0.0)
+
+    portfolios: List[dict] = []
+    for i in range(num_portfolios):
+        portfolios.append(
+            {
+                "expected_return": float(rets[i]),
+                "volatility": float(vols[i]),
+                "sharpe": float(sharpes[i]),
+                "weights": {t: float(weights[i, j]) for j, t in enumerate(tickers)},
+            }
+        )
+    return portfolios
+
+
+def efficient_frontier_points(
+    expected_returns: pd.Series,
+    covariance: pd.DataFrame,
+    num_points: int = 50,
+) -> List[dict]:
+    """
+    Trace the long-only efficient frontier: for a grid of target returns,
+    minimise volatility subject to ``w'μ >= target``, ``sum(w) = 1``, ``w >= 0``.
+
+    Returns ``[{expected_return, volatility}, ...]`` sorted by volatility.
+    Points where the optimizer fails to converge are skipped.
+    """
+    tickers = list(expected_returns.index)
+    n = len(tickers)
+    mu = expected_returns.to_numpy()
+    sigma = covariance.to_numpy()
+
+    if n == 1:
+        return [
+            {
+                "expected_return": float(mu[0]),
+                "volatility": float(np.sqrt(max(sigma[0, 0], 0.0))),
+            }
+        ]
+
+    lo, hi = float(mu.min()), float(mu.max())
+    bounds = [(0.0, 1.0)] * n
+
+    # Degenerate case: all expected returns equal → frontier is a single point.
+    if hi - lo <= _MIN_VOL:
+        w = optimize_weights(expected_returns, covariance, "min_volatility")
+        ret, vol, _ = portfolio_stats(w, expected_returns, covariance)
+        return [{"expected_return": ret, "volatility": vol}]
+
+    points: List[dict] = []
+    for target in np.linspace(lo, hi, num_points):
+        constraints = (
+            {"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)},
+            {"type": "ineq", "fun": lambda w, t=target: float(w @ mu - t)},  # w'μ >= t
+        )
+        result = minimize(
+            lambda w: float(w @ sigma @ w),
+            np.full(n, 1.0 / n),
+            method="SLSQP",
+            bounds=bounds,
+            constraints=constraints,
+            options={"maxiter": 500, "ftol": 1e-10},
+        )
+        if not result.success or not np.isfinite(result.x).all():
+            continue
+        w = np.clip(np.asarray(result.x, dtype=float), 0.0, None)
+        total = w.sum()
+        if total <= _MIN_VOL:
+            continue
+        w = w / total
+        ret = float(w @ mu)
+        vol = float(np.sqrt(max(w @ sigma @ w, 0.0)))
+        points.append({"expected_return": ret, "volatility": vol})
+
+    points.sort(key=lambda p: p["volatility"])
+    return points
