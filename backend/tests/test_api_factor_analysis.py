@@ -107,6 +107,7 @@ def test_factor_correlation_matrix_symmetric(client):
         assert corr[a][a] == pytest.approx(1.0, abs=1e-6)
         for b in fac:
             assert corr[a][b] == pytest.approx(corr[b][a], abs=1e-6)
+            assert math.isfinite(corr[a][b])
 
 
 def test_equity_curves_and_regression_points(client):
@@ -115,8 +116,11 @@ def test_equity_curves_and_regression_points(client):
     assert len(data["actual_equity_curve"]) == len(data["fitted_equity_curve"])
     assert data["actual_equity_curve"][0]["value"] == pytest.approx(100000, abs=1.0)
     assert data["fitted_equity_curve"][0]["value"] == pytest.approx(100000, abs=1.0)
+    assert data["actual_equity_curve"][0]["date"] == "2018-01-01"
+    assert data["actual_equity_curve"][1]["date"] != data["actual_equity_curve"][0]["date"]
     pts = data["regression_points"]
     assert len(pts) >= 1
+    assert pts[0]["date"] == data["actual_equity_curve"][1]["date"]
     for p in pts[:10]:
         assert p["residual"] == pytest.approx(p["actual_return"] - p["fitted_return"], abs=1e-7)
 
@@ -152,6 +156,14 @@ def test_duplicate_factor_proxies_flag_multicollinearity(client):
     assert data["diagnostics"]["multicollinearity_warning"] is True
 
 
+def test_factor_tickers_are_normalized(client):
+    data = client.post(
+        "/portfolio/factor-analysis",
+        json=base_request(factor_tickers={"market": "spy", "bonds": "tlt"}),
+    ).json()
+    assert data["factor_tickers"] == {"market": "SPY", "bonds": "TLT"}
+
+
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
@@ -180,6 +192,22 @@ def test_negative_weights_rejected(client):
     resp = client.post(
         "/portfolio/factor-analysis",
         json=base_request(weights={"SPY": 0.8, "QQQ": 0.4, "GLD": 0.0, "TLT": -0.2}),
+    )
+    assert resp.status_code == 422
+
+
+def test_missing_ticker_weight_rejected(client):
+    resp = client.post(
+        "/portfolio/factor-analysis",
+        json=base_request(weights={"SPY": 0.5, "QQQ": 0.5}),
+    )
+    assert resp.status_code == 422
+
+
+def test_extra_ticker_weight_rejected(client):
+    resp = client.post(
+        "/portfolio/factor-analysis",
+        json=base_request(weights={"SPY": 0.4, "QQQ": 0.3, "GLD": 0.2, "TLT": 0.1, "XOM": 0.0}),
     )
     assert resp.status_code == 422
 

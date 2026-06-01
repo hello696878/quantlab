@@ -2291,9 +2291,16 @@ class FactorAnalysisRequest(BaseModel):
         if self.weights is not None:
             cleaned: Dict[str, float] = {}
             for raw, wt in self.weights.items():
-                cleaned[raw.strip().upper()] = float(wt)
+                sym = raw.strip().upper()
+                if not sym:
+                    raise ValueError("weight ticker symbols must not be empty.")
+                if sym in cleaned:
+                    raise ValueError(f"duplicate weight ticker after uppercasing: {sym}.")
+                cleaned[sym] = float(wt)
             if set(cleaned) != set(self.tickers):
                 raise ValueError("weights must include exactly the requested tickers.")
+            if any(not math.isfinite(wt) for wt in cleaned.values()):
+                raise ValueError("weights must be finite.")
             if any(wt < 0 for wt in cleaned.values()):
                 raise ValueError("weights must be non-negative (long-only).")
             if abs(sum(cleaned.values()) - 1.0) > 1e-6:

@@ -175,7 +175,7 @@ export default function PortfolioFactorAnalysisPanel() {
         wd[t] = v;
       }
       const sum = Object.values(wd).reduce((a, b) => a + b, 0);
-      if (Math.abs(sum - 1) > 1e-4) {
+      if (Math.abs(sum - 1) > 1e-6) {
         return { request: null, validationMsg: `Custom weights must sum to 1 (currently ${sum.toFixed(3)}).` };
       }
       weights = wd;
@@ -294,7 +294,7 @@ export default function PortfolioFactorAnalysisPanel() {
                   Distribute equally
                 </button>
                 {customSum !== null && (
-                  <span className={"text-xs mono " + (Math.abs(customSum - 1) <= 1e-4 ? "text-green-700" : "text-red-600")}>
+                  <span className={"text-xs mono " + (Math.abs(customSum - 1) <= 1e-6 ? "text-green-700" : "text-red-600")}>
                     Σ = {customSum.toFixed(3)}
                   </span>
                 )}

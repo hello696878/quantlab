@@ -1072,11 +1072,32 @@ def factor_analysis(
     """
     _validate_price_frame(portfolio_prices)
     tickers = list(portfolio_prices.columns)
+    if not factor_names:
+        raise ValueError("factor_names must contain at least one factor.")
+    if len(set(factor_names)) != len(factor_names):
+        raise ValueError("factor_names must be unique.")
+    missing_factors = [name for name in factor_names if name not in factor_prices.columns]
+    if missing_factors:
+        raise ValueError(f"factor_prices is missing factor columns: {missing_factors}.")
+    factor_prices = factor_prices[factor_names]
+    _validate_price_frame(factor_prices)
+    if not portfolio_prices.index.equals(factor_prices.index):
+        raise ValueError("portfolio_prices and factor_prices must share the same index.")
+    if set(weights) != set(tickers):
+        raise ValueError("weights must include exactly the portfolio tickers.")
     w = np.array([weights[t] for t in tickers], dtype=float)
+    if not np.isfinite(w).all():
+        raise ValueError("weights must be finite.")
+    if (w < 0).any():
+        raise ValueError("weights must be non-negative (long-only).")
+    if abs(float(w.sum()) - 1.0) > 1e-6:
+        raise ValueError("weights must sum to 1.")
+    if not np.isfinite(initial_capital) or initial_capital <= 0:
+        raise ValueError("initial_capital must be greater than 0.")
 
     # Daily returns (drop the first NaN row jointly).
     asset_ret = portfolio_prices.pct_change(fill_method=None)
-    factor_ret_full = factor_prices[factor_names].pct_change(fill_method=None)
+    factor_ret_full = factor_prices.pct_change(fill_method=None)
     port_ret = pd.Series(asset_ret.to_numpy() @ w, index=portfolio_prices.index)
 
     combined = pd.concat([port_ret.rename("__port__"), factor_ret_full], axis=1).dropna(how="any")
@@ -1088,27 +1109,47 @@ def factor_analysis(
 
     y = combined["__port__"].to_numpy(dtype=float)
     factor_matrix = combined[factor_names].to_numpy(dtype=float)
+    if not np.isfinite(y).all() or not np.isfinite(factor_matrix).all():
+        raise ValueError("portfolio and factor returns must be finite.")
     n_obs = len(y)
     k = len(factor_names)
 
     # Design matrix with an intercept column.
     X = np.column_stack([np.ones(n_obs), factor_matrix])
 
-    # Guard against a singular / collinear design.
+    # Guard against a singular / collinear design.  The centered factor matrix
+    # catches exact/near duplicate factor proxies without the intercept scale
+    # dominating the condition number.
     rank = int(np.linalg.matrix_rank(X))
-    multicollinearity_warning = rank < X.shape[1]
+    centered_factors = factor_matrix - factor_matrix.mean(axis=0)
+    factor_rank = int(np.linalg.matrix_rank(centered_factors))
+    singular_values = np.linalg.svd(centered_factors, compute_uv=False)
+    condition_number = (
+        float(singular_values[0] / singular_values[-1])
+        if len(singular_values) and singular_values[-1] > _MIN_VOL
+        else np.inf
+    )
+    multicollinearity_warning = (
+        rank < X.shape[1] or factor_rank < k or condition_number > 1e8
+    )
 
     coef, _residual_ss, _rank, _sv = np.linalg.lstsq(X, y, rcond=None)
+    if not np.isfinite(coef).all():
+        raise ValueError("OLS regression produced non-finite coefficients.")
     alpha_daily = float(coef[0])
     betas = {name: float(coef[i + 1]) for i, name in enumerate(factor_names)}
 
     fitted = X @ coef
     residuals = y - fitted
+    if not np.isfinite(fitted).all() or not np.isfinite(residuals).all():
+        raise ValueError("OLS regression produced non-finite fitted values.")
 
     # R² = 1 − SS_res / SS_tot.
     ss_res = float(np.sum(residuals**2))
     ss_tot = float(np.sum((y - y.mean()) ** 2))
     r_squared = float(1.0 - ss_res / ss_tot) if ss_tot > 1e-18 else 0.0
+    if not np.isfinite(r_squared):
+        raise ValueError("OLS regression produced a non-finite R-squared.")
 
     residual_vol = (
         float(np.std(residuals, ddof=1) * np.sqrt(TRADING_DAYS_PER_YEAR))
@@ -1117,7 +1158,12 @@ def factor_analysis(
     )
 
     # Factor correlation matrix.
-    factor_corr = combined[factor_names].corr().fillna(0.0)
+    factor_corr = combined[factor_names].corr()
+    corr_arr = factor_corr.to_numpy(dtype=float)
+    corr_arr = np.where(np.isfinite(corr_arr), corr_arr, 0.0)
+    np.fill_diagonal(corr_arr, 1.0)
+    corr_arr = np.clip((corr_arr + corr_arr.T) / 2.0, -1.0, 1.0)
+    factor_corr = pd.DataFrame(corr_arr, index=factor_names, columns=factor_names)
     factor_correlation_matrix = {
         a: {b: float(factor_corr.loc[a, b]) for b in factor_names} for a in factor_names
     }
@@ -1129,8 +1175,14 @@ def factor_analysis(
 
     # Equity curves (anchored at initial_capital).
     dates = list(combined.index)
-    actual_curve = [{"date": _date_str(dates[0]), "value": float(initial_capital)}]
-    fitted_curve = [{"date": _date_str(dates[0]), "value": float(initial_capital)}]
+    first_return_loc = int(portfolio_prices.index.get_indexer([dates[0]])[0])
+    anchor_date = (
+        portfolio_prices.index[first_return_loc - 1]
+        if first_return_loc > 0
+        else dates[0]
+    )
+    actual_curve = [{"date": _date_str(anchor_date), "value": float(initial_capital)}]
+    fitted_curve = [{"date": _date_str(anchor_date), "value": float(initial_capital)}]
     a_run = f_run = float(initial_capital)
     regression_points = []
     for i, d in enumerate(dates):

@@ -90,6 +90,22 @@ def test_output_fields_and_curves():
         assert p["residual"] == pytest.approx(p["actual_return"] - p["fitted_return"], abs=1e-12)
 
 
+def test_equity_curves_anchor_before_first_return_without_duplicate_date():
+    rng = np.random.default_rng(20)
+    n = 50
+    f1 = rng.normal(0.0004, 0.01, n)
+    rp = 0.7 * f1
+    prices = _prices_from_returns({"PORT": rp, "F1": f1})
+
+    d = factor_analysis(prices[["PORT"]], prices[["F1"]], {"PORT": 1.0}, ["F1"])
+
+    assert d["actual_equity_curve"][0]["date"] == str(prices.index[0].date())
+    assert d["fitted_equity_curve"][0]["date"] == str(prices.index[0].date())
+    assert d["actual_equity_curve"][1]["date"] == str(prices.index[1].date())
+    assert d["actual_equity_curve"][0]["date"] != d["actual_equity_curve"][1]["date"]
+    assert d["regression_points"][0]["date"] == str(prices.index[1].date())
+
+
 def test_factor_correlation_matrix():
     rng = np.random.default_rng(3)
     n = 300
@@ -101,6 +117,24 @@ def test_factor_correlation_matrix():
     corr = d["factor_correlation_matrix"]
     assert corr["F1"]["F1"] == pytest.approx(1.0, abs=1e-9)
     assert corr["F1"]["F2"] == pytest.approx(corr["F2"]["F1"], abs=1e-9)
+
+
+def test_factor_correlation_matrix_zero_variance_is_finite_with_unit_diagonal():
+    rng = np.random.default_rng(30)
+    n = 120
+    f1 = rng.normal(0, 0.01, n)
+    f2 = np.zeros(n)
+    rp = 0.5 * f1
+    prices = _prices_from_returns({"PORT": rp, "F1": f1, "F2": f2})
+
+    d = factor_analysis(prices[["PORT"]], prices[["F1", "F2"]], {"PORT": 1.0}, ["F1", "F2"])
+    corr = d["factor_correlation_matrix"]
+    for a in ("F1", "F2"):
+        assert corr[a][a] == pytest.approx(1.0)
+        for b in ("F1", "F2"):
+            assert math.isfinite(corr[a][b])
+    assert corr["F1"]["F2"] == pytest.approx(0.0)
+    assert corr["F2"]["F1"] == pytest.approx(0.0)
 
 
 def test_diagnostics():
@@ -135,6 +169,18 @@ def test_multicollinearity_warning_on_duplicate_factor():
     assert d["diagnostics"]["multicollinearity_warning"] is True
 
 
+def test_multicollinearity_warning_on_nearly_duplicate_factor():
+    rng = np.random.default_rng(8)
+    n = 300
+    f1 = rng.normal(0, 0.01, n)
+    f2 = f1 + rng.normal(0, 1e-12, n)
+    rp = 0.5 * f1 + rng.normal(0, 0.0006, n)
+    prices = _prices_from_returns({"PORT": rp, "F1": f1, "F2": f2})
+
+    d = factor_analysis(prices[["PORT"]], prices[["F1", "F2"]], {"PORT": 1.0}, ["F1", "F2"])
+    assert d["diagnostics"]["multicollinearity_warning"] is True
+
+
 # ---------------------------------------------------------------------------
 # Errors
 # ---------------------------------------------------------------------------
@@ -150,3 +196,45 @@ def test_too_few_observations_raises():
     prices = _prices_from_returns({"PORT": rp, "F1": f1, "F2": f2, "F3": f3})
     with pytest.raises(ValueError, match="Not enough"):
         factor_analysis(prices[["PORT"]], prices[["F1", "F2", "F3"]], {"PORT": 1.0}, ["F1", "F2", "F3"])
+
+
+def test_invalid_weights_raise_clear_errors():
+    rng = np.random.default_rng(9)
+    n = 80
+    f1 = rng.normal(0, 0.01, n)
+    p1 = 0.6 * f1
+    p2 = 0.3 * f1
+    prices = _prices_from_returns({"P1": p1, "P2": p2, "F1": f1})
+    port = prices[["P1", "P2"]]
+    factors = prices[["F1"]]
+
+    with pytest.raises(ValueError, match="exactly"):
+        factor_analysis(port, factors, {"P1": 1.0}, ["F1"])
+    with pytest.raises(ValueError, match="non-negative"):
+        factor_analysis(port, factors, {"P1": 1.2, "P2": -0.2}, ["F1"])
+    with pytest.raises(ValueError, match="sum to 1"):
+        factor_analysis(port, factors, {"P1": 0.4, "P2": 0.4}, ["F1"])
+
+
+def test_factor_prices_must_align_with_portfolio_prices():
+    rng = np.random.default_rng(10)
+    n = 80
+    f1 = rng.normal(0, 0.01, n)
+    rp = 0.6 * f1
+    prices = _prices_from_returns({"PORT": rp, "F1": f1})
+    shifted_factors = prices[["F1"]].copy()
+    shifted_factors.index = shifted_factors.index + pd.Timedelta(days=1)
+
+    with pytest.raises(ValueError, match="same index"):
+        factor_analysis(prices[["PORT"]], shifted_factors, {"PORT": 1.0}, ["F1"])
+
+
+def test_missing_factor_column_raises():
+    rng = np.random.default_rng(11)
+    n = 80
+    f1 = rng.normal(0, 0.01, n)
+    rp = 0.6 * f1
+    prices = _prices_from_returns({"PORT": rp, "F1": f1})
+
+    with pytest.raises(ValueError, match="missing"):
+        factor_analysis(prices[["PORT"]], prices[["F1"]], {"PORT": 1.0}, ["F2"])
