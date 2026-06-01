@@ -150,6 +150,20 @@ def test_portfolio_scalar_stats_present(client):
     assert data["portfolio_volatility"] >= 0
 
 
+def test_transaction_cost_is_documented_not_deducted(client):
+    free = client.post(
+        "/portfolio/optimize", json=base_request(transaction_cost_bps=0)
+    ).json()
+    costly = client.post(
+        "/portfolio/optimize", json=base_request(transaction_cost_bps=500)
+    ).json()
+
+    assert costly["equity_curve"][-1]["value"] == pytest.approx(
+        free["equity_curve"][-1]["value"]
+    )
+    assert "transaction_cost_bps is not deducted" in costly["in_sample_warning"]
+
+
 # ---------------------------------------------------------------------------
 # Validation
 # ---------------------------------------------------------------------------
@@ -192,6 +206,13 @@ def test_zero_capital_rejected(client):
     assert client.post("/portfolio/optimize", json=base_request(initial_capital=0)).status_code == 422
 
 
+def test_negative_cost_rejected(client):
+    resp = client.post(
+        "/portfolio/optimize", json=base_request(transaction_cost_bps=-1)
+    )
+    assert resp.status_code == 422
+
+
 # ---------------------------------------------------------------------------
 # Common-date alignment / insufficient data
 # ---------------------------------------------------------------------------
@@ -209,3 +230,24 @@ def test_insufficient_common_data_returns_422(client, monkeypatch):
     resp = client.post("/portfolio/optimize", json=base_request(tickers=["AAA", "BBB"]))
     assert resp.status_code == 422
     assert "common trading day" in resp.json()["detail"]
+
+
+def test_non_positive_price_returns_422(client, monkeypatch):
+    def bad_price_fetch(ticker: str, start: str, end: str) -> pd.DataFrame:
+        idx = pd.date_range("2018-01-01", periods=5, freq="B")
+        return pd.DataFrame({"Close": [100.0, 101.0, 0.0, 103.0, 104.0]}, index=idx)
+
+    monkeypatch.setattr(main_module, "_fetch", bad_price_fetch)
+    resp = client.post("/portfolio/optimize", json=base_request(tickers=["AAA", "BBB"]))
+    assert resp.status_code == 422
+    assert "strictly positive" in resp.json()["detail"]
+
+
+def test_optimizer_failure_returns_422(client, monkeypatch):
+    def fail_optimizer(*_args, **_kwargs):
+        raise ValueError("synthetic optimizer failure")
+
+    monkeypatch.setattr(main_module, "optimize_weights", fail_optimizer)
+    resp = client.post("/portfolio/optimize", json=base_request())
+    assert resp.status_code == 422
+    assert "synthetic optimizer failure" in resp.json()["detail"]

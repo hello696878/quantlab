@@ -858,7 +858,9 @@ def portfolio_backtest(request: PortfolioBacktestRequest) -> PortfolioBacktestRe
         "(maximise (w'μ − rf)/√(w'Σw)).  Annualised with 252 trading days.\n\n"
         "**In-sample caveat:** weights are optimized AND backtested on the same "
         "date range.  This can overfit and does not predict future performance. "
-        "Not investment advice."
+        "Transaction costs are accepted for interface consistency, but v1 static "
+        "optimization does not deduct one-time allocation or ongoing turnover "
+        "costs. Not investment advice."
     ),
 )
 def portfolio_optimize(request: PortfolioOptimizeRequest) -> PortfolioOptimizeResponse:
@@ -881,19 +883,24 @@ def portfolio_optimize(request: PortfolioOptimizeRequest) -> PortfolioOptimizeRe
             ),
         )
 
-    expected_returns, covariance = annualized_stats(prices)
-
-    weights = optimize_weights(
-        expected_returns,
-        covariance,
-        objective=request.objective,
-        risk_free_rate=request.risk_free_rate,
-    )
+    try:
+        expected_returns, covariance = annualized_stats(prices)
+        weights = optimize_weights(
+            expected_returns,
+            covariance,
+            objective=request.objective,
+            risk_free_rate=request.risk_free_rate,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
     equal_weights = {t: 1.0 / len(tickers) for t in tickers}
 
     # In-sample buy-and-hold backtests over the same period.
-    optimized_equity = buy_and_hold_equity(prices, weights, request.initial_capital)
-    equal_equity = buy_and_hold_equity(prices, equal_weights, request.initial_capital)
+    try:
+        optimized_equity = buy_and_hold_equity(prices, weights, request.initial_capital)
+        equal_equity = buy_and_hold_equity(prices, equal_weights, request.initial_capital)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
 
     opt_ret, opt_vol, opt_sharpe = portfolio_stats(
         weights, expected_returns, covariance, risk_free_rate=request.risk_free_rate

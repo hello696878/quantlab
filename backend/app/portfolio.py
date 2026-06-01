@@ -20,6 +20,7 @@ from scipy.optimize import minimize
 REBALANCE_FREQUENCIES = ("none", "monthly", "quarterly", "yearly")
 OPTIMIZATION_OBJECTIVES = ("equal_weight", "min_volatility", "max_sharpe")
 TRADING_DAYS_PER_YEAR = 252
+_MIN_VOL = 1e-12
 
 
 def _date_str(ts) -> str:
@@ -65,6 +66,19 @@ def drawdown_series(equity: pd.Series) -> pd.Series:
     return (equity - peak) / peak
 
 
+def _validate_price_frame(prices: pd.DataFrame) -> None:
+    if len(prices.columns) == 0:
+        raise ValueError("prices must contain at least one ticker column.")
+    if len(prices) < 2:
+        raise ValueError("prices must contain at least two common dates.")
+    if prices.isna().any().any():
+        raise ValueError("prices must not contain missing values.")
+    if not np.isfinite(prices.to_numpy(dtype=float)).all():
+        raise ValueError("prices must be finite.")
+    if (prices <= 0).any().any():
+        raise ValueError("prices must be strictly positive.")
+
+
 @dataclass
 class PortfolioResult:
     equity: pd.Series                       # portfolio value per date
@@ -101,17 +115,10 @@ def run_equal_weight_portfolio(
     """
     tickers = list(prices.columns)
     n = len(tickers)
-    if n == 0:
-        raise ValueError("prices must contain at least one ticker column.")
-    if len(prices) < 2:
-        raise ValueError("prices must contain at least two common dates.")
-    if prices.isna().any().any():
-        raise ValueError("prices must not contain missing values.")
-    if (prices <= 0).any().any():
-        raise ValueError("prices must be strictly positive.")
+    _validate_price_frame(prices)
 
     dates = prices.index
-    returns = prices.pct_change()
+    returns = prices.pct_change(fill_method=None)
     cost_rate = transaction_cost_bps / 10_000.0
     target_w = 1.0 / n
 
@@ -191,14 +198,21 @@ def annualized_stats(prices: pd.DataFrame):
     (expected_returns, covariance) : (pd.Series, pd.DataFrame)
         Both annualised with a 252-trading-day convention.
     """
-    daily = prices.pct_change().dropna(how="any")
+    _validate_price_frame(prices)
+    daily = prices.pct_change(fill_method=None).dropna(how="any")
     if len(daily) < 2:
         raise ValueError(
             "Need at least 2 daily returns (3 common dates) to estimate "
             "covariance."
         )
+    if not np.isfinite(daily.to_numpy(dtype=float)).all():
+        raise ValueError("daily returns must be finite.")
     expected_returns = daily.mean() * TRADING_DAYS_PER_YEAR
     covariance = daily.cov() * TRADING_DAYS_PER_YEAR
+    if not np.isfinite(expected_returns.to_numpy(dtype=float)).all():
+        raise ValueError("expected returns must be finite.")
+    if not np.isfinite(covariance.to_numpy(dtype=float)).all():
+        raise ValueError("covariance matrix must be finite.")
     return expected_returns, covariance
 
 
@@ -210,7 +224,7 @@ def portfolio_stats(weights: Dict[str, float], expected_returns: pd.Series, cova
     sigma = covariance.to_numpy()
     annual_return = float(w @ mu)
     annual_vol = float(np.sqrt(max(w @ sigma @ w, 0.0)))
-    sharpe = (annual_return - risk_free_rate) / annual_vol if annual_vol > 1e-12 else 0.0
+    sharpe = (annual_return - risk_free_rate) / annual_vol if annual_vol > _MIN_VOL else 0.0
     return annual_return, annual_vol, float(sharpe)
 
 
@@ -237,12 +251,23 @@ def optimize_weights(
     n = len(tickers)
     mu = expected_returns.to_numpy()
     sigma = covariance.to_numpy()
+    if n == 0:
+        raise ValueError("expected_returns must contain at least one asset.")
+    if list(covariance.index) != tickers or list(covariance.columns) != tickers:
+        raise ValueError("covariance matrix must align with expected_returns.")
+    if not np.isfinite(mu).all() or not np.isfinite(sigma).all():
+        raise ValueError("expected returns and covariance must be finite.")
 
     # Equal weight (and the trivial single-asset case) is closed-form.
     if objective == "equal_weight" or n == 1:
         return {t: 1.0 / n for t in tickers}
 
-    x0 = np.full(n, 1.0 / n)
+    equal_w = np.full(n, 1.0 / n)
+    equal_vol = float(np.sqrt(max(equal_w @ sigma @ equal_w, 0.0)))
+    if objective == "max_sharpe" and equal_vol <= _MIN_VOL:
+        return {t: 1.0 / n for t in tickers}
+
+    x0 = equal_w
     bounds = [(0.0, 1.0)] * n
     constraints = ({"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)},)
 
@@ -252,7 +277,7 @@ def optimize_weights(
     else:  # max_sharpe → minimise the negative Sharpe ratio
         def cost(w):
             vol = float(np.sqrt(max(w @ sigma @ w, 0.0)))
-            if vol <= 1e-12:
+            if vol <= _MIN_VOL:
                 return 1e6
             return -((w @ mu - risk_free_rate) / vol)
 
@@ -264,10 +289,16 @@ def optimize_weights(
         constraints=constraints,
         options={"maxiter": 1000, "ftol": 1e-10},
     )
+    if not result.success:
+        raise ValueError(f"Portfolio optimization failed: {result.message}")
+    if not np.isfinite(result.x).all():
+        raise ValueError("Portfolio optimization produced non-finite weights.")
 
     w = np.clip(np.asarray(result.x, dtype=float), 0.0, None)
     total = w.sum()
-    w = w / total if total > 1e-12 else np.full(n, 1.0 / n)
+    if total <= _MIN_VOL:
+        raise ValueError("Portfolio optimization produced zero total weight.")
+    w = w / total
     # Full precision so the weights sum to 1 (rounding for display happens at
     # the API serialization boundary).
     return {t: float(wi) for t, wi in zip(tickers, w)}
@@ -283,7 +314,14 @@ def buy_and_hold_equity(
     (no rebalancing).  ``equity[0] == initial_capital`` because the weights sum
     to 1.
     """
+    _validate_price_frame(prices)
     w = np.array([weights[t] for t in prices.columns], dtype=float)
+    if not np.isfinite(w).all():
+        raise ValueError("weights must be finite.")
+    if (w < -1e-12).any():
+        raise ValueError("weights must be non-negative.")
+    if abs(float(w.sum()) - 1.0) > 1e-6:
+        raise ValueError("weights must sum to 1.")
     normalized = prices.to_numpy() / prices.to_numpy()[0]
     equity = initial_capital * (normalized @ w)
     return pd.Series(equity, index=prices.index, name="portfolio")

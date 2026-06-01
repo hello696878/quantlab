@@ -162,8 +162,9 @@ export default function PortfolioOptimizePanel() {
         <p className="text-sm text-amber-800">
           <span className="font-semibold">In-sample optimization.</span> Weights
           are optimized and backtested on the <em>same</em> historical period.
-          This can overfit and does not predict future performance. Not
-          investment advice.
+          This can overfit and does not predict future performance. v1 does not
+          deduct allocation or turnover costs from the static buy-and-hold
+          comparison. Not investment advice.
         </p>
       </div>
 

@@ -1743,7 +1743,9 @@ class PortfolioOptimizeResponse(BaseModel):
         default=(
             "Weights were optimized and backtested on the same historical "
             "period (in-sample). This can overfit and does not predict future "
-            "performance. Not investment advice."
+            "performance. Portfolio Optimization v1 is a static buy-and-hold "
+            "comparison; transaction_cost_bps is not deducted as a one-time "
+            "allocation cost or ongoing turnover cost. Not investment advice."
         ),
         description="Explicit in-sample / overfitting caveat.",
     )

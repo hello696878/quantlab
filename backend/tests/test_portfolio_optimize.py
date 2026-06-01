@@ -11,6 +11,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import app.portfolio as portfolio_module
 from app.portfolio import (
     annualized_stats,
     buy_and_hold_equity,
@@ -130,6 +131,38 @@ def test_max_sharpe_beats_equal_weight_sharpe():
     assert sharpe_ms >= sharpe_eq - 1e-9
 
 
+def test_max_sharpe_zero_volatility_falls_back_to_equal_weight():
+    mu, cov = mu_cov({"A": 0.05, "B": 0.10}, {"A": 0.0, "B": 0.0})
+    w = optimize_weights(mu, cov, objective="max_sharpe", risk_free_rate=0.02)
+    assert w == {"A": pytest.approx(0.5), "B": pytest.approx(0.5)}
+
+
+def test_optimizer_failure_raises_clear_error(monkeypatch):
+    class FailedResult:
+        success = False
+        message = "synthetic failure"
+        x = np.array([0.5, 0.5])
+
+    monkeypatch.setattr(portfolio_module, "minimize", lambda *_a, **_k: FailedResult())
+    mu, cov = mu_cov({"A": 0.1, "B": 0.08}, {"A": 0.04, "B": 0.02})
+
+    with pytest.raises(ValueError, match="Portfolio optimization failed"):
+        optimize_weights(mu, cov, objective="min_volatility")
+
+
+def test_non_finite_optimizer_result_raises(monkeypatch):
+    class BadResult:
+        success = True
+        message = "ok"
+        x = np.array([np.nan, 1.0])
+
+    monkeypatch.setattr(portfolio_module, "minimize", lambda *_a, **_k: BadResult())
+    mu, cov = mu_cov({"A": 0.1, "B": 0.08}, {"A": 0.04, "B": 0.02})
+
+    with pytest.raises(ValueError, match="non-finite weights"):
+        optimize_weights(mu, cov, objective="min_volatility")
+
+
 def test_invalid_objective_raises():
     mu, cov = mu_cov({"A": 0.1, "B": 0.1}, {"A": 0.04, "B": 0.04})
     with pytest.raises(ValueError):
@@ -167,6 +200,20 @@ def test_annualized_stats_requires_two_returns():
         annualized_stats(prices)
 
 
+def test_annualized_stats_rejects_non_positive_prices():
+    prices = make_prices(5)
+    prices.iloc[2, 0] = 0.0
+    with pytest.raises(ValueError, match="strictly positive"):
+        annualized_stats(prices)
+
+
+def test_annualized_stats_rejects_non_finite_prices():
+    prices = make_prices(5)
+    prices.iloc[2, 0] = float("inf")
+    with pytest.raises(ValueError, match="finite"):
+        annualized_stats(prices)
+
+
 def test_buy_and_hold_equity_starts_at_capital():
     prices = make_prices(120)
     eq = buy_and_hold_equity(prices, {"AAA": 0.5, "BBB": 0.5}, 100_000.0)
@@ -179,3 +226,11 @@ def test_buy_and_hold_single_asset_tracks_price():
     eq = buy_and_hold_equity(prices, {"AAA": 1.0, "BBB": 0.0}, 50_000.0)
     expected_final = 50_000.0 * (prices["AAA"].iloc[-1] / prices["AAA"].iloc[0])
     assert eq.iloc[-1] == pytest.approx(expected_final, rel=1e-9)
+
+
+def test_buy_and_hold_rejects_invalid_weights():
+    prices = make_prices(60)
+    with pytest.raises(ValueError, match="sum to 1"):
+        buy_and_hold_equity(prices, {"AAA": 0.8, "BBB": 0.1}, 50_000.0)
+    with pytest.raises(ValueError, match="non-negative"):
+        buy_and_hold_equity(prices, {"AAA": 1.1, "BBB": -0.1}, 50_000.0)

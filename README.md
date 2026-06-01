@@ -130,7 +130,7 @@ The Portfolio workspace also includes an **Optimization** tab (`POST /portfolio/
 - **Minimum Volatility** — minimise `√(wᵀ Σ w)` (portfolio variance).
 - **Maximum Sharpe** — maximise `(wᵀμ − r_f) / √(wᵀ Σ w)`.
 
-Expected returns and the covariance matrix are estimated from daily returns and annualised with 252 trading days; the constrained problem is solved with SciPy's SLSQP. The optimized weights are backtested buy-and-hold over the period and compared against the equal-weight portfolio (metrics, equity curve, drawdown).
+Expected returns and the covariance matrix are estimated from daily returns and annualised with 252 trading days; the constrained problem is solved with SciPy's SLSQP. The optimized weights are backtested buy-and-hold over the period and compared against the equal-weight portfolio (metrics, equity curve, drawdown). Portfolio Optimization v1 is a static allocation model: `transaction_cost_bps` is accepted for API/UI consistency but no one-time allocation cost or ongoing turnover cost is deducted.
 
 > ⚠️ **In-sample caveat.** v1 optimizes weights on the **same** historical window it then backtests. This is in-sample optimization: it will look good by construction, can badly overfit, and **does not predict future performance**. There is no rolling/out-of-sample optimization yet. **Not investment advice.**
 
