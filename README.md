@@ -111,6 +111,17 @@ Example exported JSON:
 }
 ```
 
+### Multi-Asset Portfolio Backtesting
+
+The **Portfolio Backtest** workspace runs a simple equal-weight, long-only, fully-invested portfolio across up to 20 assets (`POST /portfolio/backtest`). Every asset targets a 1/N weight. Choose a **rebalance frequency**:
+
+- **none** — buy equal-weight once and let the weights drift (buy & hold)
+- **monthly / quarterly / yearly** — reset to equal weight on the first trading day of each new period
+
+Rebalancing isn't free: the cost is **turnover-based** — `turnover = Σ|target_weightᵢ − driftedᵢ|` and `cost = equity × turnover × bps/10000`, deducted on the rebalance day. All assets are aligned to their common trading days (dates where any asset is missing are dropped); the benchmark is SPY buy-and-hold when available (in the basket or fetched separately), otherwise the first ticker as a documented fallback. The response includes metrics, the equity curve vs. benchmark, drawdown, per-day weights, and a rebalance-events log.
+
+> This is **not portfolio optimization** — there is no mean-variance/risk-parity weighting, no shorting, and no leverage yet. It is a transparent equal-weight baseline.
+
 #### Strategy Template Gallery
 
 The Strategy Builder includes a built-in **gallery** of curated, ready-to-use strategy templates (`GET /custom-strategy-gallery`). Open the **Gallery** from the Strategy Builder, browse the cards (each shows name, description, tags, difficulty, category, and a readable rule summary), then **Load** one into the builder to run it on any ticker/date range, or **Save to My Templates** to keep a local copy. Built-in templates are **static, pre-validated rule objects — not executable code** (no `eval`); they pass through the exact same whitelisted `CustomRule` validation as user-built strategies.

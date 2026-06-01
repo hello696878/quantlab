@@ -481,6 +481,65 @@ export interface CustomStrategyRequest {
 }
 
 // ---------------------------------------------------------------------------
+// Multi-Asset Portfolio Backtesting
+// ---------------------------------------------------------------------------
+
+export type PortfolioRebalanceFrequency =
+  | "none"
+  | "monthly"
+  | "quarterly"
+  | "yearly";
+
+export interface PortfolioBacktestRequest {
+  tickers: string[];
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  rebalance_frequency: PortfolioRebalanceFrequency;
+  transaction_cost_bps: number;
+}
+
+export interface PortfolioEquityPoint {
+  date: string;
+  portfolio: number;
+  benchmark: number;
+}
+
+export interface PortfolioDrawdownPoint {
+  date: string;
+  portfolio: number;
+  benchmark: number;
+}
+
+export interface PortfolioWeightPoint {
+  date: string;
+  weights: Record<string, number>;
+}
+
+export interface PortfolioRebalanceEvent {
+  date: string;
+  turnover: number;
+  cost: number;
+}
+
+export interface PortfolioBacktestResponse {
+  tickers: string[];
+  start_date: string;
+  end_date: string;
+  strategy: string;
+  rebalance_frequency: PortfolioRebalanceFrequency;
+  initial_capital: number;
+  transaction_cost_bps: number;
+  benchmark_ticker: string;
+  metrics: PerformanceMetrics;
+  benchmark_metrics: PerformanceMetrics;
+  equity_curve: PortfolioEquityPoint[];
+  drawdown: PortfolioDrawdownPoint[];
+  weights: PortfolioWeightPoint[];
+  rebalance_events: PortfolioRebalanceEvent[];
+}
+
+// ---------------------------------------------------------------------------
 // Saved Custom Strategy Templates (reusable rule definitions, not results)
 // ---------------------------------------------------------------------------
 

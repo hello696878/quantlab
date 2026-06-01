@@ -130,6 +130,22 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Tests assert every template validates, has entry+exit rules, generates
   signals on deterministic data, and matches the saved-template shape
 
+### Phase 7 — Multi-Asset Portfolio Backtesting v1 ✅
+
+- `POST /portfolio/backtest` — equal-weight, long-only, fully-invested
+  portfolio (1–20 assets); target weight 1/N
+- Rebalance cadence: none (drift / buy & hold) or monthly / quarterly / yearly
+  on the first trading day of each new period
+- **Turnover-based** rebalancing cost: `cost = equity × Σ|target−drift| ×
+  bps/10000`; no initial-purchase cost (equity starts at initial_capital)
+- Assets aligned on common trading days; SPY buy-and-hold benchmark when
+  available (else first-ticker fallback, documented)
+- Response: metrics + benchmark metrics, equity curve, drawdown, per-day
+  weights, and a rebalance-events log
+- New **Portfolio Backtest** workspace; `portfolio.py` logic module reusing
+  `compute_metrics`; full unit + API test coverage
+- **Not** portfolio optimization — no optimisation, shorting, or leverage yet
+
 ---
 
 ## Future Phases

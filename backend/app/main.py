@@ -10,6 +10,7 @@ POST /backtest/bollinger-band           — run a Bollinger Band mean-reversion 
 POST /backtest/momentum                 — run a time-series momentum backtest
 POST /backtest/volatility-breakout      — run a volatility breakout backtest
 POST /backtest/pairs                    — run a pairs trading backtest
+POST /portfolio/backtest                — equal-weight multi-asset portfolio backtest
 POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
 POST /backtest/custom                   — run a no-code custom rule-based strategy
 POST /custom-strategies                 — save a reusable custom strategy template
@@ -46,6 +47,11 @@ from app.custom_strategy_templates import (
 )
 from app.data import fetch_ohlcv, fetch_pairs_close
 from app.db import init_db
+from app.portfolio import (
+    align_prices,
+    drawdown_series,
+    run_equal_weight_portfolio,
+)
 from app.strategy_gallery import get_gallery_template, list_gallery
 from app.metrics import compute_metrics
 from app.saved_backtests import (
@@ -68,6 +74,12 @@ from app.schemas import (
     DeleteResponse,
     EquityPoint,
     GalleryTemplate,
+    PortfolioBacktestRequest,
+    PortfolioBacktestResponse,
+    PortfolioDrawdownPoint,
+    PortfolioEquityPoint,
+    PortfolioRebalanceEvent,
+    PortfolioWeightPoint,
     MomentumBacktestRequest,
     PairsBacktestRequest,
     PerformanceMetrics,
@@ -693,6 +705,127 @@ def backtest_pairs(request: PairsBacktestRequest) -> BacktestResponse:
         equity_curve=equity_curve,
         trades=[TradeRecord(**t) for t in trades],
         num_trades=len(trades),
+    )
+
+
+# ---------------------------------------------------------------------------
+# Multi-asset portfolio backtesting
+# ---------------------------------------------------------------------------
+
+
+def _resolve_benchmark(prices, start_date: str, end_date: str, tickers: list):
+    """
+    Choose a benchmark series aligned to the portfolio's dates.
+
+    Preference order:
+      1. SPY column already present in the portfolio prices.
+      2. SPY fetched separately and reindexed onto the portfolio dates.
+      3. Fallback: the first portfolio ticker (documented behaviour).
+
+    Returns ``(benchmark_ticker, benchmark_close_series)``.
+    """
+    if "SPY" in prices.columns:
+        return "SPY", prices["SPY"]
+
+    try:
+        spy_close = _fetch("SPY", start_date, end_date)["Close"]
+        spy_close = spy_close.reindex(prices.index).ffill().bfill()
+        if spy_close.notna().all() and len(spy_close) >= 2:
+            return "SPY", spy_close
+    except Exception:
+        pass  # fall through to the first-ticker fallback
+
+    first = tickers[0]
+    return first, prices[first]
+
+
+@app.post(
+    "/portfolio/backtest",
+    response_model=PortfolioBacktestResponse,
+    tags=["portfolio"],
+    summary="Equal-weight multi-asset portfolio backtest",
+    description=(
+        "Backtest a simple equal-weight, long-only, fully-invested portfolio "
+        "with optional periodic rebalancing (none / monthly / quarterly / "
+        "yearly).  Each asset targets weight 1/N; rebalancing costs are "
+        "turnover-based.  This is not portfolio optimisation.\n\n"
+        "Benchmark: SPY buy-and-hold when available (in the basket or fetched "
+        "separately); otherwise the first ticker is used as a documented "
+        "fallback."
+    ),
+)
+def portfolio_backtest(request: PortfolioBacktestRequest) -> PortfolioBacktestResponse:
+    tickers = request.tickers  # already cleaned/uppercased/deduped by the schema
+
+    # Fetch each asset's close (reuses the single-asset fetch + error mapping).
+    frames = {}
+    for ticker in tickers:
+        df = _fetch(ticker, request.start_date, request.end_date)
+        frames[ticker] = df["Close"]
+
+    prices = align_prices(frames)
+    if len(prices) < 2:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(prices)} common trading day(s) across "
+                f"{', '.join(tickers)}; need at least 2.  Try a wider date "
+                "range or assets with overlapping history."
+            ),
+        )
+
+    result = run_equal_weight_portfolio(
+        prices,
+        initial_capital=request.initial_capital,
+        rebalance_frequency=request.rebalance_frequency,
+        transaction_cost_bps=request.transaction_cost_bps,
+    )
+
+    # Benchmark aligned to the portfolio's dates.
+    benchmark_ticker, bench_close = _resolve_benchmark(
+        prices, request.start_date, request.end_date, tickers
+    )
+    benchmark_equity = request.initial_capital * (bench_close / float(bench_close.iloc[0]))
+
+    portfolio_equity = result.equity
+    port_dd = drawdown_series(portfolio_equity)
+    bench_dd = drawdown_series(benchmark_equity)
+
+    equity_curve = [
+        PortfolioEquityPoint(
+            date=str(d.date()) if hasattr(d, "date") else str(d),
+            portfolio=round(float(p), 2),
+            benchmark=round(float(b), 2),
+        )
+        for d, p, b in zip(portfolio_equity.index, portfolio_equity, benchmark_equity)
+    ]
+    drawdown = [
+        PortfolioDrawdownPoint(
+            date=str(d.date()) if hasattr(d, "date") else str(d),
+            portfolio=round(float(p), 6),
+            benchmark=round(float(b), 6),
+        )
+        for d, p, b in zip(port_dd.index, port_dd, bench_dd)
+    ]
+
+    metrics = PerformanceMetrics(**compute_metrics(portfolio_equity))
+    benchmark_metrics = PerformanceMetrics(**compute_metrics(benchmark_equity))
+
+    return PortfolioBacktestResponse(
+        tickers=tickers,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        strategy="equal_weight_portfolio",
+        rebalance_frequency=request.rebalance_frequency,
+        initial_capital=request.initial_capital,
+        transaction_cost_bps=request.transaction_cost_bps,
+        benchmark_ticker=benchmark_ticker,
+        metrics=metrics,
+        benchmark_metrics=benchmark_metrics,
+        equity_curve=equity_curve,
+        drawdown=drawdown,
+        weights=[PortfolioWeightPoint(**w) for w in result.weights],
+        rebalance_events=[PortfolioRebalanceEvent(**e) for e in result.rebalance_events],
     )
 
 

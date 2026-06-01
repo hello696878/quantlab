@@ -13,6 +13,7 @@ import SmaWalkForwardPanel from "@/components/SmaWalkForwardPanel";
 import StrategyComparisonPanel from "@/components/StrategyComparisonPanel";
 import CsvBacktestPanel from "@/components/CsvBacktestPanel";
 import StrategyBuilderPanel from "@/components/StrategyBuilderPanel";
+import PortfolioBacktestPanel from "@/components/PortfolioBacktestPanel";
 import SaveBacktestModal from "@/components/SaveBacktestModal";
 import SavedBacktestsList from "@/components/SavedBacktestsList";
 import SavedBacktestDetail from "@/components/SavedBacktestDetail";
@@ -255,6 +256,10 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
   builder: {
     title: "Strategy Builder",
     subtitle: "Compose a long-only strategy from indicator rules — no code.",
+  },
+  portfolio: {
+    title: "Portfolio Backtest",
+    subtitle: "Equal-weight multi-asset portfolio with optional rebalancing.",
   },
   sweep: {
     title: "Parameter Sweep",
@@ -545,6 +550,20 @@ export default function HomePage() {
               server with vectorised math.
             </SectionIntro>
             <StrategyBuilderPanel />
+          </>
+        )}
+
+        {/* ── Portfolio Backtest ───────────────────────────────────────── */}
+        {view === "portfolio" && (
+          <>
+            <SectionIntro title="Multi-Asset Portfolio Backtest">
+              Backtest a simple equal-weight, long-only, fully-invested
+              portfolio across several assets. Choose a rebalance cadence (none,
+              monthly, quarterly, or yearly); rebalancing costs are charged on
+              turnover. This is not portfolio optimization — every asset targets
+              an equal 1/N weight.
+            </SectionIntro>
+            <PortfolioBacktestPanel />
           </>
         )}
 

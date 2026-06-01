@@ -3,7 +3,7 @@ Pydantic request / response schemas for the QuantLab backtesting API.
 """
 
 from datetime import date
-from typing import Annotated, List, Literal, Optional, Union
+from typing import Annotated, Dict, List, Literal, Optional, Union
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
@@ -1514,3 +1514,118 @@ class GalleryTemplate(BaseModel):
     tags: List[str]
     difficulty: GalleryDifficulty
     category: GalleryCategory
+
+
+# ===========================================================================
+# Multi-Asset Portfolio Backtesting (v1)
+# ===========================================================================
+#
+# Equal-weight, long-only, fully-invested portfolio with optional periodic
+# rebalancing.  Not portfolio optimisation — every asset targets weight 1/N.
+
+PortfolioRebalanceFrequency = Literal["none", "monthly", "quarterly", "yearly"]
+
+
+class PortfolioBacktestRequest(BaseModel):
+    """Request body for POST /portfolio/backtest."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tickers: List[str] = Field(
+        min_length=1,
+        max_length=20,
+        description="1–20 Yahoo Finance tickers; held at equal weight.",
+    )
+    start_date: str = Field(default="2015-01-01", description="Start date (YYYY-MM-DD).")
+    end_date: str = Field(default="2023-12-31", description="End date (YYYY-MM-DD).")
+    initial_capital: float = Field(
+        default=100_000.0, gt=0, description="Starting capital in USD."
+    )
+    rebalance_frequency: PortfolioRebalanceFrequency = Field(
+        default="none",
+        description="Rebalance cadence: none / monthly / quarterly / yearly.",
+    )
+    transaction_cost_bps: float = Field(
+        default=10.0,
+        ge=0.0,
+        lt=10_000.0,
+        description="Turnover-based transaction cost in basis points.",
+    )
+
+    @field_validator("tickers")
+    @classmethod
+    def _clean_tickers(cls, value: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        seen: set[str] = set()
+        for raw in value:
+            sym = raw.strip().upper()
+            if not sym:
+                raise ValueError("ticker symbols must not be empty.")
+            if sym in seen:
+                raise ValueError(f"duplicate ticker after uppercasing: {sym}.")
+            seen.add(sym)
+            cleaned.append(sym)
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_dates(self) -> "PortfolioBacktestRequest":
+        import re
+
+        for name, val in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, val):
+                raise ValueError(f"{name} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be strictly before end_date.")
+        return self
+
+
+class PortfolioEquityPoint(BaseModel):
+    """One daily portfolio + benchmark value."""
+
+    date: str
+    portfolio: float
+    benchmark: float
+
+
+class PortfolioDrawdownPoint(BaseModel):
+    """Daily peak-to-trough drawdown (fraction ≤ 0) for portfolio + benchmark."""
+
+    date: str
+    portfolio: float
+    benchmark: float
+
+
+class PortfolioWeightPoint(BaseModel):
+    """Per-asset weights on one date (sum ≈ 1.0)."""
+
+    date: str
+    weights: Dict[str, float]
+
+
+class PortfolioRebalanceEvent(BaseModel):
+    """A rebalance back to equal weight, with its turnover and dollar cost."""
+
+    date: str
+    turnover: float = Field(description="Sum of absolute weight changes (0–2).")
+    cost: float = Field(description="Transaction cost charged in USD.")
+
+
+class PortfolioBacktestResponse(BaseModel):
+    """Full response for POST /portfolio/backtest."""
+
+    tickers: List[str]
+    start_date: str
+    end_date: str
+    strategy: str = "equal_weight_portfolio"
+    rebalance_frequency: PortfolioRebalanceFrequency
+    initial_capital: float
+    transaction_cost_bps: float
+    benchmark_ticker: str = Field(
+        description="Which series the benchmark uses (SPY when available, else a fallback)."
+    )
+    metrics: PerformanceMetrics
+    benchmark_metrics: PerformanceMetrics
+    equity_curve: List[PortfolioEquityPoint]
+    drawdown: List[PortfolioDrawdownPoint]
+    weights: List[PortfolioWeightPoint]
+    rebalance_events: List[PortfolioRebalanceEvent]

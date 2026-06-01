@@ -9,6 +9,7 @@ export type View =
   | "backtest"
   | "csv"
   | "builder"
+  | "portfolio"
   | "sweep"
   | "train-test"
   | "walk-forward"
