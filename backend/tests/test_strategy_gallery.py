@@ -33,13 +33,14 @@ def client():
     return TestClient(main_module.app)
 
 
-EXPECTED_IDS = {
-    "sma-trend-filter",
-    "rsi-mean-reversion",
-    "momentum-trend",
-    "bollinger-mean-reversion",
-    "defensive-trend",
-}
+EXPECTED_TEMPLATES = [
+    ("sma-trend-filter", "SMA Trend Filter"),
+    ("rsi-mean-reversion", "RSI Mean Reversion"),
+    ("momentum-trend", "Momentum + Trend"),
+    ("bollinger-mean-reversion", "Bollinger Mean Reversion"),
+    ("defensive-trend", "Defensive Trend Strategy"),
+]
+EXPECTED_IDS = {template_id for template_id, _name in EXPECTED_TEMPLATES}
 
 
 # ---------------------------------------------------------------------------
@@ -51,9 +52,7 @@ def test_gallery_list_returns_templates(client):
     resp = client.get("/custom-strategy-gallery")
     assert resp.status_code == 200, resp.text
     rows = resp.json()
-    assert len(rows) >= 5
-    ids = {r["id"] for r in rows}
-    assert EXPECTED_IDS.issubset(ids)
+    assert [(r["id"], r["name"]) for r in rows] == EXPECTED_TEMPLATES
 
 
 def test_gallery_items_have_all_fields(client):
@@ -72,6 +71,17 @@ def test_every_template_has_entry_and_exit_rules(client):
     for r in client.get("/custom-strategy-gallery").json():
         assert len(r["entry_rules"]) >= 1, r["id"]
         assert len(r["exit_rules"]) >= 1, r["id"]
+
+
+def test_gallery_accessors_return_defensive_copies():
+    first = gallery_module.list_gallery()[0]
+    first.name = "Mutated"
+    first.entry_rules.clear()
+
+    fresh = gallery_module.get_gallery_template("sma-trend-filter")
+    assert fresh is not None
+    assert fresh.name == "SMA Trend Filter"
+    assert len(fresh.entry_rules) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -138,26 +148,26 @@ def test_every_template_generates_signals_on_deterministic_data():
 
 
 def test_gallery_template_is_savable(client):
-    """A gallery template's fields are accepted by POST /custom-strategies."""
-    g = client.get("/custom-strategy-gallery/momentum-trend").json()
-    payload = {
-        "name": g["name"],
-        "description": g["description"],
-        "entry_logic": g["entry_logic"],
-        "exit_logic": g["exit_logic"],
-        "entry_rules": g["entry_rules"],
-        "exit_rules": g["exit_rules"],
-        "tags": g["tags"],
-    }
-    resp = client.post("/custom-strategies", json=payload)
-    assert resp.status_code == 200, resp.text
-    saved = resp.json()
-    assert saved["name"] == g["name"]
-    assert len(saved["entry_rules"]) == len(g["entry_rules"])
+    """Every gallery template's fields are accepted by POST /custom-strategies."""
+    for g in client.get("/custom-strategy-gallery").json():
+        payload = {
+            "name": g["name"],
+            "description": g["description"],
+            "entry_logic": g["entry_logic"],
+            "exit_logic": g["exit_logic"],
+            "entry_rules": g["entry_rules"],
+            "exit_rules": g["exit_rules"],
+            "tags": g["tags"],
+        }
+        resp = client.post("/custom-strategies", json=payload)
+        assert resp.status_code == 200, resp.text
+        saved = resp.json()
+        assert saved["name"] == g["name"]
+        assert len(saved["entry_rules"]) == len(g["entry_rules"])
 
 
 def test_gallery_template_runs_via_backtest(client, monkeypatch):
-    """A gallery template can be run end-to-end through /backtest/custom."""
+    """Every gallery template can run end-to-end through /backtest/custom."""
 
     def fake_df(*_a, **_k):
         vals = [100.0 + 25.0 * math.sin(i / 25.0) + i * 0.1 for i in range(400)]
@@ -168,18 +178,18 @@ def test_gallery_template_runs_via_backtest(client, monkeypatch):
 
     monkeypatch.setattr(main_module, "_fetch", fake_df)
 
-    g = client.get("/custom-strategy-gallery/sma-trend-filter").json()
-    run_req = {
-        "ticker": "SPY",
-        "start_date": "2018-01-01",
-        "end_date": "2021-01-01",
-        "transaction_cost_bps": 10,
-        "initial_capital": 100000,
-        "entry_rules": g["entry_rules"],
-        "entry_logic": "all" if g["entry_logic"] == "AND" else "any",
-        "exit_rules": g["exit_rules"],
-        "exit_logic": "all" if g["exit_logic"] == "AND" else "any",
-    }
-    resp = client.post("/backtest/custom", json=run_req)
-    assert resp.status_code == 200, resp.text
-    assert resp.json()["strategy"] == "custom"
+    for g in client.get("/custom-strategy-gallery").json():
+        run_req = {
+            "ticker": "SPY",
+            "start_date": "2018-01-01",
+            "end_date": "2021-01-01",
+            "transaction_cost_bps": 10,
+            "initial_capital": 100000,
+            "entry_rules": g["entry_rules"],
+            "entry_logic": "all" if g["entry_logic"] == "AND" else "any",
+            "exit_rules": g["exit_rules"],
+            "exit_logic": "all" if g["exit_logic"] == "AND" else "any",
+        }
+        resp = client.post("/backtest/custom", json=run_req)
+        assert resp.status_code == 200, f"{g['id']}: {resp.text}"
+        assert resp.json()["strategy"] == "custom"

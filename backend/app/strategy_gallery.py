@@ -149,9 +149,10 @@ for _t in GALLERY:
 
 def list_gallery() -> List[GalleryTemplate]:
     """Return all built-in gallery templates (full definitions)."""
-    return GALLERY
+    return [template.model_copy(deep=True) for template in GALLERY]
 
 
 def get_gallery_template(template_id: str) -> Optional[GalleryTemplate]:
     """Return one built-in template by id, or None if not found."""
-    return _BY_ID.get(template_id)
+    template = _BY_ID.get(template_id)
+    return template.model_copy(deep=True) if template is not None else None
