@@ -25,12 +25,23 @@ const inputCls =
   "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
-// Highlight colours for the three special portfolios.
-const C_RANDOM = "rgba(148,163,184,0.45)";
-const C_FRONTIER = "#22d3ee";
-const C_EQUAL = "#a78bfa";
-const C_MINVOL = "#34d399";
-const C_MAXSHARPE = "#fbbf24";
+// Special-portfolio marker colours (match legend + cards).
+const C_FRONTIER = "#67e8f9"; // cyan dots
+const C_FRONTIER_LINE = "#22d3ee"; // electric cyan line
+const C_EQUAL = "#a78bfa"; // violet
+const C_MINVOL = "#34d399"; // emerald
+const C_MAXSHARPE = "#fbbf24"; // gold
+
+// Sharpe colour ramp for the random cloud: muted slate → blue → cyan → teal →
+// emerald → gold (low → high Sharpe).
+const SHARPE_RAMP = [
+  "#64748b",
+  "#3b82f6",
+  "#22d3ee",
+  "#2dd4bf",
+  "#34d399",
+  "#fbbf24",
+];
 
 function Field({
   label,
@@ -92,6 +103,11 @@ interface ScatterDatum {
   weights?: Record<string, number>;
 }
 
+/** Renders nothing — used to draw a line-only (point-less) frontier glow. */
+function NoShape() {
+  return <g />;
+}
+
 function FrontierTooltip({
   active,
   payload,
@@ -101,40 +117,81 @@ function FrontierTooltip({
 }) {
   if (!active || !payload?.length) return null;
   const d = payload[0].payload;
+  const topWeights = d.weights
+    ? Object.entries(d.weights)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+    : [];
   return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-slate-700 mb-1">{d.label}</p>
-      <div className="flex justify-between gap-4">
-        <span className="text-slate-500">Return</span>
-        <span className="tabular">{fmtPct(d.expected_return, 1)}</span>
+    <div
+      className="rounded-lg px-3 py-2 text-xs shadow-lg"
+      style={{
+        background: "rgba(12,17,32,0.96)",
+        border: "1px solid var(--line-strong)",
+        backdropFilter: "blur(6px)",
+      }}
+    >
+      <p className="font-semibold mb-1" style={{ color: "var(--text-hi)" }}>
+        {d.label}
+      </p>
+      <div className="flex justify-between gap-6">
+        <span style={{ color: "var(--text-mut)" }}>Return</span>
+        <span className="mono" style={{ color: "var(--text-hi)" }}>
+          {fmtPct(d.expected_return, 1)}
+        </span>
       </div>
-      <div className="flex justify-between gap-4">
-        <span className="text-slate-500">Volatility</span>
-        <span className="tabular">{fmtPct(d.volatility, 1)}</span>
+      <div className="flex justify-between gap-6">
+        <span style={{ color: "var(--text-mut)" }}>Volatility</span>
+        <span className="mono" style={{ color: "var(--text-hi)" }}>
+          {fmtPct(d.volatility, 1)}
+        </span>
       </div>
       {d.sharpe !== undefined && (
-        <div className="flex justify-between gap-4">
-          <span className="text-slate-500">Sharpe</span>
-          <span className="tabular">{fmtRatio(d.sharpe, 2)}</span>
+        <div className="flex justify-between gap-6">
+          <span style={{ color: "var(--text-mut)" }}>Sharpe</span>
+          <span className="mono" style={{ color: "var(--text-hi)" }}>
+            {fmtRatio(d.sharpe, 2)}
+          </span>
         </div>
       )}
-      {d.weights && (
-        <div className="mt-1 pt-1 border-t border-slate-100">
-          {Object.entries(d.weights)
-            .sort((a, b) => b[1] - a[1])
-            .map(([t, w]) => (
-              <div key={t} className="flex justify-between gap-4">
-                <span className="text-slate-400">{t}</span>
-                <span className="tabular">{(w * 100).toFixed(1)}%</span>
-              </div>
-            ))}
+      {topWeights.length > 0 && (
+        <div
+          className="mt-1.5 pt-1.5"
+          style={{ borderTop: "1px solid var(--line)" }}
+        >
+          <p className="mb-0.5" style={{ color: "var(--text-faint)" }}>
+            Top weights
+          </p>
+          {topWeights.map(([t, w]) => (
+            <div key={t} className="flex justify-between gap-6">
+              <span style={{ color: "var(--text-mut)" }}>{t}</span>
+              <span className="mono" style={{ color: "var(--text)" }}>
+                {(w * 100).toFixed(0)}%
+              </span>
+            </div>
+          ))}
         </div>
       )}
     </div>
   );
 }
 
-/** A small weights table for a special portfolio card. */
+/** Compact KPI card shown above the chart. */
+function StatCard({ label, value, color }: { label: string; value: string; color?: string }) {
+  return (
+    <div className="card p-4">
+      <p className="uplabel">{label}</p>
+      <p
+        className="mono text-xl font-bold mt-1"
+        style={{ color: color ?? "var(--text-hi)" }}
+      >
+        {value}
+      </p>
+    </div>
+  );
+}
+
+/** Weights + stats card for a special portfolio. */
 function SpecialCard({
   title,
   color,
@@ -242,19 +299,32 @@ export default function PortfolioFrontierPanel() {
     }
   }
 
-  const randomData: ScatterDatum[] = useMemo(
-    () =>
-      result
-        ? result.random_portfolios.map((p) => ({
-            volatility: p.volatility,
-            expected_return: p.expected_return,
-            sharpe: p.sharpe,
-            z: 1,
-            label: "Random portfolio",
-          }))
-        : [],
-    [result],
-  );
+  // Bucket random portfolios by Sharpe → one Scatter series per colour band.
+  // Far fewer DOM nodes than per-point <Cell>, and gives the "cloud" look.
+  const randomBuckets: { color: string; data: ScatterDatum[] }[] = useMemo(() => {
+    if (!result || result.random_portfolios.length === 0) return [];
+    const sharpes = result.random_portfolios.map((p) => p.sharpe);
+    const lo = Math.min(...sharpes);
+    const hi = Math.max(...sharpes);
+    const span = hi - lo;
+    const n = SHARPE_RAMP.length;
+    const buckets: ScatterDatum[][] = Array.from({ length: n }, () => []);
+    for (const p of result.random_portfolios) {
+      const t = span > 1e-12 ? (p.sharpe - lo) / span : 0.5;
+      const idx = Math.min(n - 1, Math.max(0, Math.floor(t * n)));
+      buckets[idx].push({
+        volatility: p.volatility,
+        expected_return: p.expected_return,
+        sharpe: p.sharpe,
+        z: 1,
+        label: "Random portfolio",
+        weights: p.weights,
+      });
+    }
+    return buckets
+      .map((data, i) => ({ color: SHARPE_RAMP[i], data }))
+      .filter((b) => b.data.length > 0);
+  }, [result]);
 
   const frontierData: ScatterDatum[] = useMemo(
     () =>
@@ -262,7 +332,7 @@ export default function PortfolioFrontierPanel() {
         ? result.frontier_points.map((p) => ({
             volatility: p.volatility,
             expected_return: p.expected_return,
-            z: 1,
+            z: 2,
             label: "Efficient frontier",
           }))
         : [],
@@ -275,7 +345,7 @@ export default function PortfolioFrontierPanel() {
         volatility: point.volatility,
         expected_return: point.expected_return,
         sharpe: point.sharpe,
-        z: 6,
+        z: 7,
         label,
         weights: point.weights,
       },
@@ -353,15 +423,52 @@ export default function PortfolioFrontierPanel() {
       {/* Results */}
       {result && !loading && (
         <>
+          {/* KPI cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+            <StatCard
+              label="Max Sharpe"
+              value={fmtRatio(result.max_sharpe.sharpe, 2)}
+              color={C_MAXSHARPE}
+            />
+            <StatCard
+              label="Min Volatility"
+              value={fmtPct(result.min_volatility.volatility, 1)}
+              color={C_MINVOL}
+            />
+            <StatCard
+              label="Equal-Weight Sharpe"
+              value={fmtRatio(result.equal_weight.sharpe, 2)}
+              color={C_EQUAL}
+            />
+            <StatCard
+              label="Random Portfolios"
+              value={result.random_portfolios.length.toLocaleString("en-US")}
+            />
+          </div>
+
+          {/* Scatter plot */}
           <div className="card p-6">
-            <p className="section-title mb-4">
-              Risk–Return Space{" "}
-              <span className="normal-case font-normal text-slate-400 ml-1">
-                ({result.random_portfolios.length} random long-only portfolios)
-              </span>
-            </p>
-            <ResponsiveContainer width="100%" height={440}>
-              <ScatterChart margin={{ top: 10, right: 20, bottom: 16, left: 8 }}>
+            <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
+              <p className="section-title">Risk–Return Space</p>
+              {/* Sharpe colour-scale legend for the random cloud */}
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                  Low Sharpe
+                </span>
+                <span
+                  className="h-2 w-28 rounded-full"
+                  style={{
+                    background: `linear-gradient(90deg, ${SHARPE_RAMP.join(", ")})`,
+                  }}
+                />
+                <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                  High
+                </span>
+              </div>
+            </div>
+
+            <ResponsiveContainer width="100%" height={460}>
+              <ScatterChart margin={{ top: 10, right: 24, bottom: 20, left: 8 }}>
                 <CartesianGrid stroke="rgba(255,255,255,0.06)" />
                 <XAxis
                   type="number"
@@ -373,7 +480,7 @@ export default function PortfolioFrontierPanel() {
                   label={{
                     value: "Annualised Volatility",
                     position: "insideBottom",
-                    offset: -8,
+                    offset: -10,
                     fill: "#79839a",
                     fontSize: 12,
                   }}
@@ -386,45 +493,85 @@ export default function PortfolioFrontierPanel() {
                   tick={{ fontSize: 11, fill: "#79839a" }}
                   domain={["auto", "auto"]}
                   width={52}
+                  label={{
+                    value: "Expected Return",
+                    angle: -90,
+                    position: "insideLeft",
+                    offset: 14,
+                    fill: "#79839a",
+                    fontSize: 12,
+                  }}
                 />
-                <ZAxis type="number" dataKey="z" range={[18, 240]} />
+                <ZAxis type="number" dataKey="z" range={[16, 280]} />
                 <Tooltip content={<FrontierTooltip />} cursor={{ strokeDasharray: "3 3" }} />
-                <Legend wrapperStyle={{ fontSize: 12, paddingTop: 8 }} />
+                <Legend
+                  iconSize={9}
+                  wrapperStyle={{ fontSize: 12, paddingTop: 10 }}
+                />
 
+                {/* Random cloud — one series per Sharpe colour band */}
+                {randomBuckets.map((b, i) => (
+                  <Scatter
+                    key={`bucket-${i}`}
+                    name="Random"
+                    legendType="none"
+                    data={b.data}
+                    fill={b.color}
+                    fillOpacity={0.5}
+                    isAnimationActive={false}
+                  />
+                ))}
+
+                {/* Frontier glow (line only, point-less) */}
                 <Scatter
-                  name="Random"
-                  data={randomData}
-                  fill={C_RANDOM}
+                  name="frontier-glow"
+                  legendType="none"
+                  data={frontierData}
+                  line={{ stroke: C_FRONTIER_LINE, strokeWidth: 8, strokeOpacity: 0.18 }}
+                  lineType="joint"
+                  shape={NoShape}
                   isAnimationActive={false}
                 />
+                {/* Frontier line + dots */}
                 <Scatter
                   name="Efficient frontier"
                   data={frontierData}
                   fill={C_FRONTIER}
-                  line={{ stroke: C_FRONTIER, strokeWidth: 1.5 }}
+                  line={{ stroke: C_FRONTIER_LINE, strokeWidth: 2.4 }}
                   lineType="joint"
                   isAnimationActive={false}
                 />
+
+                {/* Special portfolios (drawn on top) */}
                 <Scatter
                   name="Equal weight"
                   data={special(result.equal_weight, "Equal weight")}
                   fill={C_EQUAL}
                   shape="diamond"
+                  isAnimationActive={false}
                 />
                 <Scatter
                   name="Min volatility"
                   data={special(result.min_volatility, "Min volatility")}
                   fill={C_MINVOL}
                   shape="triangle"
+                  isAnimationActive={false}
                 />
                 <Scatter
                   name="Max Sharpe"
                   data={special(result.max_sharpe, "Max Sharpe")}
                   fill={C_MAXSHARPE}
                   shape="star"
+                  isAnimationActive={false}
                 />
               </ScatterChart>
             </ResponsiveContainer>
+
+            <p className="text-xs text-slate-400 mt-3">
+              Each dot is one random long-only portfolio, coloured by Sharpe
+              ratio. This frontier is based on historical expected returns and
+              covariance — it is in-sample and may not persist.
+            </p>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
