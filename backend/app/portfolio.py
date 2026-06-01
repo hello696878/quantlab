@@ -17,6 +17,8 @@ import numpy as np
 import pandas as pd
 from scipy.optimize import minimize
 
+from app.metrics import compute_metrics
+
 REBALANCE_FREQUENCIES = ("none", "monthly", "quarterly", "yearly")
 OPTIMIZATION_OBJECTIVES = ("equal_weight", "min_volatility", "max_sharpe")
 TRADING_DAYS_PER_YEAR = 252
@@ -325,3 +327,195 @@ def buy_and_hold_equity(
     normalized = prices.to_numpy() / prices.to_numpy()[0]
     equity = initial_capital * (normalized @ w)
     return pd.Series(equity, index=prices.index, name="portfolio")
+
+
+# ===========================================================================
+# Walk-forward portfolio optimization (rolling, out-of-sample)
+# ===========================================================================
+
+
+@dataclass
+class WalkForwardResult:
+    windows: List[dict]               # per-window train/test detail
+    stitched_equity: pd.Series        # optimized OOS equity (anchored at capital)
+    benchmark_equity: pd.Series       # equal-weight OOS equity (same dates)
+    weight_stability: dict            # turnover + per-asset weight summary
+
+
+def run_walk_forward_optimization(
+    prices: pd.DataFrame,
+    *,
+    train_window_days: int,
+    test_window_days: int,
+    step_days: int,
+    objective: str,
+    risk_free_rate: float = 0.0,
+    initial_capital: float = 100_000.0,
+    transaction_cost_bps: float = 10.0,
+) -> WalkForwardResult:
+    """
+    Rolling walk-forward optimization with strict train/test separation.
+
+    For each window the optimizer sees ONLY the training slice; the resulting
+    weights are then applied (held fixed) across the following out-of-sample
+    test slice.  Test windows are stitched into one continuous OOS equity curve.
+
+    No leakage
+    ----------
+    Weights for window *k* are estimated from ``prices[train_start:train_end]``
+    and applied to returns dated strictly after ``train_end`` — future test
+    data never enters the optimizer.
+
+    Transaction cost convention
+    ---------------------------
+    At each test-window boundary the portfolio moves from the previous window's
+    weights to the new weights:
+
+        turnover = sum_i |new_w_i - prev_w_i|     (prev = 0 for the first window)
+        cost     = turnover * transaction_cost_bps / 10000
+
+    The cost is deducted from portfolio equity at the start of that test window
+    (a one-off multiplicative drag), before that window's returns compound.
+    The equal-weight benchmark is treated identically (its target never changes,
+    so it only pays the initial entry turnover).
+    """
+    _validate_price_frame(prices)
+    n = len(prices)
+    tickers = list(prices.columns)
+    n_assets = len(tickers)
+
+    if n < train_window_days + test_window_days:
+        raise ValueError(
+            f"Only {n} common trading days available; need at least "
+            f"train_window_days + test_window_days = "
+            f"{train_window_days + test_window_days}."
+        )
+
+    returns = prices.pct_change(fill_method=None)  # row 0 is NaN (unused)
+    cost_rate = transaction_cost_bps / 10_000.0
+    equal_w = np.full(n_assets, 1.0 / n_assets)
+
+    # Anchor the stitched curves at the last training day of the first window
+    # so both start exactly at initial_capital on a shared date.
+    first_test_start = train_window_days
+    anchor_date = prices.index[first_test_start - 1]
+
+    opt_equity = float(initial_capital)
+    bench_equity = float(initial_capital)
+    prev_opt_w = np.zeros(n_assets)
+    prev_bench_w = np.zeros(n_assets)
+
+    stitched_dates: List = [anchor_date]
+    stitched_opt: List[float] = [opt_equity]
+    stitched_bench: List[float] = [bench_equity]
+    last_date = anchor_date
+
+    windows: List[dict] = []
+    all_weights: List[np.ndarray] = []
+    rebalance_turnovers: List[float] = []  # window-to-window (excludes entry)
+
+    train_start = 0
+    _SAFETY_CAP = 1000
+
+    while True:
+        train_end = train_start + train_window_days
+        test_start = train_end
+        test_end = test_start + test_window_days
+        if test_end > n or len(windows) >= _SAFETY_CAP:
+            break
+
+        # ── Estimate + optimize on TRAINING data only ────────────────────────
+        train_slice = prices.iloc[train_start:train_end]
+        mu, cov = annualized_stats(train_slice)
+        w_dict = optimize_weights(mu, cov, objective, risk_free_rate)
+        w_vec = np.array([w_dict[t] for t in tickers], dtype=float)
+        tr_ret, tr_vol, tr_sharpe = portfolio_stats(w_dict, mu, cov, risk_free_rate)
+
+        # ── Turnover / cost at the boundary ─────────────────────────────────
+        turnover = float(np.sum(np.abs(w_vec - prev_opt_w)))
+        cost_fraction = turnover * cost_rate
+        cost_dollars = opt_equity * cost_fraction
+
+        bench_turnover = float(np.sum(np.abs(equal_w - prev_bench_w)))
+        bench_cost_fraction = bench_turnover * cost_rate
+
+        # ── OOS daily portfolio returns for this test window ────────────────
+        win_returns = returns.iloc[test_start:test_end].to_numpy()
+        opt_daily = win_returns @ w_vec
+        bench_daily = win_returns @ equal_w
+        win_dates = prices.index[test_start:test_end]
+
+        # Per-window standalone OOS equity for test_metrics (anchored, no cost).
+        running = float(initial_capital)
+        win_equity_vals = [running]
+        for r in opt_daily:
+            running *= 1.0 + float(r)
+            win_equity_vals.append(running)
+        test_metrics = compute_metrics(pd.Series(win_equity_vals))
+
+        # ── Apply boundary cost, then stitch the OOS days ───────────────────
+        opt_equity *= 1.0 - cost_fraction
+        bench_equity *= 1.0 - bench_cost_fraction
+        for dt, r_opt, r_bench in zip(win_dates, opt_daily, bench_daily):
+            if dt <= last_date:
+                continue  # dedup overlap when step_days < test_window_days
+            opt_equity *= 1.0 + float(r_opt)
+            bench_equity *= 1.0 + float(r_bench)
+            stitched_dates.append(dt)
+            stitched_opt.append(opt_equity)
+            stitched_bench.append(bench_equity)
+            last_date = dt
+
+        windows.append(
+            {
+                "train_start_date": _date_str(prices.index[train_start]),
+                "train_end_date": _date_str(prices.index[train_end - 1]),
+                "test_start_date": _date_str(prices.index[test_start]),
+                "test_end_date": _date_str(prices.index[test_end - 1]),
+                "weights": w_dict,
+                "train_expected_return": tr_ret,
+                "train_volatility": tr_vol,
+                "train_sharpe": tr_sharpe,
+                "test_metrics": test_metrics,
+                "turnover": turnover,
+                "transaction_cost": cost_dollars,
+            }
+        )
+        all_weights.append(w_vec)
+        if len(windows) > 1:
+            rebalance_turnovers.append(turnover)
+
+        prev_opt_w = w_vec
+        prev_bench_w = equal_w
+        train_start += step_days
+
+    if not windows:
+        raise ValueError(
+            "No walk-forward windows could be formed; widen the date range or "
+            "reduce the window sizes."
+        )
+
+    stitched_equity = pd.Series(stitched_opt, index=stitched_dates, name="portfolio")
+    benchmark_equity = pd.Series(stitched_bench, index=stitched_dates, name="benchmark")
+
+    weight_matrix = np.array(all_weights)  # (num_windows, n_assets)
+    weight_stability = {
+        "average_turnover": float(np.mean(rebalance_turnovers)) if rebalance_turnovers else 0.0,
+        "max_turnover": float(np.max(rebalance_turnovers)) if rebalance_turnovers else 0.0,
+        "average_weight_by_asset": {
+            t: float(weight_matrix[:, j].mean()) for j, t in enumerate(tickers)
+        },
+        "min_weight_by_asset": {
+            t: float(weight_matrix[:, j].min()) for j, t in enumerate(tickers)
+        },
+        "max_weight_by_asset": {
+            t: float(weight_matrix[:, j].max()) for j, t in enumerate(tickers)
+        },
+    }
+
+    return WalkForwardResult(
+        windows=windows,
+        stitched_equity=stitched_equity,
+        benchmark_equity=benchmark_equity,
+        weight_stability=weight_stability,
+    )

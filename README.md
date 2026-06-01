@@ -132,7 +132,24 @@ The Portfolio workspace also includes an **Optimization** tab (`POST /portfolio/
 
 Expected returns and the covariance matrix are estimated from daily returns and annualised with 252 trading days; the constrained problem is solved with SciPy's SLSQP. The optimized weights are backtested buy-and-hold over the period and compared against the equal-weight portfolio (metrics, equity curve, drawdown). Portfolio Optimization v1 is a static allocation model: `transaction_cost_bps` is accepted for API/UI consistency but no one-time allocation cost or ongoing turnover cost is deducted.
 
-> ⚠️ **In-sample caveat.** v1 optimizes weights on the **same** historical window it then backtests. This is in-sample optimization: it will look good by construction, can badly overfit, and **does not predict future performance**. There is no rolling/out-of-sample optimization yet. **Not investment advice.**
+> ⚠️ **In-sample caveat.** Static optimization optimizes weights on the **same** historical window it then backtests. This is in-sample optimization: it will look good by construction, can badly overfit, and **does not predict future performance**. For an out-of-sample variant, use Walk-Forward Optimization below. **Not investment advice.**
+
+### Walk-Forward Portfolio Optimization
+
+The Portfolio workspace's **Walk-Forward Optimization** tab (`POST /portfolio/walk-forward-optimize`) addresses the in-sample problem with rolling, **out-of-sample** optimization:
+
+1. Estimate expected returns and covariance on a **training window** (`train_window_days`).
+2. Optimize long-only weights on that window (equal_weight / min_volatility / max_sharpe).
+3. Apply those **fixed** weights to the following **test window** (`test_window_days`) — unseen data.
+4. Advance by `step_days` and repeat; stitch all test windows into one out-of-sample equity curve.
+
+**No data leakage:** weights for each window are estimated only from that window's training slice and applied to strictly later dates — the optimizer never sees test data.
+
+**Transaction cost (turnover-based):** at each test-window boundary the portfolio moves from the previous weights to the new ones — `turnover = Σ|new_wᵢ − prev_wᵢ|` (the first window's turnover is `Σ|wᵢ − 0| = 1`, i.e. entry from cash). `cost = turnover × bps/10000` is deducted from equity at the start of that test window. The equal-weight benchmark is treated identically (its target never changes, so it pays only the initial entry).
+
+The response includes per-window detail (train/test dates, weights, train Sharpe, out-of-sample `test_metrics`, turnover, cost), the stitched OOS equity vs. an equal-weight benchmark, drawdown, aggregate OOS metrics, and a **weight-stability** summary (average/max turnover, per-asset average/min/max weight).
+
+> ⚠️ Walk-forward results are out-of-sample and far more honest than in-sample optimization, but they still rely on historical return/covariance assumptions and **do not predict future performance**. Not investment advice.
 
 #### Strategy Template Gallery
 

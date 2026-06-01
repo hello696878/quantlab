@@ -12,6 +12,7 @@ POST /backtest/volatility-breakout      — run a volatility breakout backtest
 POST /backtest/pairs                    — run a pairs trading backtest
 POST /portfolio/backtest                — equal-weight multi-asset portfolio backtest
 POST /portfolio/optimize                — optimize portfolio weights (min-vol / max-Sharpe)
+POST /portfolio/walk-forward-optimize   — rolling out-of-sample portfolio optimization
 POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
 POST /backtest/custom                   — run a no-code custom rule-based strategy
 POST /custom-strategies                 — save a reusable custom strategy template
@@ -56,6 +57,7 @@ from app.portfolio import (
     optimize_weights,
     portfolio_stats,
     run_equal_weight_portfolio,
+    run_walk_forward_optimization,
 )
 from app.strategy_gallery import get_gallery_template, list_gallery
 from app.metrics import compute_metrics
@@ -88,7 +90,11 @@ from app.schemas import (
     PortfolioOptimizeRequest,
     PortfolioOptimizeResponse,
     PortfolioRebalanceEvent,
+    PortfolioWalkForwardRequest,
+    PortfolioWalkForwardResponse,
+    PortfolioWalkForwardWindow,
     PortfolioWeightPoint,
+    PortfolioWeightStability,
     MomentumBacktestRequest,
     PairsBacktestRequest,
     PerformanceMetrics,
@@ -952,6 +958,123 @@ def portfolio_optimize(request: PortfolioOptimizeRequest) -> PortfolioOptimizeRe
         equity_curve=equity_curve,
         equal_weight_equity_curve=equal_weight_equity_curve,
         drawdown=drawdown,
+    )
+
+
+@app.post(
+    "/portfolio/walk-forward-optimize",
+    response_model=PortfolioWalkForwardResponse,
+    tags=["portfolio"],
+    summary="Walk-forward (rolling, out-of-sample) portfolio optimization",
+    description=(
+        "Roll a training window forward, optimize long-only weights on each "
+        "training slice, then apply those fixed weights to the following "
+        "out-of-sample test window.  Test windows are stitched into one OOS "
+        "equity curve and compared to an equal-weight benchmark rebalanced on "
+        "the same boundaries.\n\n"
+        "The optimizer only ever sees training data — no future test data leaks "
+        "in.  Transaction cost is turnover-based at each window boundary "
+        "(prev → new weights; entry turnover from cash for the first window) "
+        "and is deducted from equity at the start of that test window.\n\n"
+        "This reduces — but does not eliminate — overfitting versus the static "
+        "in-sample optimizer.  Results still rely on historical assumptions and "
+        "do not predict future performance.  Not investment advice."
+    ),
+)
+def portfolio_walk_forward_optimize(
+    request: PortfolioWalkForwardRequest,
+) -> PortfolioWalkForwardResponse:
+    tickers = request.tickers  # cleaned/uppercased/deduped by the schema
+
+    frames = {}
+    for ticker in tickers:
+        df = _fetch(ticker, request.start_date, request.end_date)
+        frames[ticker] = df["Close"]
+
+    prices = align_prices(frames)
+
+    try:
+        result = run_walk_forward_optimization(
+            prices,
+            train_window_days=request.train_window_days,
+            test_window_days=request.test_window_days,
+            step_days=request.step_days,
+            objective=request.objective,
+            risk_free_rate=request.risk_free_rate,
+            initial_capital=request.initial_capital,
+            transaction_cost_bps=request.transaction_cost_bps,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    stitched = result.stitched_equity
+    bench = result.benchmark_equity
+    opt_dd = drawdown_series(stitched)
+    bench_dd = drawdown_series(bench)
+
+    def _d(ts) -> str:
+        return str(ts.date()) if hasattr(ts, "date") else str(ts)
+
+    windows = [
+        PortfolioWalkForwardWindow(
+            train_start_date=w["train_start_date"],
+            train_end_date=w["train_end_date"],
+            test_start_date=w["test_start_date"],
+            test_end_date=w["test_end_date"],
+            weights={t: round(float(v), 6) for t, v in w["weights"].items()},
+            train_expected_return=round(w["train_expected_return"], 6),
+            train_volatility=round(w["train_volatility"], 6),
+            train_sharpe=round(w["train_sharpe"], 4),
+            test_metrics=PerformanceMetrics(**w["test_metrics"]),
+            turnover=round(w["turnover"], 6),
+            transaction_cost=round(w["transaction_cost"], 2),
+        )
+        for w in result.windows
+    ]
+
+    stitched_equity_curve = [
+        PortfolioOptEquityPoint(date=_d(d), value=round(float(v), 2))
+        for d, v in zip(stitched.index, stitched)
+    ]
+    benchmark_equity_curve = [
+        PortfolioOptEquityPoint(date=_d(d), value=round(float(v), 2))
+        for d, v in zip(bench.index, bench)
+    ]
+    drawdown = [
+        PortfolioDrawdownPoint(
+            date=_d(d), portfolio=round(float(p), 6), benchmark=round(float(b), 6)
+        )
+        for d, p, b in zip(opt_dd.index, opt_dd, bench_dd)
+    ]
+
+    stab = result.weight_stability
+    weight_stability = PortfolioWeightStability(
+        average_turnover=round(stab["average_turnover"], 6),
+        max_turnover=round(stab["max_turnover"], 6),
+        average_weight_by_asset={t: round(v, 6) for t, v in stab["average_weight_by_asset"].items()},
+        min_weight_by_asset={t: round(v, 6) for t, v in stab["min_weight_by_asset"].items()},
+        max_weight_by_asset={t: round(v, 6) for t, v in stab["max_weight_by_asset"].items()},
+    )
+
+    return PortfolioWalkForwardResponse(
+        tickers=tickers,
+        objective=request.objective,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        train_window_days=request.train_window_days,
+        test_window_days=request.test_window_days,
+        step_days=request.step_days,
+        risk_free_rate=request.risk_free_rate,
+        initial_capital=request.initial_capital,
+        transaction_cost_bps=request.transaction_cost_bps,
+        num_windows=len(windows),
+        windows=windows,
+        stitched_equity_curve=stitched_equity_curve,
+        benchmark_equity_curve=benchmark_equity_curve,
+        drawdown=drawdown,
+        metrics=PerformanceMetrics(**compute_metrics(stitched)),
+        benchmark_metrics=PerformanceMetrics(**compute_metrics(bench)),
+        weight_stability=weight_stability,
     )
 
 

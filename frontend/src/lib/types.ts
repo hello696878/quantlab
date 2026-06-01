@@ -592,6 +592,67 @@ export interface PortfolioOptimizeResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Walk-Forward Portfolio Optimization
+// ---------------------------------------------------------------------------
+
+export interface PortfolioWalkForwardRequest {
+  tickers: string[];
+  start_date: string;
+  end_date: string;
+  train_window_days: number;
+  test_window_days: number;
+  step_days: number;
+  objective: PortfolioObjective;
+  risk_free_rate: number;
+  initial_capital: number;
+  transaction_cost_bps: number;
+}
+
+export interface PortfolioWalkForwardWindow {
+  train_start_date: string;
+  train_end_date: string;
+  test_start_date: string;
+  test_end_date: string;
+  weights: Record<string, number>;
+  train_expected_return: number;
+  train_volatility: number;
+  train_sharpe: number;
+  test_metrics: PerformanceMetrics;
+  turnover: number;
+  transaction_cost: number;
+}
+
+export interface PortfolioWeightStability {
+  average_turnover: number;
+  max_turnover: number;
+  average_weight_by_asset: Record<string, number>;
+  min_weight_by_asset: Record<string, number>;
+  max_weight_by_asset: Record<string, number>;
+}
+
+export interface PortfolioWalkForwardResponse {
+  tickers: string[];
+  objective: PortfolioObjective;
+  start_date: string;
+  end_date: string;
+  train_window_days: number;
+  test_window_days: number;
+  step_days: number;
+  risk_free_rate: number;
+  initial_capital: number;
+  transaction_cost_bps: number;
+  num_windows: number;
+  windows: PortfolioWalkForwardWindow[];
+  stitched_equity_curve: PortfolioOptEquityPoint[];
+  benchmark_equity_curve: PortfolioOptEquityPoint[];
+  drawdown: PortfolioDrawdownPoint[];
+  metrics: PerformanceMetrics;
+  benchmark_metrics: PerformanceMetrics;
+  weight_stability: PortfolioWeightStability;
+  oos_note: string;
+}
+
+// ---------------------------------------------------------------------------
 // Saved Custom Strategy Templates (reusable rule definitions, not results)
 // ---------------------------------------------------------------------------
 

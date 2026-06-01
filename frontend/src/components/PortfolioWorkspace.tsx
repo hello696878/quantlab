@@ -3,12 +3,14 @@
 import { useState } from "react";
 import PortfolioBacktestPanel from "@/components/PortfolioBacktestPanel";
 import PortfolioOptimizePanel from "@/components/PortfolioOptimizePanel";
+import PortfolioWalkForwardPanel from "@/components/PortfolioWalkForwardPanel";
 
-type PortfolioTab = "backtest" | "optimize";
+type PortfolioTab = "backtest" | "optimize" | "walk-forward";
 
 const TABS: { id: PortfolioTab; label: string }[] = [
   { id: "backtest", label: "Equal-Weight Backtest" },
-  { id: "optimize", label: "Portfolio Optimization" },
+  { id: "optimize", label: "Static Optimization" },
+  { id: "walk-forward", label: "Walk-Forward Optimization" },
 ];
 
 export default function PortfolioWorkspace() {
@@ -34,7 +36,9 @@ export default function PortfolioWorkspace() {
         ))}
       </div>
 
-      {tab === "backtest" ? <PortfolioBacktestPanel /> : <PortfolioOptimizePanel />}
+      {tab === "backtest" && <PortfolioBacktestPanel />}
+      {tab === "optimize" && <PortfolioOptimizePanel />}
+      {tab === "walk-forward" && <PortfolioWalkForwardPanel />}
     </div>
   );
 }

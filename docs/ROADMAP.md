@@ -163,6 +163,25 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Full optimizer unit tests (constraints, min-vol/max-sharpe behaviour) + API
   tests
 
+### Phase 7 — Walk-Forward Portfolio Optimization ✅
+
+- `POST /portfolio/walk-forward-optimize` — rolling, **out-of-sample** weight
+  optimization (train window → optimize → apply fixed weights to the next test
+  window → step → repeat → stitch the OOS test windows)
+- **No data leakage**: each window's weights come only from its training slice
+  and are applied to strictly later dates (verified by tests, incl. a
+  future-data-mutation invariance test)
+- Turnover-based transaction cost at each window boundary (entry-from-cash for
+  the first window), deducted at the start of the test window; equal-weight
+  benchmark rebalanced on the same boundaries
+- Response: per-window detail (dates, weights, train stats, OOS `test_metrics`,
+  turnover, cost), stitched OOS equity vs benchmark, drawdown, aggregate
+  metrics, and a weight-stability summary
+- Portfolio workspace gains a **Walk-Forward Optimization** tab (third tab)
+- Reduces — but does not eliminate — overfitting; still historical-assumption
+  dependent. Not investment advice.
+- Full unit (`portfolio.py` walk-forward) + API test coverage
+
 ---
 
 ## Future Phases

@@ -22,6 +22,8 @@ import type {
   PortfolioBacktestResponse,
   PortfolioOptimizeRequest,
   PortfolioOptimizeResponse,
+  PortfolioWalkForwardRequest,
+  PortfolioWalkForwardResponse,
   RsiBacktestRequest,
   SavedBacktestCreate,
   SavedBacktestFull,
@@ -400,6 +402,36 @@ export async function runPortfolioOptimize(
   }
 
   return res.json() as Promise<PortfolioOptimizeResponse>;
+}
+
+/** POST /api/portfolio/walk-forward-optimize — rolling out-of-sample optimization */
+export async function runPortfolioWalkForward(
+  params: PortfolioWalkForwardRequest,
+): Promise<PortfolioWalkForwardResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/portfolio/walk-forward-optimize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+
+  if (!res.ok) {
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = formatBackendDetail(body?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+
+  return res.json() as Promise<PortfolioWalkForwardResponse>;
 }
 
 export async function checkHealth(): Promise<boolean> {

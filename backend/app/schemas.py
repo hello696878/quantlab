@@ -1749,3 +1749,125 @@ class PortfolioOptimizeResponse(BaseModel):
         ),
         description="Explicit in-sample / overfitting caveat.",
     )
+
+
+# ===========================================================================
+# Walk-Forward Portfolio Optimization
+# ===========================================================================
+#
+# Rolling train→test optimization.  Weights are estimated on each training
+# window and applied (held fixed) to the following out-of-sample test window;
+# the test windows are stitched into one OOS equity curve.  This reduces (but
+# does not eliminate) the in-sample overfitting of the static optimizer.
+
+
+class PortfolioWalkForwardRequest(BaseModel):
+    """Request body for POST /portfolio/walk-forward-optimize."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tickers: List[str] = Field(min_length=1, max_length=20)
+    start_date: str = Field(default="2010-01-01", description="Start date (YYYY-MM-DD).")
+    end_date: str = Field(default="2023-12-31", description="End date (YYYY-MM-DD).")
+    train_window_days: int = Field(
+        default=756, ge=1, description="Trading days in each rolling training window."
+    )
+    test_window_days: int = Field(
+        default=126, ge=1, description="Trading days in each out-of-sample test window."
+    )
+    step_days: int = Field(
+        default=126, ge=1, description="Trading days to advance the window each step."
+    )
+    objective: PortfolioObjective = Field(default="max_sharpe")
+    risk_free_rate: float = Field(default=0.02, ge=0.0, le=1.0)
+    initial_capital: float = Field(default=100_000.0, gt=0)
+    transaction_cost_bps: float = Field(default=10.0, ge=0.0, lt=10_000.0)
+
+    @field_validator("tickers")
+    @classmethod
+    def _clean_tickers(cls, value: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        seen: set[str] = set()
+        for raw in value:
+            sym = raw.strip().upper()
+            if not sym:
+                raise ValueError("ticker symbols must not be empty.")
+            if sym in seen:
+                raise ValueError(f"duplicate ticker after uppercasing: {sym}.")
+            seen.add(sym)
+            cleaned.append(sym)
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_dates(self) -> "PortfolioWalkForwardRequest":
+        import re
+
+        for name, val in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, val):
+                raise ValueError(f"{name} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be strictly before end_date.")
+        return self
+
+
+class PortfolioWalkForwardWindow(BaseModel):
+    """One train→test walk-forward window."""
+
+    train_start_date: str
+    train_end_date: str
+    test_start_date: str
+    test_end_date: str
+    weights: Dict[str, float] = Field(description="Optimized weights for this window.")
+    train_expected_return: float
+    train_volatility: float
+    train_sharpe: float
+    test_metrics: PerformanceMetrics = Field(description="Out-of-sample metrics for this window.")
+    turnover: float = Field(description="Σ|new_w − prev_w| at the window boundary (prev=0 for window 1).")
+    transaction_cost: float = Field(description="Turnover cost charged in USD at the boundary.")
+
+
+class PortfolioWeightStability(BaseModel):
+    """Summary of how stable the optimized weights are across windows."""
+
+    average_turnover: float = Field(description="Mean window-to-window turnover (excludes the entry window).")
+    max_turnover: float = Field(description="Max window-to-window turnover.")
+    average_weight_by_asset: Dict[str, float]
+    min_weight_by_asset: Dict[str, float]
+    max_weight_by_asset: Dict[str, float]
+
+
+class PortfolioWalkForwardResponse(BaseModel):
+    """Full response for POST /portfolio/walk-forward-optimize."""
+
+    tickers: List[str]
+    objective: PortfolioObjective
+    start_date: str
+    end_date: str
+    train_window_days: int
+    test_window_days: int
+    step_days: int
+    risk_free_rate: float
+    initial_capital: float
+    transaction_cost_bps: float
+
+    num_windows: int
+    windows: List[PortfolioWalkForwardWindow]
+
+    stitched_equity_curve: List[PortfolioOptEquityPoint]
+    benchmark_equity_curve: List[PortfolioOptEquityPoint]
+    drawdown: List[PortfolioDrawdownPoint]
+
+    metrics: PerformanceMetrics = Field(description="Aggregate out-of-sample metrics (optimized).")
+    benchmark_metrics: PerformanceMetrics = Field(description="Aggregate OOS metrics (equal weight).")
+
+    weight_stability: PortfolioWeightStability
+
+    oos_note: str = Field(
+        default=(
+            "Walk-forward results are out-of-sample (weights estimated only on "
+            "past training windows), which reduces in-sample overfitting. They "
+            "still rely on historical return/covariance assumptions and do not "
+            "predict future performance. Not investment advice."
+        ),
+        description="Out-of-sample caveat.",
+    )
