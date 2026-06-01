@@ -1041,3 +1041,127 @@ def stress_test(
         "benchmark_equity_curve": _curve_points(bench_equity),
         "scenarios": scenario_results,
     }
+
+
+# ===========================================================================
+# Factor exposure / OLS regression analysis
+# ===========================================================================
+
+
+def factor_analysis(
+    portfolio_prices: pd.DataFrame,
+    factor_prices: pd.DataFrame,
+    weights: Dict[str, float],
+    factor_names: List[str],
+    initial_capital: float = 100_000.0,
+) -> dict:
+    """
+    Regress portfolio daily returns on factor (ETF proxy) daily returns by OLS.
+
+        r_p[t] = alpha + Σ_k beta_k · r_factor_k[t] + residual[t]
+
+    Uses ``numpy.linalg.lstsq`` (intercept included) — no statsmodels.  Returns
+    alpha (daily + annualised), betas per factor, R², annualised residual
+    volatility, fitted/residual series, actual & fitted equity curves, the
+    factor correlation matrix, and diagnostics (strongest ± exposures,
+    multicollinearity warning).
+
+    ``portfolio_prices`` (columns = tickers) and ``factor_prices`` (columns in
+    ``factor_names`` order) must share the same DatetimeIndex.  Raises
+    ``ValueError`` for degenerate inputs.
+    """
+    _validate_price_frame(portfolio_prices)
+    tickers = list(portfolio_prices.columns)
+    w = np.array([weights[t] for t in tickers], dtype=float)
+
+    # Daily returns (drop the first NaN row jointly).
+    asset_ret = portfolio_prices.pct_change(fill_method=None)
+    factor_ret_full = factor_prices[factor_names].pct_change(fill_method=None)
+    port_ret = pd.Series(asset_ret.to_numpy() @ w, index=portfolio_prices.index)
+
+    combined = pd.concat([port_ret.rename("__port__"), factor_ret_full], axis=1).dropna(how="any")
+    if len(combined) < len(factor_names) + 2:
+        raise ValueError(
+            "Not enough overlapping return observations to fit the regression "
+            f"({len(combined)} rows for {len(factor_names)} factors)."
+        )
+
+    y = combined["__port__"].to_numpy(dtype=float)
+    factor_matrix = combined[factor_names].to_numpy(dtype=float)
+    n_obs = len(y)
+    k = len(factor_names)
+
+    # Design matrix with an intercept column.
+    X = np.column_stack([np.ones(n_obs), factor_matrix])
+
+    # Guard against a singular / collinear design.
+    rank = int(np.linalg.matrix_rank(X))
+    multicollinearity_warning = rank < X.shape[1]
+
+    coef, _residual_ss, _rank, _sv = np.linalg.lstsq(X, y, rcond=None)
+    alpha_daily = float(coef[0])
+    betas = {name: float(coef[i + 1]) for i, name in enumerate(factor_names)}
+
+    fitted = X @ coef
+    residuals = y - fitted
+
+    # R² = 1 − SS_res / SS_tot.
+    ss_res = float(np.sum(residuals**2))
+    ss_tot = float(np.sum((y - y.mean()) ** 2))
+    r_squared = float(1.0 - ss_res / ss_tot) if ss_tot > 1e-18 else 0.0
+
+    residual_vol = (
+        float(np.std(residuals, ddof=1) * np.sqrt(TRADING_DAYS_PER_YEAR))
+        if n_obs >= 2
+        else 0.0
+    )
+
+    # Factor correlation matrix.
+    factor_corr = combined[factor_names].corr().fillna(0.0)
+    factor_correlation_matrix = {
+        a: {b: float(factor_corr.loc[a, b]) for b in factor_names} for a in factor_names
+    }
+
+    # Diagnostics.
+    strongest_positive = max(betas, key=lambda nm: betas[nm]) if betas else None
+    strongest_negative = min(betas, key=lambda nm: betas[nm]) if betas else None
+    abs_largest = max(betas, key=lambda nm: abs(betas[nm])) if betas else None
+
+    # Equity curves (anchored at initial_capital).
+    dates = list(combined.index)
+    actual_curve = [{"date": _date_str(dates[0]), "value": float(initial_capital)}]
+    fitted_curve = [{"date": _date_str(dates[0]), "value": float(initial_capital)}]
+    a_run = f_run = float(initial_capital)
+    regression_points = []
+    for i, d in enumerate(dates):
+        a_run *= 1.0 + float(y[i])
+        f_run *= 1.0 + float(fitted[i])
+        actual_curve.append({"date": _date_str(d), "value": a_run})
+        fitted_curve.append({"date": _date_str(d), "value": f_run})
+        regression_points.append(
+            {
+                "date": _date_str(d),
+                "actual_return": float(y[i]),
+                "fitted_return": float(fitted[i]),
+                "residual": float(residuals[i]),
+            }
+        )
+
+    return {
+        "alpha_daily": alpha_daily,
+        "alpha_annualized": alpha_daily * TRADING_DAYS_PER_YEAR,
+        "betas": betas,
+        "r_squared": r_squared,
+        "residual_volatility": residual_vol,
+        "factor_correlation_matrix": factor_correlation_matrix,
+        "diagnostics": {
+            "strongest_positive_factor": strongest_positive,
+            "strongest_negative_factor": strongest_negative,
+            "absolute_largest_exposure": abs_largest,
+            "multicollinearity_warning": bool(multicollinearity_warning),
+        },
+        "regression_points": regression_points,
+        "actual_equity_curve": actual_curve,
+        "fitted_equity_curve": fitted_curve,
+        "num_observations": n_obs,
+    }

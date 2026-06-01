@@ -196,6 +196,23 @@ v1 uses static weights with **no rebalancing or leverage**. The dashboard shows 
 
 > ⚠️ Scenario results are **historical** — they show past behaviour through these windows and **do not guarantee or predict** how a portfolio will respond to future stress. Not investment advice.
 
+### Factor Exposure / Regression Analysis
+
+The Portfolio workspace's **Factor Analysis** tab (`POST /portfolio/factor-analysis`) estimates a portfolio's exposure to a set of **ETF factor proxies** by ordinary least squares (NumPy least squares — no statsmodels, no external Fama-French data):
+
+```
+portfolio_return = alpha + Σ beta_k · factor_return_k + residual
+```
+
+- **Beta** — sensitivity to each factor (e.g., a market beta of 0.8 means the portfolio tends to move 0.8% for each 1% market move).
+- **Alpha** — the average daily/annualised return *not* explained by the factors (the intercept).
+- **R²** — the fraction of the portfolio's return variance explained by the factors (0–1; higher = better explained).
+- **Residual volatility** — annualised volatility of the unexplained (idiosyncratic) return.
+
+Default factor preset (**Core ETF Factors**): `market: SPY`, `tech_growth: QQQ`, `small_cap: IWM`, `bonds: TLT`, `gold: GLD` — fully editable, plus custom factors. The dashboard shows R²/alpha/residual-vol/largest-exposure cards, a beta table, a factor correlation heatmap, and the actual-vs-fitted equity curve. A **multicollinearity warning** is raised when the factor design matrix is rank-deficient (e.g. duplicate/overlapping proxies).
+
+> ⚠️ Exposures are **historical** and depend on the proxies chosen and the window; **highly correlated factors can make individual betas unstable**. Not investment advice.
+
 #### Strategy Template Gallery
 
 The Strategy Builder includes a built-in **gallery** of curated, ready-to-use strategy templates (`GET /custom-strategy-gallery`). Open the **Gallery** from the Strategy Builder, browse the cards (each shows name, description, tags, difficulty, category, and a readable rule summary), then **Load** one into the builder to run it on any ticker/date range, or **Save to My Templates** to keep a local copy. Built-in templates are **static, pre-validated rule objects — not executable code** (no `eval`); they pass through the exact same whitelisted `CustomRule` validation as user-built strategies.

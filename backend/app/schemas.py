@@ -2218,3 +2218,136 @@ class StressTestResponse(BaseModel):
         ),
         description="Historical caveat.",
     )
+
+
+# ===========================================================================
+# Factor Exposure / Regression Analysis
+# ===========================================================================
+
+
+class FactorAnalysisRequest(BaseModel):
+    """Request body for POST /portfolio/factor-analysis."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tickers: List[str] = Field(min_length=1, max_length=20)
+    weights: Optional[Dict[str, float]] = Field(
+        default=None,
+        description="Optional long-only weights summing to 1. Equal weight if omitted.",
+    )
+    start_date: str = Field(default="2015-01-01", description="Start date (YYYY-MM-DD).")
+    end_date: str = Field(default="2023-12-31", description="End date (YYYY-MM-DD).")
+    initial_capital: float = Field(default=100_000.0, gt=0)
+    factor_tickers: Dict[str, str] = Field(
+        min_length=1,
+        description="Map of factor name → ETF proxy ticker (1–10 factors).",
+    )
+
+    @field_validator("tickers")
+    @classmethod
+    def _clean_tickers(cls, value: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        seen: set[str] = set()
+        for raw in value:
+            sym = raw.strip().upper()
+            if not sym:
+                raise ValueError("ticker symbols must not be empty.")
+            if sym in seen:
+                raise ValueError(f"duplicate ticker after uppercasing: {sym}.")
+            seen.add(sym)
+            cleaned.append(sym)
+        return cleaned
+
+    @field_validator("factor_tickers")
+    @classmethod
+    def _clean_factors(cls, value: Dict[str, str]) -> Dict[str, str]:
+        if not value:
+            raise ValueError("factor_tickers must not be empty.")
+        if len(value) > 10:
+            raise ValueError("at most 10 factors are allowed.")
+        cleaned: Dict[str, str] = {}
+        for name, tk in value.items():
+            nm = name.strip()
+            sym = tk.strip().upper()
+            if not nm:
+                raise ValueError("factor names must not be empty.")
+            if not sym:
+                raise ValueError(f"factor '{nm}' has an empty ticker.")
+            if nm in cleaned:
+                raise ValueError(f"duplicate factor name: {nm}.")
+            cleaned[nm] = sym
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check(self) -> "FactorAnalysisRequest":
+        import re
+
+        for n, v in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, v):
+                raise ValueError(f"{n} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be strictly before end_date.")
+
+        if self.weights is not None:
+            cleaned: Dict[str, float] = {}
+            for raw, wt in self.weights.items():
+                cleaned[raw.strip().upper()] = float(wt)
+            if set(cleaned) != set(self.tickers):
+                raise ValueError("weights must include exactly the requested tickers.")
+            if any(wt < 0 for wt in cleaned.values()):
+                raise ValueError("weights must be non-negative (long-only).")
+            if abs(sum(cleaned.values()) - 1.0) > 1e-6:
+                raise ValueError("weights must sum to 1.")
+            self.weights = cleaned
+        return self
+
+
+class FactorDiagnostics(BaseModel):
+    """Headline summary of the regression exposures."""
+
+    strongest_positive_factor: Optional[str] = None
+    strongest_negative_factor: Optional[str] = None
+    absolute_largest_exposure: Optional[str] = None
+    multicollinearity_warning: bool = Field(
+        description="True when the factor design matrix is rank-deficient (collinear factors)."
+    )
+
+
+class FactorRegressionPoint(BaseModel):
+    """One daily observation: actual vs fitted return and the residual."""
+
+    date: str
+    actual_return: float
+    fitted_return: float
+    residual: float
+
+
+class FactorAnalysisResponse(BaseModel):
+    """Full response for POST /portfolio/factor-analysis."""
+
+    tickers: List[str]
+    weights: Dict[str, float]
+    start_date: str
+    end_date: str
+    factor_tickers: Dict[str, str]
+
+    alpha_daily: float
+    alpha_annualized: float
+    betas: Dict[str, float]
+    r_squared: float
+    residual_volatility: float = Field(description="Annualised residual (idiosyncratic) volatility.")
+    factor_correlation_matrix: Dict[str, Dict[str, float]]
+    diagnostics: FactorDiagnostics
+    regression_points: List[FactorRegressionPoint]
+    actual_equity_curve: List[PortfolioOptEquityPoint]
+    fitted_equity_curve: List[PortfolioOptEquityPoint]
+
+    historical_note: str = Field(
+        default=(
+            "Factor exposures are estimated by historical OLS regression on the "
+            "chosen ETF proxies. Betas depend on the proxies selected and the "
+            "window, and highly correlated factors can make individual betas "
+            "unstable. Historical — not a forecast or investment advice."
+        ),
+        description="Historical / collinearity caveat.",
+    )

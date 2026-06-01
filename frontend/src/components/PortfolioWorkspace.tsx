@@ -7,6 +7,7 @@ import PortfolioWalkForwardPanel from "@/components/PortfolioWalkForwardPanel";
 import PortfolioFrontierPanel from "@/components/PortfolioFrontierPanel";
 import PortfolioRiskDashboardPanel from "@/components/PortfolioRiskDashboardPanel";
 import PortfolioStressTestPanel from "@/components/PortfolioStressTestPanel";
+import PortfolioFactorAnalysisPanel from "@/components/PortfolioFactorAnalysisPanel";
 
 type PortfolioTab =
   | "backtest"
@@ -14,7 +15,8 @@ type PortfolioTab =
   | "walk-forward"
   | "frontier"
   | "risk"
-  | "stress";
+  | "stress"
+  | "factor";
 
 const TABS: { id: PortfolioTab; label: string }[] = [
   { id: "backtest", label: "Equal-Weight Backtest" },
@@ -23,6 +25,7 @@ const TABS: { id: PortfolioTab; label: string }[] = [
   { id: "frontier", label: "Efficient Frontier" },
   { id: "risk", label: "Risk Dashboard" },
   { id: "stress", label: "Stress Test" },
+  { id: "factor", label: "Factor Analysis" },
 ];
 
 export default function PortfolioWorkspace() {
@@ -54,6 +57,7 @@ export default function PortfolioWorkspace() {
       {tab === "frontier" && <PortfolioFrontierPanel />}
       {tab === "risk" && <PortfolioRiskDashboardPanel />}
       {tab === "stress" && <PortfolioStressTestPanel />}
+      {tab === "factor" && <PortfolioFactorAnalysisPanel />}
     </div>
   );
 }

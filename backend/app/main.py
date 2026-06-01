@@ -16,6 +16,7 @@ POST /portfolio/walk-forward-optimize   — rolling out-of-sample portfolio opti
 POST /portfolio/efficient-frontier      — risk-return space of long-only portfolios
 POST /portfolio/risk-dashboard          — asset/portfolio risk diagnostics
 POST /portfolio/stress-test             — historical scenario / stress analysis
+POST /portfolio/factor-analysis         — OLS factor-exposure regression
 POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
 POST /backtest/custom                   — run a no-code custom rule-based strategy
 POST /custom-strategies                 — save a reusable custom strategy template
@@ -58,6 +59,7 @@ from app.portfolio import (
     buy_and_hold_equity,
     drawdown_series,
     efficient_frontier_points,
+    factor_analysis,
     optimize_weights,
     portfolio_point,
     portfolio_stats,
@@ -90,6 +92,10 @@ from app.schemas import (
     EfficientFrontierRequest,
     EfficientFrontierResponse,
     EquityPoint,
+    FactorAnalysisRequest,
+    FactorAnalysisResponse,
+    FactorDiagnostics,
+    FactorRegressionPoint,
     FrontierCurvePoint,
     FrontierPortfolioPoint,
     GalleryTemplate,
@@ -1353,6 +1359,104 @@ def portfolio_stress_test(request: StressTestRequest) -> StressTestResponse:
         full_equity_curve=_to_points(result["full_equity_curve"]),
         benchmark_equity_curve=_to_points(result["benchmark_equity_curve"]),
         scenarios=scenarios,
+    )
+
+
+@app.post(
+    "/portfolio/factor-analysis",
+    response_model=FactorAnalysisResponse,
+    tags=["portfolio"],
+    summary="Factor exposure / OLS regression analysis",
+    description=(
+        "Regress a portfolio's daily returns on a set of factor ETF-proxy "
+        "returns by ordinary least squares (intercept included):\n\n"
+        "    r_p = alpha + Σ_k beta_k · r_factor_k + residual\n\n"
+        "Returns alpha (daily + annualised), per-factor betas, R², annualised "
+        "residual volatility, the factor correlation matrix, the actual-vs-"
+        "fitted return series + equity curves, and diagnostics (strongest ± "
+        "exposures, multicollinearity warning).\n\n"
+        "Uses ETF proxies (not external Fama-French data) and is computed with "
+        "NumPy least squares.  Exposures are historical and depend on the chosen "
+        "proxies; collinear factors can make betas unstable.  Not investment "
+        "advice."
+    ),
+)
+def portfolio_factor_analysis(request: FactorAnalysisRequest) -> FactorAnalysisResponse:
+    import pandas as pd
+
+    tickers = request.tickers
+    factor_names = list(request.factor_tickers.keys())
+    factor_symbols = request.factor_tickers  # name → uppercased ticker
+
+    # Fetch every distinct symbol (portfolio + factor proxies) once, then align.
+    needed = set(tickers) | set(factor_symbols.values())
+    closes: dict = {}
+    for sym in needed:
+        closes[sym] = _fetch(sym, request.start_date, request.end_date)["Close"]
+
+    aligned = align_prices(closes)
+    if len(aligned) < len(factor_names) + 3:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(aligned)} common trading day(s) across the portfolio "
+                f"and factor proxies; need more than {len(factor_names) + 2} to "
+                "fit the regression.  Widen the date range or reduce factors."
+            ),
+        )
+
+    portfolio_prices = aligned[tickers]
+    # Factor price columns in factor-name order (a proxy may equal a holding).
+    factor_prices = pd.DataFrame(
+        {name: aligned[factor_symbols[name]] for name in factor_names}
+    )
+
+    weights = request.weights or {t: 1.0 / len(tickers) for t in tickers}
+
+    try:
+        d = factor_analysis(
+            portfolio_prices,
+            factor_prices,
+            weights,
+            factor_names,
+            initial_capital=request.initial_capital,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    def _pts(curve: list) -> list[PortfolioOptEquityPoint]:
+        return [
+            PortfolioOptEquityPoint(date=p["date"], value=round(float(p["value"]), 2))
+            for p in curve
+        ]
+
+    return FactorAnalysisResponse(
+        tickers=tickers,
+        weights={t: round(float(weights[t]), 6) for t in tickers},
+        start_date=request.start_date,
+        end_date=request.end_date,
+        factor_tickers=factor_symbols,
+        alpha_daily=round(d["alpha_daily"], 8),
+        alpha_annualized=round(d["alpha_annualized"], 6),
+        betas={name: round(b, 6) for name, b in d["betas"].items()},
+        r_squared=round(d["r_squared"], 6),
+        residual_volatility=round(d["residual_volatility"], 6),
+        factor_correlation_matrix={
+            a: {b: round(v, 6) for b, v in row.items()}
+            for a, row in d["factor_correlation_matrix"].items()
+        },
+        diagnostics=FactorDiagnostics(**d["diagnostics"]),
+        regression_points=[
+            FactorRegressionPoint(
+                date=p["date"],
+                actual_return=round(p["actual_return"], 8),
+                fitted_return=round(p["fitted_return"], 8),
+                residual=round(p["residual"], 8),
+            )
+            for p in d["regression_points"]
+        ],
+        actual_equity_curve=_pts(d["actual_equity_curve"]),
+        fitted_equity_curve=_pts(d["fitted_equity_curve"]),
     )
 
 

@@ -686,6 +686,52 @@ export interface StressTestResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Factor Exposure / Regression Analysis
+// ---------------------------------------------------------------------------
+
+export interface FactorAnalysisRequest {
+  tickers: string[];
+  weights?: Record<string, number> | null;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  factor_tickers: Record<string, string>;
+}
+
+export interface FactorDiagnostics {
+  strongest_positive_factor: string | null;
+  strongest_negative_factor: string | null;
+  absolute_largest_exposure: string | null;
+  multicollinearity_warning: boolean;
+}
+
+export interface FactorRegressionPoint {
+  date: string;
+  actual_return: number;
+  fitted_return: number;
+  residual: number;
+}
+
+export interface FactorAnalysisResponse {
+  tickers: string[];
+  weights: Record<string, number>;
+  start_date: string;
+  end_date: string;
+  factor_tickers: Record<string, string>;
+  alpha_daily: number;
+  alpha_annualized: number;
+  betas: Record<string, number>;
+  r_squared: number;
+  residual_volatility: number;
+  factor_correlation_matrix: Record<string, Record<string, number>>;
+  diagnostics: FactorDiagnostics;
+  regression_points: FactorRegressionPoint[];
+  actual_equity_curve: PortfolioOptEquityPoint[];
+  fitted_equity_curve: PortfolioOptEquityPoint[];
+  historical_note: string;
+}
+
+// ---------------------------------------------------------------------------
 // Portfolio Risk Dashboard
 // ---------------------------------------------------------------------------
 

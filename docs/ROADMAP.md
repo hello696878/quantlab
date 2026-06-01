@@ -231,6 +231,23 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   forecast or investment advice
 - Full unit + API test coverage
 
+### Phase 7 — Factor Exposure / Regression Analysis ✅
+
+- `POST /portfolio/factor-analysis` — OLS regression of portfolio daily returns
+  on ETF factor-proxy returns (`r_p = alpha + Σ beta_k·factor_k + residual`)
+- Pure NumPy least squares (intercept included) — no statsmodels, no external
+  Fama-French data
+- Returns alpha (daily + annualised), per-factor betas, R², annualised residual
+  volatility, factor correlation matrix, actual-vs-fitted return series +
+  equity curves, and diagnostics (strongest ± exposures, multicollinearity
+  warning via rank check)
+- Default **Core ETF Factors** preset (market/tech/small-cap/bonds/gold) plus
+  editable custom factors; equal or custom long-only portfolio weights
+- Portfolio workspace gains a **Factor Analysis** tab: summary cards, beta
+  table, factor correlation heatmap, actual-vs-fitted equity chart
+- Historical / proxy-dependent; collinear factors flagged. Not investment advice
+- Full unit (known-beta recovery, collinearity) + API test coverage
+
 ---
 
 ## Future Phases
