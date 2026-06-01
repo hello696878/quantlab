@@ -11,6 +11,8 @@ import math
 import pandas as pd
 import pytest
 
+from app.portfolio import align_prices, risk_dashboard
+
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
 main_module = pytest.importorskip("app.main")
 
@@ -74,6 +76,27 @@ def test_asset_stats_generated(client):
         assert v >= 0
 
 
+def test_endpoint_metrics_match_aligned_daily_return_estimates(client):
+    req = base_request()
+    data = client.post("/portfolio/risk-dashboard", json=req).json()
+    frames = {
+        ticker: _fake_fetch(ticker, req["start_date"], req["end_date"])["Close"]
+        for ticker in data["tickers"]
+    }
+    expected = risk_dashboard(align_prices(frames))
+
+    for ticker in data["tickers"]:
+        assert data["asset_annual_returns"][ticker] == pytest.approx(
+            round(expected["asset_annual_returns"][ticker], 6), abs=1e-9
+        )
+        assert data["asset_annual_volatilities"][ticker] == pytest.approx(
+            round(expected["asset_annual_volatilities"][ticker], 6), abs=1e-9
+        )
+        assert data["risk_contribution"][ticker] == pytest.approx(
+            round(expected["risk_contribution"][ticker], 6), abs=1e-9
+        )
+
+
 def test_correlation_matrix_symmetric_unit_diagonal(client):
     data = client.post("/portfolio/risk-dashboard", json=base_request()).json()
     corr = data["correlation_matrix"]
@@ -132,6 +155,39 @@ def test_two_asset_dashboard(client):
     # With two assets the single pair is both most and least correlated.
     assert set(diag["most_correlated_pair"]) == {"SPY", "TLT"}
     assert set(diag["least_correlated_pair"]) == {"SPY", "TLT"}
+
+
+def test_endpoint_aligns_common_dates_and_duplicate_dates(client, monkeypatch):
+    def overlapping_fetch(ticker: str, start: str, end: str) -> pd.DataFrame:
+        if ticker.upper() == "AAA":
+            idx = pd.to_datetime(
+                ["2020-01-01", "2020-01-02", "2020-01-03", "2020-01-03", "2020-01-06", "2020-01-07"]
+            )
+            close = [100.0, 101.0, 102.0, 105.0, 106.0, 107.0]
+        else:
+            idx = pd.to_datetime(["2020-01-03", "2020-01-06", "2020-01-07", "2020-01-08"])
+            close = [50.0, 51.0, 53.0, 54.0]
+        return pd.DataFrame({"Close": close}, index=idx)
+
+    monkeypatch.setattr(main_module, "_fetch", overlapping_fetch)
+    req = base_request(tickers=["AAA", "BBB"])
+    resp = client.post("/portfolio/risk-dashboard", json=req)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+
+    frames = {
+        ticker: overlapping_fetch(ticker, req["start_date"], req["end_date"])["Close"]
+        for ticker in data["tickers"]
+    }
+    expected = risk_dashboard(align_prices(frames))
+    for ticker in data["tickers"]:
+        assert data["asset_annual_returns"][ticker] == pytest.approx(
+            round(expected["asset_annual_returns"][ticker], 6), abs=1e-9
+        )
+        for other in data["tickers"]:
+            assert data["correlation_matrix"][ticker][other] == pytest.approx(
+                round(expected["correlation_matrix"][ticker][other], 6), abs=1e-9
+            )
 
 
 # ---------------------------------------------------------------------------

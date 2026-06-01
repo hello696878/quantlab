@@ -103,6 +103,27 @@ def test_equal_weight_portfolio_metrics():
     assert ew["diversification_ratio"] >= 1.0 - 1e-6
 
 
+def test_equal_weight_portfolio_metrics_match_formula():
+    prices = make_prices()
+    d = risk_dashboard(prices)
+    tickers = d["tickers"]
+    n = len(tickers)
+    w = np.full(n, 1.0 / n)
+    annual_returns = np.array([d["asset_annual_returns"][t] for t in tickers])
+    annual_vols = np.array([d["asset_annual_volatilities"][t] for t in tickers])
+    covariance = np.array(
+        [[d["covariance_matrix"][a][b] for b in tickers] for a in tickers]
+    )
+    expected_return = float(w @ annual_returns)
+    volatility = float(math.sqrt(max(w @ covariance @ w, 0.0)))
+    diversification_ratio = float((w @ annual_vols) / volatility)
+
+    ew = d["equal_weight_portfolio"]
+    assert ew["expected_return"] == pytest.approx(expected_return, abs=1e-9)
+    assert ew["volatility"] == pytest.approx(volatility, abs=1e-9)
+    assert ew["diversification_ratio"] == pytest.approx(diversification_ratio, abs=1e-9)
+
+
 # ---------------------------------------------------------------------------
 # Correlation diagnostics
 # ---------------------------------------------------------------------------
@@ -119,6 +140,14 @@ def test_correlation_diagnostics():
     a, b = diag["most_correlated_pair"]
     assert d["correlation_matrix"][a][b] == pytest.approx(
         diag["max_pairwise_correlation"], abs=1e-9
+    )
+    pair_values = []
+    tickers = d["tickers"]
+    for i, a in enumerate(tickers):
+        for b in tickers[i + 1:]:
+            pair_values.append(d["correlation_matrix"][a][b])
+    assert diag["average_pairwise_correlation"] == pytest.approx(
+        float(np.mean(pair_values)), abs=1e-9
     )
 
 
@@ -162,6 +191,32 @@ def test_single_asset_no_pairs():
     assert diag["most_correlated_pair"] is None
     assert diag["least_correlated_pair"] is None
     assert d["risk_contribution"]["AAA"] == pytest.approx(1.0, abs=1e-6)
+
+
+def test_zero_variance_assets_return_finite_matrices_and_equal_risk_fallback():
+    idx = pd.date_range("2020-01-01", periods=6, freq="B")
+    prices = pd.DataFrame(
+        {
+            "AAA": [100.0] * len(idx),
+            "BBB": [50.0] * len(idx),
+            "CCC": [25.0] * len(idx),
+        },
+        index=idx,
+    )
+
+    d = risk_dashboard(prices)
+    for a in d["tickers"]:
+        assert d["asset_annual_returns"][a] == pytest.approx(0.0)
+        assert d["asset_annual_volatilities"][a] == pytest.approx(0.0)
+        assert d["correlation_matrix"][a][a] == pytest.approx(1.0)
+        for b in d["tickers"]:
+            assert math.isfinite(d["correlation_matrix"][a][b])
+            assert math.isfinite(d["covariance_matrix"][a][b])
+            if a != b:
+                assert d["correlation_matrix"][a][b] == pytest.approx(0.0)
+    assert d["equal_weight_portfolio"]["volatility"] == pytest.approx(0.0)
+    assert d["equal_weight_portfolio"]["diversification_ratio"] == pytest.approx(0.0)
+    assert sum(d["risk_contribution"].values()) == pytest.approx(1.0)
 
 
 def test_too_short_raises():

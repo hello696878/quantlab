@@ -761,6 +761,25 @@ def risk_dashboard(prices: pd.DataFrame) -> dict:
     annual_vols = daily.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
     correlation = daily.corr()
     covariance = daily.cov() * TRADING_DAYS_PER_YEAR
+    if not np.isfinite(annual_returns.to_numpy(dtype=float)).all():
+        raise ValueError("annualized returns must be finite.")
+    if not np.isfinite(annual_vols.to_numpy(dtype=float)).all():
+        raise ValueError("annualized volatilities must be finite.")
+    if not np.isfinite(covariance.to_numpy(dtype=float)).all():
+        raise ValueError("covariance matrix must be finite.")
+
+    # Zero-variance assets make pairwise correlations mathematically undefined
+    # in pandas (NaN).  For display diagnostics, keep diagonal self-correlation
+    # at 1 and treat undefined off-diagonal correlations as 0 rather than
+    # leaking non-JSON values into the API response.
+    corr_arr = correlation.to_numpy(dtype=float)
+    corr_arr = np.where(np.isfinite(corr_arr), corr_arr, 0.0)
+    np.fill_diagonal(corr_arr, 1.0)
+    corr_arr = np.clip((corr_arr + corr_arr.T) / 2.0, -1.0, 1.0)
+    correlation = pd.DataFrame(corr_arr, index=tickers, columns=tickers)
+
+    cov_arr = covariance.to_numpy(dtype=float)
+    covariance = pd.DataFrame((cov_arr + cov_arr.T) / 2.0, index=tickers, columns=tickers)
 
     # ── Equal-weight portfolio risk ──────────────────────────────────────
     w = np.full(n, 1.0 / n)
