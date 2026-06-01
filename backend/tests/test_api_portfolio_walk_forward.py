@@ -125,6 +125,16 @@ def test_first_window_entry_turnover(client):
     assert data["windows"][0]["turnover"] == pytest.approx(1.0, abs=1e-4)
 
 
+def test_first_window_transaction_cost_amount(client):
+    data = client.post(
+        "/portfolio/walk-forward-optimize",
+        json=base_request(objective="equal_weight", transaction_cost_bps=10),
+    ).json()
+    assert data["windows"][0]["transaction_cost"] == pytest.approx(100.0, abs=0.01)
+    for w in data["windows"][1:]:
+        assert w["transaction_cost"] == pytest.approx(0.0, abs=0.01)
+
+
 def test_weight_stability_present(client):
     data = client.post("/portfolio/walk-forward-optimize", json=base_request()).json()
     stab = data["weight_stability"]
@@ -143,6 +153,27 @@ def test_metrics_blocks_present(client):
             assert key in block
 
 
+def test_one_day_test_windows_return_finite_metrics(client):
+    resp = client.post(
+        "/portfolio/walk-forward-optimize",
+        json=base_request(
+            objective="equal_weight",
+            train_window_days=20,
+            test_window_days=1,
+            step_days=50,
+        ),
+    )
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["num_windows"] > 1
+    metric_blocks = [data["metrics"], data["benchmark_metrics"]]
+    metric_blocks.extend(w["test_metrics"] for w in data["windows"])
+    for block in metric_blocks:
+        for value in block.values():
+            if isinstance(value, (int, float)):
+                assert math.isfinite(value)
+
+
 def test_transaction_cost_effect(client):
     free = client.post(
         "/portfolio/walk-forward-optimize", json=base_request(transaction_cost_bps=0)
@@ -154,6 +185,16 @@ def test_transaction_cost_effect(client):
         costly["stitched_equity_curve"][-1]["value"]
         < free["stitched_equity_curve"][-1]["value"]
     )
+
+
+def test_step_smaller_than_test_produces_unique_ordered_dates(client):
+    data = client.post(
+        "/portfolio/walk-forward-optimize",
+        json=base_request(test_window_days=126, step_days=63),
+    ).json()
+    dates = [p["date"] for p in data["stitched_equity_curve"]]
+    assert dates == sorted(dates)
+    assert len(dates) == len(set(dates))
 
 
 # ---------------------------------------------------------------------------

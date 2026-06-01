@@ -70,7 +70,12 @@ def compute_metrics(
     # -----------------------------------------------------------------------
     # Annualised volatility (std of daily returns × √252)
     # -----------------------------------------------------------------------
-    volatility = float(daily_returns.std() * np.sqrt(TRADING_DAYS_PER_YEAR))
+    daily_std = float(daily_returns.std())
+    volatility = (
+        float(daily_std * np.sqrt(TRADING_DAYS_PER_YEAR))
+        if np.isfinite(daily_std)
+        else 0.0
+    )
 
     # -----------------------------------------------------------------------
     # Sharpe ratio  (annualised, risk-free rate subtracted daily)
@@ -79,7 +84,7 @@ def compute_metrics(
     excess_returns = daily_returns - daily_rf
     excess_std = float(excess_returns.std())
 
-    if excess_std > 1e-12:
+    if np.isfinite(excess_std) and excess_std > 1e-12:
         sharpe_ratio = float(excess_returns.mean() / excess_std) * np.sqrt(TRADING_DAYS_PER_YEAR)
     else:
         sharpe_ratio = 0.0

@@ -147,6 +147,8 @@ The Portfolio workspace's **Walk-Forward Optimization** tab (`POST /portfolio/wa
 
 **Transaction cost (turnover-based):** at each test-window boundary the portfolio moves from the previous weights to the new ones — `turnover = Σ|new_wᵢ − prev_wᵢ|` (the first window's turnover is `Σ|wᵢ − 0| = 1`, i.e. entry from cash). `cost = turnover × bps/10000` is deducted from equity at the start of that test window. The equal-weight benchmark is treated identically (its target never changes, so it pays only the initial entry).
 
+If `step_days < test_window_days`, test windows overlap; the stitched OOS curve uses each window's non-overlapping step slice (and the final window's remaining test tail) so re-optimization happens at the requested step cadence without duplicate dates. If `step_days > test_window_days`, gaps between test windows are intentionally left out of the stitched OOS curve.
+
 The response includes per-window detail (train/test dates, weights, train Sharpe, out-of-sample `test_metrics`, turnover, cost), the stitched OOS equity vs. an equal-weight benchmark, drawdown, aggregate OOS metrics, and a **weight-stability** summary (average/max turnover, per-asset average/min/max weight).
 
 > ⚠️ Walk-forward results are out-of-sample and far more honest than in-sample optimization, but they still rely on historical return/covariance assumptions and **do not predict future performance**. Not investment advice.

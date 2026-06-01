@@ -1821,7 +1821,12 @@ class PortfolioWalkForwardWindow(BaseModel):
     train_expected_return: float
     train_volatility: float
     train_sharpe: float
-    test_metrics: PerformanceMetrics = Field(description="Out-of-sample metrics for this window.")
+    test_metrics: PerformanceMetrics = Field(
+        description=(
+            "Out-of-sample metrics for this window's full test horizon, "
+            "including the one-off boundary transaction cost."
+        )
+    )
     turnover: float = Field(description="Σ|new_w − prev_w| at the window boundary (prev=0 for window 1).")
     transaction_cost: float = Field(description="Turnover cost charged in USD at the boundary.")
 

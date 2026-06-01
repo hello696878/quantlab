@@ -190,6 +190,8 @@ def test_too_short_raises():
 def test_two_points_works():
     m = compute_metrics(pd.Series([100_000.0, 110_000.0]))
     assert m["total_return"] == pytest.approx(0.10)
+    assert m["volatility"] == pytest.approx(0.0)
+    assert m["sharpe_ratio"] == pytest.approx(0.0)
 
 
 def test_num_days_correct():

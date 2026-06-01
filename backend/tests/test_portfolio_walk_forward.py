@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+import app.portfolio as portfolio_module
 from app.portfolio import (
     annualized_stats,
     optimize_weights,
@@ -77,6 +78,25 @@ def test_insufficient_data_raises():
     prices = make_prices(200)
     with pytest.raises(ValueError, match="need at least"):
         run(prices, train_window_days=252, test_window_days=63)
+
+
+@pytest.mark.parametrize("field", ["train_window_days", "test_window_days", "step_days"])
+def test_non_positive_window_inputs_raise(field):
+    with pytest.raises(ValueError, match=field):
+        run(**{field: 0})
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("initial_capital", 0.0),
+        ("transaction_cost_bps", -1.0),
+        ("transaction_cost_bps", 10_000.0),
+    ],
+)
+def test_invalid_capital_or_cost_inputs_raise(field, value):
+    with pytest.raises(ValueError, match=field):
+        run(**{field: value})
 
 
 # ---------------------------------------------------------------------------
@@ -167,6 +187,52 @@ def test_transaction_cost_reduces_final_equity():
     assert costly.stitched_equity.iloc[-1] < free.stitched_equity.iloc[-1]
 
 
+def test_transaction_cost_amount_and_window_metrics_include_entry_cost():
+    idx = pd.date_range("2020-01-01", periods=12, freq="B")
+    prices = pd.DataFrame({"AAA": 100.0, "BBB": 100.0}, index=idx)
+
+    res = run(
+        prices,
+        train_window_days=5,
+        test_window_days=3,
+        step_days=3,
+        objective="equal_weight",
+        initial_capital=100_000.0,
+        transaction_cost_bps=10.0,
+    )
+
+    assert res.windows[0]["turnover"] == pytest.approx(1.0)
+    assert res.windows[0]["transaction_cost"] == pytest.approx(100.0)
+    assert res.stitched_equity.iloc[1] == pytest.approx(99_900.0)
+    assert res.windows[0]["test_metrics"]["total_return"] == pytest.approx(-0.001)
+
+
+def test_turnover_cost_that_would_deplete_equity_raises(monkeypatch):
+    prices = make_prices(400, tickers=("AAA", "BBB"))
+    weight_sequence = [
+        {"AAA": 1.0, "BBB": 0.0},
+        {"AAA": 0.0, "BBB": 1.0},
+    ]
+    calls = {"n": 0}
+
+    def fake_optimize_weights(mu, cov, objective, risk_free_rate=0.0):
+        i = min(calls["n"], len(weight_sequence) - 1)
+        calls["n"] += 1
+        return weight_sequence[i]
+
+    monkeypatch.setattr(portfolio_module, "optimize_weights", fake_optimize_weights)
+
+    with pytest.raises(ValueError, match="would deplete portfolio equity"):
+        run(
+            prices,
+            train_window_days=50,
+            test_window_days=20,
+            step_days=20,
+            objective="max_sharpe",
+            transaction_cost_bps=6000.0,
+        )
+
+
 # ---------------------------------------------------------------------------
 # Stitched curves + benchmark + stability
 # ---------------------------------------------------------------------------
@@ -178,6 +244,58 @@ def test_stitched_and_benchmark_anchored_at_capital():
     assert res.benchmark_equity.iloc[0] == pytest.approx(100_000.0)
     assert res.stitched_equity.index.equals(res.benchmark_equity.index)
     assert len(res.stitched_equity) > 1
+
+
+def test_overlapping_windows_rebalance_at_step_boundary(monkeypatch):
+    idx = pd.date_range("2020-01-01", periods=13, freq="B")
+    prices = pd.DataFrame(
+        {
+            "AAA": [100.0 * (1.1 ** i) for i in range(len(idx))],
+            "BBB": [100.0 for _ in range(len(idx))],
+        },
+        index=idx,
+    )
+    weight_sequence = [
+        {"AAA": 1.0, "BBB": 0.0},
+        {"AAA": 0.0, "BBB": 1.0},
+        {"AAA": 1.0, "BBB": 0.0},
+    ]
+    calls = {"n": 0}
+
+    def fake_optimize_weights(mu, cov, objective, risk_free_rate=0.0):
+        i = min(calls["n"], len(weight_sequence) - 1)
+        calls["n"] += 1
+        return weight_sequence[i]
+
+    monkeypatch.setattr(portfolio_module, "optimize_weights", fake_optimize_weights)
+
+    res = run(
+        prices,
+        train_window_days=5,
+        test_window_days=4,
+        step_days=2,
+        objective="max_sharpe",
+        initial_capital=100.0,
+        transaction_cost_bps=0.0,
+    )
+
+    # Window 0 contributes days 5-6 with AAA exposure; window 1 starts at day 7
+    # and contributes BBB exposure, so day 7 should not receive AAA's +10% move.
+    assert res.stitched_equity.loc[idx[5]] == pytest.approx(110.0)
+    assert res.stitched_equity.loc[idx[6]] == pytest.approx(121.0)
+    assert res.stitched_equity.loc[idx[7]] == pytest.approx(121.0)
+
+
+def test_overlapping_windows_produce_unique_monotonic_stitched_dates():
+    res = run(
+        make_prices(500),
+        train_window_days=100,
+        test_window_days=60,
+        step_days=20,
+    )
+    idx = res.stitched_equity.index
+    assert idx.is_monotonic_increasing
+    assert len(idx) == len(idx.unique())
 
 
 def test_weight_stability_structure():

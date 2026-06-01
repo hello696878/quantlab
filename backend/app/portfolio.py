@@ -378,7 +378,31 @@ def run_walk_forward_optimization(
     (a one-off multiplicative drag), before that window's returns compound.
     The equal-weight benchmark is treated identically (its target never changes,
     so it only pays the initial entry turnover).
+
+    When ``step_days < test_window_days``, test windows overlap.  For the
+    stitched equity curve each window contributes only the non-overlapping
+    step slice, with the final window contributing its remaining full test
+    horizon.  The per-window ``test_metrics`` still describe the full requested
+    test horizon and include that window's boundary transaction cost.
     """
+    for name, value in (
+        ("train_window_days", train_window_days),
+        ("test_window_days", test_window_days),
+        ("step_days", step_days),
+    ):
+        if not isinstance(value, (int, np.integer)) or int(value) <= 0:
+            raise ValueError(f"{name} must be a positive integer.")
+    if not np.isfinite(initial_capital) or initial_capital <= 0:
+        raise ValueError("initial_capital must be greater than 0.")
+    if not np.isfinite(risk_free_rate):
+        raise ValueError("risk_free_rate must be finite.")
+    if (
+        not np.isfinite(transaction_cost_bps)
+        or transaction_cost_bps < 0
+        or transaction_cost_bps >= 10_000
+    ):
+        raise ValueError("transaction_cost_bps must be >= 0 and less than 10000.")
+
     _validate_price_frame(prices)
     n = len(prices)
     tickers = list(prices.columns)
@@ -434,31 +458,54 @@ def run_walk_forward_optimization(
         # ── Turnover / cost at the boundary ─────────────────────────────────
         turnover = float(np.sum(np.abs(w_vec - prev_opt_w)))
         cost_fraction = turnover * cost_rate
+        if cost_fraction >= 1.0:
+            raise ValueError(
+                "transaction_cost_bps is too high for the optimized turnover; "
+                "the boundary cost would deplete portfolio equity."
+            )
         cost_dollars = opt_equity * cost_fraction
 
         bench_turnover = float(np.sum(np.abs(equal_w - prev_bench_w)))
         bench_cost_fraction = bench_turnover * cost_rate
+        if bench_cost_fraction >= 1.0:
+            raise ValueError(
+                "transaction_cost_bps is too high for the benchmark entry "
+                "turnover; the boundary cost would deplete benchmark equity."
+            )
 
         # ── OOS daily portfolio returns for this test window ────────────────
         win_returns = returns.iloc[test_start:test_end].to_numpy()
         opt_daily = win_returns @ w_vec
         bench_daily = win_returns @ equal_w
-        win_dates = prices.index[test_start:test_end]
 
-        # Per-window standalone OOS equity for test_metrics (anchored, no cost).
+        # Per-window standalone OOS equity for test_metrics (anchored and
+        # charged the same one-off boundary cost as the stitched curve).
         running = float(initial_capital)
         win_equity_vals = [running]
+        running *= 1.0 - cost_fraction
         for r in opt_daily:
             running *= 1.0 + float(r)
             win_equity_vals.append(running)
         test_metrics = compute_metrics(pd.Series(win_equity_vals))
 
         # ── Apply boundary cost, then stitch the OOS days ───────────────────
+        next_train_start = train_start + step_days
+        has_next_full_window = (
+            next_train_start + train_window_days + test_window_days <= n
+        )
+        contribution_end = (
+            min(test_end, test_start + step_days) if has_next_full_window else test_end
+        )
+        contrib_returns = returns.iloc[test_start:contribution_end].to_numpy()
+        contrib_opt_daily = contrib_returns @ w_vec
+        contrib_bench_daily = contrib_returns @ equal_w
+        contrib_dates = prices.index[test_start:contribution_end]
+
         opt_equity *= 1.0 - cost_fraction
         bench_equity *= 1.0 - bench_cost_fraction
-        for dt, r_opt, r_bench in zip(win_dates, opt_daily, bench_daily):
+        for dt, r_opt, r_bench in zip(contrib_dates, contrib_opt_daily, contrib_bench_daily):
             if dt <= last_date:
-                continue  # dedup overlap when step_days < test_window_days
+                continue  # defensive deduplication if callers pass odd indexes
             opt_equity *= 1.0 + float(r_opt)
             bench_equity *= 1.0 + float(r_bench)
             stitched_dates.append(dt)
