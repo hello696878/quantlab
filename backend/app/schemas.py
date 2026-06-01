@@ -2,6 +2,7 @@
 Pydantic request / response schemas for the QuantLab backtesting API.
 """
 
+import math
 from datetime import date
 from typing import Annotated, Dict, List, Literal, Optional, Union
 
@@ -2157,9 +2158,15 @@ class StressTestRequest(BaseModel):
             cleaned: Dict[str, float] = {}
             for raw, wt in self.weights.items():
                 sym = raw.strip().upper()
+                if not sym:
+                    raise ValueError("weight ticker symbols must not be empty.")
+                if sym in cleaned:
+                    raise ValueError(f"duplicate weight ticker after uppercasing: {sym}.")
                 cleaned[sym] = float(wt)
             if set(cleaned) != set(self.tickers):
                 raise ValueError("weights must include exactly the requested tickers.")
+            if any(not math.isfinite(wt) for wt in cleaned.values()):
+                raise ValueError("weights must be finite.")
             if any(wt < 0 for wt in cleaned.values()):
                 raise ValueError("weights must be non-negative (long-only).")
             if abs(sum(cleaned.values()) - 1.0) > 1e-6:

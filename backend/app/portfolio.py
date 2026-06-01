@@ -926,7 +926,36 @@ def stress_test(
     """
     _validate_price_frame(prices)
     tickers = list(prices.columns)
+    if set(weights) != set(tickers):
+        raise ValueError("weights must include exactly the price frame tickers.")
     w = np.array([weights[t] for t in tickers], dtype=float)
+    if not np.isfinite(w).all():
+        raise ValueError("weights must be finite.")
+    if (w < 0).any():
+        raise ValueError("weights must be non-negative (long-only).")
+    if abs(float(w.sum()) - 1.0) > 1e-6:
+        raise ValueError("weights must sum to 1.")
+    if not np.isfinite(initial_capital) or initial_capital <= 0:
+        raise ValueError("initial_capital must be greater than 0.")
+    if (
+        not np.isfinite(transaction_cost_bps)
+        or transaction_cost_bps < 0
+        or transaction_cost_bps >= 10_000
+    ):
+        raise ValueError("transaction_cost_bps must be >= 0 and less than 10000.")
+
+    benchmark_close = benchmark_close.copy()
+    benchmark_close.index = pd.to_datetime(benchmark_close.index)
+    if not benchmark_close.index.equals(prices.index):
+        raise ValueError("benchmark_close must share the same index as prices.")
+    if benchmark_close.isna().any():
+        raise ValueError("benchmark_close must not contain missing values.")
+    if not np.isfinite(benchmark_close.to_numpy(dtype=float)).all():
+        raise ValueError("benchmark_close must be finite.")
+    if (benchmark_close <= 0).any():
+        raise ValueError("benchmark_close must be strictly positive.")
+    if not scenarios:
+        raise ValueError("at least one stress scenario is required.")
 
     asset_ret = prices.pct_change(fill_method=None)
     port_ret_full = pd.Series(asset_ret.to_numpy() @ w, index=prices.index)
@@ -955,13 +984,13 @@ def stress_test(
                 f"({_date_str(idx[0])} to {_date_str(idx[-1])})."
             )
         i0, i1 = int(positions[0]), int(positions[-1])
-        ret_start = max(i0, 1)
+        ret_start = i0 + 1
         if ret_start > i1:
             raise ValueError(
                 f"Scenario '{name}' is too short — no return days inside the window."
             )
         sel = slice(ret_start, i1 + 1)
-        anchor_date = idx[ret_start - 1]
+        anchor_date = idx[i0]
 
         scn_port = port_ret_full.iloc[sel]
         scn_bench = bench_ret_full.iloc[sel]
@@ -973,7 +1002,12 @@ def stress_test(
             scn_bench, initial_capital, anchor_date
         )
 
-        win_corr = asset_ret.iloc[sel].corr().fillna(0.0)
+        win_corr = asset_ret.iloc[sel].corr()
+        corr_arr = win_corr.to_numpy(dtype=float)
+        corr_arr = np.where(np.isfinite(corr_arr), corr_arr, 0.0)
+        np.fill_diagonal(corr_arr, 1.0)
+        corr_arr = np.clip((corr_arr + corr_arr.T) / 2.0, -1.0, 1.0)
+        win_corr = pd.DataFrame(corr_arr, index=tickers, columns=tickers)
         corr_dict = {
             ti: {tj: float(win_corr.loc[ti, tj]) for tj in tickers} for ti in tickers
         }

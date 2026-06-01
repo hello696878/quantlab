@@ -99,7 +99,8 @@ def test_scenario_metrics_and_curves(client):
     for key in (
         "total_return", "max_drawdown", "annualized_volatility",
         "worst_day_return", "best_day_return", "benchmark_total_return",
-        "benchmark_max_drawdown", "excess_return", "correlation_matrix",
+        "benchmark_max_drawdown", "benchmark_worst_day_return",
+        "benchmark_best_day_return", "excess_return", "correlation_matrix",
         "portfolio_equity_curve", "benchmark_equity_curve",
     ):
         assert key in s, key
@@ -110,6 +111,22 @@ def test_scenario_metrics_and_curves(client):
     assert len(s["portfolio_equity_curve"]) > 1
     assert len(s["benchmark_equity_curve"]) == len(s["portfolio_equity_curve"])
     assert s["portfolio_equity_curve"][0]["value"] == pytest.approx(100000, abs=1.0)
+    assert s["portfolio_equity_curve"][0]["date"] == s["start_date"]
+    assert s["benchmark_equity_curve"][0]["date"] == s["start_date"]
+
+
+def test_scenario_total_return_excludes_move_into_start_date(client):
+    s0, e0 = _scn_dates(100, 180)
+    req = base_request(
+        tickers=["SPY", "QQQ"],
+        weights={"SPY": 1.0, "QQQ": 0.0},
+        scenarios=[{"name": "Window", "start_date": s0, "end_date": e0}],
+    )
+    data = client.post("/portfolio/stress-test", json=req).json()
+    s = data["scenarios"][0]
+    close = _fake_fetch("SPY", req["start_date"], req["end_date"])["Close"]
+    expected = float(close.loc[pd.Timestamp(e0)] / close.loc[pd.Timestamp(s0)] - 1.0)
+    assert s["total_return"] == pytest.approx(round(expected, 6), abs=1e-9)
 
 
 def test_correlation_matrix_present(client):
@@ -119,6 +136,9 @@ def test_correlation_matrix_present(client):
     assert set(corr) == set(tickers)
     for a in tickers:
         assert corr[a][a] == pytest.approx(1.0, abs=1e-6)
+        for b in tickers:
+            assert corr[a][b] == pytest.approx(corr[b][a], abs=1e-6)
+            assert math.isfinite(corr[a][b])
 
 
 def test_full_equity_curve_generated(client):
@@ -174,6 +194,14 @@ def test_missing_ticker_weight_rejected(client):
     resp = client.post(
         "/portfolio/stress-test",
         json=base_request(weights={"SPY": 0.5, "QQQ": 0.5}),
+    )
+    assert resp.status_code == 422
+
+
+def test_extra_ticker_weight_rejected(client):
+    resp = client.post(
+        "/portfolio/stress-test",
+        json=base_request(weights={"SPY": 0.4, "QQQ": 0.3, "GLD": 0.2, "TLT": 0.1, "XOM": 0.0}),
     )
     assert resp.status_code == 422
 

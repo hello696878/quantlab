@@ -18,7 +18,7 @@ const PRESETS: { name: string; start_date: string; end_date: string }[] = [
   { name: "COVID Crash", start_date: "2020-02-19", end_date: "2020-03-23" },
   { name: "2022 Rate Hike Drawdown", start_date: "2022-01-03", end_date: "2022-10-14" },
   { name: "2018 Q4 Selloff", start_date: "2018-09-20", end_date: "2018-12-24" },
-  { name: "2011 Debt Ceiling / Euro Crisis", start_date: "2011-07-22", end_date: "2011-10-03" },
+  { name: "2011 US Debt Ceiling / Euro Crisis", start_date: "2011-07-22", end_date: "2011-10-03" },
   { name: "2008 Global Financial Crisis", start_date: "2007-10-09", end_date: "2009-03-09" },
 ];
 
@@ -130,7 +130,7 @@ export default function PortfolioStressTestPanel() {
   }
   function distributeEqually() {
     if (!parsedTickers.ok) return;
-    const eq = (1 / parsedTickers.tickers.length).toFixed(4);
+    const eq = String(1 / parsedTickers.tickers.length);
     setCustomWeights(Object.fromEntries(parsedTickers.tickers.map((t) => [t, eq])));
   }
   function addScenario(preset?: (typeof PRESETS)[number]) {
@@ -194,7 +194,7 @@ export default function PortfolioStressTestPanel() {
         wd[t] = v;
       }
       const sum = Object.values(wd).reduce((a, b) => a + b, 0);
-      if (Math.abs(sum - 1) > 1e-4) {
+      if (Math.abs(sum - 1) > 1e-6) {
         return { request: null, validationMsg: `Custom weights must sum to 1 (currently ${sum.toFixed(3)}).` };
       }
       weights = wd;
@@ -322,7 +322,7 @@ export default function PortfolioStressTestPanel() {
                   <span
                     className={
                       "text-xs mono " +
-                      (Math.abs(customSum - 1) <= 1e-4 ? "text-green-700" : "text-red-600")
+                      (Math.abs(customSum - 1) <= 1e-6 ? "text-green-700" : "text-red-600")
                     }
                   >
                     Σ = {customSum.toFixed(3)}

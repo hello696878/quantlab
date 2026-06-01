@@ -102,13 +102,45 @@ def test_total_return_matches_compounded_window_returns():
     scn = [{"name": "W", "start_date": date_str(prices, i0), "end_date": date_str(prices, i1)}]
     s = stress_test(assets, bench, w, scn)["scenarios"][0]
 
-    # Recompute: constant-weight daily returns over [i0..i1] (the move into the
-    # first scenario day, from the prior close, is included), compounded.
+    # Recompute from scenario start close to scenario end close: returns after
+    # the first scenario trading day through the end day, compounded.
     wv = np.array([w[t] for t in assets.columns])
     asset_ret = assets.pct_change(fill_method=None)
     port_ret = (asset_ret.to_numpy() @ wv)
-    factor = np.prod(1.0 + port_ret[i0 : i1 + 1])
+    factor = np.prod(1.0 + port_ret[i0 + 1 : i1 + 1])
     assert s["total_return"] == pytest.approx(factor - 1.0, abs=1e-9)
+    assert s["portfolio_equity_curve"][0]["date"] == date_str(prices, i0)
+    assert s["portfolio_equity_curve"][-1]["date"] == date_str(prices, i1)
+
+
+def test_scenario_worst_best_vol_and_drawdown_use_window_only():
+    idx = pd.date_range("2020-01-01", periods=8, freq="B")
+    assets = pd.DataFrame(
+        {
+            "AAA": [100.0, 200.0, 100.0, 110.0, 88.0, 132.0, 66.0, 72.6],
+            "BBB": [100.0] * 8,
+        },
+        index=idx,
+    )
+    bench = pd.Series([100.0] * 8, index=idx, name="SPY")
+    weights = {"AAA": 1.0, "BBB": 0.0}
+    scn = [{"name": "Window", "start_date": date_str(assets, 2), "end_date": date_str(assets, 5)}]
+
+    s = stress_test(assets, bench, weights, scn)["scenarios"][0]
+    window_returns = assets["AAA"].pct_change(fill_method=None).iloc[3:6]
+    equity = 100_000.0 * (1.0 + window_returns).cumprod()
+    equity = pd.concat(
+        [pd.Series([100_000.0], index=[assets.index[2]]), equity]
+    )
+    expected_dd = float((equity / equity.cummax() - 1.0).min())
+
+    assert s["total_return"] == pytest.approx(float(equity.iloc[-1] / 100_000.0 - 1.0))
+    assert s["max_drawdown"] == pytest.approx(expected_dd)
+    assert s["worst_day_return"] == pytest.approx(float(window_returns.min()))
+    assert s["best_day_return"] == pytest.approx(float(window_returns.max()))
+    assert s["annualized_volatility"] == pytest.approx(
+        float(window_returns.std() * math.sqrt(252))
+    )
 
 
 def test_correlation_matrix_during_scenario():
@@ -125,6 +157,21 @@ def test_correlation_matrix_during_scenario():
             assert corr[a][b] == pytest.approx(corr[b][a], abs=1e-6)
 
 
+def test_correlation_matrix_zero_variance_is_finite_with_unit_diagonal():
+    idx = pd.date_range("2020-01-01", periods=6, freq="B")
+    assets = pd.DataFrame({"AAA": [100.0] * 6, "BBB": [50.0] * 6}, index=idx)
+    bench = pd.Series([100.0] * 6, index=idx, name="SPY")
+    scn = [{"name": "Flat", "start_date": date_str(assets, 0), "end_date": date_str(assets, 5)}]
+
+    s = stress_test(assets, bench, equal_weights(list(assets.columns)), scn)["scenarios"][0]
+    for a in assets.columns:
+        assert s["correlation_matrix"][a][a] == pytest.approx(1.0)
+        for b in assets.columns:
+            assert math.isfinite(s["correlation_matrix"][a][b])
+            if a != b:
+                assert s["correlation_matrix"][a][b] == pytest.approx(0.0)
+
+
 def test_custom_weights_respected():
     prices = make_prices(300)
     assets, bench = split(prices)
@@ -135,7 +182,7 @@ def test_custom_weights_respected():
     s = stress_test(assets, bench, w, scn)["scenarios"][0]
 
     asset_ret = assets[tickers[0]].pct_change(fill_method=None)
-    factor = float(np.prod(1.0 + asset_ret.iloc[50:121].to_numpy()))
+    factor = float(np.prod(1.0 + asset_ret.iloc[51:121].to_numpy()))
     assert s["total_return"] == pytest.approx(factor - 1.0, abs=1e-9)
 
 
@@ -150,6 +197,37 @@ def test_scenario_outside_data_raises():
     scn = [{"name": "Way Future", "start_date": "2030-01-01", "end_date": "2030-06-01"}]
     with pytest.raises(ValueError, match="does not overlap"):
         stress_test(assets, bench, equal_weights(list(assets.columns)), scn)
+
+
+def test_scenario_with_only_one_trading_day_raises():
+    prices = make_prices(20)
+    assets, bench = split(prices)
+    scn = [{"name": "One day", "start_date": date_str(prices, 5), "end_date": date_str(prices, 5)}]
+    with pytest.raises(ValueError, match="too short"):
+        stress_test(assets, bench, equal_weights(list(assets.columns)), scn)
+
+
+def test_invalid_weights_raise_clear_errors():
+    prices = make_prices(40)
+    assets, bench = split(prices)
+    scn = [{"name": "W", "start_date": date_str(prices, 5), "end_date": date_str(prices, 10)}]
+
+    with pytest.raises(ValueError, match="exactly"):
+        stress_test(assets, bench, {"AAA": 1.0}, scn)
+    with pytest.raises(ValueError, match="non-negative"):
+        stress_test(assets, bench, {"AAA": 1.2, "BBB": -0.2, "CCC": 0.0}, scn)
+    with pytest.raises(ValueError, match="sum to 1"):
+        stress_test(assets, bench, {"AAA": 0.2, "BBB": 0.2, "CCC": 0.2}, scn)
+
+
+def test_benchmark_must_align_with_prices():
+    prices = make_prices(40)
+    assets, bench = split(prices)
+    shifted_bench = bench.copy()
+    shifted_bench.index = shifted_bench.index + pd.Timedelta(days=1)
+    scn = [{"name": "W", "start_date": date_str(prices, 5), "end_date": date_str(prices, 10)}]
+    with pytest.raises(ValueError, match="same index"):
+        stress_test(assets, shifted_bench, equal_weights(list(assets.columns)), scn)
 
 
 def test_multiple_scenarios():
