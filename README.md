@@ -120,7 +120,19 @@ The **Portfolio Backtest** workspace runs a simple equal-weight, long-only, full
 
 Rebalancing isn't free: the cost is **turnover-based** — `turnover = Σ|target_weightᵢ − driftedᵢ|` and `cost = equity × turnover × bps/10000`, deducted on the rebalance day. All assets are aligned to their common trading days (dates where any asset is missing are dropped); the benchmark is SPY buy-and-hold when available (in the basket or fetched separately), otherwise the first ticker as a documented fallback. The response includes metrics, the equity curve vs. benchmark, drawdown, per-day weights, and a rebalance-events log.
 
-> This is **not portfolio optimization** — there is no mean-variance/risk-parity weighting, no shorting, and no leverage yet. It is a transparent equal-weight baseline.
+> The equal-weight backtest is a transparent baseline. For weight optimization, see below.
+
+### Portfolio Optimization
+
+The Portfolio workspace also includes an **Optimization** tab (`POST /portfolio/optimize`) that solves for **long-only** weights (each `wᵢ ≥ 0`, `Σw = 1` — no shorting, no leverage) under one of three objectives:
+
+- **Equal Weight** — `wᵢ = 1/N` (baseline).
+- **Minimum Volatility** — minimise `√(wᵀ Σ w)` (portfolio variance).
+- **Maximum Sharpe** — maximise `(wᵀμ − r_f) / √(wᵀ Σ w)`.
+
+Expected returns and the covariance matrix are estimated from daily returns and annualised with 252 trading days; the constrained problem is solved with SciPy's SLSQP. The optimized weights are backtested buy-and-hold over the period and compared against the equal-weight portfolio (metrics, equity curve, drawdown).
+
+> ⚠️ **In-sample caveat.** v1 optimizes weights on the **same** historical window it then backtests. This is in-sample optimization: it will look good by construction, can badly overfit, and **does not predict future performance**. There is no rolling/out-of-sample optimization yet. **Not investment advice.**
 
 #### Strategy Template Gallery
 

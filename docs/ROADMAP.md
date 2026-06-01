@@ -146,6 +146,23 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   `compute_metrics`; full unit + API test coverage
 - **Not** portfolio optimization — no optimisation, shorting, or leverage yet
 
+### Phase 7 — Portfolio Optimization v1 ✅
+
+- `POST /portfolio/optimize` — long-only (`wᵢ ≥ 0`, `Σw = 1`) weight
+  optimization over historical returns
+- Objectives: equal_weight, **min_volatility** (minimise `wᵀΣw`), **max_sharpe**
+  (maximise `(wᵀμ − r_f)/√(wᵀΣw)`); solved with **SciPy SLSQP** (added `scipy`
+  to requirements)
+- Annualised expected returns + covariance (252-day); optimized weights are
+  backtested buy-and-hold and compared to equal weight (metrics, equity,
+  drawdown)
+- Portfolio workspace gains an **Optimization** tab alongside the equal-weight
+  backtest; both share the dark UI
+- **In-sample only** — optimized and backtested on the same window; explicit
+  overfitting warning in the API response and UI. Not investment advice.
+- Full optimizer unit tests (constraints, min-vol/max-sharpe behaviour) + API
+  tests
+
 ---
 
 ## Future Phases

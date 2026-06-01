@@ -1629,3 +1629,121 @@ class PortfolioBacktestResponse(BaseModel):
     drawdown: List[PortfolioDrawdownPoint]
     weights: List[PortfolioWeightPoint]
     rebalance_events: List[PortfolioRebalanceEvent]
+
+
+# ===========================================================================
+# Portfolio Optimization (v1) — in-sample, long-only
+# ===========================================================================
+#
+# Weights are optimised on the FULL requested history and then backtested on
+# that SAME period.  This is in-sample optimisation and can overfit — it does
+# not predict future performance.
+
+PortfolioObjective = Literal["equal_weight", "min_volatility", "max_sharpe"]
+
+
+class PortfolioOptimizeRequest(BaseModel):
+    """Request body for POST /portfolio/optimize."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tickers: List[str] = Field(
+        min_length=1, max_length=20, description="1–20 Yahoo Finance tickers."
+    )
+    start_date: str = Field(default="2015-01-01", description="Start date (YYYY-MM-DD).")
+    end_date: str = Field(default="2023-12-31", description="End date (YYYY-MM-DD).")
+    initial_capital: float = Field(default=100_000.0, gt=0)
+    risk_free_rate: float = Field(
+        default=0.02,
+        ge=0.0,
+        le=1.0,
+        description="Annual risk-free rate (decimal) used in the Sharpe objective.",
+    )
+    transaction_cost_bps: float = Field(default=10.0, ge=0.0, lt=10_000.0)
+    objective: PortfolioObjective = Field(
+        default="max_sharpe",
+        description="equal_weight / min_volatility / max_sharpe.",
+    )
+
+    @field_validator("tickers")
+    @classmethod
+    def _clean_tickers(cls, value: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        seen: set[str] = set()
+        for raw in value:
+            sym = raw.strip().upper()
+            if not sym:
+                raise ValueError("ticker symbols must not be empty.")
+            if sym in seen:
+                raise ValueError(f"duplicate ticker after uppercasing: {sym}.")
+            seen.add(sym)
+            cleaned.append(sym)
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_dates(self) -> "PortfolioOptimizeRequest":
+        import re
+
+        for name, val in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, val):
+                raise ValueError(f"{name} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be strictly before end_date.")
+        return self
+
+
+class PortfolioOptEquityPoint(BaseModel):
+    """One daily value on an optimized/equal-weight equity curve."""
+
+    date: str
+    value: float
+
+
+class PortfolioOptDrawdownPoint(BaseModel):
+    """Daily drawdown (fraction ≤ 0) for optimized portfolio + equal weight."""
+
+    date: str
+    portfolio: float
+    equal_weight: float
+
+
+class PortfolioOptimizeResponse(BaseModel):
+    """Full response for POST /portfolio/optimize."""
+
+    tickers: List[str]
+    objective: PortfolioObjective
+    start_date: str
+    end_date: str
+    initial_capital: float
+    risk_free_rate: float
+    transaction_cost_bps: float
+
+    weights: Dict[str, float] = Field(description="Optimized long-only weights (sum ≈ 1).")
+    expected_returns: Dict[str, float] = Field(
+        description="Annualised expected return per asset."
+    )
+    covariance_matrix: Dict[str, Dict[str, float]] = Field(
+        description="Annualised covariance matrix (nested by ticker)."
+    )
+
+    portfolio_expected_return: float = Field(description="Annualised expected return of the optimized weights.")
+    portfolio_volatility: float = Field(description="Annualised volatility of the optimized weights.")
+    portfolio_sharpe: float = Field(description="Annualised Sharpe ratio of the optimized weights.")
+
+    metrics: PerformanceMetrics = Field(description="Backtested optimized-portfolio metrics (in-sample).")
+    equal_weight_metrics: PerformanceMetrics = Field(description="Backtested equal-weight metrics for comparison.")
+
+    equity_curve: List[PortfolioOptEquityPoint] = Field(description="Optimized buy-and-hold equity curve.")
+    equal_weight_equity_curve: List[PortfolioOptEquityPoint] = Field(
+        description="Equal-weight buy-and-hold equity curve over the same dates."
+    )
+    drawdown: List[PortfolioOptDrawdownPoint]
+
+    in_sample_warning: str = Field(
+        default=(
+            "Weights were optimized and backtested on the same historical "
+            "period (in-sample). This can overfit and does not predict future "
+            "performance. Not investment advice."
+        ),
+        description="Explicit in-sample / overfitting caveat.",
+    )

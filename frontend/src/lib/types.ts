@@ -540,6 +540,58 @@ export interface PortfolioBacktestResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Portfolio Optimization (in-sample, long-only)
+// ---------------------------------------------------------------------------
+
+export type PortfolioObjective =
+  | "equal_weight"
+  | "min_volatility"
+  | "max_sharpe";
+
+export interface PortfolioOptimizeRequest {
+  tickers: string[];
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  risk_free_rate: number;
+  transaction_cost_bps: number;
+  objective: PortfolioObjective;
+}
+
+export interface PortfolioOptEquityPoint {
+  date: string;
+  value: number;
+}
+
+export interface PortfolioOptDrawdownPoint {
+  date: string;
+  portfolio: number;
+  equal_weight: number;
+}
+
+export interface PortfolioOptimizeResponse {
+  tickers: string[];
+  objective: PortfolioObjective;
+  start_date: string;
+  end_date: string;
+  initial_capital: number;
+  risk_free_rate: number;
+  transaction_cost_bps: number;
+  weights: Record<string, number>;
+  expected_returns: Record<string, number>;
+  covariance_matrix: Record<string, Record<string, number>>;
+  portfolio_expected_return: number;
+  portfolio_volatility: number;
+  portfolio_sharpe: number;
+  metrics: PerformanceMetrics;
+  equal_weight_metrics: PerformanceMetrics;
+  equity_curve: PortfolioOptEquityPoint[];
+  equal_weight_equity_curve: PortfolioOptEquityPoint[];
+  drawdown: PortfolioOptDrawdownPoint[];
+  in_sample_warning: string;
+}
+
+// ---------------------------------------------------------------------------
 // Saved Custom Strategy Templates (reusable rule definitions, not results)
 // ---------------------------------------------------------------------------
 

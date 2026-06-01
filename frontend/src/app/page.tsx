@@ -13,7 +13,7 @@ import SmaWalkForwardPanel from "@/components/SmaWalkForwardPanel";
 import StrategyComparisonPanel from "@/components/StrategyComparisonPanel";
 import CsvBacktestPanel from "@/components/CsvBacktestPanel";
 import StrategyBuilderPanel from "@/components/StrategyBuilderPanel";
-import PortfolioBacktestPanel from "@/components/PortfolioBacktestPanel";
+import PortfolioWorkspace from "@/components/PortfolioWorkspace";
 import SaveBacktestModal from "@/components/SaveBacktestModal";
 import SavedBacktestsList from "@/components/SavedBacktestsList";
 import SavedBacktestDetail from "@/components/SavedBacktestDetail";
@@ -556,14 +556,13 @@ export default function HomePage() {
         {/* ── Portfolio Backtest ───────────────────────────────────────── */}
         {view === "portfolio" && (
           <>
-            <SectionIntro title="Multi-Asset Portfolio Backtest">
-              Backtest a simple equal-weight, long-only, fully-invested
-              portfolio across several assets. Choose a rebalance cadence (none,
-              monthly, quarterly, or yearly); rebalancing costs are charged on
-              turnover. This is not portfolio optimization — every asset targets
-              an equal 1/N weight.
+            <SectionIntro title="Multi-Asset Portfolio">
+              Backtest an equal-weight, long-only portfolio with optional
+              rebalancing, or optimize long-only weights (minimum volatility or
+              maximum Sharpe) over a historical window. Optimization is
+              in-sample and can overfit — it is not investment advice.
             </SectionIntro>
-            <PortfolioBacktestPanel />
+            <PortfolioWorkspace />
           </>
         )}
 

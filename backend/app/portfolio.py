@@ -13,9 +13,13 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Dict, List
 
+import numpy as np
 import pandas as pd
+from scipy.optimize import minimize
 
 REBALANCE_FREQUENCIES = ("none", "monthly", "quarterly", "yearly")
+OPTIMIZATION_OBJECTIVES = ("equal_weight", "min_volatility", "max_sharpe")
+TRADING_DAYS_PER_YEAR = 252
 
 
 def _date_str(ts) -> str:
@@ -170,3 +174,116 @@ def run_equal_weight_portfolio(
     return PortfolioResult(
         equity=equity, weights=weights, rebalance_events=rebalance_events
     )
+
+
+# ===========================================================================
+# Portfolio optimization (v1, in-sample, long-only)
+# ===========================================================================
+
+
+def annualized_stats(prices: pd.DataFrame):
+    """
+    Compute annualised expected returns and the annualised covariance matrix
+    from daily simple returns.
+
+    Returns
+    -------
+    (expected_returns, covariance) : (pd.Series, pd.DataFrame)
+        Both annualised with a 252-trading-day convention.
+    """
+    daily = prices.pct_change().dropna(how="any")
+    if len(daily) < 2:
+        raise ValueError(
+            "Need at least 2 daily returns (3 common dates) to estimate "
+            "covariance."
+        )
+    expected_returns = daily.mean() * TRADING_DAYS_PER_YEAR
+    covariance = daily.cov() * TRADING_DAYS_PER_YEAR
+    return expected_returns, covariance
+
+
+def portfolio_stats(weights: Dict[str, float], expected_returns: pd.Series, covariance: pd.DataFrame, risk_free_rate: float = 0.0):
+    """Return (annual_return, annual_volatility, sharpe) for a weight vector."""
+    tickers = list(expected_returns.index)
+    w = np.array([weights[t] for t in tickers], dtype=float)
+    mu = expected_returns.to_numpy()
+    sigma = covariance.to_numpy()
+    annual_return = float(w @ mu)
+    annual_vol = float(np.sqrt(max(w @ sigma @ w, 0.0)))
+    sharpe = (annual_return - risk_free_rate) / annual_vol if annual_vol > 1e-12 else 0.0
+    return annual_return, annual_vol, float(sharpe)
+
+
+def optimize_weights(
+    expected_returns: pd.Series,
+    covariance: pd.DataFrame,
+    objective: str,
+    risk_free_rate: float = 0.0,
+) -> Dict[str, float]:
+    """
+    Solve for long-only weights (w_i >= 0, sum(w) = 1) under one objective.
+
+    * ``equal_weight``    — 1/N (closed form).
+    * ``min_volatility``  — minimise w'Σw (convex QP on the simplex).
+    * ``max_sharpe``      — maximise (w'μ − rf) / sqrt(w'Σw).
+
+    Uses SLSQP from an equal-weight start.  Tiny negative artefacts are clipped
+    and the result is renormalised to sum to exactly 1.
+    """
+    if objective not in OPTIMIZATION_OBJECTIVES:
+        raise ValueError(f"Unsupported objective: {objective!r}.")
+
+    tickers = list(expected_returns.index)
+    n = len(tickers)
+    mu = expected_returns.to_numpy()
+    sigma = covariance.to_numpy()
+
+    # Equal weight (and the trivial single-asset case) is closed-form.
+    if objective == "equal_weight" or n == 1:
+        return {t: 1.0 / n for t in tickers}
+
+    x0 = np.full(n, 1.0 / n)
+    bounds = [(0.0, 1.0)] * n
+    constraints = ({"type": "eq", "fun": lambda w: float(np.sum(w) - 1.0)},)
+
+    if objective == "min_volatility":
+        def cost(w):
+            return float(w @ sigma @ w)  # variance is monotonic in volatility
+    else:  # max_sharpe → minimise the negative Sharpe ratio
+        def cost(w):
+            vol = float(np.sqrt(max(w @ sigma @ w, 0.0)))
+            if vol <= 1e-12:
+                return 1e6
+            return -((w @ mu - risk_free_rate) / vol)
+
+    result = minimize(
+        cost,
+        x0,
+        method="SLSQP",
+        bounds=bounds,
+        constraints=constraints,
+        options={"maxiter": 1000, "ftol": 1e-10},
+    )
+
+    w = np.clip(np.asarray(result.x, dtype=float), 0.0, None)
+    total = w.sum()
+    w = w / total if total > 1e-12 else np.full(n, 1.0 / n)
+    # Full precision so the weights sum to 1 (rounding for display happens at
+    # the API serialization boundary).
+    return {t: float(wi) for t, wi in zip(tickers, w)}
+
+
+def buy_and_hold_equity(
+    prices: pd.DataFrame, weights: Dict[str, float], initial_capital: float
+) -> pd.Series:
+    """
+    Buy-and-hold equity curve for a fixed starting weight vector.
+
+    Capital is allocated to the target weights on day 0 and then left to drift
+    (no rebalancing).  ``equity[0] == initial_capital`` because the weights sum
+    to 1.
+    """
+    w = np.array([weights[t] for t in prices.columns], dtype=float)
+    normalized = prices.to_numpy() / prices.to_numpy()[0]
+    equity = initial_capital * (normalized @ w)
+    return pd.Series(equity, index=prices.index, name="portfolio")

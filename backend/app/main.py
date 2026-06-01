@@ -11,6 +11,7 @@ POST /backtest/momentum                 — run a time-series momentum backtest
 POST /backtest/volatility-breakout      — run a volatility breakout backtest
 POST /backtest/pairs                    — run a pairs trading backtest
 POST /portfolio/backtest                — equal-weight multi-asset portfolio backtest
+POST /portfolio/optimize                — optimize portfolio weights (min-vol / max-Sharpe)
 POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
 POST /backtest/custom                   — run a no-code custom rule-based strategy
 POST /custom-strategies                 — save a reusable custom strategy template
@@ -49,7 +50,11 @@ from app.data import fetch_ohlcv, fetch_pairs_close
 from app.db import init_db
 from app.portfolio import (
     align_prices,
+    annualized_stats,
+    buy_and_hold_equity,
     drawdown_series,
+    optimize_weights,
+    portfolio_stats,
     run_equal_weight_portfolio,
 )
 from app.strategy_gallery import get_gallery_template, list_gallery
@@ -78,6 +83,10 @@ from app.schemas import (
     PortfolioBacktestResponse,
     PortfolioDrawdownPoint,
     PortfolioEquityPoint,
+    PortfolioOptDrawdownPoint,
+    PortfolioOptEquityPoint,
+    PortfolioOptimizeRequest,
+    PortfolioOptimizeResponse,
     PortfolioRebalanceEvent,
     PortfolioWeightPoint,
     MomentumBacktestRequest,
@@ -832,6 +841,110 @@ def portfolio_backtest(request: PortfolioBacktestRequest) -> PortfolioBacktestRe
         drawdown=drawdown,
         weights=[PortfolioWeightPoint(**w) for w in result.weights],
         rebalance_events=[PortfolioRebalanceEvent(**e) for e in result.rebalance_events],
+    )
+
+
+@app.post(
+    "/portfolio/optimize",
+    response_model=PortfolioOptimizeResponse,
+    tags=["portfolio"],
+    summary="Optimize long-only portfolio weights (in-sample)",
+    description=(
+        "Optimize long-only, fully-invested weights (w_i >= 0, sum = 1) across "
+        "the requested assets using historical returns, then backtest the "
+        "optimized buy-and-hold portfolio against an equal-weight benchmark "
+        "over the same period.\n\n"
+        "Objectives: equal_weight, min_volatility (minimise w'Σw), max_sharpe "
+        "(maximise (w'μ − rf)/√(w'Σw)).  Annualised with 252 trading days.\n\n"
+        "**In-sample caveat:** weights are optimized AND backtested on the same "
+        "date range.  This can overfit and does not predict future performance. "
+        "Not investment advice."
+    ),
+)
+def portfolio_optimize(request: PortfolioOptimizeRequest) -> PortfolioOptimizeResponse:
+    tickers = request.tickers  # cleaned/uppercased/deduped by the schema
+
+    frames = {}
+    for ticker in tickers:
+        df = _fetch(ticker, request.start_date, request.end_date)
+        frames[ticker] = df["Close"]
+
+    prices = align_prices(frames)
+    if len(prices) < 3:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(prices)} common trading day(s) across "
+                f"{', '.join(tickers)}; need at least 3 to estimate returns and "
+                "covariance.  Try a wider date range or assets with overlapping "
+                "history."
+            ),
+        )
+
+    expected_returns, covariance = annualized_stats(prices)
+
+    weights = optimize_weights(
+        expected_returns,
+        covariance,
+        objective=request.objective,
+        risk_free_rate=request.risk_free_rate,
+    )
+    equal_weights = {t: 1.0 / len(tickers) for t in tickers}
+
+    # In-sample buy-and-hold backtests over the same period.
+    optimized_equity = buy_and_hold_equity(prices, weights, request.initial_capital)
+    equal_equity = buy_and_hold_equity(prices, equal_weights, request.initial_capital)
+
+    opt_ret, opt_vol, opt_sharpe = portfolio_stats(
+        weights, expected_returns, covariance, risk_free_rate=request.risk_free_rate
+    )
+
+    opt_dd = drawdown_series(optimized_equity)
+    eq_dd = drawdown_series(equal_equity)
+
+    def _d(ts) -> str:
+        return str(ts.date()) if hasattr(ts, "date") else str(ts)
+
+    equity_curve = [
+        PortfolioOptEquityPoint(date=_d(d), value=round(float(v), 2))
+        for d, v in zip(optimized_equity.index, optimized_equity)
+    ]
+    equal_weight_equity_curve = [
+        PortfolioOptEquityPoint(date=_d(d), value=round(float(v), 2))
+        for d, v in zip(equal_equity.index, equal_equity)
+    ]
+    drawdown = [
+        PortfolioOptDrawdownPoint(
+            date=_d(d), portfolio=round(float(p), 6), equal_weight=round(float(e), 6)
+        )
+        for d, p, e in zip(opt_dd.index, opt_dd, eq_dd)
+    ]
+
+    expected_returns_dict = {t: round(float(expected_returns[t]), 6) for t in tickers}
+    covariance_dict = {
+        ti: {tj: round(float(covariance.loc[ti, tj]), 8) for tj in tickers}
+        for ti in tickers
+    }
+
+    return PortfolioOptimizeResponse(
+        tickers=tickers,
+        objective=request.objective,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        initial_capital=request.initial_capital,
+        risk_free_rate=request.risk_free_rate,
+        transaction_cost_bps=request.transaction_cost_bps,
+        weights=weights,
+        expected_returns=expected_returns_dict,
+        covariance_matrix=covariance_dict,
+        portfolio_expected_return=round(opt_ret, 6),
+        portfolio_volatility=round(opt_vol, 6),
+        portfolio_sharpe=round(opt_sharpe, 4),
+        metrics=PerformanceMetrics(**compute_metrics(optimized_equity)),
+        equal_weight_metrics=PerformanceMetrics(**compute_metrics(equal_equity)),
+        equity_curve=equity_curve,
+        equal_weight_equity_curve=equal_weight_equity_curve,
+        drawdown=drawdown,
     )
 
 

@@ -20,6 +20,8 @@ import type {
   PairsBacktestRequest,
   PortfolioBacktestRequest,
   PortfolioBacktestResponse,
+  PortfolioOptimizeRequest,
+  PortfolioOptimizeResponse,
   RsiBacktestRequest,
   SavedBacktestCreate,
   SavedBacktestFull,
@@ -368,6 +370,36 @@ export async function runPortfolioBacktest(
   }
 
   return res.json() as Promise<PortfolioBacktestResponse>;
+}
+
+/** POST /api/portfolio/optimize — long-only weight optimization (in-sample) */
+export async function runPortfolioOptimize(
+  params: PortfolioOptimizeRequest,
+): Promise<PortfolioOptimizeResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/portfolio/optimize", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(params),
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+
+  if (!res.ok) {
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
+    try {
+      const body = await res.json();
+      message = formatBackendDetail(body?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+
+  return res.json() as Promise<PortfolioOptimizeResponse>;
 }
 
 export async function checkHealth(): Promise<boolean> {
