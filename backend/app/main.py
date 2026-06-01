@@ -14,6 +14,7 @@ POST /portfolio/backtest                — equal-weight multi-asset portfolio b
 POST /portfolio/optimize                — optimize portfolio weights (min-vol / max-Sharpe)
 POST /portfolio/walk-forward-optimize   — rolling out-of-sample portfolio optimization
 POST /portfolio/efficient-frontier      — risk-return space of long-only portfolios
+POST /portfolio/risk-dashboard          — asset/portfolio risk diagnostics
 POST /backtest/csv                      — run a single-asset backtest on an uploaded CSV
 POST /backtest/custom                   — run a no-code custom rule-based strategy
 POST /custom-strategies                 — save a reusable custom strategy template
@@ -60,6 +61,7 @@ from app.portfolio import (
     portfolio_point,
     portfolio_stats,
     random_portfolios,
+    risk_dashboard,
     run_equal_weight_portfolio,
     run_walk_forward_optimization,
 )
@@ -103,6 +105,10 @@ from app.schemas import (
     PortfolioWalkForwardWindow,
     PortfolioWeightPoint,
     PortfolioWeightStability,
+    CorrelationDiagnostics,
+    EqualWeightRiskSummary,
+    RiskDashboardRequest,
+    RiskDashboardResponse,
     MomentumBacktestRequest,
     PairsBacktestRequest,
     PerformanceMetrics,
@@ -1173,6 +1179,75 @@ def portfolio_efficient_frontier(
             )
             for p in frontier
         ],
+    )
+
+
+@app.post(
+    "/portfolio/risk-dashboard",
+    response_model=RiskDashboardResponse,
+    tags=["portfolio"],
+    summary="Portfolio risk dashboard — correlations, diversification, risk contribution",
+    description=(
+        "Compute asset- and portfolio-level risk diagnostics from historical "
+        "daily returns (252-day annualisation): per-asset annual return and "
+        "volatility, the correlation and covariance matrices, equal-weight "
+        "portfolio return/volatility and diversification ratio, correlation "
+        "diagnostics (average / most / least correlated pairs), and the "
+        "equal-weight percent risk contribution per asset.\n\n"
+        "All statistics are historical estimates and may not persist "
+        "out-of-sample.  Not investment advice."
+    ),
+)
+def portfolio_risk_dashboard(request: RiskDashboardRequest) -> RiskDashboardResponse:
+    tickers = request.tickers  # cleaned/uppercased/deduped by the schema
+
+    frames = {}
+    for ticker in tickers:
+        df = _fetch(ticker, request.start_date, request.end_date)
+        frames[ticker] = df["Close"]
+
+    prices = align_prices(frames)
+    if len(prices) < 3:
+        raise HTTPException(
+            status_code=422,
+            detail=(
+                f"Only {len(prices)} common trading day(s) across "
+                f"{', '.join(tickers)}; need at least 3 to estimate risk "
+                "statistics.  Try a wider date range or assets with overlapping "
+                "history."
+            ),
+        )
+
+    try:
+        d = risk_dashboard(prices)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    def _round_matrix(m: dict, ndigits: int) -> dict:
+        return {ti: {tj: round(v, ndigits) for tj, v in row.items()} for ti, row in m.items()}
+
+    return RiskDashboardResponse(
+        tickers=tickers,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        asset_annual_returns={t: round(v, 6) for t, v in d["asset_annual_returns"].items()},
+        asset_annual_volatilities={t: round(v, 6) for t, v in d["asset_annual_volatilities"].items()},
+        correlation_matrix=_round_matrix(d["correlation_matrix"], 6),
+        covariance_matrix=_round_matrix(d["covariance_matrix"], 8),
+        equal_weight_portfolio=EqualWeightRiskSummary(
+            expected_return=round(d["equal_weight_portfolio"]["expected_return"], 6),
+            volatility=round(d["equal_weight_portfolio"]["volatility"], 6),
+            diversification_ratio=round(d["equal_weight_portfolio"]["diversification_ratio"], 4),
+            weights={t: round(v, 6) for t, v in d["equal_weight_portfolio"]["weights"].items()},
+        ),
+        correlation_diagnostics=CorrelationDiagnostics(
+            average_pairwise_correlation=round(d["correlation_diagnostics"]["average_pairwise_correlation"], 6),
+            max_pairwise_correlation=round(d["correlation_diagnostics"]["max_pairwise_correlation"], 6),
+            min_pairwise_correlation=round(d["correlation_diagnostics"]["min_pairwise_correlation"], 6),
+            most_correlated_pair=d["correlation_diagnostics"]["most_correlated_pair"],
+            least_correlated_pair=d["correlation_diagnostics"]["least_correlated_pair"],
+        ),
+        risk_contribution={t: round(v, 6) for t, v in d["risk_contribution"].items()},
     )
 
 

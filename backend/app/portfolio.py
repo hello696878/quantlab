@@ -726,3 +726,118 @@ def efficient_frontier_points(
 
     points.sort(key=lambda p: p["volatility"])
     return points
+
+
+# ===========================================================================
+# Portfolio risk dashboard (asset- and portfolio-level diagnostics)
+# ===========================================================================
+
+
+def risk_dashboard(prices: pd.DataFrame) -> dict:
+    """
+    Compute asset- and portfolio-level risk diagnostics from a price frame.
+
+    Returns a dict with annualised per-asset returns/volatilities, the
+    correlation and (annualised) covariance matrices, equal-weight portfolio
+    risk, correlation diagnostics, and the equal-weight percent risk
+    contributions.  All annualisation uses 252 trading days.
+
+    Raises ``ValueError`` for an invalid / too-short price frame.
+    """
+    _validate_price_frame(prices)
+    tickers = list(prices.columns)
+    n = len(tickers)
+
+    daily = prices.pct_change(fill_method=None).dropna(how="any")
+    if len(daily) < 2:
+        raise ValueError(
+            "Need at least 2 daily returns (3 common dates) to estimate risk "
+            "statistics."
+        )
+    if not np.isfinite(daily.to_numpy(dtype=float)).all():
+        raise ValueError("daily returns must be finite.")
+
+    annual_returns = daily.mean() * TRADING_DAYS_PER_YEAR
+    annual_vols = daily.std() * np.sqrt(TRADING_DAYS_PER_YEAR)
+    correlation = daily.corr()
+    covariance = daily.cov() * TRADING_DAYS_PER_YEAR
+
+    # ── Equal-weight portfolio risk ──────────────────────────────────────
+    w = np.full(n, 1.0 / n)
+    sigma = covariance.to_numpy(dtype=float)
+    vols_vec = annual_vols.to_numpy(dtype=float)
+
+    port_return = float(w @ annual_returns.to_numpy(dtype=float))
+    port_var = float(w @ sigma @ w)
+    port_vol = float(np.sqrt(max(port_var, 0.0)))
+
+    weighted_avg_vol = float(w @ vols_vec)
+    diversification_ratio = (
+        weighted_avg_vol / port_vol if port_vol > _MIN_VOL else 0.0
+    )
+
+    # ── Risk contribution (equal weight) ─────────────────────────────────
+    if port_vol > _MIN_VOL:
+        marginal = sigma @ w / port_vol          # ∂σ_p/∂w_i
+        component = w * marginal                  # component risk (sums to σ_p)
+        percent = component / port_vol            # fraction of total risk (sums to 1)
+        risk_contribution = {
+            t: float(percent[i]) for i, t in enumerate(tickers)
+        }
+    else:
+        risk_contribution = {t: float(w[i]) for i, t in enumerate(tickers)}
+
+    # ── Correlation diagnostics (off-diagonal pairs) ─────────────────────
+    diagnostics: dict = {
+        "average_pairwise_correlation": 0.0,
+        "max_pairwise_correlation": 0.0,
+        "min_pairwise_correlation": 0.0,
+        "most_correlated_pair": None,
+        "least_correlated_pair": None,
+    }
+    if n >= 2:
+        corr = correlation.to_numpy(dtype=float)
+        pair_values: List[float] = []
+        most_pair = (tickers[0], tickers[1])
+        least_pair = (tickers[0], tickers[1])
+        most_val = -np.inf
+        least_val = np.inf
+        for i in range(n):
+            for j in range(i + 1, n):
+                c = float(corr[i, j])
+                pair_values.append(c)
+                if c > most_val:
+                    most_val = c
+                    most_pair = (tickers[i], tickers[j])
+                if c < least_val:
+                    least_val = c
+                    least_pair = (tickers[i], tickers[j])
+        diagnostics = {
+            "average_pairwise_correlation": float(np.mean(pair_values)),
+            "max_pairwise_correlation": most_val,
+            "min_pairwise_correlation": least_val,
+            "most_correlated_pair": [most_pair[0], most_pair[1]],
+            "least_correlated_pair": [least_pair[0], least_pair[1]],
+        }
+
+    return {
+        "tickers": tickers,
+        "asset_annual_returns": {t: float(annual_returns[t]) for t in tickers},
+        "asset_annual_volatilities": {t: float(annual_vols[t]) for t in tickers},
+        "correlation_matrix": {
+            ti: {tj: float(correlation.loc[ti, tj]) for tj in tickers}
+            for ti in tickers
+        },
+        "covariance_matrix": {
+            ti: {tj: float(covariance.loc[ti, tj]) for tj in tickers}
+            for ti in tickers
+        },
+        "equal_weight_portfolio": {
+            "expected_return": port_return,
+            "volatility": port_vol,
+            "diversification_ratio": float(diversification_ratio),
+            "weights": {t: float(w[i]) for i, t in enumerate(tickers)},
+        },
+        "correlation_diagnostics": diagnostics,
+        "risk_contribution": risk_contribution,
+    }

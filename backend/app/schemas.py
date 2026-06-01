@@ -1973,3 +1973,99 @@ class EfficientFrontierResponse(BaseModel):
         ),
         description="Historical / in-sample caveat.",
     )
+
+
+# ===========================================================================
+# Portfolio Risk Dashboard
+# ===========================================================================
+#
+# Asset- and portfolio-level risk diagnostics estimated from historical daily
+# returns (252-day annualisation).  Descriptive only.
+
+
+class RiskDashboardRequest(BaseModel):
+    """Request body for POST /portfolio/risk-dashboard."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    tickers: List[str] = Field(min_length=1, max_length=20)
+    start_date: str = Field(default="2015-01-01", description="Start date (YYYY-MM-DD).")
+    end_date: str = Field(default="2023-12-31", description="End date (YYYY-MM-DD).")
+
+    @field_validator("tickers")
+    @classmethod
+    def _clean_tickers(cls, value: List[str]) -> List[str]:
+        cleaned: List[str] = []
+        seen: set[str] = set()
+        for raw in value:
+            sym = raw.strip().upper()
+            if not sym:
+                raise ValueError("ticker symbols must not be empty.")
+            if sym in seen:
+                raise ValueError(f"duplicate ticker after uppercasing: {sym}.")
+            seen.add(sym)
+            cleaned.append(sym)
+        return cleaned
+
+    @model_validator(mode="after")
+    def _check_dates(self) -> "RiskDashboardRequest":
+        import re
+
+        for name, val in [("start_date", self.start_date), ("end_date", self.end_date)]:
+            if not re.match(_DATE_RE_PATTERN, val):
+                raise ValueError(f"{name} must be in YYYY-MM-DD format.")
+        if self.start_date >= self.end_date:
+            raise ValueError("start_date must be strictly before end_date.")
+        return self
+
+
+class EqualWeightRiskSummary(BaseModel):
+    """Equal-weight portfolio risk summary."""
+
+    expected_return: float
+    volatility: float
+    diversification_ratio: float = Field(
+        description="Weighted-average asset volatility ÷ portfolio volatility (≥ 1 means diversification benefit)."
+    )
+    weights: Dict[str, float]
+
+
+class CorrelationDiagnostics(BaseModel):
+    """Summary statistics over the off-diagonal correlation pairs."""
+
+    average_pairwise_correlation: float
+    max_pairwise_correlation: float
+    min_pairwise_correlation: float
+    most_correlated_pair: Optional[List[str]] = Field(
+        default=None, description="[ticker_a, ticker_b] with the highest correlation."
+    )
+    least_correlated_pair: Optional[List[str]] = Field(
+        default=None, description="[ticker_a, ticker_b] with the lowest correlation."
+    )
+
+
+class RiskDashboardResponse(BaseModel):
+    """Full response for POST /portfolio/risk-dashboard."""
+
+    tickers: List[str]
+    start_date: str
+    end_date: str
+
+    asset_annual_returns: Dict[str, float]
+    asset_annual_volatilities: Dict[str, float]
+    correlation_matrix: Dict[str, Dict[str, float]]
+    covariance_matrix: Dict[str, Dict[str, float]]
+    equal_weight_portfolio: EqualWeightRiskSummary
+    correlation_diagnostics: CorrelationDiagnostics
+    risk_contribution: Dict[str, float] = Field(
+        description="Equal-weight percent risk contribution per asset (≈ sums to 1)."
+    )
+
+    historical_note: str = Field(
+        default=(
+            "All statistics are estimated from historical daily returns over "
+            "the selected window. Correlations, volatilities, and risk "
+            "contributions may not persist out-of-sample. Not investment advice."
+        ),
+        description="Historical-estimate caveat.",
+    )

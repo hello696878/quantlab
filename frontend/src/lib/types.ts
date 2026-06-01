@@ -632,6 +632,45 @@ export interface EfficientFrontierResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Portfolio Risk Dashboard
+// ---------------------------------------------------------------------------
+
+export interface RiskDashboardRequest {
+  tickers: string[];
+  start_date: string;
+  end_date: string;
+}
+
+export interface EqualWeightRiskSummary {
+  expected_return: number;
+  volatility: number;
+  diversification_ratio: number;
+  weights: Record<string, number>;
+}
+
+export interface CorrelationDiagnostics {
+  average_pairwise_correlation: number;
+  max_pairwise_correlation: number;
+  min_pairwise_correlation: number;
+  most_correlated_pair: string[] | null;
+  least_correlated_pair: string[] | null;
+}
+
+export interface RiskDashboardResponse {
+  tickers: string[];
+  start_date: string;
+  end_date: string;
+  asset_annual_returns: Record<string, number>;
+  asset_annual_volatilities: Record<string, number>;
+  correlation_matrix: Record<string, Record<string, number>>;
+  covariance_matrix: Record<string, Record<string, number>>;
+  equal_weight_portfolio: EqualWeightRiskSummary;
+  correlation_diagnostics: CorrelationDiagnostics;
+  risk_contribution: Record<string, number>;
+  historical_note: string;
+}
+
+// ---------------------------------------------------------------------------
 // Walk-Forward Portfolio Optimization
 // ---------------------------------------------------------------------------
 

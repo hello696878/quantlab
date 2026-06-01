@@ -165,6 +165,19 @@ The dashboard renders a Recharts scatter plot — x = volatility, y = expected r
 
 > ⚠️ This is **historical, in-sample** analysis: expected returns and covariance are estimated from the selected window and may not persist. It is descriptive, **not a forecast or investment advice**.
 
+### Portfolio Risk Dashboard
+
+The Portfolio workspace's **Risk Dashboard** tab (`POST /portfolio/risk-dashboard`) reports asset- and portfolio-level risk diagnostics from historical daily returns (252-day annualisation):
+
+- **Per-asset** annualised return and volatility.
+- **Correlation matrix** — `returns.corr()`, rendered as a heatmap (cyan for low/negative, amber→red for high). Correlation measures how assets move together (−1 = opposite, 0 = unrelated, +1 = identical); low correlations are what make diversification work.
+- **Covariance matrix** — `returns.cov() × 252` (collapsible).
+- **Equal-weight portfolio** return, volatility, and **diversification ratio** = weighted-average asset volatility ÷ portfolio volatility. A ratio above 1 means combining the assets reduced risk below the average of their individual risks; higher is better-diversified.
+- **Correlation diagnostics** — average / most-correlated / least-correlated pairs.
+- **Risk contribution** — each asset's share of total portfolio risk for the equal-weight portfolio: marginal contribution `Σw/σ_p`, component `wᵢ·marginalᵢ`, percent `componentᵢ/σ_p` (the percentages sum to ~1). This reveals when one volatile/correlated asset dominates portfolio risk even at equal dollar weight.
+
+> ⚠️ All figures are **historical estimates** — correlations, volatilities, and risk contributions may not persist out-of-sample. Not investment advice.
+
 #### Strategy Template Gallery
 
 The Strategy Builder includes a built-in **gallery** of curated, ready-to-use strategy templates (`GET /custom-strategy-gallery`). Open the **Gallery** from the Strategy Builder, browse the cards (each shows name, description, tags, difficulty, category, and a readable rule summary), then **Load** one into the builder to run it on any ticker/date range, or **Save to My Templates** to keep a local copy. Built-in templates are **static, pre-validated rule objects — not executable code** (no `eval`); they pass through the exact same whitelisted `CustomRule` validation as user-built strategies.

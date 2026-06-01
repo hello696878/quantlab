@@ -197,6 +197,23 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - **Historical, in-sample** — descriptive only, not a forecast or advice
 - Full unit + API test coverage
 
+### Phase 7 — Portfolio Risk Dashboard ✅
+
+- `POST /portfolio/risk-dashboard` — asset/portfolio risk diagnostics from
+  historical daily returns (252-day annualisation)
+- Per-asset annual return + volatility; correlation matrix (`returns.corr()`)
+  and annualised covariance matrix
+- Equal-weight portfolio return/volatility + **diversification ratio**
+  (weighted-avg vol ÷ portfolio vol)
+- Correlation diagnostics: average / most / least correlated pairs
+- **Risk contribution** decomposition for the equal-weight portfolio
+  (marginal `Σw/σ_p`, component `wᵢ·marginalᵢ`, percent — sums to ~1)
+- Portfolio workspace gains a **Risk Dashboard** tab: asset table, correlation
+  heatmap (cyan→amber→red), diagnostic + diversification cards, risk-contribution
+  bars, collapsible covariance table
+- Historical estimates may not persist; not investment advice
+- Full unit + API test coverage
+
 ---
 
 ## Future Phases
