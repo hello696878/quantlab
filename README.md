@@ -63,7 +63,9 @@ Most result views have an **Export Report** button that generates a clean **Mark
 
 Each report includes metadata, an executive summary, parameters/weights, a performance-metrics table, an equity-curve summary (start/end/peak equity, final & worst drawdown), a trades/events summary, and a standard risk/caveats disclaimer. Export is available from the **Backtest**, **Saved Backtest detail**, and the Portfolio **Equal-Weight Backtest**, **Static Optimization**, **Risk Dashboard**, **Stress Test**, and **Factor Analysis** views.
 
-> PDF export and chart images are future work — v1 is Markdown only.
+Alongside the Markdown download, an **Export PDF** button opens a clean, print-friendly preview of the same report. Click **Print / Save as PDF** to produce a PDF through the browser's own print dialog — there is no server-side PDF rendering and no extra dependency. The print view drops the dark app chrome for a white-background, black-text page with readable tables and sensible page breaks.
+
+> The PDF export is browser-based (print to PDF) and is text/table only — embedded chart images are future work.
 
 ### Custom Strategy Builder
 

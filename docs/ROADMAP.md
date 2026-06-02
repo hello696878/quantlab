@@ -259,9 +259,23 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Reports include metadata, executive summary, parameters/weights, a
   performance-metrics table, equity-curve summary (start/end/peak, final +
   worst drawdown), trades/events summary, and a risk/caveats disclaimer
-- Extensible builder design (one builder per analysis type); PDF export and
-  embedded chart images are deferred to future work
+- Extensible builder design (one builder per analysis type); embedded chart
+  images are deferred to future work
 - Frontend-only (`tsc --noEmit` clean); no backend changes
+
+### Phase 8.2 — PDF Research Report Export v1 ✅
+
+- Browser-based **PDF export** — no server-side PDF rendering, no new
+  dependency. The existing Markdown report is the single source of truth
+- `frontend/src/lib/printReport.ts` converts the report Markdown to clean,
+  HTML-escaped, print-friendly HTML (headings, tables, lists, blockquotes)
+- `PrintableReportModal.tsx` portals a white-background preview to `<body>`;
+  **Print / Save as PDF** calls `window.print()`
+- `ExportReportButton.tsx` now renders both **Export Report** (Markdown) and
+  **Export PDF** — so every existing export location gains PDF automatically
+- `@media print` rules in `globals.css` hide the dark app chrome / nav / buttons,
+  force a light page, and add `@page` margins + table/heading page-break control
+- Text/table only (no chart images); frontend-only (`tsc --noEmit` clean)
 
 ---
 
