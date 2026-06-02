@@ -1332,6 +1332,7 @@ export default function StrategyBuilderPanel() {
                 getReport={() =>
                   buildBacktestReport(result, {
                     analysisType: "Custom Strategy Backtest",
+                    sourceType: "custom_strategy",
                     extraParameters: [
                       ["Entry logic", entryLogic === "all" ? "AND" : "OR"],
                       ["Entry rules", entrySummary],

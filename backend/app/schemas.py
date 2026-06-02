@@ -1191,6 +1191,8 @@ class DeleteResponse(BaseModel):
 # DB stay consistent; "manual" covers ad-hoc / hand-written reports.
 SavedReportSourceType = Literal[
     "backtest",
+    "csv_backtest",
+    "custom_strategy",
     "portfolio_backtest",
     "portfolio_optimization",
     "risk_dashboard",
@@ -1254,6 +1256,13 @@ class SavedReportCreate(BaseModel):
             raise ValueError("markdown_content must not be blank.")
         return value
 
+    @field_validator("date_range_start", "date_range_end", mode="before")
+    @classmethod
+    def _blank_date_to_none(cls, value: object) -> object:
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
+
     @model_validator(mode="after")
     def _check_dates(self) -> "SavedReportCreate":
         parsed: dict = {}
@@ -1300,7 +1309,7 @@ class SavedReportSummary(BaseModel):
     updated_at: str = Field(description="ISO-8601 UTC timestamp of last update.")
     title: str
     report_type: str
-    source_type: str
+    source_type: SavedReportSourceType
     source_id: Optional[int] = None
     tickers: List[str] = Field(default_factory=list)
     strategy: Optional[str] = None

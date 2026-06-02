@@ -13,6 +13,8 @@ import PrintableReportModal from "@/components/PrintableReportModal";
 
 const SOURCE_LABELS: Record<string, string> = {
   backtest: "Backtest",
+  csv_backtest: "CSV Backtest",
+  custom_strategy: "Custom Strategy",
   portfolio_backtest: "Portfolio Backtest",
   portfolio_optimization: "Optimization",
   risk_dashboard: "Risk Dashboard",

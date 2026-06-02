@@ -445,6 +445,8 @@ export interface DeleteResponse {
 
 export type SavedReportSourceType =
   | "backtest"
+  | "csv_backtest"
+  | "custom_strategy"
   | "portfolio_backtest"
   | "portfolio_optimization"
   | "risk_dashboard"
@@ -480,7 +482,7 @@ export interface SavedReportSummary {
   updated_at: string;
   title: string;
   report_type: string;
-  source_type: string;
+  source_type: SavedReportSourceType;
   source_id: number | null;
   tickers: string[];
   strategy: string | null;

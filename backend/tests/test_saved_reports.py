@@ -138,6 +138,15 @@ def test_create_defaults_optional_fields(client):
     assert data["notes"] == ""
 
 
+@pytest.mark.parametrize("source_type", ["csv_backtest", "custom_strategy"])
+def test_create_accepts_frontend_report_source_types(client, source_type):
+    """CSV upload and no-code builder reports keep their real source labels."""
+    payload = {**BASE_PAYLOAD, "source_type": source_type}
+    resp = client.post("/saved-reports", json=payload)
+    assert resp.status_code == 200, resp.text
+    assert resp.json()["source_type"] == source_type
+
+
 # ---------------------------------------------------------------------------
 # 3. List
 # ---------------------------------------------------------------------------
@@ -272,6 +281,7 @@ def test_delete_missing_id_returns_404(client):
         ({"report_type": "   "}, "blank report_type"),
         ({"markdown_content": ""}, "empty markdown_content"),
         ({"markdown_content": "   \n  "}, "blank markdown_content"),
+        ({"source_type": ""}, "empty source_type"),
         ({"source_type": "not_a_real_source"}, "invalid source_type"),
         ({"date_range_start": "not-a-date"}, "invalid start date"),
         ({"date_range_end": "not-a-date"}, "invalid end date"),
@@ -297,6 +307,16 @@ def test_one_sided_date_is_allowed(client):
     resp = client.post("/saved-reports", json=payload)
     assert resp.status_code == 200, resp.text
     assert resp.json()["date_range_end"] is None
+
+
+def test_blank_date_fields_are_treated_as_missing(client):
+    """Blank optional date inputs from forms do not persist as fake dates."""
+    payload = {**BASE_PAYLOAD, "date_range_start": "", "date_range_end": "   "}
+    resp = client.post("/saved-reports", json=payload)
+    assert resp.status_code == 200, resp.text
+    data = resp.json()
+    assert data["date_range_start"] is None
+    assert data["date_range_end"] is None
 
 
 # ---------------------------------------------------------------------------

@@ -44,6 +44,7 @@ interface BacktestReportOptions {
   analysisType?: string;
   dataSource?: "yfinance" | "csv";
   extraParameters?: [string, string][];
+  sourceType?: SavedReportSourceType;
 }
 
 // ---------------------------------------------------------------------------
@@ -363,6 +364,8 @@ export function buildBacktestReport(
     r.strategy === "pairs"
       ? [r.pairs_asset_y, r.pairs_asset_x].filter((t): t is string => Boolean(t))
       : splitTickerLabel(r.ticker);
+  const sourceType =
+    options.sourceType ?? (options.dataSource === "csv" ? "csv_backtest" : "backtest");
   const content = [
     header(options.analysisType ?? "Single-Strategy Backtest"),
     `## Metadata\n`,
@@ -400,7 +403,7 @@ export function buildBacktestReport(
     content,
     title: `${r.ticker.toUpperCase()} — ${label}`,
     reportType: "markdown",
-    sourceType: "backtest",
+    sourceType,
     tickers: caveatTickers,
     strategy: r.strategy,
     dateRangeStart: r.start_date,
@@ -414,6 +417,7 @@ export function buildBacktestReport(
       max_drawdown: m.max_drawdown,
       volatility: m.volatility,
       num_trades: r.num_trades,
+      data_source: options.dataSource ?? "yfinance",
     },
   };
 }
