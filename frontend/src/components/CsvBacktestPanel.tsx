@@ -7,6 +7,8 @@ import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
+import ExportReportButton from "@/components/ExportReportButton";
+import { buildBacktestReport } from "@/lib/reportExport";
 
 // ---------------------------------------------------------------------------
 // Strategy + field configuration (single-asset strategies only — no pairs)
@@ -399,6 +401,16 @@ export default function CsvBacktestPanel() {
             <span className="text-xs text-slate-400">
               {resultLabel} · {result.transaction_cost_bps} bps · {result.num_trades}{" "}
               trade events
+            </span>
+            <span className="ml-auto">
+              <ExportReportButton
+                getReport={() =>
+                  buildBacktestReport(result, {
+                    analysisType: "CSV Upload Backtest",
+                    dataSource: "csv",
+                  })
+                }
+              />
             </span>
           </div>
 

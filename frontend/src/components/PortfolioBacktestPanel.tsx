@@ -354,7 +354,7 @@ export default function PortfolioBacktestPanel() {
                     <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-400 border-b border-slate-100">
                       <th className="py-2 pr-4">Date</th>
                       <th className="py-2 pr-4 text-right">Turnover</th>
-                      <th className="py-2 text-right">Cost</th>
+                      <th className="py-2 text-right">Transaction Cost</th>
                     </tr>
                   </thead>
                   <tbody className="mono">

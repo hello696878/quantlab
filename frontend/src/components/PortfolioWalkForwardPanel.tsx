@@ -358,7 +358,7 @@ export default function PortfolioWalkForwardPanel() {
                     <th className="py-2 pr-3 text-right">Test Sharpe</th>
                     <th className="py-2 pr-3 text-right">Test CAGR</th>
                     <th className="py-2 pr-3 text-right">Turnover</th>
-                    <th className="py-2 text-right">Cost</th>
+                    <th className="py-2 text-right">Transaction Cost</th>
                   </tr>
                 </thead>
                 <tbody>

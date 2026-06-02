@@ -52,7 +52,7 @@ export default function TradeTable({ trades }: Props) {
                 Shares
               </th>
               <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Cost (USD)
+                Transaction Cost (USD)
               </th>
             </tr>
           </thead>

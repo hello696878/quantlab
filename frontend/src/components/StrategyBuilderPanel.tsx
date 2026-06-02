@@ -27,6 +27,8 @@ import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
+import ExportReportButton from "@/components/ExportReportButton";
+import { buildBacktestReport } from "@/lib/reportExport";
 
 // ---------------------------------------------------------------------------
 // Operand / indicator metadata
@@ -1324,6 +1326,21 @@ export default function StrategyBuilderPanel() {
             </span>
             <span className="text-xs text-slate-400">
               Custom · {result.transaction_cost_bps} bps · {result.num_trades} trade events
+            </span>
+            <span className="ml-auto">
+              <ExportReportButton
+                getReport={() =>
+                  buildBacktestReport(result, {
+                    analysisType: "Custom Strategy Backtest",
+                    extraParameters: [
+                      ["Entry logic", entryLogic === "all" ? "AND" : "OR"],
+                      ["Entry rules", entrySummary],
+                      ["Exit logic", exitLogic === "all" ? "AND" : "OR"],
+                      ["Exit rules", exitSummary || "Hold once long"],
+                    ],
+                  })
+                }
+              />
             </span>
           </div>
 

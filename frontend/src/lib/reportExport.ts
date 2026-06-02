@@ -24,6 +24,12 @@ export interface Report {
   content: string;
 }
 
+interface BacktestReportOptions {
+  analysisType?: string;
+  dataSource?: "yfinance" | "csv";
+  extraParameters?: [string, string][];
+}
+
 // ---------------------------------------------------------------------------
 // Download helper
 // ---------------------------------------------------------------------------
@@ -38,7 +44,7 @@ export function downloadTextFile(
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = filename;
+  a.download = ensureMarkdownFilename(filename);
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -74,6 +80,11 @@ function slug(s: string): string {
   );
 }
 
+function ensureMarkdownFilename(filename: string): string {
+  const cleaned = filename.trim().replace(/[\\/:*?"<>|]+/g, "-") || "quantlab-report.md";
+  return cleaned.toLowerCase().endsWith(".md") ? cleaned : `${cleaned}.md`;
+}
+
 /** "20260602-1530" — local timestamp for filenames. */
 function timestamp(): string {
   const d = new Date();
@@ -93,10 +104,21 @@ function generatedAt(): string {
 // ---------------------------------------------------------------------------
 
 function mdTable(headers: string[], rows: (string | number)[][]): string {
-  const head = `| ${headers.join(" | ")} |`;
+  const head = `| ${headers.map(mdCell).join(" | ")} |`;
   const sep = `| ${headers.map(() => "---").join(" | ")} |`;
-  const body = rows.map((r) => `| ${r.map((c) => String(c)).join(" | ")} |`).join("\n");
-  return `${head}\n${sep}\n${body}`;
+  const body = rows.map((r) => `| ${r.map(mdCell).join(" | ")} |`).join("\n");
+  return body ? `${head}\n${sep}\n${body}` : `${head}\n${sep}`;
+}
+
+function mdCell(value: string | number): string {
+  return String(value)
+    .replace(/\r?\n/g, " ")
+    .replace(/\|/g, "\\|")
+    .trim();
+}
+
+function mdText(value: string): string {
+  return value.replace(/\r\n/g, "\n").trim();
 }
 
 /** Performance-metrics table from a PerformanceMetrics-like object. */
@@ -164,7 +186,13 @@ function equitySummary(values: number[]): string {
 function tradesSummary(trades: TradeRecord[]): string {
   if (!trades.length) return "_No trades._";
   const fmt = (t: TradeRecord) =>
-    [t.date, t.action, `$${t.price.toFixed(2)}`, t.shares, `$${t.cost.toFixed(2)}`];
+    [
+      t.date,
+      t.action,
+      formatCurrency(t.price),
+      t.shares.toLocaleString("en-US", { maximumFractionDigits: 4 }),
+      formatCurrency(t.cost),
+    ];
   const head = trades.slice(0, 5);
   const tail = trades.length > 10 ? trades.slice(-5) : [];
   const rows = head.map(fmt);
@@ -176,19 +204,69 @@ function tradesSummary(trades: TradeRecord[]): string {
   }
   return (
     `Total trade events: **${trades.length}**\n\n` +
-    mdTable(["Date", "Action", "Price", "Shares", "Cost"], rows)
+    mdTable(["Date", "Action", "Price", "Shares", "Transaction Cost"], rows)
   );
 }
 
-const DISCLAIMER = `## Risk / Caveats
+const CRYPTO_BASE_TICKERS = new Set([
+  "BTC",
+  "ETH",
+  "SOL",
+  "BNB",
+  "XRP",
+  "ADA",
+  "DOGE",
+  "AVAX",
+  "DOT",
+  "LINK",
+  "LTC",
+  "BCH",
+  "MATIC",
+  "SHIB",
+  "TRX",
+  "UNI",
+  "XLM",
+  "ATOM",
+  "ETC",
+]);
+
+function splitTickerLabel(label: string): string[] {
+  return label
+    .split(/[,\s/]+/)
+    .map((t) => t.trim())
+    .filter(Boolean);
+}
+
+function isCryptoTicker(ticker: string): boolean {
+  const t = ticker.trim().toUpperCase();
+  const base = t.split("-")[0];
+  return CRYPTO_BASE_TICKERS.has(base) || t.includes("CRYPTO");
+}
+
+function riskCaveats(
+  tickers: string[],
+  dataSource: BacktestReportOptions["dataSource"] = "yfinance",
+): string {
+  const dataLine =
+    dataSource === "csv"
+      ? "- **Data source limitations.** Prices come from the uploaded CSV file; column choices, missing rows, date cleaning, and stale or erroneous prices affect results."
+      : "- **Data source limitations.** Prices come from Yahoo Finance (yfinance) and may contain gaps or errors.";
+  const cryptoTickers = Array.from(new Set(tickers.filter(isCryptoTicker)));
+  const cryptoLine = cryptoTickers.length
+    ? `\n- **Crypto / 24/7 markets.** ${cryptoTickers.join(", ")} trades outside equity market hours; annualized return, volatility, Sharpe, Sortino, and CAGR use QuantLab's standard daily-return convention and should be compared with care.`
+    : "";
+
+  return `## Risk / Caveats
 
 - **Historical backtest only.** Results reflect simulated performance on past data.
 - **No guarantee of future performance.** Past results do not predict future returns.
-- **Data source limitations.** Prices come from Yahoo Finance (yfinance) and may contain gaps or errors.
+${dataLine}
 - **Transaction cost & slippage.** Costs use a simple basis-point assumption; real fills, slippage, and market impact are not modelled.
 - **Possible overfitting.** Parameters or weights chosen on historical data may not generalise out-of-sample.
 - This report is for research and educational purposes only and is **not investment advice**.
+${cryptoLine}
 `;
+}
 
 function header(analysisType: string): string {
   return `# QuantLab Research Report\n\n_Generated at ${generatedAt()}_\n\n**Analysis type:** ${analysisType}\n`;
@@ -258,12 +336,19 @@ function backtestParams(r: BacktestResponse): [string, string][] {
   }
 }
 
-export function buildBacktestReport(r: BacktestResponse): Report {
+export function buildBacktestReport(
+  r: BacktestResponse,
+  options: BacktestReportOptions = {},
+): Report {
   const label = STRATEGY_LABELS[r.strategy] ?? r.strategy;
   const m = r.strategy_metrics;
-  const params = backtestParams(r);
+  const params = [...backtestParams(r), ...(options.extraParameters ?? [])];
+  const caveatTickers =
+    r.strategy === "pairs"
+      ? [r.pairs_asset_y, r.pairs_asset_x].filter((t): t is string => Boolean(t))
+      : splitTickerLabel(r.ticker);
   const content = [
-    header("Single-Strategy Backtest"),
+    header(options.analysisType ?? "Single-Strategy Backtest"),
     `## Metadata\n`,
     mdTable(
       ["Field", "Value"],
@@ -291,7 +376,7 @@ export function buildBacktestReport(r: BacktestResponse): Report {
     equitySummary((r.equity_curve as EquityPoint[]).map((p) => p.strategy)),
     `\n## Trades Summary\n`,
     tradesSummary(r.trades),
-    `\n${DISCLAIMER}`,
+    `\n${riskCaveats(caveatTickers, options.dataSource)}`,
   ].join("\n");
 
   return {
@@ -307,6 +392,7 @@ export function buildSavedBacktestReport(rec: SavedBacktestFull): Report {
     ([k, v]) => [k, String(v)] as [string, string],
   );
   const equity = (rec.equity_curve ?? []).map((p) => p.strategy);
+  const caveatTickers = splitTickerLabel(rec.ticker);
   const content = [
     header("Saved Backtest"),
     `## Metadata\n`,
@@ -330,7 +416,7 @@ export function buildSavedBacktestReport(rec: SavedBacktestFull): Report {
     `- **Max Drawdown:** ${formatPercent(num(m.max_drawdown))}`,
     `- **Volatility:** ${formatPercent(num(m.volatility))}`,
     `- **Trades:** ${rec.trades?.length ?? 0}`,
-    rec.notes ? `\n## Notes\n\n${rec.notes}` : "",
+    rec.notes ? `\n## Notes\n\n${mdText(rec.notes)}` : "",
     `\n## Parameters\n`,
     params.length ? mdTable(["Parameter", "Value"], params) : "_No parameters._",
     `\n## Performance Metrics\n`,
@@ -339,7 +425,7 @@ export function buildSavedBacktestReport(rec: SavedBacktestFull): Report {
     equitySummary(equity),
     `\n## Trades Summary\n`,
     tradesSummary((rec.trades ?? []) as TradeRecord[]),
-    `\n${DISCLAIMER}`,
+    `\n${riskCaveats(caveatTickers)}`,
   ].join("\n");
 
   return { filename: `quantlab-report-saved-${slug(rec.name)}.md`, content };
@@ -383,7 +469,7 @@ export function buildPortfolioBacktestReport(r: PortfolioBacktestResponse): Repo
     `\n## Rebalance Events Summary\n`,
     `- **Rebalance events:** ${r.rebalance_events.length}`,
     `- **Average turnover:** ${formatPercent(avgTurnover, 1)}`,
-    `\n${DISCLAIMER}`,
+    `\n${riskCaveats([...r.tickers, r.benchmark_ticker])}`,
   ].join("\n");
 
   return { filename: `quantlab-report-portfolio-backtest-${timestamp()}.md`, content };
@@ -402,6 +488,7 @@ export function buildPortfolioOptimizeReport(r: PortfolioOptimizeResponse): Repo
         ["Date range", `${r.start_date} → ${r.end_date}`],
         ["Initial capital", formatCurrency(r.initial_capital)],
         ["Risk-free rate", formatPercent(r.risk_free_rate)],
+        ["Transaction cost", `${r.transaction_cost_bps} bps`],
       ],
     ),
     `\n## Executive Summary\n`,
@@ -416,8 +503,8 @@ export function buildPortfolioOptimizeReport(r: PortfolioOptimizeResponse): Repo
     metricsTable(m, r.equal_weight_metrics),
     `\n## Equity Curve Summary\n`,
     equitySummary(r.equity_curve.map((p) => p.value)),
-    `\n> ⚠️ In-sample optimization: weights were fit and backtested on the same window and can overfit.`,
-    `\n${DISCLAIMER}`,
+    `\n> ${mdText(r.in_sample_warning || "In-sample optimization: weights were fit and backtested on the same window and can overfit.")}`,
+    `\n${riskCaveats(r.tickers)}`,
   ].join("\n");
 
   return { filename: `quantlab-report-optimization-${slug(r.objective)}-${timestamp()}.md`, content };
@@ -453,11 +540,14 @@ export function buildRiskDashboardReport(r: RiskDashboardResponse): Report {
     `- **Average Pairwise Correlation:** ${formatRatio(diag.average_pairwise_correlation)}`,
     `- **Most Correlated:** ${diag.most_correlated_pair?.join(" / ") ?? "—"} (${formatRatio(diag.max_pairwise_correlation)})`,
     `- **Least Correlated:** ${diag.least_correlated_pair?.join(" / ") ?? "—"} (${formatRatio(diag.min_pairwise_correlation)})`,
+    `\n## Equal-Weight Portfolio\n`,
+    weightsTable(ew.weights),
     `\n## Asset Risk Summary\n`,
     mdTable(["Ticker", "Annual Return", "Annual Volatility", "Risk Contribution"], assetRows),
     `\n## Correlation Matrix\n`,
     mdTable(["", ...r.tickers], corrRows),
-    `\n${DISCLAIMER}`,
+    r.historical_note ? `\n## Method Note\n\n${mdText(r.historical_note)}` : "",
+    `\n${riskCaveats(r.tickers)}`,
   ].join("\n");
 
   return { filename: `quantlab-report-risk-dashboard-${timestamp()}.md`, content };
@@ -493,7 +583,8 @@ export function buildStressTestReport(r: StressTestResponse): Report {
       ["Scenario", "Portfolio", "Benchmark", "Excess", "Max DD", "Worst Day", "Volatility"],
       scnRows,
     ),
-    `\n${DISCLAIMER}`,
+    r.historical_note ? `\n## Method Note\n\n${mdText(r.historical_note)}` : "",
+    `\n${riskCaveats([...r.tickers, r.benchmark_ticker])}`,
   ].join("\n");
 
   return { filename: `quantlab-report-stress-test-${timestamp()}.md`, content };
@@ -530,7 +621,8 @@ export function buildFactorAnalysisReport(r: FactorAnalysisResponse): Report {
     weightsTable(r.weights),
     `\n## Factor Betas\n`,
     mdTable(["Factor", "ETF", "Beta"], betaRows),
-    `\n${DISCLAIMER}`,
+    r.historical_note ? `\n## Method Note\n\n${mdText(r.historical_note)}` : "",
+    `\n${riskCaveats([...r.tickers, ...Object.values(r.factor_tickers)])}`,
   ].join("\n");
 
   return { filename: `quantlab-report-factor-analysis-${timestamp()}.md`, content };
