@@ -109,6 +109,28 @@ def init_db() -> None:
             )
             """
         )
+        # Saved research reports (Report Gallery).  Stores the Markdown report
+        # text + structured metadata only — never PDF binaries.
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS saved_reports (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at        TEXT NOT NULL,
+                updated_at        TEXT NOT NULL,
+                title             TEXT NOT NULL,
+                report_type       TEXT NOT NULL,
+                source_type       TEXT NOT NULL,
+                source_id         INTEGER,
+                tickers_json      TEXT NOT NULL DEFAULT '[]',
+                strategy          TEXT,
+                date_range_start  TEXT,
+                date_range_end    TEXT,
+                markdown_content  TEXT NOT NULL,
+                metadata_json     TEXT NOT NULL DEFAULT '{}',
+                notes             TEXT NOT NULL DEFAULT ''
+            )
+            """
+        )
         conn.commit()
     finally:
         conn.close()

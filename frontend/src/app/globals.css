@@ -406,6 +406,15 @@
 .report-html th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
 .report-html tbody tr:nth-child(even) { background: #f9fafb; }
 
+/* ---- On-screen paper surface for a rendered saved report (dark page) ------- */
+.report-surface {
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: var(--sh-md);
+  overflow-x: auto;
+}
+
 /* ---- Print: isolate the report, hide the dark app & all chrome ------------ */
 @media print {
   @page { margin: 16mm; }

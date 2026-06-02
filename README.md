@@ -67,6 +67,12 @@ Alongside the Markdown download, an **Export PDF** button opens a clean, print-f
 
 > The PDF export is browser-based (print to PDF) and is text/table only — embedded chart images are future work.
 
+### Saved Reports (Report Gallery)
+
+Next to the export buttons, a **Save Report** button stores the generated report in the local **SQLite** database (`/saved-reports` CRUD endpoints), consistent with Saved Backtests. Only the **Markdown content** and structured metadata (title, source type, tickers, strategy, date range, notes) are persisted — **PDF binaries are never stored**; PDF remains a browser-print operation you can repeat any time.
+
+The **Saved Reports** workspace lists everything you have saved. Open a report to read it (the Markdown is rendered with a small built-in, HTML-escaping renderer — saved content is treated as untrusted text and **no embedded HTML/script is ever executed**), **Download Markdown**, **Print / Save as PDF**, or **Delete** it. Everything stays on your machine — no authentication, no cloud storage.
+
 ### Custom Strategy Builder
 
 The **Strategy Builder** workspace is a no-code rule builder for long-only, single-asset strategies (`POST /backtest/custom`). Compose entry and exit rules that compare two operands — `close`, a numeric constant, or an indicator (`sma`, `rsi`, `bb_upper`/`bb_middle`/`bb_lower`, `momentum`) — with `>`, `>=`, `<`, or `<=`. Rules are combined with ALL (AND) or ANY (OR) logic; the position is shifted one bar forward to avoid lookahead bias. Rules are evaluated entirely with vectorised pandas math — **no `eval`, no user code is ever executed**. Indicators reuse the exact formulas of the built-in strategies. No short selling, leverage, or pairs.

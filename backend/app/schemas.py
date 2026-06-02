@@ -1184,6 +1184,141 @@ class DeleteResponse(BaseModel):
 
 
 # ===========================================================================
+# Saved Reports (Report Gallery)
+# ===========================================================================
+
+# The analysis that produced a report.  Constrained so list/filter UIs and the
+# DB stay consistent; "manual" covers ad-hoc / hand-written reports.
+SavedReportSourceType = Literal[
+    "backtest",
+    "portfolio_backtest",
+    "portfolio_optimization",
+    "risk_dashboard",
+    "stress_test",
+    "factor_analysis",
+    "manual",
+]
+
+
+class SavedReportCreate(BaseModel):
+    """Request body for POST /saved-reports."""
+
+    title: str = Field(min_length=1, description="Report title (non-empty).")
+    report_type: str = Field(
+        min_length=1,
+        description="Report content format, e.g. 'markdown' (non-empty).",
+    )
+    source_type: SavedReportSourceType = Field(
+        description="The analysis type that produced the report."
+    )
+    source_id: Optional[int] = Field(
+        default=None,
+        description="Optional id of a related record (e.g. a saved backtest).",
+    )
+    tickers: List[str] = Field(
+        default_factory=list,
+        description="Tickers referenced by the report, if any.",
+    )
+    strategy: Optional[str] = Field(
+        default=None, description="Strategy / objective identifier, if applicable."
+    )
+    date_range_start: Optional[str] = Field(
+        default=None, description="Analysis start date (YYYY-MM-DD), if applicable."
+    )
+    date_range_end: Optional[str] = Field(
+        default=None, description="Analysis end date (YYYY-MM-DD), if applicable."
+    )
+    markdown_content: str = Field(
+        min_length=1, description="Full Markdown report text (non-empty)."
+    )
+    metadata: dict = Field(
+        default_factory=dict,
+        description="Structured report metadata (free-form JSON object).",
+    )
+    notes: str = Field(default="", description="Optional free-text notes.")
+
+    @field_validator("title", "report_type")
+    @classmethod
+    def _strip_required_text(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("field must not be blank.")
+        return stripped
+
+    @field_validator("markdown_content")
+    @classmethod
+    def _check_markdown_non_empty(cls, value: str) -> str:
+        # Preserve the original content (whitespace/formatting), but reject
+        # content that is blank once stripped.
+        if not value.strip():
+            raise ValueError("markdown_content must not be blank.")
+        return value
+
+    @model_validator(mode="after")
+    def _check_dates(self) -> "SavedReportCreate":
+        parsed: dict = {}
+        for field_name in ("date_range_start", "date_range_end"):
+            raw = getattr(self, field_name)
+            if raw is None or raw == "":
+                continue
+            try:
+                parsed[field_name] = date.fromisoformat(raw)
+            except ValueError as exc:
+                raise ValueError(
+                    f"{field_name} must be a valid YYYY-MM-DD date."
+                ) from exc
+
+        if "date_range_start" in parsed and "date_range_end" in parsed:
+            if parsed["date_range_start"] >= parsed["date_range_end"]:
+                raise ValueError("date_range_start must be before date_range_end.")
+        return self
+
+
+class SavedReportUpdate(BaseModel):
+    """Request body for PUT /saved-reports/{id} — mutable metadata only."""
+
+    title: str = Field(min_length=1, description="Report title (non-empty).")
+    notes: str = Field(default="", description="Optional free-text notes.")
+    metadata: dict = Field(
+        default_factory=dict, description="Structured report metadata."
+    )
+
+    @field_validator("title")
+    @classmethod
+    def _strip_title(cls, value: str) -> str:
+        stripped = value.strip()
+        if not stripped:
+            raise ValueError("title must not be blank.")
+        return stripped
+
+
+class SavedReportSummary(BaseModel):
+    """Lightweight list-view row returned by GET /saved-reports (no Markdown)."""
+
+    id: int
+    created_at: str = Field(description="ISO-8601 UTC timestamp of creation.")
+    updated_at: str = Field(description="ISO-8601 UTC timestamp of last update.")
+    title: str
+    report_type: str
+    source_type: str
+    source_id: Optional[int] = None
+    tickers: List[str] = Field(default_factory=list)
+    strategy: Optional[str] = None
+    date_range_start: Optional[str] = None
+    date_range_end: Optional[str] = None
+    notes: str
+
+
+class SavedReportFull(SavedReportSummary):
+    """Full record returned by GET /saved-reports/{id} and POST /saved-reports."""
+
+    markdown_content: str = Field(description="Full Markdown report text.")
+    metadata: dict = Field(
+        default_factory=dict, description="Structured report metadata."
+    )
+
+
+# ===========================================================================
 # Custom Strategy Builder (v1) — no-code rule builder
 # ===========================================================================
 

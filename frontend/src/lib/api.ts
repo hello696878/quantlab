@@ -36,6 +36,10 @@ import type {
   SavedBacktestCreate,
   SavedBacktestFull,
   SavedBacktestSummary,
+  SavedReportCreate,
+  SavedReportFull,
+  SavedReportSummary,
+  SavedReportUpdate,
   SmaSweepRequest,
   SmaSweepResponse,
   SmaTrainTestRequest,
@@ -637,6 +641,52 @@ export async function deleteSavedBacktest(id: number): Promise<DeleteResponse> {
     `/api/saved-backtests/${id}`,
     { method: "DELETE" },
   );
+}
+
+// ---------------------------------------------------------------------------
+// Saved Reports (Report Gallery)
+// ---------------------------------------------------------------------------
+
+/** POST /api/saved-reports */
+export async function createSavedReport(
+  data: SavedReportCreate,
+): Promise<SavedReportFull> {
+  return savedBacktestsRequest<SavedReportFull>("/api/saved-reports", {
+    method: "POST",
+    body: JSON.stringify(data),
+  });
+}
+
+/** GET /api/saved-reports */
+export async function listSavedReports(): Promise<SavedReportSummary[]> {
+  return savedBacktestsRequest<SavedReportSummary[]>("/api/saved-reports", {
+    method: "GET",
+  });
+}
+
+/** GET /api/saved-reports/{id} */
+export async function getSavedReport(id: number): Promise<SavedReportFull> {
+  return savedBacktestsRequest<SavedReportFull>(`/api/saved-reports/${id}`, {
+    method: "GET",
+  });
+}
+
+/** PUT /api/saved-reports/{id} — update mutable metadata (title/notes/metadata). */
+export async function updateSavedReport(
+  id: number,
+  data: SavedReportUpdate,
+): Promise<SavedReportFull> {
+  return savedBacktestsRequest<SavedReportFull>(`/api/saved-reports/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(data),
+  });
+}
+
+/** DELETE /api/saved-reports/{id} */
+export async function deleteSavedReport(id: number): Promise<DeleteResponse> {
+  return savedBacktestsRequest<DeleteResponse>(`/api/saved-reports/${id}`, {
+    method: "DELETE",
+  });
 }
 
 // ---------------------------------------------------------------------------

@@ -440,6 +440,62 @@ export interface DeleteResponse {
 }
 
 // ---------------------------------------------------------------------------
+// Saved Reports (Report Gallery)
+// ---------------------------------------------------------------------------
+
+export type SavedReportSourceType =
+  | "backtest"
+  | "portfolio_backtest"
+  | "portfolio_optimization"
+  | "risk_dashboard"
+  | "stress_test"
+  | "factor_analysis"
+  | "manual";
+
+export interface SavedReportCreate {
+  title: string;
+  report_type: string;
+  source_type: SavedReportSourceType;
+  source_id?: number | null;
+  tickers: string[];
+  strategy?: string | null;
+  date_range_start?: string | null;
+  date_range_end?: string | null;
+  markdown_content: string;
+  metadata: Record<string, unknown>;
+  notes: string;
+}
+
+/** Mutable-metadata payload for PUT /saved-reports/{id}. */
+export interface SavedReportUpdate {
+  title: string;
+  notes: string;
+  metadata: Record<string, unknown>;
+}
+
+/** Lightweight list-view row — no Markdown content blob. */
+export interface SavedReportSummary {
+  id: number;
+  created_at: string;
+  updated_at: string;
+  title: string;
+  report_type: string;
+  source_type: string;
+  source_id: number | null;
+  tickers: string[];
+  strategy: string | null;
+  date_range_start: string | null;
+  date_range_end: string | null;
+  notes: string;
+}
+
+/** Full record including the Markdown content and structured metadata. */
+export interface SavedReportFull extends SavedReportSummary {
+  markdown_content: string;
+  metadata: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
 // Custom Strategy Builder (v1)
 // ---------------------------------------------------------------------------
 

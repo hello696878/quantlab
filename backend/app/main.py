@@ -77,6 +77,13 @@ from app.saved_backtests import (
     get_saved_backtest as db_get,
     list_saved_backtests as db_list,
 )
+from app.saved_reports import (
+    create_saved_report as report_create,
+    delete_saved_report as report_delete,
+    get_saved_report as report_get,
+    list_saved_reports as report_list,
+    update_saved_report as report_update,
+)
 from app.schemas import (
     BacktestRequest,
     BacktestResponse,
@@ -127,6 +134,10 @@ from app.schemas import (
     SavedBacktestCreate,
     SavedBacktestFull,
     SavedBacktestSummary,
+    SavedReportCreate,
+    SavedReportFull,
+    SavedReportSummary,
+    SavedReportUpdate,
     SmaSweepRequest,
     SmaSweepResponse,
     SmaSweepRow,
@@ -2309,6 +2320,89 @@ def delete_saved_backtest_endpoint(id: int) -> DeleteResponse:
         raise HTTPException(
             status_code=404, detail=f"Saved backtest {id} not found."
         )
+    return DeleteResponse(deleted=True, id=id)
+
+
+# ---------------------------------------------------------------------------
+# Saved Reports (Report Gallery) endpoints
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/saved-reports",
+    response_model=SavedReportFull,
+    tags=["saved-reports"],
+    summary="Save a research report",
+    description=(
+        "Persist a generated research report (Markdown text + structured "
+        "metadata) to the local SQLite database.  PDF binaries are never "
+        "stored — PDF export remains a client-side browser-print operation.  "
+        "Returns the saved record with its assigned ``id`` and timestamps."
+    ),
+)
+def create_saved_report_endpoint(request: SavedReportCreate) -> SavedReportFull:
+    record = report_create(request.model_dump())
+    return SavedReportFull(**record)
+
+
+@app.get(
+    "/saved-reports",
+    response_model=list[SavedReportSummary],
+    tags=["saved-reports"],
+    summary="List saved reports",
+    description=(
+        "Return all saved reports as lightweight summary rows (no Markdown "
+        "content blob).  Ordered newest-first by creation timestamp."
+    ),
+)
+def list_saved_reports_endpoint() -> list[SavedReportSummary]:
+    return [SavedReportSummary(**row) for row in report_list()]
+
+
+@app.get(
+    "/saved-reports/{id}",
+    response_model=SavedReportFull,
+    tags=["saved-reports"],
+    summary="Get a saved report",
+    description="Return the full saved report including the Markdown content.",
+)
+def get_saved_report_endpoint(id: int) -> SavedReportFull:
+    record = report_get(id)
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Saved report {id} not found.")
+    return SavedReportFull(**record)
+
+
+@app.put(
+    "/saved-reports/{id}",
+    response_model=SavedReportFull,
+    tags=["saved-reports"],
+    summary="Update a saved report",
+    description=(
+        "Update a saved report's mutable metadata (title, notes, metadata).  "
+        "The Markdown content and source provenance are preserved; "
+        "``updated_at`` is refreshed."
+    ),
+)
+def update_saved_report_endpoint(
+    id: int, request: SavedReportUpdate
+) -> SavedReportFull:
+    record = report_update(id, request.model_dump())
+    if record is None:
+        raise HTTPException(status_code=404, detail=f"Saved report {id} not found.")
+    return SavedReportFull(**record)
+
+
+@app.delete(
+    "/saved-reports/{id}",
+    response_model=DeleteResponse,
+    tags=["saved-reports"],
+    summary="Delete a saved report",
+    description="Permanently delete a saved report by id.",
+)
+def delete_saved_report_endpoint(id: int) -> DeleteResponse:
+    if not report_delete(id):
+        raise HTTPException(status_code=404, detail=f"Saved report {id} not found.")
     return DeleteResponse(deleted=True, id=id)
 
 

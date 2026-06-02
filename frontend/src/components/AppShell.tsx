@@ -14,7 +14,8 @@ export type View =
   | "train-test"
   | "walk-forward"
   | "comparison"
-  | "saved";
+  | "saved"
+  | "reports";
 
 interface AppShellProps {
   active: View;

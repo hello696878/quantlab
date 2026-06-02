@@ -19,6 +19,8 @@ import ExportReportButton from "@/components/ExportReportButton";
 import { buildBacktestReport } from "@/lib/reportExport";
 import SavedBacktestsList from "@/components/SavedBacktestsList";
 import SavedBacktestDetail from "@/components/SavedBacktestDetail";
+import SavedReportsList from "@/components/SavedReportsList";
+import SavedReportDetail from "@/components/SavedReportDetail";
 import {
   runBacktest,
   runBbBacktest,
@@ -283,6 +285,10 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Saved Backtests",
     subtitle: "Locally persisted results, stored in SQLite.",
   },
+  reports: {
+    title: "Saved Reports",
+    subtitle: "Research reports saved locally in SQLite — view, download, print.",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -315,6 +321,12 @@ export default function HomePage() {
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [savedRefreshKey, setSavedRefreshKey] = useState(0);
   const [savedDetailId, setSavedDetailId] = useState<number | null>(null);
+
+  // Saved reports (Report Gallery) state
+  const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
+  const [savedReportDetailId, setSavedReportDetailId] = useState<number | null>(
+    null,
+  );
 
   // Backtest state
   const [strategy, setStrategy] = useState<StrategyType>("sma_crossover");
@@ -366,6 +378,7 @@ export default function HomePage() {
   function handleNav(next: View) {
     setView(next);
     if (next !== "saved") setSavedDetailId(null);
+    if (next !== "reports") setSavedReportDetailId(null);
   }
 
   const heading = STRATEGY_HEADINGS[strategy];
@@ -644,6 +657,34 @@ export default function HomePage() {
               <SavedBacktestsList
                 refreshKey={savedRefreshKey}
                 onSelect={(id) => setSavedDetailId(id)}
+              />
+            )}
+          </>
+        )}
+
+        {/* ── Saved Reports (Report Gallery) ───────────────────────────── */}
+        {view === "reports" && (
+          <>
+            <SectionIntro title="Saved Reports">
+              Research reports you save are stored locally in a SQLite database
+              (Markdown text only — PDF files are not stored). Open any report to
+              read it, download the Markdown, or print / save it as a PDF from
+              your browser.
+            </SectionIntro>
+
+            {savedReportDetailId !== null ? (
+              <SavedReportDetail
+                id={savedReportDetailId}
+                onBack={() => setSavedReportDetailId(null)}
+                onDeleted={() => {
+                  setSavedReportDetailId(null);
+                  setSavedReportsRefreshKey((k) => k + 1);
+                }}
+              />
+            ) : (
+              <SavedReportsList
+                refreshKey={savedReportsRefreshKey}
+                onSelect={(id) => setSavedReportDetailId(id)}
               />
             )}
           </>

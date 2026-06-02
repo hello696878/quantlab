@@ -16,6 +16,7 @@ import type {
   PortfolioOptimizeResponse,
   RiskDashboardResponse,
   SavedBacktestFull,
+  SavedReportSourceType,
   StressTestResponse,
   TradeRecord,
 } from "./types";
@@ -23,6 +24,20 @@ import type {
 export interface Report {
   filename: string;
   content: string;
+  /**
+   * Optional structured metadata used when saving the report to the local
+   * Report Gallery (Saved Reports).  Markdown download and PDF print ignore
+   * these fields; the Save flow maps them onto a `SavedReportCreate` payload.
+   */
+  title?: string;
+  reportType?: string;
+  sourceType?: SavedReportSourceType;
+  sourceId?: number | null;
+  tickers?: string[];
+  strategy?: string | null;
+  dateRangeStart?: string | null;
+  dateRangeEnd?: string | null;
+  metadata?: Record<string, unknown>;
 }
 
 interface BacktestReportOptions {
@@ -383,6 +398,23 @@ export function buildBacktestReport(
   return {
     filename: `quantlab-report-${slug(r.ticker)}-${slug(r.strategy)}-${r.start_date}-${r.end_date}.md`,
     content,
+    title: `${r.ticker.toUpperCase()} — ${label}`,
+    reportType: "markdown",
+    sourceType: "backtest",
+    tickers: caveatTickers,
+    strategy: r.strategy,
+    dateRangeStart: r.start_date,
+    dateRangeEnd: r.end_date,
+    metadata: {
+      analysis_type: options.analysisType ?? "Single-Strategy Backtest",
+      total_return: m.total_return,
+      cagr: m.cagr,
+      sharpe_ratio: m.sharpe_ratio,
+      sortino_ratio: m.sortino_ratio,
+      max_drawdown: m.max_drawdown,
+      volatility: m.volatility,
+      num_trades: r.num_trades,
+    },
   };
 }
 
@@ -429,7 +461,25 @@ export function buildSavedBacktestReport(rec: SavedBacktestFull): Report {
     `\n${riskCaveats(caveatTickers)}`,
   ].join("\n");
 
-  return { filename: `quantlab-report-saved-${slug(rec.name)}.md`, content };
+  return {
+    filename: `quantlab-report-saved-${slug(rec.name)}.md`,
+    content,
+    title: rec.name,
+    reportType: "markdown",
+    sourceType: "backtest",
+    sourceId: rec.id,
+    tickers: caveatTickers,
+    strategy: rec.strategy,
+    dateRangeStart: rec.start_date,
+    dateRangeEnd: rec.end_date,
+    metadata: {
+      total_return: num(m.total_return),
+      cagr: num(m.cagr),
+      sharpe_ratio: num(m.sharpe_ratio),
+      max_drawdown: num(m.max_drawdown),
+      saved_backtest_id: rec.id,
+    },
+  };
 }
 
 export function buildPortfolioBacktestReport(r: PortfolioBacktestResponse): Report {
@@ -473,7 +523,27 @@ export function buildPortfolioBacktestReport(r: PortfolioBacktestResponse): Repo
     `\n${riskCaveats([...r.tickers, r.benchmark_ticker])}`,
   ].join("\n");
 
-  return { filename: `quantlab-report-portfolio-backtest-${timestamp()}.md`, content };
+  return {
+    filename: `quantlab-report-portfolio-backtest-${timestamp()}.md`,
+    content,
+    title: `Equal-Weight Portfolio — ${r.tickers.join(", ")}`,
+    reportType: "markdown",
+    sourceType: "portfolio_backtest",
+    tickers: r.tickers,
+    strategy: "equal_weight",
+    dateRangeStart: r.start_date,
+    dateRangeEnd: r.end_date,
+    metadata: {
+      rebalance_frequency: r.rebalance_frequency,
+      total_return: m.total_return,
+      cagr: m.cagr,
+      sharpe_ratio: m.sharpe_ratio,
+      max_drawdown: m.max_drawdown,
+      volatility: m.volatility,
+      rebalance_events: r.rebalance_events.length,
+      average_turnover: avgTurnover,
+    },
+  };
 }
 
 export function buildPortfolioOptimizeReport(r: PortfolioOptimizeResponse): Report {
@@ -508,7 +578,25 @@ export function buildPortfolioOptimizeReport(r: PortfolioOptimizeResponse): Repo
     `\n${riskCaveats(r.tickers)}`,
   ].join("\n");
 
-  return { filename: `quantlab-report-optimization-${slug(r.objective)}-${timestamp()}.md`, content };
+  return {
+    filename: `quantlab-report-optimization-${slug(r.objective)}-${timestamp()}.md`,
+    content,
+    title: `Portfolio Optimization — ${r.objective}`,
+    reportType: "markdown",
+    sourceType: "portfolio_optimization",
+    tickers: r.tickers,
+    strategy: r.objective,
+    dateRangeStart: r.start_date,
+    dateRangeEnd: r.end_date,
+    metadata: {
+      objective: r.objective,
+      expected_return: r.portfolio_expected_return,
+      volatility: r.portfolio_volatility,
+      sharpe: r.portfolio_sharpe,
+      total_return: m.total_return,
+      max_drawdown: m.max_drawdown,
+    },
+  };
 }
 
 export function buildRiskDashboardReport(r: RiskDashboardResponse): Report {
@@ -551,7 +639,23 @@ export function buildRiskDashboardReport(r: RiskDashboardResponse): Report {
     `\n${riskCaveats(r.tickers)}`,
   ].join("\n");
 
-  return { filename: `quantlab-report-risk-dashboard-${timestamp()}.md`, content };
+  return {
+    filename: `quantlab-report-risk-dashboard-${timestamp()}.md`,
+    content,
+    title: `Risk Dashboard — ${r.tickers.join(", ")}`,
+    reportType: "markdown",
+    sourceType: "risk_dashboard",
+    tickers: r.tickers,
+    strategy: null,
+    dateRangeStart: r.start_date,
+    dateRangeEnd: r.end_date,
+    metadata: {
+      expected_return: ew.expected_return,
+      volatility: ew.volatility,
+      diversification_ratio: ew.diversification_ratio,
+      average_pairwise_correlation: diag.average_pairwise_correlation,
+    },
+  };
 }
 
 export function buildStressTestReport(r: StressTestResponse): Report {
@@ -588,7 +692,23 @@ export function buildStressTestReport(r: StressTestResponse): Report {
     `\n${riskCaveats([...r.tickers, r.benchmark_ticker])}`,
   ].join("\n");
 
-  return { filename: `quantlab-report-stress-test-${timestamp()}.md`, content };
+  return {
+    filename: `quantlab-report-stress-test-${timestamp()}.md`,
+    content,
+    title: `Stress Test — ${r.tickers.join(", ")}`,
+    reportType: "markdown",
+    sourceType: "stress_test",
+    tickers: r.tickers,
+    strategy: null,
+    dateRangeStart: r.start_date,
+    dateRangeEnd: r.end_date,
+    metadata: {
+      benchmark_ticker: r.benchmark_ticker,
+      scenarios: r.scenarios.length,
+      full_period_total_return: r.full_period_metrics.total_return,
+      full_period_max_drawdown: r.full_period_metrics.max_drawdown,
+    },
+  };
 }
 
 export function buildFactorAnalysisReport(r: FactorAnalysisResponse): Report {
@@ -626,5 +746,21 @@ export function buildFactorAnalysisReport(r: FactorAnalysisResponse): Report {
     `\n${riskCaveats([...r.tickers, ...Object.values(r.factor_tickers)])}`,
   ].join("\n");
 
-  return { filename: `quantlab-report-factor-analysis-${timestamp()}.md`, content };
+  return {
+    filename: `quantlab-report-factor-analysis-${timestamp()}.md`,
+    content,
+    title: `Factor Analysis — ${r.tickers.join(", ")}`,
+    reportType: "markdown",
+    sourceType: "factor_analysis",
+    tickers: r.tickers,
+    strategy: null,
+    dateRangeStart: r.start_date,
+    dateRangeEnd: r.end_date,
+    metadata: {
+      r_squared: r.r_squared,
+      alpha_annualized: r.alpha_annualized,
+      residual_volatility: r.residual_volatility,
+      multicollinearity_warning: r.diagnostics.multicollinearity_warning,
+    },
+  };
 }

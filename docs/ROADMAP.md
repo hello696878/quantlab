@@ -277,6 +277,25 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   force a light page, and add `@page` margins + table/heading page-break control
 - Text/table only (no chart images); frontend-only (`tsc --noEmit` clean)
 
+### Phase 8.3 — Saved Reports / Report Gallery ✅
+
+- Local **SQLite** persistence for generated reports (Markdown text + metadata
+  only — **no PDF binaries stored**), consistent with Saved Backtests
+- New `saved_reports` table (`db.py`) + parameterised CRUD module
+  (`saved_reports.py`); all tests use a temporary DB
+- Endpoints: `POST/GET/GET{id}/PUT{id}/DELETE{id} /saved-reports` with
+  validation (non-empty title / report_type / markdown_content, enum
+  source_type, date ordering, 404 on missing, 422 on invalid)
+- Report generators now attach structured save-metadata to each `Report`;
+  `ExportReportButton.tsx` adds a **Save Report** button beside the export
+  buttons (every export location), opening `SaveReportModal.tsx`
+- New **Saved Reports** workspace: `SavedReportsList.tsx` +
+  `SavedReportDetail.tsx` (renders Markdown via the existing HTML-escaping
+  renderer — no `dangerouslySetInnerHTML` of unsanitised text, no script
+  execution), with Download Markdown / Print-to-PDF / Delete
+- Backend `pytest -q` green (793 passed, incl. the 32-test saved-reports
+  suite); frontend `tsc --noEmit` clean; no quant logic changed
+
 ---
 
 ## Future Phases
