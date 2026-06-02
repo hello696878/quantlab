@@ -42,6 +42,9 @@ export default function PrintableReportModal({
   if (!mounted) return null;
 
   const html = markdownToHtml(report.content);
+  const handlePrint = () => {
+    if (typeof window !== "undefined") window.print();
+  };
 
   const node = (
     <div
@@ -58,7 +61,7 @@ export default function PrintableReportModal({
             <button
               type="button"
               className="print-btn print-btn-primary"
-              onClick={() => window.print()}
+              onClick={handlePrint}
             >
               Print / Save as PDF
             </button>

@@ -2,8 +2,9 @@
  * Markdown research-report generation (client-side, v1).
  *
  * All reports are built in the browser from existing result state and
- * downloaded as a `.md` file — no backend, no stored files, no PDF rendering.
- * Each builder returns `{ filename, content }`; PDF export is future work.
+ * downloaded as a `.md` file — no backend and no stored files.
+ * Each builder returns `{ filename, content }`; the print/PDF preview reuses
+ * this same Markdown content so both export paths stay in sync.
  */
 
 import type {

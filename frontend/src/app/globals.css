@@ -401,6 +401,7 @@
   border: 1px solid #d1d5db;
   text-align: left;
   vertical-align: top;
+  overflow-wrap: anywhere;
 }
 .report-html th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
 .report-html tbody tr:nth-child(even) { background: #f9fafb; }
@@ -441,6 +442,17 @@
     font-size: 11pt;
   }
   .report-html h1, .report-html h2, .report-html h3 { page-break-after: avoid; }
-  .report-html table, .report-html tr, .report-html blockquote { page-break-inside: avoid; }
+  .report-html blockquote, .report-html tr { page-break-inside: avoid; }
+  .report-html table {
+    page-break-inside: auto;
+    width: 100% !important;
+    font-size: 9pt;
+  }
+  .report-html th,
+  .report-html td {
+    padding: 3px 5px;
+    color: #000000 !important;
+    background: #ffffff !important;
+  }
   .report-html thead { display: table-header-group; }
 }
