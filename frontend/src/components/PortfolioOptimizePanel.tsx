@@ -9,6 +9,8 @@ import type {
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
+import ExportReportButton from "@/components/ExportReportButton";
+import { buildPortfolioOptimizeReport } from "@/lib/reportExport";
 import { fmtPct, fmtRatio } from "@/lib/format";
 
 const OBJECTIVES: { id: PortfolioObjective; label: string }[] = [
@@ -274,6 +276,10 @@ export default function PortfolioOptimizePanel() {
       {/* Results */}
       {result && !loading && (
         <>
+          <div className="flex justify-end">
+            <ExportReportButton getReport={() => buildPortfolioOptimizeReport(result)} />
+          </div>
+
           {/* Portfolio scalar stats */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="card p-5">

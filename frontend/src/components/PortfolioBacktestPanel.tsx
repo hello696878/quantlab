@@ -9,6 +9,8 @@ import type {
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
+import ExportReportButton from "@/components/ExportReportButton";
+import { buildPortfolioBacktestReport } from "@/lib/reportExport";
 import { fmtPct, fmtDollar } from "@/lib/format";
 
 const REBALANCE_OPTIONS: { id: PortfolioRebalanceFrequency; label: string }[] = [
@@ -279,6 +281,9 @@ export default function PortfolioBacktestPanel() {
               {result.tickers.join(" · ")} · rebalance: {result.rebalance_frequency} ·{" "}
               {result.transaction_cost_bps} bps · {result.rebalance_events.length}{" "}
               rebalances
+            </span>
+            <span className="ml-auto">
+              <ExportReportButton getReport={() => buildPortfolioBacktestReport(result)} />
             </span>
           </div>
 

@@ -57,6 +57,14 @@ Benchmark: buy-and-hold with no transaction costs.
 
 The **CSV Backtest** workspace lets you upload your own historical price CSV and run any single-asset strategy on it (Pairs Trading excluded). Column detection is flexible: a date column (`date` / `datetime` / `timestamp`) and a close column (`close` / `adj_close` / `adjusted_close`) are required; optional OHLCV columns are ignored. The uploaded series flows through the same lookahead-bias-free strategy, backtest, and metrics stack as the yfinance endpoints (`POST /backtest/csv`).
 
+### Research Report Export
+
+Most result views have an **Export Report** button that generates a clean **Markdown** research report and downloads it as a `.md` file (e.g. `quantlab-report-SPY-sma_crossover-2015-2023.md`). Reports are generated **locally in the browser** from the result data already on screen — nothing is uploaded or stored on the server.
+
+Each report includes metadata, an executive summary, parameters/weights, a performance-metrics table, an equity-curve summary (start/end/peak equity, final & worst drawdown), a trades/events summary, and a standard risk/caveats disclaimer. Export is available from the **Backtest**, **Saved Backtest detail**, and the Portfolio **Equal-Weight Backtest**, **Static Optimization**, **Risk Dashboard**, **Stress Test**, and **Factor Analysis** views.
+
+> PDF export and chart images are future work — v1 is Markdown only.
+
 ### Custom Strategy Builder
 
 The **Strategy Builder** workspace is a no-code rule builder for long-only, single-asset strategies (`POST /backtest/custom`). Compose entry and exit rules that compare two operands — `close`, a numeric constant, or an indicator (`sma`, `rsi`, `bb_upper`/`bb_middle`/`bb_lower`, `momentum`) — with `>`, `>=`, `<`, or `<=`. Rules are combined with ALL (AND) or ANY (OR) logic; the position is shifted one bar forward to avoid lookahead bias. Rules are evaluated entirely with vectorised pandas math — **no `eval`, no user code is ever executed**. Indicators reuse the exact formulas of the built-in strategies. No short selling, leverage, or pairs.

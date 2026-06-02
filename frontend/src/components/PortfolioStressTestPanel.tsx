@@ -5,6 +5,8 @@ import { runStressTest } from "@/lib/api";
 import type { StressTestRequest, StressTestResponse } from "@/lib/types";
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
+import ExportReportButton from "@/components/ExportReportButton";
+import { buildStressTestReport } from "@/lib/reportExport";
 import { fmtPct } from "@/lib/format";
 
 const inputCls =
@@ -447,6 +449,10 @@ export default function PortfolioStressTestPanel() {
       {/* Results */}
       {result && !loading && (
         <>
+          <div className="flex justify-end">
+            <ExportReportButton getReport={() => buildStressTestReport(result)} />
+          </div>
+
           {/* Scenario comparison table */}
           <div className="card p-6">
             <p className="section-title mb-4">Scenario Comparison</p>

@@ -3,6 +3,8 @@
 import { useMemo, useState } from "react";
 import { runRiskDashboard } from "@/lib/api";
 import type { RiskDashboardResponse } from "@/lib/types";
+import ExportReportButton from "@/components/ExportReportButton";
+import { buildRiskDashboardReport } from "@/lib/reportExport";
 import { fmtPct, fmtRatio } from "@/lib/format";
 
 const inputCls =
@@ -194,6 +196,10 @@ export default function PortfolioRiskDashboardPanel() {
       {/* Results */}
       {result && !loading && (
         <>
+          <div className="flex justify-end">
+            <ExportReportButton getReport={() => buildRiskDashboardReport(result)} />
+          </div>
+
           {/* Diagnostic cards */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
             <StatCard

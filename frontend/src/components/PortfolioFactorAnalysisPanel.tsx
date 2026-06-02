@@ -4,6 +4,8 @@ import { useMemo, useState } from "react";
 import { runFactorAnalysis } from "@/lib/api";
 import type { FactorAnalysisRequest, FactorAnalysisResponse } from "@/lib/types";
 import EquityCurveChart from "@/components/EquityCurveChart";
+import ExportReportButton from "@/components/ExportReportButton";
+import { buildFactorAnalysisReport } from "@/lib/reportExport";
 import { fmtPct, fmtRatio } from "@/lib/format";
 
 const inputCls =
@@ -405,6 +407,10 @@ export default function PortfolioFactorAnalysisPanel() {
       {/* Results */}
       {result && !loading && (
         <>
+          <div className="flex justify-end">
+            <ExportReportButton getReport={() => buildFactorAnalysisReport(result)} />
+          </div>
+
           {result.diagnostics.multicollinearity_warning && (
             <div className="rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-800">
               ⚠ Collinear factors detected — the design matrix is rank-deficient,

@@ -6,6 +6,8 @@ import type { EquityPoint, SavedBacktestFull, TradeRecord } from "@/lib/types";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
+import ExportReportButton from "@/components/ExportReportButton";
+import { buildSavedBacktestReport } from "@/lib/reportExport";
 import { fmtPct, fmtRatio, fmtDollar } from "@/lib/format";
 
 // ---------------------------------------------------------------------------
@@ -167,8 +169,11 @@ export default function SavedBacktestDetail({
               {record.start_date} → {record.end_date}
             </p>
           </div>
-          <div className="text-xs text-slate-400">
-            Saved {fmtSavedDate(record.created_at)}
+          <div className="flex flex-col items-end gap-2">
+            <div className="text-xs text-slate-400">
+              Saved {fmtSavedDate(record.created_at)}
+            </div>
+            <ExportReportButton getReport={() => buildSavedBacktestReport(record)} />
           </div>
         </div>
 

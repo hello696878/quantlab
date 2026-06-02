@@ -15,6 +15,8 @@ import CsvBacktestPanel from "@/components/CsvBacktestPanel";
 import StrategyBuilderPanel from "@/components/StrategyBuilderPanel";
 import PortfolioWorkspace from "@/components/PortfolioWorkspace";
 import SaveBacktestModal from "@/components/SaveBacktestModal";
+import ExportReportButton from "@/components/ExportReportButton";
+import { buildBacktestReport } from "@/lib/reportExport";
 import SavedBacktestsList from "@/components/SavedBacktestsList";
 import SavedBacktestDetail from "@/components/SavedBacktestDetail";
 import {
@@ -468,7 +470,8 @@ export default function HomePage() {
                   <span className="text-xs text-slate-400">
                     {paramSummary(result)}
                   </span>
-                  <span className="ml-auto">
+                  <span className="ml-auto flex items-center gap-2">
+                    <ExportReportButton getReport={() => buildBacktestReport(result)} />
                     {!showSaveForm && (
                       <button
                         type="button"

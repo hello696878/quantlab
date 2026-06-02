@@ -248,6 +248,21 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Historical / proxy-dependent; collinear factors flagged. Not investment advice
 - Full unit (known-beta recovery, collinearity) + API test coverage
 
+### Phase 8 — Research Report Export v1 ✅
+
+- Client-side **Markdown** research-report generation — no backend, no stored
+  files, no PDF rendering (`frontend/src/lib/reportExport.ts`)
+- Reusable **Export Report** button (`ExportReportButton.tsx`) wired into the
+  single backtest, saved-backtest detail, and the portfolio Equal-Weight
+  Backtest, Static Optimization, Risk Dashboard, Stress Test, and Factor
+  Analysis views
+- Reports include metadata, executive summary, parameters/weights, a
+  performance-metrics table, equity-curve summary (start/end/peak, final +
+  worst drawdown), trades/events summary, and a risk/caveats disclaimer
+- Extensible builder design (one builder per analysis type); PDF export and
+  embedded chart images are deferred to future work
+- Frontend-only (`tsc --noEmit` clean); no backend changes
+
 ---
 
 ## Future Phases
