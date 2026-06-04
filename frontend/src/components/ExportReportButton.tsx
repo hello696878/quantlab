@@ -1,23 +1,28 @@
 "use client";
 
 import { useState } from "react";
-import { downloadTextFile, type Report } from "@/lib/reportExport";
+import {
+  downloadTextFile,
+  REPORT_TEMPLATES,
+  type Report,
+  type ReportTemplate,
+} from "@/lib/reportExport";
 import PrintableReportModal from "@/components/PrintableReportModal";
 import SaveReportModal from "@/components/SaveReportModal";
 
 /**
  * Report export controls shown wherever results are displayed.
  *
- * Renders three small buttons:
+ * A template selector chooses the branded layout (Standard / Executive Summary
+ * / Quant Tear Sheet / Risk Report); the selection applies to all three
+ * actions:
  *  - "Export Report" — downloads the report as a local Markdown (`.md`) file.
- *  - "Export PDF"    — opens a print-friendly preview modal; the user prints it
- *                      or chooses "Save as PDF" from the browser dialog.
- *  - "Save Report"   — saves the Markdown report to the local Report Gallery
- *                      (SQLite) so it can be reopened, downloaded, or re-printed
- *                      later from the Saved Reports workspace.
+ *  - "Export PDF"    — opens a print-friendly preview modal (Save as PDF).
+ *  - "Save Report"   — saves the Markdown report to the local Report Gallery.
  *
- * The report is built lazily on click via `getReport` so large result sets are
- * not serialised on every render.
+ * The report is built lazily on click via `getReport(template)` so large result
+ * sets are not serialised on every render.  `templates` restricts the offered
+ * layouts for analyses that cannot meaningfully fill a given template.
  */
 export default function ExportReportButton({
   getReport,
@@ -26,16 +31,26 @@ export default function ExportReportButton({
   saveLabel = "Save Report",
   showPdf = true,
   showSave = true,
+  templates,
   className,
 }: {
-  getReport: () => Report;
+  getReport: (template: ReportTemplate) => Report;
   label?: string;
   pdfLabel?: string;
   saveLabel?: string;
   showPdf?: boolean;
   showSave?: boolean;
+  templates?: ReportTemplate[];
   className?: string;
 }) {
+  const options =
+    templates && templates.length
+      ? REPORT_TEMPLATES.filter((t) => templates.includes(t.id))
+      : REPORT_TEMPLATES;
+
+  const [template, setTemplate] = useState<ReportTemplate>(
+    options[0]?.id ?? "standard",
+  );
   const [preview, setPreview] = useState<Report | null>(null);
   const [toSave, setToSave] = useState<Report | null>(null);
 
@@ -44,14 +59,34 @@ export default function ExportReportButton({
     "px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 " +
       "border border-slate-300 hover:border-slate-400 transition-colors";
 
+  const selCls =
+    "px-2 py-1 rounded-lg text-xs font-semibold text-slate-700 bg-white " +
+    "border border-slate-300 hover:border-slate-400 transition-colors " +
+    "focus:outline-none focus:ring-2 focus:ring-blue-500";
+
   function handleMarkdown() {
-    const { filename, content } = getReport();
+    const { filename, content } = getReport(template);
     downloadTextFile(filename, content);
   }
 
   return (
     <>
       <span className="inline-flex items-center gap-2">
+        {options.length > 1 && (
+          <select
+            value={template}
+            onChange={(e) => setTemplate(e.target.value as ReportTemplate)}
+            title="Report template"
+            aria-label="Report template"
+            className={selCls}
+          >
+            {options.map((t) => (
+              <option key={t.id} value={t.id}>
+                {t.label}
+              </option>
+            ))}
+          </select>
+        )}
         <button
           type="button"
           onClick={handleMarkdown}
@@ -63,7 +98,7 @@ export default function ExportReportButton({
         {showPdf && (
           <button
             type="button"
-            onClick={() => setPreview(getReport())}
+            onClick={() => setPreview(getReport(template))}
             title="Preview a printable report, then save as PDF"
             className={btnCls}
           >
@@ -73,7 +108,7 @@ export default function ExportReportButton({
         {showSave && (
           <button
             type="button"
-            onClick={() => setToSave(getReport())}
+            onClick={() => setToSave(getReport(template))}
             title="Save this report to the local Report Gallery"
             className={btnCls}
           >

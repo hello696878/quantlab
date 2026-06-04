@@ -173,7 +173,9 @@ export default function SavedBacktestDetail({
             <div className="text-xs text-slate-400">
               Saved {fmtSavedDate(record.created_at)}
             </div>
-            <ExportReportButton getReport={() => buildSavedBacktestReport(record)} />
+            <ExportReportButton
+              getReport={(tpl) => buildSavedBacktestReport(record, tpl)}
+            />
           </div>
         </div>
 

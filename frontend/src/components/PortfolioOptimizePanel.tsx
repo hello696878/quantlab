@@ -277,7 +277,9 @@ export default function PortfolioOptimizePanel() {
       {result && !loading && (
         <>
           <div className="flex justify-end">
-            <ExportReportButton getReport={() => buildPortfolioOptimizeReport(result)} />
+            <ExportReportButton
+              getReport={(tpl) => buildPortfolioOptimizeReport(result, tpl)}
+            />
           </div>
 
           {/* Portfolio scalar stats */}

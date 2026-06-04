@@ -484,7 +484,9 @@ export default function HomePage() {
                     {paramSummary(result)}
                   </span>
                   <span className="ml-auto flex items-center gap-2">
-                    <ExportReportButton getReport={() => buildBacktestReport(result)} />
+                    <ExportReportButton
+                      getReport={(tpl) => buildBacktestReport(result, {}, tpl)}
+                    />
                     {!showSaveForm && (
                       <button
                         type="button"

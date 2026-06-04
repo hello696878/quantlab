@@ -408,7 +408,10 @@ export default function PortfolioFactorAnalysisPanel() {
       {result && !loading && (
         <>
           <div className="flex justify-end">
-            <ExportReportButton getReport={() => buildFactorAnalysisReport(result)} />
+            <ExportReportButton
+              getReport={(tpl) => buildFactorAnalysisReport(result, tpl)}
+              templates={["standard", "executive_summary", "risk_report"]}
+            />
           </div>
 
           {result.diagnostics.multicollinearity_warning && (

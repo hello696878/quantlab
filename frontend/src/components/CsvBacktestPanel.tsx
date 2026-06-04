@@ -404,11 +404,16 @@ export default function CsvBacktestPanel() {
             </span>
             <span className="ml-auto">
               <ExportReportButton
-                getReport={() =>
-                  buildBacktestReport(result, {
-                    analysisType: "CSV Upload Backtest",
-                    dataSource: "csv",
-                  })
+                getReport={(tpl) =>
+                  buildBacktestReport(
+                    result,
+                    {
+                      analysisType: "CSV Upload Backtest",
+                      dataSource: "csv",
+                      sourceType: "csv_backtest",
+                    },
+                    tpl,
+                  )
                 }
               />
             </span>

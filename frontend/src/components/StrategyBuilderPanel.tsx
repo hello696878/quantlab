@@ -1329,17 +1329,21 @@ export default function StrategyBuilderPanel() {
             </span>
             <span className="ml-auto">
               <ExportReportButton
-                getReport={() =>
-                  buildBacktestReport(result, {
-                    analysisType: "Custom Strategy Backtest",
-                    sourceType: "custom_strategy",
-                    extraParameters: [
-                      ["Entry logic", entryLogic === "all" ? "AND" : "OR"],
-                      ["Entry rules", entrySummary],
-                      ["Exit logic", exitLogic === "all" ? "AND" : "OR"],
-                      ["Exit rules", exitSummary || "Hold once long"],
-                    ],
-                  })
+                getReport={(tpl) =>
+                  buildBacktestReport(
+                    result,
+                    {
+                      analysisType: "Custom Strategy Backtest",
+                      sourceType: "custom_strategy",
+                      extraParameters: [
+                        ["Entry logic", entryLogic === "all" ? "AND" : "OR"],
+                        ["Entry rules", entrySummary],
+                        ["Exit logic", exitLogic === "all" ? "AND" : "OR"],
+                        ["Exit rules", exitSummary || "Hold once long"],
+                      ],
+                    },
+                    tpl,
+                  )
                 }
               />
             </span>

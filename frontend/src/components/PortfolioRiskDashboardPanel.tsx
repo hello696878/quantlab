@@ -197,7 +197,10 @@ export default function PortfolioRiskDashboardPanel() {
       {result && !loading && (
         <>
           <div className="flex justify-end">
-            <ExportReportButton getReport={() => buildRiskDashboardReport(result)} />
+            <ExportReportButton
+              getReport={(tpl) => buildRiskDashboardReport(result, tpl)}
+              templates={["standard", "executive_summary", "risk_report"]}
+            />
           </div>
 
           {/* Diagnostic cards */}

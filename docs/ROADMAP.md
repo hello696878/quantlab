@@ -296,6 +296,23 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Backend `pytest -q` green (793 passed, incl. the 32-test saved-reports
   suite); frontend `tsc --noEmit` clean; no quant logic changed
 
+### Phase 8.4 — Branded Report Templates ✅
+
+- `ReportTemplate` enum (`standard` / `executive_summary` / `quant_tear_sheet`
+  / `risk_report`) selectable wherever reports are exported; the choice applies
+  to Markdown download, PDF/print, and Save Report
+- `reportExport.ts` refactored around a structured `ReportDoc` model +
+  `renderReport(doc, template)`; each builder populates one doc and the four
+  templates pick/trim sections from it (Standard output preserved)
+- Risk Report shows only the risk sections the result type actually provides
+  (volatility, max/worst drawdown, stress, factor exposures, correlation, risk
+  contribution) — **missing data is never fabricated**
+- `ExportReportButton.tsx` gains a template `<select>`; analyses that cannot
+  fill a template don't offer it (Risk Dashboard / Factor Analysis omit the
+  Tear Sheet). Saved reports record the template in `metadata.report_template`
+- Frontend-only (`tsc --noEmit` clean); no backend analytics or quant logic
+  changed (backend `pytest -q` still green, 797 passed)
+
 ---
 
 ## Future Phases

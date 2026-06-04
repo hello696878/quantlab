@@ -67,6 +67,17 @@ Alongside the Markdown download, an **Export PDF** button opens a clean, print-f
 
 > The PDF export is browser-based (print to PDF) and is text/table only — embedded chart images are future work.
 
+#### Branded report templates
+
+A **template selector** next to the export buttons chooses the report layout; the selection applies to Markdown download, PDF/print, and Save Report alike:
+
+- **Standard Research Report** — the full default report (metadata, executive summary, parameters/weights, performance + benchmark metrics, equity summary, trades/events, caveats).
+- **Executive Summary** — a short report: title, timestamp, analysis type, tickers, date range, the top 5 metrics, a one-paragraph interpretation, and key caveats (no long trades table).
+- **Quant Tear Sheet** — performance-focused: metadata, metric table, strategy-vs-benchmark table, equity + drawdown summaries, trade/event summary, an annualization note, and risk caveats.
+- **Risk Report** — risk-focused: volatility, max/worst drawdown, and (where the analysis provides them) stress-scenario metrics, factor exposures, correlation diagnostics, and risk contribution. Sections with no data for the current result type are simply omitted — **never fabricated**.
+
+Templates that a given analysis cannot meaningfully fill are not offered (e.g. the Risk Dashboard and Factor Analysis views omit the Quant Tear Sheet). All four are generated locally in the browser from existing result state.
+
 ### Saved Reports (Report Gallery)
 
 Next to the export buttons, a **Save Report** button stores the generated report in the local **SQLite** database (`/saved-reports` CRUD endpoints), consistent with Saved Backtests. Only the **Markdown content** and structured metadata (title, source type, tickers, strategy, date range, notes) are persisted — **PDF binaries are never stored**; PDF remains a browser-print operation you can repeat any time.

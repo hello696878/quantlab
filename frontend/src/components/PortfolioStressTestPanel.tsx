@@ -450,7 +450,9 @@ export default function PortfolioStressTestPanel() {
       {result && !loading && (
         <>
           <div className="flex justify-end">
-            <ExportReportButton getReport={() => buildStressTestReport(result)} />
+            <ExportReportButton
+              getReport={(tpl) => buildStressTestReport(result, tpl)}
+            />
           </div>
 
           {/* Scenario comparison table */}

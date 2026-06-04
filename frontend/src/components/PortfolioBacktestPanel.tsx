@@ -283,7 +283,9 @@ export default function PortfolioBacktestPanel() {
               rebalances
             </span>
             <span className="ml-auto">
-              <ExportReportButton getReport={() => buildPortfolioBacktestReport(result)} />
+              <ExportReportButton
+                getReport={(tpl) => buildPortfolioBacktestReport(result, tpl)}
+              />
             </span>
           </div>
 
