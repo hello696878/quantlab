@@ -4,7 +4,11 @@ import { useEffect, useMemo, useState } from "react";
 import { deleteSavedReport, getSavedReport } from "@/lib/api";
 import type { SavedReportFull } from "@/lib/types";
 import { markdownToHtml } from "@/lib/printReport";
-import { downloadTextFile, type Report } from "@/lib/reportExport";
+import {
+  downloadTextFile,
+  REPORT_TEMPLATES,
+  type Report,
+} from "@/lib/reportExport";
 import PrintableReportModal from "@/components/PrintableReportModal";
 
 // ---------------------------------------------------------------------------
@@ -23,8 +27,18 @@ const SOURCE_LABELS: Record<string, string> = {
   manual: "Manual",
 };
 
+const REPORT_TEMPLATE_LABELS: Record<string, string> = Object.fromEntries(
+  REPORT_TEMPLATES.map((t) => [t.id, t.label]),
+);
+
 function sourceLabel(s: string): string {
   return SOURCE_LABELS[s] ?? s;
+}
+
+function templateLabel(record: SavedReportFull): string | null {
+  const template = record.metadata?.report_template;
+  if (typeof template !== "string" || template.trim() === "") return null;
+  return REPORT_TEMPLATE_LABELS[template] ?? template;
 }
 
 function fmtDate(iso: string): string {
@@ -147,6 +161,7 @@ export default function SavedReportDetail({
     record.date_range_start && record.date_range_end
       ? `${record.date_range_start} → ${record.date_range_end}`
       : "—";
+  const savedTemplate = templateLabel(record);
 
   return (
     <div className="space-y-6">
@@ -174,6 +189,11 @@ export default function SavedReportDetail({
                 <> · updated {fmtDate(record.updated_at)}</>
               )}
             </p>
+            {savedTemplate && (
+              <p className="mt-0.5 text-xs text-slate-400">
+                Template: {savedTemplate}
+              </p>
+            )}
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
