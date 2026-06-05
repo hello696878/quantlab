@@ -15,6 +15,7 @@ import CsvBacktestPanel from "@/components/CsvBacktestPanel";
 import StrategyBuilderPanel from "@/components/StrategyBuilderPanel";
 import PortfolioWorkspace from "@/components/PortfolioWorkspace";
 import SaveBacktestModal from "@/components/SaveBacktestModal";
+import SignalDiagnostics from "@/components/SignalDiagnostics";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildBacktestReport } from "@/lib/reportExport";
 import SavedBacktestsList from "@/components/SavedBacktestsList";
@@ -46,9 +47,8 @@ import type {
 // Default parameters
 // ---------------------------------------------------------------------------
 
-// Defaults are chosen to be demo-friendly (produce a useful number of trades on
-// common assets over 2015–2023), not performance-optimized.  Classic/long-term
-// variants are available as one-click presets in the form.
+// Defaults are demo-friendly starting points, not performance-optimized.
+// Classic/long-term variants are available as one-click presets in the form.
 
 const DEFAULT_SMA_PARAMS: BacktestRequest = {
   ticker: "SPY",
@@ -130,24 +130,24 @@ function strategyLabel(r: BacktestResponse): string {
   }
   if (r.strategy === "bollinger_band") {
     const exit = r.bb_exit_band === "upper" ? "Upper" : "Mid";
-    return `BB(${r.bb_window ?? 20}, ${r.bb_num_std ?? 2}σ) exit:${exit}`;
+    return `BB(${r.bb_window ?? 20}, ${r.bb_num_std ?? 1.8}σ) exit:${exit}`;
   }
   if (r.strategy === "momentum") {
     const entry = r.momentum_entry_threshold ?? 0;
     const exit = r.momentum_exit_threshold ?? 0;
-    return `Momentum(${r.momentum_window ?? 126}) entry:${entry} exit:${exit}`;
+    return `Momentum(${r.momentum_window ?? 63}) entry:${entry} exit:${exit}`;
   }
   if (r.strategy === "volatility_breakout") {
     return (
       `VolBreakout(${r.vb_lookback_window ?? 20}, ` +
-      `${r.vb_breakout_multiplier ?? 1}x range, exit:${r.vb_exit_window ?? 10})`
+      `${r.vb_breakout_multiplier ?? 0.3}x range, exit:${r.vb_exit_window ?? 10})`
     );
   }
   if (r.strategy === "pairs") {
     return (
       `Pairs ${r.pairs_asset_y ?? ""}/${r.pairs_asset_x ?? ""} ` +
       `Z(${r.pairs_lookback_window ?? 60}) ` +
-      `entry:${r.pairs_entry_z_score ?? 2} exit:${r.pairs_exit_z_score ?? 0.5}`
+      `entry:${r.pairs_entry_z_score ?? 1.5} exit:${r.pairs_exit_z_score ?? 0.5}`
     );
   }
   return r.strategy;
@@ -168,13 +168,13 @@ function paramSummary(r: BacktestResponse): string {
   }
   if (r.strategy === "bollinger_band") {
     return (
-      `BB(${r.bb_window ?? 20}, ${r.bb_num_std ?? 2}σ) ` +
+      `BB(${r.bb_window ?? 20}, ${r.bb_num_std ?? 1.8}σ) ` +
       `exit:${r.bb_exit_band ?? "middle"} · ${cost} · ${trades}`
     );
   }
   if (r.strategy === "momentum") {
     return (
-      `Momentum(${r.momentum_window ?? 126}) ` +
+      `Momentum(${r.momentum_window ?? 63}) ` +
       `entry:${r.momentum_entry_threshold ?? 0} ` +
       `exit:${r.momentum_exit_threshold ?? 0} · ${cost} · ${trades}`
     );
@@ -182,7 +182,7 @@ function paramSummary(r: BacktestResponse): string {
   if (r.strategy === "volatility_breakout") {
     return (
       `VolBreakout lookback:${r.vb_lookback_window ?? 20} ` +
-      `mult:${r.vb_breakout_multiplier ?? 1}x range ` +
+      `mult:${r.vb_breakout_multiplier ?? 0.3}x range ` +
       `exit mean:${r.vb_exit_window ?? 10} · ${cost} · ${trades}`
     );
   }
@@ -190,7 +190,7 @@ function paramSummary(r: BacktestResponse): string {
     return (
       `Spread ${r.pairs_asset_y ?? ""}/${r.pairs_asset_x ?? ""} ` +
       `lookback:${r.pairs_lookback_window ?? 60} ` +
-      `entry:|z|>${r.pairs_entry_z_score ?? 2} ` +
+      `entry:|z|>${r.pairs_entry_z_score ?? 1.5} ` +
       `exit z→±${r.pairs_exit_z_score ?? 0.5} · ${cost} · ${trades}`
     );
   }
@@ -558,6 +558,11 @@ export default function HomePage() {
                   strategyLabel={strategyLabel(result)}
                 />
 
+                <SignalDiagnostics
+                  numTrades={result.num_trades}
+                  strategy={result.strategy}
+                />
+
                 <div className="card p-6">
                   <p className="section-title mb-4">Equity Curve</p>
                   <EquityCurveChart data={result.equity_curve} />
@@ -576,6 +581,13 @@ export default function HomePage() {
                     </span>
                   </p>
                   <TradeTable trades={result.trades} />
+                  <p className="mt-3 text-xs text-slate-400">
+                    Most built-in strategies are <span className="font-medium text-slate-500">long-only</span>:
+                    they hold cash when flat and can stay out of the market during
+                    downtrends — staying flat is expected, not a bug. Use{" "}
+                    <span className="font-medium text-slate-500">Pairs Trading</span>{" "}
+                    for non-directional exposure.
+                  </p>
                 </div>
               </>
             )}

@@ -174,11 +174,11 @@ a benchmark, and a ranking.
 
 | Strategy | Parameters |
 |---|---|
-| SMA Crossover | fast=50, slow=200 |
-| RSI Mean Reversion | window=14, oversold=30, exit=50 |
-| Bollinger Band | window=20, 2σ, exit=middle band |
-| Momentum | window=126, entry/exit threshold=0 |
-| Volatility Breakout | lookback=20, multiplier=1.0×, exit_window=10 |
+| SMA Crossover | fast=20, slow=100 |
+| RSI Mean Reversion | window=14, oversold=35, exit=55 |
+| Bollinger Band | window=20, 1.8σ, exit=middle band |
+| Momentum | window=63, entry/exit threshold=0 |
+| Volatility Breakout | lookback=20, multiplier=0.3×, exit_window=10 |
 
 **Pairs Trading is excluded** — it requires two tickers and cannot be compared on a single asset.
 

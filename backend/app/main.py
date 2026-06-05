@@ -2061,11 +2061,11 @@ def sma_walk_forward(request: SmaWalkForwardRequest) -> SmaWalkForwardResponse:
     description=(
         "Run five single-asset strategies on the same ticker and date range "
         "using fixed default parameters, then rank them by key performance "
-        "metrics.  Strategies: SMA Crossover (fast=50, slow=200), "
-        "RSI Mean Reversion (window=14, OB=30, exit=50), "
-        "Bollinger Band (window=20, 2σ, exit=middle), "
-        "Momentum (window=126, thresholds=0), "
-        "Volatility Breakout (lookback=20, mult=1.0, exit=10).  "
+        "metrics.  Strategies: SMA Crossover (fast=20, slow=100), "
+        "RSI Mean Reversion (window=14, OB=35, exit=55), "
+        "Bollinger Band (window=20, 1.8σ, exit=middle), "
+        "Momentum (window=63, thresholds=0), "
+        "Volatility Breakout (lookback=20, mult=0.3, exit=10).  "
         "Pairs Trading is excluded (two-asset strategy).  "
         "Data is fetched once; all strategies share the same price history.  "
         "All signals use a one-day forward shift to prevent lookahead bias."
@@ -2086,15 +2086,15 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
     end_ts = pd.Timestamp(request.end_date)
     close = close[(close.index >= start_ts) & (close.index <= end_ts)]
 
-    # SMA 50/200 is the most restrictive default: needs slow + 2 = 202 bars.
-    min_bars = 202
+    # SMA 20/100 is the most restrictive demo default: needs slow + 2 = 102 bars.
+    min_bars = 102
     if len(close) < min_bars:
         raise HTTPException(
             status_code=422,
             detail=(
                 f"Only {len(close)} trading days available; need at least "
                 f"{min_bars} for strategy comparison "
-                f"(SMA Crossover with slow=200 requires {min_bars} trading days)."
+                f"(SMA Crossover with slow=100 requires {min_bars} trading days)."
             ),
         )
 
@@ -2112,8 +2112,10 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
     results: list = []
     bench_eq = None  # populated on first strategy run; identical for all
 
-    # ── 1. SMA Crossover (fast=50, slow=200) ─────────────────────────────
-    sma_pos = sma_crossover_signals(close, fast_window=50, slow_window=200)
+    # Demo-friendly defaults — mirror the calibrated single-strategy schema
+    # defaults so the comparison reflects what a first-run user sees.
+    # ── 1. SMA Crossover (fast=20, slow=100) ─────────────────────────────
+    sma_pos = sma_crossover_signals(close, fast_window=20, slow_window=100)
     sma_eq, bench_eq, sma_trades = run_backtest(
         close=close,
         position=sma_pos,
@@ -2123,15 +2125,15 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
     results.append(StrategyResultItem(
         strategy="sma_crossover",
         display_name="SMA Crossover",
-        params={"fast_window": 50, "slow_window": 200},
+        params={"fast_window": 20, "slow_window": 100},
         metrics=PerformanceMetrics(**compute_metrics(sma_eq)),
         equity_curve=_curve(sma_eq, bench_eq),
         num_trades=len(sma_trades),
     ))
 
-    # ── 2. RSI Mean Reversion (window=14, oversold=30, exit=50) ──────────
+    # ── 2. RSI Mean Reversion (window=14, oversold=35, exit=55) ──────────
     rsi_pos = rsi_mean_reversion_signals(
-        close, rsi_window=14, oversold_threshold=30.0, exit_threshold=50.0
+        close, rsi_window=14, oversold_threshold=35.0, exit_threshold=55.0
     )
     rsi_eq, _, rsi_trades = run_backtest(
         close=close,
@@ -2142,15 +2144,15 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
     results.append(StrategyResultItem(
         strategy="rsi_mean_reversion",
         display_name="RSI Mean Reversion",
-        params={"rsi_window": 14, "oversold_threshold": 30.0, "exit_threshold": 50.0},
+        params={"rsi_window": 14, "oversold_threshold": 35.0, "exit_threshold": 55.0},
         metrics=PerformanceMetrics(**compute_metrics(rsi_eq)),
         equity_curve=_curve(rsi_eq, bench_eq),
         num_trades=len(rsi_trades),
     ))
 
-    # ── 3. Bollinger Band (window=20, 2σ, exit=middle) ───────────────────
+    # ── 3. Bollinger Band (window=20, 1.8σ, exit=middle) ─────────────────
     bb_pos = bollinger_band_signals(
-        close, bb_window=20, num_std=2.0, exit_band="middle"
+        close, bb_window=20, num_std=1.8, exit_band="middle"
     )
     bb_eq, _, bb_trades = run_backtest(
         close=close,
@@ -2161,15 +2163,15 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
     results.append(StrategyResultItem(
         strategy="bollinger_band",
         display_name="Bollinger Band",
-        params={"bb_window": 20, "num_std": 2.0, "exit_band": "middle"},
+        params={"bb_window": 20, "num_std": 1.8, "exit_band": "middle"},
         metrics=PerformanceMetrics(**compute_metrics(bb_eq)),
         equity_curve=_curve(bb_eq, bench_eq),
         num_trades=len(bb_trades),
     ))
 
-    # ── 4. Momentum (window=126, entry=0, exit=0) ─────────────────────────
+    # ── 4. Momentum (window=63, entry=0, exit=0) ──────────────────────────
     mom_pos = momentum_signals(
-        close, momentum_window=126, entry_threshold=0.0, exit_threshold=0.0
+        close, momentum_window=63, entry_threshold=0.0, exit_threshold=0.0
     )
     mom_eq, _, mom_trades = run_backtest(
         close=close,
@@ -2180,15 +2182,15 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
     results.append(StrategyResultItem(
         strategy="momentum",
         display_name="Momentum",
-        params={"momentum_window": 126, "entry_threshold": 0.0, "exit_threshold": 0.0},
+        params={"momentum_window": 63, "entry_threshold": 0.0, "exit_threshold": 0.0},
         metrics=PerformanceMetrics(**compute_metrics(mom_eq)),
         equity_curve=_curve(mom_eq, bench_eq),
         num_trades=len(mom_trades),
     ))
 
-    # ── 5. Volatility Breakout (lookback=20, mult=1.0, exit=10) ──────────
+    # ── 5. Volatility Breakout (lookback=20, mult=0.3, exit=10) ──────────
     vb_pos = volatility_breakout_signals(
-        close, lookback_window=20, breakout_multiplier=1.0, exit_window=10
+        close, lookback_window=20, breakout_multiplier=0.3, exit_window=10
     )
     vb_eq, _, vb_trades = run_backtest(
         close=close,
@@ -2199,7 +2201,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
     results.append(StrategyResultItem(
         strategy="volatility_breakout",
         display_name="Volatility Breakout",
-        params={"lookback_window": 20, "breakout_multiplier": 1.0, "exit_window": 10},
+        params={"lookback_window": 20, "breakout_multiplier": 0.3, "exit_window": 10},
         metrics=PerformanceMetrics(**compute_metrics(vb_eq)),
         equity_curve=_curve(vb_eq, bench_eq),
         num_trades=len(vb_trades),

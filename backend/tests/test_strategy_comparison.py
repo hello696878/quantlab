@@ -4,7 +4,7 @@ API tests for the strategy comparison endpoint.
 All tests monkeypatch the data-fetch layer to avoid network calls.
 
 The synthetic price series (500 bars ≈ 2 years) is long enough to satisfy
-the 202-bar minimum imposed by SMA Crossover (slow=200).
+the 102-bar minimum imposed by SMA Crossover (slow=100).
 """
 
 import numpy as np
@@ -298,25 +298,27 @@ def test_comparison_default_strategy_params(monkeypatch):
     body = client.post("/research/strategy-comparison", json=_BASE_PAYLOAD).json()
     params = {s["strategy"]: s["params"] for s in body["strategies"]}
 
-    assert params["sma_crossover"] == {"fast_window": 50, "slow_window": 200}
+    # Demo-friendly defaults (mirror the calibrated single-strategy schema
+    # defaults — Phase 9.4 / 9.4.1).
+    assert params["sma_crossover"] == {"fast_window": 20, "slow_window": 100}
     assert params["rsi_mean_reversion"] == {
         "rsi_window": 14,
-        "oversold_threshold": 30.0,
-        "exit_threshold": 50.0,
+        "oversold_threshold": 35.0,
+        "exit_threshold": 55.0,
     }
     assert params["bollinger_band"] == {
         "bb_window": 20,
-        "num_std": 2.0,
+        "num_std": 1.8,
         "exit_band": "middle",
     }
     assert params["momentum"] == {
-        "momentum_window": 126,
+        "momentum_window": 63,
         "entry_threshold": 0.0,
         "exit_threshold": 0.0,
     }
     assert params["volatility_breakout"] == {
         "lookback_window": 20,
-        "breakout_multiplier": 1.0,
+        "breakout_multiplier": 0.3,
         "exit_window": 10,
     }
 
@@ -465,7 +467,7 @@ def test_comparison_fetch_called_once(monkeypatch):
 
 
 def test_comparison_too_short_returns_422(monkeypatch):
-    """Fewer than 202 trading days → 422 (SMA 50/200 cannot run)."""
+    """Fewer than 102 trading days → 422 (SMA 20/100 cannot run)."""
     short_df = make_df(n=100)
     monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: short_df)
     client = TestClient(main_module.app)

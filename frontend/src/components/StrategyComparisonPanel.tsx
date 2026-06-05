@@ -11,11 +11,11 @@
  *   4. Notes / disclaimer
  *
  * Default strategy params (fixed on the backend):
- *   SMA Crossover        fast=50, slow=200
- *   RSI Mean Reversion   window=14, OB=30, exit=50
- *   Bollinger Band       window=20, 2σ, exit=middle
- *   Momentum             window=126, thresholds=0
- *   Volatility Breakout  lookback=20, mult=1.0, exit=10
+ *   SMA Crossover        fast=20, slow=100
+ *   RSI Mean Reversion   window=14, OB=35, exit=55
+ *   Bollinger Band       window=20, 1.8σ, exit=middle
+ *   Momentum             window=63, thresholds=0
+ *   Volatility Breakout  lookback=20, mult=0.3, exit=10
  */
 
 import { useState } from "react";
@@ -245,6 +245,15 @@ function ComparisonTableRow({
     >
       <td className="px-3 py-2 text-sm font-medium" style={{ color }}>
         {name}
+        {numTrades === 0 && (
+          <span
+            className="ml-2 inline-block align-middle rounded-full bg-slate-100 px-2 py-0.5
+                       text-[10px] font-medium uppercase tracking-wide text-slate-400"
+            title="The strategy never triggered an entry and stayed in cash. Try a more responsive preset on the Backtest tab."
+          >
+            No signal · stayed flat
+          </span>
+        )}
       </td>
       <td className="px-3 py-2 text-sm text-right tabular-nums">
         {fmtPct(metrics.cagr)}
@@ -446,11 +455,11 @@ export default function StrategyComparisonPanel() {
         {/* Fixed-params note */}
         <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-500 space-y-0.5">
           <p className="font-medium text-slate-600">Fixed default parameters</p>
-          <p>SMA Crossover — fast=50, slow=200</p>
-          <p>RSI Mean Reversion — window=14, oversold=30, exit=50</p>
-          <p>Bollinger Band — window=20, 2σ, exit=middle band</p>
-          <p>Momentum — window=126, entry/exit threshold=0</p>
-          <p>Volatility Breakout — lookback=20, multiplier=1.0×, exit=10-day mean</p>
+          <p>SMA Crossover — fast=20, slow=100</p>
+          <p>RSI Mean Reversion — window=14, oversold=35, exit=55</p>
+          <p>Bollinger Band — window=20, 1.8σ, exit=middle band</p>
+          <p>Momentum — window=63, entry/exit threshold=0</p>
+          <p>Volatility Breakout — lookback=20, multiplier=0.3×, exit=10-day mean</p>
         </div>
 
         {validationMsg && (
@@ -631,6 +640,15 @@ export default function StrategyComparisonPanel() {
             </div>
             <p className="text-xs text-slate-400">
               Highlighted row = best Sharpe ratio.  Max DD in red when below −20%.
+            </p>
+            <p className="mt-1 text-xs text-slate-400">
+              These are all <span className="font-medium text-slate-500">long-only</span>{" "}
+              strategies run with fixed demo-friendly defaults. A{" "}
+              <span className="font-medium text-slate-500">“No signal · stayed flat”</span>{" "}
+              tag means the strategy never triggered an entry over this period
+              (common in downtrends or with strict parameters) — it is not an
+              error. Adjust parameters or pick a more responsive preset on the
+              Backtest tab, and validate with the research tools.
             </p>
           </div>
 

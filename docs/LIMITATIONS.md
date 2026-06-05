@@ -96,7 +96,7 @@ When `step_days < test_window_days`, consecutive test windows overlap. The stitc
 
 ### Strategy Comparison uses fixed default parameters
 
-The Strategy Comparison tool runs each strategy with hard-coded default parameters (e.g., SMA 50/200, RSI window 14). These defaults were chosen as reasonable starting points but may not be optimal for any particular asset or period. A strategy that ranks last with its defaults might rank first with tuned parameters.
+The Strategy Comparison tool runs each strategy with fixed demo-friendly default parameters (SMA 20/100, RSI 14 with 35/55 thresholds, Bollinger 20 with 1.8σ, momentum 63, Volatility Breakout 20 with 0.3× range). These defaults are starting points, not recommendations, and may still produce few or zero trades for some assets or periods. A strategy that ranks last with its defaults might rank first with tuned parameters.
 
 ---
 

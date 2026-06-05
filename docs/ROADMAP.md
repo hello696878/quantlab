@@ -386,7 +386,7 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   change). Old → new: SMA `50/200 → 20/100`; RSI oversold/exit `30/50 → 35/55`;
   Bollinger `2.0σ → 1.8σ`; momentum window `126 → 63`; volatility-breakout
   multiplier `1.0 → 0.3`; pairs entry-z `2.0 → 1.5` (KO/PEP kept). Values were
-  sanity-checked on real SPY/QQQ/BTC-USD/GLD data for non-zero, non-noisy counts
+  sanity-checked as demo-friendly starting points, not return-optimized settings
 - Synced everywhere: `page.tsx` `DEFAULT_*_PARAMS`, `CsvBacktestPanel` `DEFAULTS`,
   and the backend `schemas.py` `Field(default=…)` (docs/examples stay consistent;
   explicit user inputs unaffected). Strategy Builder starter (SMA 20/50) was
@@ -400,6 +400,32 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   SMA/RSI defaults generate trades, and the calibrated values are locked in.
   Updated the one CSV test that asserted the old SMA defaults
 - Backend `pytest -q` green (**811 passed**); frontend `tsc --noEmit` clean
+
+### Phase 9.4.1 — Strategy Defaults & Signal Diagnostics v2 ✅
+
+- **Root-caused the persistent zero-trade Volatility Breakout** (esp. in Strategy
+  Comparison): the comparison endpoint hard-coded the *old* params (incl. VB
+  `breakout_multiplier=1.0`, which could be too strict for demos) instead of
+  the calibrated defaults.
+  Aligned all five comparison strategies with the demo-friendly defaults
+  (SMA 20/100, RSI 35/55, BB 1.8σ, momentum 63, VB 0.3) and lowered the
+  comparison `min_bars` 202 → 102. No strategy math changed (VB entry/exit rule
+  audited and left intact — only the multiplier was too strict)
+- Sanity-checked on representative demo assets; zero trades remain possible
+  when market conditions do not trigger a strategy's entry rule
+- **VB presets** added to `BacktestForm` (Responsive 0.2× / Balanced 0.3× /
+  Conservative 0.5×), completing the preset set for all preset-able strategies
+- **No-signal diagnostics** (`SignalDiagnostics.tsx`): a non-error info card on
+  the Backtest results — "0 trades, stayed in cash…" (amber) or "very few
+  trades…" (muted), with a long-only-downtrend note for trend strategies.
+  Strategy Comparison tags 0-trade rows with a muted "No signal · stayed flat"
+  (row still shown), plus a long-only explainer under the table
+- **Long-only behaviour explained** in the UI (Backtest + Comparison) and docs:
+  staying flat in downtrends is expected, not a bug; Pairs Trading for
+  non-directional exposure; no short selling yet
+- Backend changed (comparison params + min_bars + 2 test assertions /
+  docstrings); no API contract change. `pytest -q` green (**811 passed**);
+  frontend `tsc --noEmit` clean
 
 ---
 

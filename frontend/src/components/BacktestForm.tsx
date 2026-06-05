@@ -116,8 +116,9 @@ const STRATEGIES: { id: StrategyType; label: string; description: string }[] = [
 ];
 
 // ---------------------------------------------------------------------------
-// One-click parameter presets (the demo-friendly default is first; the classic
-// long-term variant is included so users can opt into slower behaviour).
+// One-click parameter presets. They include the demo-friendly defaults plus
+// classic/stricter variants so users can opt into slower or less frequent
+// signal behaviour without losing manual editability.
 // ---------------------------------------------------------------------------
 
 const SMA_PRESETS = [
@@ -139,6 +140,13 @@ const MOM_PRESETS = [
   { label: "3-month (63)", window: 63 },
   { label: "6-month (126)", window: 126 },
   { label: "12-month (252)", window: 252 },
+];
+// Entry = prior rolling high + multiplier × prior range; lower multiplier ⇒
+// more (more responsive) breakouts.  Balanced 0.3× is the demo default.
+const VB_PRESETS = [
+  { label: "Responsive 0.2×", lookback: 20, mult: 0.2, exit: 10 },
+  { label: "Balanced 0.3×", lookback: 20, mult: 0.3, exit: 10 },
+  { label: "Conservative 0.5×", lookback: 20, mult: 0.5, exit: 10 },
 ];
 
 // ---------------------------------------------------------------------------
@@ -325,6 +333,18 @@ export default function BacktestForm({
     setMomWindowStr(String(p.window));
     onMomentumParamsChange({ ...momentumParams, momentum_window: p.window });
   }
+  function applyVbPreset(i: number) {
+    const p = VB_PRESETS[i];
+    setVbLookbackStr(String(p.lookback));
+    setVbMultStr(String(p.mult));
+    setVbExitWindowStr(String(p.exit));
+    onVbParamsChange({
+      ...vbParams,
+      lookback_window: p.lookback,
+      breakout_multiplier: p.mult,
+      exit_window: p.exit,
+    });
+  }
 
   const smaActiveIdx = SMA_PRESETS.findIndex(
     (p) => p.fast === smaParams.fast_window && p.slow === smaParams.slow_window,
@@ -336,6 +356,12 @@ export default function BacktestForm({
   const bbActiveIdx = BB_PRESETS.findIndex((p) => p.std === bbParams.num_std);
   const momActiveIdx = MOM_PRESETS.findIndex(
     (p) => p.window === momentumParams.momentum_window,
+  );
+  const vbActiveIdx = VB_PRESETS.findIndex(
+    (p) =>
+      p.lookback === vbParams.lookback_window &&
+      p.mult === vbParams.breakout_multiplier &&
+      p.exit === vbParams.exit_window,
   );
 
   function renderPresets(
@@ -549,6 +575,8 @@ export default function BacktestForm({
             renderPresets(BB_PRESETS, bbActiveIdx, applyBbPreset)}
           {strategy === "momentum" &&
             renderPresets(MOM_PRESETS, momActiveIdx, applyMomPreset)}
+          {strategy === "volatility_breakout" &&
+            renderPresets(VB_PRESETS, vbActiveIdx, applyVbPreset)}
           {strategy === "sma_crossover" ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Fast SMA" hint="days">
