@@ -90,10 +90,14 @@ The **Settings** workspace stores local preferences that prefill forms and contr
 
 - **Defaults** — initial capital, transaction cost (bps), benchmark ticker, risk-free rate, and a default date range (`last_1y` / `last_3y` / `last_5y` / `last_10y` / `custom`). Relative ranges resolve from today when a form loads.
 - **Analytics conventions** — annualization convention (`252 trading days` or `365 crypto`). This is **stored for future use only**; the backend still annualizes with 252, and the panel shows a clear note (crypto 365 is flagged experimental).
-- **Appearance** — theme accent color (cyan / blue / emerald / violet / amber), applied immediately via the existing `data-accent` CSS and persisted right away (a tiny pre-paint script avoids a flash on reload).
+- **Appearance** — theme accent color (cyan / blue / emerald / violet / amber, plus a red **Risk** mode), applied immediately and persisted right away (a tiny pre-paint script avoids a flash on reload).
 - **Reporting** — the default branded report template preselected by export panels.
 
 Defaults prefill **newly mounted** forms (single-strategy Backtest, Portfolio Backtest / Optimization / Stress Test, and the report template selector). A form you're already editing won't reset out from under you — changes apply to new forms (or after a reload). **Save settings** persists changes; **Reset to defaults** restores the built-in defaults.
+
+#### Neon terminal theme
+
+QuantLab uses a **CSS-variable accent theme** (a "neon quant terminal" look). One token — `data-accent` on `<html>` — re-skins the **whole product**, not just the sidebar: buttons, focus rings, inputs, strategy tabs, links, badges, selected rows, card border/glow, the top-bar accent rule + neon divider, and the primary chart line (with the benchmark on the harmonized partner hue). Charts read the accent via a small `useAccentColors` hook (a `MutationObserver` re-reads the CSS variables) so they restyle instantly on theme change. **Semantic colors are intentionally fixed** across every accent — success stays green/emerald, warnings amber, danger/drawdown red, positive returns green, and the API status indicator keeps its own green/red — so the six accents never turn the UI into a rainbow or hurt readability.
 
 ### Custom Strategy Builder
 

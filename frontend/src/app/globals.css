@@ -38,6 +38,7 @@
   --emerald: oklch(0.80 0.15 162);
   --violet:  oklch(0.72 0.17 292);
   --amber:   oklch(0.82 0.15 78);
+  --risk:    oklch(0.64 0.20 22);
 
   --pos:  oklch(0.80 0.15 162);
   --neg:  oklch(0.68 0.19 18);
@@ -48,7 +49,34 @@
 
   --accent:     var(--blue);
   --accent-2:   var(--cyan);
-  --accent-rgb: 77, 139, 255;
+  --accent-rgb:   77, 139, 255;
+  --accent-2-rgb: 52, 224, 232;
+  --accent-hue:   256;   /* oklch hue — drives heatmap ramps        */
+  --accent-2-hue: 205;
+
+  /* ---- Derived accent tokens (declared once; auto-cascade per theme) --- */
+  --accent-soft:   color-mix(in oklch, var(--accent) 15%, transparent);
+  --accent-softer: color-mix(in oklch, var(--accent)  8%, transparent);
+  --accent-muted:  color-mix(in oklch, var(--accent) 22%, transparent);
+  --accent-line:   color-mix(in oklch, var(--accent) 40%, transparent);
+  --accent-border: color-mix(in oklch, var(--accent) 58%, transparent);
+  --accent-text:   color-mix(in oklch, var(--accent) 92%, white);
+  --accent-ink:    color-mix(in oklch, var(--accent) 84%, white);
+  --on-accent:     #05070d;   /* dark ink on a solid accent fill */
+
+  /* ---- Neon / glow tokens --------------------------------------------- */
+  --accent-glow:   0 0 24px -6px rgba(var(--accent-rgb), 0.45);
+  --panel-glow:    0 0 32px -12px rgba(var(--accent-rgb), 0.30);
+  --focus-ring:    0 0 0 2px rgba(var(--accent-rgb), 0.45);
+  --neon-line:     linear-gradient(90deg, transparent,
+                     rgba(var(--accent-rgb), 0.55) 22%,
+                     rgba(var(--accent-rgb), 0.95) 50%,
+                     rgba(var(--accent-rgb), 0.55) 78%, transparent);
+  --grid-line:     var(--line-faint);
+
+  /* ---- Chart series (read in JS via useAccentColors) ------------------- */
+  --chart-primary:   var(--accent);
+  --chart-secondary: var(--accent-2);
 
   /* ---- Spacing scale (4px base) --------------------------------------- */
   --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
@@ -74,12 +102,41 @@
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Accent themes (kept for future user-preference theming) */
-:root[data-accent="blue"]    { --accent: var(--blue);    --accent-2: var(--cyan);    --accent-rgb: 77, 139, 255; }
-:root[data-accent="cyan"]    { --accent: var(--cyan);    --accent-2: var(--blue);    --accent-rgb: 52, 224, 232; }
-:root[data-accent="emerald"] { --accent: var(--emerald); --accent-2: var(--cyan);    --accent-rgb: 43, 224, 168; }
-:root[data-accent="violet"]  { --accent: var(--violet);  --accent-2: var(--cyan);    --accent-rgb: 167, 139, 250; }
-:root[data-accent="amber"]   { --accent: var(--amber);   --accent-2: var(--emerald); --accent-rgb: 251, 191, 36; }
+/* Accent themes — each overrides only the primitives; derived tokens cascade.
+   Semantic colors (--pos/--neg/--warn) are intentionally NOT touched here. */
+:root[data-accent="blue"] {
+  --accent: var(--blue); --accent-2: var(--cyan);
+  --accent-rgb: 77, 139, 255;  --accent-2-rgb: 52, 224, 232;
+  --accent-hue: 256; --accent-2-hue: 205;
+}
+:root[data-accent="cyan"] {
+  --accent: var(--cyan); --accent-2: var(--blue);
+  --accent-rgb: 52, 224, 232;  --accent-2-rgb: 77, 139, 255;
+  --accent-hue: 205; --accent-2-hue: 256;
+}
+:root[data-accent="emerald"] {
+  --accent: var(--emerald); --accent-2: var(--cyan);
+  --accent-rgb: 43, 224, 168;  --accent-2-rgb: 52, 224, 232;
+  --accent-hue: 162; --accent-2-hue: 205;
+}
+:root[data-accent="violet"] {
+  --accent: var(--violet); --accent-2: var(--cyan);
+  --accent-rgb: 167, 139, 250;  --accent-2-rgb: 52, 224, 232;
+  --accent-hue: 292; --accent-2-hue: 205;
+}
+:root[data-accent="amber"] {
+  --accent: var(--amber); --accent-2: var(--emerald);
+  --accent-rgb: 251, 191, 36;  --accent-2-rgb: 43, 224, 168;
+  --accent-hue: 78; --accent-2-hue: 162;
+}
+/* Risk / stress mode — red accent.  Semantic --neg is deepened slightly so
+   losses stay distinguishable from the accent. */
+:root[data-accent="risk"] {
+  --accent: var(--risk); --accent-2: var(--amber);
+  --accent-rgb: 240, 96, 88;  --accent-2-rgb: 251, 191, 36;
+  --accent-hue: 22; --accent-2-hue: 78;
+  --neg: oklch(0.60 0.21 14);
+}
 
 /* ============================================================================
    Base
@@ -143,14 +200,29 @@
    Reusable component primitives
    ============================================================================ */
 @layer components {
-  /* Reusable dark glass card — the workhorse surface */
+  /* Reusable dark glass card — the workhorse surface.
+     Border carries a faint accent tint; a restrained accent glow lifts on
+     hover so the neon identity reads without shouting. */
   .card {
+    position: relative;
     background: var(--glass);
-    border: 1px solid var(--line);
+    border: 1px solid color-mix(in oklch, var(--accent) 12%, var(--line));
     border-radius: var(--r-lg);
     box-shadow: var(--sh-md);
     backdrop-filter: blur(14px) saturate(1.1);
     -webkit-backdrop-filter: blur(14px) saturate(1.1);
+    transition: box-shadow 0.22s var(--ease), border-color 0.22s var(--ease);
+  }
+  .card:hover {
+    border-color: color-mix(in oklch, var(--accent) 22%, var(--line));
+    box-shadow: var(--sh-md),
+                0 0 0 1px rgba(var(--accent-rgb), 0.10),
+                var(--panel-glow);
+  }
+  /* Opt-in stronger accent panel (hero surfaces) */
+  .panel-glow { box-shadow: var(--sh-md), var(--panel-glow); }
+  .neon-divider {
+    height: 1px; border: 0; background: var(--neon-line); opacity: 0.8;
   }
 
   /* Lighter glass (no shadow) — for nested/inline surfaces */
@@ -203,12 +275,18 @@
     width: 100%; transition: background 0.15s var(--ease), color 0.15s var(--ease);
   }
   .navbtn:hover { background: var(--glass); color: var(--text); }
+  .navbtn:hover .navicon { color: var(--accent-text); }
   .navbtn .navicon { display: flex; color: inherit; }
   .navbtn.active {
-    background: rgba(var(--accent-rgb), 0.12); color: var(--text-hi);
-    font-weight: 600; box-shadow: inset 2px 0 0 var(--accent);
+    background: linear-gradient(90deg, rgba(var(--accent-rgb), 0.18), rgba(var(--accent-rgb), 0.04));
+    color: var(--text-hi);
+    font-weight: 600;
+    box-shadow: inset 2px 0 0 var(--accent), 0 0 20px -8px rgba(var(--accent-rgb), 0.6);
   }
-  .navbtn.active .navicon { color: var(--accent); }
+  .navbtn.active .navicon {
+    color: var(--accent);
+    filter: drop-shadow(0 0 6px rgba(var(--accent-rgb), 0.55));
+  }
 
   /* live status dot */
   .livedot {
@@ -265,6 +343,85 @@
    ============================================================================ */
 .bg-white      { background-color: var(--bg-panel) !important; }
 .bg-white\/60  { background-color: rgba(12, 17, 32, 0.6) !important; }
+
+/* ============================================================================
+   Accent reach — route the app's `blue-*` utilities through the accent tokens
+   ----------------------------------------------------------------------------
+   The components were authored with Tailwind `blue-*` as the single interactive
+   accent (buttons, tabs, focus rings, links, badges, selected rows, quick-pick
+   chips). Remapping those shades to the accent tokens here makes the chosen
+   theme reach the WHOLE product with no per-component edits. Semantic palettes
+   (green/emerald success, amber warning, red danger/drawdown) are left intact.
+   ============================================================================ */
+
+/* Solid accent fills → accent + dark ink (buttons, selected quick-picks, bars) */
+.bg-blue-600,
+.bg-blue-700 {
+  background-color: var(--accent) !important;
+  color: var(--on-accent) !important;
+}
+.hover\:bg-blue-700:hover,
+.hover\:bg-blue-600:hover {
+  background-color: var(--accent-ink) !important;
+  color: var(--on-accent) !important;
+}
+
+/* Neon lift on real primary buttons only (not weight bars / chips) */
+button.bg-blue-600,
+button.bg-blue-700 {
+  box-shadow: 0 0 20px -8px rgba(var(--accent-rgb), 0.55);
+}
+button.bg-blue-600:hover,
+button.bg-blue-700:hover {
+  box-shadow: 0 0 26px -6px rgba(var(--accent-rgb), 0.7);
+}
+
+/* Faint accent tints (panel fills, badges, soft hovers) */
+.bg-blue-50,
+.bg-blue-50\/40,
+.bg-blue-50\/60,
+.bg-blue-100 {
+  background-color: var(--accent-softer) !important;
+}
+.hover\:bg-blue-50:hover {
+  background-color: var(--accent-softer) !important;
+}
+
+/* Accent text (links, badge text, "View"/"Back" actions, active-tab label) */
+.text-blue-500,
+.text-blue-600,
+.text-blue-700,
+.hover\:text-blue-600:hover,
+.hover\:text-blue-700:hover {
+  color: var(--accent-text) !important;
+}
+
+/* Accent borders — light → strong */
+.border-blue-100,
+.border-blue-200 { border-color: var(--accent-line) !important; }
+.border-blue-300 { border-color: var(--accent-border) !important; }
+.border-blue-400,
+.border-blue-500,
+.border-blue-600,
+.hover\:border-blue-400:hover,
+.hover\:border-blue-500:hover { border-color: var(--accent) !important; }
+
+/* Focus rings + focus borders → accent (inputs, tabs, buttons) */
+.ring-blue-500,
+.focus\:ring-blue-500:focus { --tw-ring-color: rgba(var(--accent-rgb), 0.5) !important; }
+.focus\:border-blue-500:focus { border-color: var(--accent) !important; }
+
+/* Top bar — neon accent divider under the sticky header */
+.topbar { position: relative; }
+.topbar::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0; bottom: -1px;
+  height: 1px;
+  background: var(--neon-line);
+  opacity: 0.7;
+  pointer-events: none;
+}
 
 /* ============================================================================
    Printable research report (PDF export v1)
@@ -414,6 +571,7 @@
 .report-surface {
   background: #ffffff;
   border: 1px solid #e2e8f0;
+  border-top: 2px solid var(--accent); /* on-screen accent header strip (print hides it) */
   border-radius: 12px;
   box-shadow: var(--sh-md);
   overflow-x: auto;

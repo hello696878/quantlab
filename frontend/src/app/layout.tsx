@@ -23,7 +23,7 @@ export default function RootLayout({
             __html:
               "(function(){try{var a='cyan';var raw=localStorage.getItem('quantlab.settings.v1');" +
               "if(raw){var p=JSON.parse(raw);if(p&&typeof p.accent_color==='string')a=p.accent_color;}" +
-              "if(['cyan','blue','emerald','violet','amber'].indexOf(a)===-1)a='cyan';" +
+              "if(['cyan','blue','emerald','violet','amber','risk'].indexOf(a)===-1)a='cyan';" +
               "document.documentElement.setAttribute('data-accent',a);}catch(e){}})();",
           }}
         />

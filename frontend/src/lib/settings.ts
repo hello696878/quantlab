@@ -19,7 +19,13 @@ export type DateRangeOption =
 
 export type AnnualizationConvention = "trading_days_252" | "crypto_365";
 
-export type AccentColor = "cyan" | "blue" | "emerald" | "violet" | "amber";
+export type AccentColor =
+  | "cyan"
+  | "blue"
+  | "emerald"
+  | "violet"
+  | "amber"
+  | "risk";
 
 export interface AppSettings {
   default_initial_capital: number;
@@ -74,6 +80,7 @@ export const ACCENT_OPTIONS: { id: AccentColor; label: string; swatch: string }[
   { id: "emerald", label: "Emerald", swatch: "#2be0a8" },
   { id: "violet", label: "Violet", swatch: "#a78bfa" },
   { id: "amber", label: "Amber", swatch: "#fbbf24" },
+  { id: "risk", label: "Risk", swatch: "#f06058" },
 ];
 
 const ACCENT_IDS = ACCENT_OPTIONS.map((a) => a.id);

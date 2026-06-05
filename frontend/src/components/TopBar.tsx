@@ -83,7 +83,7 @@ interface TopBarProps {
 export default function TopBar({ title, subtitle }: TopBarProps) {
   return (
     <header
-      className="sticky top-0 z-20 flex items-center gap-4 px-7 py-4"
+      className="topbar sticky top-0 z-20 flex items-center gap-4 px-7 py-4"
       style={{
         borderBottom: "1px solid var(--line)",
         background: "rgba(8,11,20,0.72)",
@@ -91,18 +91,33 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
         WebkitBackdropFilter: "blur(12px)",
       }}
     >
-      <div className="min-w-0">
-        <h1
-          className="m-0 text-[19px] font-bold tracking-[-0.01em]"
-          style={{ color: "var(--text-hi)" }}
-        >
-          {title}
-        </h1>
-        {subtitle && (
-          <p className="mt-0.5 text-[12.5px]" style={{ color: "var(--text-mut)" }}>
-            {subtitle}
-          </p>
-        )}
+      <div className="flex min-w-0 items-center gap-3">
+        {/* Accent terminal rule next to the page title */}
+        <span
+          aria-hidden
+          style={{
+            width: 3,
+            alignSelf: "stretch",
+            minHeight: 28,
+            borderRadius: 2,
+            background: "var(--accent)",
+            boxShadow: "0 0 12px -1px rgba(var(--accent-rgb), 0.7)",
+            flexShrink: 0,
+          }}
+        />
+        <div className="min-w-0">
+          <h1
+            className="m-0 text-[19px] font-bold tracking-[-0.01em]"
+            style={{ color: "var(--text-hi)" }}
+          >
+            {title}
+          </h1>
+          {subtitle && (
+            <p className="mt-0.5 text-[12.5px]" style={{ color: "var(--text-mut)" }}>
+              {subtitle}
+            </p>
+          )}
+        </div>
       </div>
       <div className="ml-auto flex items-center gap-3.5">
         <Clock />

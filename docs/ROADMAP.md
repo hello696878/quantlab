@@ -330,6 +330,30 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   uses 252 trading days; the panel shows a clear (crypto = experimental) note
 - Frontend-only (`tsc --noEmit` clean); no backend or quant-logic changes
 
+### Phase 9.2 — Neon Quant Terminal Theme System ✅
+
+- Global CSS-variable theme: one `data-accent` token re-skins the **whole**
+  product (was sidebar-only). New tokens in `globals.css`: `--accent-soft/
+  -softer/-muted/-line/-border/-text/-ink`, `--on-accent`, `--accent-glow/
+  -2-rgb/-hue`, `--panel-glow`, `--focus-ring`, `--neon-line`, `--grid-line`,
+  `--chart-primary/-secondary`
+- **Accent reach via utility remap:** the app's `blue-*` Tailwind classes
+  (buttons, focus rings, inputs, strategy tabs, links, badges, selected rows,
+  quick-picks) are routed through accent tokens in one CSS block — themes all
+  ~26 components with no per-file edits
+- Neon detailing: sidebar active glow + left bar, top-bar accent rule + neon
+  divider, card accent-tinted border + restrained hover glow, primary-button
+  glow, on-screen report header strip
+- Charts: `lib/useAccentColors.ts` resolves `--accent-rgb`/`--accent-2-rgb` to
+  concrete `rgb()` and re-reads on a `MutationObserver`; `EquityCurveChart`
+  primary line = accent, benchmark = accent-2 (restyles live, no remount)
+- Accents: cyan / blue / emerald / violet / amber + optional **risk** (red,
+  deepens `--neg` so losses stay legible). Semantic colors (pos/neg/warn + API
+  status) intentionally **left fixed** across every accent
+- Settings switch applies live + persists in `localStorage` (reload-safe);
+  reset restores default. Frontend-only; no backend / API / quant changes;
+  `tsc --noEmit` clean; dev server compiles and serves 200
+
 ---
 
 ## Future Phases

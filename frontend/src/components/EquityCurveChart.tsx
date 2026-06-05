@@ -13,6 +13,7 @@ import {
 } from "recharts";
 import type { EquityPoint } from "@/lib/types";
 import { fmtDollarTick, fmtDollar, fmtMonthYear } from "@/lib/format";
+import { useAccentColors } from "@/lib/useAccentColors";
 
 interface Props {
   data: EquityPoint[];
@@ -57,6 +58,8 @@ function CustomTooltip({
 }
 
 export default function EquityCurveChart({ data }: Props) {
+  const colors = useAccentColors();
+
   if (!data.length) {
     return (
       <div className="flex h-[340px] items-center justify-center text-sm text-slate-400">
@@ -108,27 +111,27 @@ export default function EquityCurveChart({ data }: Props) {
           strokeWidth={1}
         />
 
-        {/* Benchmark — rendered first (below strategy) */}
+        {/* Benchmark — accent-2 (harmonized partner), dashed + subordinate */}
         <Line
           type="monotone"
           dataKey="benchmark"
           name="Benchmark"
-          stroke="#94a3b8"
+          stroke={colors.accent2}
           strokeWidth={1.5}
           strokeDasharray="5 3"
           dot={false}
           activeDot={{ r: 3 }}
         />
 
-        {/* Strategy — rendered on top */}
+        {/* Strategy — primary accent line, rendered on top */}
         <Line
           type="monotone"
           dataKey="strategy"
           name="Strategy"
-          stroke="#4d8bff"
+          stroke={colors.accent}
           strokeWidth={2}
           dot={false}
-          activeDot={{ r: 4, fill: "#4d8bff" }}
+          activeDot={{ r: 4, fill: colors.accent }}
         />
       </LineChart>
     </ResponsiveContainer>
