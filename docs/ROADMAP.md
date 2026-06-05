@@ -354,6 +354,32 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   reset restores default. Frontend-only; no backend / API / quant changes;
   `tsc --noEmit` clean; dev server compiles and serves 200
 
+### Phase 9.3 — Neon Chart & Data Visualization System ✅
+
+- Shared neon chart toolkit: `components/charts/chartTheme.ts` (grid/axis/muted
+  benchmark/semantic-danger constants + glow widths) and
+  `components/charts/NeonTooltip.tsx` (dark-glass tooltip, accent or semantic
+  border + glow, hides helper series)
+- **`EquityCurveChart`** rebuilt as a Recharts `ComposedChart`: accent→transparent
+  gradient `Area` fill (gridlines still visible) + a wide low-opacity accent
+  glow underlay behind a crisp accent line (duplicate-line technique, no costly
+  SVG filters) + muted slate **dashed** benchmark + neon tooltip. Used by ~12
+  views, so single/CSV/builder/portfolio/optimize/walk-forward/stress/factor/
+  saved/train-test equity charts all upgrade at once
+- **`DrawdownChart`** keeps semantic **red** (area + subtle red glow line + a
+  danger-toned neon tooltip) — drawdown is never recolored to the accent
+- Efficient-frontier line/dots/glow follow the accent (reference markers stay
+  distinct); parameter-sweep best cell gets an accent outline + inner glow;
+  risk correlation matrix renders as rounded neon tiles (red glow on
+  concentrated pairs, cyan on diversifying) — all still readable
+- Charts restyle **live** on accent change via `useAccentColors` (verified:
+  switching accent updates strategy strokes to the new `rgb()` with no remount;
+  benchmark/drawdown stay fixed). Fixed a Recharts legend crash by supplying an
+  explicit legend `payload` (with inner `strokeDasharray`) so helper series are
+  excluded cleanly
+- Frontend-only; no backend / API / quant changes; `tsc --noEmit` clean;
+  verified in a running dev server with real yfinance data
+
 ---
 
 ## Future Phases

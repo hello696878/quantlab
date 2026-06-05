@@ -315,7 +315,10 @@ export default function PortfolioRiskDashboardPanel() {
           <div className="card p-6">
             <p className="section-title mb-4">Correlation Matrix</p>
             <div className="overflow-x-auto">
-              <table className="text-xs mono border-collapse">
+              <table
+                className="text-xs mono"
+                style={{ borderCollapse: "separate", borderSpacing: 3 }}
+              >
                 <thead>
                   <tr>
                     <th className="p-2"></th>
@@ -332,6 +335,16 @@ export default function PortfolioRiskDashboardPanel() {
                       <td className="p-2 text-slate-400 font-semibold text-right">{rowT}</td>
                       {tickers.map((colT) => {
                         const c = result.correlation_matrix[rowT][colT];
+                        // Off-diagonal strong correlations get a neon halo:
+                        // red for high positive (concentration risk), cyan for
+                        // strong negative (diversifying). The diverging fill
+                        // already encodes magnitude; this just draws the eye.
+                        const strong = rowT !== colT && Math.abs(c) >= 0.7;
+                        const halo = strong
+                          ? c >= 0
+                            ? "inset 0 0 12px -2px rgba(248,113,113,0.70)"
+                            : "inset 0 0 12px -2px rgba(34,211,238,0.60)"
+                          : undefined;
                         return (
                           <td
                             key={colT}
@@ -340,6 +353,9 @@ export default function PortfolioRiskDashboardPanel() {
                               background: corrColor(c),
                               color: "var(--text-hi)",
                               minWidth: 52,
+                              borderRadius: 7,
+                              border: "1px solid rgba(255,255,255,0.05)",
+                              boxShadow: halo,
                             }}
                             title={`${rowT} / ${colT}: ${c.toFixed(2)}`}
                           >

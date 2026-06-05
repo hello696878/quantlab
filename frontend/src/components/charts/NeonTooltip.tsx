@@ -1,0 +1,82 @@
+"use client";
+
+import { fmtMonthYear } from "@/lib/format";
+
+interface TooltipEntry {
+  name?: string;
+  value?: number;
+  color?: string;
+}
+
+interface NeonTooltipProps {
+  active?: boolean;
+  payload?: TooltipEntry[];
+  label?: string;
+  /** Format a numeric series value (e.g. dollars or percent). */
+  formatValue: (v: number) => string;
+  /** Border color — defaults to the accent; pass a semantic color for e.g. drawdown. */
+  borderColor?: string;
+  /** Box-shadow glow — defaults to the accent glow token. */
+  glow?: string;
+}
+
+/**
+ * Dark-glass chart tooltip with an accent (or semantic) neon border + glow.
+ *
+ * Series whose name starts with "_" (the glow/area helper series used by the
+ * neon line technique) are filtered out so each datum appears once.
+ */
+export default function NeonTooltip({
+  active,
+  payload,
+  label,
+  formatValue,
+  borderColor = "var(--accent-border)",
+  glow = "var(--accent-glow)",
+}: NeonTooltipProps) {
+  if (!active || !payload?.length) return null;
+
+  const rows = payload.filter(
+    (p) => p.value != null && p.name != null && !p.name.startsWith("_"),
+  );
+  if (!rows.length) return null;
+
+  return (
+    <div
+      className="rounded-lg px-3 py-2 text-xs"
+      style={{
+        background: "rgba(10,14,24,0.94)",
+        border: `1px solid ${borderColor}`,
+        boxShadow: `${glow}, var(--sh-md)`,
+        backdropFilter: "blur(8px)",
+        WebkitBackdropFilter: "blur(8px)",
+      }}
+    >
+      <p className="mb-1 font-semibold" style={{ color: "var(--text-hi)" }}>
+        {label ? fmtMonthYear(label) : ""}
+      </p>
+      {rows.map((p) => (
+        <div key={p.name} className="flex items-center justify-between gap-5">
+          <span
+            className="flex items-center gap-1.5"
+            style={{ color: "var(--text-mut)" }}
+          >
+            <span
+              style={{
+                display: "inline-block",
+                width: 8,
+                height: 8,
+                borderRadius: 9,
+                background: p.color,
+              }}
+            />
+            {p.name}
+          </span>
+          <span className="mono font-semibold" style={{ color: "var(--text-hi)" }}>
+            {formatValue(p.value as number)}
+          </span>
+        </div>
+      ))}
+    </div>
+  );
+}

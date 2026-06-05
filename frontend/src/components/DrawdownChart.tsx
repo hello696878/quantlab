@@ -1,10 +1,11 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import {
   ResponsiveContainer,
-  AreaChart,
+  ComposedChart,
   Area,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -12,7 +13,14 @@ import {
   Legend,
 } from "recharts";
 import type { EquityPoint } from "@/lib/types";
-import { fmtMonthYear } from "@/lib/format";
+import NeonTooltip from "@/components/charts/NeonTooltip";
+import {
+  CHART_AXIS,
+  CHART_AXIS_LINE,
+  CHART_GRID,
+  DANGER,
+  DANGER_SOFT,
+} from "@/components/charts/chartTheme";
 
 interface Props {
   data: EquityPoint[];
@@ -20,7 +28,7 @@ interface Props {
 
 interface DrawdownPoint {
   date: string;
-  strategy: number;  // fraction ≤ 0
+  strategy: number; // fraction ≤ 0
   benchmark: number; // fraction ≤ 0
 }
 
@@ -33,31 +41,8 @@ function drawdownSeries(values: number[]): number[] {
   });
 }
 
-function CustomTooltip({
-  active,
-  payload,
-  label,
-}: {
-  active?: boolean;
-  payload?: { name: string; value: number; color: string }[];
-  label?: string;
-}) {
-  if (!active || !payload?.length) return null;
-  return (
-    <div className="bg-white border border-slate-200 rounded-lg shadow-lg px-3 py-2 text-xs">
-      <p className="font-semibold text-slate-600 mb-1">
-        {label ? fmtMonthYear(label) : ""}
-      </p>
-      {payload.map((p) => (
-        <div key={p.name} className="flex justify-between gap-4">
-          <span style={{ color: p.color }}>{p.name}</span>
-          <span className="font-semibold tabular">
-            {(p.value * 100).toFixed(2)}%
-          </span>
-        </div>
-      ))}
-    </div>
-  );
+function fmtDdPct(v: number): string {
+  return `${(v * 100).toFixed(2)}%`;
 }
 
 function buildYearTicks(data: DrawdownPoint[]): string[] {
@@ -74,6 +59,10 @@ function buildYearTicks(data: DrawdownPoint[]): string[] {
 }
 
 export default function DrawdownChart({ data }: Props) {
+  const uid = useId().replace(/:/g, "");
+  const strokeId = `ddStrategy-${uid}`;
+  const benchId = `ddBenchmark-${uid}`;
+
   const drawdown: DrawdownPoint[] = useMemo(() => {
     const stratValues = data.map((d) => d.strategy);
     const benchValues = data.map((d) => d.benchmark);
@@ -102,46 +91,67 @@ export default function DrawdownChart({ data }: Props) {
 
   return (
     <ResponsiveContainer width="100%" height={240}>
-      <AreaChart
-        data={drawdown}
-        margin={{ top: 4, right: 16, bottom: 0, left: 16 }}
-      >
+      <ComposedChart data={drawdown} margin={{ top: 4, right: 16, bottom: 0, left: 16 }}>
         <defs>
-          <linearGradient id="ddStrategy" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#ef4444" stopOpacity={0.35} />
-            <stop offset="95%" stopColor="#ef4444" stopOpacity={0.05} />
+          <linearGradient id={strokeId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={DANGER} stopOpacity={0.38} />
+            <stop offset="95%" stopColor={DANGER} stopOpacity={0.04} />
           </linearGradient>
-          <linearGradient id="ddBenchmark" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor="#f97316" stopOpacity={0.2} />
-            <stop offset="95%" stopColor="#f97316" stopOpacity={0.02} />
+          <linearGradient id={benchId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%" stopColor={DANGER_SOFT} stopOpacity={0.2} />
+            <stop offset="95%" stopColor={DANGER_SOFT} stopOpacity={0.02} />
           </linearGradient>
         </defs>
 
-        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+        <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
 
         <XAxis
           dataKey="date"
           ticks={yearTicks}
           tickFormatter={(v: string) => v.slice(0, 4)}
-          tick={{ fontSize: 11, fill: "#79839a" }}
-          axisLine={{ stroke: "rgba(255,255,255,0.1)" }}
+          tick={{ fontSize: 11, fill: CHART_AXIS }}
+          axisLine={{ stroke: CHART_AXIS_LINE }}
           tickLine={false}
         />
 
         <YAxis
           domain={[yMin, 0]}
           tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
-          tick={{ fontSize: 11, fill: "#79839a" }}
+          tick={{ fontSize: 11, fill: CHART_AXIS }}
           axisLine={false}
           tickLine={false}
           width={48}
         />
 
-        <Tooltip content={<CustomTooltip />} />
+        <Tooltip
+          content={
+            <NeonTooltip
+              formatValue={fmtDdPct}
+              borderColor="rgba(239,68,68,0.6)"
+              glow="0 0 20px -6px rgba(239,68,68,0.55)"
+            />
+          }
+        />
 
         <Legend
           iconType="plainline"
           wrapperStyle={{ fontSize: 12, paddingTop: 8 }}
+          payload={[
+            {
+              value: "Strategy DD",
+              type: "plainline",
+              id: "strategy",
+              color: DANGER,
+              payload: { strokeDasharray: "0" },
+            },
+            {
+              value: "Benchmark DD",
+              type: "plainline",
+              id: "benchmark",
+              color: DANGER_SOFT,
+              payload: { strokeDasharray: "4 3" },
+            },
+          ]}
         />
 
         {/* Benchmark drawdown — drawn first (behind) */}
@@ -149,24 +159,42 @@ export default function DrawdownChart({ data }: Props) {
           type="monotone"
           dataKey="benchmark"
           name="Benchmark DD"
-          stroke="#f97316"
+          stroke={DANGER_SOFT}
           strokeWidth={1.5}
           strokeDasharray="4 3"
-          fill="url(#ddBenchmark)"
+          strokeOpacity={0.7}
+          fill={`url(#${benchId})`}
           dot={false}
+          isAnimationActive={false}
         />
 
-        {/* Strategy drawdown — drawn on top */}
+        {/* Strategy drawdown — semantic red area */}
         <Area
           type="monotone"
           dataKey="strategy"
           name="Strategy DD"
-          stroke="#ef4444"
+          stroke={DANGER}
           strokeWidth={2}
-          fill="url(#ddStrategy)"
+          fill={`url(#${strokeId})`}
           dot={false}
+          isAnimationActive={false}
         />
-      </AreaChart>
+
+        {/* Subtle red glow halo over the strategy drawdown line */}
+        <Line
+          type="monotone"
+          dataKey="strategy"
+          name="_glow"
+          legendType="none"
+          stroke={DANGER}
+          strokeWidth={6}
+          strokeOpacity={0.14}
+          strokeLinecap="round"
+          dot={false}
+          activeDot={false}
+          isAnimationActive={false}
+        />
+      </ComposedChart>
     </ResponsiveContainer>
   );
 }

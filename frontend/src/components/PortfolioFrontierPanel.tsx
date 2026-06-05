@@ -18,6 +18,7 @@ import type {
   FrontierPortfolioPoint,
 } from "@/lib/types";
 import { fmtPct, fmtRatio } from "@/lib/format";
+import { useAccentColors } from "@/lib/useAccentColors";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm " +
@@ -25,9 +26,9 @@ const inputCls =
   "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 " +
   "disabled:opacity-50 disabled:cursor-not-allowed";
 
-// Special-portfolio marker colours (match legend + cards).
-const C_FRONTIER = "#67e8f9"; // cyan dots
-const C_FRONTIER_LINE = "#22d3ee"; // electric cyan line
+// Special-portfolio marker colours (match legend + cards).  These stay distinct
+// from the (theme-driven) frontier line so the three reference portfolios remain
+// individually recognisable in any accent.
 const C_EQUAL = "#a78bfa"; // violet
 const C_MINVOL = "#34d399"; // emerald
 const C_MAXSHARPE = "#fbbf24"; // gold
@@ -250,6 +251,7 @@ function SpecialCard({
 }
 
 export default function PortfolioFrontierPanel() {
+  const colors = useAccentColors();
   const [tickersStr, setTickersStr] = useState("SPY, QQQ, GLD, TLT");
   const [startDate, setStartDate] = useState("2015-01-01");
   const [endDate, setEndDate] = useState("2023-12-31");
@@ -522,22 +524,22 @@ export default function PortfolioFrontierPanel() {
                   />
                 ))}
 
-                {/* Frontier glow (line only, point-less) */}
+                {/* Frontier glow (line only, point-less) — follows the accent */}
                 <Scatter
                   name="frontier-glow"
                   legendType="none"
                   data={frontierData}
-                  line={{ stroke: C_FRONTIER_LINE, strokeWidth: 8, strokeOpacity: 0.18 }}
+                  line={{ stroke: colors.accent, strokeWidth: 8, strokeOpacity: 0.18 }}
                   lineType="joint"
                   shape={NoShape}
                   isAnimationActive={false}
                 />
-                {/* Frontier line + dots */}
+                {/* Frontier line + dots — accent themed */}
                 <Scatter
                   name="Efficient frontier"
                   data={frontierData}
-                  fill={C_FRONTIER}
-                  line={{ stroke: C_FRONTIER_LINE, strokeWidth: 2.4 }}
+                  fill={colors.accent}
+                  line={{ stroke: colors.accent, strokeWidth: 2.4 }}
                   lineType="joint"
                   isAnimationActive={false}
                 />

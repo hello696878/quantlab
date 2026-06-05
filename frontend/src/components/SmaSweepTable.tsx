@@ -186,6 +186,9 @@ export default function SmaSweepTable({ rows }: Props) {
                 const isSharpe = key === "sharpe_ratio";
                 const t =
                   sharpeSpan > 1e-9 ? (row.sharpe_ratio - minSharpe) / sharpeSpan : 0.5;
+                // Best-performing combination gets a neon accent outline + glow.
+                const isBest =
+                  isSharpe && sharpeSpan > 1e-9 && row.sharpe_ratio === maxSharpe;
 
                 return (
                   <td
@@ -193,7 +196,19 @@ export default function SmaSweepTable({ rows }: Props) {
                     className="px-3 py-1.5 text-right text-slate-700 tabular-nums first:text-left first:font-medium"
                     style={
                       isSharpe
-                        ? { backgroundColor: sharpeColor(t), fontWeight: 600 }
+                        ? {
+                            backgroundColor: sharpeColor(t),
+                            fontWeight: 600,
+                            ...(isBest
+                              ? {
+                                  outline: "1.5px solid var(--accent)",
+                                  outlineOffset: "-2px",
+                                  boxShadow:
+                                    "inset 0 0 14px -2px rgba(var(--accent-rgb), 0.65)",
+                                  color: "var(--accent-text)",
+                                }
+                              : {}),
+                          }
                         : undefined
                     }
                   >
