@@ -128,8 +128,10 @@ function FrontierTooltip({
       className="rounded-lg px-3 py-2 text-xs shadow-lg"
       style={{
         background: "rgba(12,17,32,0.96)",
-        border: "1px solid var(--line-strong)",
+        border: "1px solid var(--accent-border)",
+        boxShadow: "var(--accent-glow), var(--sh-md)",
         backdropFilter: "blur(6px)",
+        WebkitBackdropFilter: "blur(6px)",
       }}
     >
       <p className="font-semibold mb-1" style={{ color: "var(--text-hi)" }}>

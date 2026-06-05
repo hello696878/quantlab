@@ -168,19 +168,7 @@ export default function DrawdownChart({ data }: Props) {
           isAnimationActive={false}
         />
 
-        {/* Strategy drawdown — semantic red area */}
-        <Area
-          type="monotone"
-          dataKey="strategy"
-          name="Strategy DD"
-          stroke={DANGER}
-          strokeWidth={2}
-          fill={`url(#${strokeId})`}
-          dot={false}
-          isAnimationActive={false}
-        />
-
-        {/* Subtle red glow halo over the strategy drawdown line */}
+        {/* Subtle red glow underlay behind the strategy drawdown line */}
         <Line
           type="monotone"
           dataKey="strategy"
@@ -192,6 +180,18 @@ export default function DrawdownChart({ data }: Props) {
           strokeLinecap="round"
           dot={false}
           activeDot={false}
+          isAnimationActive={false}
+        />
+
+        {/* Strategy drawdown — semantic red area */}
+        <Area
+          type="monotone"
+          dataKey="strategy"
+          name="Strategy DD"
+          stroke={DANGER}
+          strokeWidth={2}
+          fill={`url(#${strokeId})`}
+          dot={false}
           isAnimationActive={false}
         />
       </ComposedChart>

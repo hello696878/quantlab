@@ -4,7 +4,7 @@ import { fmtMonthYear } from "@/lib/format";
 
 interface TooltipEntry {
   name?: string;
-  value?: number;
+  value?: number | string | null;
   color?: string;
 }
 
@@ -37,7 +37,11 @@ export default function NeonTooltip({
   if (!active || !payload?.length) return null;
 
   const rows = payload.filter(
-    (p) => p.value != null && p.name != null && !p.name.startsWith("_"),
+    (p): p is TooltipEntry & { name: string; value: number } =>
+      typeof p.name === "string" &&
+      !p.name.startsWith("_") &&
+      typeof p.value === "number" &&
+      Number.isFinite(p.value),
   );
   if (!rows.length) return null;
 
@@ -73,7 +77,7 @@ export default function NeonTooltip({
             {p.name}
           </span>
           <span className="mono font-semibold" style={{ color: "var(--text-hi)" }}>
-            {formatValue(p.value as number)}
+            {formatValue(p.value)}
           </span>
         </div>
       ))}
