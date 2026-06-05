@@ -353,9 +353,22 @@ function isCryptoTicker(ticker: string): boolean {
   return CRYPTO_BASE_TICKERS.has(base) || t.includes("CRYPTO");
 }
 
+/** Short-selling caveat bullets, included when a short-enabled mode was used. */
+function shortSellingCaveat(positionMode?: string): string {
+  if (positionMode !== "short_only" && positionMode !== "long_short") return "";
+  const label = positionMode === "short_only" ? "short-only" : "long/short";
+  return (
+    `\n- **Short selling — risks not modelled.** This backtest ran in ${label} mode.  ` +
+    `Borrow costs, margin, liquidation, and funding are **excluded**, and short ` +
+    `exposure carries risks not represented here.\n- **Sensitivity.** Long/short ` +
+    `results may be highly sensitive to signal timing and transaction costs.`
+  );
+}
+
 function riskCaveats(
   tickers: string[],
   dataSource: BacktestReportOptions["dataSource"] = "yfinance",
+  positionMode?: string,
 ): string {
   const dataLine =
     dataSource === "csv"
@@ -373,7 +386,7 @@ function riskCaveats(
 ${dataLine}
 - **Transaction cost & slippage.** Costs use a simple basis-point assumption; real fills, slippage, and market impact are not modelled.
 - **Possible overfitting.** Parameters or weights chosen on historical data may not generalise out-of-sample.
-- This report is for research and educational purposes only and is **not investment advice**.
+- This report is for research and educational purposes only and is **not investment advice**.${shortSellingCaveat(positionMode)}
 ${cryptoLine}
 `;
 }
@@ -382,6 +395,7 @@ ${cryptoLine}
 function keyCaveats(
   tickers: string[],
   dataSource: BacktestReportOptions["dataSource"] = "yfinance",
+  positionMode?: string,
 ): string {
   const cryptoTickers = Array.from(new Set(tickers.filter(isCryptoTicker)));
   const cryptoLine = cryptoTickers.length
@@ -392,7 +406,7 @@ function keyCaveats(
 
 - **Historical only — no guarantee.** Simulated past performance does not predict future returns.
 - **Simplified costs & data.** ${dataWord} with basis-point cost assumptions; slippage and market impact are not modelled.
-- Research and educational purposes only — **not investment advice**.${cryptoLine}
+- Research and educational purposes only — **not investment advice**.${shortSellingCaveat(positionMode)}${cryptoLine}
 `;
 }
 
@@ -434,6 +448,8 @@ interface ReportDoc {
   analysisType: string;
   caveatTickers: string[];
   dataSource?: "yfinance" | "csv";
+  /** Direction mode, when applicable — drives the short-selling caveat. */
+  positionMode?: string;
   fileSlug: string;
   save: ReportSaveMeta;
 
@@ -472,7 +488,7 @@ function renderStandard(doc: ReportDoc): string {
   return joinBlocks([
     header(doc.analysisType),
     ...doc.standardBlocks,
-    riskCaveats(doc.caveatTickers, doc.dataSource),
+    riskCaveats(doc.caveatTickers, doc.dataSource, doc.positionMode),
   ]);
 }
 
@@ -488,7 +504,7 @@ function renderExecutive(doc: ReportDoc): string {
     head,
     top.length ? section("Key Metrics", mdTable(["Metric", "Value"], top)) : "",
     doc.interpretation ? section("Interpretation", doc.interpretation) : "",
-    keyCaveats(doc.caveatTickers, doc.dataSource),
+    keyCaveats(doc.caveatTickers, doc.dataSource, doc.positionMode),
   ]);
 }
 
@@ -503,7 +519,7 @@ function renderTearSheet(doc: ReportDoc): string {
     t.drawdownSummary ? section("Drawdown Summary", t.drawdownSummary) : "",
     t.tradesOrEvents ? section("Trades / Events Summary", t.tradesOrEvents) : "",
     annualizationNote(),
-    riskCaveats(doc.caveatTickers, doc.dataSource),
+    riskCaveats(doc.caveatTickers, doc.dataSource, doc.positionMode),
   ]);
 }
 
@@ -520,7 +536,7 @@ function renderRiskReport(doc: ReportDoc): string {
     r.correlation ? section("Correlation Diagnostics", r.correlation) : "",
     r.riskContribution ? section("Risk Contribution", r.riskContribution) : "",
     r.diagnostics ? section("Diagnostics", r.diagnostics) : "",
-    riskCaveats(doc.caveatTickers, doc.dataSource),
+    riskCaveats(doc.caveatTickers, doc.dataSource, doc.positionMode),
   ]);
 }
 
@@ -623,16 +639,22 @@ export function buildBacktestReport(
       : splitTickerLabel(r.ticker);
   const equity = (r.equity_curve as EquityPoint[]).map((p) => p.strategy);
 
-  const metadataBody = mdTable(
-    ["Field", "Value"],
-    [
-      ["Ticker", r.ticker],
-      ["Strategy", label],
-      ["Date range", `${r.start_date} → ${r.end_date}`],
-      ["Initial capital", formatCurrency(r.initial_capital)],
-      ["Transaction cost", `${r.transaction_cost_bps} bps`],
-    ],
-  );
+  const modeLabels: Record<string, string> = {
+    long_only: "Long only",
+    short_only: "Short only",
+    long_short: "Long / Short",
+  };
+  const metaRows: [string, string][] = [
+    ["Ticker", r.ticker],
+    ["Strategy", label],
+    ["Date range", `${r.start_date} → ${r.end_date}`],
+    ["Initial capital", formatCurrency(r.initial_capital)],
+    ["Transaction cost", `${r.transaction_cost_bps} bps`],
+  ];
+  if (r.position_mode) {
+    metaRows.push(["Direction", modeLabels[r.position_mode] ?? r.position_mode]);
+  }
+  const metadataBody = mdTable(["Field", "Value"], metaRows);
 
   const execBullets = [
     `- **Total Return:** ${formatPercent(m.total_return)}`,
@@ -648,6 +670,7 @@ export function buildBacktestReport(
     analysisType,
     caveatTickers,
     dataSource: options.dataSource,
+    positionMode: r.position_mode,
     fileSlug: `${slug(r.ticker)}-${slug(r.strategy)}-${r.start_date}-${r.end_date}`,
     metadataBody,
     standardBlocks: [
@@ -701,6 +724,7 @@ export function buildBacktestReport(
       dateRangeEnd: r.end_date,
       metadata: {
         analysis_type: analysisType,
+        position_mode: r.position_mode ?? "long_only",
         total_return: m.total_return,
         cagr: m.cagr,
         sharpe_ratio: m.sharpe_ratio,

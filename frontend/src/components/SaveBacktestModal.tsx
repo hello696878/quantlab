@@ -101,7 +101,12 @@ export default function SaveBacktestModal({
       end_date: result.end_date,
       initial_capital: result.initial_capital,
       transaction_cost_bps: result.transaction_cost_bps,
-      params: buildParams(result),
+      params: {
+        ...buildParams(result),
+        // Preserve the direction mode (long_only / short_only / long_short).
+        // Older saved records simply omit it and load as long_only.
+        ...(result.position_mode ? { position_mode: result.position_mode } : {}),
+      },
       metrics: result.strategy_metrics as unknown as Record<string, unknown>,
       equity_curve: result.equity_curve,
       trades: result.trades,

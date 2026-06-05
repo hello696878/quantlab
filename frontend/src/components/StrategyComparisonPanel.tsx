@@ -642,13 +642,18 @@ export default function StrategyComparisonPanel() {
               Highlighted row = best Sharpe ratio.  Max DD in red when below −20%.
             </p>
             <p className="mt-1 text-xs text-slate-400">
-              These are all <span className="font-medium text-slate-500">long-only</span>{" "}
-              strategies run with fixed demo-friendly defaults. A{" "}
+              <span className="font-medium text-slate-500">
+                Strategy Comparison uses long-only mode by default.
+              </span>{" "}
+              All five run with fixed demo-friendly defaults. A{" "}
               <span className="font-medium text-slate-500">“No signal · stayed flat”</span>{" "}
               tag means the strategy never triggered an entry over this period
               (common in downtrends or with strict parameters) — it is not an
-              error. Adjust parameters or pick a more responsive preset on the
-              Backtest tab, and validate with the research tools.
+              error. To study long/short behaviour, use the direction modes on
+              the Backtest tab; long/short is not guaranteed to improve
+              performance — it is useful for studying bearish signal quality.
+              Adjust parameters or pick a more responsive preset, and validate
+              with the research tools.
             </p>
           </div>
 

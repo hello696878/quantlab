@@ -142,6 +142,19 @@ export interface EquityPoint {
   benchmark: number;
 }
 
+/** Direction / exposure diagnostics (present for single-asset backtests). */
+export interface BacktestDiagnostics {
+  long_trade_count: number;
+  short_trade_count: number;
+  percent_time_long: number;
+  percent_time_short: number;
+  percent_time_cash: number;
+  gross_long_return: number;
+  gross_short_return: number;
+  short_return_contribution: number;
+  turnover_estimate: number;
+}
+
 // ---------------------------------------------------------------------------
 // Unified response  (all six strategy endpoints return this shape)
 // ---------------------------------------------------------------------------
@@ -194,6 +207,8 @@ export interface BacktestResponse {
   equity_curve: EquityPoint[];
   trades: TradeRecord[];
   num_trades: number;
+  /** Direction / exposure diagnostics (absent on older saved results). */
+  diagnostics?: BacktestDiagnostics | null;
 }
 
 // A backend 422 / 404 error detail string.

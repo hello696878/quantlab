@@ -427,6 +427,28 @@ class EquityPoint(BaseModel):
 # Full response  (shared by all six strategy endpoints)
 # ===========================================================================
 
+class BacktestDiagnostics(BaseModel):
+    """
+    Direction / exposure diagnostics for a single-asset backtest.
+
+    Long/short gross returns are pre-cost and decompose multiplicatively
+    (cash bars contribute a factor of 1).  Borrow costs, margin and funding are
+    **not** modelled.
+    """
+
+    long_trade_count: int = Field(description="Entries into a long position (BUY + FLIP_TO_LONG).")
+    short_trade_count: int = Field(description="Entries into a short position (SHORT + FLIP_TO_SHORT).")
+    percent_time_long: float = Field(description="Fraction of bars held long (0–1).")
+    percent_time_short: float = Field(description="Fraction of bars held short (0–1).")
+    percent_time_cash: float = Field(description="Fraction of bars in cash (0–1).")
+    gross_long_return: float = Field(description="Pre-cost compounded return earned while long.")
+    gross_short_return: float = Field(description="Pre-cost compounded return earned while short.")
+    short_return_contribution: float = Field(
+        description="Incremental compound effect of the short legs on total gross return."
+    )
+    turnover_estimate: float = Field(description="Total |Δposition| over the period.")
+
+
 class BacktestResponse(BaseModel):
     """
     Universal backtest response.
@@ -513,6 +535,10 @@ class BacktestResponse(BaseModel):
     equity_curve: List[EquityPoint]
     trades: List[TradeRecord]
     num_trades: int = Field(description="Total number of trade events.")
+    diagnostics: Optional[BacktestDiagnostics] = Field(
+        default=None,
+        description="Direction / exposure diagnostics (long/short trade counts, time-in-state, gross contributions, turnover).",
+    )
 
 
 # ===========================================================================

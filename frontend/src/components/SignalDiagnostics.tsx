@@ -25,12 +25,17 @@ const TREND_STRATEGIES = new Set([
 export default function SignalDiagnostics({
   numTrades,
   strategy,
+  positionMode,
 }: {
   numTrades: number;
   strategy: string;
+  positionMode?: string;
 }) {
-  const isLongOnly = LONG_ONLY_STRATEGIES.has(strategy);
-  const isTrend = TREND_STRATEGIES.has(strategy);
+  // The long-only / "stays flat in downtrends" notes only apply in long-only
+  // mode; short / long-short runs take bearish exposure instead.
+  const longOnly = (positionMode ?? "long_only") === "long_only";
+  const isLongOnly = LONG_ONLY_STRATEGIES.has(strategy) && longOnly;
+  const isTrend = TREND_STRATEGIES.has(strategy) && longOnly;
   const zeroTradeSuggestion =
     strategy === "pairs"
       ? "Try a lower entry z-score, a wider date range, or a different pair."

@@ -189,6 +189,75 @@ def run_backtest(
     return strategy_equity, benchmark_equity, trades
 
 
+def compute_position_diagnostics(
+    close: pd.Series,
+    position: pd.Series,
+    trades: List[Dict],
+) -> Dict:
+    """
+    Direction / exposure diagnostics for a single-asset backtest.
+
+    All figures are computed from the (already shifted) position series and the
+    close-to-close returns — no extra assumptions, no fabricated data.  Long /
+    short gross returns are *pre-cost* and decompose multiplicatively
+    (cash bars contribute a factor of 1):
+
+        (1 + total_gross) = (1 + gross_long) * (1 + gross_short)
+
+    ``short_return_contribution`` is the incremental compound effect the short
+    legs added to (or subtracted from) the total gross return relative to the
+    long/cash bars alone:  ``gross_short * (1 + gross_long)``.
+
+    Returns a dict matching :class:`schemas.BacktestDiagnostics`.
+    """
+    pos = position.reindex(close.index).ffill().fillna(0.0)
+    daily_return = close.pct_change().fillna(0.0)
+    n = len(pos)
+
+    long_mask = pos > 0
+    short_mask = pos < 0
+    cash_mask = pos == 0
+
+    pct_long = float(long_mask.mean()) if n else 0.0
+    pct_short = float(short_mask.mean()) if n else 0.0
+    pct_cash = float(cash_mask.mean()) if n else 0.0
+
+    # Per-bar pre-cost strategy market return = position * asset_return.
+    market = (pos * daily_return).to_numpy()
+    long_factors = market[long_mask.to_numpy()]
+    short_factors = market[short_mask.to_numpy()]
+    gross_long = float(np.prod(1.0 + long_factors) - 1.0) if long_factors.size else 0.0
+    gross_short = float(np.prod(1.0 + short_factors) - 1.0) if short_factors.size else 0.0
+    short_contribution = gross_short * (1.0 + gross_long)
+
+    # Turnover: total |Δposition| (open/close = 1, long↔short flip = 2),
+    # including the initial move away from cash.
+    if n:
+        pos_change = pos.diff().fillna(pos.iloc[0])
+        turnover = float(pos_change.abs().sum())
+    else:
+        turnover = 0.0
+
+    long_entries = sum(
+        1 for t in trades if t.get("action") in ("BUY", "FLIP_TO_LONG")
+    )
+    short_entries = sum(
+        1 for t in trades if t.get("action") in ("SHORT", "FLIP_TO_SHORT")
+    )
+
+    return {
+        "long_trade_count": long_entries,
+        "short_trade_count": short_entries,
+        "percent_time_long": round(pct_long, 6),
+        "percent_time_short": round(pct_short, 6),
+        "percent_time_cash": round(pct_cash, 6),
+        "gross_long_return": round(gross_long, 6),
+        "gross_short_return": round(gross_short, 6),
+        "short_return_contribution": round(short_contribution, 6),
+        "turnover_estimate": round(turnover, 4),
+    }
+
+
 def run_pairs_backtest(
     close_y: pd.Series,
     close_x: pd.Series,

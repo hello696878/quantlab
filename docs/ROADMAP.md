@@ -451,6 +451,30 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   long-short produce the expected SHORT/COVER/FLIP actions and inverse P&L
 - RSI / Bollinger left long-only for now (clean symmetric short = future work)
 
+### Phase 9.5.1 — Long/Short Mode UX & Diagnostics ✅
+
+- Confirmed `long_only` stays the default everywhere (forms, schema, Strategy
+  Comparison); requests omitting `position_mode` and old saved backtests (params
+  without the field) load as long-only
+- UX wording near the Direction control: per-mode helper text (long-only stays
+  in cash; short-only is experimental/no borrow costs; long/short is an
+  **advanced research mode** that may underperform trending assets) plus a
+  "short-selling costs, borrow fees, margin calls, liquidation not modelled" note
+- **Direction Diagnostics**: optional `BacktestDiagnostics` on `BacktestResponse`
+  computed in the engine (`compute_position_diagnostics`) — long/short trade
+  counts, % time long/short/cash, pre-cost gross long & short return (exact
+  multiplicative decomposition), short contribution, turnover. New
+  `ShortModeDiagnostics.tsx` card renders for short-enabled runs and says whether
+  shorts helped or hurt
+- Strategy Comparison labelled "uses long-only mode by default" + "long/short is
+  not guaranteed to improve performance — useful for studying bearish signals"
+- Reports: short-selling caveat added when `position_mode` is short/long-short,
+  `position_mode` shown in metadata table + saved-report metadata
+- Saved backtests preserve `position_mode` (in `params`); `SignalDiagnostics`
+  made mode-aware (no misleading "long-only" note on short runs)
+- Backend additive only (optional field; no breaking change). New diagnostics
+  tests; `pytest -q` green (**836 passed**); `tsc --noEmit` clean
+
 ---
 
 ## Future Phases

@@ -41,7 +41,11 @@ from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 
-from app.backtest import run_backtest, run_pairs_backtest
+from app.backtest import (
+    compute_position_diagnostics,
+    run_backtest,
+    run_pairs_backtest,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -265,6 +269,7 @@ def _build_response(
 
     strategy_metrics_dict = compute_metrics(strategy_equity)
     benchmark_metrics_dict = compute_metrics(benchmark_equity)
+    diagnostics = compute_position_diagnostics(close, position, trades)
 
     equity_curve = [
         EquityPoint(
@@ -302,6 +307,7 @@ def _build_response(
         equity_curve=equity_curve,
         trades=[TradeRecord(**t) for t in trades],
         num_trades=len(trades),
+        diagnostics=diagnostics,
     )
 
 

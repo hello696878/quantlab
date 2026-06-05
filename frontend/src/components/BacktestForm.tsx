@@ -623,13 +623,15 @@ export default function BacktestForm({
                   ))}
                 </div>
               </div>
-              {currentMode !== "long_only" && (
-                <p className="mt-1.5 text-[11px] text-slate-400">
-                  {currentMode === "short_only"
-                    ? "Goes short on bearish signals (−1), cash otherwise. No leverage; |position| ≤ 1."
-                    : "Goes long on bullish signals (+1) and short on bearish signals (−1). No leverage."}
-                </p>
-              )}
+              <p className="mt-1.5 text-[11px] text-slate-400">
+                {currentMode === "long_only"
+                  ? "Long-only strategies can stay in cash during downtrends."
+                  : currentMode === "short_only"
+                    ? "Short-only mode trades only bearish signals. This is experimental and does not model borrow costs."
+                    : "Advanced research mode. Long/short mode may underperform on upward-trending assets due to whipsaws, higher turnover, and short-selling risk."}
+                {currentMode !== "long_only" &&
+                  " Short-selling costs, borrow fees, margin calls, and liquidation are not modelled."}
+              </p>
             </div>
           )}
           {strategy === "sma_crossover" &&

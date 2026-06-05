@@ -213,6 +213,46 @@ def test_api_invalid_mode_returns_422(client, endpoint):
     assert resp.status_code == 422
 
 
+def test_api_diagnostics_present_and_consistent(client):
+    body = client.post(
+        "/backtest/sma-crossover", json={"position_mode": "long_short"}
+    ).json()
+    d = body["diagnostics"]
+    assert d is not None
+    # Time fractions partition the period.
+    assert d["percent_time_long"] + d["percent_time_short"] + d[
+        "percent_time_cash"
+    ] == pytest.approx(1.0, abs=1e-6)
+    # Trade counts match the trade-log actions.
+    longs = sum(1 for t in body["trades"] if t["action"] in ("BUY", "FLIP_TO_LONG"))
+    shorts = sum(
+        1 for t in body["trades"] if t["action"] in ("SHORT", "FLIP_TO_SHORT")
+    )
+    assert d["long_trade_count"] == longs
+    assert d["short_trade_count"] == shorts
+    assert d["turnover_estimate"] >= 0
+    # Short contribution decomposition: gross_short * (1 + gross_long).
+    assert d["short_return_contribution"] == pytest.approx(
+        d["gross_short_return"] * (1.0 + d["gross_long_return"]), abs=1e-5
+    )
+
+
+def test_api_diagnostics_long_only_has_no_short_exposure(client):
+    d = client.post("/backtest/sma-crossover", json={}).json()["diagnostics"]
+    assert d["percent_time_short"] == 0.0
+    assert d["short_trade_count"] == 0
+    assert d["gross_short_return"] == 0.0
+
+
+def test_api_diagnostics_short_only_has_no_long_exposure(client):
+    d = client.post(
+        "/backtest/sma-crossover", json={"position_mode": "short_only"}
+    ).json()["diagnostics"]
+    assert d["percent_time_long"] == 0.0
+    assert d["long_trade_count"] == 0
+    assert d["percent_time_short"] > 0.0
+
+
 def test_api_long_only_matches_omitted_mode(client):
     """Explicit long_only equals the implicit default (no behaviour drift)."""
     a = client.post("/backtest/sma-crossover", json={}).json()
