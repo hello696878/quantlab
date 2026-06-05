@@ -1,0 +1,311 @@
+/* ============================================================================
+   QuantLab Terminal — Design Tokens
+   Dark-mode-first quant research terminal.
+   All values exposed as CSS custom properties; accent theme is swappable
+   at runtime via [data-accent] on <html> (driven by the Tweaks panel).
+   ============================================================================ */
+
+:root {
+  /* ---- Surfaces / background (deep navy-black, cool hue) ---------------- */
+  --bg-void:      #05070d;   /* deepest, behind everything */
+  --bg-base:      #080b14;   /* app background */
+  --bg-panel:     #0c1120;   /* solid panels */
+  --bg-elev:      #11182b;   /* raised elements */
+
+  /* Glass fills (translucent, sit over the grid background) */
+  --glass:        rgba(255, 255, 255, 0.030);
+  --glass-strong: rgba(255, 255, 255, 0.055);
+  --glass-hover:  rgba(255, 255, 255, 0.075);
+
+  /* ---- Hairlines / borders -------------------------------------------- */
+  --line:         rgba(255, 255, 255, 0.07);
+  --line-strong:  rgba(255, 255, 255, 0.12);
+  --line-faint:   rgba(255, 255, 255, 0.04);
+
+  /* ---- Text ------------------------------------------------------------ */
+  --text-hi:      #e8ecf6;   /* primary */
+  --text:         #b4bccd;   /* body */
+  --text-mut:     #79839a;   /* muted / labels */
+  --text-faint:   #4f586d;   /* faintest / disabled */
+
+  /* ---- Accents (harmonized in oklch: L~0.78, C~0.15, hue varies) ------- */
+  --blue:    oklch(0.72 0.16 256);
+  --blue-dim: oklch(0.62 0.13 256);
+  --cyan:    oklch(0.82 0.13 205);
+  --emerald: oklch(0.80 0.15 162);
+
+  /* Semantic */
+  --pos:     oklch(0.80 0.15 162);   /* gains — emerald */
+  --neg:     oklch(0.68 0.19 18);    /* losses — rose-red */
+  --warn:    oklch(0.82 0.14 80);    /* warnings — amber */
+  --pos-soft: color-mix(in oklch, var(--pos) 16%, transparent);
+  --neg-soft: color-mix(in oklch, var(--neg) 16%, transparent);
+  --warn-soft: color-mix(in oklch, var(--warn) 16%, transparent);
+
+  /* ---- The active accent (primitives overridden per theme below) -------- */
+  --accent:      var(--blue);
+  --accent-2:    var(--cyan);
+  --accent-rgb:  77, 139, 255;       /* for rgba() glows */
+  --accent-2-rgb: 52, 214, 224;
+  --accent-hue:  256;                /* oklch hue — drives the heatmap ramp */
+  --accent-2-hue: 205;
+
+  /* ---- Derived accent tokens (auto-cascade from --accent / --accent-rgb) -
+     Every accent-tinted surface in the app reads ONE of these, so a single
+     theme swap re-skins the whole product, not just the sidebar. ---------- */
+  --accent-soft:   color-mix(in oklch, var(--accent) 15%, transparent);  /* badges, selected rows, soft fills */
+  --accent-softer: color-mix(in oklch, var(--accent) 8%,  transparent);  /* hover wash, metric highlight bg */
+  --accent-line:   color-mix(in oklch, var(--accent) 40%, transparent);  /* accent hairlines, badge borders */
+  --accent-ink:    color-mix(in oklch, var(--accent) 88%, white);        /* accent text on dark */
+  --on-accent:     #05070d;                                              /* text on a solid accent fill */
+
+  /* ---- Spacing scale (4px base) --------------------------------------- */
+  --s-1: 4px;  --s-2: 8px;  --s-3: 12px; --s-4: 16px;
+  --s-5: 20px; --s-6: 24px; --s-8: 32px; --s-10: 40px;
+  --s-12: 48px; --s-16: 64px; --s-20: 80px;
+
+  /* ---- Radius ---------------------------------------------------------- */
+  --r-xs: 6px; --r-sm: 9px; --r-md: 13px; --r-lg: 18px; --r-xl: 24px; --r-pill: 999px;
+
+  /* ---- Type ------------------------------------------------------------ */
+  --font-ui:   "Manrope", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+
+  --t-2xs: 10.5px; --t-xs: 11.5px; --t-sm: 13px; --t-base: 14.5px;
+  --t-md: 16px; --t-lg: 19px; --t-xl: 24px; --t-2xl: 31px; --t-3xl: 42px; --t-4xl: 56px;
+
+  /* ---- Shadows / elevation -------------------------------------------- */
+  --sh-sm: 0 1px 2px rgba(0,0,0,0.4);
+  --sh-md: 0 4px 16px rgba(0,0,0,0.35), 0 1px 2px rgba(0,0,0,0.4);
+  --sh-lg: 0 18px 50px -12px rgba(0,0,0,0.65), 0 2px 8px rgba(0,0,0,0.4);
+  --glow:  0 0 0 1px color-mix(in oklch, var(--accent) 55%, transparent),
+           0 0 28px -4px rgba(var(--accent-rgb), 0.45);
+  --glow-soft: 0 0 24px -8px rgba(var(--accent-rgb), 0.35);
+
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ============================================================================
+   ACCENT THEMES — set [data-accent] on <html>; the live switcher + Tweaks
+   panel both write this attribute. Each theme overrides only the PRIMITIVES;
+   all derived tokens above cascade automatically.
+   Six curated accents, all tuned to the same perceptual lightness/chroma so
+   the product reads as ONE institutional system, never a rainbow.
+   ============================================================================ */
+:root[data-accent="cyan"] {
+  --accent: oklch(0.82 0.13 205); --accent-2: oklch(0.70 0.15 256);
+  --accent-rgb: 52, 214, 224; --accent-2-rgb: 96, 152, 255; --accent-hue: 205; --accent-2-hue: 256;
+}
+:root[data-accent="blue"] {
+  --accent: oklch(0.72 0.16 256); --accent-2: oklch(0.82 0.13 205);
+  --accent-rgb: 77, 139, 255; --accent-2-rgb: 52, 214, 224; --accent-hue: 256; --accent-2-hue: 205;
+}
+:root[data-accent="emerald"] {
+  --accent: oklch(0.80 0.15 162); --accent-2: oklch(0.80 0.12 195);
+  --accent-rgb: 43, 214, 160; --accent-2-rgb: 64, 208, 208; --accent-hue: 162; --accent-2-hue: 195;
+}
+:root[data-accent="violet"] {
+  --accent: oklch(0.69 0.17 292); --accent-2: oklch(0.72 0.15 262);
+  --accent-rgb: 162, 134, 248; --accent-2-rgb: 116, 150, 255; --accent-hue: 292; --accent-2-hue: 262;
+}
+:root[data-accent="amber"] {
+  --accent: oklch(0.82 0.13 78); --accent-2: oklch(0.74 0.15 52);
+  --accent-rgb: 240, 182, 72; --accent-2-rgb: 246, 150, 88; --accent-hue: 78; --accent-2-hue: 52;
+}
+/* Risk mode — deliberately charged red accent for stress dashboards.
+   Loss semantics shift to a deeper crimson so up/down stays legible. */
+:root[data-accent="red"] {
+  --accent: oklch(0.64 0.20 22); --accent-2: oklch(0.78 0.14 60);
+  --accent-rgb: 240, 86, 92; --accent-2-rgb: 246, 168, 92; --accent-hue: 22; --accent-2-hue: 60;
+  --neg: oklch(0.58 0.20 12);
+}
+
+/* ---- Glow intensity (Tweaks) ------------------------------------------- */
+:root[data-glow="low"]  { --glow-mult: 0.4; }
+:root[data-glow="med"]  { --glow-mult: 1;   }
+:root[data-glow="high"] { --glow-mult: 1.7; }
+
+/* ============================================================================
+   Base
+   ============================================================================ */
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0; padding: 0;
+  background: var(--bg-base);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--t-base);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* The signature ambient backdrop: deep navy + subtle grid + accent aurora */
+body::before {
+  content: "";
+  position: fixed; inset: 0; z-index: -2;
+  background:
+    radial-gradient(1100px 700px at 78% -8%, rgba(var(--accent-rgb), 0.10), transparent 60%),
+    radial-gradient(900px 600px at 8% 108%, rgba(var(--accent-rgb), 0.06), transparent 55%),
+    var(--bg-base);
+}
+body::after {
+  content: "";
+  position: fixed; inset: 0; z-index: -1;
+  display: var(--grid-display, block);
+  background-image:
+    linear-gradient(var(--line-faint) 1px, transparent 1px),
+    linear-gradient(90deg, var(--line-faint) 1px, transparent 1px);
+  background-size: 44px 44px;
+  -webkit-mask-image: radial-gradient(circle at 50% 30%, black, transparent 95%);
+          mask-image: radial-gradient(circle at 50% 30%, black, transparent 95%);
+  opacity: 0.6;
+}
+
+::selection { background: rgba(var(--accent-rgb), 0.3); color: #fff; }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 999px; border: 2px solid transparent; background-clip: padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-faint); background-clip: padding-box; }
+
+/* ============================================================================
+   Reusable primitives
+   ============================================================================ */
+.mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+.glass {
+  background: var(--glass);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  backdrop-filter: blur(14px) saturate(1.1);
+  -webkit-backdrop-filter: blur(14px) saturate(1.1);
+}
+:root[data-cardstyle="solid"] .glass { background: var(--bg-panel); backdrop-filter: none; -webkit-backdrop-filter: none; }
+:root[data-cardstyle="outline"] .glass { background: transparent; }
+
+/* top-edge sheen most glass cards share */
+.glass.sheen { position: relative; overflow: hidden; }
+.glass.sheen::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 1px;
+  background: linear-gradient(90deg, transparent, var(--line-strong) 30%, var(--line-strong) 70%, transparent);
+}
+
+.pos { color: var(--pos); }
+.neg { color: var(--neg); }
+.warn { color: var(--warn); }
+.accent { color: var(--accent); }
+
+.uplabel {
+  font-size: var(--t-2xs); letter-spacing: 0.13em; text-transform: uppercase;
+  color: var(--text-mut); font-weight: 600;
+}
+
+/* focus ring */
+button, input, select { font-family: inherit; }
+button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible {
+  outline: 2px solid color-mix(in oklch, var(--accent) 70%, transparent);
+  outline-offset: 2px;
+}
+
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes pulse-dot { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.35; transform: scale(0.82); } }
+/* transform-only: if a frozen (hidden) document never advances the timeline,
+   content stays fully visible — just nudged 8px. Never strands at opacity 0. */
+@keyframes rise { from { transform: translateY(8px); } to { transform: translateY(0); } }
+@keyframes shimmer { 100% { background-position: 200% 0; } }
+
+.rise { animation: rise 0.5s var(--ease-out) both; }
+
+/* live status dot */
+.livedot { width: 7px; height: 7px; border-radius: 999px; background: var(--pos); box-shadow: 0 0 8px var(--pos); animation: pulse-dot 2s var(--ease) infinite; }
+
+/* ============================================================================
+   THEMED SURFACES — every class here reads an accent token, so all of them
+   re-skin together on a theme swap. This is the heart of the theme system.
+   ============================================================================ */
+
+/* Accent text + rules */
+.accent-text { color: var(--accent-ink); }
+.accent-rule { border-color: var(--accent-line) !important; }
+
+/* Primary button — solid accent, on-accent ink, restrained glow */
+.btn-primary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 16px; border-radius: var(--r-sm); border: none; cursor: pointer;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 700; color: var(--on-accent);
+  background: linear-gradient(135deg, var(--accent), color-mix(in oklch, var(--accent) 72%, var(--accent-2)));
+  box-shadow: 0 0 0 1px color-mix(in oklch, var(--accent) 45%, transparent), 0 6px 20px -8px rgba(var(--accent-rgb), 0.7);
+}
+.btn-primary:hover { filter: brightness(1.06); }
+
+/* Secondary button — glass with an accent-tinted border that warms on hover */
+.btn-secondary {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 9px 16px; border-radius: var(--r-sm); cursor: pointer;
+  font-family: var(--font-ui); font-size: 13px; font-weight: 600; color: var(--text-hi);
+  background: var(--glass); border: 1px solid var(--accent-line);
+}
+.btn-secondary:hover { background: var(--accent-softer); border-color: var(--accent); color: var(--accent-ink); }
+
+/* Ghost button — text only, accent on hover */
+.btn-ghost {
+  padding: 8px 12px; border-radius: var(--r-sm); border: 1px solid var(--line); cursor: pointer;
+  background: transparent; color: var(--text-mut); font-family: var(--font-ui); font-size: 13px; font-weight: 600;
+}
+.btn-ghost:hover { color: var(--accent-ink); border-color: var(--accent-line); }
+
+/* Tabs */
+.tabbar { display: inline-flex; gap: 4px; padding: 3px; background: var(--glass); border: 1px solid var(--line); border-radius: var(--r-sm); }
+.tab { padding: 6px 13px; border-radius: 7px; border: none; cursor: pointer; background: transparent;
+  color: var(--text-mut); font-family: var(--font-ui); font-size: 12.5px; font-weight: 600; }
+.tab:hover { color: var(--text); }
+.tab.active { background: var(--accent-soft); color: var(--accent-ink); box-shadow: inset 0 0 0 1px var(--accent-line); }
+
+/* Accent badge / chip */
+.badge-accent {
+  display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: var(--r-pill);
+  font-family: var(--font-mono); font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-transform: uppercase;
+  color: var(--accent-ink); background: var(--accent-soft); border: 1px solid var(--accent-line);
+}
+
+/* Input with accent focus ring */
+.field-input {
+  width: 100%; padding: 9px 12px; border-radius: var(--r-sm); background: var(--bg-void);
+  border: 1px solid var(--line-strong); color: var(--text-hi); font-family: var(--font-mono); font-size: 13px; outline: none;
+}
+.field-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), 0.22); }
+
+/* Selected / highlighted table row */
+.row-selected { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+
+/* Metric card highlight (accent variant) */
+.metric-accent { border-color: var(--accent-line) !important; box-shadow: 0 0 28px -10px rgba(var(--accent-rgb), 0.55); }
+.metric-accent .metric-value { color: var(--accent-ink); }
+
+/* Report header accent band */
+.report-accent-band { height: 3px; border-radius: 3px; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+
+/* Theme switcher swatch */
+.swatch { width: 22px; height: 22px; border-radius: 7px; border: 1.5px solid var(--line-strong); cursor: pointer; padding: 0;
+  position: relative; transition: transform .12s var(--ease); }
+.swatch:hover { transform: translateY(-1px) scale(1.06); }
+.swatch[data-on="true"] { border-color: #fff; box-shadow: 0 0 0 2px rgba(0,0,0,0.5), 0 0 14px -2px currentColor; }
+.swatch[data-on="true"]::after { content: ""; position: absolute; inset: 0; margin: auto; width: 7px; height: 7px; border-radius: 999px; background: #05070d; }
+
+/* ---- Sidebar nav (CSS-driven hover/active — never mutate style in JS) ---- */
+.navbtn {
+  display: flex; align-items: center; gap: 11px; padding: 9px 11px; border-radius: 10px;
+  border: none; cursor: pointer; background: transparent; color: var(--text-mut);
+  text-align: left; font-size: 13.5px; font-weight: 500; font-family: var(--font-ui);
+}
+.navbtn:hover { background: var(--glass); color: var(--text); }
+.navbtn .navicon { display: flex; color: inherit; }
+.navbtn.active {
+  background: rgba(var(--accent-rgb), 0.12); color: var(--text-hi);
+  font-weight: 600; box-shadow: inset 2px 0 0 var(--accent);
+}
+.navbtn.active .navicon { color: var(--accent); }
