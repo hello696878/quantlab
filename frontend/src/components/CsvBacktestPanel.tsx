@@ -64,12 +64,14 @@ const FIELD_SPECS: Record<CsvStrategy, FieldSpec[]> = {
   ],
 };
 
+// Demo-friendly defaults (match the single-strategy Backtest form), chosen for
+// usability rather than performance.
 const DEFAULTS: Record<CsvStrategy, Record<string, string>> = {
-  sma_crossover: { fast_window: "50", slow_window: "200" },
-  rsi_mean_reversion: { rsi_window: "14", oversold_threshold: "30", exit_threshold: "50" },
-  bollinger_band: { bb_window: "20", num_std: "2", exit_band: "middle" },
-  momentum: { momentum_window: "126", entry_threshold: "0", exit_threshold: "0" },
-  volatility_breakout: { lookback_window: "20", breakout_multiplier: "1", exit_window: "10" },
+  sma_crossover: { fast_window: "20", slow_window: "100" },
+  rsi_mean_reversion: { rsi_window: "14", oversold_threshold: "35", exit_threshold: "55" },
+  bollinger_band: { bb_window: "20", num_std: "1.8", exit_band: "middle" },
+  momentum: { momentum_window: "63", entry_threshold: "0", exit_threshold: "0" },
+  volatility_breakout: { lookback_window: "20", breakout_multiplier: "0.3", exit_window: "10" },
 };
 
 const STRATEGY_LABELS: Record<string, string> = {

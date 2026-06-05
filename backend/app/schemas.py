@@ -29,14 +29,20 @@ class BacktestRequest(BaseModel):
         description="Backtest end date in YYYY-MM-DD format (exclusive in yfinance).",
     )
     fast_window: int = Field(
-        default=50,
+        default=20,
         ge=2,
-        description="Fast SMA look-back window in trading days.",
+        description=(
+            "Fast SMA look-back window in trading days "
+            "(demo-friendly default: 20; use 50 for the classic long-term trend)."
+        ),
     )
     slow_window: int = Field(
-        default=200,
+        default=100,
         ge=2,
-        description="Slow SMA look-back window in trading days.",
+        description=(
+            "Slow SMA look-back window in trading days "
+            "(demo-friendly default: 100; use 200 for the classic golden-cross)."
+        ),
     )
     transaction_cost_bps: float = Field(
         default=10.0,
@@ -73,16 +79,19 @@ class RsiBacktestRequest(BaseModel):
         description="RSI look-back window in trading days.",
     )
     oversold_threshold: float = Field(
-        default=30.0,
+        default=35.0,
         ge=1.0,
         lt=100.0,
-        description="Enter long when RSI falls strictly below this level.",
+        description=(
+            "Enter long when RSI falls strictly below this level "
+            "(demo-friendly default: 35; use 30 for a stricter, classic oversold)."
+        ),
     )
     exit_threshold: float = Field(
-        default=50.0,
+        default=55.0,
         gt=1.0,
         le=100.0,
-        description="Exit long when RSI rises above this level.",
+        description="Exit long when RSI rises above this level (default: 55).",
     )
     transaction_cost_bps: float = Field(
         default=10.0,
@@ -128,10 +137,13 @@ class BbBacktestRequest(BaseModel):
         description="Bollinger Band rolling look-back window in trading days.",
     )
     num_std: float = Field(
-        default=2.0,
+        default=1.8,
         gt=0.0,
         le=10.0,
-        description="Width of the bands in standard deviations (typical: 2.0).",
+        description=(
+            "Width of the bands in standard deviations "
+            "(demo-friendly default: 1.8; classic Bollinger uses 2.0)."
+        ),
     )
     exit_band: Literal["middle", "upper"] = Field(
         default="middle",
@@ -170,12 +182,12 @@ class MomentumBacktestRequest(BaseModel):
         description="Backtest end date in YYYY-MM-DD format (exclusive in yfinance).",
     )
     momentum_window: int = Field(
-        default=126,
+        default=63,
         ge=1,
         le=1000,
         description=(
             "Trailing return look-back period in trading days "
-            "(default: 126 ≈ 6 months)."
+            "(demo-friendly default: 63 ≈ 3 months; 126 ≈ 6 months, 252 ≈ 12)."
         ),
     )
     entry_threshold: float = Field(
@@ -252,12 +264,13 @@ class PairsBacktestRequest(BaseModel):
         ),
     )
     entry_z_score: float = Field(
-        default=2.0,
+        default=1.5,
         gt=0.0,
         le=5.0,
         description=(
             "Enter a position when |z-score| exceeds this threshold "
-            "(default: 2.0).  Must be > exit_z_score."
+            "(demo-friendly default: 1.5; 2.0 is stricter/classic).  "
+            "Must be > exit_z_score."
         ),
     )
     exit_z_score: float = Field(
@@ -323,12 +336,13 @@ class VbBacktestRequest(BaseModel):
         ),
     )
     breakout_multiplier: float = Field(
-        default=1.0,
+        default=0.3,
         gt=0.0,
         le=10.0,
         description=(
             "Entry threshold: prior rolling high plus this multiple of the "
-            "prior rolling high-low range."
+            "prior rolling high-low range (demo-friendly default: 0.3; raise "
+            "toward 1.0+ for a stricter breakout buffer)."
         ),
     )
     exit_window: int = Field(

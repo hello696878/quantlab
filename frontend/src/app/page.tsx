@@ -46,12 +46,16 @@ import type {
 // Default parameters
 // ---------------------------------------------------------------------------
 
+// Defaults are chosen to be demo-friendly (produce a useful number of trades on
+// common assets over 2015–2023), not performance-optimized.  Classic/long-term
+// variants are available as one-click presets in the form.
+
 const DEFAULT_SMA_PARAMS: BacktestRequest = {
   ticker: "SPY",
   start_date: "2015-01-01",
   end_date: "2023-12-31",
-  fast_window: 50,
-  slow_window: 200,
+  fast_window: 20,
+  slow_window: 100,
   transaction_cost_bps: 10,
   initial_capital: 100_000,
 };
@@ -61,8 +65,8 @@ const DEFAULT_RSI_PARAMS: RsiBacktestRequest = {
   start_date: "2015-01-01",
   end_date: "2023-12-31",
   rsi_window: 14,
-  oversold_threshold: 30,
-  exit_threshold: 50,
+  oversold_threshold: 35,
+  exit_threshold: 55,
   transaction_cost_bps: 10,
   initial_capital: 100_000,
 };
@@ -72,7 +76,7 @@ const DEFAULT_BB_PARAMS: BbBacktestRequest = {
   start_date: "2015-01-01",
   end_date: "2023-12-31",
   bb_window: 20,
-  num_std: 2.0,
+  num_std: 1.8,
   exit_band: "middle",
   transaction_cost_bps: 10,
   initial_capital: 100_000,
@@ -82,7 +86,7 @@ const DEFAULT_MOMENTUM_PARAMS: MomentumBacktestRequest = {
   ticker: "SPY",
   start_date: "2015-01-01",
   end_date: "2023-12-31",
-  momentum_window: 126,
+  momentum_window: 63,
   entry_threshold: 0.0,
   exit_threshold: 0.0,
   transaction_cost_bps: 10,
@@ -94,7 +98,7 @@ const DEFAULT_VB_PARAMS: VbBacktestRequest = {
   start_date: "2015-01-01",
   end_date: "2023-12-31",
   lookback_window: 20,
-  breakout_multiplier: 1.0,
+  breakout_multiplier: 0.3,
   exit_window: 10,
   transaction_cost_bps: 10,
   initial_capital: 100_000,
@@ -106,7 +110,7 @@ const DEFAULT_PAIRS_PARAMS: PairsBacktestRequest = {
   start_date: "2015-01-01",
   end_date: "2023-12-31",
   lookback_window: 60,
-  entry_z_score: 2.0,
+  entry_z_score: 1.5,
   exit_z_score: 0.5,
   transaction_cost_bps: 10,
   initial_capital: 100_000,

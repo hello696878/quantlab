@@ -380,6 +380,27 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Frontend-only; no backend / API / quant changes; `tsc --noEmit` clean;
   verified in a running dev server with real yfinance data
 
+### Phase 9.4 — Calibrate Strategy Default Parameters ✅
+
+- Demo-friendly first-run defaults (usability, not performance; no quant-logic
+  change). Old → new: SMA `50/200 → 20/100`; RSI oversold/exit `30/50 → 35/55`;
+  Bollinger `2.0σ → 1.8σ`; momentum window `126 → 63`; volatility-breakout
+  multiplier `1.0 → 0.3`; pairs entry-z `2.0 → 1.5` (KO/PEP kept). Values were
+  sanity-checked on real SPY/QQQ/BTC-USD/GLD data for non-zero, non-noisy counts
+- Synced everywhere: `page.tsx` `DEFAULT_*_PARAMS`, `CsvBacktestPanel` `DEFAULTS`,
+  and the backend `schemas.py` `Field(default=…)` (docs/examples stay consistent;
+  explicit user inputs unaffected). Strategy Builder starter (SMA 20/50) was
+  already demo-friendly — left as-is; gallery templates keep their classic params
+- One-click **presets** added to `BacktestForm` for SMA / RSI / Bollinger /
+  momentum (incl. the classic long-term variants), plus a "defaults are
+  demo-friendly, not optimized — validate with the research tools" notice.
+  Numeric input editing behaviour unchanged; parameters stay user-editable
+- New `backend/tests/test_default_params.py` (14 tests): synthetic deterministic
+  prices (no live yfinance) confirm every default returns a valid backtest,
+  SMA/RSI defaults generate trades, and the calibrated values are locked in.
+  Updated the one CSV test that asserted the old SMA defaults
+- Backend `pytest -q` green (**811 passed**); frontend `tsc --noEmit` clean
+
 ---
 
 ## Future Phases

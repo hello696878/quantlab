@@ -319,9 +319,9 @@ def test_csv_negative_prices_rejected(client):
 
 
 def test_csv_defaults_when_params_empty(client):
-    # Empty params → model defaults (SMA 50/200); 300 rows is enough.
+    # Empty params → demo-friendly SMA model defaults (20/100); 300 rows is enough.
     resp = post_csv(client, strategy="sma_crossover", params={})
     assert resp.status_code == 200
     data = resp.json()
-    assert data["fast_window"] == 50
-    assert data["slow_window"] == 200
+    assert data["fast_window"] == 20
+    assert data["slow_window"] == 100

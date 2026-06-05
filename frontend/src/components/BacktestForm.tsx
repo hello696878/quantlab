@@ -116,6 +116,32 @@ const STRATEGIES: { id: StrategyType; label: string; description: string }[] = [
 ];
 
 // ---------------------------------------------------------------------------
+// One-click parameter presets (the demo-friendly default is first; the classic
+// long-term variant is included so users can opt into slower behaviour).
+// ---------------------------------------------------------------------------
+
+const SMA_PRESETS = [
+  { label: "Responsive 20/100", fast: 20, slow: 100 },
+  { label: "Classic 50/200", fast: 50, slow: 200 },
+  { label: "Short 10/50", fast: 10, slow: 50 },
+];
+const RSI_PRESETS = [
+  { label: "Conservative 30/50", ob: 30, exit: 50 },
+  { label: "Balanced 35/55", ob: 35, exit: 55 },
+  { label: "Aggressive 40/60", ob: 40, exit: 60 },
+];
+const BB_PRESETS = [
+  { label: "Classic 2.0σ", std: 2.0 },
+  { label: "Balanced 1.8σ", std: 1.8 },
+  { label: "Active 1.5σ", std: 1.5 },
+];
+const MOM_PRESETS = [
+  { label: "3-month (63)", window: 63 },
+  { label: "6-month (126)", window: 126 },
+  { label: "12-month (252)", window: 252 },
+];
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -267,6 +293,79 @@ export default function BacktestForm({
     value: PairsBacktestRequest[K],
   ) {
     onPairsParamsChange({ ...pairsParams, [key]: value });
+  }
+
+  // ---------------------------------------------------------------------------
+  // Parameter presets — set the numeric string state AND the parent params so
+  // editing behaviour is unchanged; a preset is just a one-click value setter.
+  // ---------------------------------------------------------------------------
+  function applySmaPreset(i: number) {
+    const p = SMA_PRESETS[i];
+    setSmaFastStr(String(p.fast));
+    setSmaSlowStr(String(p.slow));
+    onSmaParamsChange({ ...smaParams, fast_window: p.fast, slow_window: p.slow });
+  }
+  function applyRsiPreset(i: number) {
+    const p = RSI_PRESETS[i];
+    setRsiOversoldStr(String(p.ob));
+    setRsiExitStr(String(p.exit));
+    onRsiParamsChange({
+      ...rsiParams,
+      oversold_threshold: p.ob,
+      exit_threshold: p.exit,
+    });
+  }
+  function applyBbPreset(i: number) {
+    const p = BB_PRESETS[i];
+    setBbNumStdStr(String(p.std));
+    onBbParamsChange({ ...bbParams, num_std: p.std });
+  }
+  function applyMomPreset(i: number) {
+    const p = MOM_PRESETS[i];
+    setMomWindowStr(String(p.window));
+    onMomentumParamsChange({ ...momentumParams, momentum_window: p.window });
+  }
+
+  const smaActiveIdx = SMA_PRESETS.findIndex(
+    (p) => p.fast === smaParams.fast_window && p.slow === smaParams.slow_window,
+  );
+  const rsiActiveIdx = RSI_PRESETS.findIndex(
+    (p) =>
+      p.ob === rsiParams.oversold_threshold && p.exit === rsiParams.exit_threshold,
+  );
+  const bbActiveIdx = BB_PRESETS.findIndex((p) => p.std === bbParams.num_std);
+  const momActiveIdx = MOM_PRESETS.findIndex(
+    (p) => p.window === momentumParams.momentum_window,
+  );
+
+  function renderPresets(
+    items: { label: string }[],
+    activeIdx: number,
+    pick: (i: number) => void,
+  ) {
+    return (
+      <div className="mb-3 flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+          Presets
+        </span>
+        {items.map((p, i) => (
+          <button
+            key={p.label}
+            type="button"
+            disabled={loading}
+            onClick={() => pick(i)}
+            className={
+              "px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors " +
+              (activeIdx === i
+                ? "bg-blue-600 text-white border-blue-600"
+                : "bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-600")
+            }
+          >
+            {p.label}
+          </button>
+        ))}
+      </div>
+    );
   }
 
   // ---------------------------------------------------------------------------
@@ -442,6 +541,14 @@ export default function BacktestForm({
 
         {/* ── Strategy-specific fields ───────────────────────────────────── */}
         <div className="mb-5 p-4 rounded-lg bg-blue-50/60 border border-blue-100">
+          {strategy === "sma_crossover" &&
+            renderPresets(SMA_PRESETS, smaActiveIdx, applySmaPreset)}
+          {strategy === "rsi_mean_reversion" &&
+            renderPresets(RSI_PRESETS, rsiActiveIdx, applyRsiPreset)}
+          {strategy === "bollinger_band" &&
+            renderPresets(BB_PRESETS, bbActiveIdx, applyBbPreset)}
+          {strategy === "momentum" &&
+            renderPresets(MOM_PRESETS, momActiveIdx, applyMomPreset)}
           {strategy === "sma_crossover" ? (
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <Field label="Fast SMA" hint="days">
@@ -784,6 +891,17 @@ export default function BacktestForm({
             </div>
           )}
         </div>
+
+        {/* Demo-friendly defaults notice */}
+        <p className="mb-4 text-xs text-slate-400">
+          Default parameters are{" "}
+          <span className="font-medium text-slate-500">demo-friendly, not optimized</span>{" "}
+          — classic long-term presets are available above. Validate parameters with the{" "}
+          <span className="font-medium text-slate-500">
+            Parameter Sweep, Train/Test, and Walk-Forward
+          </span>{" "}
+          research tools; defaults are not recommendations.
+        </p>
 
         {/* ── Inline validation ─────────────────────────────────────────── */}
         {(!commonNumericOk ||

@@ -38,6 +38,8 @@ QuantLab lets you select a strategy, choose an asset and date range, tune parame
 
 All strategies apply a **one-day signal shift** — the position derived from day T's close prices is applied on day T+1. This prevents lookahead bias by construction.
 
+**Default parameters are chosen for usability, not performance.** They are calibrated to produce a useful (non-zero, non-noisy) number of trades on common demo assets (SPY, QQQ, BTC-USD, GLD) over 2015–2023 so the first run yields a meaningful chart and trade log — they are **not recommendations** and are not tuned for returns. Each strategy form offers one-click **presets** (including the classic long-term variants, e.g. SMA 50/200, Bollinger 2.0σ, 6-/12-month momentum), and you should validate any parameter choice with the **Parameter Sweep**, **Train/Test**, and **Walk-Forward** research tools before drawing conclusions.
+
 ### Research Tools
 
 | Tool | Purpose |
