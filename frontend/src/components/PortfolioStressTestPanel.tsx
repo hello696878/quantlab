@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { runStressTest } from "@/lib/api";
 import type { StressTestRequest, StressTestResponse } from "@/lib/types";
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildStressTestReport } from "@/lib/reportExport";
+import { loadSettings } from "@/lib/settings";
 import { fmtPct } from "@/lib/format";
 
 const inputCls =
@@ -124,6 +125,15 @@ export default function PortfolioStressTestPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
+
+  // Prefill capital and benchmark from settings on mount.  The full-period date
+  // window is intentionally left as-is so it keeps spanning the preset crisis
+  // scenarios (e.g. 2008, 2011).
+  useEffect(() => {
+    const s = loadSettings();
+    setCapitalStr(String(s.default_initial_capital));
+    setBenchmarkStr(s.default_benchmark_ticker);
+  }, []);
 
   const parsedTickers = useMemo(() => parseTickers(tickersStr), [tickersStr]);
 

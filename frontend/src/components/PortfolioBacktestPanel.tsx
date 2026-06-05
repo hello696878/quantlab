@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { runPortfolioBacktest } from "@/lib/api";
 import type {
   PortfolioBacktestResponse,
@@ -11,6 +11,7 @@ import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildPortfolioBacktestReport } from "@/lib/reportExport";
+import { loadSettings, resolveDateRange } from "@/lib/settings";
 import { fmtPct, fmtDollar } from "@/lib/format";
 
 const REBALANCE_OPTIONS: { id: PortfolioRebalanceFrequency; label: string }[] = [
@@ -106,6 +107,16 @@ export default function PortfolioBacktestPanel() {
   const [result, setResult] = useState<PortfolioBacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Prefill capital, cost, and date range from local settings on mount only.
+  useEffect(() => {
+    const s = loadSettings();
+    const { start_date, end_date } = resolveDateRange(s);
+    setStartDate(start_date);
+    setEndDate(end_date);
+    setCapitalStr(String(s.default_initial_capital));
+    setCostStr(String(s.default_transaction_cost_bps));
+  }, []);
 
   const { request, validationMsg } = useMemo(() => {
     const parsed = parseTickers(tickersStr);

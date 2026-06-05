@@ -84,6 +84,17 @@ Next to the export buttons, a **Save Report** button stores the generated report
 
 The **Saved Reports** workspace lists everything you have saved. Open a report to read it (the Markdown is rendered with a small built-in, HTML-escaping renderer — saved content is treated as untrusted text and **no embedded HTML/script is ever executed**), **Download Markdown**, **Print / Save as PDF**, or **Delete** it. Everything stays on your machine — no authentication, no cloud storage.
 
+### App Settings / Preferences
+
+The **Settings** workspace stores local preferences that prefill forms and control display conventions. Settings are kept in **browser `localStorage`** only — there is **no account and no cloud sync**, and they never change how the backend computes metrics.
+
+- **Defaults** — initial capital, transaction cost (bps), benchmark ticker, risk-free rate, and a default date range (`last_1y` / `last_3y` / `last_5y` / `last_10y` / `custom`). Relative ranges resolve from today when a form loads.
+- **Analytics conventions** — annualization convention (`252 trading days` or `365 crypto`). This is **stored for future use only**; the backend still annualizes with 252, and the panel shows a clear note (crypto 365 is flagged experimental).
+- **Appearance** — theme accent color (cyan / blue / emerald / violet / amber), applied immediately via the existing `data-accent` CSS and persisted right away (a tiny pre-paint script avoids a flash on reload).
+- **Reporting** — the default branded report template preselected by export panels.
+
+Defaults prefill **newly mounted** forms (single-strategy Backtest, Portfolio Backtest / Optimization / Stress Test, and the report template selector). A form you're already editing won't reset out from under you — changes apply to new forms (or after a reload). **Save settings** persists changes; **Reset to defaults** restores the built-in defaults.
+
 ### Custom Strategy Builder
 
 The **Strategy Builder** workspace is a no-code rule builder for long-only, single-asset strategies (`POST /backtest/custom`). Compose entry and exit rules that compare two operands — `close`, a numeric constant, or an indicator (`sma`, `rsi`, `bb_upper`/`bb_middle`/`bb_lower`, `momentum`) — with `>`, `>=`, `<`, or `<=`. Rules are combined with ALL (AND) or ANY (OR) logic; the position is shifted one bar forward to avoid lookahead bias. Rules are evaluated entirely with vectorised pandas math — **no `eval`, no user code is ever executed**. Indicators reuse the exact formulas of the built-in strategies. No short selling, leverage, or pairs.

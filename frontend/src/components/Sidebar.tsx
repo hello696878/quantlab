@@ -17,6 +17,8 @@ const ICONS: Record<string, string> = {
     "M5 3h11l3 3v15H5V3Zm3 0v6h7V3M8 14h8M8 17h8",
   report:
     "M7 3h7l4 4v14H7V3Zm7 0v4h4M10 12h5M10 16h5M10 8h2",
+  settings:
+    "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm8.4 3a8.4 8.4 0 0 0-.12-1.4l2-1.55-2-3.46-2.36.95a8.4 8.4 0 0 0-2.42-1.4L14.8 1.6h-4l-.3 2.94a8.4 8.4 0 0 0-2.42 1.4l-2.36-.95-2 3.46 2 1.55A8.4 8.4 0 0 0 3.6 12c0 .47.04.94.12 1.4l-2 1.55 2 3.46 2.36-.95a8.4 8.4 0 0 0 2.42 1.4l.3 2.94h4l.3-2.94a8.4 8.4 0 0 0 2.42-1.4l2.36.95 2-3.46-2-1.55c.08-.46.12-.93.12-1.4Z",
   upload: "M12 16V4m0 0L7 9m5-5 5 5M5 20h14",
   builder: "M4 7h7v7H4V7Zm9 3h7v7h-7v-7ZM7 4h10M16 14v6",
   portfolio: "M3 3v18h18M7 14l3-3 3 2 5-6",
@@ -100,6 +102,7 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "comparison", label: "Strategy Comparison", icon: "compare" },
   { id: "saved", label: "Saved Backtests", icon: "saved" },
   { id: "reports", label: "Saved Reports", icon: "report" },
+  { id: "settings", label: "Settings", icon: "settings" },
 ];
 
 interface SidebarProps {

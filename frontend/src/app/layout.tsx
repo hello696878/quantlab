@@ -13,8 +13,20 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-accent="blue">
+    <html lang="en" data-accent="cyan" suppressHydrationWarning>
       <head>
+        {/* Apply the saved theme accent before first paint (no flash). Reads the
+            same localStorage key as lib/settings.ts; falls back to the default
+            accent on any error. */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var a='cyan';var raw=localStorage.getItem('quantlab.settings.v1');" +
+              "if(raw){var p=JSON.parse(raw);if(p&&typeof p.accent_color==='string')a=p.accent_color;}" +
+              "if(['cyan','blue','emerald','violet','amber'].indexOf(a)===-1)a='cyan';" +
+              "document.documentElement.setAttribute('data-accent',a);}catch(e){}})();",
+          }}
+        />
         {/* Design-system fonts: Manrope (UI) + JetBrains Mono (data/figures).
             Loaded via <link> so an offline build still succeeds (system
             fallbacks apply at runtime). */}

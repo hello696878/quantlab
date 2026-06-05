@@ -313,6 +313,23 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Frontend-only (`tsc --noEmit` clean); no backend analytics or quant logic
   changed (backend `pytest -q` still green, 797 passed)
 
+### Phase 9.1 — App Settings / Preferences ✅
+
+- Local, single-user preferences in **`localStorage`** (no account, no cloud
+  sync): `lib/settings.ts` (typed `AppSettings`, defaults, validating
+  load/save/reset, `resolveDateRange`, `applyAccent`) + `SettingsPanel.tsx`
+- Settings: default initial capital, transaction cost bps, benchmark ticker,
+  risk-free rate, default date range, annualization convention, theme accent
+  (cyan/blue/emerald/violet/amber), default report template
+- Prefills **newly mounted** forms only (mount-effect, SSR-safe) so it never
+  overrides in-progress edits: single Backtest, Portfolio Backtest / Optimize /
+  Stress Test, and the report template selector
+- Theme accent applies live via existing `[data-accent]` CSS (violet/amber
+  added) + a pre-paint script in `layout.tsx` to avoid a flash on reload
+- Annualization convention is **stored for future use only** — backend still
+  uses 252 trading days; the panel shows a clear (crypto = experimental) note
+- Frontend-only (`tsc --noEmit` clean); no backend or quant-logic changes
+
 ---
 
 ## Future Phases

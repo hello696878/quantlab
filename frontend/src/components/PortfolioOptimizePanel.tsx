@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { runPortfolioOptimize } from "@/lib/api";
 import type {
   PortfolioObjective,
@@ -11,6 +11,7 @@ import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildPortfolioOptimizeReport } from "@/lib/reportExport";
+import { loadSettings, resolveDateRange } from "@/lib/settings";
 import { fmtPct, fmtRatio } from "@/lib/format";
 
 const OBJECTIVES: { id: PortfolioObjective; label: string }[] = [
@@ -98,6 +99,17 @@ export default function PortfolioOptimizePanel() {
   const [result, setResult] = useState<PortfolioOptimizeResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Prefill capital, cost, risk-free rate, and date range from settings on mount.
+  useEffect(() => {
+    const s = loadSettings();
+    const { start_date, end_date } = resolveDateRange(s);
+    setStartDate(start_date);
+    setEndDate(end_date);
+    setCapitalStr(String(s.default_initial_capital));
+    setCostStr(String(s.default_transaction_cost_bps));
+    setRfStr(String(s.default_risk_free_rate));
+  }, []);
 
   const { request, validationMsg } = useMemo(() => {
     const parsed = parseTickers(tickersStr);

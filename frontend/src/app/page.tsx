@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import AppShell, { type View } from "@/components/AppShell";
 import BacktestForm from "@/components/BacktestForm";
 import MetricsGrid from "@/components/MetricsGrid";
@@ -21,6 +21,8 @@ import SavedBacktestsList from "@/components/SavedBacktestsList";
 import SavedBacktestDetail from "@/components/SavedBacktestDetail";
 import SavedReportsList from "@/components/SavedReportsList";
 import SavedReportDetail from "@/components/SavedReportDetail";
+import SettingsPanel from "@/components/SettingsPanel";
+import { applyAccent, loadSettings, resolveDateRange } from "@/lib/settings";
 import {
   runBacktest,
   runBbBacktest,
@@ -289,6 +291,10 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Saved Reports",
     subtitle: "Research reports saved locally in SQLite — view, download, print.",
   },
+  settings: {
+    title: "Settings",
+    subtitle: "Local preferences for defaults, conventions, theme, and reports.",
+  },
 };
 
 // ---------------------------------------------------------------------------
@@ -343,6 +349,33 @@ export default function HomePage() {
   const [result, setResult] = useState<BacktestResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Bumping this key remounts BacktestForm so its internal numeric string
+  // states re-derive from the (settings-prefilled) param props.
+  const [formKey, setFormKey] = useState(0);
+
+  // Apply local settings once on startup: set the theme accent and prefill the
+  // single-backtest forms' common fields (capital, cost, date range).  Runs in
+  // an effect (client-only, post-hydration) so it never causes an SSR mismatch,
+  // and only on mount so it never overrides edits the user makes afterwards.
+  useEffect(() => {
+    const s = loadSettings();
+    applyAccent(s.accent_color);
+    const { start_date, end_date } = resolveDateRange(s);
+    const common = {
+      initial_capital: s.default_initial_capital,
+      transaction_cost_bps: s.default_transaction_cost_bps,
+      start_date,
+      end_date,
+    };
+    setSmaParams((p) => ({ ...p, ...common }));
+    setRsiParams((p) => ({ ...p, ...common }));
+    setBbParams((p) => ({ ...p, ...common }));
+    setMomentumParams((p) => ({ ...p, ...common }));
+    setVbParams((p) => ({ ...p, ...common }));
+    setPairsParams((p) => ({ ...p, ...common }));
+    setFormKey((k) => k + 1);
+  }, []);
 
   async function handleRun() {
     if (loading) return;
@@ -405,6 +438,7 @@ export default function HomePage() {
             </div>
 
             <BacktestForm
+              key={formKey}
               strategy={strategy}
               onStrategyChange={(s) => {
                 setStrategy(s);
@@ -689,6 +723,18 @@ export default function HomePage() {
                 onSelect={(id) => setSavedReportDetailId(id)}
               />
             )}
+          </>
+        )}
+
+        {/* ── Settings ─────────────────────────────────────────────────── */}
+        {view === "settings" && (
+          <>
+            <SectionIntro title="App Settings">
+              Configure local defaults that prefill forms and control display
+              conventions. Stored in your browser only — no account, no cloud
+              sync.
+            </SectionIntro>
+            <SettingsPanel />
           </>
         )}
       </div>

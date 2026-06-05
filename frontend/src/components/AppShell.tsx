@@ -15,7 +15,8 @@ export type View =
   | "walk-forward"
   | "comparison"
   | "saved"
-  | "reports";
+  | "reports"
+  | "settings";
 
 interface AppShellProps {
   active: View;

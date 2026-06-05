@@ -36,6 +36,8 @@
   --blue:    oklch(0.72 0.16 256);
   --cyan:    oklch(0.82 0.13 205);
   --emerald: oklch(0.80 0.15 162);
+  --violet:  oklch(0.72 0.17 292);
+  --amber:   oklch(0.82 0.15 78);
 
   --pos:  oklch(0.80 0.15 162);
   --neg:  oklch(0.68 0.19 18);
@@ -73,9 +75,11 @@
 }
 
 /* Accent themes (kept for future user-preference theming) */
-:root[data-accent="blue"]    { --accent: var(--blue);    --accent-2: var(--cyan);  --accent-rgb: 77, 139, 255; }
-:root[data-accent="cyan"]    { --accent: var(--cyan);    --accent-2: var(--blue);  --accent-rgb: 52, 224, 232; }
-:root[data-accent="emerald"] { --accent: var(--emerald); --accent-2: var(--cyan);  --accent-rgb: 43, 224, 168; }
+:root[data-accent="blue"]    { --accent: var(--blue);    --accent-2: var(--cyan);    --accent-rgb: 77, 139, 255; }
+:root[data-accent="cyan"]    { --accent: var(--cyan);    --accent-2: var(--blue);    --accent-rgb: 52, 224, 232; }
+:root[data-accent="emerald"] { --accent: var(--emerald); --accent-2: var(--cyan);    --accent-rgb: 43, 224, 168; }
+:root[data-accent="violet"]  { --accent: var(--violet);  --accent-2: var(--cyan);    --accent-rgb: 167, 139, 250; }
+:root[data-accent="amber"]   { --accent: var(--amber);   --accent-2: var(--emerald); --accent-rgb: 251, 191, 36; }
 
 /* ============================================================================
    Base

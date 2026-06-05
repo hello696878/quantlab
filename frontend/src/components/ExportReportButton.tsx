@@ -9,6 +9,7 @@ import {
 } from "@/lib/reportExport";
 import PrintableReportModal from "@/components/PrintableReportModal";
 import SaveReportModal from "@/components/SaveReportModal";
+import { loadSettings } from "@/lib/settings";
 
 /**
  * Report export controls shown wherever results are displayed.
@@ -48,9 +49,12 @@ export default function ExportReportButton({
       ? REPORT_TEMPLATES.filter((t) => templates.includes(t.id))
       : REPORT_TEMPLATES;
 
-  const [template, setTemplate] = useState<ReportTemplate>(
-    options[0]?.id ?? "standard",
-  );
+  const [template, setTemplate] = useState<ReportTemplate>(() => {
+    const preferred = loadSettings().default_report_template;
+    return options.some((o) => o.id === preferred)
+      ? preferred
+      : options[0]?.id ?? "standard";
+  });
   const [preview, setPreview] = useState<Report | null>(null);
   const [toSave, setToSave] = useState<Report | null>(null);
 
