@@ -2128,8 +2128,14 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
 
     # Demo-friendly defaults — mirror the calibrated single-strategy schema
     # defaults so the comparison reflects what a first-run user sees.
+    # Direction mode applies only to strategies that support it; RSI and
+    # Bollinger always run long-only.
+    cmp_mode = request.position_mode
+
     # ── 1. SMA Crossover (fast=20, slow=100) ─────────────────────────────
-    sma_pos = sma_crossover_signals(close, fast_window=20, slow_window=100)
+    sma_pos = sma_crossover_signals(
+        close, fast_window=20, slow_window=100, position_mode=cmp_mode
+    )
     sma_eq, bench_eq, sma_trades = run_backtest(
         close=close,
         position=sma_pos,
@@ -2140,6 +2146,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         strategy="sma_crossover",
         display_name="SMA Crossover",
         params={"fast_window": 20, "slow_window": 100},
+        position_mode=cmp_mode,
         metrics=PerformanceMetrics(**compute_metrics(sma_eq)),
         equity_curve=_curve(sma_eq, bench_eq),
         num_trades=len(sma_trades),
@@ -2159,6 +2166,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         strategy="rsi_mean_reversion",
         display_name="RSI Mean Reversion",
         params={"rsi_window": 14, "oversold_threshold": 35.0, "exit_threshold": 55.0},
+        position_mode="long_only",  # mean-reversion: long-only only
         metrics=PerformanceMetrics(**compute_metrics(rsi_eq)),
         equity_curve=_curve(rsi_eq, bench_eq),
         num_trades=len(rsi_trades),
@@ -2178,6 +2186,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         strategy="bollinger_band",
         display_name="Bollinger Band",
         params={"bb_window": 20, "num_std": 1.8, "exit_band": "middle"},
+        position_mode="long_only",  # mean-reversion: long-only only
         metrics=PerformanceMetrics(**compute_metrics(bb_eq)),
         equity_curve=_curve(bb_eq, bench_eq),
         num_trades=len(bb_trades),
@@ -2185,7 +2194,11 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
 
     # ── 4. Momentum (window=63, entry=0, exit=0) ──────────────────────────
     mom_pos = momentum_signals(
-        close, momentum_window=63, entry_threshold=0.0, exit_threshold=0.0
+        close,
+        momentum_window=63,
+        entry_threshold=0.0,
+        exit_threshold=0.0,
+        position_mode=cmp_mode,
     )
     mom_eq, _, mom_trades = run_backtest(
         close=close,
@@ -2197,6 +2210,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         strategy="momentum",
         display_name="Momentum",
         params={"momentum_window": 63, "entry_threshold": 0.0, "exit_threshold": 0.0},
+        position_mode=cmp_mode,
         metrics=PerformanceMetrics(**compute_metrics(mom_eq)),
         equity_curve=_curve(mom_eq, bench_eq),
         num_trades=len(mom_trades),
@@ -2204,7 +2218,11 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
 
     # ── 5. Volatility Breakout (lookback=20, mult=0.3, exit=10) ──────────
     vb_pos = volatility_breakout_signals(
-        close, lookback_window=20, breakout_multiplier=0.3, exit_window=10
+        close,
+        lookback_window=20,
+        breakout_multiplier=0.3,
+        exit_window=10,
+        position_mode=cmp_mode,
     )
     vb_eq, _, vb_trades = run_backtest(
         close=close,
@@ -2216,6 +2234,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         strategy="volatility_breakout",
         display_name="Volatility Breakout",
         params={"lookback_window": 20, "breakout_multiplier": 0.3, "exit_window": 10},
+        position_mode=cmp_mode,
         metrics=PerformanceMetrics(**compute_metrics(vb_eq)),
         equity_curve=_curve(vb_eq, bench_eq),
         num_trades=len(vb_trades),
@@ -2257,6 +2276,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         end_date=request.end_date,
         initial_capital=request.initial_capital,
         transaction_cost_bps=request.transaction_cost_bps,
+        position_mode=request.position_mode,
         strategies=results,
         benchmark=bench_curve,
         benchmark_metrics=PerformanceMetrics(**bench_m),

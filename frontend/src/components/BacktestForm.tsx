@@ -11,6 +11,7 @@ import type {
   VbBacktestRequest,
 } from "@/lib/types";
 import { useState } from "react";
+import ShortSellingWarning from "@/components/ShortSellingWarning";
 
 // Direction modes (supported by SMA Crossover, Momentum, Volatility Breakout).
 const MODE_OPTIONS: { id: PositionMode; label: string }[] = [
@@ -629,10 +630,19 @@ export default function BacktestForm({
                   : currentMode === "short_only"
                     ? "Short-only mode trades only bearish signals. This is experimental and does not model borrow costs."
                     : "Advanced research mode. Long/short mode may underperform on upward-trending assets due to whipsaws, higher turnover, and short-selling risk."}
-                {currentMode !== "long_only" &&
-                  " Short-selling costs, borrow fees, margin calls, and liquidation are not modelled."}
               </p>
+              {currentMode !== "long_only" && (
+                <ShortSellingWarning className="mt-2" />
+              )}
             </div>
+          )}
+          {!supportsMode && strategy !== "pairs" && (
+            <p className="mb-3 inline-flex items-center gap-1.5 text-[11px] font-medium uppercase tracking-wide text-slate-400">
+              <span className="rounded bg-slate-100 px-1.5 py-0.5">Long-only strategy</span>
+              <span className="normal-case font-normal text-slate-400">
+                — direction modes are available for SMA, Momentum, and Volatility Breakout.
+              </span>
+            </p>
           )}
           {strategy === "sma_crossover" &&
             renderPresets(SMA_PRESETS, smaActiveIdx, applySmaPreset)}

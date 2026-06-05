@@ -30,7 +30,25 @@ import {
   Legend,
 } from "recharts";
 import { BacktestApiError, runStrategyComparison } from "@/lib/api";
-import type { StrategyComparisonRequest, StrategyComparisonResponse } from "@/lib/types";
+import type {
+  PositionMode,
+  StrategyComparisonRequest,
+  StrategyComparisonResponse,
+} from "@/lib/types";
+import ShortSellingWarning from "@/components/ShortSellingWarning";
+
+// Direction modes; applied to SMA/Momentum/Volatility Breakout, RSI/Bollinger
+// stay long-only.
+const CMP_MODE_OPTIONS: { id: PositionMode; label: string }[] = [
+  { id: "long_only", label: "Long only" },
+  { id: "short_only", label: "Short only" },
+  { id: "long_short", label: "Long / Short" },
+];
+const CMP_MODE_LABEL: Record<PositionMode, string> = {
+  long_only: "Long only",
+  short_only: "Short only",
+  long_short: "Long / Short",
+};
 import {
   fmtPct,
   fmtRatio,
@@ -227,6 +245,8 @@ interface TableRowProps {
   numTrades: number;
   isBest: boolean;
   color: string;
+  /** True when the comparison ran in a short mode but this strategy stayed long-only. */
+  longOnlyNote?: boolean;
 }
 
 function ComparisonTableRow({
@@ -235,6 +255,7 @@ function ComparisonTableRow({
   numTrades,
   isBest,
   color,
+  longOnlyNote = false,
 }: TableRowProps) {
   return (
     <tr
@@ -252,6 +273,15 @@ function ComparisonTableRow({
             title="The strategy never triggered an entry and stayed in cash. Try a more responsive preset on the Backtest tab."
           >
             No signal · stayed flat
+          </span>
+        )}
+        {longOnlyNote && (
+          <span
+            className="ml-2 inline-block align-middle rounded-full bg-slate-100 px-2 py-0.5
+                       text-[10px] font-medium uppercase tracking-wide text-slate-400"
+            title="This strategy does not support short modes and ran long-only."
+          >
+            long-only
           </span>
         )}
       </td>
@@ -303,6 +333,7 @@ export default function StrategyComparisonPanel() {
   const [endDate, setEndDate] = useState(DEFAULT_PARAMS.end_date);
   const [capitalStr, setCapitalStr] = useState(String(DEFAULT_PARAMS.initial_capital));
   const [costBpsStr, setCostBpsStr] = useState(String(DEFAULT_PARAMS.transaction_cost_bps));
+  const [positionMode, setPositionMode] = useState<PositionMode>("long_only");
 
   // Derived numbers — parsed at render time so the input can hold partial strings
   const capital = parseFloat(capitalStr);
@@ -345,6 +376,7 @@ export default function StrategyComparisonPanel() {
         end_date: endDate,
         initial_capital: capital,
         transaction_cost_bps: costBps,
+        position_mode: positionMode,
       });
       setResult(data);
     } catch (err) {
@@ -462,6 +494,35 @@ export default function StrategyComparisonPanel() {
           <p>Volatility Breakout — lookback=20, multiplier=0.3×, exit=10-day mean</p>
         </div>
 
+        {/* Direction mode */}
+        <div>
+          <label className={labelCls}>Direction</label>
+          <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+            {CMP_MODE_OPTIONS.map((o) => (
+              <button
+                key={o.id}
+                type="button"
+                disabled={loading}
+                onClick={() => setPositionMode(o.id)}
+                className={
+                  "px-3 py-1.5 text-xs font-medium transition-colors " +
+                  (positionMode === o.id
+                    ? "bg-blue-600 text-white"
+                    : "bg-white text-slate-600 hover:bg-blue-50")
+                }
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px] text-slate-400">
+            Applies to SMA, Momentum, and Volatility Breakout. RSI and Bollinger
+            stay long-only. Long/short is not guaranteed to improve performance —
+            it is useful for studying bearish signal quality.
+          </p>
+          {positionMode !== "long_only" && <ShortSellingWarning className="mt-2" />}
+        </div>
+
         {validationMsg && (
           <p className="text-xs text-red-600 font-medium">{validationMsg}</p>
         )}
@@ -515,11 +576,17 @@ export default function StrategyComparisonPanel() {
             <span className="text-slate-400 text-sm">
               {result.start_date} → {result.end_date}
             </span>
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
+              {CMP_MODE_LABEL[result.position_mode ?? "long_only"]}
+            </span>
             <span className="ml-auto text-xs text-slate-400">
               {result.transaction_cost_bps} bps · $
               {result.initial_capital.toLocaleString()}
             </span>
           </div>
+
+          {(result.position_mode === "short_only" ||
+            result.position_mode === "long_short") && <ShortSellingWarning />}
 
           {/* ── Ranking cards ──────────────────────────────────────────── */}
           <div>
@@ -603,6 +670,10 @@ export default function StrategyComparisonPanel() {
                       numTrades={s.num_trades}
                       isBest={s.display_name === result.ranking.best_by_sharpe}
                       color={STRATEGY_META[s.strategy]?.color ?? "#64748b"}
+                      longOnlyNote={
+                        result.position_mode !== "long_only" &&
+                        (s.position_mode ?? "long_only") === "long_only"
+                      }
                     />
                   ))}
                   {/* Benchmark row */}
@@ -643,17 +714,19 @@ export default function StrategyComparisonPanel() {
             </p>
             <p className="mt-1 text-xs text-slate-400">
               <span className="font-medium text-slate-500">
-                Strategy Comparison uses long-only mode by default.
+                Mode: {CMP_MODE_LABEL[result.position_mode ?? "long_only"]}
               </span>{" "}
-              All five run with fixed demo-friendly defaults. A{" "}
+              — all five run with fixed demo-friendly defaults
+              {result.position_mode !== "long_only" &&
+                " (RSI and Bollinger stay long-only, tagged above)"}
+              . A{" "}
               <span className="font-medium text-slate-500">“No signal · stayed flat”</span>{" "}
               tag means the strategy never triggered an entry over this period
               (common in downtrends or with strict parameters) — it is not an
-              error. To study long/short behaviour, use the direction modes on
-              the Backtest tab; long/short is not guaranteed to improve
-              performance — it is useful for studying bearish signal quality.
-              Adjust parameters or pick a more responsive preset, and validate
-              with the research tools.
+              error. Long/short is not guaranteed to improve performance — it is
+              useful for studying bearish signal quality. Adjust parameters or
+              pick a more responsive preset, and validate with the research
+              tools.
             </p>
           </div>
 

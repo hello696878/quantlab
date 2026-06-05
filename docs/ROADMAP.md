@@ -475,6 +475,29 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 - Backend additive only (optional field; no breaking change). New diagnostics
   tests; `pytest -q` green (**836 passed**); `tsc --noEmit` clean
 
+### Phase 9.5.2 — Complete Long/Short UX Integration ✅
+
+- Reusable, prominent **`ShortSellingWarning`** (amber, non-blocking) shown in
+  three places for short/long-short runs: near the Backtest mode selector, on
+  the results, and in Strategy Comparison (reports already carry the caveat)
+- **Strategy Comparison now supports `position_mode`** (backend + UI): a
+  Direction selector (default long-only) applies the mode to SMA / Momentum /
+  Volatility Breakout; RSI & Bollinger stay long-only and are **tagged
+  "long-only"** in the table. Response echoes the comparison mode and a
+  per-strategy applied `position_mode` (additive, non-breaking). Header shows
+  the active mode; invalid mode → 422
+- Backtest form: unsupported strategies (RSI / Bollinger) now show a small
+  "Long-only strategy" label instead of just hiding the selector
+- Diagnostics card (`ShortModeDiagnostics`) unchanged from 9.5.1 (long/short
+  trade counts, time long/short/cash, gross long/short contribution, turnover);
+  rendered alongside the warning on short runs
+- Saved backtests preserve `position_mode`; old records without it load as
+  long-only; export/report still works (verified)
+- Backend additive only. New comparison-mode tests (default long-only, mode
+  applied to supported only, 422). `pytest -q` green (**840 passed**);
+  `tsc --noEmit` clean; verified live on SPY (short comparison: SMA/Mom/VB go
+  short, RSI/BB stay long-only)
+
 ---
 
 ## Future Phases

@@ -72,6 +72,51 @@ def make_df(n: int = 500, start: str = "2010-01-01") -> pd.DataFrame:
 
 
 # ---------------------------------------------------------------------------
+# Position mode (Phase 9.5.2)
+# ---------------------------------------------------------------------------
+
+
+def test_comparison_defaults_to_long_only(monkeypatch):
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: make_df())
+    client = TestClient(main_module.app)
+    body = client.post("/research/strategy-comparison", json=_BASE_PAYLOAD).json()
+    assert body["position_mode"] == "long_only"
+    for s in body["strategies"]:
+        assert s["position_mode"] == "long_only"
+
+
+@pytest.mark.parametrize("mode", ["short_only", "long_short"])
+def test_comparison_mode_applied_to_supported_strategies_only(monkeypatch, mode):
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: make_df())
+    client = TestClient(main_module.app)
+    body = client.post(
+        "/research/strategy-comparison", json={**_BASE_PAYLOAD, "position_mode": mode}
+    ).json()
+    assert body["position_mode"] == mode
+    modes = {s["strategy"]: s["position_mode"] for s in body["strategies"]}
+    # Mode-capable strategies receive the requested mode.
+    assert modes["sma_crossover"] == mode
+    assert modes["momentum"] == mode
+    assert modes["volatility_breakout"] == mode
+    # Mean-reversion strategies stay long-only.
+    assert modes["rsi_mean_reversion"] == "long_only"
+    assert modes["bollinger_band"] == "long_only"
+    # Metrics remain finite for every strategy (no fabricated values).
+    for s in body["strategies"]:
+        assert s["num_trades"] >= 0
+        assert isinstance(s["metrics"]["total_return"], (int, float))
+
+
+def test_comparison_invalid_mode_returns_422(monkeypatch):
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: make_df())
+    client = TestClient(main_module.app)
+    resp = client.post(
+        "/research/strategy-comparison", json={**_BASE_PAYLOAD, "position_mode": "sideways"}
+    )
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
 # Happy-path tests
 # ---------------------------------------------------------------------------
 

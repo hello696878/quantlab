@@ -1046,6 +1046,14 @@ class StrategyComparisonRequest(BaseModel):
         lt=10_000.0,
         description="One-way transaction cost in basis points, applied to all strategies.",
     )
+    position_mode: PositionMode = Field(
+        default="long_only",
+        description=(
+            "Direction mode applied to strategies that support it (SMA Crossover, "
+            "Momentum, Volatility Breakout).  RSI and Bollinger remain long-only "
+            "regardless.  Defaults to 'long_only'."
+        ),
+    )
 
     @model_validator(mode="after")
     def check_dates(self) -> "StrategyComparisonRequest":
@@ -1069,6 +1077,14 @@ class StrategyResultItem(BaseModel):
     )
     display_name: str = Field(description="Human-readable strategy name.")
     params: dict = Field(description="Default parameter values used for this strategy run.")
+    position_mode: str = Field(
+        default="long_only",
+        description=(
+            "Direction mode actually applied to this strategy.  Equals the "
+            "comparison mode for strategies that support it; 'long_only' for "
+            "strategies (RSI, Bollinger) that do not."
+        ),
+    )
     metrics: PerformanceMetrics = Field(description="Performance metrics over the full period.")
     equity_curve: List[EquityPoint] = Field(description="Daily portfolio value.")
     num_trades: int = Field(description="Number of trade events.")
@@ -1102,6 +1118,10 @@ class StrategyComparisonResponse(BaseModel):
     end_date: str
     initial_capital: float
     transaction_cost_bps: float
+    position_mode: str = Field(
+        default="long_only",
+        description="Direction mode requested for the comparison.",
+    )
 
     strategies: List[StrategyResultItem] = Field(
         description=(

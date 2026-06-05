@@ -17,6 +17,7 @@ import PortfolioWorkspace from "@/components/PortfolioWorkspace";
 import SaveBacktestModal from "@/components/SaveBacktestModal";
 import SignalDiagnostics from "@/components/SignalDiagnostics";
 import ShortModeDiagnostics from "@/components/ShortModeDiagnostics";
+import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildBacktestReport } from "@/lib/reportExport";
 import SavedBacktestsList from "@/components/SavedBacktestsList";
@@ -575,13 +576,17 @@ export default function HomePage() {
                 />
 
                 {(result.position_mode === "short_only" ||
-                  result.position_mode === "long_short") &&
-                  result.diagnostics && (
-                    <ShortModeDiagnostics
-                      diagnostics={result.diagnostics}
-                      mode={result.position_mode}
-                    />
-                  )}
+                  result.position_mode === "long_short") && (
+                  <>
+                    <ShortSellingWarning />
+                    {result.diagnostics && (
+                      <ShortModeDiagnostics
+                        diagnostics={result.diagnostics}
+                        mode={result.position_mode}
+                      />
+                    )}
+                  </>
+                )}
 
                 <div className="card p-6">
                   <p className="section-title mb-4">Equity Curve</p>

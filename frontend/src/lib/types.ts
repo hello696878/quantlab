@@ -394,12 +394,15 @@ export interface StrategyComparisonRequest {
   end_date: string;
   initial_capital: number;
   transaction_cost_bps: number;
+  position_mode?: PositionMode;
 }
 
 export interface StrategyResultItem {
   strategy: string;
   display_name: string;
   params: Record<string, number | string>;
+  /** Direction mode actually applied (long_only for RSI/Bollinger). */
+  position_mode?: PositionMode;
   metrics: PerformanceMetrics;
   equity_curve: EquityPoint[];
   num_trades: number;
@@ -418,6 +421,8 @@ export interface StrategyComparisonResponse {
   end_date: string;
   initial_capital: number;
   transaction_cost_bps: number;
+  /** Direction mode requested for the comparison (defaults to long_only). */
+  position_mode?: PositionMode;
   strategies: StrategyResultItem[];
   /** Buy-and-hold equity curve — strategy and benchmark fields both carry the benchmark value. */
   benchmark: EquityPoint[];
