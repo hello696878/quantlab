@@ -5,11 +5,24 @@ import type {
   BbBacktestRequest,
   MomentumBacktestRequest,
   PairsBacktestRequest,
+  PositionMode,
   RsiBacktestRequest,
   StrategyType,
   VbBacktestRequest,
 } from "@/lib/types";
 import { useState } from "react";
+
+// Direction modes (supported by SMA Crossover, Momentum, Volatility Breakout).
+const MODE_OPTIONS: { id: PositionMode; label: string }[] = [
+  { id: "long_only", label: "Long only" },
+  { id: "short_only", label: "Short only" },
+  { id: "long_short", label: "Long & Short" },
+];
+const MODE_STRATEGIES = new Set<StrategyType>([
+  "sma_crossover",
+  "momentum",
+  "volatility_breakout",
+]);
 
 // Quick-pick tickers (single-asset strategies only)
 const POPULAR_TICKERS = ["SPY", "QQQ", "AAPL", "MSFT", "GLD", "BTC-USD"];
@@ -364,6 +377,24 @@ export default function BacktestForm({
       p.exit === vbParams.exit_window,
   );
 
+  // ── Direction mode (long / short / long-short) ────────────────────────────
+  const supportsMode = MODE_STRATEGIES.has(strategy);
+  const currentMode: PositionMode =
+    strategy === "sma_crossover"
+      ? smaParams.position_mode ?? "long_only"
+      : strategy === "momentum"
+        ? momentumParams.position_mode ?? "long_only"
+        : vbParams.position_mode ?? "long_only";
+  function setMode(m: PositionMode) {
+    if (strategy === "sma_crossover") {
+      onSmaParamsChange({ ...smaParams, position_mode: m });
+    } else if (strategy === "momentum") {
+      onMomentumParamsChange({ ...momentumParams, position_mode: m });
+    } else if (strategy === "volatility_breakout") {
+      onVbParamsChange({ ...vbParams, position_mode: m });
+    }
+  }
+
   function renderPresets(
     items: { label: string }[],
     activeIdx: number,
@@ -567,6 +598,40 @@ export default function BacktestForm({
 
         {/* ── Strategy-specific fields ───────────────────────────────────── */}
         <div className="mb-5 p-4 rounded-lg bg-blue-50/60 border border-blue-100">
+          {supportsMode && (
+            <div className="mb-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                  Direction
+                </span>
+                <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+                  {MODE_OPTIONS.map((o) => (
+                    <button
+                      key={o.id}
+                      type="button"
+                      disabled={loading}
+                      onClick={() => setMode(o.id)}
+                      className={
+                        "px-3 py-1 text-xs font-medium transition-colors " +
+                        (currentMode === o.id
+                          ? "bg-blue-600 text-white"
+                          : "bg-white text-slate-600 hover:bg-blue-50")
+                      }
+                    >
+                      {o.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {currentMode !== "long_only" && (
+                <p className="mt-1.5 text-[11px] text-slate-400">
+                  {currentMode === "short_only"
+                    ? "Goes short on bearish signals (−1), cash otherwise. No leverage; |position| ≤ 1."
+                    : "Goes long on bullish signals (+1) and short on bearish signals (−1). No leverage."}
+                </p>
+              )}
+            </div>
+          )}
           {strategy === "sma_crossover" &&
             renderPresets(SMA_PRESETS, smaActiveIdx, applySmaPreset)}
           {strategy === "rsi_mean_reversion" &&

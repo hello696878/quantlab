@@ -37,14 +37,19 @@ def run_backtest(
     initial_capital: float = 100_000.0,
 ) -> Tuple[pd.Series, pd.Series, List[Dict]]:
     """
-    Run a long-only backtest and return equity curves plus a trade log.
+    Run a single-asset backtest and return equity curves plus a trade log.
+
+    Supports long, cash and short exposure: ``position`` ∈ {−1, 0, +1}.  The
+    return (``position[t] * asset_return[t]``) and cost (``|Δposition| *
+    cost_rate``) math is the same for all three, so long-only callers
+    (position ∈ {0, 1}) are completely unaffected.
 
     Parameters
     ----------
     close : pd.Series
         Adjusted daily closing prices (DatetimeIndex, no NaN).
     position : pd.Series
-        Pre-shifted position series (0 = flat, 1 = fully long).
+        Pre-shifted position series (−1 = short, 0 = flat, +1 = long).
         Must already account for lookahead-bias prevention.
     transaction_cost_bps : float
         One-way transaction cost in basis points.  Charged on both entry and
@@ -87,8 +92,11 @@ def run_backtest(
     position = position.reindex(close.index).ffill().fillna(0.0)
     if position.isna().any():
         raise ValueError("position must not contain NaN values after alignment.")
-    if ((position < 0) | (position > 1)).any():
-        raise ValueError("position must be between 0 and 1 for a long-only backtest.")
+    # Single-asset positions are −1 (short), 0 (cash) or +1 (long).  The return
+    # and cost math below is identical for all three; long-only callers
+    # (position ∈ {0, 1}) are unaffected.
+    if ((position < -1) | (position > 1)).any():
+        raise ValueError("position must be between -1 (short) and 1 (long).")
 
     # -----------------------------------------------------------------------
     # 2. Position changes  (+1 = enter long, −1 = exit long)
@@ -115,12 +123,22 @@ def run_backtest(
     # -----------------------------------------------------------------------
     # 5. Trade log
     # -----------------------------------------------------------------------
+    # Actions by transition (prev → new position):
+    #   0 → +1  BUY            +1 → 0  SELL
+    #   0 → -1  SHORT          -1 → 0  COVER
+    #   -1 → +1 FLIP_TO_LONG   +1 → -1 FLIP_TO_SHORT
+    # For a long-only series (position ∈ {0, 1}) only BUY/SELL ever occur, and
+    # the prices/shares/costs are byte-for-byte identical to the original model.
     trades: List[Dict] = []
-    buy_shares: float = 0.0
+    # Absolute share count of the currently open position (long or short).
+    open_shares: float = 0.0
 
     for i, (_, chg) in enumerate(pos_change.items()):
-        if abs(chg) < 1e-9:
+        if abs(float(chg)) < 1e-9:
             continue  # no trade on this day
+
+        prev_pos = int(round(float(position.iloc[i - 1]))) if i > 0 else 0
+        new_pos = int(round(float(position.iloc[i])))
 
         execution_i = max(i - 1, 0)
         execution_date = close.index[execution_i]
@@ -134,34 +152,39 @@ def run_backtest(
         # Equity at the execution close, before the new trade cost is deducted.
         equity_before = float(strategy_equity.iloc[i - 1]) if i > 0 else initial_capital
 
-        if chg > 0:
-            # ---- BUY -------------------------------------------------------
-            # Invest equity_before; cost is deducted from the invested amount.
-            cost_usd = equity_before * abs(float(chg)) * cost_rate
-            buy_shares = (equity_before - cost_usd) / price
+        if new_pos == 0:
+            # ---- Closing to cash: SELL (from long) or COVER (from short) ----
+            action = "SELL" if prev_pos > 0 else "COVER"
+            close_gross = open_shares * price
+            cost_usd = close_gross * abs(float(chg)) * cost_rate
             trades.append(
                 {
                     "date": date_str,
-                    "action": "BUY",
+                    "action": action,
                     "price": round(price, 4),
-                    "shares": round(buy_shares, 4),
+                    "shares": round(open_shares, 4),
                     "cost": round(cost_usd, 4),
                 }
             )
+            open_shares = 0.0
         else:
-            # ---- SELL ------------------------------------------------------
-            sell_gross = buy_shares * price
-            cost_usd = sell_gross * abs(float(chg)) * cost_rate
+            # ---- Opening or flipping into a long/short position -------------
+            cost_usd = equity_before * abs(float(chg)) * cost_rate
+            new_shares = (equity_before - cost_usd) / price
+            if prev_pos == 0:
+                action = "BUY" if new_pos > 0 else "SHORT"
+            else:
+                action = "FLIP_TO_LONG" if new_pos > 0 else "FLIP_TO_SHORT"
             trades.append(
                 {
                     "date": date_str,
-                    "action": "SELL",
+                    "action": action,
                     "price": round(price, 4),
-                    "shares": round(buy_shares, 4),
+                    "shares": round(new_shares, 4),
                     "cost": round(cost_usd, 4),
                 }
             )
-            buy_shares = 0.0
+            open_shares = new_shares
 
     return strategy_equity, benchmark_equity, trades
 

@@ -23,6 +23,21 @@ import pandas as pd
 
 
 # ===========================================================================
+# Position direction modes (long-only / short-only / long-short)
+# ===========================================================================
+
+#: Supported strategy direction modes.
+POSITION_MODES = ("long_only", "short_only", "long_short")
+
+
+def _validate_position_mode(position_mode: str) -> None:
+    if position_mode not in POSITION_MODES:
+        raise ValueError(
+            f"position_mode must be one of {POSITION_MODES}; got {position_mode!r}."
+        )
+
+
+# ===========================================================================
 # SMA Crossover
 # ===========================================================================
 
@@ -30,37 +45,47 @@ def sma_crossover_signals(
     close: pd.Series,
     fast_window: int = 50,
     slow_window: int = 200,
+    position_mode: str = "long_only",
 ) -> pd.Series:
     """
-    Generate a long-only, fully-invested position series from an SMA crossover.
+    Generate a position series from an SMA crossover.
 
-    Rules
-    -----
-    * Position = 1 (100 % long) when fast SMA > slow SMA.
-    * Position = 0 (flat / cash) when fast SMA <= slow SMA.
+    Signal
+    ------
+    * Bullish when fast SMA > slow SMA.
+    * Bearish when fast SMA < slow SMA.
+
+    Direction modes (``position_mode``)
+    -----------------------------------
+    * ``"long_only"``  (default): bullish → +1 (long), otherwise → 0 (cash).
+      **Identical to the original long-only behaviour.**
+    * ``"short_only"``: bearish → -1 (short), otherwise → 0 (cash).
+    * ``"long_short"``: bullish → +1, bearish → -1, neither → 0.
+
     * The raw signal is **shifted by one period** to prevent lookahead bias.
       Days before the slow SMA has enough history are treated as flat (0).
-
-    Parameters
-    ----------
-    close : pd.Series
-        Adjusted daily closing prices with a DatetimeIndex.
-    fast_window : int
-        Fast SMA look-back period in trading days.
-    slow_window : int
-        Slow SMA look-back period in trading days (must be > fast_window).
 
     Returns
     -------
     pd.Series
-        Integer position series (0 or 1) with the same index as *close*,
+        Integer position series (-1, 0, or 1) with the same index as *close*,
         named "position".  No NaN values.
     """
+    _validate_position_mode(position_mode)
+
     sma_fast = close.rolling(window=fast_window, min_periods=fast_window).mean()
     sma_slow = close.rolling(window=slow_window, min_periods=slow_window).mean()
 
-    # Raw signal: 1 = fast above slow, 0 = otherwise (includes NaN periods)
-    raw_signal = (sma_fast > sma_slow).astype(int)
+    # NaN comparisons are False, so warm-up bars resolve to neutral (0).
+    bullish = (sma_fast > sma_slow).astype(int)
+    bearish = (sma_fast < sma_slow).astype(int)
+
+    if position_mode == "long_only":
+        raw_signal = bullish
+    elif position_mode == "short_only":
+        raw_signal = -bearish
+    else:  # long_short
+        raw_signal = bullish - bearish
 
     # *** Shift by 1 to prevent lookahead bias ***
     # position[T] = raw_signal[T-1], held over close[T-1] -> close[T].
@@ -357,6 +382,7 @@ def momentum_signals(
     momentum_window: int = 126,
     entry_threshold: float = 0.0,
     exit_threshold: float = 0.0,
+    position_mode: str = "long_only",
 ) -> pd.Series:
     """
     Generate long-only positions from a time-series momentum rule.
@@ -409,10 +435,18 @@ def momentum_signals(
             "hysteresis band (equal values → no gap, i.e. enter above "
             "threshold and exit at-or-below the same threshold)."
         )
+    _validate_position_mode(position_mode)
+
+    allow_long = position_mode in ("long_only", "long_short")
+    allow_short = position_mode in ("short_only", "long_short")
 
     momentum = compute_momentum(close, momentum_window)
 
-    in_position = False
+    # Symmetric hysteresis state machine over {-1 short, 0 flat, +1 long}.
+    # The short band mirrors the long band: enter short below -entry_threshold,
+    # cover at or above -exit_threshold.  In "long_only" the short branches are
+    # disabled, so this reduces *exactly* to the original long-only rule.
+    state = 0
     raw: list = []
 
     for val in momentum:
@@ -422,12 +456,16 @@ def momentum_signals(
             continue
 
         v = float(val)
-        if not in_position and v > entry_threshold:
-            in_position = True     # Momentum crossed above entry threshold
-        elif in_position and v <= exit_threshold:
-            in_position = False    # Momentum fell to or below exit threshold
+        if allow_long and state <= 0 and v > entry_threshold:
+            state = 1      # momentum crossed above the long entry threshold
+        elif allow_short and state >= 0 and v < -entry_threshold:
+            state = -1     # momentum crossed below the short entry threshold
+        elif state == 1 and v <= exit_threshold:
+            state = 0      # long exits (momentum fell to/below exit)
+        elif state == -1 and v >= -exit_threshold:
+            state = 0      # short covers (momentum rose to/above -exit)
 
-        raw.append(1 if in_position else 0)
+        raw.append(state)
 
     # *** Shift by 1 to prevent lookahead bias ***
     # position[T] = raw_signal[T-1], held over close[T-1] -> close[T].
@@ -524,6 +562,7 @@ def volatility_breakout_signals(
     lookback_window: int = 20,
     breakout_multiplier: float = 1.0,
     exit_window: int = 10,
+    position_mode: str = "long_only",
 ) -> pd.Series:
     """
     Generate long-only positions from a price-channel volatility breakout rule.
@@ -567,6 +606,10 @@ def volatility_breakout_signals(
         )
     if exit_window < 1:
         raise ValueError(f"exit_window must be at least 1; got {exit_window}.")
+    _validate_position_mode(position_mode)
+
+    allow_long = position_mode in ("long_only", "long_short")
+    allow_short = position_mode in ("short_only", "long_short")
 
     breakout_level, exit_level = compute_volatility_breakout_levels(
         close,
@@ -575,29 +618,52 @@ def volatility_breakout_signals(
         exit_window=exit_window,
     )
 
-    in_position = False
+    # Symmetric downside breakdown channel for short modes:
+    #   breakdown_level[T] = rolling_low[T-1] - breakout_multiplier * range[T-1]
+    # Enter short when price closes strictly *below* it; cover when price
+    # recovers above the rolling-mean exit level.
+    if allow_short:
+        rolling_high = close.rolling(
+            window=lookback_window, min_periods=lookback_window
+        ).max()
+        rolling_low = close.rolling(
+            window=lookback_window, min_periods=lookback_window
+        ).min()
+        rolling_range = rolling_high - rolling_low
+        breakdown_level = rolling_low.shift(1) - breakout_multiplier * rolling_range.shift(1)
+    else:
+        breakdown_level = None
+
+    state = 0
     raw: list[int] = []
 
     for i in range(len(close)):
-        entry_level = breakout_level.iloc[i]
+        entry_up = breakout_level.iloc[i]
         exit_ma = exit_level.iloc[i]
         price = float(close.iloc[i])
 
-        if pd.isna(entry_level):
+        if pd.isna(entry_up):
             # Warm-up period: not enough history for prior breakout channel.
             raw.append(0)
             continue
 
-        if in_position:
+        if state == 1:
+            # Long: exit to cash when price falls below the rolling-mean exit.
             if not pd.isna(exit_ma) and price < float(exit_ma):
-                in_position = False
-            elif price > float(entry_level):
-                in_position = True
-        else:
-            if price > float(entry_level):
-                in_position = True
+                state = 0
+        elif state == -1:
+            # Short: cover to cash when price rises above the rolling-mean exit.
+            if not pd.isna(exit_ma) and price > float(exit_ma):
+                state = 0
+        else:  # flat — look for a fresh breakout / breakdown
+            if allow_long and price > float(entry_up):
+                state = 1
+            elif allow_short and breakdown_level is not None:
+                entry_down = breakdown_level.iloc[i]
+                if not pd.isna(entry_down) and price < float(entry_down):
+                    state = -1
 
-        raw.append(1 if in_position else 0)
+        raw.append(state)
 
     # *** Shift by 1 to prevent lookahead bias ***
     # position[T] = raw_signal[T-1], held over close[T-1] -> close[T].

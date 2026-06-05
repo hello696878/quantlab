@@ -427,6 +427,30 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   docstrings); no API contract change. `pytest -q` green (**811 passed**);
   frontend `tsc --noEmit` clean
 
+### Phase 9.5 — Long / Short Strategy Modes ✅
+
+- New `position_mode` (`long_only` default / `short_only` / `long_short`) for
+  **SMA Crossover, Momentum, Volatility Breakout**. No leverage (|position| ≤ 1),
+  no margin/options; a short earns `−1 × asset_return`
+- Engine: `run_backtest` already computed `position·return` and `|Δposition|`
+  cost, so only the position-range guard was relaxed (now [−1, 1]) and the trade
+  log extended → **BUY / SELL / SHORT / COVER / FLIP_TO_LONG / FLIP_TO_SHORT**.
+  Long-only (position ∈ {0,1}) math + trade log are byte-for-byte unchanged
+- Signals: each function gained a mode-aware, symmetric state machine
+  (`long_only` reduces *exactly* to the original). Volatility Breakout adds a
+  symmetric downside-breakdown short (prior rolling low − mult×range)
+- Schema: `PositionMode` + `position_mode` on the three requests (and echoed on
+  `BacktestResponse`); invalid mode → 422. Frontend: types, a **Direction**
+  segmented control in `BacktestForm` (long-only strategies don't show it),
+  trade-table colours/labels for short/flip actions, and a mode tag in the
+  results summary
+- New `backend/tests/test_position_modes.py` (22 tests): engine short returns +
+  flip turnover + actions, signal mode-mapping + long-only identity, API echo /
+  valid actions / 422. `pytest -q` green (**833 passed**); `tsc --noEmit` clean
+- Verified live on real SPY 2015–2023: long-only returns unchanged; short/
+  long-short produce the expected SHORT/COVER/FLIP actions and inverse P&L
+- RSI / Bollinger left long-only for now (clean symmetric short = future work)
+
 ---
 
 ## Future Phases

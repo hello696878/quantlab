@@ -17,6 +17,9 @@ export type BacktestResponseStrategyType = StrategyType | "custom";
 // Requests
 // ---------------------------------------------------------------------------
 
+/** Strategy direction mode (SMA Crossover, Momentum, Volatility Breakout). */
+export type PositionMode = "long_only" | "short_only" | "long_short";
+
 export interface BacktestRequest {
   ticker: string;
   start_date: string;
@@ -25,6 +28,7 @@ export interface BacktestRequest {
   slow_window: number;
   transaction_cost_bps: number;
   initial_capital: number;
+  position_mode?: PositionMode;
 }
 
 export interface RsiBacktestRequest {
@@ -58,6 +62,7 @@ export interface MomentumBacktestRequest {
   exit_threshold: number;
   transaction_cost_bps: number;
   initial_capital: number;
+  position_mode?: PositionMode;
 }
 
 export interface VbBacktestRequest {
@@ -69,6 +74,7 @@ export interface VbBacktestRequest {
   exit_window: number;
   transaction_cost_bps: number;
   initial_capital: number;
+  position_mode?: PositionMode;
 }
 
 export interface PairsBacktestRequest {
@@ -110,8 +116,21 @@ export interface PerformanceMetrics {
 
 export interface TradeRecord {
   date: string;
-  /** Single-asset: "BUY" | "SELL".  Pairs: "LONG SPREAD" | "SHORT SPREAD" | "EXIT". */
-  action: "BUY" | "SELL" | "LONG SPREAD" | "SHORT SPREAD" | "EXIT";
+  /**
+   * Single-asset long/short: "BUY" | "SELL" | "SHORT" | "COVER" |
+   * "FLIP_TO_LONG" | "FLIP_TO_SHORT".  Pairs: "LONG SPREAD" | "SHORT SPREAD" |
+   * "EXIT".
+   */
+  action:
+    | "BUY"
+    | "SELL"
+    | "SHORT"
+    | "COVER"
+    | "FLIP_TO_LONG"
+    | "FLIP_TO_SHORT"
+    | "LONG SPREAD"
+    | "SHORT SPREAD"
+    | "EXIT";
   price: number;
   shares: number;
   cost: number;
@@ -168,6 +187,8 @@ export interface BacktestResponse {
 
   transaction_cost_bps: number;
   initial_capital: number;
+  /** Direction mode used (defaults to "long_only" for strategies without it). */
+  position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;
   benchmark_metrics: PerformanceMetrics;
   equity_curve: EquityPoint[];

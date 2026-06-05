@@ -27,16 +27,18 @@ QuantLab lets you select a strategy, choose an asset and date range, tune parame
 
 ### Strategies
 
-| Strategy | Type | Parameters |
-|---|---|---|
-| SMA Crossover | Trend-following | Fast window, slow window |
-| RSI Mean Reversion | Mean-reversion | RSI window, oversold threshold, exit threshold |
-| Bollinger Band Mean Reversion | Mean-reversion | Window, std multiplier, exit band |
-| Time-Series Momentum | Trend-following | Momentum window, entry/exit thresholds |
-| Volatility Breakout | Trend-following | Lookback window, breakout multiplier, exit window |
-| Pairs Trading | Statistical arbitrage | Asset Y, asset X, lookback window, entry/exit z-score |
+| Strategy | Type | Parameters | Direction modes |
+|---|---|---|---|
+| SMA Crossover | Trend-following | Fast window, slow window | long / short / long-short |
+| RSI Mean Reversion | Mean-reversion | RSI window, oversold threshold, exit threshold | long-only |
+| Bollinger Band Mean Reversion | Mean-reversion | Window, std multiplier, exit band | long-only |
+| Time-Series Momentum | Trend-following | Momentum window, entry/exit thresholds | long / short / long-short |
+| Volatility Breakout | Trend-following | Lookback window, breakout multiplier, exit window | long / short / long-short |
+| Pairs Trading | Statistical arbitrage | Asset Y, asset X, lookback window, entry/exit z-score | long-short spread |
 
 All strategies apply a **one-day signal shift** — the position derived from day T's close prices is applied on day T+1. This prevents lookahead bias by construction.
+
+**Direction modes.** SMA Crossover, Momentum, and Volatility Breakout accept a `position_mode`: `long_only` (default — bullish → long, else cash), `short_only` (bearish → short, else cash), or `long_short` (bullish → long, bearish → short). There is **no leverage** (|position| ≤ 1) and **no margin model**; a short simply earns `−1 × asset_return`. Transaction cost is charged on turnover `|Δposition|`, so a direct long↔short flip costs twice a single open. The trade log uses **BUY / SELL / SHORT / COVER / FLIP_TO_LONG / FLIP_TO_SHORT**. `long_only` behaviour (and every existing long-only result) is byte-for-byte unchanged.
 
 **Default parameters are chosen for usability, not performance.** They are demo-friendly starting points intended to make first runs more informative across common assets and date ranges, but they can still produce zero trades when conditions do not trigger signals. They are **not recommendations** and are not tuned for returns. Each strategy form offers one-click **presets** (including the classic long-term variants, e.g. SMA 50/200, Bollinger 2.0σ, 6-/12-month momentum, and a Volatility-Breakout Responsive/Balanced/Conservative set), and you should validate any parameter choice with the **Parameter Sweep**, **Train/Test**, and **Walk-Forward** research tools before drawing conclusions. The Strategy Comparison runs all five single-asset strategies with these same demo-friendly defaults.
 

@@ -9,6 +9,21 @@ from typing import Annotated, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
+# Strategy direction modes.  Long-only (the default, original behaviour),
+# short-only, or long/short.  Supported by SMA Crossover, Momentum and
+# Volatility Breakout.
+PositionMode = Literal["long_only", "short_only", "long_short"]
+
+_POSITION_MODE_FIELD = Field(
+    default="long_only",
+    description=(
+        "Strategy direction: 'long_only' (default — bullish→long, else cash), "
+        "'short_only' (bearish→short, else cash), or 'long_short' "
+        "(bullish→long, bearish→short).  No leverage; |position| ≤ 1."
+    ),
+)
+
+
 # ===========================================================================
 # Requests
 # ===========================================================================
@@ -55,6 +70,7 @@ class BacktestRequest(BaseModel):
         gt=0,
         description="Starting capital in USD.",
     )
+    position_mode: PositionMode = _POSITION_MODE_FIELD
 
 
 class RsiBacktestRequest(BaseModel):
@@ -220,6 +236,8 @@ class MomentumBacktestRequest(BaseModel):
         description="Starting capital in USD.",
     )
 
+    position_mode: PositionMode = _POSITION_MODE_FIELD
+
     @model_validator(mode="after")
     def check_thresholds(self) -> "MomentumBacktestRequest":
         if self.entry_threshold < self.exit_threshold:
@@ -364,6 +382,7 @@ class VbBacktestRequest(BaseModel):
         gt=0,
         description="Starting capital in USD.",
     )
+    position_mode: PositionMode = _POSITION_MODE_FIELD
 
 
 # ===========================================================================
@@ -485,6 +504,10 @@ class BacktestResponse(BaseModel):
 
     transaction_cost_bps: float
     initial_capital: float
+    position_mode: str = Field(
+        default="long_only",
+        description="Strategy direction mode used (long_only / short_only / long_short).",
+    )
     strategy_metrics: PerformanceMetrics
     benchmark_metrics: PerformanceMetrics
     equity_curve: List[EquityPoint]

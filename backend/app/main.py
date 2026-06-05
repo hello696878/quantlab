@@ -253,6 +253,7 @@ def _build_response(
     vb_lookback_window=None,
     vb_breakout_multiplier=None,
     vb_exit_window=None,
+    position_mode: str = "long_only",
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response."""
     strategy_equity, benchmark_equity, trades = run_backtest(
@@ -295,6 +296,7 @@ def _build_response(
         vb_exit_window=vb_exit_window,
         transaction_cost_bps=transaction_cost_bps,
         initial_capital=initial_capital,
+        position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
         equity_curve=equity_curve,
@@ -430,6 +432,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         close,
         fast_window=request.fast_window,
         slow_window=request.slow_window,
+        position_mode=request.position_mode,
     )
 
     return _build_response(
@@ -443,6 +446,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         strategy="sma_crossover",
         fast_window=request.fast_window,
         slow_window=request.slow_window,
+        position_mode=request.position_mode,
     )
 
 
@@ -586,6 +590,7 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         momentum_window=request.momentum_window,
         entry_threshold=request.entry_threshold,
         exit_threshold=request.exit_threshold,
+        position_mode=request.position_mode,
     )
 
     return _build_response(
@@ -600,6 +605,7 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         momentum_window=request.momentum_window,
         momentum_entry_threshold=request.entry_threshold,
         momentum_exit_threshold=request.exit_threshold,
+        position_mode=request.position_mode,
     )
 
 
@@ -639,6 +645,7 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         lookback_window=request.lookback_window,
         breakout_multiplier=request.breakout_multiplier,
         exit_window=request.exit_window,
+        position_mode=request.position_mode,
     )
 
     return _build_response(
@@ -653,6 +660,7 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         vb_lookback_window=request.lookback_window,
         vb_breakout_multiplier=request.breakout_multiplier,
         vb_exit_window=request.exit_window,
+        position_mode=request.position_mode,
     )
 
 

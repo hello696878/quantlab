@@ -10,6 +10,32 @@ interface Props {
 
 const PAGE_SIZE = 20;
 
+/**
+ * Visual style per trade action.  Green = took long exposure, red = took short
+ * exposure, slate = closed to cash.  Covers single-asset long/short actions and
+ * the pairs spread actions.
+ */
+function actionStyle(action: TradeRecord["action"]): {
+  pillCls: string;
+  arrow: string;
+} {
+  switch (action) {
+    case "BUY":
+    case "FLIP_TO_LONG":
+    case "LONG SPREAD":
+      return { pillCls: "bg-green-100 text-green-700", arrow: "▲ " };
+    case "SHORT":
+    case "FLIP_TO_SHORT":
+    case "SHORT SPREAD":
+      return { pillCls: "bg-red-100 text-red-700", arrow: "▼ " };
+    case "SELL":
+    case "COVER":
+    case "EXIT":
+    default:
+      return { pillCls: "bg-slate-100 text-slate-600", arrow: "● " };
+  }
+}
+
 export default function TradeTable({ trades }: Props) {
   const [page, setPage] = useState(0);
 
@@ -59,15 +85,7 @@ export default function TradeTable({ trades }: Props) {
           <tbody className="divide-y divide-slate-100">
             {visible.map((trade, idx) => {
               const globalIdx = page * PAGE_SIZE + idx + 1;
-              const isLongEntry =
-                trade.action === "BUY" || trade.action === "LONG SPREAD";
-              const isShortEntry = trade.action === "SHORT SPREAD";
-              const pillCls = isLongEntry
-                ? "bg-green-100 text-green-700"
-                : isShortEntry
-                  ? "bg-blue-100 text-blue-700"
-                  : "bg-red-100 text-red-700"; // SELL or EXIT
-              const arrow = isLongEntry ? "▲ " : isShortEntry ? "▼ " : "● ";
+              const { pillCls, arrow } = actionStyle(trade.action);
               return (
                 <tr
                   key={globalIdx}
@@ -92,7 +110,7 @@ export default function TradeTable({ trades }: Props) {
                         pillCls
                       }
                     >
-                      {arrow}{trade.action}
+                      {arrow}{trade.action.replace(/_/g, " ")}
                     </span>
                   </td>
                   <td className="px-4 py-2.5 text-right tabular text-slate-800 font-medium">

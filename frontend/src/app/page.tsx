@@ -58,6 +58,7 @@ const DEFAULT_SMA_PARAMS: BacktestRequest = {
   slow_window: 100,
   transaction_cost_bps: 10,
   initial_capital: 100_000,
+  position_mode: "long_only",
 };
 
 const DEFAULT_RSI_PARAMS: RsiBacktestRequest = {
@@ -91,6 +92,7 @@ const DEFAULT_MOMENTUM_PARAMS: MomentumBacktestRequest = {
   exit_threshold: 0.0,
   transaction_cost_bps: 10,
   initial_capital: 100_000,
+  position_mode: "long_only",
 };
 
 const DEFAULT_VB_PARAMS: VbBacktestRequest = {
@@ -102,6 +104,7 @@ const DEFAULT_VB_PARAMS: VbBacktestRequest = {
   exit_window: 10,
   transaction_cost_bps: 10,
   initial_capital: 100_000,
+  position_mode: "long_only",
 };
 
 const DEFAULT_PAIRS_PARAMS: PairsBacktestRequest = {
@@ -157,8 +160,14 @@ function strategyLabel(r: BacktestResponse): string {
 function paramSummary(r: BacktestResponse): string {
   const cost = `${r.transaction_cost_bps} bps`;
   const trades = `${r.num_trades} trade events`;
+  const modeLabel =
+    r.position_mode === "short_only"
+      ? "Short-only · "
+      : r.position_mode === "long_short"
+        ? "Long/Short · "
+        : "";
   if (r.strategy === "sma_crossover") {
-    return `SMA ${r.fast_window}/${r.slow_window} · ${cost} · ${trades}`;
+    return `${modeLabel}SMA ${r.fast_window}/${r.slow_window} · ${cost} · ${trades}`;
   }
   if (r.strategy === "rsi_mean_reversion") {
     return (
@@ -174,14 +183,14 @@ function paramSummary(r: BacktestResponse): string {
   }
   if (r.strategy === "momentum") {
     return (
-      `Momentum(${r.momentum_window ?? 63}) ` +
+      `${modeLabel}Momentum(${r.momentum_window ?? 63}) ` +
       `entry:${r.momentum_entry_threshold ?? 0} ` +
       `exit:${r.momentum_exit_threshold ?? 0} · ${cost} · ${trades}`
     );
   }
   if (r.strategy === "volatility_breakout") {
     return (
-      `VolBreakout lookback:${r.vb_lookback_window ?? 20} ` +
+      `${modeLabel}VolBreakout lookback:${r.vb_lookback_window ?? 20} ` +
       `mult:${r.vb_breakout_multiplier ?? 0.3}x range ` +
       `exit mean:${r.vb_exit_window ?? 10} · ${cost} · ${trades}`
     );
