@@ -7,6 +7,7 @@ import type { View } from "@/components/AppShell";
 // ---------------------------------------------------------------------------
 
 const ICONS: Record<string, string> = {
+  home: "M3 11l9-8 9 8M5 9.5V21h5v-6h4v6h5V9.5",
   backtest: "M4 4v16h16M8 16l3-4 3 2 4-6",
   sweep:
     "M4 4h4v4H4V4Zm6 0h4v4h-4V4Zm6 0h4v4h-4V4ZM4 10h4v4H4v-4Zm6 0h4v4h-4v-4Zm6 0h4v4h-4v-4ZM4 16h4v4H4v-4Zm6 0h4v4h-4v-4Zm6 0h4v4h-4v-4Z",
@@ -92,6 +93,7 @@ function Logo() {
 // ---------------------------------------------------------------------------
 
 export const NAV: { id: View; label: string; icon: string }[] = [
+  { id: "home", label: "Home", icon: "home" },
   { id: "backtest", label: "Backtest", icon: "backtest" },
   { id: "csv", label: "CSV Backtest", icon: "upload" },
   { id: "builder", label: "Strategy Builder", icon: "builder" },

@@ -500,6 +500,27 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
+### Phase 10.1 — Dashboard Home / Command Center ✅
+
+- New **Home / Command Center** workspace (`HomeDashboard.tsx`) added as the
+  **default view** on load, with a **Home** sidebar item. Existing views are
+  untouched.
+- **Hero** (title + subtitle + Local-first / FastAPI / Next.js / SQLite /
+  Research-only badges), **Quick Actions** grid (Run Backtest, Upload CSV, Build
+  Custom Strategy, Portfolio Lab, Saved Backtests, Saved Reports, Export Report)
+  wired to the same `handleNav` the sidebar uses.
+- **Recent Saved Backtests** and **Recent Saved Reports** fetched live from
+  `GET /saved-backtests` and `GET /saved-reports` (latest 5, newest first),
+  clickable to open the full record; honest **empty states** when none exist —
+  no fake rows.
+- **System Status** (real `GET /health`, local mode, live saved counts) and a
+  **Feature Map** (Strategy Lab / Research Tools / Portfolio Lab / Reporting).
+- **No backend changes** — reuses existing endpoints; counts computed
+  frontend-side. Neon terminal theme, responsive laptop layout. `tsc --noEmit`
+  clean.
+
+---
+
 ## Future Phases
 
 The items below are planned but not yet started. Order and scope may change.

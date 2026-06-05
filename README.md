@@ -25,6 +25,17 @@ QuantLab lets you select a strategy, choose an asset and date range, tune parame
 
 ## Features
 
+### Command Center (Home Dashboard)
+
+The app opens on a **Home / Command Center** — a local-first landing dashboard that ties every workspace together. It shows:
+
+- **Quick Actions** that jump straight into running a backtest, uploading CSV data, building a custom strategy, opening the Portfolio Lab, viewing saved backtests/reports, or exporting a research report.
+- **Recent Saved Backtests** and **Recent Saved Reports** — the latest few records pulled live from the backend (`GET /saved-backtests`, `GET /saved-reports`), each clickable to open the full record. Empty states are shown when nothing has been saved yet (no placeholder/fake rows).
+- **System Status** — real API health (`GET /health`), local-only mode, and live saved-backtest / saved-report counts.
+- A **Feature Map** summarising the Strategy Lab, Research Tools, Portfolio Lab, and Reporting areas.
+
+Home is the default view; the sidebar's **Home** item returns to it at any time. The entire dashboard reads from existing endpoints — no new backend, no authentication, no cloud sync.
+
 ### Strategies
 
 | Strategy | Type | Parameters | Direction modes |

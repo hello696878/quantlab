@@ -24,6 +24,7 @@ import SavedBacktestsList from "@/components/SavedBacktestsList";
 import SavedBacktestDetail from "@/components/SavedBacktestDetail";
 import SavedReportsList from "@/components/SavedReportsList";
 import SavedReportDetail from "@/components/SavedReportDetail";
+import HomeDashboard from "@/components/HomeDashboard";
 import SettingsPanel from "@/components/SettingsPanel";
 import { applyAccent, loadSettings, resolveDateRange } from "@/lib/settings";
 import {
@@ -266,6 +267,11 @@ const STRATEGY_HEADINGS: Record<
 
 /** TopBar title + subtitle per workspace. */
 const VIEW_META: Record<View, { title: string; subtitle: string }> = {
+  home: {
+    title: "Home",
+    subtitle:
+      "Research, backtest, optimize, and report trading strategies from one local dashboard.",
+  },
   backtest: {
     title: "Backtest",
     subtitle: "Run a single strategy on real historical market data.",
@@ -336,7 +342,7 @@ function SectionIntro({
 // ---------------------------------------------------------------------------
 
 export default function HomePage() {
-  const [view, setView] = useState<View>("backtest");
+  const [view, setView] = useState<View>("home");
 
   // Saved backtests state
   const [showSaveForm, setShowSaveForm] = useState(false);
@@ -440,6 +446,21 @@ export default function HomePage() {
       subtitle={meta.subtitle}
     >
       <div className="space-y-8">
+        {/* ── Home / Command Center ────────────────────────────────────── */}
+        {view === "home" && (
+          <HomeDashboard
+            onNav={handleNav}
+            onOpenBacktest={(id) => {
+              setSavedDetailId(id);
+              setView("saved");
+            }}
+            onOpenReport={(id) => {
+              setSavedReportDetailId(id);
+              setView("reports");
+            }}
+          />
+        )}
+
         {/* ── Backtest ─────────────────────────────────────────────────── */}
         {view === "backtest" && (
           <>
