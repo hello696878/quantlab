@@ -46,6 +46,12 @@ function fmtDate(iso: string): string {
   return iso.replace("T", " ").slice(0, 16) + " UTC";
 }
 
+function tickerLabel(tickers: unknown): string {
+  return Array.isArray(tickers) && tickers.length > 0
+    ? tickers.join(", ")
+    : "—";
+}
+
 function filenameFor(record: SavedReportFull): string {
   const base =
     record.title.trim().toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(
@@ -168,7 +174,7 @@ export default function SavedReportDetail({
 
   if (!record) return null;
 
-  const tickers = record.tickers.length > 0 ? record.tickers.join(", ") : "—";
+  const tickers = tickerLabel(record.tickers);
   const dates =
     record.date_range_start && record.date_range_end
       ? `${record.date_range_start} → ${record.date_range_end}`

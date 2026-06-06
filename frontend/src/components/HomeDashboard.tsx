@@ -46,6 +46,12 @@ function fmtDate(iso: string): string {
   return iso.replace("T", " ").slice(0, 16);
 }
 
+function tickerLabel(tickers: unknown): string {
+  return Array.isArray(tickers) && tickers.length > 0
+    ? tickers.join(", ")
+    : "";
+}
+
 function metricColor(v: number | null | undefined, positiveGood = true): string {
   if (v == null) return "text-slate-400";
   if (v > 0) return positiveGood ? "text-green-700" : "text-red-600";
@@ -670,29 +676,32 @@ export default function HomeDashboard({
             </div>
           ) : (
             <div className="card overflow-hidden">
-              {recentReports.map((r, i) => (
-                <button
-                  key={r.id}
-                  type="button"
-                  onClick={() => onOpenReport(r.id)}
-                  style={{ borderTop: i ? "1px solid var(--line)" : undefined }}
-                  className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--glass)]"
-                >
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium" style={{ color: "var(--text-hi)" }}>
-                      {r.title}
-                    </p>
-                    <p className="mt-0.5 truncate text-xs text-slate-400">
-                      {SOURCE_LABELS[r.source_type] ?? r.source_type}
-                      {r.strategy ? ` · ${STRATEGY_LABELS[r.strategy] ?? r.strategy}` : ""}
-                      {r.tickers.length > 0 ? ` · ${r.tickers.join(", ")}` : ""}
-                    </p>
-                  </div>
-                  <span className="flex-shrink-0 text-xs text-slate-500">
-                    {fmtDate(r.created_at)}
-                  </span>
-                </button>
-              ))}
+              {recentReports.map((r, i) => {
+                const tickers = tickerLabel(r.tickers);
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    onClick={() => onOpenReport(r.id)}
+                    style={{ borderTop: i ? "1px solid var(--line)" : undefined }}
+                    className="flex w-full items-center gap-3 px-4 py-3 text-left transition-colors hover:bg-[var(--glass)]"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-medium" style={{ color: "var(--text-hi)" }}>
+                        {r.title}
+                      </p>
+                      <p className="mt-0.5 truncate text-xs text-slate-400">
+                        {SOURCE_LABELS[r.source_type] ?? r.source_type}
+                        {r.strategy ? ` · ${STRATEGY_LABELS[r.strategy] ?? r.strategy}` : ""}
+                        {tickers ? ` · ${tickers}` : ""}
+                      </p>
+                    </div>
+                    <span className="flex-shrink-0 text-xs text-slate-500">
+                      {fmtDate(r.created_at)}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           )}
         </div>

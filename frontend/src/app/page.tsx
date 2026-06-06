@@ -566,7 +566,6 @@ export default function HomePage() {
     setBuilderDemoTemplateId(null);
     setBuilderKey((k) => k + 1);
     setDemoNotice(null);
-    markChecklistStep("built_strategy");
     setView("builder");
   }
 
@@ -576,7 +575,6 @@ export default function HomePage() {
     setBuilderSavedTemplateId(null);
     setBuilderKey((k) => k + 1);
     setDemoNotice(null);
-    markChecklistStep("built_strategy");
     setView("builder");
   }
 

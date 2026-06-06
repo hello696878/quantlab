@@ -40,6 +40,12 @@ function dateRange(row: SavedReportSummary): string {
   return "—";
 }
 
+function tickerLabel(tickers: unknown): string {
+  return Array.isArray(tickers) && tickers.length > 0
+    ? tickers.join(", ")
+    : "—";
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -185,7 +191,7 @@ export default function SavedReportsList({
                     {sourceLabel(row.source_type)}
                   </td>
                   <td className="max-w-[180px] truncate px-4 py-3 font-mono text-slate-700">
-                    {row.tickers.length > 0 ? row.tickers.join(", ") : "—"}
+                    {tickerLabel(row.tickers)}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-500">
                     {dateRange(row)}
