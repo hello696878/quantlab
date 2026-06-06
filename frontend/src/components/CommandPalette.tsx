@@ -271,8 +271,10 @@ export default function CommandPalette({
 
   // Fetch saved resources each time the palette opens so newly-saved items
   // appear, while keeping any cached data visible during the (silent) refresh.
-  // A failure (e.g. backend offline) is non-fatal: commands still work and the
-  // saved-resource section shows an "unavailable" note instead of crashing.
+  // Each list is settled independently, so one failing endpoint never breaks
+  // the others or crashes the palette.  A *total* failure (backend offline)
+  // omits saved resources entirely — we never show stale rows — and surfaces
+  // the "unavailable" note; commands and demos keep working.
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
@@ -286,15 +288,17 @@ export default function CommandPalette({
       if (cancelled) return;
       const [bt, rp, tpl, gal] = settled;
       const allFailed = settled.every((s) => s.status === "rejected");
-      // On a total failure keep any previously cached data rather than wiping it.
-      if (!allFailed) {
-        setData({
-          backtests: bt.status === "fulfilled" ? bt.value : [],
-          reports: rp.status === "fulfilled" ? rp.value : [],
-          templates: tpl.status === "fulfilled" ? tpl.value : [],
-          gallery: gal.status === "fulfilled" ? gal.value : [],
-        });
-      }
+      // Total failure → drop any cached resources so nothing stale is shown.
+      setData(
+        allFailed
+          ? null
+          : {
+              backtests: bt.status === "fulfilled" ? bt.value : [],
+              reports: rp.status === "fulfilled" ? rp.value : [],
+              templates: tpl.status === "fulfilled" ? tpl.value : [],
+              gallery: gal.status === "fulfilled" ? gal.value : [],
+            },
+      );
       setResOffline(allFailed);
       setResLoading(false);
     });
@@ -511,8 +515,21 @@ export default function CommandPalette({
             </div>
           )}
           {!resLoading && resOffline && (
-            <div className="px-3 py-2 text-[11.5px] text-amber-500/80">
-              Saved resources unavailable while backend is offline.
+            <div className="px-1">
+              <div className="uplabel px-2.5 pb-1 pt-2" style={{ color: "var(--text-mut)" }}>
+                Saved resources
+              </div>
+              <div
+                className="rounded-lg px-2.5 py-2 text-[11.5px]"
+                style={{
+                  border: "1px solid rgba(245,158,11,0.3)",
+                  background: "rgba(245,158,11,0.06)",
+                  color: "#fbbf24",
+                }}
+              >
+                Saved resources unavailable while backend is offline. Navigation
+                and demo commands still work.
+              </div>
             </div>
           )}
         </div>

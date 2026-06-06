@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { getSavedBacktest } from "@/lib/api";
+import { classifyApiError, getSavedBacktest } from "@/lib/api";
 import type { EquityPoint, SavedBacktestFull, TradeRecord } from "@/lib/types";
+import BackendOfflinePanel from "@/components/BackendOfflinePanel";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
@@ -73,15 +74,18 @@ function MetricRow({
 interface SavedBacktestDetailProps {
   id: number;
   onBack: () => void;
+  onGoHome?: () => void;
 }
 
 export default function SavedBacktestDetail({
   id,
   onBack,
+  onGoHome,
 }: SavedBacktestDetailProps) {
   const [record, setRecord] = useState<SavedBacktestFull | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -94,12 +98,7 @@ export default function SavedBacktestDetail({
         if (!cancelled) setRecord(data);
       })
       .catch((err) => {
-        if (!cancelled)
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Failed to load saved backtest.",
-          );
+        if (!cancelled) setError(err);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -108,7 +107,7 @@ export default function SavedBacktestDetail({
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, retryTick]);
 
   // ── States ──────────────────────────────────────────────────────────────
 
@@ -121,6 +120,7 @@ export default function SavedBacktestDetail({
   }
 
   if (error) {
+    const cls = classifyApiError(error);
     return (
       <div className="space-y-4">
         <button
@@ -130,9 +130,19 @@ export default function SavedBacktestDetail({
         >
           ← Back to list
         </button>
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          ⚠ {error}
-        </div>
+        {cls.backendUnavailable ? (
+          <BackendOfflinePanel
+            resource="saved backtests"
+            capabilities="open"
+            detail={cls.message}
+            onRetry={() => setRetryTick((k) => k + 1)}
+            onGoHome={onGoHome}
+          />
+        ) : (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            ⚠ {cls.message}
+          </div>
+        )}
       </div>
     );
   }

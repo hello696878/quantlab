@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { deleteSavedReport, getSavedReport } from "@/lib/api";
+import { classifyApiError, deleteSavedReport, getSavedReport } from "@/lib/api";
 import type { SavedReportFull } from "@/lib/types";
+import BackendOfflinePanel from "@/components/BackendOfflinePanel";
 import { markdownToHtml } from "@/lib/printReport";
 import {
   downloadTextFile,
@@ -67,23 +68,27 @@ interface SavedReportDetailProps {
   id: number;
   onBack: () => void;
   onDeleted: () => void;
+  onGoHome?: () => void;
 }
 
 export default function SavedReportDetail({
   id,
   onBack,
   onDeleted,
+  onGoHome,
 }: SavedReportDetailProps) {
   const [record, setRecord] = useState<SavedReportFull | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<unknown>(null);
   const [error, setError] = useState<string | null>(null);
   const [showPrint, setShowPrint] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setError(null);
+    setLoadError(null);
     setRecord(null);
 
     getSavedReport(id)
@@ -91,10 +96,7 @@ export default function SavedReportDetail({
         if (!cancelled) setRecord(data);
       })
       .catch((err) => {
-        if (!cancelled)
-          setError(
-            err instanceof Error ? err.message : "Failed to load saved report.",
-          );
+        if (!cancelled) setLoadError(err);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -103,7 +105,7 @@ export default function SavedReportDetail({
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, retryTick]);
 
   // `markdownToHtml` fully HTML-escapes every piece of report text before
   // emitting its own fixed tag grammar, so embedded HTML/script in the saved
@@ -137,7 +139,8 @@ export default function SavedReportDetail({
     );
   }
 
-  if (error && !record) {
+  if (loadError && !record) {
+    const cls = classifyApiError(loadError);
     return (
       <div className="space-y-4">
         <button
@@ -147,9 +150,18 @@ export default function SavedReportDetail({
         >
           ← Back to list
         </button>
-        <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-          ⚠ {error}
-        </div>
+        {cls.backendUnavailable ? (
+          <BackendOfflinePanel
+            resource="saved reports"
+            detail={cls.message}
+            onRetry={() => setRetryTick((k) => k + 1)}
+            onGoHome={onGoHome}
+          />
+        ) : (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            ⚠ {cls.message}
+          </div>
+        )}
       </div>
     );
   }

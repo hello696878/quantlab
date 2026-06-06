@@ -1,8 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { deleteSavedReport, listSavedReports } from "@/lib/api";
+import {
+  classifyApiError,
+  deleteSavedReport,
+  listSavedReports,
+} from "@/lib/api";
 import type { SavedReportSummary } from "@/lib/types";
+import BackendOfflinePanel from "@/components/BackendOfflinePanel";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -42,17 +47,20 @@ function dateRange(row: SavedReportSummary): string {
 interface SavedReportsListProps {
   onSelect: (id: number) => void;
   refreshKey: number;
+  onGoHome?: () => void;
 }
 
 export default function SavedReportsList({
   onSelect,
   refreshKey,
+  onGoHome,
 }: SavedReportsListProps) {
   const [rows, setRows] = useState<SavedReportSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -64,10 +72,7 @@ export default function SavedReportsList({
         if (!cancelled) setRows(data);
       })
       .catch((err) => {
-        if (!cancelled)
-          setError(
-            err instanceof Error ? err.message : "Failed to load saved reports.",
-          );
+        if (!cancelled) setError(err);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -76,7 +81,7 @@ export default function SavedReportsList({
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, retryTick]);
 
   async function handleDelete(id: number, title: string) {
     if (!confirm(`Delete "${title}"? This cannot be undone.`)) return;
@@ -105,9 +110,20 @@ export default function SavedReportsList({
   }
 
   if (error) {
+    const cls = classifyApiError(error);
+    if (cls.backendUnavailable) {
+      return (
+        <BackendOfflinePanel
+          resource="saved reports"
+          detail={cls.message}
+          onRetry={() => setRetryTick((k) => k + 1)}
+          onGoHome={onGoHome}
+        />
+      );
+    }
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        ⚠ {error}
+        ⚠ {cls.message}
       </div>
     );
   }

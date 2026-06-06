@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { deleteSavedBacktest, listSavedBacktests } from "@/lib/api";
+import {
+  classifyApiError,
+  deleteSavedBacktest,
+  listSavedBacktests,
+} from "@/lib/api";
 import type { SavedBacktestSummary } from "@/lib/types";
 import { fmtPct, fmtRatio } from "@/lib/format";
+import BackendOfflinePanel from "@/components/BackendOfflinePanel";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -54,17 +59,20 @@ function metricCell(
 interface SavedBacktestsListProps {
   onSelect: (id: number) => void;
   refreshKey: number;
+  onGoHome?: () => void;
 }
 
 export default function SavedBacktestsList({
   onSelect,
   refreshKey,
+  onGoHome,
 }: SavedBacktestsListProps) {
   const [rows, setRows] = useState<SavedBacktestSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<unknown>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,12 +84,7 @@ export default function SavedBacktestsList({
         if (!cancelled) setRows(data);
       })
       .catch((err) => {
-        if (!cancelled)
-          setError(
-            err instanceof Error
-              ? err.message
-              : "Failed to load saved backtests.",
-          );
+        if (!cancelled) setError(err);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -90,7 +93,7 @@ export default function SavedBacktestsList({
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, retryTick]);
 
   async function handleDelete(id: number, name: string) {
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
@@ -119,9 +122,21 @@ export default function SavedBacktestsList({
   }
 
   if (error) {
+    const cls = classifyApiError(error);
+    if (cls.backendUnavailable) {
+      return (
+        <BackendOfflinePanel
+          resource="saved backtests"
+          capabilities="view, open, or delete"
+          detail={cls.message}
+          onRetry={() => setRetryTick((k) => k + 1)}
+          onGoHome={onGoHome}
+        />
+      );
+    }
     return (
       <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        ⚠ {error}
+        ⚠ {cls.message}
       </div>
     );
   }

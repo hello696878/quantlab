@@ -89,6 +89,72 @@ function backendUnavailableMessage(status: number): string {
   );
 }
 
+// ---------------------------------------------------------------------------
+// Error classification
+//
+// Normalises whatever an API call throws into a small, friendly shape the UI
+// can branch on.  The original technical message is always preserved (never
+// swallowed) — callers decide how prominently to show it.
+// ---------------------------------------------------------------------------
+
+export type ApiErrorKind =
+  | "offline" // backend unreachable (network error)
+  | "server" // backend returned 5xx (often also "backend not really up")
+  | "not_found" // 404
+  | "validation" // 400 / 422
+  | "unknown";
+
+export interface ClassifiedApiError {
+  kind: ApiErrorKind;
+  status: number;
+  /** Original technical message (kept for diagnostics). */
+  message: string;
+  /**
+   * True when the failure means the backend is effectively unavailable
+   * (network error or 5xx via the dev proxy).  These get the friendly
+   * "Backend offline" treatment.
+   */
+  backendUnavailable: boolean;
+}
+
+/** Classify any thrown value from an API call into a friendly shape. */
+export function classifyApiError(err: unknown): ClassifiedApiError {
+  if (err instanceof BacktestApiError) {
+    const status = err.status;
+    if (status === 0) {
+      return { kind: "offline", status, message: err.message, backendUnavailable: true };
+    }
+    if (status >= 500) {
+      return { kind: "server", status, message: err.message, backendUnavailable: true };
+    }
+    if (status === 404) {
+      return { kind: "not_found", status, message: err.message, backendUnavailable: false };
+    }
+    if (status === 400 || status === 422) {
+      return { kind: "validation", status, message: err.message, backendUnavailable: false };
+    }
+    return { kind: "unknown", status, message: err.message, backendUnavailable: false };
+  }
+
+  // A bare network failure (fetch TypeError) that escaped the helpers also
+  // means the backend is unreachable.
+  const message = err instanceof Error ? err.message : "Unknown error";
+  const looksOffline = /failed to fetch|networkerror|load failed|fetch failed/i.test(
+    message,
+  );
+  return {
+    kind: looksOffline ? "offline" : "unknown",
+    status: 0,
+    message,
+    backendUnavailable: looksOffline,
+  };
+}
+
+/** Convenience: true when the error means the backend is unavailable. */
+export function isBackendUnavailable(err: unknown): boolean {
+  return classifyApiError(err).backendUnavailable;
+}
+
 async function postBacktest(
   endpoint: string,
   params:

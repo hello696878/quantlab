@@ -996,11 +996,13 @@ export default function HomePage() {
               <SavedBacktestDetail
                 id={savedDetailId}
                 onBack={() => setSavedDetailId(null)}
+                onGoHome={() => handleNav("home")}
               />
             ) : (
               <SavedBacktestsList
                 refreshKey={savedRefreshKey}
                 onSelect={(id) => setSavedDetailId(id)}
+                onGoHome={() => handleNav("home")}
               />
             )}
           </>
@@ -1024,11 +1026,13 @@ export default function HomePage() {
                   setSavedReportDetailId(null);
                   setSavedReportsRefreshKey((k) => k + 1);
                 }}
+                onGoHome={() => handleNav("home")}
               />
             ) : (
               <SavedReportsList
                 refreshKey={savedReportsRefreshKey}
                 onSelect={(id) => setSavedReportDetailId(id)}
+                onGoHome={() => handleNav("home")}
               />
             )}
           </>

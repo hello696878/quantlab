@@ -589,6 +589,29 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
+### Phase 10.4.1 — Offline UX for Global Search & Saved Resources ✅
+
+- **Error classifier** (`classifyApiError` in `lib/api.ts`): normalises any
+  thrown API error into `offline / server / not_found / validation / unknown`
+  with a `backendUnavailable` flag (status 0 *or* ≥500 — the dev proxy surfaces
+  an unreachable backend as a 500). Original messages are preserved, not
+  swallowed. Plus `isBackendUnavailable`.
+- **`BackendOfflinePanel.tsx`**: reusable amber neon info card — "Backend
+  offline", reassurance that local SQLite data is safe, the exact `uvicorn`
+  start command, and **Retry** / **Go to Command Center** actions.
+- **Saved Backtests & Saved Reports** (list + detail) now branch on the
+  classifier: a backend-unavailable failure shows the friendly panel (with a
+  working in-place Retry) instead of a raw "HTTP 500"; genuine 4xx errors keep
+  the concise red message. `onGoHome` wired from `page.tsx`.
+- **Command Palette**: on a *total* resource-fetch failure it now **drops the
+  cache** (never shows stale saved rows) and shows a grouped *"Saved resources
+  unavailable while backend is offline"* card; commands/demos keep working.
+  Each list is still settled independently (one failure can't break the rest).
+- **No backend, schema, or fake-data changes.** Global search retained.
+  `tsc --noEmit` clean.
+
+---
+
 ## Future Phases
 
 The items below are planned but not yet started. Order and scope may change.
