@@ -10,6 +10,7 @@ import {
 import PrintableReportModal from "@/components/PrintableReportModal";
 import SaveReportModal from "@/components/SaveReportModal";
 import { loadSettings } from "@/lib/settings";
+import { markChecklistStep } from "@/lib/onboarding";
 
 /**
  * Report export controls shown wherever results are displayed.
@@ -71,6 +72,7 @@ export default function ExportReportButton({
   function handleMarkdown() {
     const { filename, content } = getReport(template);
     downloadTextFile(filename, content);
+    markChecklistStep("exported_report");
   }
 
   return (
@@ -102,7 +104,10 @@ export default function ExportReportButton({
         {showPdf && (
           <button
             type="button"
-            onClick={() => setPreview(getReport(template))}
+            onClick={() => {
+              setPreview(getReport(template));
+              markChecklistStep("exported_report");
+            }}
             title="Preview a printable report, then save as PDF"
             className={btnCls}
           >

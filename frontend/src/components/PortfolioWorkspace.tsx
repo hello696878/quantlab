@@ -9,7 +9,7 @@ import PortfolioRiskDashboardPanel from "@/components/PortfolioRiskDashboardPane
 import PortfolioStressTestPanel from "@/components/PortfolioStressTestPanel";
 import PortfolioFactorAnalysisPanel from "@/components/PortfolioFactorAnalysisPanel";
 
-type PortfolioTab =
+export type PortfolioTab =
   | "backtest"
   | "optimize"
   | "walk-forward"
@@ -28,8 +28,13 @@ const TABS: { id: PortfolioTab; label: string }[] = [
   { id: "factor", label: "Factor Analysis" },
 ];
 
-export default function PortfolioWorkspace() {
-  const [tab, setTab] = useState<PortfolioTab>("backtest");
+export default function PortfolioWorkspace({
+  initialTab = "backtest",
+}: {
+  /** Tab to open on mount — lets a guided demo land on a specific sub-tool. */
+  initialTab?: PortfolioTab;
+} = {}) {
+  const [tab, setTab] = useState<PortfolioTab>(initialTab);
 
   return (
     <div className="space-y-6">

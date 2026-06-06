@@ -5,6 +5,16 @@ import type { View } from "@/components/AppShell";
 import { checkHealth, listSavedBacktests, listSavedReports } from "@/lib/api";
 import type { SavedBacktestSummary, SavedReportSummary } from "@/lib/types";
 import { fmtPct, fmtRatio } from "@/lib/format";
+import { DEMO_PRESETS, type DemoPresetId } from "@/lib/demoPresets";
+import {
+  EMPTY_CHECKLIST,
+  ONBOARDING_EVENT,
+  getChecklist,
+  isOnboardingHidden,
+  setOnboardingHidden,
+  type ChecklistState,
+  type ChecklistStep,
+} from "@/lib/onboarding";
 
 // ---------------------------------------------------------------------------
 // Labels
@@ -42,6 +52,15 @@ function metricColor(v: number | null | undefined, positiveGood = true): string 
   if (v < 0) return positiveGood ? "text-red-600" : "text-green-700";
   return "text-slate-500";
 }
+
+/** Quick-start checklist rows. Order = suggested first-run path. */
+const CHECKLIST_ITEMS: { step: ChecklistStep; label: string }[] = [
+  { step: "ran_backtest", label: "Run your first backtest" },
+  { step: "saved_backtest", label: "Save a backtest" },
+  { step: "exported_report", label: "Export a report" },
+  { step: "viewed_risk", label: "Try the portfolio risk dashboard" },
+  { step: "built_strategy", label: "Build a custom strategy" },
+];
 
 // ---------------------------------------------------------------------------
 // Small building blocks
@@ -179,6 +198,84 @@ function FeatureCard({
   );
 }
 
+/** Filled accent button used for the onboarding primary actions. */
+function PrimaryButton({
+  label,
+  onClick,
+}: {
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-lg px-3.5 py-2 text-sm font-semibold transition-colors"
+      style={{
+        background: "var(--accent-soft)",
+        border: "1px solid var(--accent-line)",
+        color: "var(--accent-text)",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
+/** A guided-demo shortcut chip. Prefills a workspace; never auto-runs. */
+function DemoChip({
+  label,
+  detail,
+  onClick,
+}: {
+  label: string;
+  detail: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={`${label} — ${detail}`}
+      className="group flex flex-col items-start rounded-lg px-3 py-2 text-left transition-colors"
+      style={{ background: "var(--glass)", border: "1px solid var(--line)" }}
+    >
+      <span className="text-xs font-semibold" style={{ color: "var(--text-hi)" }}>
+        {label}
+      </span>
+      <span className="mt-0.5 text-[11px] text-slate-400">{detail}</span>
+    </button>
+  );
+}
+
+function ChecklistRow({ done, label }: { done: boolean; label: string }) {
+  return (
+    <li className="flex items-center gap-2.5 py-1.5 text-sm">
+      <span
+        aria-hidden
+        className="flex h-4 w-4 flex-shrink-0 items-center justify-center rounded-full text-[10px] font-bold"
+        style={
+          done
+            ? { background: "var(--pos)", color: "#04140d" }
+            : {
+                background: "transparent",
+                border: "1.5px solid var(--line-strong)",
+                color: "transparent",
+              }
+        }
+      >
+        ✓
+      </span>
+      <span
+        className={done ? "line-through" : ""}
+        style={{ color: done ? "var(--text-lo, #8b93a7)" : "var(--text-hi)" }}
+      >
+        {label}
+      </span>
+    </li>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -187,12 +284,15 @@ interface HomeDashboardProps {
   onNav: (view: View) => void;
   onOpenBacktest: (id: number) => void;
   onOpenReport: (id: number) => void;
+  /** Load a guided-demo preset: navigates + prefills, never auto-runs. */
+  onDemo: (id: DemoPresetId) => void;
 }
 
 export default function HomeDashboard({
   onNav,
   onOpenBacktest,
   onOpenReport,
+  onDemo,
 }: HomeDashboardProps) {
   const [backtests, setBacktests] = useState<SavedBacktestSummary[]>([]);
   const [reports, setReports] = useState<SavedReportSummary[]>([]);
@@ -200,6 +300,27 @@ export default function HomeDashboard({
   const [loaded, setLoaded] = useState(false);
   const [btOk, setBtOk] = useState(true);
   const [rpOk, setRpOk] = useState(true);
+
+  // Onboarding state lives in localStorage (client-only).  Start from
+  // deterministic values so SSR and first client render match, then hydrate
+  // from localStorage in an effect.  `hidden === null` means "not yet known"
+  // (render nothing) so the welcome card never flashes before we know.
+  const [hidden, setHidden] = useState<boolean | null>(null);
+  const [checklist, setChecklist] = useState<ChecklistState>(EMPTY_CHECKLIST);
+
+  useEffect(() => {
+    const sync = () => {
+      setHidden(isOnboardingHidden());
+      setChecklist(getChecklist());
+    };
+    sync();
+    window.addEventListener(ONBOARDING_EVENT, sync);
+    window.addEventListener("storage", sync);
+    return () => {
+      window.removeEventListener(ONBOARDING_EVENT, sync);
+      window.removeEventListener("storage", sync);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -228,6 +349,8 @@ export default function HomeDashboard({
   const recentReports = [...reports]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 5);
+
+  const doneCount = CHECKLIST_ITEMS.filter((i) => checklist[i.step]).length;
 
   const quickActions: QuickAction[] = [
     {
@@ -318,6 +441,105 @@ export default function HomeDashboard({
           <Badge>Research-only</Badge>
         </div>
       </div>
+
+      {/* ── Onboarding / Guided demo ─────────────────────────────────────── */}
+      {hidden === true && (
+        <button
+          type="button"
+          onClick={() => setOnboardingHidden(false)}
+          className="text-xs font-medium text-blue-600 hover:underline"
+        >
+          ↘ Show welcome guide
+        </button>
+      )}
+
+      {hidden === false && (
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Welcome + guided demos */}
+          <div className="card panel-glow p-5 sm:p-6 lg:col-span-2">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-bold" style={{ color: "var(--text-hi)" }}>
+                  Welcome to QuantLab
+                </h2>
+                <p className="mt-0.5 text-sm text-slate-400">
+                  Start with a guided workflow or jump directly into a research
+                  tool.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOnboardingHidden(true)}
+                className="flex-shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-400 transition-colors hover:text-slate-200"
+                style={{ border: "1px solid var(--line)" }}
+              >
+                Hide onboarding
+              </button>
+            </div>
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              <PrimaryButton
+                label="Run Demo Backtest"
+                onClick={() => onDemo("sma_backtest")}
+              />
+              <PrimaryButton
+                label="Try Portfolio Lab"
+                onClick={() => onDemo("portfolio_risk")}
+              />
+              <PrimaryButton
+                label="Build a Custom Strategy"
+                onClick={() => onDemo("strategy_builder")}
+              />
+              <PrimaryButton
+                label="Open Saved Reports"
+                onClick={() => onNav("reports")}
+              />
+            </div>
+
+            <div className="my-4 neon-divider" />
+
+            <p className="uplabel mb-2">
+              Guided demos · parameters are prefilled, nothing runs until you
+              click Run
+            </p>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-3">
+              {DEMO_PRESETS.map((p) => (
+                <DemoChip
+                  key={p.id}
+                  label={p.label}
+                  detail={p.detail}
+                  onClick={() => onDemo(p.id)}
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Quick-start checklist */}
+          <div className="card p-5 sm:p-6">
+            <div className="flex items-baseline justify-between">
+              <h2 className="text-sm font-bold" style={{ color: "var(--text-hi)" }}>
+                Quick-start checklist
+              </h2>
+              <span className="mono text-xs text-slate-400">
+                {doneCount}/{CHECKLIST_ITEMS.length}
+              </span>
+            </div>
+            <ul className="mt-2">
+              {CHECKLIST_ITEMS.map((i) => (
+                <ChecklistRow
+                  key={i.step}
+                  done={checklist[i.step]}
+                  label={i.label}
+                />
+              ))}
+            </ul>
+            <p className="mt-3 text-[11px] text-slate-500">
+              Progress is tracked locally as you use each tool — no account
+              needed.
+            </p>
+          </div>
+        </section>
+      )}
 
       {/* ── Quick Actions ────────────────────────────────────────────────── */}
       <section>

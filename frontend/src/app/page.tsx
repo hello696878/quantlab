@@ -13,7 +13,9 @@ import SmaWalkForwardPanel from "@/components/SmaWalkForwardPanel";
 import StrategyComparisonPanel from "@/components/StrategyComparisonPanel";
 import CsvBacktestPanel from "@/components/CsvBacktestPanel";
 import StrategyBuilderPanel from "@/components/StrategyBuilderPanel";
-import PortfolioWorkspace from "@/components/PortfolioWorkspace";
+import PortfolioWorkspace, {
+  type PortfolioTab,
+} from "@/components/PortfolioWorkspace";
 import SaveBacktestModal from "@/components/SaveBacktestModal";
 import SignalDiagnostics from "@/components/SignalDiagnostics";
 import ShortModeDiagnostics from "@/components/ShortModeDiagnostics";
@@ -26,6 +28,8 @@ import SavedReportsList from "@/components/SavedReportsList";
 import SavedReportDetail from "@/components/SavedReportDetail";
 import HomeDashboard from "@/components/HomeDashboard";
 import SettingsPanel from "@/components/SettingsPanel";
+import { type DemoPresetId } from "@/lib/demoPresets";
+import { markChecklistStep } from "@/lib/onboarding";
 import { applyAccent, loadSettings, resolveDateRange } from "@/lib/settings";
 import {
   runBacktest,
@@ -120,6 +124,13 @@ const DEFAULT_PAIRS_PARAMS: PairsBacktestRequest = {
   exit_z_score: 0.5,
   transaction_cost_bps: 10,
   initial_capital: 100_000,
+};
+
+// Guided "Demo Crypto Momentum" preset — the long-only momentum defaults on a
+// crypto ticker. Real backend run; only the inputs are prefilled.
+const DEMO_CRYPTO_MOMENTUM_PARAMS: MomentumBacktestRequest = {
+  ...DEFAULT_MOMENTUM_PARAMS,
+  ticker: "BTC-USD",
 };
 
 // ---------------------------------------------------------------------------
@@ -344,6 +355,14 @@ function SectionIntro({
 export default function HomePage() {
   const [view, setView] = useState<View>("home");
 
+  // Guided-demo banner ("Demo parameters loaded. Click Run to execute.") and
+  // the portfolio sub-tab a demo should open on.  `portfolioKey` is bumped to
+  // remount PortfolioWorkspace so a demo lands on the right tab even if the
+  // user is already in the Portfolio Lab.
+  const [demoNotice, setDemoNotice] = useState<string | null>(null);
+  const [portfolioTab, setPortfolioTab] = useState<PortfolioTab>("backtest");
+  const [portfolioKey, setPortfolioKey] = useState(0);
+
   // Saved backtests state
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [savedRefreshKey, setSavedRefreshKey] = useState(0);
@@ -420,6 +439,8 @@ export default function HomePage() {
                   ? await runVbBacktest(vbParams)
                   : await runPairsBacktest(pairsParams);
       setResult(data);
+      setDemoNotice(null); // a real run replaces the "click Run" hint
+      markChecklistStep("ran_backtest");
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "An unexpected error occurred.",
@@ -431,8 +452,71 @@ export default function HomePage() {
 
   function handleNav(next: View) {
     setView(next);
+    setDemoNotice(null);
     if (next !== "saved") setSavedDetailId(null);
     if (next !== "reports") setSavedReportDetailId(null);
+    // Quick-start checklist: mark workflows the user actually visits.
+    if (next === "portfolio") markChecklistStep("viewed_risk");
+    if (next === "builder") markChecklistStep("built_strategy");
+  }
+
+  /**
+   * Load a guided-demo preset: navigate to the right workspace and prefill the
+   * form.  Never auto-runs — the real backend call only happens when the user
+   * clicks Run.  No results are fabricated.
+   */
+  function handleDemo(id: DemoPresetId) {
+    setSavedDetailId(null);
+    setSavedReportDetailId(null);
+    switch (id) {
+      case "sma_backtest":
+        setStrategy("sma_crossover");
+        setSmaParams(DEFAULT_SMA_PARAMS);
+        setResult(null);
+        setError(null);
+        setFormKey((k) => k + 1);
+        setDemoNotice(
+          "Demo parameters loaded (SPY · SMA Crossover 20/100 · 2015–2023). Click Run to execute.",
+        );
+        setView("backtest");
+        break;
+      case "crypto_momentum":
+        setStrategy("momentum");
+        setMomentumParams(DEMO_CRYPTO_MOMENTUM_PARAMS);
+        setResult(null);
+        setError(null);
+        setFormKey((k) => k + 1);
+        setDemoNotice(
+          "Demo parameters loaded (BTC-USD · Time-Series Momentum · 2015–2023). Click Run to execute.",
+        );
+        setView("backtest");
+        break;
+      case "portfolio_risk":
+        setPortfolioTab("risk");
+        setPortfolioKey((k) => k + 1);
+        markChecklistStep("viewed_risk");
+        setDemoNotice(
+          "Demo loaded: SPY, QQQ, GLD, TLT in the Risk Dashboard. Click Run to execute.",
+        );
+        setView("portfolio");
+        break;
+      case "efficient_frontier":
+        setPortfolioTab("frontier");
+        setPortfolioKey((k) => k + 1);
+        markChecklistStep("viewed_risk");
+        setDemoNotice(
+          "Demo loaded: efficient frontier for SPY, QQQ, GLD, TLT (2,000 portfolios). Click Run to execute.",
+        );
+        setView("portfolio");
+        break;
+      case "strategy_builder":
+        markChecklistStep("built_strategy");
+        setDemoNotice(
+          "Open the Template Gallery below and load “SMA Trend Filter” or “Momentum + Trend”, then Run.",
+        );
+        setView("builder");
+        break;
+    }
   }
 
   const heading = STRATEGY_HEADINGS[strategy];
@@ -446,10 +530,37 @@ export default function HomePage() {
       subtitle={meta.subtitle}
     >
       <div className="space-y-8">
+        {/* Guided-demo banner — shown in the target workspace after a demo is
+            loaded; cleared on navigation or once a real run completes. */}
+        {demoNotice && view !== "home" && (
+          <div
+            className="flex items-start gap-2.5 rounded-xl p-3 text-sm"
+            style={{
+              background: "var(--accent-softer)",
+              border: "1px solid var(--accent-line)",
+              color: "var(--accent-text)",
+            }}
+          >
+            <span aria-hidden className="mt-0.5 flex-shrink-0">
+              ⚡
+            </span>
+            <p className="flex-1">{demoNotice}</p>
+            <button
+              type="button"
+              onClick={() => setDemoNotice(null)}
+              aria-label="Dismiss demo hint"
+              className="flex-shrink-0 px-1 text-slate-400 transition-colors hover:text-slate-200"
+            >
+              ✕
+            </button>
+          </div>
+        )}
+
         {/* ── Home / Command Center ────────────────────────────────────── */}
         {view === "home" && (
           <HomeDashboard
             onNav={handleNav}
+            onDemo={handleDemo}
             onOpenBacktest={(id) => {
               setSavedDetailId(id);
               setView("saved");
@@ -577,6 +688,7 @@ export default function HomePage() {
                       setShowSaveForm(false);
                       setSavedRefreshKey((k) => k + 1);
                       setSavedDetailId(id);
+                      markChecklistStep("saved_backtest");
                       setView("saved");
                     }}
                     onCancel={() => setShowSaveForm(false)}
@@ -676,7 +788,7 @@ export default function HomePage() {
               maximum Sharpe) over a historical window. Optimization is
               in-sample and can overfit — it is not investment advice.
             </SectionIntro>
-            <PortfolioWorkspace />
+            <PortfolioWorkspace key={portfolioKey} initialTab={portfolioTab} />
           </>
         )}
 

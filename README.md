@@ -36,6 +36,17 @@ The app opens on a **Home / Command Center** — a local-first landing dashboard
 
 Home is the default view; the sidebar's **Home** item returns to it at any time. The entire dashboard reads from existing endpoints — no new backend, no authentication, no cloud sync.
 
+### Onboarding & Guided Demo Mode
+
+First-time users get a **Welcome to QuantLab** onboarding card on the Command Center with one-click starting points:
+
+- **Primary actions** — *Run Demo Backtest*, *Try Portfolio Lab*, *Build a Custom Strategy*, *Open Saved Reports*.
+- **Guided demo presets** — *Demo Backtest* (SPY · SMA 20/100), *Demo Crypto Momentum* (BTC-USD · Time-Series Momentum), *Demo Portfolio Risk* (SPY/QQQ/GLD/TLT risk dashboard), *Demo Efficient Frontier* (SPY/QQQ/GLD/TLT · 2,000 portfolios), and *Demo Strategy Builder* (load the *SMA Trend Filter* or *Momentum + Trend* gallery template).
+
+Clicking a demo **navigates to the right workspace and prefills the form**, then shows a banner — *"Demo parameters loaded. Click Run to execute."* **Nothing runs automatically**: demo results are produced by the same real backend API calls as any manual run, only after you press **Run**. No performance numbers, saved backtests, or reports are ever fabricated — demo presets only fill in inputs.
+
+The card is **dismissible** ("Hide onboarding", remembered in `localStorage`); a small **"Show welcome guide"** link brings it back. A **quick-start checklist** (run your first backtest, save a backtest, export a report, try the portfolio risk dashboard, build a custom strategy) tracks progress via local flags set as you actually use each tool — all browser-local, no account required.
+
 ### Strategies
 
 | Strategy | Type | Parameters | Direction modes |

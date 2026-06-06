@@ -521,6 +521,30 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
+### Phase 10.2 — Onboarding / Guided Demo Mode ✅
+
+- **Welcome to QuantLab** onboarding card on the Command Center: primary
+  actions (Run Demo Backtest, Try Portfolio Lab, Build a Custom Strategy, Open
+  Saved Reports) plus a row of **guided demo presets**.
+- **Demo presets** (`lib/demoPresets.ts`): Demo Backtest (SPY · SMA 20/100),
+  Demo Crypto Momentum (BTC-USD · Momentum), Demo Portfolio Risk and Demo
+  Efficient Frontier (SPY/QQQ/GLD/TLT — match the panels' existing defaults,
+  rf 0.02 / 2,000 portfolios), Demo Strategy Builder (gallery templates).
+- **Prefill, never auto-run**: clicking a demo navigates + prefills the form and
+  shows a *"Demo parameters loaded. Click Run to execute."* banner. Results come
+  only from the real backend API after the user clicks Run — **no fabricated
+  data**. `PortfolioWorkspace` gained an optional `initialTab` so demos land on
+  the right sub-tool.
+- **Dismissible onboarding** persisted in `localStorage` ("Hide onboarding" /
+  "Show welcome guide") and a **quick-start checklist** (run / save backtest,
+  export report, view portfolio risk, build strategy) tracked with local flags
+  set from real user actions (`lib/onboarding.ts`; checklist refreshes via a
+  same-tab event).
+- **No backend changes, no new endpoints, no auth/cloud/billing.** Existing
+  long_only defaults and every workspace untouched. `tsc --noEmit` clean.
+
+---
+
 ## Future Phases
 
 The items below are planned but not yet started. Order and scope may change.
