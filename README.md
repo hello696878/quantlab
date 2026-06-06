@@ -47,16 +47,21 @@ Clicking a demo **navigates to the right workspace and prefills the form**, then
 
 The card is **dismissible** ("Hide onboarding", remembered in `localStorage`); a small **"Show welcome guide"** link brings it back. A **quick-start checklist** (run your first backtest, save a backtest, export a report, try the portfolio risk dashboard, build a custom strategy) tracks progress via local flags set as you actually use each tool — all browser-local, no account required.
 
-### Command Palette (Ctrl/Cmd + K)
+### Command Palette + Global Search (Ctrl/Cmd + K)
 
 Press **Ctrl + K** (Windows/Linux) or **⌘ + K** (macOS) anywhere to open a searchable command palette — or click the **Search** chip in the top bar. Type to filter, navigate with **↑/↓**, run with **Enter**, dismiss with **Esc** (or click outside). It's purely a navigation accelerator that calls the *same* handlers as the sidebar and onboarding — no separate router, no fake data.
 
-Commands include:
+It searches **both commands and your real local resources**:
 
 - **Navigation** — Go to Home / Backtest / CSV Upload / Custom Strategy Builder / Portfolio Lab / Research Tools / Parameter Sweep / Train/Test / Walk-Forward / Strategy Comparison / Saved Backtests / Saved Reports / Settings.
 - **Guided demos** — Load Demo Backtest, Demo Crypto Momentum, Demo Portfolio Risk, Demo Efficient Frontier, Demo Strategy Builder (reusing the onboarding presets — they prefill, they never auto-run).
 - **Portfolio tools** — jump straight to Portfolio Backtest, Optimization, Walk-Forward, Efficient Frontier, Risk Dashboard, Stress Test, or Factor Analysis.
 - **Report** — *Export current backtest report (Markdown)*, shown only when a backtest result is on screen (broken/no-op commands are never listed).
+- **Saved Backtests** — search by name, ticker, or strategy (shows ticker · strategy · Sharpe/CAGR · date); opens the saved backtest detail.
+- **Saved Reports** — search by title, ticker, source, or strategy; opens the saved report detail.
+- **Strategy Templates** — your saved *My Templates* **and** the built-in **gallery** templates (matched on name, description, and tags); opens the Custom Strategy Builder with that template loaded.
+
+Saved resources are fetched live from the backend (`/saved-backtests`, `/saved-reports`, `/custom-strategies`, `/custom-strategy-gallery`) the first time you open the palette — never fabricated. Try `BTC` (your BTC-USD backtests/reports), `momentum` (the Momentum command, momentum templates, the *Momentum + Trend* gallery template, momentum reports), or `risk` (Risk Dashboard, Risk Report template, saved risk reports, stress test). If the backend is offline, navigation/demo commands still work and the saved section shows *"Saved resources unavailable while backend is offline."*
 
 ### Strategies
 

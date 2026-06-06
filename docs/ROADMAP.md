@@ -563,6 +563,32 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
+### Phase 10.4 — Global Search in the Command Palette ✅
+
+- The Ctrl/Cmd+K palette now searches **commands + real local resources** in one
+  list: Navigation, Guided demos, Portfolio/Research tools, **Saved Backtests**,
+  **Saved Reports**, and **Strategy Templates** (saved *My Templates* + built-in
+  gallery).
+- **`lib/search.ts`**: tiny dependency-free search — `tokenize`, `buildHaystack`
+  (null-safe), `searchItems` (AND-substring match, preserves grouped order). No
+  external library.
+- **Data**: fetched lazily on first open via `Promise.allSettled` over
+  `/saved-backtests`, `/saved-reports`, `/custom-strategies`,
+  `/custom-strategy-gallery` and cached; results carry display fields (ticker ·
+  strategy · Sharpe/CAGR, source_type · tickers, template tags). **No fake
+  data.**
+- **Resilient**: partial/total fetch failure never crashes — commands still
+  work, a *"Saved resources unavailable while backend is offline"* note shows,
+  and an all-failed first open is retried on the next open. Missing optional
+  fields render safely (null-safe haystack/subtitle builders).
+- **Actions**: backtest → Saved Backtests detail; report → Saved Reports detail;
+  saved/gallery template → Custom Strategy Builder with the template loaded
+  (new `initialSavedTemplateId` prop mirrors the existing gallery loader).
+  Selecting an item only navigates/loads — no form is mutated otherwise.
+- **No backend / API / auth / fake-data changes.** `tsc --noEmit` clean.
+
+---
+
 ## Future Phases
 
 The items below are planned but not yet started. Order and scope may change.

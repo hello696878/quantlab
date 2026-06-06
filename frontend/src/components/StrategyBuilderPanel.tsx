@@ -771,10 +771,13 @@ function GalleryPanel({
 interface StrategyBuilderPanelProps {
   /** Optional guided-demo gallery template to load on mount. */
   initialGalleryTemplateId?: string;
+  /** Optional saved (My Templates) template id to load on mount. */
+  initialSavedTemplateId?: number;
 }
 
 export default function StrategyBuilderPanel({
   initialGalleryTemplateId,
+  initialSavedTemplateId,
 }: StrategyBuilderPanelProps = {}) {
   const [ticker, setTicker] = useState("SPY");
   const [startDate, setStartDate] = useState("2015-01-01");
@@ -808,6 +811,7 @@ export default function StrategyBuilderPanel({
   const [showGallery, setShowGallery] = useState(false);
   const [gallerySavingName, setGallerySavingName] = useState<string | null>(null);
   const initialGalleryLoadRef = useRef<string | null>(null);
+  const initialSavedLoadRef = useRef<number | null>(null);
 
   /** Populate the builder from a template-like definition (gallery or saved). */
   function populateFromDefinition(def: {
@@ -879,6 +883,45 @@ export default function StrategyBuilderPanel({
       cancelled = true;
     };
   }, [initialGalleryTemplateId]);
+
+  // Load a saved (My Templates) record on mount when requested (e.g. from the
+  // command-palette global search).  Mirrors the gallery loader above.
+  useEffect(() => {
+    if (
+      initialSavedTemplateId == null ||
+      initialSavedLoadRef.current === initialSavedTemplateId
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    initialSavedLoadRef.current = initialSavedTemplateId;
+    setTplMsg({ kind: "info", text: "Loading saved template..." });
+
+    getCustomStrategyTemplate(initialSavedTemplateId)
+      .then((template) => {
+        if (cancelled) return;
+        populateFromDefinition(template);
+        setLoadedId(template.id);
+        setShowTemplates(false);
+        setTplMsg({
+          kind: "info",
+          text: `Loaded “${template.name}”. Edit it, or click Run Strategy to execute a real backend backtest.`,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setTplMsg({
+          kind: "error",
+          text:
+            err instanceof Error ? err.message : "Failed to load saved template.",
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialSavedTemplateId]);
 
   async function handleSaveGalleryTemplate(t: GalleryTemplate) {
     setGallerySavingName(t.name);

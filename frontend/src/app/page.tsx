@@ -366,6 +366,9 @@ export default function HomePage() {
   const [builderDemoTemplateId, setBuilderDemoTemplateId] = useState<string | null>(
     null,
   );
+  const [builderSavedTemplateId, setBuilderSavedTemplateId] = useState<
+    number | null
+  >(null);
   const [builderKey, setBuilderKey] = useState(0);
 
   // Saved backtests state
@@ -512,6 +515,7 @@ export default function HomePage() {
         break;
       case "strategy_builder":
         setBuilderDemoTemplateId("sma-trend-filter");
+        setBuilderSavedTemplateId(null);
         setBuilderKey((k) => k + 1);
         setDemoNotice(
           "Loading SMA Trend Filter demo template. When it appears below, click Run Strategy to execute.",
@@ -538,6 +542,42 @@ export default function HomePage() {
     const report = buildBacktestReport(result, {}, tpl);
     downloadTextFile(report.filename, report.content);
     markChecklistStep("exported_report");
+  }
+
+  /** Open a saved backtest's detail (shared by Home cards + palette search). */
+  function openSavedBacktest(id: number) {
+    setDemoNotice(null);
+    setSavedReportDetailId(null);
+    setSavedDetailId(id);
+    setView("saved");
+  }
+
+  /** Open a saved report's detail (shared by Home cards + palette search). */
+  function openSavedReport(id: number) {
+    setDemoNotice(null);
+    setSavedDetailId(null);
+    setSavedReportDetailId(id);
+    setView("reports");
+  }
+
+  /** Load a saved (My Templates) custom strategy into the builder. */
+  function openSavedTemplate(id: number) {
+    setBuilderSavedTemplateId(id);
+    setBuilderDemoTemplateId(null);
+    setBuilderKey((k) => k + 1);
+    setDemoNotice(null);
+    markChecklistStep("built_strategy");
+    setView("builder");
+  }
+
+  /** Load a built-in gallery template into the builder. */
+  function openGalleryTemplate(id: string) {
+    setBuilderDemoTemplateId(id);
+    setBuilderSavedTemplateId(null);
+    setBuilderKey((k) => k + 1);
+    setDemoNotice(null);
+    markChecklistStep("built_strategy");
+    setView("builder");
   }
 
   // Command palette entries — all reuse the same navigation / demo / portfolio
@@ -657,14 +697,8 @@ export default function HomePage() {
           <HomeDashboard
             onNav={handleNav}
             onDemo={handleDemo}
-            onOpenBacktest={(id) => {
-              setSavedDetailId(id);
-              setView("saved");
-            }}
-            onOpenReport={(id) => {
-              setSavedReportDetailId(id);
-              setView("reports");
-            }}
+            onOpenBacktest={openSavedBacktest}
+            onOpenReport={openSavedReport}
           />
         )}
 
@@ -874,6 +908,7 @@ export default function HomePage() {
             <StrategyBuilderPanel
               key={builderKey}
               initialGalleryTemplateId={builderDemoTemplateId ?? undefined}
+              initialSavedTemplateId={builderSavedTemplateId ?? undefined}
             />
           </>
         )}
@@ -1013,7 +1048,13 @@ export default function HomePage() {
       </div>
 
       {/* Global command palette (Ctrl/Cmd + K) — overlays every workspace. */}
-      <CommandPalette commands={commands} />
+      <CommandPalette
+        commands={commands}
+        onOpenBacktest={openSavedBacktest}
+        onOpenReport={openSavedReport}
+        onOpenSavedTemplate={openSavedTemplate}
+        onOpenGalleryTemplate={openGalleryTemplate}
+      />
     </AppShell>
   );
 }
