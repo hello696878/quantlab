@@ -5,6 +5,7 @@ import {
   createCustomStrategyTemplate,
   deleteCustomStrategyTemplate,
   exportCustomStrategyTemplate,
+  getStrategyGalleryTemplate,
   getCustomStrategyTemplate,
   importCustomStrategyTemplate,
   listCustomStrategyTemplates,
@@ -29,6 +30,7 @@ import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildBacktestReport } from "@/lib/reportExport";
+import { markChecklistStep } from "@/lib/onboarding";
 
 // ---------------------------------------------------------------------------
 // Operand / indicator metadata
@@ -766,7 +768,14 @@ function GalleryPanel({
   );
 }
 
-export default function StrategyBuilderPanel() {
+interface StrategyBuilderPanelProps {
+  /** Optional guided-demo gallery template to load on mount. */
+  initialGalleryTemplateId?: string;
+}
+
+export default function StrategyBuilderPanel({
+  initialGalleryTemplateId,
+}: StrategyBuilderPanelProps = {}) {
   const [ticker, setTicker] = useState("SPY");
   const [startDate, setStartDate] = useState("2015-01-01");
   const [endDate, setEndDate] = useState("2023-12-31");
@@ -798,6 +807,7 @@ export default function StrategyBuilderPanel() {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [showGallery, setShowGallery] = useState(false);
   const [gallerySavingName, setGallerySavingName] = useState<string | null>(null);
+  const initialGalleryLoadRef = useRef<string | null>(null);
 
   /** Populate the builder from a template-like definition (gallery or saved). */
   function populateFromDefinition(def: {
@@ -830,6 +840,45 @@ export default function StrategyBuilderPanel() {
       text: `Loaded “${t.name}” from the gallery. Run it, or save it to My Templates.`,
     });
   }
+
+  useEffect(() => {
+    if (
+      !initialGalleryTemplateId ||
+      initialGalleryLoadRef.current === initialGalleryTemplateId
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+    initialGalleryLoadRef.current = initialGalleryTemplateId;
+    setTplMsg({ kind: "info", text: "Loading guided demo template..." });
+
+    getStrategyGalleryTemplate(initialGalleryTemplateId)
+      .then((template) => {
+        if (cancelled) return;
+        populateFromDefinition(template);
+        setLoadedId(null);
+        setShowGallery(false);
+        setTplMsg({
+          kind: "info",
+          text: `Loaded “${template.name}” demo template. Click Run Strategy to execute a real backend backtest.`,
+        });
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        setTplMsg({
+          kind: "error",
+          text:
+            err instanceof Error
+              ? err.message
+              : "Failed to load guided demo template.",
+        });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [initialGalleryTemplateId]);
 
   async function handleSaveGalleryTemplate(t: GalleryTemplate) {
     setGallerySavingName(t.name);
@@ -1039,6 +1088,7 @@ export default function StrategyBuilderPanel() {
     try {
       const data = await runCustomBacktest(request);
       setResult(data);
+      markChecklistStep("built_strategy");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Custom backtest failed.");
     } finally {

@@ -362,6 +362,10 @@ export default function HomePage() {
   const [demoNotice, setDemoNotice] = useState<string | null>(null);
   const [portfolioTab, setPortfolioTab] = useState<PortfolioTab>("backtest");
   const [portfolioKey, setPortfolioKey] = useState(0);
+  const [builderDemoTemplateId, setBuilderDemoTemplateId] = useState<string | null>(
+    null,
+  );
+  const [builderKey, setBuilderKey] = useState(0);
 
   // Saved backtests state
   const [showSaveForm, setShowSaveForm] = useState(false);
@@ -453,11 +457,9 @@ export default function HomePage() {
   function handleNav(next: View) {
     setView(next);
     setDemoNotice(null);
+    setBuilderDemoTemplateId(null);
     if (next !== "saved") setSavedDetailId(null);
     if (next !== "reports") setSavedReportDetailId(null);
-    // Quick-start checklist: mark workflows the user actually visits.
-    if (next === "portfolio") markChecklistStep("viewed_risk");
-    if (next === "builder") markChecklistStep("built_strategy");
   }
 
   /**
@@ -494,7 +496,6 @@ export default function HomePage() {
       case "portfolio_risk":
         setPortfolioTab("risk");
         setPortfolioKey((k) => k + 1);
-        markChecklistStep("viewed_risk");
         setDemoNotice(
           "Demo loaded: SPY, QQQ, GLD, TLT in the Risk Dashboard. Click Run to execute.",
         );
@@ -503,16 +504,16 @@ export default function HomePage() {
       case "efficient_frontier":
         setPortfolioTab("frontier");
         setPortfolioKey((k) => k + 1);
-        markChecklistStep("viewed_risk");
         setDemoNotice(
           "Demo loaded: efficient frontier for SPY, QQQ, GLD, TLT (2,000 portfolios). Click Run to execute.",
         );
         setView("portfolio");
         break;
       case "strategy_builder":
-        markChecklistStep("built_strategy");
+        setBuilderDemoTemplateId("sma-trend-filter");
+        setBuilderKey((k) => k + 1);
         setDemoNotice(
-          "Open the Template Gallery below and load “SMA Trend Filter” or “Momentum + Trend”, then Run.",
+          "Loading SMA Trend Filter demo template. When it appears below, click Run Strategy to execute.",
         );
         setView("builder");
         break;
@@ -775,7 +776,10 @@ export default function HomePage() {
               short selling, no leverage. Rules are evaluated safely on the
               server with vectorised math.
             </SectionIntro>
-            <StrategyBuilderPanel />
+            <StrategyBuilderPanel
+              key={builderKey}
+              initialGalleryTemplateId={builderDemoTemplateId ?? undefined}
+            />
           </>
         )}
 

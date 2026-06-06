@@ -6,6 +6,7 @@ import type { RiskDashboardResponse } from "@/lib/types";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildRiskDashboardReport } from "@/lib/reportExport";
 import { fmtPct, fmtRatio } from "@/lib/format";
+import { markChecklistStep } from "@/lib/onboarding";
 
 const inputCls =
   "w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm " +
@@ -117,6 +118,7 @@ export default function PortfolioRiskDashboardPanel() {
     try {
       const data = await runRiskDashboard(request);
       setResult(data);
+      markChecklistStep("viewed_risk");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Risk dashboard failed.");
     } finally {

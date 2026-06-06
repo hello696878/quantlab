@@ -71,8 +71,17 @@ export function getChecklist(): ChecklistState {
   try {
     const raw = ls.getItem(CHECK_KEY);
     if (!raw) return { ...EMPTY_CHECKLIST };
-    const parsed = JSON.parse(raw) as Partial<ChecklistState>;
-    return { ...EMPTY_CHECKLIST, ...parsed };
+    const parsed = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      return { ...EMPTY_CHECKLIST };
+    }
+
+    const src = parsed as Record<string, unknown>;
+    const clean = { ...EMPTY_CHECKLIST };
+    (Object.keys(EMPTY_CHECKLIST) as ChecklistStep[]).forEach((step) => {
+      clean[step] = src[step] === true;
+    });
+    return clean;
   } catch {
     return { ...EMPTY_CHECKLIST };
   }
