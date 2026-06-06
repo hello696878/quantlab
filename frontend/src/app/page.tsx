@@ -528,7 +528,6 @@ export default function HomePage() {
     setDemoNotice(null);
     setPortfolioTab(tab);
     setPortfolioKey((k) => k + 1);
-    markChecklistStep("viewed_risk"); // entering the Portfolio Lab
     setView("portfolio");
   }
 
@@ -570,6 +569,14 @@ export default function HomePage() {
     { tab: "factor", title: "Open Factor Analysis", keywords: "regression exposure beta" },
   ];
 
+  const DEMO_COMMAND_TITLES: Record<DemoPresetId, string> = {
+    sma_backtest: "Load Demo Backtest",
+    crypto_momentum: "Load Crypto Momentum Demo",
+    portfolio_risk: "Load Portfolio Risk Demo",
+    efficient_frontier: "Load Efficient Frontier Demo",
+    strategy_builder: "Load Strategy Builder Demo",
+  };
+
   const commands: Command[] = [
     ...NAV_COMMANDS.map((c) => ({
       id: `nav-${c.title}`,
@@ -581,7 +588,7 @@ export default function HomePage() {
     ...DEMO_PRESETS.map((p) => ({
       id: `demo-${p.id}`,
       group: "Guided demos",
-      title: `Load ${p.label}`,
+      title: DEMO_COMMAND_TITLES[p.id],
       keywords: `demo preset ${p.detail}`,
       hint: "prefill",
       run: () => handleDemo(p.id),

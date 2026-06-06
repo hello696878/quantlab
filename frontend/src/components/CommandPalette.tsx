@@ -73,6 +73,8 @@ export default function CommandPalette({ commands }: { commands: Command[] }) {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
         e.preventDefault(); // some browsers focus the address bar on Ctrl+K
         setOpen((o) => !o);
+      } else if (e.key === "Escape") {
+        setOpen(false);
       }
     }
     function onOpen() {
@@ -180,7 +182,10 @@ export default function CommandPalette({ commands }: { commands: Command[] }) {
           <input
             ref={inputRef}
             value={query}
-            onChange={(e) => setQuery(e.target.value)}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setActive(0);
+            }}
             onKeyDown={onInputKeyDown}
             placeholder="Search commands…"
             spellCheck={false}
