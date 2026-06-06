@@ -47,6 +47,17 @@ Clicking a demo **navigates to the right workspace and prefills the form**, then
 
 The card is **dismissible** ("Hide onboarding", remembered in `localStorage`); a small **"Show welcome guide"** link brings it back. A **quick-start checklist** (run your first backtest, save a backtest, export a report, try the portfolio risk dashboard, build a custom strategy) tracks progress via local flags set as you actually use each tool — all browser-local, no account required.
 
+### Command Palette (Ctrl/Cmd + K)
+
+Press **Ctrl + K** (Windows/Linux) or **⌘ + K** (macOS) anywhere to open a searchable command palette — or click the **Search** chip in the top bar. Type to filter, navigate with **↑/↓**, run with **Enter**, dismiss with **Esc** (or click outside). It's purely a navigation accelerator that calls the *same* handlers as the sidebar and onboarding — no separate router, no fake data.
+
+Commands include:
+
+- **Navigation** — Go to Home / Backtest / CSV Upload / Custom Strategy Builder / Portfolio Lab / Research Tools / Parameter Sweep / Train/Test / Walk-Forward / Strategy Comparison / Saved Backtests / Saved Reports / Settings.
+- **Guided demos** — Load Demo Backtest, Demo Crypto Momentum, Demo Portfolio Risk, Demo Efficient Frontier, Demo Strategy Builder (reusing the onboarding presets — they prefill, they never auto-run).
+- **Portfolio tools** — jump straight to Portfolio Backtest, Optimization, Walk-Forward, Efficient Frontier, Risk Dashboard, Stress Test, or Factor Analysis.
+- **Report** — *Export current backtest report (Markdown)*, shown only when a backtest result is on screen (broken/no-op commands are never listed).
+
 ### Strategies
 
 | Strategy | Type | Parameters | Direction modes |

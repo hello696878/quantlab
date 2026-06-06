@@ -545,6 +545,24 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
+### Phase 10.3 — Command Palette / Keyboard Shortcuts ✅
+
+- **`CommandPalette.tsx`**: a portalled, dark-glass modal opened with
+  **Ctrl/Cmd + K** (toggle) or the new TopBar **Search** chip. Search input,
+  grouped + filtered list, **↑/↓** to move, **Enter** to run, **Esc** / click
+  outside to close. Footer + TopBar show the platform-correct ⌘K / Ctrl K hint.
+- **Commands** (built in `page.tsx`, all reusing existing handlers — no second
+  router): Navigation (13 views incl. research tools), Guided demos (from
+  `DEMO_PRESETS` — no duplication), Portfolio tools (7 sub-tabs via the
+  `initialTab` mechanism), and a conditional *Export current backtest report*
+  shown only when a result exists (no broken commands listed).
+- **State-safe**: commands only navigate / prefill (demos still never auto-run);
+  Ctrl+K is global but only opens an overlay, so no form values are lost and no
+  saved data is mutated. `e.preventDefault()` stops the browser's native Ctrl+K.
+- **No backend, API, auth, or fake data changes.** `tsc --noEmit` clean.
+
+---
+
 ## Future Phases
 
 The items below are planned but not yet started. Order and scope may change.

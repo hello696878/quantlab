@@ -2,6 +2,41 @@
 
 import { useEffect, useState } from "react";
 import { checkHealth } from "@/lib/api";
+import { openCommandPalette, useIsMac } from "@/components/CommandPalette";
+
+/** Discoverability hint that also opens the command palette on click. */
+function PaletteHint() {
+  const isMac = useIsMac();
+  return (
+    <button
+      type="button"
+      onClick={openCommandPalette}
+      title="Search commands (Ctrl/Cmd + K)"
+      className="glass hidden items-center gap-2 px-3 py-1.5 transition-colors hover:brightness-125 sm:flex"
+      style={{ borderRadius: 999 }}
+    >
+      <svg
+        width={13}
+        height={13}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--text-mut)"
+        strokeWidth="2"
+        strokeLinecap="round"
+        aria-hidden
+      >
+        <circle cx="11" cy="11" r="7" />
+        <path d="m21 21-4.3-4.3" />
+      </svg>
+      <span className="uplabel" style={{ color: "var(--text)" }}>
+        Search
+      </span>
+      <kbd className="mono text-[11px]" style={{ color: "var(--text-mut)" }}>
+        {isMac ? "⌘K" : "Ctrl K"}
+      </kbd>
+    </button>
+  );
+}
 
 /** Live UTC clock. */
 function Clock() {
@@ -120,6 +155,7 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
         </div>
       </div>
       <div className="ml-auto flex items-center gap-3.5">
+        <PaletteHint />
         <Clock />
         <ApiStatus />
       </div>

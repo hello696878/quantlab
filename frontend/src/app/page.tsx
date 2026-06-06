@@ -21,14 +21,15 @@ import SignalDiagnostics from "@/components/SignalDiagnostics";
 import ShortModeDiagnostics from "@/components/ShortModeDiagnostics";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
-import { buildBacktestReport } from "@/lib/reportExport";
+import { buildBacktestReport, downloadTextFile } from "@/lib/reportExport";
 import SavedBacktestsList from "@/components/SavedBacktestsList";
 import SavedBacktestDetail from "@/components/SavedBacktestDetail";
 import SavedReportsList from "@/components/SavedReportsList";
 import SavedReportDetail from "@/components/SavedReportDetail";
 import HomeDashboard from "@/components/HomeDashboard";
 import SettingsPanel from "@/components/SettingsPanel";
-import { type DemoPresetId } from "@/lib/demoPresets";
+import CommandPalette, { type Command } from "@/components/CommandPalette";
+import { DEMO_PRESETS, type DemoPresetId } from "@/lib/demoPresets";
 import { markChecklistStep } from "@/lib/onboarding";
 import { applyAccent, loadSettings, resolveDateRange } from "@/lib/settings";
 import {
@@ -520,6 +521,93 @@ export default function HomePage() {
     }
   }
 
+  /** Open the Portfolio Lab on a specific sub-tab (shared by the palette). */
+  function goToPortfolioTab(tab: PortfolioTab) {
+    setSavedDetailId(null);
+    setSavedReportDetailId(null);
+    setDemoNotice(null);
+    setPortfolioTab(tab);
+    setPortfolioKey((k) => k + 1);
+    markChecklistStep("viewed_risk"); // entering the Portfolio Lab
+    setView("portfolio");
+  }
+
+  /** Download the current single-asset backtest as a Markdown report. */
+  function exportCurrentReport() {
+    if (!result) return;
+    const tpl = loadSettings().default_report_template;
+    const report = buildBacktestReport(result, {}, tpl);
+    downloadTextFile(report.filename, report.content);
+    markChecklistStep("exported_report");
+  }
+
+  // Command palette entries — all reuse the same navigation / demo / portfolio
+  // handlers as the sidebar and onboarding, so behaviour can never diverge.
+  // Demo definitions come straight from DEMO_PRESETS (no duplication).
+  const NAV_COMMANDS: { view: View; title: string; keywords: string }[] = [
+    { view: "home", title: "Go to Home", keywords: "command center dashboard" },
+    { view: "backtest", title: "Go to Backtest", keywords: "single asset run strategy" },
+    { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
+    { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
+    { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
+    { view: "sweep", title: "Go to Research Tools", keywords: "sweep validation optimization research" },
+    { view: "sweep", title: "Go to Parameter Sweep", keywords: "grid search sma fast slow" },
+    { view: "train-test", title: "Go to Train/Test Validation", keywords: "in sample out of sample" },
+    { view: "walk-forward", title: "Go to Walk-Forward Optimization", keywords: "rolling reoptimization" },
+    { view: "comparison", title: "Go to Strategy Comparison", keywords: "compare strategies side by side" },
+    { view: "saved", title: "Go to Saved Backtests", keywords: "history persisted sqlite" },
+    { view: "reports", title: "Go to Saved Reports", keywords: "report gallery markdown" },
+    { view: "settings", title: "Go to Settings", keywords: "preferences theme defaults" },
+  ];
+
+  const PORTFOLIO_COMMANDS: { tab: PortfolioTab; title: string; keywords: string }[] = [
+    { tab: "backtest", title: "Open Portfolio Backtest", keywords: "equal weight rebalance" },
+    { tab: "optimize", title: "Open Portfolio Optimization", keywords: "min volatility max sharpe weights" },
+    { tab: "walk-forward", title: "Open Walk-Forward Portfolio Optimization", keywords: "rolling" },
+    { tab: "frontier", title: "Open Efficient Frontier", keywords: "mean variance random portfolios" },
+    { tab: "risk", title: "Open Risk Dashboard", keywords: "var drawdown correlation" },
+    { tab: "stress", title: "Open Stress Test", keywords: "scenario crash shock" },
+    { tab: "factor", title: "Open Factor Analysis", keywords: "regression exposure beta" },
+  ];
+
+  const commands: Command[] = [
+    ...NAV_COMMANDS.map((c) => ({
+      id: `nav-${c.title}`,
+      group: "Navigation",
+      title: c.title,
+      keywords: c.keywords,
+      run: () => handleNav(c.view),
+    })),
+    ...DEMO_PRESETS.map((p) => ({
+      id: `demo-${p.id}`,
+      group: "Guided demos",
+      title: `Load ${p.label}`,
+      keywords: `demo preset ${p.detail}`,
+      hint: "prefill",
+      run: () => handleDemo(p.id),
+    })),
+    ...PORTFOLIO_COMMANDS.map((c) => ({
+      id: `pf-${c.tab}`,
+      group: "Portfolio tools",
+      title: c.title,
+      keywords: c.keywords,
+      run: () => goToPortfolioTab(c.tab),
+    })),
+    // Report actions are only offered when they actually work (a result exists).
+    ...(result
+      ? [
+          {
+            id: "report-export-current",
+            group: "Report",
+            title: "Export current backtest report (Markdown)",
+            keywords: "download md save export report current result",
+            hint: result.ticker,
+            run: exportCurrentReport,
+          },
+        ]
+      : []),
+  ];
+
   const heading = STRATEGY_HEADINGS[strategy];
   const meta = VIEW_META[view];
 
@@ -916,6 +1004,9 @@ export default function HomePage() {
           </>
         )}
       </div>
+
+      {/* Global command palette (Ctrl/Cmd + K) — overlays every workspace. */}
+      <CommandPalette commands={commands} />
     </AppShell>
   );
 }
