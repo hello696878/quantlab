@@ -267,6 +267,12 @@ export default function HomeDashboard({
       onClick: () => onNav("reports"),
     },
     {
+      label: "Open Settings",
+      description: "Theme, default inputs, and report preferences",
+      icon: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6Zm8.4 3a8.4 8.4 0 0 0-.12-1.4l2-1.55-2-3.46-2.36.95a8.4 8.4 0 0 0-2.42-1.4L14.8 1.6h-4l-.3 2.94a8.4 8.4 0 0 0-2.42 1.4l-2.36-.95-2 3.46 2 1.55A8.4 8.4 0 0 0 3.6 12c0 .47.04.94.12 1.4l-2 1.55 2 3.46 2.36-.95a8.4 8.4 0 0 0 2.42 1.4l.3 2.94h4l.3-2.94a8.4 8.4 0 0 0 2.42-1.4l2.36.95 2-3.46-2-1.55c.08-.46.12-.93.12-1.4Z",
+      onClick: () => onNav("settings"),
+    },
+    {
       label: "Export Research Report",
       description: "Run an analysis, then export Markdown / PDF",
       icon: "M12 16V4m0 0l-4 4m4-4 4 4M6 20h12",
