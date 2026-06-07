@@ -1,8 +1,24 @@
 # QuantLab
 
-An interactive quantitative research and backtesting platform built for learning, exploration, and portfolio demonstration.
+**Local-first quant research terminal for backtesting, portfolio analytics, strategy building, and report generation.**
 
-QuantLab lets you select a strategy, choose an asset and date range, tune parameters, and instantly see equity curves, drawdown charts, performance metrics, and trade logs — all computed on real historical price data with no lookahead bias.
+QuantLab is a full-stack quantitative research platform you run on your own machine. A **FastAPI** backend computes every backtest, optimization, and risk metric on **real historical price data** — yfinance daily OHLCV, or your own **CSV uploads** — with no lookahead bias. A **Next.js** frontend gives you an interactive "neon terminal" dashboard to explore strategies, compare them, build your own with no code, run portfolio analytics, and export branded research reports. Saved backtests, strategies, and reports persist in a **local SQLite** database — no account, no cloud sync, no telemetry.
+
+> **Research only.** QuantLab is an educational/research tool. It does **not** place trades, connect to a broker, or provide investment advice. See [Limitations & Disclaimers](#limitations--disclaimers).
+
+---
+
+## Features at a glance
+
+| Area | Capabilities |
+|---|---|
+| **Strategy Research** | Single-asset backtesting · SMA / RSI / Bollinger / Momentum / Volatility Breakout / Pairs · long / short / long-short modes · strategy comparison · parameter sweep · train/test validation · walk-forward validation |
+| **Custom Strategy Lab** | No-code rule builder (whitelisted indicators, **no `eval`**) · saved templates · JSON import / export · built-in template gallery |
+| **Portfolio Lab** | Equal-weight backtesting · optimization (min-vol / max-Sharpe) · walk-forward optimization · efficient frontier · risk dashboard · stress testing · factor analysis |
+| **Reporting** | Markdown export · PDF / print export · four branded report templates · saved reports gallery |
+| **Product Experience** | Command Center home · guided demo mode · Ctrl/Cmd + K command palette · global search · app settings · neon theme & charts · toast notifications · loading / empty / offline states |
+
+Each capability is described in detail under [Features](#features) below.
 
 ---
 
@@ -11,13 +27,13 @@ QuantLab lets you select a strategy, choose an asset and date range, tune parame
 | Layer | Technology |
 |---|---|
 | Backend API | FastAPI · Python 3.11 · Pydantic v2 |
-| Data | yfinance (OHLCV daily) |
-| Backtest engine | NumPy · pandas (vectorised) |
-| Frontend | Next.js 14 · React 18 · TypeScript |
-| Styling | Tailwind CSS |
+| Data | yfinance (daily OHLCV) · user CSV upload |
+| Backtest / analytics engine | NumPy · pandas · SciPy (vectorised) |
+| Frontend | Next.js 14 (App Router) · React 18 · TypeScript |
+| Styling | Tailwind CSS · CSS-variable neon theme |
 | Charts | Recharts |
-| Local persistence | SQLite for saved backtests |
-| Testing | pytest (325+ tests, synthetic data) |
+| Local persistence | SQLite (saved backtests, reports & strategy templates) |
+| Testing | pytest (840+ tests across 44 files, synthetic data) |
 | CI | GitHub Actions |
 | Containerisation | Docker · Docker Compose |
 
@@ -94,7 +110,7 @@ All strategies apply a **one-day signal shift** — the position derived from da
 
 **Default parameters are chosen for usability, not performance.** They are demo-friendly starting points intended to make first runs more informative across common assets and date ranges, but they can still produce zero trades when conditions do not trigger signals. They are **not recommendations** and are not tuned for returns. Each strategy form offers one-click **presets** (including the classic long-term variants, e.g. SMA 50/200, Bollinger 2.0σ, 6-/12-month momentum, and a Volatility-Breakout Responsive/Balanced/Conservative set), and you should validate any parameter choice with the **Parameter Sweep**, **Train/Test**, and **Walk-Forward** research tools before drawing conclusions. The Strategy Comparison runs all five single-asset strategies with these same demo-friendly defaults.
 
-**Most built-in strategies are long-only.** They hold cash when not in a position, so trend/momentum/breakout strategies can legitimately **stay flat during downtrends** — that is expected behaviour, not a bug. The UI surfaces a small, non-error info card when a run produces zero or very few trades (and a "No signal · stayed flat" tag in Strategy Comparison) suggesting a more responsive preset or a parameter sweep. Use **Pairs Trading** for non-directional exposure; short selling is not enabled yet.
+**Most built-in strategies are long-only.** They hold cash when not in a position, so trend/momentum/breakout strategies can legitimately **stay flat during downtrends** — that is expected behaviour, not a bug. The UI surfaces a small, non-error info card when a run produces zero or very few trades (and a "No signal · stayed flat" tag in Strategy Comparison) suggesting a more responsive preset or a parameter sweep. For directional flexibility, SMA Crossover, Momentum, and Volatility Breakout support **short / long-short modes** (see Direction modes above); use **Pairs Trading** for dollar-neutral exposure.
 
 ### Research Tools
 
@@ -337,10 +353,11 @@ The local database lives at `backend/data/quantlab.db` (both `saved_backtests` a
 
 ### Engineering
 
-- Vectorised backtest engine (no Python loops over price series)
-- Transaction cost model: flat bps charged on each position change
+- Vectorised backtest, portfolio, and risk engines (no Python loops over price series)
+- Transaction cost model: flat bps charged on turnover (`|Δposition|` / portfolio rebalancing)
 - Pydantic v2 request/response schemas with full validation
-- 325+ pytest tests using synthetic data (no network calls)
+- 840+ pytest tests (44 files) using synthetic data — no network calls at test time
+- Typed frontend (`tsc --noEmit` clean), shared loading/empty/offline/error UI primitives, toast system, and an app-level error boundary
 - GitHub Actions CI: backend tests + frontend build on every push/PR
 - Docker Compose: one command to start the full stack
 
@@ -372,6 +389,8 @@ The local database lives at `backend/data/quantlab.db` (both `saved_backtests` a
 
 ![FastAPI Docs](docs/screenshots/fastapi-docs.png)
 
+> **Recommended additional screenshots (TODO).** The captures above predate several major features. To fully represent the current platform, add: `command-center.png`, `backtest-neon-chart.png`, `custom-strategy-builder.png`, `portfolio-efficient-frontier.png`, `portfolio-risk-dashboard.png`, `stress-test.png`, `factor-analysis.png`, `saved-reports.png`, and `command-palette.png`. See [`docs/screenshots/README.md`](docs/screenshots/README.md) for the suggested view and parameters for each.
+
 ---
 
 ## Architecture
@@ -387,15 +406,21 @@ Next.js Frontend  (React 18, Tailwind, Recharts)
   │  /api/*  (proxied at build time via next.config.js rewrites)
   ▼
 FastAPI Backend  (Python 3.11, Pydantic v2)
-  │  /backtest/*  /research/*  /saved-backtests  /health
+  │  /backtest/*  /research/*  /portfolio/*  /custom-strategies  /custom-strategy-gallery
+  │  /saved-backtests  /saved-reports  /health
   │
-  ├── data.py        yfinance OHLCV download + alignment
-  ├── strategies.py  Signal generation (all shift-by-1)
-  ├── backtest.py    Vectorised engine, trade log, benchmark
-  ├── metrics.py     Sharpe, CAGR, drawdown, Sortino, Calmar, …
-  ├── db.py          SQLite connection + schema initialisation
-  ├── saved_backtests.py  Saved-backtest CRUD helpers
-  └── schemas.py     Pydantic request / response models
+  ├── data.py                    yfinance OHLCV download + alignment
+  ├── strategies.py              Signal generation (all shift-by-1)
+  ├── backtest.py                Vectorised engine, trade log, benchmark, long/short
+  ├── custom_strategy.py         No-code rule evaluation (whitelisted, no eval)
+  ├── portfolio.py               Equal-weight, optimization, walk-forward, frontier, risk, stress, factor
+  ├── metrics.py                 Sharpe, CAGR, drawdown, Sortino, Calmar, …
+  ├── db.py                      SQLite connection + schema initialisation
+  ├── saved_backtests.py         Saved-backtest CRUD helpers
+  ├── saved_reports.py           Saved-report CRUD helpers
+  ├── custom_strategy_templates.py  Saved custom-strategy CRUD + import/export
+  ├── strategy_gallery.py        Built-in template gallery (static, validated)
+  └── schemas.py                 Pydantic request / response models
 ```
 
 In Docker, the browser never calls the backend directly:
@@ -479,12 +504,20 @@ Frontend: http://localhost:3000
 
 ## Testing
 
+**Backend** — 840+ tests across 44 files, all on synthetic price data (no network calls, no yfinance dependency at test time):
+
 ```powershell
 cd backend
 python -m pytest -q
 ```
 
-All 325+ tests use synthetic price data — no network calls, no yfinance dependency at test time.
+**Frontend** — type-check and production build:
+
+```powershell
+cd frontend
+npx tsc --noEmit   # fast type check
+npm run build      # full production build
+```
 
 ---
 
@@ -514,15 +547,16 @@ quantlab/
 │   │   ├── schemas.py       Pydantic v2 request / response models
 │   │   ├── data.py          yfinance OHLCV download layer
 │   │   └── utils.py         Shared helpers (date validation, etc.)
-│   ├── tests/               pytest suite (325+ tests, synthetic data)
+│   ├── tests/               pytest suite (840+ tests, synthetic data)
 │   ├── Dockerfile
 │   ├── .dockerignore
 │   └── requirements.txt
 ├── frontend/
 │   ├── src/
-│   │   ├── app/             Next.js App Router pages
-│   │   ├── components/      React components (BacktestForm, charts, panels)
-│   │   └── lib/             API client, TypeScript types, formatters
+│   │   ├── app/             Next.js App Router pages + root layout
+│   │   ├── components/      React components (forms, charts, panels, ui/ state primitives)
+│   │   ├── hooks/           React hooks (e.g. useToasts)
+│   │   └── lib/             API client, types, formatters, toast store, search
 │   ├── Dockerfile
 │   ├── .dockerignore
 │   └── package.json
@@ -530,7 +564,7 @@ quantlab/
 │   ├── PROJECT_OVERVIEW.md  Module descriptions and data flow
 │   ├── ROADMAP.md           Completed phases and future plans
 │   ├── LIMITATIONS.md       Known constraints and caveats
-│   └── screenshots/         Screenshot placeholders
+│   └── screenshots/         UI screenshots + capture guide
 ├── .github/
 │   └── workflows/
 │       └── ci.yml           GitHub Actions CI
@@ -540,28 +574,34 @@ quantlab/
 
 ---
 
-## Known Limitations
+## Limitations & Disclaimers
 
-See [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) for the full list. Key points:
+QuantLab is deliberately honest about what it does and does not model. See [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) for the full list; the key points:
 
-- Price data from yfinance may have gaps, splits, or quality issues
-- No survivorship-bias-free database
-- No intraday data or live trading
-- Annualisation assumes 252 trading days (equities convention)
-- Parameter sweeps can overfit in-sample — always check out-of-sample results
+- **Research only — not investment advice.** Backtests are historical, simulated, and past performance does not predict future results.
+- **No live trading.** There is no broker connection, order routing, or paper-trading engine.
+- **Short selling is simplified.** Long/short modes (and pairs trading) earn `−1 × asset_return` on shorts with **no borrow fees, margin requirements, liquidation, or funding costs modelled** — short results are highly sensitive to timing and transaction costs.
+- **Backtests can overfit.** Default parameters are demo-friendly, not tuned; parameter sweeps and in-sample optimization look good by construction. Always validate with Train/Test and Walk-Forward.
+- **Portfolio optimization v1** estimates expected returns and covariance from the selected historical window (252-day annualisation) — descriptive, in-sample, and not a forecast.
+- **Data limitations.** yfinance daily data may have gaps/anomalies and is not survivorship-bias-free; there is no intraday/tick data.
+- **252-day annualisation** is a US-equity convention; a crypto/365-day convention is stored as a preference only (the backend still uses 252).
+- **Local & single-user.** Data lives in a local SQLite file with **no authentication, no multi-user support, and no cloud sync**.
 
 ---
 
 ## Roadmap
 
-See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full phase plan. Completed phases:
+Most of the platform described above is complete; see [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full per-phase history (Phases 0–10.x: backend MVP → strategies → research tools → portfolio lab → reporting → settings/theme → long/short → Command Center / palette / search → toasts, error boundary, and state polish).
 
-- Phase 0 — project setup and structure
-- Phase 1 — backend MVP (backtest engine + metrics)
-- Phase 2 — frontend dashboard
-- Phase 3 — strategy expansion (RSI, Bollinger, Momentum, VB, Pairs)
-- Phase 4 — research tools (sweep, train/test, walk-forward, comparison)
-- Phase 5 — engineering infrastructure (CI, Docker, numeric input UX)
+**Near-term, candidate next steps** (not commitments):
+
+- Deployment polish (hosted demo, image hardening)
+- Real market-data provider integrations (beyond yfinance)
+- More realistic execution modelling: slippage and market impact
+- Richer PDF reports with embedded charts
+- More robust crypto annualization (365-day) end-to-end
+- Optional user authentication (future, if multi-user is needed)
+- Broker / live-trading integration — **far-future only**, and out of scope for a research tool
 
 ---
 

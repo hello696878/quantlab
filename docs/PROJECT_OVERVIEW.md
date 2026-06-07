@@ -17,23 +17,30 @@ Browser
   │
   │  http://localhost:3000
   ▼
-Next.js Frontend
-  │  BacktestForm · SmaSweepPanel · SmaTrainTestPanel
-  │  SmaWalkForwardPanel · StrategyComparisonPanel
-  │  EquityCurveChart · DrawdownChart · MetricsGrid · TradeTable
+Next.js Frontend (App Router)
+  │  Command Center · Backtest · CSV · Strategy Builder · Portfolio Lab
+  │  Research tools · Saved Backtests/Reports · Settings
+  │  Command palette (Ctrl/Cmd+K) · global search · toasts · error boundary
+  │  EquityCurveChart · DrawdownChart · MetricsGrid · TradeTable (neon charts)
   │
-  │  POST /api/backtest/*   POST /api/research/*
-  │  (proxied via next.config.js rewrites → internal Docker DNS)
+  │  /api/*  (proxied via next.config.js rewrites → internal Docker DNS)
   ▼
 FastAPI Backend
   │
-  ├── main.py        Route handlers, request validation, response assembly
-  ├── data.py        yfinance OHLCV fetch and alignment
-  ├── strategies.py  Signal generation (all strategies, all shift by 1 day)
-  ├── backtest.py    Vectorised P&L engine, trade log, buy-and-hold benchmark
-  ├── metrics.py     Performance statistics from an equity curve
-  ├── schemas.py     Pydantic v2 request / response models
-  └── utils.py       Date format validation helpers
+  ├── main.py                       Route handlers, validation, response assembly
+  ├── data.py                       yfinance OHLCV fetch and alignment
+  ├── strategies.py                 Signal generation (all strategies, all shift by 1 day)
+  ├── backtest.py                   Vectorised P&L engine, trade log, benchmark, long/short
+  ├── custom_strategy.py            No-code rule evaluation (whitelisted operands, no eval)
+  ├── portfolio.py                  Equal-weight, optimization, walk-forward, frontier, risk, stress, factor
+  ├── metrics.py                    Performance statistics from an equity curve
+  ├── db.py                         SQLite connection + schema initialisation
+  ├── saved_backtests.py            Saved-backtest CRUD
+  ├── saved_reports.py              Saved-report CRUD
+  ├── custom_strategy_templates.py  Saved custom-strategy CRUD + import/export
+  ├── strategy_gallery.py           Built-in template gallery (static, validated)
+  ├── schemas.py                    Pydantic v2 request / response models
+  └── utils.py                      Date format validation helpers
 ```
 
 ---
@@ -218,6 +225,28 @@ signal_context = close_all.iloc[train_start_idx:test_end_idx]
 ```
 
 The shift-by-1 inside `sma_crossover_signals` ensures the signal for the first OOS bar is still based on the last training bar.
+
+---
+
+## Post-MVP Modules (current platform)
+
+The sections above describe the original MVP backtest path. The platform has since grown; these modules reuse the same lookahead-bias-free engine and SQLite layer:
+
+### Backend
+
+- **`custom_strategy.py`** — evaluates no-code strategies as whitelisted rule trees (operands: `close`, constant, or `sma`/`rsi`/`bb_*`/`momentum`; operators `>`, `>=`, `<`, `<=`; ALL/ANY logic). Rules are validated against a strict schema and evaluated with vectorised pandas — **no `eval`, no user code is executed**. Position is shifted one bar forward like every other strategy.
+- **`portfolio.py`** — multi-asset analytics: equal-weight backtest (turnover-cost rebalancing), long-only optimization (min-vol / max-Sharpe via SciPy SLSQP), walk-forward optimization (out-of-sample, no leakage), efficient frontier, risk dashboard (correlation/covariance, diversification ratio, risk contribution), historical stress testing, and OLS factor-exposure analysis.
+- **`strategy_gallery.py`** — a static, pre-validated catalogue of built-in custom-strategy templates served read-only.
+- **`db.py` / `saved_backtests.py` / `saved_reports.py` / `custom_strategy_templates.py`** — SQLite persistence + CRUD for saved results, reports (Markdown + metadata only), and reusable strategy templates (with portable JSON import/export).
+
+### Frontend
+
+- **Command Center** (`HomeDashboard`) — default landing view with quick actions, live recent saved backtests/reports, system status, and a feature map.
+- **Onboarding / guided demos** (`lib/demoPresets.ts`, `lib/onboarding.ts`) — first-run welcome card, dismissible, with prefilled (never auto-run) demo presets and a local quick-start checklist.
+- **Command palette + global search** (`CommandPalette`, `lib/search.ts`) — Ctrl/Cmd+K to navigate and search commands plus real local resources (saved backtests/reports, templates, gallery).
+- **Reporting** (`lib/reportExport.ts`, `ExportReportButton`, `PrintableReportModal`) — local Markdown generation, browser print-to-PDF, four branded templates, and a saved-reports gallery.
+- **State & feedback primitives** (`components/ui/`, `lib/toast.ts`, `hooks/useToasts.ts`, `AppErrorBoundary`) — shared loading skeletons, empty/offline/error states, a global toast store, and an app-level error boundary.
+- **Theme & charts** (`lib/settings.ts`, `lib/useAccentColors.ts`, `components/charts/`) — CSS-variable neon accent theme and accent-aware neon chart styling.
 
 ---
 

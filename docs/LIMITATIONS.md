@@ -50,9 +50,9 @@ Trades are executed at the closing price of the signal bar (i.e., the open of th
 
 Capital gains taxes, wash-sale rules, and other tax considerations are not modelled.
 
-### No margin, leverage, or short-selling constraints
+### No margin, leverage, or short-selling cost model
 
-Pairs trading is dollar-neutral but assumes no margin requirements and no borrow cost on short positions. In practice, short-selling requires a locate, incurs borrow fees, and may have forced buy-in risk.
+Pairs trading is dollar-neutral, and SMA Crossover / Momentum / Volatility Breakout offer **short-only** and **long-short** direction modes. All of these assume **no margin requirements and no borrow/funding cost** on short positions — a short simply earns `−1 × asset_return` with `|position| ≤ 1` (no leverage). In practice, short-selling requires a locate, incurs borrow fees, is subject to margin calls and forced buy-in risk, and can be liquidated. **None of that is modelled.** Long/short results are therefore highly sensitive to timing and transaction costs; the UI surfaces a short-selling warning and direction diagnostics, and exported reports add an explicit caveat. `long_only` is always the default.
 
 ### Buy-and-hold benchmark
 
@@ -100,11 +100,17 @@ The Strategy Comparison tool runs each strategy with fixed demo-friendly default
 
 ---
 
+## Persistence & Portfolio Analytics
+
+### In-sample portfolio optimization
+
+Static Portfolio Optimization and the Efficient Frontier estimate expected returns and the covariance matrix from the **same** historical window they then analyse (252-day annualisation). This is in-sample by construction: it will look good, can overfit, and **does not predict future performance**. Walk-Forward Optimization provides an out-of-sample variant but still relies on historical assumptions. Risk-dashboard, stress-test, and factor-analysis figures are likewise **historical estimates** that may not persist out-of-sample.
+
+### Local SQLite — single-user, no auth
+
+Saved backtests, saved reports, and saved custom-strategy templates persist in a **local SQLite** file (`backend/data/quantlab.db`). There is **no authentication, no multi-user support, and no cloud sync** — anyone with access to the running app can read/modify/delete local records. It is intended for single-user, local research, not a shared or hosted deployment.
+
 ## Frontend
-
-### No persistent state
-
-Backtest results are not saved. Navigating away or refreshing the page loses all results. Persistence is planned in a future phase (see `ROADMAP.md`).
 
 ### No real-time data
 

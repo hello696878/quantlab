@@ -1,99 +1,53 @@
 # Screenshots
 
-This folder is a placeholder for QuantLab UI screenshots.
+UI screenshots for the README. Capture as **PNG**, ideally **1440 × 900** (or similar widescreen) on the dark neon theme. Run with the suggested parameters below so the captures are representative and reproducible.
 
-Screenshots should be added after the first full deployment or local run.
-Recommended format: PNG, captured at 1440 × 900 or similar widescreen resolution.
-
----
-
-## Planned Screenshots
-
-### 1. `backtest_dashboard.png`
-
-The main backtest results page after running a strategy.
-
-Should show:
-- Performance metrics grid (Total Return, CAGR, Sharpe, Sortino, Calmar, Max Drawdown, Volatility, Win Rate)
-- Equity curve chart with strategy vs. buy-and-hold benchmark
-- Drawdown chart
-- Trade log table
-- Strategy and parameter selection panel on the left
-
-Suggested run: `AAPL`, SMA Crossover, fast=50, slow=200, 2015-01-01 → 2024-01-01
+> Screenshots are illustrative of the UI only — every chart/metric shown must come from a **real backend run** (no fabricated data).
 
 ---
 
-### 2. `strategy_comparison.png`
+## Current screenshots (in this folder)
 
-The Strategy Comparison research tool showing all five single-asset strategies on the same ticker.
+These are already committed and referenced by the README:
 
-Should show:
-- Overlay equity curve with all five strategies + benchmark
-- Metrics table with Sharpe, CAGR, Max Drawdown, Win Rate columns
-- Ranking summary (best by Sharpe, CAGR, Calmar, lowest drawdown)
-
-Suggested run: `SPY`, 2015-01-01 → 2024-01-01
-
----
-
-### 3. `sma_parameter_sweep.png`
-
-The SMA Parameter Sweep research tool.
-
-Should show:
-- The full results table with fast/slow window pairs sorted by Sharpe ratio
-- Column headers: Fast Window, Slow Window, Total Return, CAGR, Sharpe, Sortino, Calmar, Max Drawdown, Trades
-
-Suggested run: `AAPL`, fast windows 10–50, slow windows 50–200
+| File | View | Suggested run |
+|---|---|---|
+| `main-backtest-dashboard.png` | Single-asset Backtest results | `AAPL`, SMA Crossover 50/200, 2015-01-01 → 2024-01-01 |
+| `strategy-comparison.png` | Strategy Comparison | `SPY`, 2015-01-01 → 2024-01-01, long-only |
+| `sma-parameter-sweep.png` | SMA Parameter Sweep | `AAPL`, fast 10–50, slow 50–200 |
+| `train-test-validation.png` | SMA Train/Test Validation | `AAPL`, 2010-01-01 → 2024-01-01, split 2020-01-01 |
+| `walk-forward-optimization.png` | SMA Walk-Forward | `SPY`, 2010-01-01 → 2024-01-01, train 504 / test 126 / step 63 |
+| `fastapi-docs.png` | Swagger UI at `:8000/docs` | endpoints grouped by tag, one expanded |
 
 ---
 
-### 4. `sma_train_test.png`
+## Recommended additional screenshots (TODO)
 
-The SMA Train/Test Out-of-Sample Validation tool.
+The platform has grown well beyond the captures above. Adding the following would make the README fully represent the current product. Filenames are referenced (as TODO) in the README Screenshots section.
 
-Should show:
-- In-sample vs. out-of-sample metrics side by side
-- Degradation row (Sharpe degradation, CAGR degradation)
-- OOS equity curve chart
-- `oos_collapsed` flag indicator (ideally `false` for a well-behaved example)
+| File | View | Suggested run / what to show |
+|---|---|---|
+| `command-center.png` | Home / Command Center | Default landing view — quick actions, recent saved backtests/reports, system status, feature map (have a couple of saved items so recents are populated) |
+| `backtest-neon-chart.png` | Backtest equity + drawdown | `SPY`, SMA 20/100, 2015-01-01 → 2023-12-31 — focus on the neon equity curve, glow line, dashed benchmark, and drawdown chart |
+| `custom-strategy-builder.png` | Custom Strategy Builder | Load the *Momentum + Trend* gallery template; show entry/exit rule rows + a result |
+| `portfolio-efficient-frontier.png` | Portfolio Lab → Efficient Frontier | `SPY, QQQ, GLD, TLT`, 2015-01-01 → 2023-12-31, rf 0.02, 2,000 portfolios — scatter with min-vol / max-Sharpe / equal-weight highlighted |
+| `portfolio-risk-dashboard.png` | Portfolio Lab → Risk Dashboard | `SPY, QQQ, GLD, TLT` — correlation heatmap + risk-contribution table |
+| `stress-test.png` | Portfolio Lab → Stress Test | `SPY, QQQ, GLD, TLT` with COVID Crash + 2022 Rate-Hike scenarios |
+| `factor-analysis.png` | Portfolio Lab → Factor Analysis | `SPY, QQQ, GLD, TLT` vs Core ETF Factors — beta table + actual-vs-fitted curve |
+| `saved-reports.png` | Saved Reports gallery | A few saved reports listed; optionally a report opened in the reader |
+| `command-palette.png` | Command palette (Ctrl/Cmd+K) | Open with a query like `momentum` or `risk` showing commands + saved resources grouped |
 
-Suggested run: `AAPL`, 2010-01-01 → 2024-01-01, split 2020-01-01
-
----
-
-### 5. `sma_walk_forward.png`
-
-The SMA Walk-Forward Optimization tool.
-
-Should show:
-- Stitched OOS equity curve across all walk-forward windows
-- Per-window table (train dates, test dates, selected fast/slow, OOS Sharpe)
-- Parameter stability summary (most common parameter pair, unique sets)
-
-Suggested run: `SPY`, 2010-01-01 → 2024-01-01, train=504, test=126, step=63
+Optional: a theme-variant capture (e.g. the **Risk** red accent) and a guided-demo/onboarding card shot.
 
 ---
 
-### 6. `fastapi_docs.png`
-
-The auto-generated Swagger UI at `http://localhost:8000/docs`.
-
-Should show:
-- The full list of endpoints grouped by tag (`backtest`, `research`, `ops`)
-- One endpoint expanded to show request/response schema
-
----
-
-## How to Take Screenshots
+## How to capture
 
 ### Local dev
 
-1. Start the app: `npm run dev` (frontend) + `uvicorn app.main:app --reload` (backend)
-2. Open http://localhost:3000
-3. Run a backtest with the suggested parameters above
-4. Capture with your OS screenshot tool or browser dev tools
+1. Start the backend: `cd backend && python -m uvicorn app.main:app --reload --port 8000`
+2. Start the frontend: `cd frontend && npm run dev`
+3. Open <http://localhost:3000>, run the suggested parameters, capture with your OS tool or browser dev tools (device toolbar at 1440×900).
 
 ### Docker
 
@@ -102,16 +56,9 @@ docker compose up --build
 # open http://localhost:3000
 ```
 
-### Adding to README
-
-Once screenshots are saved here, add them to `README.md` under the Screenshots section:
+### Referencing in the README
 
 ```markdown
-## Screenshots
-
-### Backtest Dashboard
-![Backtest Dashboard](docs/screenshots/backtest_dashboard.png)
-
-### Strategy Comparison
-![Strategy Comparison](docs/screenshots/strategy_comparison.png)
+### Command Center
+![Command Center](docs/screenshots/command-center.png)
 ```

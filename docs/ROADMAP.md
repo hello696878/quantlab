@@ -660,75 +660,70 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
+### Phase 10.7 — Final Portfolio Polish & README Refresh ✅
+
+- Documentation-only pass to make the repo accurately represent the current
+  platform. **No code, quant logic, API, or feature changes.**
+- **README** rewritten/refreshed: new local-first one-liner + hero, a
+  categorized **Features at a glance** table (Strategy Research / Custom Strategy
+  Lab / Portfolio Lab / Reporting / Product Experience), updated tech stack and
+  architecture (now lists `portfolio.py`, `custom_strategy.py`, `saved_reports.py`,
+  `custom_strategy_templates.py`, `strategy_gallery.py`), frontend build added to
+  Testing, corrected test count (840+), a consolidated **Limitations &
+  Disclaimers** section, and an honest near-term **Roadmap**.
+- Fixed stale claims: "short selling is not enabled yet" (long/short modes
+  exist) and "backtest results are not saved" in `LIMITATIONS.md` (SQLite
+  persistence shipped).
+- **`docs/`** refreshed: `PROJECT_OVERVIEW.md` (architecture + post-MVP module
+  map), `LIMITATIONS.md` (long/short cost model, in-sample portfolio caveats,
+  local SQLite / no-auth), and `docs/screenshots/README.md` (current files +
+  recommended new captures with suggested parameters).
+
+---
+
 ## Future Phases
 
-The items below are planned but not yet started. Order and scope may change.
+Most of the original roadmap has shipped — **saved backtests + database**, **CSV
+upload backtesting**, the full **multi-asset Portfolio Lab** (equal-weight,
+optimization, walk-forward, efficient frontier, risk dashboard, stress test,
+**factor analysis**), **report export** (Markdown/PDF/templates/gallery),
+**settings + neon theme/charts**, the **Command Center / palette / global
+search**, and **toasts / error boundary / state polish**. The items below are
+candidate next steps; order and scope may change, and none are commitments.
 
-### Phase 6 — Saved Backtests and Database
+### Near-term
 
-- Persist backtest results to a lightweight database (SQLite or PostgreSQL)
-- Save, name, and reload previous backtest runs
-- Compare saved runs side by side
+- **Deployment polish** — hosted public demo (Render / Fly.io / Railway),
+  environment config, image hardening, basic rate limiting.
+- **Richer PDF reports** — embed equity/drawdown chart images in the print/PDF
+  export (currently text + tables only).
+- **Crypto annualization (365-day)** wired end-to-end (currently a stored
+  preference only; backend still annualizes with 252).
+- **Real data-provider integrations** beyond yfinance, with data-quality
+  warnings (gaps, splits, anomalies) and a dividend-adjusted toggle.
 
-### Phase 7 — User Accounts
+### Execution realism
 
-- Authentication (email/password or OAuth)
-- Per-user saved strategies and backtests
-- User dashboard
+- **Slippage and market-impact modelling** (size-dependent fills) on top of the
+  current flat-bps turnover cost.
+- Optional non-zero risk-free rate in Sharpe/Sortino.
 
-### Phase 8 — CSV Upload (extensions)
+### Visualisation
 
-- Single-asset CSV upload backtesting shipped — see "Phase 6 — CSV Upload
-  Backtesting" above.
-- Remaining: run the research tools (sweep, train/test, walk-forward,
-  comparison) on uploaded data, and two-asset CSV upload for Pairs Trading.
+- Monthly-return heatmap, rolling Sharpe/beta, trade-distribution histogram,
+  underwater (time-in-drawdown) plot.
 
-### Phase 9 — Multi-Asset Portfolio Backtesting
+### Advanced models (long-term)
 
-- Portfolio of assets with configurable weights
-- Rebalancing schedule (monthly, quarterly, annual)
-- Portfolio-level metrics (portfolio Sharpe, diversification ratio)
-- Mean-variance optimisation (Markowitz efficient frontier)
-- Risk parity
+- Kalman-filter / rolling-beta pairs v2, HMM regime detection, options pricing
+  (Black–Scholes / Heston + volatility surface).
 
-### Phase 10 — Better Visualisation
+### Optional, far-future
 
-- Monthly return heatmap (calendar chart)
-- Rolling Sharpe / rolling beta charts
-- Trade distribution histogram
-- Underwater plot (time spent in drawdown)
-- Interactive parameter sensitivity charts
-
-### Phase 11 — Live Data Integration
-
-- Real-time or end-of-day price feed
-- Paper trading mode (no real orders, just simulated fills)
-- Alert when a live signal triggers
-
-### Phase 12 — Deployment
-
-- Hosted public demo (Railway, Render, Fly.io, or AWS)
-- Environment-specific configuration
-- Rate limiting and basic abuse protection
-- Custom domain
-
-### Phase 13 — Advanced Models
-
-Items from the long-term vision, ordered by complexity:
-
-- Kalman filter pairs trading (dynamic hedge ratio)
-- Rolling-beta pairs trading v2 (vs. fixed lookback z-score)
-- Hidden Markov Model regime detection
-- Factor model exposure analysis (Fama-French)
-- Black-Scholes options pricing module
-- Heston model and volatility surface
-
-### Phase 14 — Data Quality Improvements
-
-- Crypto calendar support (365-day annualisation, 24/7 trading)
-- Survivorship-bias awareness flag
-- Dividend-adjusted vs. unadjusted price toggle
-- Data quality warnings (gaps, splits, anomalies)
+- **User authentication & multi-user** — only if a shared/hosted deployment is
+  pursued (today is intentionally single-user, local SQLite).
+- **Broker / live-trading integration** — **far-future only** and arguably a
+  non-goal for a research tool (see below).
 
 ---
 
