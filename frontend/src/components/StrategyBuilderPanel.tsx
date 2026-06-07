@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
+  classifyApiError,
   createCustomStrategyTemplate,
   deleteCustomStrategyTemplate,
   exportCustomStrategyTemplate,
@@ -32,6 +33,10 @@ import ExportReportButton from "@/components/ExportReportButton";
 import { buildBacktestReport } from "@/lib/reportExport";
 import { markChecklistStep } from "@/lib/onboarding";
 import { toast } from "@/lib/toast";
+import OfflineState from "@/components/ui/OfflineState";
+import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/ui/EmptyState";
+import { SkeletonCard } from "@/components/ui/LoadingSkeleton";
 
 // ---------------------------------------------------------------------------
 // Operand / indicator metadata
@@ -504,9 +509,10 @@ function TemplateList({
 }) {
   const [rows, setRows] = useState<CustomStrategyTemplateSummary[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<unknown>(null);
   const [deletingId, setDeletingId] = useState<number | null>(null);
   const [exportingId, setExportingId] = useState<number | null>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   async function exportOne(id: number, name: string) {
     setExportingId(id);
@@ -528,16 +534,12 @@ function TemplateList({
     setErr(null);
     listCustomStrategyTemplates()
       .then((d) => !cancelled && setRows(d))
-      .catch(
-        (e) =>
-          !cancelled &&
-          setErr(e instanceof Error ? e.message : "Failed to load templates."),
-      )
+      .catch((e) => !cancelled && setErr(e))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, [refreshKey]);
+  }, [refreshKey, retryTick]);
 
   async function del(id: number, name: string) {
     if (!confirm(`Delete template "${name}"? This cannot be undone.`)) return;
@@ -555,18 +557,37 @@ function TemplateList({
   }
 
   if (loading) {
-    return <p className="text-xs text-slate-400 px-1 py-2">Loading templates…</p>;
+    return (
+      <div className="space-y-2">
+        {Array.from({ length: 3 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
+    );
   }
   if (err) {
-    return (
-      <p className="text-xs text-red-600 px-1 py-2">⚠ {err}</p>
+    const cls = classifyApiError(err);
+    return cls.backendUnavailable ? (
+      <OfflineState
+        compact
+        message="Saved strategy templates require the FastAPI backend (local SQLite)."
+        onRetry={() => setRetryTick((k) => k + 1)}
+      />
+    ) : (
+      <ErrorState
+        title="Couldn’t load templates"
+        message={cls.message}
+        onRetry={() => setRetryTick((k) => k + 1)}
+      />
     );
   }
   if (rows.length === 0) {
     return (
-      <p className="text-xs text-slate-400 px-1 py-2">
-        No saved templates yet. Build a strategy and click “Save Template”.
-      </p>
+      <EmptyState
+        compact
+        title="No saved strategy templates yet"
+        description="Build a custom strategy above and save it as a reusable template."
+      />
     );
   }
 
@@ -679,7 +700,8 @@ function GalleryPanel({
 }) {
   const [rows, setRows] = useState<GalleryTemplate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState<unknown>(null);
+  const [retryTick, setRetryTick] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -687,22 +709,37 @@ function GalleryPanel({
     setErr(null);
     listStrategyGallery()
       .then((d) => !cancelled && setRows(d))
-      .catch(
-        (e) =>
-          !cancelled &&
-          setErr(e instanceof Error ? e.message : "Failed to load gallery."),
-      )
+      .catch((e) => !cancelled && setErr(e))
       .finally(() => !cancelled && setLoading(false));
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryTick]);
 
   if (loading) {
-    return <p className="text-xs text-slate-400 px-1 py-2">Loading gallery…</p>;
+    return (
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <SkeletonCard key={i} />
+        ))}
+      </div>
+    );
   }
   if (err) {
-    return <p className="text-xs text-red-600 px-1 py-2">⚠ {err}</p>;
+    const cls = classifyApiError(err);
+    return cls.backendUnavailable ? (
+      <OfflineState
+        compact
+        message="The strategy gallery requires the FastAPI backend."
+        onRetry={() => setRetryTick((k) => k + 1)}
+      />
+    ) : (
+      <ErrorState
+        title="Couldn’t load the gallery"
+        message={cls.message}
+        onRetry={() => setRetryTick((k) => k + 1)}
+      />
+    );
   }
 
   return (

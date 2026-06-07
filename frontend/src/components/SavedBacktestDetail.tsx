@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { classifyApiError, getSavedBacktest } from "@/lib/api";
 import type { EquityPoint, SavedBacktestFull, TradeRecord } from "@/lib/types";
 import { notifyBackendOffline } from "@/lib/toast";
-import BackendOfflinePanel from "@/components/BackendOfflinePanel";
+import OfflineState from "@/components/ui/OfflineState";
+import ErrorState from "@/components/ui/ErrorState";
+import { Skeleton } from "@/components/ui/LoadingSkeleton";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
@@ -118,8 +120,18 @@ export default function SavedBacktestDetail({
 
   if (loading) {
     return (
-      <div className="card p-8 text-center text-sm text-slate-500">
-        Loading…
+      <div className="space-y-4">
+        <Skeleton className="h-4 w-28" />
+        <div className="card space-y-3 p-5">
+          <Skeleton className="h-5 w-2/5" />
+          <Skeleton className="h-3 w-3/5" />
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Skeleton key={i} className="h-20" />
+          ))}
+        </div>
+        <Skeleton className="h-64" />
       </div>
     );
   }
@@ -136,17 +148,17 @@ export default function SavedBacktestDetail({
           ← Back to list
         </button>
         {cls.backendUnavailable ? (
-          <BackendOfflinePanel
-            resource="saved backtests"
-            capabilities="open"
+          <OfflineState
             detail={cls.message}
             onRetry={() => setRetryTick((k) => k + 1)}
             onGoHome={onGoHome}
           />
         ) : (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            ⚠ {cls.message}
-          </div>
+          <ErrorState
+            title="Couldn’t load this backtest"
+            message={cls.message}
+            onRetry={() => setRetryTick((k) => k + 1)}
+          />
         )}
       </div>
     );

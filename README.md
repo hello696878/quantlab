@@ -71,6 +71,8 @@ A consistent **global toast** system (`lib/toast.ts` + `ToastProvider` / `ToastV
 
 An app-level **error boundary** (`AppErrorBoundary`) wraps the whole UI: if an unexpected frontend error occurs, you get a friendly *"Something went wrong"* recovery panel (with **Reload app** / **Go to Command Center** and a collapsible technical-details section) instead of a blank crash — and your local SQLite data is untouched.
 
+Shared **state primitives** (`components/ui/`: `LoadingSkeleton`, `EmptyState`, `OfflineState`, `ErrorState`) give every async surface the same treatment — **shimmer skeletons** while loading (Saved Backtests/Reports tables, Command Center recents, custom-strategy templates, the strategy gallery), clear **empty states** with a next-step action (e.g. *No saved backtests yet → Run Backtest*), the consistent amber **Backend offline** panel with **Retry**, and a collapsible **error card** — so the UI never just says "Loading…" or dumps a raw error.
+
 ### Strategies
 
 | Strategy | Type | Parameters | Direction modes |

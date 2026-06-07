@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { classifyApiError, deleteSavedReport, getSavedReport } from "@/lib/api";
 import type { SavedReportFull } from "@/lib/types";
 import { notifyBackendOffline, toast } from "@/lib/toast";
-import BackendOfflinePanel from "@/components/BackendOfflinePanel";
+import OfflineState from "@/components/ui/OfflineState";
+import ErrorState from "@/components/ui/ErrorState";
+import { Skeleton } from "@/components/ui/LoadingSkeleton";
 import { markdownToHtml } from "@/lib/printReport";
 import {
   downloadTextFile,
@@ -148,7 +150,15 @@ export default function SavedReportDetail({
 
   if (loading) {
     return (
-      <div className="card p-8 text-center text-sm text-slate-500">Loading…</div>
+      <div className="space-y-4">
+        <Skeleton className="h-4 w-32" />
+        <div className="card space-y-3 p-5">
+          <Skeleton className="h-5 w-2/5" />
+          <Skeleton className="h-3 w-3/5" />
+          <Skeleton className="h-3 w-1/4" />
+        </div>
+        <Skeleton className="h-80" />
+      </div>
     );
   }
 
@@ -164,16 +174,17 @@ export default function SavedReportDetail({
           ← Back to list
         </button>
         {cls.backendUnavailable ? (
-          <BackendOfflinePanel
-            resource="saved reports"
+          <OfflineState
             detail={cls.message}
             onRetry={() => setRetryTick((k) => k + 1)}
             onGoHome={onGoHome}
           />
         ) : (
-          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-            ⚠ {cls.message}
-          </div>
+          <ErrorState
+            title="Couldn’t load this report"
+            message={cls.message}
+            onRetry={() => setRetryTick((k) => k + 1)}
+          />
         )}
       </div>
     );

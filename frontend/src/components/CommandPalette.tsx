@@ -451,8 +451,13 @@ export default function CommandPalette({
         {/* Results */}
         <div className="max-h-[52vh] overflow-y-auto px-1.5 py-1.5" ref={listRef}>
           {filtered.length === 0 ? (
-            <div className="px-4 py-10 text-center text-sm text-slate-500">
-              No results found{query ? ` for “${query}”` : ""}.
+            <div className="px-4 py-10 text-center">
+              <p className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                No results found{query ? ` for “${query}”` : ""}
+              </p>
+              <p className="mt-1 text-xs" style={{ color: "var(--text-mut)" }}>
+                Try searching for a strategy, report, ticker, or tool.
+              </p>
             </div>
           ) : (
             filtered.map((item, i) => {

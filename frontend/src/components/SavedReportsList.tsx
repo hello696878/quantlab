@@ -8,7 +8,10 @@ import {
 } from "@/lib/api";
 import type { SavedReportSummary } from "@/lib/types";
 import { notifyBackendOffline, toast } from "@/lib/toast";
-import BackendOfflinePanel from "@/components/BackendOfflinePanel";
+import OfflineState from "@/components/ui/OfflineState";
+import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/ui/EmptyState";
+import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -55,12 +58,15 @@ interface SavedReportsListProps {
   onSelect: (id: number) => void;
   refreshKey: number;
   onGoHome?: () => void;
+  /** Navigate to the Backtest workspace (empty-state action). */
+  onRunBacktest?: () => void;
 }
 
 export default function SavedReportsList({
   onSelect,
   refreshKey,
   onGoHome,
+  onRunBacktest,
 }: SavedReportsListProps) {
   const [rows, setRows] = useState<SavedReportSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -115,19 +121,14 @@ export default function SavedReportsList({
   // ── States ────────────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="card p-8 text-center text-sm text-slate-500">
-        Loading saved reports…
-      </div>
-    );
+    return <SkeletonTable rows={5} cols={6} caption="Loading saved reports…" />;
   }
 
   if (error) {
     const cls = classifyApiError(error);
     if (cls.backendUnavailable) {
       return (
-        <BackendOfflinePanel
-          resource="saved reports"
+        <OfflineState
           detail={cls.message}
           onRetry={() => setRetryTick((k) => k + 1)}
           onGoHome={onGoHome}
@@ -135,22 +136,25 @@ export default function SavedReportsList({
       );
     }
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        ⚠ {cls.message}
-      </div>
+      <ErrorState
+        title="Couldn’t load saved reports"
+        message={cls.message}
+        onRetry={() => setRetryTick((k) => k + 1)}
+      />
     );
   }
 
   if (rows.length === 0) {
     return (
-      <div className="card p-10 text-center">
-        <p className="text-sm text-slate-500">No saved reports yet.</p>
-        <p className="mt-1 text-xs text-slate-400">
-          Run any analysis and click{" "}
-          <span className="font-medium text-slate-600">Save Report</span> next to
-          the export buttons to store it here.
-        </p>
-      </div>
+      <EmptyState
+        title="No saved reports yet"
+        description="Export or save a research report to see it here."
+        actions={
+          onRunBacktest
+            ? [{ label: "Run a Backtest", onClick: onRunBacktest }]
+            : undefined
+        }
+      />
     );
   }
 

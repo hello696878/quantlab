@@ -636,6 +636,30 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
+### Phase 10.6 — Loading Skeletons & Empty/Offline/Error State Polish ✅
+
+- **Shared `components/ui/` primitives**: `LoadingSkeleton` (`Skeleton`,
+  `SkeletonText`, `SkeletonCard`, `SkeletonTable` — shimmer via a new
+  `.skeleton` keyframe, reduced-motion aware), `EmptyState` (title + description
+  + action buttons), `OfflineState` (canonical amber backend-offline panel —
+  `BackendOfflinePanel` is now a thin re-export), and `ErrorState` (title +
+  message + Retry + collapsed technical `<details>`).
+- **Applied consistently**: Saved Backtests & Saved Reports (list = skeleton
+  table / detail = skeleton blocks), Command Center recents (compact skeleton
+  cards + compact offline/empty with actions), custom-strategy **My Templates**
+  and the **strategy gallery** (skeleton cards + offline/error), and the Command
+  Palette "No results" empty state. Each list/detail gained an in-place **Retry**.
+- **Empty states with next actions**: e.g. *No saved backtests yet → Run
+  Backtest*, *No saved reports yet → Run a Backtest*, *No saved strategy
+  templates yet*. No fake/placeholder rows anywhere.
+- **A11y/UX**: skeletons match content size to limit layout shift; retry buttons
+  are real `<button>`s (keyboard accessible); offline copy reassures data is
+  safe in local SQLite.
+- **Frontend-only. No backend, API, schema, or fake-data changes.**
+  `tsc --noEmit` clean.
+
+---
+
 ## Future Phases
 
 The items below are planned but not yet started. Order and scope may change.

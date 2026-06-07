@@ -1004,6 +1004,7 @@ export default function HomePage() {
                 refreshKey={savedRefreshKey}
                 onSelect={(id) => setSavedDetailId(id)}
                 onGoHome={() => handleNav("home")}
+                onRunBacktest={() => handleNav("backtest")}
               />
             )}
           </>
@@ -1034,6 +1035,7 @@ export default function HomePage() {
                 refreshKey={savedReportsRefreshKey}
                 onSelect={(id) => setSavedReportDetailId(id)}
                 onGoHome={() => handleNav("home")}
+                onRunBacktest={() => handleNav("backtest")}
               />
             )}
           </>

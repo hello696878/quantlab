@@ -336,6 +336,32 @@
 @keyframes rise { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .rise { animation: rise 0.45s var(--ease-out) both; }
 
+/* Skeleton loading placeholder: muted block with a subtle moving shimmer. */
+@keyframes shimmer { 100% { transform: translateX(100%); } }
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--glass);
+  border: 1px solid var(--line-faint);
+  border-radius: 8px;
+}
+.skeleton::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.06),
+    transparent
+  );
+  animation: shimmer 1.5s var(--ease) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after { animation: none; }
+}
+
 /* ============================================================================
    Tailwind compatibility overrides
    ----------------------------------------------------------------------------

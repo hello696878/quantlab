@@ -9,7 +9,10 @@ import {
 import type { SavedBacktestSummary } from "@/lib/types";
 import { fmtPct, fmtRatio } from "@/lib/format";
 import { notifyBackendOffline, toast } from "@/lib/toast";
-import BackendOfflinePanel from "@/components/BackendOfflinePanel";
+import OfflineState from "@/components/ui/OfflineState";
+import ErrorState from "@/components/ui/ErrorState";
+import EmptyState from "@/components/ui/EmptyState";
+import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -61,11 +64,14 @@ interface SavedBacktestsListProps {
   onSelect: (id: number) => void;
   refreshKey: number;
   onGoHome?: () => void;
+  /** Navigate to the Backtest workspace (empty-state action). */
+  onRunBacktest?: () => void;
 }
 
 export default function SavedBacktestsList({
   onSelect,
   refreshKey,
+  onRunBacktest,
   onGoHome,
 }: SavedBacktestsListProps) {
   const [rows, setRows] = useState<SavedBacktestSummary[]>([]);
@@ -121,20 +127,14 @@ export default function SavedBacktestsList({
   // ── States ──────────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="card p-8 text-center text-sm text-slate-500">
-        Loading saved backtests…
-      </div>
-    );
+    return <SkeletonTable rows={5} cols={6} caption="Loading saved backtests…" />;
   }
 
   if (error) {
     const cls = classifyApiError(error);
     if (cls.backendUnavailable) {
       return (
-        <BackendOfflinePanel
-          resource="saved backtests"
-          capabilities="view, open, or delete"
+        <OfflineState
           detail={cls.message}
           onRetry={() => setRetryTick((k) => k + 1)}
           onGoHome={onGoHome}
@@ -142,22 +142,25 @@ export default function SavedBacktestsList({
       );
     }
     return (
-      <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-        ⚠ {cls.message}
-      </div>
+      <ErrorState
+        title="Couldn’t load saved backtests"
+        message={cls.message}
+        onRetry={() => setRetryTick((k) => k + 1)}
+      />
     );
   }
 
   if (rows.length === 0) {
     return (
-      <div className="card p-10 text-center">
-        <p className="text-slate-500 text-sm">No saved backtests yet.</p>
-        <p className="text-slate-400 text-xs mt-1">
-          Run a backtest and click{" "}
-          <span className="font-medium text-slate-600">Save backtest</span> to
-          store it here.
-        </p>
-      </div>
+      <EmptyState
+        title="No saved backtests yet"
+        description="Run a backtest and save it to build your research history."
+        actions={
+          onRunBacktest
+            ? [{ label: "Run Backtest", onClick: onRunBacktest }]
+            : undefined
+        }
+      />
     );
   }
 

@@ -6,6 +6,9 @@ import { checkHealth, listSavedBacktests, listSavedReports } from "@/lib/api";
 import type { SavedBacktestSummary, SavedReportSummary } from "@/lib/types";
 import { fmtPct, fmtRatio } from "@/lib/format";
 import { DEMO_PRESETS, type DemoPresetId } from "@/lib/demoPresets";
+import { SkeletonCard } from "@/components/ui/LoadingSkeleton";
+import OfflineState from "@/components/ui/OfflineState";
+import EmptyState from "@/components/ui/EmptyState";
 import {
   EMPTY_CHECKLIST,
   ONBOARDING_EVENT,
@@ -306,6 +309,7 @@ export default function HomeDashboard({
   const [loaded, setLoaded] = useState(false);
   const [btOk, setBtOk] = useState(true);
   const [rpOk, setRpOk] = useState(true);
+  const [retryTick, setRetryTick] = useState(0);
 
   // Onboarding state lives in localStorage (client-only).  Start from
   // deterministic values so SSR and first client render match, then hydrate
@@ -330,6 +334,9 @@ export default function HomeDashboard({
 
   useEffect(() => {
     let cancelled = false;
+    setLoaded(false);
+    setBtOk(true);
+    setRpOk(true);
     checkHealth().then((ok) => {
       if (!cancelled) setOnline(ok);
     });
@@ -346,7 +353,7 @@ export default function HomeDashboard({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryTick]);
 
   // ISO timestamps sort lexicographically == chronologically; newest first.
   const recentBacktests = [...backtests]
@@ -595,15 +602,24 @@ export default function HomeDashboard({
             )}
           </div>
           {!loaded ? (
-            <div className="card p-6 text-center text-sm text-slate-500">Loading…</div>
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
           ) : !btOk ? (
-            <div className="card p-6 text-center text-sm text-slate-400">
-              Couldn&apos;t reach the backend to load saved backtests.
-            </div>
+            <OfflineState
+              compact
+              message="Recent saved backtests require the FastAPI backend (local SQLite)."
+              onRetry={() => setRetryTick((k) => k + 1)}
+            />
           ) : recentBacktests.length === 0 ? (
-            <div className="card p-6 text-center text-sm text-slate-400">
-              No saved backtests yet. Run a backtest and save it to see it here.
-            </div>
+            <EmptyState
+              compact
+              title="No saved backtests yet"
+              description="Run a backtest and save it to build your research history."
+              actions={[{ label: "Run Backtest", onClick: () => onNav("backtest") }]}
+            />
           ) : (
             <div className="card overflow-hidden">
               {recentBacktests.map((b, i) => (
@@ -664,16 +680,24 @@ export default function HomeDashboard({
             )}
           </div>
           {!loaded ? (
-            <div className="card p-6 text-center text-sm text-slate-500">Loading…</div>
+            <div className="space-y-2">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <SkeletonCard key={i} />
+              ))}
+            </div>
           ) : !rpOk ? (
-            <div className="card p-6 text-center text-sm text-slate-400">
-              Couldn&apos;t reach the backend to load saved reports.
-            </div>
+            <OfflineState
+              compact
+              message="Recent saved reports require the FastAPI backend (local SQLite)."
+              onRetry={() => setRetryTick((k) => k + 1)}
+            />
           ) : recentReports.length === 0 ? (
-            <div className="card p-6 text-center text-sm text-slate-400">
-              No saved reports yet. Run any analysis and click Save Report to see
-              it here.
-            </div>
+            <EmptyState
+              compact
+              title="No saved reports yet"
+              description="Export or save a research report to see it here."
+              actions={[{ label: "Run a Backtest", onClick: () => onNav("backtest") }]}
+            />
           ) : (
             <div className="card overflow-hidden">
               {recentReports.map((r, i) => {
