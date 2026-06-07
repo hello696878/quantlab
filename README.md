@@ -564,6 +564,10 @@ quantlab/
 │   ├── PROJECT_OVERVIEW.md  Module descriptions and data flow
 │   ├── ROADMAP.md           Completed phases and future plans
 │   ├── LIMITATIONS.md       Known constraints and caveats
+│   ├── KNOWN_ISSUES.md      Release-facing honest limitations
+│   ├── RELEASE_CHECKLIST.md Pre-release QA checklist
+│   ├── DEMO_SCRIPT.md       5–8 min showcase walkthrough
+│   ├── SCREENSHOT_PLAN.md   Release screenshot capture plan
 │   └── screenshots/         UI screenshots + capture guide
 ├── .github/
 │   └── workflows/
@@ -571,6 +575,20 @@ quantlab/
 ├── docker-compose.yml
 └── README.md
 ```
+
+---
+
+## Documentation
+
+| Doc | Purpose |
+|---|---|
+| [`docs/PROJECT_OVERVIEW.md`](docs/PROJECT_OVERVIEW.md) | Architecture, module responsibilities, and request data flow |
+| [`docs/ROADMAP.md`](docs/ROADMAP.md) | Completed phases and candidate next steps |
+| [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Full, categorized constraints and caveats |
+| [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) | Release-facing honest summary of what is / isn't modelled |
+| [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) | Manual QA checklist for cutting a release candidate |
+| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | 5–8 minute demo flow with exact parameters |
+| [`docs/SCREENSHOT_PLAN.md`](docs/SCREENSHOT_PLAN.md) | Recommended release screenshots with capture settings |
 
 ---
 
@@ -593,15 +611,13 @@ QuantLab is deliberately honest about what it does and does not model. See [`doc
 
 Most of the platform described above is complete; see [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full per-phase history (Phases 0–10.x: backend MVP → strategies → research tools → portfolio lab → reporting → settings/theme → long/short → Command Center / palette / search → toasts, error boundary, and state polish).
 
-**Near-term, candidate next steps** (not commitments):
+**Next stages**
 
-- Deployment polish (hosted demo, image hardening)
-- Real market-data provider integrations (beyond yfinance)
-- More realistic execution modelling: slippage and market impact
-- Richer PDF reports with embedded charts
-- More robust crypto annualization (365-day) end-to-end
-- Optional user authentication (future, if multi-user is needed)
-- Broker / live-trading integration — **far-future only**, and out of scope for a research tool
+1. **v4.0 release candidate** — QA-harden the current build for a polished, portfolio-ready release. Run the [Release Checklist](docs/RELEASE_CHECKLIST.md), rehearse the [Demo Script](docs/DEMO_SCRIPT.md), capture the [Screenshot Plan](docs/SCREENSHOT_PLAN.md), and tag `v4.0-rc`.
+2. **Quant research depth** — richer execution realism (slippage / market impact), more robust crypto (365-day) annualization, richer PDF reports with embedded charts, additional data-provider integrations, and more advanced models.
+3. **Commercialization foundation** — only if pursued: deployment polish (hosted demo, image hardening), then optional user authentication / multi-user. Broker / live-trading integration remains **far-future** and out of scope for a research tool.
+
+See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the detailed candidate list (none are commitments).
 
 ---
 

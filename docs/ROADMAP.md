@@ -681,7 +681,42 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
+### Phase 11.1 — Release Candidate QA Checklist ✅
+
+- Documentation-only pass to prepare a **v4.0 release candidate**. **No code,
+  quant logic, API, or feature changes.**
+- New release/QA docs: **`RELEASE_CHECKLIST.md`** (environment / backend /
+  frontend / per-feature QA with expected results + demo parameters),
+  **`DEMO_SCRIPT.md`** (5–8 min showcase flow with exact parameters),
+  **`KNOWN_ISSUES.md`** (honest, release-facing limitations), and
+  **`SCREENSHOT_PLAN.md`** (12 recommended captures with page/params/visible/
+  filename).
+- README gained a **Documentation** index linking all docs and a **Next stages**
+  roadmap (v4.0 RC → quant research depth → commercialization foundation).
+- Verified facts used in the QA docs against the code: health endpoint is
+  `GET /health`; tests redirect persistence to a temp SQLite DB via a
+  `fresh_db`/monkeypatch fixture, guarded by
+  `test_tests_use_temp_database_not_real_database`.
+
+---
+
 ## Future Phases
+
+### Release track (next stages)
+
+1. **v4.0 release candidate** — QA-harden and present the current build: run
+   `RELEASE_CHECKLIST.md`, rehearse `DEMO_SCRIPT.md`, capture `SCREENSHOT_PLAN.md`,
+   and tag `v4.0-rc`.
+2. **Quant research depth** — execution realism (slippage / market impact),
+   robust crypto (365-day) annualization, richer PDF reports with embedded
+   charts, more data providers, and advanced models.
+3. **Commercialization foundation** *(only if pursued)* — deployment polish
+   (hosted demo, image hardening), then optional auth / multi-user. Broker /
+   live-trading remains far-future and out of scope for a research tool.
+
+The detailed candidate backlog below feeds those stages.
+
+
 
 Most of the original roadmap has shipped — **saved backtests + database**, **CSV
 upload backtesting**, the full **multi-asset Portfolio Lab** (equal-weight,
