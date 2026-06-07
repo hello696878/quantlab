@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { classifyApiError, getSavedBacktest } from "@/lib/api";
 import type { EquityPoint, SavedBacktestFull, TradeRecord } from "@/lib/types";
+import { notifyBackendOffline } from "@/lib/toast";
 import BackendOfflinePanel from "@/components/BackendOfflinePanel";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
@@ -98,7 +99,11 @@ export default function SavedBacktestDetail({
         if (!cancelled) setRecord(data);
       })
       .catch((err) => {
-        if (!cancelled) setError(err);
+        if (cancelled) return;
+        setError(err);
+        if (classifyApiError(err).backendUnavailable) {
+          notifyBackendOffline({ onRetry: () => setRetryTick((k) => k + 1) });
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
