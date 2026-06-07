@@ -1,5 +1,7 @@
 "use client";
 
+import RetryButton from "@/components/ui/RetryButton";
+
 /**
  * Consistent "backend offline" panel for any SQLite-backed resource.  Explains
  * the data is safe (stored locally), how to start the backend, and offers
@@ -80,18 +82,7 @@ export default function OfflineState({
           {(onRetry || onGoHome) && (
             <div className="mt-4 flex flex-wrap items-center gap-2">
               {onRetry && (
-                <button
-                  type="button"
-                  onClick={onRetry}
-                  className="rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
-                  style={{
-                    background: "var(--accent-soft)",
-                    border: "1px solid var(--accent-line)",
-                    color: "var(--accent-text)",
-                  }}
-                >
-                  Retry
-                </button>
+                <RetryButton onClick={onRetry} />
               )}
               {onGoHome && (
                 <button

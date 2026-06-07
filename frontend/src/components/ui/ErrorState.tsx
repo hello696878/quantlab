@@ -1,5 +1,7 @@
 "use client";
 
+import RetryButton from "@/components/ui/RetryButton";
+
 /**
  * Consistent inline error card for non-offline failures.  Shows a title, a
  * readable message, an optional Retry, and the raw technical text tucked inside
@@ -42,18 +44,7 @@ export default function ErrorState({
           </p>
 
           {onRetry && (
-            <button
-              type="button"
-              onClick={onRetry}
-              className="mt-3 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
-              style={{
-                background: "var(--accent-soft)",
-                border: "1px solid var(--accent-line)",
-                color: "var(--accent-text)",
-              }}
-            >
-              Retry
-            </button>
+            <RetryButton onClick={onRetry} className="mt-3" />
           )}
 
           {detail && detail !== message && (

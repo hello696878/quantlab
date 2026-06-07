@@ -2,13 +2,19 @@
 
 import { useEffect, useState } from "react";
 import type { View } from "@/components/AppShell";
-import { checkHealth, listSavedBacktests, listSavedReports } from "@/lib/api";
+import {
+  checkHealth,
+  classifyApiError,
+  listSavedBacktests,
+  listSavedReports,
+} from "@/lib/api";
 import type { SavedBacktestSummary, SavedReportSummary } from "@/lib/types";
 import { fmtPct, fmtRatio } from "@/lib/format";
 import { DEMO_PRESETS, type DemoPresetId } from "@/lib/demoPresets";
 import { SkeletonCard } from "@/components/ui/LoadingSkeleton";
 import OfflineState from "@/components/ui/OfflineState";
 import EmptyState from "@/components/ui/EmptyState";
+import ErrorState from "@/components/ui/ErrorState";
 import {
   EMPTY_CHECKLIST,
   ONBOARDING_EVENT,
@@ -307,8 +313,8 @@ export default function HomeDashboard({
   const [reports, setReports] = useState<SavedReportSummary[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
   const [loaded, setLoaded] = useState(false);
-  const [btOk, setBtOk] = useState(true);
-  const [rpOk, setRpOk] = useState(true);
+  const [backtestsError, setBacktestsError] = useState<unknown>(null);
+  const [reportsError, setReportsError] = useState<unknown>(null);
   const [retryTick, setRetryTick] = useState(0);
 
   // Onboarding state lives in localStorage (client-only).  Start from
@@ -335,18 +341,26 @@ export default function HomeDashboard({
   useEffect(() => {
     let cancelled = false;
     setLoaded(false);
-    setBtOk(true);
-    setRpOk(true);
+    setBacktestsError(null);
+    setReportsError(null);
     checkHealth().then((ok) => {
       if (!cancelled) setOnline(ok);
     });
     Promise.allSettled([listSavedBacktests(), listSavedReports()]).then(
       ([b, r]) => {
         if (cancelled) return;
-        if (b.status === "fulfilled") setBacktests(b.value);
-        else setBtOk(false);
-        if (r.status === "fulfilled") setReports(r.value);
-        else setRpOk(false);
+        if (b.status === "fulfilled") {
+          setBacktests(b.value);
+          setBacktestsError(null);
+        } else {
+          setBacktestsError(b.reason);
+        }
+        if (r.status === "fulfilled") {
+          setReports(r.value);
+          setReportsError(null);
+        } else {
+          setReportsError(r.reason);
+        }
         setLoaded(true);
       },
     );
@@ -362,6 +376,10 @@ export default function HomeDashboard({
   const recentReports = [...reports]
     .sort((a, b) => b.created_at.localeCompare(a.created_at))
     .slice(0, 5);
+  const backtestsErrorInfo = backtestsError
+    ? classifyApiError(backtestsError)
+    : null;
+  const reportsErrorInfo = reportsError ? classifyApiError(reportsError) : null;
 
   const doneCount = CHECKLIST_ITEMS.filter((i) => checklist[i.step]).length;
 
@@ -576,11 +594,11 @@ export default function HomeDashboard({
           <StatusTile label="Mode" value="LOCAL" tone="neutral" />
           <StatusTile
             label="Saved Backtests"
-            value={!loaded ? "…" : btOk ? String(backtests.length) : "—"}
+            value={!loaded ? "…" : backtestsErrorInfo ? "—" : String(backtests.length)}
           />
           <StatusTile
             label="Saved Reports"
-            value={!loaded ? "…" : rpOk ? String(reports.length) : "—"}
+            value={!loaded ? "…" : reportsErrorInfo ? "—" : String(reports.length)}
           />
         </div>
       </section>
@@ -607,12 +625,20 @@ export default function HomeDashboard({
                 <SkeletonCard key={i} />
               ))}
             </div>
-          ) : !btOk ? (
-            <OfflineState
-              compact
-              message="Recent saved backtests require the FastAPI backend (local SQLite)."
-              onRetry={() => setRetryTick((k) => k + 1)}
-            />
+          ) : backtestsErrorInfo ? (
+            backtestsErrorInfo.backendUnavailable ? (
+              <OfflineState
+                compact
+                message="Recent saved backtests require the FastAPI backend (local SQLite)."
+                onRetry={() => setRetryTick((k) => k + 1)}
+              />
+            ) : (
+              <ErrorState
+                title="Couldn’t load recent backtests"
+                message={backtestsErrorInfo.message}
+                onRetry={() => setRetryTick((k) => k + 1)}
+              />
+            )
           ) : recentBacktests.length === 0 ? (
             <EmptyState
               compact
@@ -685,12 +711,20 @@ export default function HomeDashboard({
                 <SkeletonCard key={i} />
               ))}
             </div>
-          ) : !rpOk ? (
-            <OfflineState
-              compact
-              message="Recent saved reports require the FastAPI backend (local SQLite)."
-              onRetry={() => setRetryTick((k) => k + 1)}
-            />
+          ) : reportsErrorInfo ? (
+            reportsErrorInfo.backendUnavailable ? (
+              <OfflineState
+                compact
+                message="Recent saved reports require the FastAPI backend (local SQLite)."
+                onRetry={() => setRetryTick((k) => k + 1)}
+              />
+            ) : (
+              <ErrorState
+                title="Couldn’t load recent reports"
+                message={reportsErrorInfo.message}
+                onRetry={() => setRetryTick((k) => k + 1)}
+              />
+            )
           ) : recentReports.length === 0 ? (
             <EmptyState
               compact

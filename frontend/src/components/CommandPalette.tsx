@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import {
+  classifyApiError,
   listCustomStrategyTemplates,
   listSavedBacktests,
   listSavedReports,
@@ -230,6 +231,7 @@ export default function CommandPalette({
   const [data, setData] = useState<ResourceData | null>(null);
   const [resLoading, setResLoading] = useState(false);
   const [resOffline, setResOffline] = useState(false);
+  const [resError, setResError] = useState<string | null>(null);
   // Mirror of `data` so the fetch effect can read it without depending on it
   // (depending on `data` + calling setData would loop).
   const dataRef = useRef<ResourceData | null>(null);
@@ -279,6 +281,7 @@ export default function CommandPalette({
     if (!open) return;
     let cancelled = false;
     setResLoading(dataRef.current === null); // full "loading" only when nothing cached
+    setResError(null);
     Promise.allSettled([
       listSavedBacktests(),
       listSavedReports(),
@@ -288,6 +291,12 @@ export default function CommandPalette({
       if (cancelled) return;
       const [bt, rp, tpl, gal] = settled;
       const allFailed = settled.every((s) => s.status === "rejected");
+      const failures = settled.filter(
+        (s): s is PromiseRejectedResult => s.status === "rejected",
+      );
+      const allBackendUnavailable =
+        failures.length > 0 &&
+        failures.every((s) => classifyApiError(s.reason).backendUnavailable);
       // Total failure → drop any cached resources so nothing stale is shown.
       setData(
         allFailed
@@ -299,7 +308,12 @@ export default function CommandPalette({
               gallery: gal.status === "fulfilled" ? gal.value : [],
             },
       );
-      setResOffline(allFailed);
+      setResOffline(allFailed && allBackendUnavailable);
+      setResError(
+        allFailed && !allBackendUnavailable
+          ? "Saved resources could not be loaded. Navigation and demo commands still work."
+          : null,
+      );
       setResLoading(false);
     });
     return () => {
@@ -534,6 +548,23 @@ export default function CommandPalette({
               >
                 Saved resources unavailable while backend is offline. Navigation
                 and demo commands still work.
+              </div>
+            </div>
+          )}
+          {!resLoading && resError && (
+            <div className="px-1">
+              <div className="uplabel px-2.5 pb-1 pt-2" style={{ color: "var(--text-mut)" }}>
+                Saved resources
+              </div>
+              <div
+                className="rounded-lg px-2.5 py-2 text-[11.5px]"
+                style={{
+                  border: "1px solid rgba(240,96,88,0.3)",
+                  background: "rgba(240,96,88,0.06)",
+                  color: "var(--neg)",
+                }}
+              >
+                {resError}
               </div>
             </div>
           )}
