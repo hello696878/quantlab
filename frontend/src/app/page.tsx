@@ -31,8 +31,10 @@ import SettingsPanel from "@/components/SettingsPanel";
 import CommandPalette, { type Command } from "@/components/CommandPalette";
 import { DEMO_PRESETS, type DemoPresetId } from "@/lib/demoPresets";
 import { markChecklistStep } from "@/lib/onboarding";
+import { notifyBackendOffline, toast } from "@/lib/toast";
 import { applyAccent, loadSettings, resolveDateRange } from "@/lib/settings";
 import {
+  classifyApiError,
   runBacktest,
   runBbBacktest,
   runMomentumBacktest,
@@ -450,9 +452,9 @@ export default function HomePage() {
       setDemoNotice(null); // a real run replaces the "click Run" hint
       markChecklistStep("ran_backtest");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "An unexpected error occurred.",
-      );
+      const cls = classifyApiError(err);
+      setError(cls.message);
+      if (cls.backendUnavailable) notifyBackendOffline();
     } finally {
       setLoading(false);
     }
@@ -523,6 +525,7 @@ export default function HomePage() {
         setView("builder");
         break;
     }
+    toast.info("Demo parameters loaded", "Click Run to execute a real backtest.");
   }
 
   /** Open the Portfolio Lab on a specific sub-tab (shared by the palette). */

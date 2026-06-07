@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { classifyApiError, deleteSavedReport, getSavedReport } from "@/lib/api";
 import type { SavedReportFull } from "@/lib/types";
+import { notifyBackendOffline, toast } from "@/lib/toast";
 import BackendOfflinePanel from "@/components/BackendOfflinePanel";
 import { markdownToHtml } from "@/lib/printReport";
 import {
@@ -102,7 +103,11 @@ export default function SavedReportDetail({
         if (!cancelled) setRecord(data);
       })
       .catch((err) => {
-        if (!cancelled) setLoadError(err);
+        if (cancelled) return;
+        setLoadError(err);
+        if (classifyApiError(err).backendUnavailable) {
+          notifyBackendOffline({ onRetry: () => setRetryTick((k) => k + 1) });
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -128,11 +133,13 @@ export default function SavedReportDetail({
     setDeleting(true);
     try {
       await deleteSavedReport(record.id);
+      toast.success("Report deleted", `"${record.title}" removed.`);
       onDeleted();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Delete failed. Please try again.",
-      );
+      const cls = classifyApiError(err);
+      setError(cls.message);
+      if (cls.backendUnavailable) notifyBackendOffline();
+      else toast.error("Delete failed", cls.message);
       setDeleting(false);
     }
   }
@@ -217,7 +224,10 @@ export default function SavedReportDetail({
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
-              onClick={() => downloadTextFile(filenameFor(record), record.markdown_content)}
+              onClick={() => {
+                downloadTextFile(filenameFor(record), record.markdown_content);
+                toast.success("Markdown downloaded", filenameFor(record));
+              }}
               className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold
                          text-slate-600 transition-colors hover:border-slate-400"
             >
@@ -225,7 +235,10 @@ export default function SavedReportDetail({
             </button>
             <button
               type="button"
-              onClick={() => setShowPrint(true)}
+              onClick={() => {
+                setShowPrint(true);
+                toast.info("Print preview opened", "Use your browser to save as PDF.");
+              }}
               className="rounded-lg border border-slate-300 px-3 py-1 text-xs font-semibold
                          text-slate-600 transition-colors hover:border-slate-400"
             >

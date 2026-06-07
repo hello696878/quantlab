@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import AppErrorBoundary from "@/components/AppErrorBoundary";
+import ToastProvider from "@/components/ToastProvider";
 
 export const metadata: Metadata = {
   title: "QuantLab — Research Terminal",
@@ -42,7 +44,11 @@ export default function RootLayout({
         />
       </head>
       {/* The dark background, aurora, and grid come from globals.css (body::before/::after). */}
-      <body className="min-h-screen">{children}</body>
+      <body className="min-h-screen">
+        <AppErrorBoundary>
+          <ToastProvider>{children}</ToastProvider>
+        </AppErrorBoundary>
+      </body>
     </html>
   );
 }

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { createSavedBacktest } from "@/lib/api";
+import { classifyApiError, createSavedBacktest } from "@/lib/api";
 import type { BacktestResponse, SavedBacktestCreate } from "@/lib/types";
+import { notifyBackendOffline, toast } from "@/lib/toast";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -115,11 +116,13 @@ export default function SaveBacktestModal({
 
     try {
       const saved = await createSavedBacktest(payload);
+      toast.success("Backtest saved", `"${saved.name}" stored locally.`);
       onSaved(saved.id);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Save failed. Please try again.",
-      );
+      const cls = classifyApiError(err);
+      if (cls.backendUnavailable) notifyBackendOffline();
+      else toast.error("Save failed", cls.message);
+      setError(cls.message);
       setSaving(false);
     }
   }

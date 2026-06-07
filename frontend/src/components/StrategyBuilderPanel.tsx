@@ -31,6 +31,7 @@ import TradeTable from "@/components/TradeTable";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildBacktestReport } from "@/lib/reportExport";
 import { markChecklistStep } from "@/lib/onboarding";
+import { toast } from "@/lib/toast";
 
 // ---------------------------------------------------------------------------
 // Operand / indicator metadata
@@ -511,9 +512,11 @@ function TemplateList({
     setExportingId(id);
     try {
       const doc = await exportCustomStrategyTemplate(id);
-      downloadJson(`quantlab-strategy-${slugify(name)}.json`, doc);
+      const filename = `quantlab-strategy-${slugify(name)}.json`;
+      downloadJson(filename, doc);
+      toast.success("Template exported", filename);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Export failed.");
+      toast.error("Export failed", e instanceof Error ? e.message : undefined);
     } finally {
       setExportingId(null);
     }
@@ -543,8 +546,9 @@ function TemplateList({
       await deleteCustomStrategyTemplate(id);
       setRows((p) => p.filter((r) => r.id !== id));
       onDeleted(id);
+      toast.success("Template deleted", `"${name}" removed.`);
     } catch (e) {
-      alert(e instanceof Error ? e.message : "Delete failed.");
+      toast.error("Delete failed", e instanceof Error ? e.message : undefined);
     } finally {
       setDeletingId(null);
     }
@@ -984,10 +988,12 @@ export default function StrategyBuilderPanel({
       if (loadedId !== null && !asNew) {
         const updated = await updateCustomStrategyTemplate(loadedId, payload);
         setTplMsg({ kind: "info", text: `Updated “${updated.name}”.` });
+        toast.success("Template updated", `"${updated.name}" saved.`);
       } else {
         const created = await createCustomStrategyTemplate(payload);
         setLoadedId(created.id);
         setTplMsg({ kind: "info", text: `Saved “${created.name}”.` });
+        toast.success("Template saved", `"${created.name}" added to My Templates.`);
       }
       setTplRefresh((k) => k + 1);
     } catch (err) {
@@ -995,6 +1001,7 @@ export default function StrategyBuilderPanel({
         kind: "error",
         text: err instanceof Error ? err.message : "Save failed.",
       });
+      toast.error("Save failed", err instanceof Error ? err.message : undefined);
     } finally {
       setSavingTpl(false);
     }
@@ -1045,6 +1052,7 @@ export default function StrategyBuilderPanel({
         doc = JSON.parse(text);
       } catch {
         setTplMsg({ kind: "error", text: "That file is not valid JSON." });
+        toast.warning("Import failed", "That file is not valid JSON.");
         return;
       }
       // The backend performs all schema + security validation.
@@ -1055,11 +1063,13 @@ export default function StrategyBuilderPanel({
         kind: "info",
         text: `Imported “${created.name}”. Click Load to edit and run it.`,
       });
+      toast.success("Template imported", `"${created.name}" added to My Templates.`);
     } catch (err) {
       setTplMsg({
         kind: "error",
         text: err instanceof Error ? err.message : "Import failed.",
       });
+      toast.error("Import failed", err instanceof Error ? err.message : undefined);
     } finally {
       setImporting(false);
       if (importInputRef.current) importInputRef.current.value = "";

@@ -612,6 +612,30 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
+### Phase 10.5 — Global Toasts & Error Boundary ✅
+
+- **Toast system**: module-level store (`lib/toast.ts`) so any code can fire a
+  toast without context/prop-drilling; a `useSyncExternalStore` adapter
+  (`hooks/useToasts.ts`), a portalled `ToastViewport` (bottom-right, semantic
+  colors, auto-dismiss + hover-pause, manual close, optional action), and a thin
+  `ToastProvider`. `toast.success/error/warning/info` + a de-duplicated
+  `notifyBackendOffline` (collapses repeated offline errors into one toast,
+  suppressed briefly after dismissal).
+- **App-level error boundary** (`AppErrorBoundary`, class component): catches
+  unexpected render errors and shows a friendly *"Something went wrong"* panel
+  (Reload app / Go to Command Center + collapsible technical details) instead of
+  a crash. Wrapped around the app in `layout.tsx` with `ToastProvider`
+  (SSR-safe: viewport mounts client-side, store has a server snapshot → no
+  hydration mismatch).
+- **Actions now toasting**: save/delete backtest & report, markdown export /
+  print preview, custom-strategy template save/update/delete/import/export,
+  CSV backtest complete / invalid CSV, demo parameters loaded, and a consistent
+  backend-offline notification (with Retry) across save/delete/load/run paths.
+  Inline error panels and the offline panel are retained as context.
+- **No backend, API, schema, or fake-data changes.** `tsc --noEmit` clean.
+
+---
+
 ## Future Phases
 
 The items below are planned but not yet started. Order and scope may change.

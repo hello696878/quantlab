@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { createSavedReport } from "@/lib/api";
+import { classifyApiError, createSavedReport } from "@/lib/api";
 import type { Report } from "@/lib/reportExport";
 import type { SavedReportCreate } from "@/lib/types";
+import { notifyBackendOffline, toast } from "@/lib/toast";
 
 /**
  * Small modal that saves a generated report to the local Report Gallery.
@@ -81,12 +82,14 @@ export default function SaveReportModal({
 
     try {
       const saved = await createSavedReport(payload);
+      toast.success("Report saved", "Stored locally in the Report Gallery.");
       setSavedId(saved.id);
       onSaved?.(saved.id);
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Save failed. Please try again.",
-      );
+      const cls = classifyApiError(err);
+      if (cls.backendUnavailable) notifyBackendOffline();
+      else toast.error("Save failed", cls.message);
+      setError(cls.message);
       setSaving(false);
     }
   }

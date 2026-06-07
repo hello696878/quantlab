@@ -8,6 +8,7 @@ import {
 } from "@/lib/api";
 import type { SavedBacktestSummary } from "@/lib/types";
 import { fmtPct, fmtRatio } from "@/lib/format";
+import { notifyBackendOffline, toast } from "@/lib/toast";
 import BackendOfflinePanel from "@/components/BackendOfflinePanel";
 
 // ---------------------------------------------------------------------------
@@ -84,7 +85,11 @@ export default function SavedBacktestsList({
         if (!cancelled) setRows(data);
       })
       .catch((err) => {
-        if (!cancelled) setError(err);
+        if (cancelled) return;
+        setError(err);
+        if (classifyApiError(err).backendUnavailable) {
+          notifyBackendOffline({ onRetry: () => setRetryTick((k) => k + 1) });
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -102,10 +107,12 @@ export default function SavedBacktestsList({
     try {
       await deleteSavedBacktest(id);
       setRows((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Backtest deleted", `"${name}" removed.`);
     } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Delete failed. Please try again.",
-      );
+      const cls = classifyApiError(err);
+      setDeleteError(cls.message);
+      if (cls.backendUnavailable) notifyBackendOffline();
+      else toast.error("Delete failed", cls.message);
     } finally {
       setDeletingId(null);
     }

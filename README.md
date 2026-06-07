@@ -65,6 +65,12 @@ Saved resources are fetched live from the backend (`/saved-backtests`, `/saved-r
 
 **Offline behaviour.** If the FastAPI backend is offline, navigation and demo commands still work; saved resources are **omitted** (never shown stale) and the palette shows a *"Saved resources unavailable while backend is offline"* note. Opening a saved backtest or report while the backend is down shows a friendly **Backend offline** panel (amber info card) — explaining the data is safe in local SQLite, the exact `uvicorn` command to start the backend, and **Retry** / **Go to Command Center** actions — instead of a raw HTTP 500. The frontend API layer classifies errors (`classifyApiError`: offline / server / not-found / validation / unknown) so real errors are still surfaced, just presented better.
 
+### Notifications & Error Handling
+
+A consistent **global toast** system (`lib/toast.ts` + `ToastProvider` / `ToastViewport`) gives unified feedback across the app — neon cards, bottom-right, semantic colors (success green / error red / warning amber / info accent), auto-dismiss with hover-pause, manual close, and optional actions. Toasts confirm the important things: backtest/report **saved**, **deleted**, report **markdown exported** / **print preview opened**, custom strategy template **saved / updated / deleted / imported / exported**, **CSV backtest complete** / invalid CSV, and **demo parameters loaded**. A single **"Backend offline"** toast (with a **Retry** action) is de-duplicated, so a burst of failed requests never spams the stack.
+
+An app-level **error boundary** (`AppErrorBoundary`) wraps the whole UI: if an unexpected frontend error occurs, you get a friendly *"Something went wrong"* recovery panel (with **Reload app** / **Go to Command Center** and a collapsible technical-details section) instead of a blank crash — and your local SQLite data is untouched.
+
 ### Strategies
 
 | Strategy | Type | Parameters | Direction modes |

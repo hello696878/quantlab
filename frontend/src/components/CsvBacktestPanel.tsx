@@ -1,8 +1,9 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import { runCsvBacktest } from "@/lib/api";
+import { classifyApiError, runCsvBacktest } from "@/lib/api";
 import type { BacktestResponse } from "@/lib/types";
+import { notifyBackendOffline, toast } from "@/lib/toast";
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
@@ -222,8 +223,17 @@ export default function CsvBacktestPanel() {
     try {
       const data = await runCsvBacktest(file, strategy, payload);
       setResult(data);
+      toast.success("CSV backtest complete", `${data.ticker} · ${data.num_trades} trade events.`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "CSV backtest failed.");
+      const cls = classifyApiError(err);
+      setError(cls.message);
+      if (cls.backendUnavailable) {
+        notifyBackendOffline();
+      } else if (cls.kind === "validation") {
+        toast.warning("Invalid CSV or parameters", cls.message);
+      } else {
+        toast.error("CSV backtest failed", cls.message);
+      }
     } finally {
       setLoading(false);
     }

@@ -7,6 +7,7 @@ import {
   listSavedReports,
 } from "@/lib/api";
 import type { SavedReportSummary } from "@/lib/types";
+import { notifyBackendOffline, toast } from "@/lib/toast";
 import BackendOfflinePanel from "@/components/BackendOfflinePanel";
 
 // ---------------------------------------------------------------------------
@@ -78,7 +79,11 @@ export default function SavedReportsList({
         if (!cancelled) setRows(data);
       })
       .catch((err) => {
-        if (!cancelled) setError(err);
+        if (cancelled) return;
+        setError(err);
+        if (classifyApiError(err).backendUnavailable) {
+          notifyBackendOffline({ onRetry: () => setRetryTick((k) => k + 1) });
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -96,10 +101,12 @@ export default function SavedReportsList({
     try {
       await deleteSavedReport(id);
       setRows((prev) => prev.filter((r) => r.id !== id));
+      toast.success("Report deleted", `"${title}" removed.`);
     } catch (err) {
-      setDeleteError(
-        err instanceof Error ? err.message : "Delete failed. Please try again.",
-      );
+      const cls = classifyApiError(err);
+      setDeleteError(cls.message);
+      if (cls.backendUnavailable) notifyBackendOffline();
+      else toast.error("Delete failed", cls.message);
     } finally {
       setDeletingId(null);
     }

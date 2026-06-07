@@ -11,6 +11,7 @@ import PrintableReportModal from "@/components/PrintableReportModal";
 import SaveReportModal from "@/components/SaveReportModal";
 import { loadSettings } from "@/lib/settings";
 import { markChecklistStep } from "@/lib/onboarding";
+import { toast } from "@/lib/toast";
 
 /**
  * Report export controls shown wherever results are displayed.
@@ -73,6 +74,7 @@ export default function ExportReportButton({
     const { filename, content } = getReport(template);
     downloadTextFile(filename, content);
     markChecklistStep("exported_report");
+    toast.success("Markdown exported", filename);
   }
 
   return (
@@ -107,6 +109,7 @@ export default function ExportReportButton({
             onClick={() => {
               setPreview(getReport(template));
               markChecklistStep("exported_report");
+              toast.info("Print preview opened", "Use your browser to save as PDF.");
             }}
             title="Preview a printable report, then save as PDF"
             className={btnCls}
