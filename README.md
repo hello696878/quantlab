@@ -22,6 +22,68 @@ Each capability is described in detail under [Features](#features) below.
 
 ---
 
+## Screenshots
+
+A tour of the running app — every chart and metric below is a **real backend run** on real historical data (no mock data). Full capture parameters are in [`docs/screenshots/README.md`](docs/screenshots/README.md).
+
+### Command Center
+
+**Command Center** — the local-first home dashboard, with quick actions, guided demos, a quick-start checklist, recent saved work, and live system status.
+
+![QuantLab Command Center](docs/screenshots/command-center.png)
+
+### Strategy Research
+
+**Single-asset backtest** — a neon equity curve (strategy vs. dashed buy-&-hold benchmark) and a semantic-red drawdown chart, computed with a one-day signal shift so there is no lookahead bias.
+
+![Backtest neon equity and drawdown charts](docs/screenshots/backtest-neon-chart.png)
+
+**Strategy comparison** — the built-in single-asset strategies run on one ticker and date range, then compared and ranked side by side.
+
+![Strategy comparison](docs/screenshots/strategy-comparison.png)
+
+### Custom Strategy Lab
+
+**No-code strategy builder** — compose entry/exit rules from whitelisted indicators (SMA, RSI, Bollinger, momentum) with ALL/ANY logic and backtest them — no code, no `eval`.
+
+![Custom strategy builder](docs/screenshots/custom-strategy-builder.png)
+
+### Portfolio Lab
+
+**Efficient frontier** — thousands of random long-only portfolios coloured by Sharpe, with the minimum-volatility, maximum-Sharpe, and equal-weight portfolios highlighted alongside their weights.
+
+![Portfolio efficient frontier](docs/screenshots/portfolio-efficient-frontier.png)
+
+**Risk dashboard** — per-asset return/volatility, a correlation heatmap, diversification ratio, and each asset's contribution to total portfolio risk.
+
+![Portfolio risk dashboard](docs/screenshots/portfolio-risk-dashboard.png)
+
+**Stress test** — how a static portfolio would have moved through historical stress windows (e.g. the COVID crash) versus its benchmark.
+
+![Portfolio stress test](docs/screenshots/portfolio-stress-test.png)
+
+**Factor analysis** — an OLS regression of portfolio returns onto ETF factor proxies, reporting betas, alpha, R², and an actual-vs-fitted curve.
+
+![Portfolio factor analysis](docs/screenshots/factor-analysis.png)
+
+### Reporting
+
+**Saved reports gallery** — research reports saved locally as Markdown in SQLite, ready to reopen, download, or print to PDF.
+
+![Saved reports gallery](docs/screenshots/saved-reports.png)
+
+### Productivity & Settings
+
+**Command palette + global search** — `Ctrl/Cmd + K` opens a fast palette that searches navigation, guided demos, and your real saved backtests, reports, and templates.
+
+![Command palette and global search](docs/screenshots/command-palette.png)
+
+**Settings & neon theme** — local preferences and the CSS-variable accent theme (six accents including a Risk mode), stored in the browser only — no account required.
+
+![App settings and theme](docs/screenshots/settings-theme.png)
+
+---
+
 ## Tech Stack
 
 | Layer | Technology |
@@ -360,36 +422,6 @@ The local database lives at `backend/data/quantlab.db` (both `saved_backtests` a
 - Typed frontend (`tsc --noEmit` clean), shared loading/empty/offline/error UI primitives, toast system, and an app-level error boundary
 - GitHub Actions CI: backend tests + frontend build on every push/PR
 - Docker Compose: one command to start the full stack
-
----
-
-## Screenshots
-
-### Main Backtest Dashboard
-
-![Main Backtest Dashboard](docs/screenshots/main-backtest-dashboard.png)
-
-### Strategy Comparison
-
-![Strategy Comparison](docs/screenshots/strategy-comparison.png)
-
-### SMA Parameter Sweep
-
-![SMA Parameter Sweep](docs/screenshots/sma-parameter-sweep.png)
-
-### Train/Test Validation
-
-![Train/Test Validation](docs/screenshots/train-test-validation.png)
-
-### Walk-Forward Optimization
-
-![Walk-Forward Optimization](docs/screenshots/walk-forward-optimization.png)
-
-### FastAPI Docs
-
-![FastAPI Docs](docs/screenshots/fastapi-docs.png)
-
-> **Recommended additional screenshots (TODO).** The captures above predate several major features. To fully represent the current platform, add: `command-center.png`, `backtest-neon-chart.png`, `custom-strategy-builder.png`, `portfolio-efficient-frontier.png`, `portfolio-risk-dashboard.png`, `stress-test.png`, `factor-analysis.png`, `saved-reports.png`, and `command-palette.png`. See [`docs/screenshots/README.md`](docs/screenshots/README.md) for the suggested view and parameters for each.
 
 ---
 

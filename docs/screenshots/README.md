@@ -1,64 +1,55 @@
 # Screenshots
 
-UI screenshots for the README. Capture as **PNG**, ideally **1440 × 900** (or similar widescreen) on the dark neon theme. Run with the suggested parameters below so the captures are representative and reproducible.
+UI screenshots for the README, captured on the dark neon theme (PNG, ~1440 × 900). Every image is a **real backend run** on real historical data — no mock data.
 
-> Screenshots are illustrative of the UI only — every chart/metric shown must come from a **real backend run** (no fabricated data).
+The **README showcase set** below is embedded in the main [README](../../README.md#screenshots), grouped by workflow. The **additional captures** (research tools + API docs) are kept here for reference.
 
----
-
-## Current screenshots (in this folder)
-
-These are already committed and referenced by the README:
-
-| File | View | Suggested run |
-|---|---|---|
-| `main-backtest-dashboard.png` | Single-asset Backtest results | `AAPL`, SMA Crossover 50/200, 2015-01-01 → 2024-01-01 |
-| `strategy-comparison.png` | Strategy Comparison | `SPY`, 2015-01-01 → 2024-01-01, long-only |
-| `sma-parameter-sweep.png` | SMA Parameter Sweep | `AAPL`, fast 10–50, slow 50–200 |
-| `train-test-validation.png` | SMA Train/Test Validation | `AAPL`, 2010-01-01 → 2024-01-01, split 2020-01-01 |
-| `walk-forward-optimization.png` | SMA Walk-Forward | `SPY`, 2010-01-01 → 2024-01-01, train 504 / test 126 / step 63 |
-| `fastapi-docs.png` | Swagger UI at `:8000/docs` | endpoints grouped by tag, one expanded |
+> Reproduce a capture by running the stack and using the listed demo parameters. Have a few saved backtests/reports/templates stored first so the Command Center, Saved Reports, and Command Palette show real content.
 
 ---
 
-## Recommended additional screenshots (TODO)
+## README showcase set
 
-The platform has grown well beyond the captures above. Adding the following would make the README fully represent the current product. Filenames are referenced (as TODO) in the README Screenshots section.
+| Filename | Page / workflow | Demo parameters | Demonstrates |
+|---|---|---|---|
+| `command-center.png` | Command Center (Home) | — (≥2 saved backtests, ≥1 saved report) | Local-first home dashboard: hero + badges, welcome/guided demos, quick-start checklist, recent saved work, system status, quick actions |
+| `backtest-neon-chart.png` | Backtest results | SPY · SMA Crossover 20/100 · 2015-01-01 → 2023-12-31 · 100,000 · 10 bps · long_only | Neon equity curve (strategy vs dashed benchmark) + semantic-red drawdown chart |
+| `strategy-comparison.png` | Strategy Comparison | SPY · 2015-01-01 → 2023-12-31 · long-only | Built-in single-asset strategies compared and ranked on one ticker |
+| `custom-strategy-builder.png` | Custom Strategy Builder | Load gallery template *Momentum + Trend*, then Run | No-code entry/exit rule builder (whitelisted indicators, no `eval`) with a result |
+| `portfolio-efficient-frontier.png` | Portfolio Lab → Efficient Frontier | SPY, QQQ, GLD, TLT · 2015-01-01 → 2023-12-31 · rf 0.02 · 2,000 portfolios | Risk–return scatter coloured by Sharpe with min-vol / max-Sharpe / equal-weight portfolios + weights |
+| `portfolio-risk-dashboard.png` | Portfolio Lab → Risk Dashboard | SPY, QQQ, GLD, TLT · 2015-01-01 → 2023-12-31 | Correlation heatmap, diversification ratio, per-asset risk contribution |
+| `portfolio-stress-test.png` | Portfolio Lab → Stress Test | Basket + COVID Crash + 2022 Rate-Hike scenarios | Historical stress-window behaviour vs benchmark, scenario table + correlation heatmap |
+| `factor-analysis.png` | Portfolio Lab → Factor Analysis | Basket vs Core ETF Factors (SPY/QQQ/IWM/TLT/GLD) | OLS factor-exposure regression: betas, alpha, R², actual-vs-fitted curve |
+| `saved-reports.png` | Saved Reports gallery | — (≥2 saved reports) | Local report gallery — Markdown reports stored in SQLite, reopen / download / print |
+| `command-palette.png` | Command Palette (Ctrl/Cmd + K) | Query e.g. `momentum` or `risk` | Global palette/search across navigation, demos, and real saved resources |
+| `settings-theme.png` | Settings → Appearance | Pick an accent (e.g. **Blue** / **Risk**) | Local preferences + CSS-variable neon accent theme (six accents) |
 
-| File | View | Suggested run / what to show |
-|---|---|---|
-| `command-center.png` | Home / Command Center | Default landing view — quick actions, recent saved backtests/reports, system status, feature map (have a couple of saved items so recents are populated) |
-| `backtest-neon-chart.png` | Backtest equity + drawdown | `SPY`, SMA 20/100, 2015-01-01 → 2023-12-31 — focus on the neon equity curve, glow line, dashed benchmark, and drawdown chart |
-| `custom-strategy-builder.png` | Custom Strategy Builder | Load the *Momentum + Trend* gallery template; show entry/exit rule rows + a result |
-| `portfolio-efficient-frontier.png` | Portfolio Lab → Efficient Frontier | `SPY, QQQ, GLD, TLT`, 2015-01-01 → 2023-12-31, rf 0.02, 2,000 portfolios — scatter with min-vol / max-Sharpe / equal-weight highlighted |
-| `portfolio-risk-dashboard.png` | Portfolio Lab → Risk Dashboard | `SPY, QQQ, GLD, TLT` — correlation heatmap + risk-contribution table |
-| `stress-test.png` | Portfolio Lab → Stress Test | `SPY, QQQ, GLD, TLT` with COVID Crash + 2022 Rate-Hike scenarios |
-| `factor-analysis.png` | Portfolio Lab → Factor Analysis | `SPY, QQQ, GLD, TLT` vs Core ETF Factors — beta table + actual-vs-fitted curve |
-| `saved-reports.png` | Saved Reports gallery | A few saved reports listed; optionally a report opened in the reader |
-| `command-palette.png` | Command palette (Ctrl/Cmd+K) | Open with a query like `momentum` or `risk` showing commands + saved resources grouped |
+---
 
-Optional: a theme-variant capture (e.g. the **Risk** red accent) and a guided-demo/onboarding card shot.
+## Additional captures (reference)
+
+Earlier captures of the research tools and API docs, retained for reference:
+
+| Filename | Page / workflow | Demo parameters | Demonstrates |
+|---|---|---|---|
+| `main-backtest-dashboard.png` | Backtest results (earlier) | AAPL · SMA 50/200 · 2015-01-01 → 2024-01-01 | Full backtest dashboard (metrics + charts + trade log) |
+| `sma-parameter-sweep.png` | Research → SMA Parameter Sweep | AAPL · fast 10–50 · slow 50–200 | Grid search over fast/slow windows ranked by Sharpe/CAGR/Calmar |
+| `train-test-validation.png` | Research → Train/Test Validation | AAPL · 2010-01-01 → 2024-01-01 · split 2020-01-01 | In-sample vs out-of-sample metrics + degradation |
+| `walk-forward-optimization.png` | Research → Walk-Forward | SPY · 2010-01-01 → 2024-01-01 · train 504 / test 126 / step 63 | Stitched out-of-sample equity + parameter stability |
+| `fastapi-docs.png` | Swagger UI (`:8000/docs`) | — | Auto-generated API docs grouped by tag |
 
 ---
 
 ## How to capture
 
-### Local dev
-
-1. Start the backend: `cd backend && python -m uvicorn app.main:app --reload --port 8000`
-2. Start the frontend: `cd frontend && npm run dev`
-3. Open <http://localhost:3000>, run the suggested parameters, capture with your OS tool or browser dev tools (device toolbar at 1440×900).
-
-### Docker
-
-```bash
-docker compose up --build
-# open http://localhost:3000
-```
-
-### Referencing in the README
+1. Start the stack: `docker compose up --build` (or `uvicorn` + `npm run dev`).
+2. Set the browser/device toolbar to ~1440 × 900.
+3. Run the listed parameters, wait for the real result, and capture.
+4. Save into this folder with the listed filename and reference it from the README, e.g.:
 
 ```markdown
 ### Command Center
 ![Command Center](docs/screenshots/command-center.png)
 ```
+
+See [`../SCREENSHOT_PLAN.md`](../SCREENSHOT_PLAN.md) for the per-shot capture plan.
