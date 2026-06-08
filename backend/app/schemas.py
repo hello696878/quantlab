@@ -24,12 +24,78 @@ _POSITION_MODE_FIELD = Field(
 )
 
 
+# ---------------------------------------------------------------------------
+# Transaction-cost / slippage model (research v1)
+# ---------------------------------------------------------------------------
+
+# All costs are basis points charged on trade *turnover* (|Δposition|), so a
+# long↔short flip (turnover 2) costs twice a single open.  The model only
+# resolves to an effective per-side bps value; the backtest engine's turnover
+# math is unchanged.
+CostModelType = Literal["simple_bps", "commission_slippage", "conservative"]
+
+
+class CostModel(BaseModel):
+    """
+    Optional transaction-cost / slippage assumptions for a backtest.
+
+    * ``simple_bps``          — one ``transaction_cost_bps`` value (default;
+      falls back to the request's top-level ``transaction_cost_bps`` when
+      omitted, so existing requests are unchanged).
+    * ``commission_slippage`` — ``commission_bps + slippage_bps + spread_bps``
+      (``spread_bps`` optional, defaults to 0).
+    * ``conservative``        — preset 10 + 10 + 5 = 25 bps/side
+      ("higher assumed execution friction").
+    """
+
+    type: CostModelType = "simple_bps"
+    transaction_cost_bps: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        lt=10_000.0,
+        description="simple_bps: one-way cost in bps (falls back to the request's transaction_cost_bps).",
+    )
+    commission_bps: Optional[float] = Field(
+        default=None, ge=0.0, lt=10_000.0, description="commission_slippage: commission in bps."
+    )
+    slippage_bps: Optional[float] = Field(
+        default=None, ge=0.0, lt=10_000.0, description="commission_slippage: slippage in bps."
+    )
+    spread_bps: Optional[float] = Field(
+        default=None, ge=0.0, lt=10_000.0, description="commission_slippage: optional half-spread in bps."
+    )
+
+
+class CostModelResolved(BaseModel):
+    """The cost model after resolution, echoed on the response for display."""
+
+    type: CostModelType
+    label: str
+    commission_bps: float
+    slippage_bps: float
+    spread_bps: float
+    effective_bps_per_side: float = Field(
+        description="Total per-side cost in bps applied on turnover (|Δposition|)."
+    )
+
+
+_COST_MODEL_FIELD = Field(
+    default=None,
+    description=(
+        "Optional transaction-cost / slippage model. When omitted, the simple "
+        "transaction_cost_bps is used (backward-compatible default)."
+    ),
+)
+
+
 # ===========================================================================
 # Requests
 # ===========================================================================
 
 class BacktestRequest(BaseModel):
     """Parameters for the SMA crossover backtest endpoint."""
+
+    cost_model: Optional[CostModel] = _COST_MODEL_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -75,6 +141,8 @@ class BacktestRequest(BaseModel):
 
 class RsiBacktestRequest(BaseModel):
     """Parameters for the RSI mean-reversion backtest endpoint."""
+
+    cost_model: Optional[CostModel] = _COST_MODEL_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -134,6 +202,8 @@ class RsiBacktestRequest(BaseModel):
 class BbBacktestRequest(BaseModel):
     """Parameters for the Bollinger Band mean-reversion backtest endpoint."""
 
+    cost_model: Optional[CostModel] = _COST_MODEL_FIELD
+
     ticker: str = Field(
         default="SPY",
         description="Yahoo Finance ticker symbol (e.g. SPY, AAPL, BTC-USD).",
@@ -184,6 +254,8 @@ class BbBacktestRequest(BaseModel):
 
 class MomentumBacktestRequest(BaseModel):
     """Parameters for the time-series momentum backtest endpoint."""
+
+    cost_model: Optional[CostModel] = _COST_MODEL_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -250,6 +322,8 @@ class MomentumBacktestRequest(BaseModel):
 
 class PairsBacktestRequest(BaseModel):
     """Parameters for the pairs trading / statistical arbitrage endpoint."""
+
+    cost_model: Optional[CostModel] = _COST_MODEL_FIELD
 
     asset_y: str = Field(
         default="KO",
@@ -331,6 +405,8 @@ class PairsBacktestRequest(BaseModel):
 
 class VbBacktestRequest(BaseModel):
     """Parameters for the volatility breakout backtest endpoint."""
+
+    cost_model: Optional[CostModel] = _COST_MODEL_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -524,8 +600,26 @@ class BacktestResponse(BaseModel):
     pairs_entry_z_score: Optional[float] = Field(default=None)
     pairs_exit_z_score: Optional[float] = Field(default=None)
 
-    transaction_cost_bps: float
+    transaction_cost_bps: float = Field(
+        description="Effective per-side transaction cost in bps applied (resolved from cost_model when provided).",
+    )
     initial_capital: float
+    cost_model: Optional[CostModelResolved] = Field(
+        default=None,
+        description="Resolved cost model echo (present only when a cost_model was supplied).",
+    )
+    effective_cost_bps: Optional[float] = Field(
+        default=None,
+        description="Effective per-side cost in bps applied on turnover (|Δposition|).",
+    )
+    total_transaction_cost: Optional[float] = Field(
+        default=None,
+        description="Sum of all per-trade dollar transaction costs over the backtest.",
+    )
+    cost_drag_return: Optional[float] = Field(
+        default=None,
+        description="Total return given up to transaction costs (gross-of-cost minus net).",
+    )
     position_mode: str = Field(
         default="long_only",
         description="Strategy direction mode used (long_only / short_only / long_short).",

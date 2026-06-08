@@ -3,6 +3,8 @@
 import type {
   BacktestRequest,
   BbBacktestRequest,
+  CostModel,
+  CostModelType,
   MomentumBacktestRequest,
   PairsBacktestRequest,
   PositionMode,
@@ -12,6 +14,15 @@ import type {
 } from "@/lib/types";
 import { useState } from "react";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
+
+// Cost model options for the single-asset backtest form.
+const COST_MODEL_OPTIONS: { id: CostModelType; label: string }[] = [
+  { id: "simple_bps", label: "Simple BPS" },
+  { id: "commission_slippage", label: "Commission + Slippage" },
+  { id: "conservative", label: "Conservative" },
+];
+// Conservative preset (mirrors the backend cost_model.py constants).
+const CONSERVATIVE = { commission: 10, slippage: 10, spread: 5 } as const;
 
 // Direction modes (supported by SMA Crossover, Momentum, Volatility Breakout).
 const MODE_OPTIONS: { id: PositionMode; label: string }[] = [
@@ -193,6 +204,18 @@ export default function BacktestForm({
   // Common (shared across all strategies)
   const [costBpsStr, setCostBpsStr] = useState(String(smaParams.transaction_cost_bps));
   const [capitalStr, setCapitalStr] = useState(String(smaParams.initial_capital));
+  // Cost model (shared across all strategies; initialised from saved params).
+  const _initialCm = smaParams.cost_model;
+  const [costModelType, setCostModelType] = useState<CostModelType>(
+    _initialCm?.type ?? "simple_bps",
+  );
+  const [commissionStr, setCommissionStr] = useState(
+    String(_initialCm?.commission_bps ?? 5),
+  );
+  const [slippageStr, setSlippageStr] = useState(
+    String(_initialCm?.slippage_bps ?? 5),
+  );
+  const [spreadStr, setSpreadStr] = useState(String(_initialCm?.spread_bps ?? 2));
   // SMA Crossover
   const [smaFastStr, setSmaFastStr] = useState(String(smaParams.fast_window));
   const [smaSlowStr, setSmaSlowStr] = useState(String(smaParams.slow_window));
@@ -272,6 +295,38 @@ export default function BacktestForm({
         ...pairsParams,
         [key]: value,
       } as PairsBacktestRequest);
+    }
+  }
+
+  // ── Cost model wiring ──────────────────────────────────────────────────────
+  // The cost model is a shared field (like cost / capital), so it is synced
+  // across every strategy via setCommon.  Simple BPS leaves cost_model unset so
+  // the request is byte-identical to the old transaction_cost_bps behaviour.
+  function pushCommissionSlippage(
+    commission: string,
+    slippage: string,
+    spread: string,
+  ) {
+    const c = parseFloat(commission);
+    const s = parseFloat(slippage);
+    const sp = spread.trim() === "" ? 0 : parseFloat(spread);
+    if (isNaN(c) || c < 0 || isNaN(s) || s < 0 || isNaN(sp) || sp < 0) return;
+    setCommon("cost_model", {
+      type: "commission_slippage",
+      commission_bps: c,
+      slippage_bps: s,
+      spread_bps: sp,
+    } as CostModel);
+  }
+
+  function handleCostTypeChange(t: CostModelType) {
+    setCostModelType(t);
+    if (t === "simple_bps") {
+      setCommon("cost_model", undefined);
+    } else if (t === "conservative") {
+      setCommon("cost_model", { type: "conservative" } as CostModel);
+    } else {
+      pushCommissionSlippage(commissionStr, slippageStr, spreadStr);
     }
   }
 
@@ -430,8 +485,34 @@ export default function BacktestForm({
   // Validation
   // ---------------------------------------------------------------------------
   const dateInvalid = active.start_date >= active.end_date;
-  const commonNumericOk =
-    !isNaN(costBps) && costBps >= 0 && !isNaN(capital) && capital > 0;
+
+  // Cost-model derived values (display + validation).
+  const commissionVal = parseFloat(commissionStr);
+  const slippageVal = parseFloat(slippageStr);
+  const spreadVal = spreadStr.trim() === "" ? 0 : parseFloat(spreadStr);
+  const costOk =
+    costModelType === "conservative"
+      ? true
+      : costModelType === "commission_slippage"
+        ? !isNaN(commissionVal) &&
+          commissionVal >= 0 &&
+          !isNaN(slippageVal) &&
+          slippageVal >= 0 &&
+          !isNaN(spreadVal) &&
+          spreadVal >= 0
+        : !isNaN(costBps) && costBps >= 0;
+  const effectiveBps =
+    costModelType === "conservative"
+      ? CONSERVATIVE.commission + CONSERVATIVE.slippage + CONSERVATIVE.spread
+      : costModelType === "commission_slippage"
+        ? (isNaN(commissionVal) ? 0 : commissionVal) +
+          (isNaN(slippageVal) ? 0 : slippageVal) +
+          (isNaN(spreadVal) ? 0 : spreadVal)
+        : isNaN(costBps)
+          ? 0
+          : costBps;
+
+  const commonNumericOk = costOk && !isNaN(capital) && capital > 0;
   const smaInvalid =
     strategy === "sma_crossover" &&
     (isNaN(smaFast) || isNaN(smaSlow) || smaFast >= smaSlow);
@@ -545,7 +626,7 @@ export default function BacktestForm({
         )}
 
         {/* ── Common fields ─────────────────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-4 mb-5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-4 mb-5 sm:grid-cols-3">
           <Field label="Start date">
             <input
               type="date"
@@ -564,22 +645,6 @@ export default function BacktestForm({
               disabled={loading}
             />
           </Field>
-          <Field label="Cost" hint="bps">
-            <input
-              type="number"
-              className={inputCls}
-              value={costBpsStr}
-              min={0}
-              max={200}
-              step={1}
-              onChange={(e) => {
-                setCostBpsStr(e.target.value);
-                const v = parseFloat(e.target.value);
-                if (!isNaN(v)) setCommon("transaction_cost_bps", v);
-              }}
-              disabled={loading}
-            />
-          </Field>
           <Field label="Capital" hint="USD">
             <input
               type="number"
@@ -595,6 +660,133 @@ export default function BacktestForm({
               disabled={loading}
             />
           </Field>
+        </div>
+
+        {/* ── Cost model ────────────────────────────────────────────────── */}
+        <div className="mb-5 rounded-lg border border-slate-200 p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+              Cost model
+            </span>
+            <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+              {COST_MODEL_OPTIONS.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => handleCostTypeChange(o.id)}
+                  className={
+                    "px-3 py-1.5 text-xs font-medium transition-colors " +
+                    (costModelType === o.id
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-slate-600 hover:bg-slate-50")
+                  }
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {costModelType === "simple_bps" && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Field label="Transaction cost" hint="bps">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={costBpsStr}
+                  min={0}
+                  max={200}
+                  step={1}
+                  onChange={(e) => {
+                    setCostBpsStr(e.target.value);
+                    const v = parseFloat(e.target.value);
+                    if (!isNaN(v)) setCommon("transaction_cost_bps", v);
+                  }}
+                  disabled={loading}
+                />
+              </Field>
+            </div>
+          )}
+
+          {costModelType === "commission_slippage" && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Field label="Commission" hint="bps">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={commissionStr}
+                  min={0}
+                  step={1}
+                  onChange={(e) => {
+                    setCommissionStr(e.target.value);
+                    pushCommissionSlippage(e.target.value, slippageStr, spreadStr);
+                  }}
+                  disabled={loading}
+                />
+              </Field>
+              <Field label="Slippage" hint="bps">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={slippageStr}
+                  min={0}
+                  step={1}
+                  onChange={(e) => {
+                    setSlippageStr(e.target.value);
+                    pushCommissionSlippage(commissionStr, e.target.value, spreadStr);
+                  }}
+                  disabled={loading}
+                />
+              </Field>
+              <Field label="Spread" hint="bps · optional">
+                <input
+                  type="number"
+                  className={inputCls}
+                  value={spreadStr}
+                  min={0}
+                  step={1}
+                  onChange={(e) => {
+                    setSpreadStr(e.target.value);
+                    pushCommissionSlippage(commissionStr, slippageStr, e.target.value);
+                  }}
+                  disabled={loading}
+                />
+              </Field>
+            </div>
+          )}
+
+          {costModelType === "conservative" && (
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+              <Field label="Commission" hint="bps">
+                <input type="number" className={inputCls} value={CONSERVATIVE.commission} readOnly disabled />
+              </Field>
+              <Field label="Slippage" hint="bps">
+                <input type="number" className={inputCls} value={CONSERVATIVE.slippage} readOnly disabled />
+              </Field>
+              <Field label="Spread" hint="bps">
+                <input type="number" className={inputCls} value={CONSERVATIVE.spread} readOnly disabled />
+              </Field>
+            </div>
+          )}
+
+          <p className="mt-2.5 text-xs text-slate-600">
+            Effective cost:{" "}
+            <span className="font-semibold text-slate-800">{effectiveBps} bps</span>{" "}
+            per side
+            {costModelType === "conservative" && (
+              <span className="ml-1 text-slate-400">
+                · Conservative: higher assumed execution friction
+              </span>
+            )}
+          </p>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Costs are applied to turnover. Long → short flips count as 2x turnover.
+          </p>
+          <p className="text-[11px] text-slate-400">
+            These are simplified assumptions and do not model order book depth or
+            market impact.
+          </p>
         </div>
 
         {/* ── Strategy-specific fields ───────────────────────────────────── */}
@@ -1020,13 +1212,11 @@ export default function BacktestForm({
           <div className="mb-4 space-y-1">
             {!commonNumericOk && (
               <p className="text-xs text-red-600">
-                ⚠ {isNaN(costBps)
-                  ? "Transaction cost must be a valid number (≥ 0)."
-                  : costBps < 0
-                    ? "Transaction cost must be ≥ 0."
-                    : isNaN(capital)
-                      ? "Initial capital must be a valid number (> 0)."
-                      : "Initial capital must be greater than 0."}
+                ⚠ {!costOk
+                  ? "Cost model values must be valid numbers (≥ 0)."
+                  : isNaN(capital)
+                    ? "Initial capital must be a valid number (> 0)."
+                    : "Initial capital must be greater than 0."}
               </p>
             )}
             {dateInvalid && (

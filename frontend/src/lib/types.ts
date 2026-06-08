@@ -20,6 +20,29 @@ export type BacktestResponseStrategyType = StrategyType | "custom";
 /** Strategy direction mode (SMA Crossover, Momentum, Volatility Breakout). */
 export type PositionMode = "long_only" | "short_only" | "long_short";
 
+/** Transaction-cost / slippage model (research v1). All bps charged on turnover. */
+export type CostModelType = "simple_bps" | "commission_slippage" | "conservative";
+
+export interface CostModel {
+  type: CostModelType;
+  /** simple_bps: one-way cost (falls back to request.transaction_cost_bps when omitted). */
+  transaction_cost_bps?: number;
+  /** commission_slippage components. */
+  commission_bps?: number;
+  slippage_bps?: number;
+  spread_bps?: number;
+}
+
+/** Resolved cost model echoed on the response (present only when one was supplied). */
+export interface CostModelResolved {
+  type: CostModelType;
+  label: string;
+  commission_bps: number;
+  slippage_bps: number;
+  spread_bps: number;
+  effective_bps_per_side: number;
+}
+
 export interface BacktestRequest {
   ticker: string;
   start_date: string;
@@ -29,6 +52,7 @@ export interface BacktestRequest {
   transaction_cost_bps: number;
   initial_capital: number;
   position_mode?: PositionMode;
+  cost_model?: CostModel;
 }
 
 export interface RsiBacktestRequest {
@@ -40,6 +64,7 @@ export interface RsiBacktestRequest {
   exit_threshold: number;
   transaction_cost_bps: number;
   initial_capital: number;
+  cost_model?: CostModel;
 }
 
 export interface BbBacktestRequest {
@@ -51,6 +76,7 @@ export interface BbBacktestRequest {
   exit_band: "middle" | "upper";
   transaction_cost_bps: number;
   initial_capital: number;
+  cost_model?: CostModel;
 }
 
 export interface MomentumBacktestRequest {
@@ -63,6 +89,7 @@ export interface MomentumBacktestRequest {
   transaction_cost_bps: number;
   initial_capital: number;
   position_mode?: PositionMode;
+  cost_model?: CostModel;
 }
 
 export interface VbBacktestRequest {
@@ -75,6 +102,7 @@ export interface VbBacktestRequest {
   transaction_cost_bps: number;
   initial_capital: number;
   position_mode?: PositionMode;
+  cost_model?: CostModel;
 }
 
 export interface PairsBacktestRequest {
@@ -87,6 +115,7 @@ export interface PairsBacktestRequest {
   exit_z_score: number;
   transaction_cost_bps: number;
   initial_capital: number;
+  cost_model?: CostModel;
 }
 
 /** Fields shared by every backtest request type. */
@@ -198,8 +227,17 @@ export interface BacktestResponse {
   pairs_entry_z_score: number | null;
   pairs_exit_z_score: number | null;
 
+  /** Effective per-side cost in bps applied (resolved from cost_model when supplied). */
   transaction_cost_bps: number;
   initial_capital: number;
+  /** Resolved cost model echo — present only when a cost_model was supplied. */
+  cost_model?: CostModelResolved | null;
+  /** Effective per-side cost in bps applied on turnover. */
+  effective_cost_bps?: number | null;
+  /** Sum of all per-trade dollar transaction costs over the backtest. */
+  total_transaction_cost?: number | null;
+  /** Total return given up to transaction costs (gross-of-cost minus net). */
+  cost_drag_return?: number | null;
   /** Direction mode used (defaults to "long_only" for strategies without it). */
   position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;

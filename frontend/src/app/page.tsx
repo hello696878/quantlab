@@ -795,6 +795,18 @@ export default function HomePage() {
                   <span className="text-xs text-slate-400">
                     {paramSummary(result)}
                   </span>
+                  {result.cost_model && (
+                    <span
+                      className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600"
+                      title={result.cost_model.label}
+                    >
+                      {result.cost_model.type === "conservative"
+                        ? "Conservative cost"
+                        : "Commission + slippage"}
+                      {" · "}
+                      {result.effective_cost_bps ?? result.transaction_cost_bps} bps
+                    </span>
+                  )}
                   <span className="ml-auto flex items-center gap-2">
                     <ExportReportButton
                       getReport={(tpl) => buildBacktestReport(result, {}, tpl)}

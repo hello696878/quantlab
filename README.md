@@ -418,7 +418,7 @@ The local database lives at `backend/data/quantlab.db` (both `saved_backtests` a
 ### Engineering
 
 - Vectorised backtest, portfolio, and risk engines (no Python loops over price series)
-- Transaction cost model: flat bps charged on turnover (`|Δposition|` / portfolio rebalancing)
+- Transaction cost model: bps charged on turnover (`|Δposition|` / portfolio rebalancing), with a v1 `cost_model` on single-asset backtests (Backtest form → **Cost model** selector) — **simple BPS** (default, backward-compatible), **commission + slippage (+ optional spread)**, or a **conservative** preset (10 + 10 + 5 = 25 bps/side). The response reports `effective_cost_bps`, `total_transaction_cost`, and `cost_drag_return`. Still a static per-side assumption — no size-dependent market-impact model. *(Strategy Comparison and the CSV/research tools currently use the simple `transaction_cost_bps` field; the advanced cost model applies to the single-asset Backtest form.)*
 - Pydantic v2 request/response schemas with full validation
 - 840+ pytest tests (44 files) using synthetic data — no network calls at test time
 - Typed frontend (`tsc --noEmit` clean), shared loading/empty/offline/error UI primitives, toast system, and an app-level error boundary

@@ -36,6 +36,7 @@ POST /research/strategy-comparison     — compare five single-asset strategies
 
 import json
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
@@ -46,6 +47,7 @@ from app.backtest import (
     run_backtest,
     run_pairs_backtest,
 )
+from app.cost_model import resolve as resolve_cost_model
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -92,6 +94,7 @@ from app.schemas import (
     BacktestRequest,
     BacktestResponse,
     BbBacktestRequest,
+    CostModel,
     CustomStrategyRequest,
     CustomStrategyTemplateCreate,
     CustomStrategyTemplateExport,
@@ -258,18 +261,48 @@ def _build_response(
     vb_breakout_multiplier=None,
     vb_exit_window=None,
     position_mode: str = "long_only",
+    cost_model: Optional[CostModel] = None,
 ) -> BacktestResponse:
-    """Run backtest + metrics and assemble the unified response."""
+    """Run backtest + metrics and assemble the unified response.
+
+    When a ``cost_model`` is supplied it is resolved to an effective per-side
+    bps value that feeds the engine and is reported as ``transaction_cost_bps``;
+    the resolved breakdown is echoed on ``cost_model``.  With no ``cost_model``
+    the behaviour is identical to before (``transaction_cost_bps`` is used).
+    """
+    cost_model_echo = None
+    effective_cost_bps = transaction_cost_bps
+    if cost_model is not None:
+        resolved = resolve_cost_model(cost_model, transaction_cost_bps)
+        effective_cost_bps = resolved.effective_bps_per_side
+        cost_model_echo = resolved
+
     strategy_equity, benchmark_equity, trades = run_backtest(
         close=close,
         position=position,
-        transaction_cost_bps=transaction_cost_bps,
+        transaction_cost_bps=effective_cost_bps,
         initial_capital=initial_capital,
     )
 
     strategy_metrics_dict = compute_metrics(strategy_equity)
     benchmark_metrics_dict = compute_metrics(benchmark_equity)
     diagnostics = compute_position_diagnostics(close, position, trades)
+
+    # Cost transparency: total dollar cost paid, and the return given up to costs
+    # (gross-of-cost minus net) via a cost-free run of the *same* position series.
+    total_transaction_cost = round(
+        float(sum(float(t.get("cost", 0.0)) for t in trades)), 2
+    )
+    gross_equity, _gross_bench, _gross_trades = run_backtest(
+        close=close,
+        position=position,
+        transaction_cost_bps=0.0,
+        initial_capital=initial_capital,
+    )
+    gross_total_return = float(gross_equity.iloc[-1]) / float(initial_capital) - 1.0
+    cost_drag_return = round(
+        gross_total_return - float(strategy_metrics_dict["total_return"]), 6
+    )
 
     equity_curve = [
         EquityPoint(
@@ -299,8 +332,12 @@ def _build_response(
         vb_lookback_window=vb_lookback_window,
         vb_breakout_multiplier=vb_breakout_multiplier,
         vb_exit_window=vb_exit_window,
-        transaction_cost_bps=transaction_cost_bps,
+        transaction_cost_bps=effective_cost_bps,
         initial_capital=initial_capital,
+        cost_model=cost_model_echo,
+        effective_cost_bps=effective_cost_bps,
+        total_transaction_cost=total_transaction_cost,
+        cost_drag_return=cost_drag_return,
         position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
@@ -450,6 +487,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         close=close,
         position=position,
         strategy="sma_crossover",
+        cost_model=request.cost_model,
         fast_window=request.fast_window,
         slow_window=request.slow_window,
         position_mode=request.position_mode,
@@ -501,6 +539,7 @@ def backtest_rsi_mean_reversion(request: RsiBacktestRequest) -> BacktestResponse
         close=close,
         position=position,
         strategy="rsi_mean_reversion",
+        cost_model=request.cost_model,
         rsi_window=request.rsi_window,
         oversold_threshold=request.oversold_threshold,
         exit_threshold=request.exit_threshold,
@@ -553,6 +592,7 @@ def backtest_bollinger_band(request: BbBacktestRequest) -> BacktestResponse:
         close=close,
         position=position,
         strategy="bollinger_band",
+        cost_model=request.cost_model,
         bb_window=request.bb_window,
         bb_num_std=request.num_std,
         bb_exit_band=request.exit_band,
@@ -608,6 +648,7 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         close=close,
         position=position,
         strategy="momentum",
+        cost_model=request.cost_model,
         momentum_window=request.momentum_window,
         momentum_entry_threshold=request.entry_threshold,
         momentum_exit_threshold=request.exit_threshold,
@@ -663,6 +704,7 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         close=close,
         position=position,
         strategy="volatility_breakout",
+        cost_model=request.cost_model,
         vb_lookback_window=request.lookback_window,
         vb_breakout_multiplier=request.breakout_multiplier,
         vb_exit_window=request.exit_window,
@@ -730,17 +772,42 @@ def backtest_pairs(request: PairsBacktestRequest) -> BacktestResponse:
         exit_z_score=request.exit_z_score,
     )
 
+    # Resolve the cost model to an effective per-side bps (backward-compatible
+    # when no cost_model is supplied).
+    resolved_cost = resolve_cost_model(request.cost_model, request.transaction_cost_bps)
+    effective_cost_bps = resolved_cost.effective_bps_per_side
+    cost_model_echo = resolved_cost if request.cost_model is not None else None
+
     # Run the pairs-specific backtest engine.
     strategy_equity, benchmark_equity, trades = run_pairs_backtest(
         close_y=close_y,
         close_x=close_x,
         signal=signal,
-        transaction_cost_bps=request.transaction_cost_bps,
+        transaction_cost_bps=effective_cost_bps,
         initial_capital=request.initial_capital,
     )
 
     strategy_metrics_dict = compute_metrics(strategy_equity)
     benchmark_metrics_dict = compute_metrics(benchmark_equity)
+
+    # Cost transparency (same as single-asset): total dollar cost + cost drag via
+    # a cost-free run of the same signal.
+    total_transaction_cost = round(
+        float(sum(float(t.get("cost", 0.0)) for t in trades)), 2
+    )
+    gross_equity, _gb, _gt = run_pairs_backtest(
+        close_y=close_y,
+        close_x=close_x,
+        signal=signal,
+        transaction_cost_bps=0.0,
+        initial_capital=request.initial_capital,
+    )
+    gross_total_return = (
+        float(gross_equity.iloc[-1]) / float(request.initial_capital) - 1.0
+    )
+    cost_drag_return = round(
+        gross_total_return - float(strategy_metrics_dict["total_return"]), 6
+    )
 
     equity_curve = [
         EquityPoint(
@@ -758,8 +825,12 @@ def backtest_pairs(request: PairsBacktestRequest) -> BacktestResponse:
         start_date=request.start_date,
         end_date=request.end_date,
         strategy="pairs",
-        transaction_cost_bps=request.transaction_cost_bps,
+        transaction_cost_bps=effective_cost_bps,
         initial_capital=request.initial_capital,
+        cost_model=cost_model_echo,
+        effective_cost_bps=effective_cost_bps,
+        total_transaction_cost=total_transaction_cost,
+        cost_drag_return=cost_drag_return,
         pairs_asset_y=asset_y.upper(),
         pairs_asset_x=asset_x.upper(),
         pairs_lookback_window=request.lookback_window,

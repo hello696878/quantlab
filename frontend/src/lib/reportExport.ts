@@ -649,8 +649,20 @@ export function buildBacktestReport(
     ["Strategy", label],
     ["Date range", `${r.start_date} → ${r.end_date}`],
     ["Initial capital", formatCurrency(r.initial_capital)],
-    ["Transaction cost", `${r.transaction_cost_bps} bps`],
+    [
+      "Transaction cost",
+      `${r.transaction_cost_bps} bps${r.cost_model ? " per side (effective)" : ""}`,
+    ],
   ];
+  if (r.cost_model) {
+    metaRows.push(["Cost model", r.cost_model.label]);
+  }
+  if (typeof r.total_transaction_cost === "number") {
+    metaRows.push(["Total transaction cost", formatCurrency(r.total_transaction_cost)]);
+  }
+  if (typeof r.cost_drag_return === "number") {
+    metaRows.push(["Cost drag (return)", formatPercent(r.cost_drag_return)]);
+  }
   if (r.position_mode) {
     metaRows.push(["Direction", modeLabels[r.position_mode] ?? r.position_mode]);
   }
