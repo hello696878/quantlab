@@ -6,6 +6,8 @@ QuantLab is a full-stack quantitative research platform you run on your own mach
 
 > **Research only.** QuantLab is an educational/research tool. It does **not** place trades, connect to a broker, or provide investment advice. See [Limitations & Disclaimers](#limitations--disclaimers).
 
+📦 **Latest release: v4.0.0** — [release notes](docs/RELEASE_NOTES_v4.0.0.md) · [changelog](CHANGELOG.md)
+
 ---
 
 ## Features at a glance
