@@ -456,6 +456,7 @@ function riskCaveats(
 - **No guarantee of future performance.** Past results do not predict future returns.
 ${dataLine}
 - **Transaction cost & slippage.** Costs use a simple basis-point assumption; real fills, slippage, and market impact are not modelled.${positionSizingCaveat(positionSizing)}${riskManagementCaveat(riskManagement)}
+- **Annualization convention.** Annualized metrics depend on the selected annualization convention. Crypto assets may be more appropriately annualized with 365 periods per year, while equities often use 252 trading days. The convention rescales Sharpe / Sortino / volatility / CAGR only — it does not change trades or total return.
 - **Possible overfitting.** Parameters or weights chosen on historical data may not generalise out-of-sample.
 - This report is for research and educational purposes only and is **not investment advice**.${shortSellingCaveat(positionMode)}
 ${cryptoLine}
@@ -790,6 +791,13 @@ export function buildBacktestReport(
   if (r.position_mode) {
     metaRows.push(["Direction", modeLabels[r.position_mode] ?? r.position_mode]);
   }
+  if (r.periods_per_year) {
+    metaRows.push(["Annualization mode", String(r.annualization_mode ?? "trading_days_252")]);
+    if (r.annualization_mode_used) {
+      metaRows.push(["Annualization resolved", String(r.annualization_mode_used)]);
+    }
+    metaRows.push(["Periods per year", String(r.periods_per_year)]);
+  }
   const metadataBody = mdTable(["Field", "Value"], metaRows);
 
   const execBullets = [
@@ -940,6 +948,12 @@ export function buildSavedBacktestReport(
     savedMetaRows.push([
       "Risk management",
       savedRisk.label ?? formatParamValue(rec.params.risk_management),
+    ]);
+  }
+  if (typeof rec.params?.periods_per_year === "number") {
+    savedMetaRows.push([
+      "Annualization",
+      `${rec.params.annualization_mode ?? "trading_days_252"} (${rec.params.periods_per_year}/yr)`,
     ]);
   }
 

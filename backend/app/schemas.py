@@ -310,6 +310,40 @@ _RISK_MANAGEMENT_FIELD = Field(
 )
 
 
+# ---------------------------------------------------------------------------
+# Annualization convention (research v1)
+# ---------------------------------------------------------------------------
+
+# Annualized metrics (volatility, Sharpe, Sortino) and CAGR depend on how many
+# return periods make up a year.  This only rescales metrics — it never changes
+# trades, the equity curve, or total return.
+AnnualizationMode = Literal["trading_days_252", "crypto_365", "auto"]
+
+_ANNUALIZATION_FIELD = Field(
+    default=None,
+    description=(
+        "Optional annualization convention for risk metrics: 'trading_days_252' "
+        "(default, equities/ETFs), 'crypto_365' (24/7 crypto daily data), or "
+        "'auto' (infer from the ticker). When omitted, 252 is used "
+        "(backward-compatible). Affects volatility / Sharpe / Sortino / CAGR "
+        "scaling only — trades and total return are unchanged."
+    ),
+)
+
+
+class AnnualizationResolved(BaseModel):
+    """Resolved annualization echo (present on backtest / comparison responses)."""
+
+    mode: AnnualizationMode = Field(description="Requested annualization mode.")
+    mode_used: Literal["trading_days_252", "crypto_365"] = Field(
+        description="Concrete convention applied after resolution."
+    )
+    periods_per_year: int = Field(description="Return periods per year used (252 or 365).")
+    warning: Optional[str] = Field(
+        default=None, description="Set when 'auto' could not confirm the asset class."
+    )
+
+
 # ===========================================================================
 # Requests
 # ===========================================================================
@@ -320,6 +354,7 @@ class BacktestRequest(BaseModel):
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
+    annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -369,6 +404,7 @@ class RsiBacktestRequest(BaseModel):
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
+    annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -431,6 +467,7 @@ class BbBacktestRequest(BaseModel):
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
+    annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -486,6 +523,7 @@ class MomentumBacktestRequest(BaseModel):
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
+    annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -639,6 +677,7 @@ class VbBacktestRequest(BaseModel):
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
+    annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -875,6 +914,18 @@ class BacktestResponse(BaseModel):
     risk_diagnostics: Optional[RiskDiagnostics] = Field(
         default=None,
         description="Risk-exit counts (present only when risk rules are active).",
+    )
+    annualization_mode: Optional[AnnualizationMode] = Field(
+        default=None, description="Requested annualization mode (defaults to trading_days_252)."
+    )
+    annualization_mode_used: Optional[str] = Field(
+        default=None, description="Concrete annualization convention applied (trading_days_252 / crypto_365)."
+    )
+    periods_per_year: Optional[int] = Field(
+        default=None, description="Return periods per year used for annualized metrics (252 or 365)."
+    )
+    annualization_warning: Optional[str] = Field(
+        default=None, description="Set when 'auto' could not confirm the asset class."
     )
     position_mode: str = Field(
         default="long_only",
@@ -1407,6 +1458,7 @@ class StrategyComparisonRequest(BaseModel):
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
+    annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
 
     @model_validator(mode="after")
     def check_dates(self) -> "StrategyComparisonRequest":
@@ -1521,6 +1573,18 @@ class StrategyComparisonResponse(BaseModel):
     warnings: List[str] = Field(
         default_factory=list,
         description="Comparison-level notes (e.g. strategies that could not apply a mode).",
+    )
+    annualization_mode: Optional[AnnualizationMode] = Field(
+        default=None, description="Requested annualization mode (defaults to trading_days_252)."
+    )
+    annualization_mode_used: Optional[str] = Field(
+        default=None, description="Concrete annualization convention applied to all strategies."
+    )
+    periods_per_year: Optional[int] = Field(
+        default=None, description="Return periods per year used (252 or 365)."
+    )
+    annualization_warning: Optional[str] = Field(
+        default=None, description="Set when 'auto' could not confirm the asset class."
     )
 
     strategies: List[StrategyResultItem] = Field(

@@ -59,6 +59,7 @@ from app.risk_management import (
     is_active as is_risk_active,
     resolve as resolve_risk_management,
 )
+from app.annualization import resolve_annualization
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -277,6 +278,7 @@ def _build_response(
     cost_model: Optional[CostModel] = None,
     position_sizing: Optional[PositionSizing] = None,
     risk_management: Optional[RiskManagement] = None,
+    annualization_mode: Optional[str] = None,
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response.
 
@@ -322,8 +324,13 @@ def _build_response(
         position_change_reasons=change_reasons,
     )
 
-    strategy_metrics_dict = compute_metrics(strategy_equity)
-    benchmark_metrics_dict = compute_metrics(benchmark_equity)
+    # Annualization convention — affects metric *scaling* only (252 = identical
+    # to the historical default); never changes trades / equity / total return.
+    annualization = resolve_annualization(request_ticker, annualization_mode)
+    ppy = annualization.periods_per_year
+
+    strategy_metrics_dict = compute_metrics(strategy_equity, periods_per_year=ppy)
+    benchmark_metrics_dict = compute_metrics(benchmark_equity, periods_per_year=ppy)
     diagnostics = compute_position_diagnostics(close, sized_position, trades)
 
     # Cost transparency: total dollar cost paid, and the return given up to costs
@@ -380,6 +387,10 @@ def _build_response(
         average_exposure=avg_exposure,
         risk_management=risk_management_echo,
         risk_diagnostics=risk_diagnostics_obj,
+        annualization_mode=annualization.mode,
+        annualization_mode_used=annualization.mode_used,
+        periods_per_year=annualization.periods_per_year,
+        annualization_warning=annualization.warning,
         position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
@@ -532,6 +543,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
+        annualization_mode=request.annualization_mode,
         fast_window=request.fast_window,
         slow_window=request.slow_window,
         position_mode=request.position_mode,
@@ -586,6 +598,7 @@ def backtest_rsi_mean_reversion(request: RsiBacktestRequest) -> BacktestResponse
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
+        annualization_mode=request.annualization_mode,
         rsi_window=request.rsi_window,
         oversold_threshold=request.oversold_threshold,
         exit_threshold=request.exit_threshold,
@@ -641,6 +654,7 @@ def backtest_bollinger_band(request: BbBacktestRequest) -> BacktestResponse:
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
+        annualization_mode=request.annualization_mode,
         bb_window=request.bb_window,
         bb_num_std=request.num_std,
         bb_exit_band=request.exit_band,
@@ -699,6 +713,7 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
+        annualization_mode=request.annualization_mode,
         momentum_window=request.momentum_window,
         momentum_entry_threshold=request.entry_threshold,
         momentum_exit_threshold=request.exit_threshold,
@@ -757,6 +772,7 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
+        annualization_mode=request.annualization_mode,
         vb_lookback_window=request.lookback_window,
         vb_breakout_multiplier=request.breakout_multiplier,
         vb_exit_window=request.exit_window,
@@ -2262,6 +2278,10 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
     position_sizing_echo = resolve_position_sizing(request.position_sizing)
     risk_management_echo = resolve_risk_management(request.risk_management)
 
+    # One annualization convention for the whole comparison (single ticker).
+    annualization = resolve_annualization(request.ticker, request.annualization_mode)
+    ppy = annualization.periods_per_year
+
     def _run_strategy(raw_position):
         """Apply risk → sizing → engine to a raw signal (shared assumptions)."""
         nonlocal bench_eq
@@ -2289,7 +2309,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
             display_name=display_name,
             params=params,
             position_mode=mode_used,
-            metrics=PerformanceMetrics(**compute_metrics(eq)),
+            metrics=PerformanceMetrics(**compute_metrics(eq, periods_per_year=ppy)),
             equity_curve=_curve(eq, bench_eq),
             num_trades=len(trades),
             average_exposure=avg_exp,
@@ -2364,7 +2384,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         )
 
     # ── Benchmark metrics + curve ─────────────────────────────────────────
-    bench_m = compute_metrics(bench_eq)
+    bench_m = compute_metrics(bench_eq, periods_per_year=ppy)
     bench_curve = [
         EquityPoint(
             date=str(d.date()) if hasattr(d, "date") else str(d),
@@ -2405,6 +2425,10 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         position_sizing=position_sizing_echo,
         risk_management=risk_management_echo,
         warnings=warnings_global,
+        annualization_mode=annualization.mode,
+        annualization_mode_used=annualization.mode_used,
+        periods_per_year=annualization.periods_per_year,
+        annualization_warning=annualization.warning,
         strategies=results,
         benchmark=bench_curve,
         benchmark_metrics=PerformanceMetrics(**bench_m),

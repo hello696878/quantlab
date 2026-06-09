@@ -7,6 +7,7 @@ import type {
   CostModelType,
   MomentumBacktestRequest,
   PairsBacktestRequest,
+  AnnualizationMode,
   PositionMode,
   PositionSizing,
   PositionSizingType,
@@ -44,6 +45,18 @@ const RISK_OPTIONS: { id: RiskManagementType; label: string }[] = [
   { id: "max_holding_days", label: "Max Holding" },
   { id: "combined", label: "Combined" },
 ];
+
+// Annualization convention options.
+const ANNUALIZATION_OPTIONS: { id: AnnualizationMode; label: string }[] = [
+  { id: "trading_days_252", label: "Trading days · 252" },
+  { id: "crypto_365", label: "Crypto · 365" },
+  { id: "auto", label: "Auto" },
+];
+
+/** Heuristic: does this ticker look like a 24/7 crypto pair? (UI hint only.) */
+function looksLikeCrypto(ticker: string): boolean {
+  return /-USD$/i.test(ticker.trim());
+}
 
 // Direction modes (supported by SMA Crossover, Momentum, Volatility Breakout).
 const MODE_OPTIONS: { id: PositionMode; label: string }[] = [
@@ -290,6 +303,10 @@ export default function BacktestForm({
   const [maxHoldStr, setMaxHoldStr] = useState(
     String(_initialRm?.max_holding_days ?? 20),
   );
+  // Annualization convention (shared; seeded from settings via params).
+  const [annualizationMode, setAnnualizationMode] = useState<AnnualizationMode>(
+    smaParams.annualization_mode ?? "trading_days_252",
+  );
   // SMA Crossover
   const [smaFastStr, setSmaFastStr] = useState(String(smaParams.fast_window));
   const [smaSlowStr, setSmaSlowStr] = useState(String(smaParams.slow_window));
@@ -357,6 +374,7 @@ export default function BacktestForm({
     cost_model: CostModel | undefined;
     position_sizing: PositionSizing | undefined;
     risk_management: RiskManagement | undefined;
+    annualization_mode: AnnualizationMode | undefined;
   }>;
 
   /** Update every strategy's common fields simultaneously so switching strategy
@@ -1322,6 +1340,59 @@ export default function BacktestForm({
                 </p>
               </>
             )}
+          </div>
+        )}
+
+        {/* ── Annualization convention ──────────────────────────────────── */}
+        {strategy !== "pairs" && (
+          <div className="mb-5 rounded-lg border border-slate-200 p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                Annualization
+              </span>
+              <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
+                {ANNUALIZATION_OPTIONS.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setAnnualizationMode(o.id);
+                      setCommon("annualization_mode", o.id);
+                    }}
+                    className={
+                      "px-3 py-1.5 text-xs font-medium transition-colors " +
+                      (annualizationMode === o.id
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50")
+                    }
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <p className="text-[11px] text-slate-400">
+              Annualization affects Sharpe, Sortino, and volatility. Use 365 for
+              24/7 crypto daily data.
+            </p>
+            {annualizationMode === "auto" && (
+              <p className="text-[11px] text-slate-400">
+                Auto uses Crypto 365 for recognized crypto tickers and Trading days
+                252 otherwise.
+              </p>
+            )}
+            <p className="text-[11px] text-slate-400">
+              Annualization changes metric scaling only; it does not change trades
+              or returns.
+            </p>
+            {looksLikeCrypto(smaParams.ticker) &&
+              annualizationMode === "trading_days_252" && (
+                <p className="mt-1 text-[11px] text-amber-600">
+                  {smaParams.ticker} trades 24/7; Crypto · 365 may be more
+                  appropriate.
+                </p>
+              )}
           </div>
         )}
 

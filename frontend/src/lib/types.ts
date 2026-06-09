@@ -107,6 +107,9 @@ export interface RiskDiagnostics {
   risk_exit_rate: number;
 }
 
+/** Annualization convention for risk metrics (research v1). */
+export type AnnualizationMode = "trading_days_252" | "crypto_365" | "auto";
+
 /** Why a trade happened (only present when risk management is active). */
 export type TradeReason =
   | "signal_entry"
@@ -129,6 +132,7 @@ export interface BacktestRequest {
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
+  annualization_mode?: AnnualizationMode;
 }
 
 export interface RsiBacktestRequest {
@@ -143,6 +147,7 @@ export interface RsiBacktestRequest {
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
+  annualization_mode?: AnnualizationMode;
 }
 
 export interface BbBacktestRequest {
@@ -157,6 +162,7 @@ export interface BbBacktestRequest {
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
+  annualization_mode?: AnnualizationMode;
 }
 
 export interface MomentumBacktestRequest {
@@ -172,6 +178,7 @@ export interface MomentumBacktestRequest {
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
+  annualization_mode?: AnnualizationMode;
 }
 
 export interface VbBacktestRequest {
@@ -187,6 +194,7 @@ export interface VbBacktestRequest {
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
+  annualization_mode?: AnnualizationMode;
 }
 
 export interface PairsBacktestRequest {
@@ -332,6 +340,11 @@ export interface BacktestResponse {
   risk_management?: RiskManagementResolved | null;
   /** Risk-exit counts — present only when risk rules are active. */
   risk_diagnostics?: RiskDiagnostics | null;
+  /** Annualization convention (research v1) — present on new responses. */
+  annualization_mode?: AnnualizationMode | null;
+  annualization_mode_used?: string | null;
+  periods_per_year?: number | null;
+  annualization_warning?: string | null;
   /** Direction mode used (defaults to "long_only" for strategies without it). */
   position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;
@@ -530,6 +543,7 @@ export interface StrategyComparisonRequest {
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
+  annualization_mode?: AnnualizationMode;
 }
 
 export interface StrategyResultItem {
@@ -568,6 +582,10 @@ export interface StrategyComparisonResponse {
   position_sizing?: PositionSizingResolved | null;
   risk_management?: RiskManagementResolved | null;
   warnings?: string[];
+  annualization_mode?: AnnualizationMode | null;
+  annualization_mode_used?: string | null;
+  periods_per_year?: number | null;
+  annualization_warning?: string | null;
   strategies: StrategyResultItem[];
   /** Buy-and-hold equity curve — strategy and benchmark fields both carry the benchmark value. */
   benchmark: EquityPoint[];

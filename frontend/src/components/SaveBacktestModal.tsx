@@ -90,6 +90,11 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
   if (result.risk_diagnostics) {
     params.risk_diagnostics = result.risk_diagnostics;
   }
+  if (result.periods_per_year) {
+    params.annualization_mode = result.annualization_mode;
+    params.annualization_mode_used = result.annualization_mode_used;
+    params.periods_per_year = result.periods_per_year;
+  }
   return params;
 }
 

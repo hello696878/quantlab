@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import type {
+  AnnualizationMode,
   CostModel,
   CostModelType,
   PositionSizing,
@@ -579,6 +580,43 @@ export function RiskManagementControl({
         Risk rules close positions; they do not reverse positions by themselves.
         Daily-bar risk exits are simplified and may differ from intraday stop
         execution. They interact with transaction costs and position sizing.
+      </p>
+    </div>
+  );
+}
+
+// ── Annualization convention ─────────────────────────────────────────────────
+
+const ANNUALIZATION_OPTIONS: { id: AnnualizationMode; label: string }[] = [
+  { id: "trading_days_252", label: "Trading days · 252" },
+  { id: "crypto_365", label: "Crypto · 365" },
+  { id: "auto", label: "Auto" },
+];
+
+/** Controlled selector — the parent owns the value (it drives the request + header). */
+export function AnnualizationControl({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: AnnualizationMode;
+  onChange: (v: AnnualizationMode) => void;
+  disabled?: boolean;
+}) {
+  return (
+    <div>
+      <Segmented
+        options={ANNUALIZATION_OPTIONS}
+        value={value}
+        onSelect={onChange}
+        disabled={disabled}
+      />
+      <p className="mt-2 text-[11px] text-slate-400">
+        Annualization affects Sharpe, Sortino, and volatility (252 for equities,
+        365 for 24/7 crypto daily data). It changes metric scaling only — not
+        trades or returns.
+        {value === "auto" &&
+          " Auto uses Crypto 365 for recognized crypto tickers and 252 otherwise."}
       </p>
     </div>
   );

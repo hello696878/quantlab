@@ -18,6 +18,7 @@ TRADING_DAYS_PER_YEAR: int = 252
 def compute_metrics(
     equity_curve: pd.Series,
     risk_free_rate: float = 0.0,
+    periods_per_year: int = TRADING_DAYS_PER_YEAR,
 ) -> Dict[str, float | int]:
     """
     Compute a standard set of performance statistics from a daily equity curve.
@@ -29,6 +30,11 @@ def compute_metrics(
         at least 2 data points and no NaN values.
     risk_free_rate : float
         Annual risk-free rate as a decimal (default 0.0).
+    periods_per_year : int
+        Annualization convention — return periods per year (default 252 for
+        equities; 365 for 24/7 crypto daily data).  Affects CAGR, volatility,
+        Sharpe and Sortino only; it never changes total return, drawdown, or
+        the equity curve.  The default keeps results identical to before.
 
     Returns
     -------
@@ -45,6 +51,8 @@ def compute_metrics(
         raise ValueError(
             f"Equity curve must have at least 2 data points; got {len(equity_curve)}."
         )
+    if periods_per_year <= 0:
+        raise ValueError(f"periods_per_year must be positive; got {periods_per_year}.")
 
     # -----------------------------------------------------------------------
     # Daily returns (first return is NaN → drop it)
@@ -61,18 +69,18 @@ def compute_metrics(
     # -----------------------------------------------------------------------
     n_days = len(equity_curve)  # observations, including the starting day
     n_return_periods = len(daily_returns)
-    n_years = n_return_periods / TRADING_DAYS_PER_YEAR
+    n_years = n_return_periods / periods_per_year
     if n_years > 0 and equity_curve.iloc[0] > 0:
         cagr = float(equity_curve.iloc[-1] / equity_curve.iloc[0]) ** (1.0 / n_years) - 1.0
     else:
         cagr = 0.0
 
     # -----------------------------------------------------------------------
-    # Annualised volatility (std of daily returns × √252)
+    # Annualised volatility (std of daily returns × √periods_per_year)
     # -----------------------------------------------------------------------
     daily_std = float(daily_returns.std())
     volatility = (
-        float(daily_std * np.sqrt(TRADING_DAYS_PER_YEAR))
+        float(daily_std * np.sqrt(periods_per_year))
         if np.isfinite(daily_std)
         else 0.0
     )
@@ -80,12 +88,12 @@ def compute_metrics(
     # -----------------------------------------------------------------------
     # Sharpe ratio  (annualised, risk-free rate subtracted daily)
     # -----------------------------------------------------------------------
-    daily_rf = risk_free_rate / TRADING_DAYS_PER_YEAR
+    daily_rf = risk_free_rate / periods_per_year
     excess_returns = daily_returns - daily_rf
     excess_std = float(excess_returns.std())
 
     if np.isfinite(excess_std) and excess_std > 1e-12:
-        sharpe_ratio = float(excess_returns.mean() / excess_std) * np.sqrt(TRADING_DAYS_PER_YEAR)
+        sharpe_ratio = float(excess_returns.mean() / excess_std) * np.sqrt(periods_per_year)
     else:
         sharpe_ratio = 0.0
 
@@ -96,7 +104,7 @@ def compute_metrics(
     downside_deviation = float(np.sqrt((downside_returns**2).mean()))
     if downside_deviation > 1e-12:
         sortino_ratio = float(excess_returns.mean() / downside_deviation) * np.sqrt(
-            TRADING_DAYS_PER_YEAR
+            periods_per_year
         )
     else:
         sortino_ratio = 0.0

@@ -62,15 +62,19 @@ The benchmark is always buy-and-hold of the primary asset with no transaction co
 
 ## Metrics
 
-### 252-day annualisation is an equity convention
+### Annualization convention is selectable but still simplified
 
-All annualised metrics (CAGR, Sharpe, Sortino, Volatility) use 252 trading days per year. This is standard for US equity markets but incorrect for:
+Single-asset backtests and Strategy Comparison support an **annualization convention** (`annualization_mode`): `trading_days_252` (default, equities/ETFs), `crypto_365` (24/7 crypto daily data), or `auto` (recognized crypto tickers → 365, otherwise 252 with a caveat). The convention rescales **CAGR, Sharpe, Sortino, and volatility** only — it never changes trades, the equity curve, total return, or max drawdown. The default (252) is identical to previous behaviour.
 
-- Cryptocurrencies (365-day markets)
-- Futures calendars
-- Assets in markets with different holiday schedules
+This is still a simplified convention:
 
-Using 252 for crypto assets will understate annual returns and overstate risk metrics compared to a 365-day calculation.
+- It assumes one fixed number of return periods per year; intraday data would require different period assumptions.
+- CAGR uses `periods_per_year` (not exact calendar days) for v1.
+- `auto` detection is a simple ticker heuristic (`-USD` suffix / a known-crypto list); uncertain tickers default to 252 with a warning.
+- Mixed-asset portfolios may need more nuanced calendar handling in future.
+- **Pairs trading, CSV-upload backtests, the SMA research tools (sweep / train-test / walk-forward), and all portfolio analytics still annualise with 252** regardless of asset — only the single-asset Backtest and Strategy Comparison flows honour the selected mode.
+
+Using 252 for crypto assets will understate annual returns and overstate risk metrics compared to a 365-day calculation, which is why `crypto_365` / `auto` exist.
 
 ### Risk-free rate is zero
 

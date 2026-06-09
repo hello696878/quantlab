@@ -140,6 +140,8 @@ const DEFAULT_PAIRS_PARAMS: PairsBacktestRequest = {
 const DEMO_CRYPTO_MOMENTUM_PARAMS: MomentumBacktestRequest = {
   ...DEFAULT_MOMENTUM_PARAMS,
   ticker: "BTC-USD",
+  // 24/7 asset → let auto-detection pick the crypto (365) convention.
+  annualization_mode: "auto",
 };
 
 // ---------------------------------------------------------------------------
@@ -432,6 +434,7 @@ export default function HomePage() {
         type: "simple_bps" as const,
         transaction_cost_bps: s.default_transaction_cost_bps,
       },
+      annualization_mode: s.annualization_convention,
       start_date,
       end_date,
     };
@@ -848,6 +851,19 @@ export default function HomePage() {
                       {result.risk_diagnostics
                         ? ` · ${result.risk_diagnostics.risk_exit_count} exits`
                         : ""}
+                    </span>
+                  )}
+                  {result.periods_per_year && (
+                    <span
+                      className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600"
+                      title={
+                        result.annualization_warning ??
+                        "Annualization convention for Sharpe / Sortino / volatility"
+                      }
+                    >
+                      {result.annualization_mode === "auto"
+                        ? `Auto → ${result.periods_per_year}d`
+                        : `${result.periods_per_year}d/yr`}
                     </span>
                   )}
                   <span className="ml-auto flex items-center gap-2">

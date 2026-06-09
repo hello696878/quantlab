@@ -18,7 +18,7 @@
  *   Volatility Breakout  lookback=20, mult=0.3, exit=10
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   ResponsiveContainer,
   LineChart,
@@ -34,15 +34,18 @@ import {
   CostModelControl,
   PositionSizingControl,
   RiskManagementControl,
+  AnnualizationControl,
   type CostModelControlValue,
   type PositionSizingControlValue,
   type RiskManagementControlValue,
 } from "@/components/SimulationControls";
 import type {
+  AnnualizationMode,
   PositionMode,
   StrategyComparisonRequest,
   StrategyComparisonResponse,
 } from "@/lib/types";
+import { loadSettings } from "@/lib/settings";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 
 // Direction modes; applied to SMA/Momentum/Volatility Breakout, RSI/Bollinger
@@ -92,6 +95,20 @@ const STRATEGY_META: Record<
 };
 
 const BENCHMARK_COLOR = "#8b95ab";
+
+/** UI-only heuristic: does the ticker look like a 24/7 crypto pair? */
+function looksLikeCryptoCmp(ticker: string): boolean {
+  return /-USD$/i.test(ticker.trim());
+}
+
+/** Result-header label for the resolved annualization convention. */
+function annualizationLabel(
+  mode?: string | null,
+  modeUsed?: string | null,
+): string {
+  const used = modeUsed === "crypto_365" ? "Crypto 365" : "Trading days 252";
+  return mode === "auto" ? `Auto → ${used}` : used;
+}
 
 // ---------------------------------------------------------------------------
 // Styling
@@ -357,6 +374,13 @@ export default function StrategyComparisonPanel() {
   const [costCtl, setCostCtl] = useState<CostModelControlValue | null>(null);
   const [sizingCtl, setSizingCtl] = useState<PositionSizingControlValue | null>(null);
   const [riskCtl, setRiskCtl] = useState<RiskManagementControlValue | null>(null);
+  const [annualizationMode, setAnnualizationMode] =
+    useState<AnnualizationMode>("trading_days_252");
+
+  // Seed annualization default from saved settings (client-only, on mount).
+  useEffect(() => {
+    setAnnualizationMode(loadSettings().annualization_convention);
+  }, []);
 
   // Derived numbers — parsed at render time so the input can hold partial strings
   const capital = parseFloat(capitalStr);
@@ -403,6 +427,7 @@ export default function StrategyComparisonPanel() {
         cost_model: costCtl?.costModel,
         position_sizing: sizingCtl?.positionSizing,
         risk_management: riskCtl?.riskManagement,
+        annualization_mode: annualizationMode,
       });
       setResult(data);
     } catch (err) {
@@ -521,6 +546,22 @@ export default function StrategyComparisonPanel() {
           <div>
             <label className={labelCls}>Risk management</label>
             <RiskManagementControl onChange={setRiskCtl} disabled={loading} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Annualization</label>
+            <AnnualizationControl
+              value={annualizationMode}
+              onChange={setAnnualizationMode}
+              disabled={loading}
+            />
+            {looksLikeCryptoCmp(ticker) &&
+              annualizationMode === "trading_days_252" && (
+                <p className="mt-1 text-[11px] text-amber-600">
+                  {ticker.toUpperCase()} trades 24/7; Crypto · 365 may be more
+                  appropriate.
+                </p>
+              )}
           </div>
 
           {/* Direction mode */}
@@ -659,7 +700,21 @@ export default function StrategyComparisonPanel() {
                   {CMP_MODE_LABEL[result.position_mode ?? "long_only"]}
                 </span>
               </p>
+              <p>
+                Annualization:{" "}
+                <span className="font-medium text-slate-700">
+                  {annualizationLabel(
+                    result.annualization_mode,
+                    result.annualization_mode_used,
+                  )}
+                </span>
+              </p>
             </div>
+            {result.annualization_warning && (
+              <p className="mt-2 text-[11px] text-slate-400">
+                {result.annualization_warning}
+              </p>
+            )}
             {result.warnings && result.warnings.length > 0 && (
               <ul className="mt-2 list-disc space-y-0.5 pl-4 text-amber-700">
                 {result.warnings.map((w, i) => (

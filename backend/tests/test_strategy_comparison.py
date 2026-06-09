@@ -296,7 +296,7 @@ def test_comparison_ranking_ties_are_deterministic(monkeypatch):
     """When metrics tie, ranking keeps the fixed strategy order."""
     df = make_df()
 
-    def flat_metrics(_equity):
+    def flat_metrics(_equity, **kwargs):
         return {
             "total_return": 0.0,
             "cagr": 0.0,
