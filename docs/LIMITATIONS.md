@@ -98,6 +98,8 @@ When `step_days < test_window_days`, consecutive test windows overlap. The stitc
 
 The Strategy Comparison tool runs each strategy with fixed demo-friendly default parameters (SMA 20/100, RSI 14 with 35/55 thresholds, Bollinger 20 with 1.8σ, momentum 63, Volatility Breakout 20 with 0.3× range). These defaults are starting points, not recommendations, and may still produce few or zero trades for some assets or periods. A strategy that ranks last with its defaults might rank first with tuned parameters.
 
+Strategy Comparison **does** let you adjust the shared market-simulation assumptions — cost model, position sizing, risk management, and direction mode — which are applied globally to all five strategies. The **strategy-specific** parameters above remain fixed (per-strategy parameter customization is not implemented). Direction modes apply only to SMA Crossover, Momentum, and Volatility Breakout; RSI and Bollinger run long-only and are labelled as unsupported under short modes. Risk exits use the same daily-bar approximation, costs/slippage are simplified, and position sizing does not model margin or financing — none of these are guaranteed to improve performance.
+
 ---
 
 ## Persistence & Portfolio Analytics

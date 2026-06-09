@@ -2248,120 +2248,132 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
 
     results: list = []
     bench_eq = None  # populated on first strategy run; identical for all
+    warnings_global: list = []
 
-    # Demo-friendly defaults — mirror the calibrated single-strategy schema
-    # defaults so the comparison reflects what a first-run user sees.
-    # Direction mode applies only to strategies that support it; RSI and
-    # Bollinger always run long-only.
+    # Direction mode applies only to strategies that support it (SMA, Momentum,
+    # Volatility Breakout); RSI and Bollinger always run long-only.
     cmp_mode = request.position_mode
+
+    # Resolve the shared simulation controls once; they apply to *every* strategy
+    # (signal → mode → risk → sizing → engine), exactly like a single backtest.
+    resolved_cost = (
+        resolve_cost_model(request.cost_model, request.transaction_cost_bps)
+        if request.cost_model is not None
+        else None
+    )
+    effective_cost_bps = (
+        resolved_cost.effective_bps_per_side
+        if resolved_cost is not None
+        else request.transaction_cost_bps
+    )
+    risk_active = is_risk_active(request.risk_management)
+    position_sizing_echo = (
+        resolve_position_sizing(request.position_sizing)
+        if request.position_sizing is not None
+        else None
+    )
+    risk_management_echo = resolve_risk_management(request.risk_management)
+
+    def _run_strategy(raw_position):
+        """Apply risk → sizing → engine to a raw signal (shared assumptions)."""
+        nonlocal bench_eq
+        risk_result = apply_risk_management(raw_position, close, request.risk_management)
+        sized = apply_sizing(risk_result.position, close, request.position_sizing)
+        eq, bench, trades = run_backtest(
+            close=close,
+            position=sized,
+            transaction_cost_bps=effective_cost_bps,
+            initial_capital=request.initial_capital,
+            position_change_reasons=(risk_result.exit_reasons if risk_active else None),
+        )
+        if bench_eq is None:
+            bench_eq = bench
+        risk_exits = sum(risk_result.counts.values()) if risk_active else None
+        return eq, trades, round(average_exposure(sized), 6), risk_exits
+
+    def _item(strategy, display_name, params, eq, trades, avg_exp, risk_exits,
+              mode_used, unsupported):
+        item_warnings = []
+        if "position_mode" in unsupported:
+            item_warnings.append("Does not support short modes — ran long-only.")
+        return StrategyResultItem(
+            strategy=strategy,
+            display_name=display_name,
+            params=params,
+            position_mode=mode_used,
+            metrics=PerformanceMetrics(**compute_metrics(eq)),
+            equity_curve=_curve(eq, bench_eq),
+            num_trades=len(trades),
+            average_exposure=avg_exp,
+            risk_exit_count=risk_exits,
+            effective_cost_bps=effective_cost_bps,
+            unsupported_features=unsupported,
+            warnings=item_warnings,
+        )
+
+    mode_unsupported = ["position_mode"] if cmp_mode != "long_only" else []
 
     # ── 1. SMA Crossover (fast=20, slow=100) ─────────────────────────────
     sma_pos = sma_crossover_signals(
         close, fast_window=20, slow_window=100, position_mode=cmp_mode
     )
-    sma_eq, bench_eq, sma_trades = run_backtest(
-        close=close,
-        position=sma_pos,
-        transaction_cost_bps=request.transaction_cost_bps,
-        initial_capital=request.initial_capital,
-    )
-    results.append(StrategyResultItem(
-        strategy="sma_crossover",
-        display_name="SMA Crossover",
-        params={"fast_window": 20, "slow_window": 100},
-        position_mode=cmp_mode,
-        metrics=PerformanceMetrics(**compute_metrics(sma_eq)),
-        equity_curve=_curve(sma_eq, bench_eq),
-        num_trades=len(sma_trades),
+    sma_eq, sma_trades, sma_exp, sma_risk = _run_strategy(sma_pos)
+    results.append(_item(
+        "sma_crossover", "SMA Crossover", {"fast_window": 20, "slow_window": 100},
+        sma_eq, sma_trades, sma_exp, sma_risk, cmp_mode, [],
     ))
 
-    # ── 2. RSI Mean Reversion (window=14, oversold=35, exit=55) ──────────
+    # ── 2. RSI Mean Reversion (window=14, oversold=35, exit=55) — long-only ──
     rsi_pos = rsi_mean_reversion_signals(
         close, rsi_window=14, oversold_threshold=35.0, exit_threshold=55.0
     )
-    rsi_eq, _, rsi_trades = run_backtest(
-        close=close,
-        position=rsi_pos,
-        transaction_cost_bps=request.transaction_cost_bps,
-        initial_capital=request.initial_capital,
-    )
-    results.append(StrategyResultItem(
-        strategy="rsi_mean_reversion",
-        display_name="RSI Mean Reversion",
-        params={"rsi_window": 14, "oversold_threshold": 35.0, "exit_threshold": 55.0},
-        position_mode="long_only",  # mean-reversion: long-only only
-        metrics=PerformanceMetrics(**compute_metrics(rsi_eq)),
-        equity_curve=_curve(rsi_eq, bench_eq),
-        num_trades=len(rsi_trades),
+    rsi_eq, rsi_trades, rsi_exp, rsi_risk = _run_strategy(rsi_pos)
+    results.append(_item(
+        "rsi_mean_reversion", "RSI Mean Reversion",
+        {"rsi_window": 14, "oversold_threshold": 35.0, "exit_threshold": 55.0},
+        rsi_eq, rsi_trades, rsi_exp, rsi_risk, "long_only", mode_unsupported,
     ))
 
-    # ── 3. Bollinger Band (window=20, 1.8σ, exit=middle) ─────────────────
+    # ── 3. Bollinger Band (window=20, 1.8σ, exit=middle) — long-only ─────
     bb_pos = bollinger_band_signals(
         close, bb_window=20, num_std=1.8, exit_band="middle"
     )
-    bb_eq, _, bb_trades = run_backtest(
-        close=close,
-        position=bb_pos,
-        transaction_cost_bps=request.transaction_cost_bps,
-        initial_capital=request.initial_capital,
-    )
-    results.append(StrategyResultItem(
-        strategy="bollinger_band",
-        display_name="Bollinger Band",
-        params={"bb_window": 20, "num_std": 1.8, "exit_band": "middle"},
-        position_mode="long_only",  # mean-reversion: long-only only
-        metrics=PerformanceMetrics(**compute_metrics(bb_eq)),
-        equity_curve=_curve(bb_eq, bench_eq),
-        num_trades=len(bb_trades),
+    bb_eq, bb_trades, bb_exp, bb_risk = _run_strategy(bb_pos)
+    results.append(_item(
+        "bollinger_band", "Bollinger Band",
+        {"bb_window": 20, "num_std": 1.8, "exit_band": "middle"},
+        bb_eq, bb_trades, bb_exp, bb_risk, "long_only", mode_unsupported,
     ))
 
     # ── 4. Momentum (window=63, entry=0, exit=0) ──────────────────────────
     mom_pos = momentum_signals(
-        close,
-        momentum_window=63,
-        entry_threshold=0.0,
-        exit_threshold=0.0,
+        close, momentum_window=63, entry_threshold=0.0, exit_threshold=0.0,
         position_mode=cmp_mode,
     )
-    mom_eq, _, mom_trades = run_backtest(
-        close=close,
-        position=mom_pos,
-        transaction_cost_bps=request.transaction_cost_bps,
-        initial_capital=request.initial_capital,
-    )
-    results.append(StrategyResultItem(
-        strategy="momentum",
-        display_name="Momentum",
-        params={"momentum_window": 63, "entry_threshold": 0.0, "exit_threshold": 0.0},
-        position_mode=cmp_mode,
-        metrics=PerformanceMetrics(**compute_metrics(mom_eq)),
-        equity_curve=_curve(mom_eq, bench_eq),
-        num_trades=len(mom_trades),
+    mom_eq, mom_trades, mom_exp, mom_risk = _run_strategy(mom_pos)
+    results.append(_item(
+        "momentum", "Momentum",
+        {"momentum_window": 63, "entry_threshold": 0.0, "exit_threshold": 0.0},
+        mom_eq, mom_trades, mom_exp, mom_risk, cmp_mode, [],
     ))
 
     # ── 5. Volatility Breakout (lookback=20, mult=0.3, exit=10) ──────────
     vb_pos = volatility_breakout_signals(
-        close,
-        lookback_window=20,
-        breakout_multiplier=0.3,
-        exit_window=10,
+        close, lookback_window=20, breakout_multiplier=0.3, exit_window=10,
         position_mode=cmp_mode,
     )
-    vb_eq, _, vb_trades = run_backtest(
-        close=close,
-        position=vb_pos,
-        transaction_cost_bps=request.transaction_cost_bps,
-        initial_capital=request.initial_capital,
-    )
-    results.append(StrategyResultItem(
-        strategy="volatility_breakout",
-        display_name="Volatility Breakout",
-        params={"lookback_window": 20, "breakout_multiplier": 0.3, "exit_window": 10},
-        position_mode=cmp_mode,
-        metrics=PerformanceMetrics(**compute_metrics(vb_eq)),
-        equity_curve=_curve(vb_eq, bench_eq),
-        num_trades=len(vb_trades),
+    vb_eq, vb_trades, vb_exp, vb_risk = _run_strategy(vb_pos)
+    results.append(_item(
+        "volatility_breakout", "Volatility Breakout",
+        {"lookback_window": 20, "breakout_multiplier": 0.3, "exit_window": 10},
+        vb_eq, vb_trades, vb_exp, vb_risk, cmp_mode, [],
     ))
+
+    if cmp_mode != "long_only":
+        warnings_global.append(
+            "RSI Mean Reversion and Bollinger Band do not support short modes "
+            "and ran long-only."
+        )
 
     # ── Benchmark metrics + curve ─────────────────────────────────────────
     bench_m = compute_metrics(bench_eq)
@@ -2398,8 +2410,13 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         start_date=request.start_date,
         end_date=request.end_date,
         initial_capital=request.initial_capital,
-        transaction_cost_bps=request.transaction_cost_bps,
+        transaction_cost_bps=effective_cost_bps,
         position_mode=request.position_mode,
+        cost_model=resolved_cost,
+        effective_cost_bps=effective_cost_bps,
+        position_sizing=position_sizing_echo,
+        risk_management=risk_management_echo,
+        warnings=warnings_global,
         strategies=results,
         benchmark=bench_curve,
         benchmark_metrics=PerformanceMetrics(**bench_m),

@@ -422,13 +422,16 @@ def test_comparison_all_strategies_use_same_cost_and_capital(monkeypatch):
     calls = []
     original = main_module.run_backtest
 
-    def recording_run_backtest(*, close, position, transaction_cost_bps, initial_capital):
+    def recording_run_backtest(
+        *, close, position, transaction_cost_bps, initial_capital, **kwargs
+    ):
         calls.append((transaction_cost_bps, initial_capital, len(close)))
         return original(
             close=close,
             position=position,
             transaction_cost_bps=transaction_cost_bps,
             initial_capital=initial_capital,
+            **kwargs,
         )
 
     monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: df)
@@ -563,4 +566,138 @@ def test_comparison_start_after_end_returns_422(monkeypatch):
         json={**_BASE_PAYLOAD, "start_date": "2023-01-01", "end_date": "2015-01-01"},
     )
 
+    assert resp.status_code == 422
+
+
+# ---------------------------------------------------------------------------
+# Phase 12.3.1 — shared simulation controls (cost / sizing / risk)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def cmp_client(monkeypatch):
+    monkeypatch.setattr(main_module, "_fetch", lambda t, s, e: make_df())
+    return TestClient(main_module.app)
+
+
+def _cmp(client, **overrides):
+    return client.post(
+        "/research/strategy-comparison", json={**_BASE_PAYLOAD, **overrides}
+    ).json()
+
+
+def test_comparison_old_request_still_works(cmp_client):
+    body = _cmp(cmp_client)
+    assert len(body["strategies"]) == 5
+    assert body["effective_cost_bps"] == 10.0
+    assert body["cost_model"] is None
+    assert body["position_sizing"] is None
+    assert body["risk_management"] is None
+
+
+def test_comparison_simple_bps_cost_model(cmp_client):
+    body = _cmp(cmp_client, cost_model={"type": "simple_bps", "transaction_cost_bps": 15})
+    assert body["cost_model"]["type"] == "simple_bps"
+    assert body["effective_cost_bps"] == 15.0
+    assert all(s["effective_cost_bps"] == 15.0 for s in body["strategies"])
+
+
+def test_comparison_commission_slippage_cost_model(cmp_client):
+    body = _cmp(
+        cmp_client,
+        cost_model={"type": "commission_slippage", "commission_bps": 5, "slippage_bps": 5, "spread_bps": 2},
+    )
+    assert body["effective_cost_bps"] == 12.0
+    assert body["transaction_cost_bps"] == 12.0
+
+
+def test_comparison_conservative_cost_model(cmp_client):
+    body = _cmp(cmp_client, cost_model={"type": "conservative"})
+    assert body["effective_cost_bps"] == 25.0
+
+
+def test_comparison_higher_cost_reduces_return(cmp_client):
+    cheap = _cmp(cmp_client, cost_model={"type": "simple_bps", "transaction_cost_bps": 0})
+    pricey = _cmp(cmp_client, cost_model={"type": "conservative"})
+
+    def sma_return(body):
+        s = next(x for x in body["strategies"] if x["strategy"] == "sma_crossover")
+        return s["metrics"]["total_return"]
+
+    assert sma_return(pricey) <= sma_return(cheap) + 1e-9
+
+
+def test_comparison_fixed_fraction_position_sizing(cmp_client):
+    full = _cmp(cmp_client)
+    half = _cmp(cmp_client, position_sizing={"type": "fixed_fraction", "fraction": 0.5})
+    assert half["position_sizing"]["type"] == "fixed_fraction"
+    for f, h in zip(full["strategies"], half["strategies"]):
+        if f["average_exposure"] and f["average_exposure"] > 0:
+            assert h["average_exposure"] == pytest.approx(f["average_exposure"] * 0.5, rel=1e-6)
+
+
+def test_comparison_volatility_target_position_sizing(cmp_client):
+    body = _cmp(
+        cmp_client,
+        position_sizing={"type": "volatility_target", "target_volatility": 0.1, "lookback_days": 20},
+    )
+    assert body["position_sizing"]["type"] == "volatility_target"
+    assert all(s["average_exposure"] <= 1.0 + 1e-9 for s in body["strategies"])
+
+
+def test_comparison_risk_none_preserves_behavior(cmp_client):
+    a = _cmp(cmp_client)
+    b = _cmp(cmp_client, risk_management={"type": "none"})
+    for x, y in zip(a["strategies"], b["strategies"]):
+        assert x["equity_curve"] == y["equity_curve"]
+    assert b["risk_management"] is None
+
+
+def test_comparison_stop_take_profit_risk(cmp_client):
+    body = _cmp(
+        cmp_client,
+        risk_management={"type": "fixed_stop_take_profit", "stop_loss_pct": 0.05, "take_profit_pct": 0.1},
+    )
+    assert body["risk_management"]["type"] == "fixed_stop_take_profit"
+    assert all(s["risk_exit_count"] is not None for s in body["strategies"])
+
+
+def test_comparison_trailing_and_max_holding_risk(cmp_client):
+    t = _cmp(cmp_client, risk_management={"type": "trailing_stop", "trailing_stop_pct": 0.08})
+    assert t["risk_management"]["type"] == "trailing_stop"
+    m = _cmp(cmp_client, risk_management={"type": "max_holding_days", "max_holding_days": 15})
+    assert m["risk_management"]["type"] == "max_holding_days"
+
+
+@pytest.mark.parametrize("mode", ["short_only", "long_short"])
+def test_comparison_short_mode_marks_unsupported_strategies(cmp_client, mode):
+    body = _cmp(cmp_client, position_mode=mode)
+    by_id = {s["strategy"]: s for s in body["strategies"]}
+    # Mean-reversion strategies cannot short: marked unsupported + ran long-only.
+    for sid in ("rsi_mean_reversion", "bollinger_band"):
+        assert by_id[sid]["position_mode"] == "long_only"
+        assert "position_mode" in by_id[sid]["unsupported_features"]
+        assert by_id[sid]["warnings"]
+    # Mode-capable strategies are not flagged.
+    assert by_id["sma_crossover"]["unsupported_features"] == []
+    assert body["warnings"]  # comparison-level note present
+
+
+def test_comparison_all_five_strategies_always_present(cmp_client):
+    body = _cmp(
+        cmp_client,
+        cost_model={"type": "conservative"},
+        position_sizing={"type": "fixed_fraction", "fraction": 0.3},
+        risk_management={"type": "combined", "stop_loss_pct": 0.05, "max_holding_days": 10},
+        position_mode="long_short",
+    )
+    ids = {s["strategy"] for s in body["strategies"]}
+    assert ids == EXPECTED_STRATEGY_IDS  # zero-trade / unsupported never dropped
+
+
+def test_comparison_invalid_cost_model_rejected(cmp_client):
+    resp = cmp_client.post(
+        "/research/strategy-comparison",
+        json={**_BASE_PAYLOAD, "cost_model": {"type": "commission_slippage", "commission_bps": -1}},
+    )
     assert resp.status_code == 422

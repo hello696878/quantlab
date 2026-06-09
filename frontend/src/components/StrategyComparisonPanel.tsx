@@ -30,6 +30,14 @@ import {
   Legend,
 } from "recharts";
 import { BacktestApiError, runStrategyComparison } from "@/lib/api";
+import {
+  CostModelControl,
+  PositionSizingControl,
+  RiskManagementControl,
+  type CostModelControlValue,
+  type PositionSizingControlValue,
+  type RiskManagementControlValue,
+} from "@/components/SimulationControls";
 import type {
   PositionMode,
   StrategyComparisonRequest,
@@ -247,6 +255,8 @@ interface TableRowProps {
   color: string;
   /** True when the comparison ran in a short mode but this strategy stayed long-only. */
   longOnlyNote?: boolean;
+  /** Risk-management exits for this strategy (null/undefined when risk inactive). */
+  riskExits?: number | null;
 }
 
 function ComparisonTableRow({
@@ -256,6 +266,7 @@ function ComparisonTableRow({
   isBest,
   color,
   longOnlyNote = false,
+  riskExits = null,
 }: TableRowProps) {
   return (
     <tr
@@ -281,7 +292,16 @@ function ComparisonTableRow({
                        text-[10px] font-medium uppercase tracking-wide text-slate-400"
             title="This strategy does not support short modes and ran long-only."
           >
-            long-only
+            unsupported mode · long-only
+          </span>
+        )}
+        {typeof riskExits === "number" && riskExits > 0 && (
+          <span
+            className="ml-2 inline-block align-middle rounded-full bg-amber-100 px-2 py-0.5
+                       text-[10px] font-medium uppercase tracking-wide text-amber-700"
+            title="Number of risk-management exits (stop / take / trailing / max holding)."
+          >
+            {riskExits} risk exits
           </span>
         )}
       </td>
@@ -332,12 +352,16 @@ export default function StrategyComparisonPanel() {
   const [startDate, setStartDate] = useState(DEFAULT_PARAMS.start_date);
   const [endDate, setEndDate] = useState(DEFAULT_PARAMS.end_date);
   const [capitalStr, setCapitalStr] = useState(String(DEFAULT_PARAMS.initial_capital));
-  const [costBpsStr, setCostBpsStr] = useState(String(DEFAULT_PARAMS.transaction_cost_bps));
   const [positionMode, setPositionMode] = useState<PositionMode>("long_only");
+
+  // Global simulation controls — self-managed string state; each emits its
+  // resolved config + validity (no parseFloat||default in any input onChange).
+  const [costCtl, setCostCtl] = useState<CostModelControlValue | null>(null);
+  const [sizingCtl, setSizingCtl] = useState<PositionSizingControlValue | null>(null);
+  const [riskCtl, setRiskCtl] = useState<RiskManagementControlValue | null>(null);
 
   // Derived numbers — parsed at render time so the input can hold partial strings
   const capital = parseFloat(capitalStr);
-  const costBps = parseFloat(costBpsStr);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -345,22 +369,23 @@ export default function StrategyComparisonPanel() {
 
   // ── Validation ────────────────────────────────────────────────────────
   const datesOk = startDate < endDate;
-  const moneyOk = !isNaN(costBps) && costBps >= 0 && costBps < 10_000 && !isNaN(capital) && capital > 0;
-  const formInvalid = !ticker.trim() || !datesOk || !moneyOk || loading;
+  const moneyOk = !isNaN(capital) && capital > 0;
+  const controlsOk = !!costCtl?.valid && !!sizingCtl?.valid && !!riskCtl?.valid;
+  const formInvalid =
+    !ticker.trim() || !datesOk || !moneyOk || !controlsOk || loading;
 
   let validationMsg: string | null = null;
   if (!ticker.trim()) {
     validationMsg = "Ticker is required.";
   } else if (startDate >= endDate) {
     validationMsg = "Start date must be before end date.";
-  } else if (isNaN(costBps)) {
-    validationMsg = "Transaction cost must be a valid number (≥ 0 bps).";
-  } else if (costBps < 0 || costBps >= 10_000) {
-    validationMsg = "Transaction cost must be between 0 and 9,999 bps.";
   } else if (isNaN(capital)) {
     validationMsg = "Initial capital must be a valid number (> 0).";
   } else if (capital <= 0) {
     validationMsg = "Initial capital must be greater than 0.";
+  } else if (!controlsOk) {
+    validationMsg =
+      "Check the simulation settings (cost / position sizing / risk values).";
   }
 
   // ── Submit ────────────────────────────────────────────────────────────
@@ -375,8 +400,11 @@ export default function StrategyComparisonPanel() {
         start_date: startDate,
         end_date: endDate,
         initial_capital: capital,
-        transaction_cost_bps: costBps,
+        transaction_cost_bps: costCtl?.transactionCostBps ?? 10,
         position_mode: positionMode,
+        cost_model: costCtl?.costModel,
+        position_sizing: sizingCtl?.positionSizing,
+        risk_management: riskCtl?.riskManagement,
       });
       setResult(data);
     } catch (err) {
@@ -455,21 +483,8 @@ export default function StrategyComparisonPanel() {
           </div>
         </div>
 
-        {/* Cost + Capital */}
+        {/* Capital */}
         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <div>
-            <label className={labelCls}>Transaction Cost (bps, one-way)</label>
-            <input
-              type="number"
-              className={inputCls}
-              value={costBpsStr}
-              min={0}
-              max={9999}
-              step={1}
-              onChange={(e) => setCostBpsStr(e.target.value)}
-              disabled={loading}
-            />
-          </div>
           <div>
             <label className={labelCls}>Initial Capital ($)</label>
             <input
@@ -484,48 +499,72 @@ export default function StrategyComparisonPanel() {
           </div>
         </div>
 
-        {/* Fixed-params note */}
+        {/* ── Simulation Settings (applied globally to all five strategies) ── */}
+        <div className="rounded-xl border border-slate-200 p-4 space-y-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Simulation Settings
+          </p>
+
+          <div>
+            <label className={labelCls}>Cost model</label>
+            <CostModelControl onChange={setCostCtl} disabled={loading} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Position sizing</label>
+            <PositionSizingControl onChange={setSizingCtl} disabled={loading} />
+          </div>
+
+          <div>
+            <label className={labelCls}>Risk management</label>
+            <RiskManagementControl onChange={setRiskCtl} disabled={loading} />
+          </div>
+
+          {/* Direction mode */}
+          <div>
+            <label className={labelCls}>Direction</label>
+            <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+              {CMP_MODE_OPTIONS.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setPositionMode(o.id)}
+                  className={
+                    "px-3 py-1.5 text-xs font-medium transition-colors " +
+                    (positionMode === o.id
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-slate-600 hover:bg-blue-50")
+                  }
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            <p className="mt-1.5 text-[11px] text-slate-400">
+              Applies to SMA, Momentum, and Volatility Breakout. RSI and Bollinger
+              stay long-only. Long/short is not guaranteed to improve performance —
+              it is useful for studying bearish signal quality.
+            </p>
+            {positionMode !== "long_only" && <ShortSellingWarning className="mt-2" />}
+          </div>
+        </div>
+
+        {/* Default strategy parameters note */}
         <div className="rounded-lg bg-slate-50 border border-slate-200 p-3 text-xs text-slate-500 space-y-0.5">
-          <p className="font-medium text-slate-600">Fixed default parameters</p>
+          <p className="font-medium text-slate-600">
+            Strategy Comparison uses each strategy&apos;s default parameters
+          </p>
           <p>SMA Crossover — fast=20, slow=100</p>
           <p>RSI Mean Reversion — window=14, oversold=35, exit=55</p>
           <p>Bollinger Band — window=20, 1.8σ, exit=middle band</p>
           <p>Momentum — window=63, entry/exit threshold=0</p>
           <p>Volatility Breakout — lookback=20, multiplier=0.3×, exit=10-day mean</p>
           <p className="pt-1 text-slate-400">
-            Strategy Comparison uses signal-based exits only in this version — no
-            cost model, position sizing, or risk-management rules are applied.
-            Configure those on the single-asset Backtest tab.
+            Strategy-specific parameters are fixed; the simulation settings above
+            (cost model, position sizing, risk management, direction) are applied
+            globally to every strategy.
           </p>
-        </div>
-
-        {/* Direction mode */}
-        <div>
-          <label className={labelCls}>Direction</label>
-          <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
-            {CMP_MODE_OPTIONS.map((o) => (
-              <button
-                key={o.id}
-                type="button"
-                disabled={loading}
-                onClick={() => setPositionMode(o.id)}
-                className={
-                  "px-3 py-1.5 text-xs font-medium transition-colors " +
-                  (positionMode === o.id
-                    ? "bg-blue-600 text-white"
-                    : "bg-white text-slate-600 hover:bg-blue-50")
-                }
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
-          <p className="mt-1.5 text-[11px] text-slate-400">
-            Applies to SMA, Momentum, and Volatility Breakout. RSI and Bollinger
-            stay long-only. Long/short is not guaranteed to improve performance —
-            it is useful for studying bearish signal quality.
-          </p>
-          {positionMode !== "long_only" && <ShortSellingWarning className="mt-2" />}
         </div>
 
         {validationMsg && (
@@ -585,9 +624,50 @@ export default function StrategyComparisonPanel() {
               {CMP_MODE_LABEL[result.position_mode ?? "long_only"]}
             </span>
             <span className="ml-auto text-xs text-slate-400">
-              {result.transaction_cost_bps} bps · $
+              {result.effective_cost_bps ?? result.transaction_cost_bps} bps · $
               {result.initial_capital.toLocaleString()}
             </span>
+          </div>
+
+          {/* Applied simulation assumptions */}
+          <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-600">
+            <p className="mb-1 font-medium uppercase tracking-wide text-slate-400">
+              Simulation settings applied to all strategies
+            </p>
+            <div className="grid grid-cols-1 gap-x-6 gap-y-0.5 sm:grid-cols-2">
+              <p>
+                Cost model:{" "}
+                <span className="font-medium text-slate-700">
+                  {result.cost_model?.label ??
+                    `Simple ${result.effective_cost_bps ?? result.transaction_cost_bps} bps`}
+                </span>
+              </p>
+              <p>
+                Position sizing:{" "}
+                <span className="font-medium text-slate-700">
+                  {result.position_sizing?.label ?? "Full allocation"}
+                </span>
+              </p>
+              <p>
+                Risk management:{" "}
+                <span className="font-medium text-slate-700">
+                  {result.risk_management?.label ?? "Signal-based exits only"}
+                </span>
+              </p>
+              <p>
+                Direction:{" "}
+                <span className="font-medium text-slate-700">
+                  {CMP_MODE_LABEL[result.position_mode ?? "long_only"]}
+                </span>
+              </p>
+            </div>
+            {result.warnings && result.warnings.length > 0 && (
+              <ul className="mt-2 list-disc space-y-0.5 pl-4 text-amber-700">
+                {result.warnings.map((w, i) => (
+                  <li key={i}>{w}</li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {(result.position_mode === "short_only" ||
@@ -676,9 +756,11 @@ export default function StrategyComparisonPanel() {
                       isBest={s.display_name === result.ranking.best_by_sharpe}
                       color={STRATEGY_META[s.strategy]?.color ?? "#64748b"}
                       longOnlyNote={
-                        result.position_mode !== "long_only" &&
-                        (s.position_mode ?? "long_only") === "long_only"
+                        (s.unsupported_features ?? []).includes("position_mode") ||
+                        (result.position_mode !== "long_only" &&
+                          (s.position_mode ?? "long_only") === "long_only")
                       }
+                      riskExits={s.risk_exit_count}
                     />
                   ))}
                   {/* Benchmark row */}

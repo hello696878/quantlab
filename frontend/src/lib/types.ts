@@ -527,6 +527,9 @@ export interface StrategyComparisonRequest {
   initial_capital: number;
   transaction_cost_bps: number;
   position_mode?: PositionMode;
+  cost_model?: CostModel;
+  position_sizing?: PositionSizing;
+  risk_management?: RiskManagement;
 }
 
 export interface StrategyResultItem {
@@ -538,6 +541,11 @@ export interface StrategyResultItem {
   metrics: PerformanceMetrics;
   equity_curve: EquityPoint[];
   num_trades: number;
+  average_exposure?: number | null;
+  risk_exit_count?: number | null;
+  effective_cost_bps?: number | null;
+  unsupported_features?: string[];
+  warnings?: string[];
 }
 
 export interface StrategyComparisonRanking {
@@ -555,6 +563,11 @@ export interface StrategyComparisonResponse {
   transaction_cost_bps: number;
   /** Direction mode requested for the comparison (defaults to long_only). */
   position_mode?: PositionMode;
+  cost_model?: CostModelResolved | null;
+  effective_cost_bps?: number | null;
+  position_sizing?: PositionSizingResolved | null;
+  risk_management?: RiskManagementResolved | null;
+  warnings?: string[];
   strategies: StrategyResultItem[];
   /** Buy-and-hold equity curve — strategy and benchmark fields both carry the benchmark value. */
   benchmark: EquityPoint[];

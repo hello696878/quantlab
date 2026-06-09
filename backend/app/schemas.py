@@ -1404,6 +1404,9 @@ class StrategyComparisonRequest(BaseModel):
             "regardless.  Defaults to 'long_only'."
         ),
     )
+    cost_model: Optional[CostModel] = _COST_MODEL_FIELD
+    position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
+    risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
 
     @model_validator(mode="after")
     def check_dates(self) -> "StrategyComparisonRequest":
@@ -1438,6 +1441,26 @@ class StrategyResultItem(BaseModel):
     metrics: PerformanceMetrics = Field(description="Performance metrics over the full period.")
     equity_curve: List[EquityPoint] = Field(description="Daily portfolio value.")
     num_trades: int = Field(description="Number of trade events.")
+    average_exposure: Optional[float] = Field(
+        default=None,
+        description="Mean absolute exposure (|position|) after position sizing.",
+    )
+    risk_exit_count: Optional[int] = Field(
+        default=None,
+        description="Number of risk-management exits (present only when risk rules are active).",
+    )
+    effective_cost_bps: Optional[float] = Field(
+        default=None,
+        description="Effective per-side cost in bps applied to this strategy.",
+    )
+    unsupported_features: List[str] = Field(
+        default_factory=list,
+        description="Selected simulation features this strategy could not apply (e.g. 'position_mode').",
+    )
+    warnings: List[str] = Field(
+        default_factory=list,
+        description="Human-readable notes for this strategy row (e.g. 'ran long-only').",
+    )
 
 
 class StrategyComparisonRanking(BaseModel):
@@ -1467,10 +1490,32 @@ class StrategyComparisonResponse(BaseModel):
     start_date: str
     end_date: str
     initial_capital: float
-    transaction_cost_bps: float
+    transaction_cost_bps: float = Field(
+        description="Effective per-side cost in bps applied to all strategies.",
+    )
     position_mode: str = Field(
         default="long_only",
         description="Direction mode requested for the comparison.",
+    )
+    cost_model: Optional[CostModelResolved] = Field(
+        default=None,
+        description="Resolved cost model echo (present only when a cost_model was supplied).",
+    )
+    effective_cost_bps: Optional[float] = Field(
+        default=None,
+        description="Effective per-side cost in bps applied to all strategies.",
+    )
+    position_sizing: Optional[PositionSizingResolved] = Field(
+        default=None,
+        description="Resolved position-sizing echo (present only when supplied).",
+    )
+    risk_management: Optional[RiskManagementResolved] = Field(
+        default=None,
+        description="Resolved risk-management echo (present only when risk rules are active).",
+    )
+    warnings: List[str] = Field(
+        default_factory=list,
+        description="Comparison-level notes (e.g. strategies that could not apply a mode).",
     )
 
     strategies: List[StrategyResultItem] = Field(
