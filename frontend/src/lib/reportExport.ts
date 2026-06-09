@@ -677,6 +677,12 @@ export function buildBacktestReport(
   if (typeof r.cost_drag_return === "number") {
     metaRows.push(["Cost drag (return)", formatPercent(r.cost_drag_return)]);
   }
+  if (r.position_sizing) {
+    metaRows.push(["Position sizing", r.position_sizing.label]);
+  }
+  if (typeof r.average_exposure === "number") {
+    metaRows.push(["Average exposure", formatPercent(r.average_exposure)]);
+  }
   if (r.position_mode) {
     metaRows.push(["Direction", modeLabels[r.position_mode] ?? r.position_mode]);
   }

@@ -48,6 +48,11 @@ from app.backtest import (
     run_pairs_backtest,
 )
 from app.cost_model import resolve as resolve_cost_model
+from app.position_sizing import (
+    apply_sizing,
+    average_exposure,
+    resolve as resolve_position_sizing,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -95,6 +100,7 @@ from app.schemas import (
     BacktestResponse,
     BbBacktestRequest,
     CostModel,
+    PositionSizing,
     CustomStrategyRequest,
     CustomStrategyTemplateCreate,
     CustomStrategyTemplateExport,
@@ -262,6 +268,7 @@ def _build_response(
     vb_exit_window=None,
     position_mode: str = "long_only",
     cost_model: Optional[CostModel] = None,
+    position_sizing: Optional[PositionSizing] = None,
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response.
 
@@ -269,6 +276,10 @@ def _build_response(
     bps value that feeds the engine and is reported as ``transaction_cost_bps``;
     the resolved breakdown is echoed on ``cost_model``.  With no ``cost_model``
     the behaviour is identical to before (``transaction_cost_bps`` is used).
+
+    When ``position_sizing`` is supplied the position magnitude is scaled
+    (signal timing / direction unchanged) before the engine runs; with no
+    sizing (``full``) the position is used as-is.
     """
     cost_model_echo = None
     effective_cost_bps = transaction_cost_bps
@@ -277,16 +288,23 @@ def _build_response(
         effective_cost_bps = resolved.effective_bps_per_side
         cost_model_echo = resolved
 
+    # Position sizing scales exposure magnitude only.  Full / None is identity.
+    sized_position = apply_sizing(position, close, position_sizing)
+    position_sizing_echo = (
+        resolve_position_sizing(position_sizing) if position_sizing is not None else None
+    )
+    avg_exposure = average_exposure(sized_position)
+
     strategy_equity, benchmark_equity, trades = run_backtest(
         close=close,
-        position=position,
+        position=sized_position,
         transaction_cost_bps=effective_cost_bps,
         initial_capital=initial_capital,
     )
 
     strategy_metrics_dict = compute_metrics(strategy_equity)
     benchmark_metrics_dict = compute_metrics(benchmark_equity)
-    diagnostics = compute_position_diagnostics(close, position, trades)
+    diagnostics = compute_position_diagnostics(close, sized_position, trades)
 
     # Cost transparency: total dollar cost paid, and the return given up to costs
     # (gross-of-cost minus net) via a cost-free run of the *same* position series.
@@ -295,7 +313,7 @@ def _build_response(
     )
     gross_equity, _gross_bench, _gross_trades = run_backtest(
         close=close,
-        position=position,
+        position=sized_position,
         transaction_cost_bps=0.0,
         initial_capital=initial_capital,
     )
@@ -338,6 +356,8 @@ def _build_response(
         effective_cost_bps=effective_cost_bps,
         total_transaction_cost=total_transaction_cost,
         cost_drag_return=cost_drag_return,
+        position_sizing=position_sizing_echo,
+        average_exposure=avg_exposure,
         position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
@@ -488,6 +508,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         position=position,
         strategy="sma_crossover",
         cost_model=request.cost_model,
+        position_sizing=request.position_sizing,
         fast_window=request.fast_window,
         slow_window=request.slow_window,
         position_mode=request.position_mode,
@@ -540,6 +561,7 @@ def backtest_rsi_mean_reversion(request: RsiBacktestRequest) -> BacktestResponse
         position=position,
         strategy="rsi_mean_reversion",
         cost_model=request.cost_model,
+        position_sizing=request.position_sizing,
         rsi_window=request.rsi_window,
         oversold_threshold=request.oversold_threshold,
         exit_threshold=request.exit_threshold,
@@ -593,6 +615,7 @@ def backtest_bollinger_band(request: BbBacktestRequest) -> BacktestResponse:
         position=position,
         strategy="bollinger_band",
         cost_model=request.cost_model,
+        position_sizing=request.position_sizing,
         bb_window=request.bb_window,
         bb_num_std=request.num_std,
         bb_exit_band=request.exit_band,
@@ -649,6 +672,7 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         position=position,
         strategy="momentum",
         cost_model=request.cost_model,
+        position_sizing=request.position_sizing,
         momentum_window=request.momentum_window,
         momentum_entry_threshold=request.entry_threshold,
         momentum_exit_threshold=request.exit_threshold,
@@ -705,6 +729,7 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         position=position,
         strategy="volatility_breakout",
         cost_model=request.cost_model,
+        position_sizing=request.position_sizing,
         vb_lookback_window=request.lookback_window,
         vb_breakout_multiplier=request.breakout_multiplier,
         vb_exit_window=request.exit_window,

@@ -103,6 +103,79 @@ _COST_MODEL_FIELD = Field(
 )
 
 
+# ---------------------------------------------------------------------------
+# Position sizing (research v1)
+# ---------------------------------------------------------------------------
+
+# Position sizing scales the *magnitude* of a strategy's position after signals
+# are generated — it never changes signal timing or direction.  All modes keep
+# |exposure| ≤ 1 (no leverage by default).
+PositionSizingType = Literal[
+    "full", "fixed_fraction", "volatility_target", "max_exposure"
+]
+
+
+class PositionSizing(BaseModel):
+    """
+    Optional position-sizing model for a single-asset backtest.
+
+    * ``full``               — full allocation (default; ±100% on a signal,
+      identical to the original behaviour).
+    * ``fixed_fraction``     — allocate a fixed ``fraction`` (0–1) of capital on
+      each signal; the rest stays in cash.
+    * ``volatility_target``  — scale exposure toward an annualized
+      ``target_volatility`` using a rolling realized-vol estimate
+      (``vol_lookback`` days, default 20).  Capped at 100% — it only
+      de-levers in high-vol regimes (no leverage).
+    * ``max_exposure``       — cash reserve: cap ``|exposure|`` at
+      ``max_exposure`` (0–1); the remainder is always held in cash.
+    """
+
+    type: PositionSizingType = "full"
+    fraction: Optional[float] = Field(
+        default=None, gt=0.0, le=1.0, description="fixed_fraction: capital fraction (0–1]."
+    )
+    target_volatility: Optional[float] = Field(
+        default=None,
+        gt=0.0,
+        le=2.0,
+        description="volatility_target: annualized target volatility (e.g. 0.15 = 15%).",
+    )
+    vol_lookback: Optional[int] = Field(
+        default=None,
+        ge=2,
+        le=2520,
+        description="volatility_target: realized-vol lookback in trading days (default 20).",
+    )
+    max_exposure: Optional[float] = Field(
+        default=None,
+        gt=0.0,
+        le=1.0,
+        description="max_exposure: cap on |exposure| (0–1]; the remainder stays in cash.",
+    )
+
+
+class PositionSizingResolved(BaseModel):
+    """The position-sizing config after resolution, echoed on the response."""
+
+    type: PositionSizingType
+    label: str
+    fraction: Optional[float] = None
+    target_volatility: Optional[float] = None
+    vol_lookback: Optional[int] = None
+    max_exposure: Optional[float] = None
+
+
+_POSITION_SIZING_FIELD = Field(
+    default=None,
+    description=(
+        "Optional position-sizing model. When omitted, full allocation is used "
+        "(backward-compatible default). Sizing scales exposure magnitude only — "
+        "signal timing / direction are unchanged, and |exposure| ≤ 1."
+    ),
+)
+
+
 # ===========================================================================
 # Requests
 # ===========================================================================
@@ -111,6 +184,7 @@ class BacktestRequest(BaseModel):
     """Parameters for the SMA crossover backtest endpoint."""
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
+    position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -158,6 +232,7 @@ class RsiBacktestRequest(BaseModel):
     """Parameters for the RSI mean-reversion backtest endpoint."""
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
+    position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -218,6 +293,7 @@ class BbBacktestRequest(BaseModel):
     """Parameters for the Bollinger Band mean-reversion backtest endpoint."""
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
+    position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -271,6 +347,7 @@ class MomentumBacktestRequest(BaseModel):
     """Parameters for the time-series momentum backtest endpoint."""
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
+    position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -422,6 +499,7 @@ class VbBacktestRequest(BaseModel):
     """Parameters for the volatility breakout backtest endpoint."""
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
+    position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -634,6 +712,14 @@ class BacktestResponse(BaseModel):
     cost_drag_return: Optional[float] = Field(
         default=None,
         description="Total return given up to transaction costs (gross-of-cost minus net).",
+    )
+    position_sizing: Optional[PositionSizingResolved] = Field(
+        default=None,
+        description="Resolved position-sizing echo (present only when a position_sizing was supplied).",
+    )
+    average_exposure: Optional[float] = Field(
+        default=None,
+        description="Mean absolute exposure (|position|) over the backtest period.",
     )
     position_mode: str = Field(
         default="long_only",

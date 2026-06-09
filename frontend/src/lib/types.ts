@@ -43,6 +43,35 @@ export interface CostModelResolved {
   effective_bps_per_side: number;
 }
 
+/** Position-sizing model (research v1). Scales exposure magnitude only; |exposure| ≤ 1. */
+export type PositionSizingType =
+  | "full"
+  | "fixed_fraction"
+  | "volatility_target"
+  | "max_exposure";
+
+export interface PositionSizing {
+  type: PositionSizingType;
+  /** fixed_fraction: capital fraction (0–1]. */
+  fraction?: number;
+  /** volatility_target: annualized target volatility (e.g. 0.15). */
+  target_volatility?: number;
+  /** volatility_target: realized-vol lookback in trading days (default 20). */
+  vol_lookback?: number;
+  /** max_exposure: cap on |exposure| (0–1]; remainder stays in cash. */
+  max_exposure?: number;
+}
+
+/** Resolved position sizing echoed on the response (present only when supplied). */
+export interface PositionSizingResolved {
+  type: PositionSizingType;
+  label: string;
+  fraction?: number | null;
+  target_volatility?: number | null;
+  vol_lookback?: number | null;
+  max_exposure?: number | null;
+}
+
 export interface BacktestRequest {
   ticker: string;
   start_date: string;
@@ -53,6 +82,7 @@ export interface BacktestRequest {
   initial_capital: number;
   position_mode?: PositionMode;
   cost_model?: CostModel;
+  position_sizing?: PositionSizing;
 }
 
 export interface RsiBacktestRequest {
@@ -65,6 +95,7 @@ export interface RsiBacktestRequest {
   transaction_cost_bps: number;
   initial_capital: number;
   cost_model?: CostModel;
+  position_sizing?: PositionSizing;
 }
 
 export interface BbBacktestRequest {
@@ -77,6 +108,7 @@ export interface BbBacktestRequest {
   transaction_cost_bps: number;
   initial_capital: number;
   cost_model?: CostModel;
+  position_sizing?: PositionSizing;
 }
 
 export interface MomentumBacktestRequest {
@@ -90,6 +122,7 @@ export interface MomentumBacktestRequest {
   initial_capital: number;
   position_mode?: PositionMode;
   cost_model?: CostModel;
+  position_sizing?: PositionSizing;
 }
 
 export interface VbBacktestRequest {
@@ -103,6 +136,7 @@ export interface VbBacktestRequest {
   initial_capital: number;
   position_mode?: PositionMode;
   cost_model?: CostModel;
+  position_sizing?: PositionSizing;
 }
 
 export interface PairsBacktestRequest {
@@ -238,6 +272,10 @@ export interface BacktestResponse {
   total_transaction_cost?: number | null;
   /** Total return given up to transaction costs (gross-of-cost minus net). */
   cost_drag_return?: number | null;
+  /** Resolved position-sizing echo — present only when a position_sizing was supplied. */
+  position_sizing?: PositionSizingResolved | null;
+  /** Mean absolute exposure (|position|) over the backtest period. */
+  average_exposure?: number | null;
   /** Direction mode used (defaults to "long_only" for strategies without it). */
   position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;

@@ -816,6 +816,23 @@ export default function HomePage() {
                       {result.effective_cost_bps ?? result.transaction_cost_bps} bps
                     </span>
                   )}
+                  {result.position_sizing && (
+                    <span
+                      className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600"
+                      title={result.position_sizing.label}
+                    >
+                      {result.position_sizing.type === "fixed_fraction"
+                        ? "Fixed fraction"
+                        : result.position_sizing.type === "volatility_target"
+                          ? "Vol target"
+                          : result.position_sizing.type === "max_exposure"
+                            ? "Max exposure"
+                            : "Full alloc"}
+                      {typeof result.average_exposure === "number" && (
+                        <> · {Math.round(result.average_exposure * 100)}% avg</>
+                      )}
+                    </span>
+                  )}
                   <span className="ml-auto flex items-center gap-2">
                     <ExportReportButton
                       getReport={(tpl) => buildBacktestReport(result, {}, tpl)}
