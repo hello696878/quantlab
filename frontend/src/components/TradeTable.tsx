@@ -36,8 +36,27 @@ function actionStyle(action: TradeRecord["action"]): {
   }
 }
 
+const REASON_LABEL: Record<string, string> = {
+  signal_entry: "Signal entry",
+  signal_exit: "Signal exit",
+  signal_flip: "Signal flip",
+  stop_loss: "Stop loss",
+  take_profit: "Take profit",
+  trailing_stop: "Trailing stop",
+  max_holding_days: "Max holding",
+};
+
+const RISK_REASONS = new Set([
+  "stop_loss",
+  "take_profit",
+  "trailing_stop",
+  "max_holding_days",
+]);
+
 export default function TradeTable({ trades }: Props) {
   const [page, setPage] = useState(0);
+  // Only show the Reason column when risk management is active (trades carry a reason).
+  const hasReason = trades.some((t) => t.reason != null);
 
   if (!trades.length) {
     return (
@@ -80,6 +99,11 @@ export default function TradeTable({ trades }: Props) {
               <th className="px-4 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">
                 Transaction Cost (USD)
               </th>
+              {hasReason && (
+                <th className="px-4 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                  Reason
+                </th>
+              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -124,6 +148,24 @@ export default function TradeTable({ trades }: Props) {
                   <td className="px-4 py-2.5 text-right tabular text-slate-600">
                     ${trade.cost.toFixed(2)}
                   </td>
+                  {hasReason && (
+                    <td className="px-4 py-2.5 text-xs whitespace-nowrap">
+                      {trade.reason ? (
+                        <span
+                          className={
+                            "inline-flex items-center rounded-full px-2 py-0.5 font-medium " +
+                            (RISK_REASONS.has(trade.reason)
+                              ? "bg-amber-100 text-amber-700"
+                              : "bg-slate-100 text-slate-500")
+                          }
+                        >
+                          {REASON_LABEL[trade.reason] ?? trade.reason}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">—</span>
+                      )}
+                    </td>
+                  )}
                 </tr>
               );
             })}

@@ -19,6 +19,7 @@ import PortfolioWorkspace, {
 import SaveBacktestModal from "@/components/SaveBacktestModal";
 import SignalDiagnostics from "@/components/SignalDiagnostics";
 import ShortModeDiagnostics from "@/components/ShortModeDiagnostics";
+import RiskDiagnosticsCard from "@/components/RiskDiagnosticsCard";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildBacktestReport, downloadTextFile } from "@/lib/reportExport";
@@ -838,6 +839,17 @@ export default function HomePage() {
                       )}
                     </span>
                   )}
+                  {result.risk_management && (
+                    <span
+                      className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700"
+                      title={result.risk_management.label}
+                    >
+                      Risk rules
+                      {result.risk_diagnostics
+                        ? ` · ${result.risk_diagnostics.risk_exit_count} exits`
+                        : ""}
+                    </span>
+                  )}
                   <span className="ml-auto flex items-center gap-2">
                     <ExportReportButton
                       getReport={(tpl) => buildBacktestReport(result, {}, tpl)}
@@ -881,6 +893,13 @@ export default function HomePage() {
                   strategy={result.strategy}
                   positionMode={result.position_mode}
                 />
+
+                {result.risk_management && (
+                  <RiskDiagnosticsCard
+                    risk={result.risk_management}
+                    diagnostics={result.risk_diagnostics ?? null}
+                  />
+                )}
 
                 {(result.position_mode === "short_only" ||
                   result.position_mode === "long_short") && (

@@ -201,6 +201,31 @@ function positionSizingMeta(value: unknown): PositionSizingMeta | undefined {
   };
 }
 
+interface RiskManagementMeta {
+  active?: boolean;
+  label?: string;
+}
+
+function riskManagementMeta(value: unknown): RiskManagementMeta | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as { type?: unknown; label?: unknown };
+  if (record.type == null || record.type === "none") return undefined;
+  return {
+    active: true,
+    label: typeof record.label === "string" ? record.label : undefined,
+  };
+}
+
+function riskManagementCaveat(risk?: RiskManagementMeta): string {
+  if (!risk?.active) return "";
+  return (
+    `\n- **Risk management.** Risk rules are simulated using available historical ` +
+    `bar data (daily close-based); intraday stop execution, gaps, liquidity, and ` +
+    `order priority are not fully modelled. Risk rules close positions to cash ` +
+    `(never reverse) and are not investment recommendations.`
+  );
+}
+
 function positionSizingCaveat(positionSizing?: PositionSizingMeta): string {
   if (!positionSizing) return "";
   if (
@@ -414,6 +439,7 @@ function riskCaveats(
   dataSource: BacktestReportOptions["dataSource"] = "yfinance",
   positionMode?: string,
   positionSizing?: PositionSizingMeta,
+  riskManagement?: RiskManagementMeta,
 ): string {
   const dataLine =
     dataSource === "csv"
@@ -429,7 +455,7 @@ function riskCaveats(
 - **Historical backtest only.** Results reflect simulated performance on past data.
 - **No guarantee of future performance.** Past results do not predict future returns.
 ${dataLine}
-- **Transaction cost & slippage.** Costs use a simple basis-point assumption; real fills, slippage, and market impact are not modelled.${positionSizingCaveat(positionSizing)}
+- **Transaction cost & slippage.** Costs use a simple basis-point assumption; real fills, slippage, and market impact are not modelled.${positionSizingCaveat(positionSizing)}${riskManagementCaveat(riskManagement)}
 - **Possible overfitting.** Parameters or weights chosen on historical data may not generalise out-of-sample.
 - This report is for research and educational purposes only and is **not investment advice**.${shortSellingCaveat(positionMode)}
 ${cryptoLine}
@@ -442,6 +468,7 @@ function keyCaveats(
   dataSource: BacktestReportOptions["dataSource"] = "yfinance",
   positionMode?: string,
   positionSizing?: PositionSizingMeta,
+  riskManagement?: RiskManagementMeta,
 ): string {
   const cryptoTickers = Array.from(new Set(tickers.filter(isCryptoTicker)));
   const cryptoLine = cryptoTickers.length
@@ -451,7 +478,7 @@ function keyCaveats(
   return `## Key Caveats
 
 - **Historical only — no guarantee.** Simulated past performance does not predict future returns.
-- **Simplified costs & data.** ${dataWord} with basis-point cost assumptions; slippage and market impact are not modelled.${positionSizingCaveat(positionSizing)}
+- **Simplified costs & data.** ${dataWord} with basis-point cost assumptions; slippage and market impact are not modelled.${positionSizingCaveat(positionSizing)}${riskManagementCaveat(riskManagement)}
 - Research and educational purposes only — **not investment advice**.${shortSellingCaveat(positionMode)}${cryptoLine}
 `;
 }
@@ -498,6 +525,8 @@ interface ReportDoc {
   positionMode?: string;
   /** Position sizing, when applicable — drives the sizing caveat. */
   positionSizing?: PositionSizingMeta;
+  /** Risk management, when active — drives the risk caveat. */
+  riskManagement?: RiskManagementMeta;
   fileSlug: string;
   save: ReportSaveMeta;
 
@@ -541,6 +570,7 @@ function renderStandard(doc: ReportDoc): string {
       doc.dataSource,
       doc.positionMode,
       doc.positionSizing,
+      doc.riskManagement,
     ),
   ]);
 }
@@ -562,6 +592,7 @@ function renderExecutive(doc: ReportDoc): string {
       doc.dataSource,
       doc.positionMode,
       doc.positionSizing,
+      doc.riskManagement,
     ),
   ]);
 }
@@ -582,6 +613,7 @@ function renderTearSheet(doc: ReportDoc): string {
       doc.dataSource,
       doc.positionMode,
       doc.positionSizing,
+      doc.riskManagement,
     ),
   ]);
 }
@@ -604,6 +636,7 @@ function renderRiskReport(doc: ReportDoc): string {
       doc.dataSource,
       doc.positionMode,
       doc.positionSizing,
+      doc.riskManagement,
     ),
   ]);
 }
@@ -702,6 +735,7 @@ export function buildBacktestReport(
   const params = [...backtestParams(r), ...(options.extraParameters ?? [])];
   const analysisType = options.analysisType ?? "Single-Strategy Backtest";
   const sizingMeta = positionSizingMeta(r.position_sizing);
+  const riskMeta = riskManagementMeta(r.risk_management);
   const caveatTickers =
     r.strategy === "pairs"
       ? [r.pairs_asset_y, r.pairs_asset_x].filter((t): t is string => Boolean(t))
@@ -738,6 +772,21 @@ export function buildBacktestReport(
   if (typeof r.average_exposure === "number") {
     metaRows.push(["Average exposure", formatPercent(r.average_exposure)]);
   }
+  if (r.risk_management) {
+    metaRows.push(["Risk management", r.risk_management.label]);
+    const rm = r.risk_management;
+    if (typeof rm.stop_loss_pct === "number")
+      metaRows.push(["Stop loss", formatPercent(rm.stop_loss_pct)]);
+    if (typeof rm.take_profit_pct === "number")
+      metaRows.push(["Take profit", formatPercent(rm.take_profit_pct)]);
+    if (typeof rm.trailing_stop_pct === "number")
+      metaRows.push(["Trailing stop", formatPercent(rm.trailing_stop_pct)]);
+    if (typeof rm.max_holding_days === "number")
+      metaRows.push(["Max holding days", String(rm.max_holding_days)]);
+    if (r.risk_diagnostics) {
+      metaRows.push(["Risk exits", String(r.risk_diagnostics.risk_exit_count)]);
+    }
+  }
   if (r.position_mode) {
     metaRows.push(["Direction", modeLabels[r.position_mode] ?? r.position_mode]);
   }
@@ -759,6 +808,7 @@ export function buildBacktestReport(
     dataSource: options.dataSource,
     positionMode: r.position_mode,
     positionSizing: sizingMeta,
+    riskManagement: riskMeta,
     fileSlug: `${slug(r.ticker)}-${slug(r.strategy)}-${r.start_date}-${r.end_date}`,
     metadataBody,
     standardBlocks: [
@@ -885,6 +935,13 @@ export function buildSavedBacktestReport(
       formatPercent(rec.params.average_exposure),
     ]);
   }
+  const savedRisk = riskManagementMeta(rec.params?.risk_management);
+  if (savedRisk) {
+    savedMetaRows.push([
+      "Risk management",
+      savedRisk.label ?? formatParamValue(rec.params.risk_management),
+    ]);
+  }
 
   const metadataBody = mdTable(["Field", "Value"], savedMetaRows);
 
@@ -903,6 +960,7 @@ export function buildSavedBacktestReport(
     caveatTickers,
     positionMode: savedPositionMode,
     positionSizing: savedPositionSizing,
+    riskManagement: savedRisk,
     fileSlug: `saved-${slug(rec.name)}`,
     metadataBody,
     standardBlocks: [

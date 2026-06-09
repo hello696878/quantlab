@@ -84,6 +84,12 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
   if (typeof result.average_exposure === "number") {
     params.average_exposure = result.average_exposure;
   }
+  if (result.risk_management) {
+    params.risk_management = result.risk_management;
+  }
+  if (result.risk_diagnostics) {
+    params.risk_diagnostics = result.risk_diagnostics;
+  }
   return params;
 }
 

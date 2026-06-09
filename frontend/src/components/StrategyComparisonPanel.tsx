@@ -492,6 +492,11 @@ export default function StrategyComparisonPanel() {
           <p>Bollinger Band — window=20, 1.8σ, exit=middle band</p>
           <p>Momentum — window=63, entry/exit threshold=0</p>
           <p>Volatility Breakout — lookback=20, multiplier=0.3×, exit=10-day mean</p>
+          <p className="pt-1 text-slate-400">
+            Strategy Comparison uses signal-based exits only in this version — no
+            cost model, position sizing, or risk-management rules are applied.
+            Configure those on the single-asset Backtest tab.
+          </p>
         </div>
 
         {/* Direction mode */}

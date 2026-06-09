@@ -72,6 +72,51 @@ export interface PositionSizingResolved {
   max_exposure?: number | null;
 }
 
+/** Risk-management exits (research v1). Rules close to cash only; never reverse. */
+export type RiskManagementType =
+  | "none"
+  | "fixed_stop_take_profit"
+  | "trailing_stop"
+  | "max_holding_days"
+  | "combined";
+
+export interface RiskManagement {
+  type: RiskManagementType;
+  /** Decimals (0.10 = 10%). */
+  stop_loss_pct?: number;
+  take_profit_pct?: number;
+  trailing_stop_pct?: number;
+  max_holding_days?: number;
+}
+
+export interface RiskManagementResolved {
+  type: RiskManagementType;
+  label: string;
+  stop_loss_pct?: number | null;
+  take_profit_pct?: number | null;
+  trailing_stop_pct?: number | null;
+  max_holding_days?: number | null;
+}
+
+export interface RiskDiagnostics {
+  risk_exit_count: number;
+  stop_loss_count: number;
+  take_profit_count: number;
+  trailing_stop_count: number;
+  max_holding_exit_count: number;
+  risk_exit_rate: number;
+}
+
+/** Why a trade happened (only present when risk management is active). */
+export type TradeReason =
+  | "signal_entry"
+  | "signal_exit"
+  | "signal_flip"
+  | "stop_loss"
+  | "take_profit"
+  | "trailing_stop"
+  | "max_holding_days";
+
 export interface BacktestRequest {
   ticker: string;
   start_date: string;
@@ -83,6 +128,7 @@ export interface BacktestRequest {
   position_mode?: PositionMode;
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
+  risk_management?: RiskManagement;
 }
 
 export interface RsiBacktestRequest {
@@ -96,6 +142,7 @@ export interface RsiBacktestRequest {
   initial_capital: number;
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
+  risk_management?: RiskManagement;
 }
 
 export interface BbBacktestRequest {
@@ -109,6 +156,7 @@ export interface BbBacktestRequest {
   initial_capital: number;
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
+  risk_management?: RiskManagement;
 }
 
 export interface MomentumBacktestRequest {
@@ -123,6 +171,7 @@ export interface MomentumBacktestRequest {
   position_mode?: PositionMode;
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
+  risk_management?: RiskManagement;
 }
 
 export interface VbBacktestRequest {
@@ -137,6 +186,7 @@ export interface VbBacktestRequest {
   position_mode?: PositionMode;
   cost_model?: CostModel;
   position_sizing?: PositionSizing;
+  risk_management?: RiskManagement;
 }
 
 export interface PairsBacktestRequest {
@@ -197,6 +247,8 @@ export interface TradeRecord {
   price: number;
   shares: number;
   cost: number;
+  /** Present only when risk management is active (null otherwise). */
+  reason?: TradeReason | null;
 }
 
 export interface EquityPoint {
@@ -276,6 +328,10 @@ export interface BacktestResponse {
   position_sizing?: PositionSizingResolved | null;
   /** Mean absolute exposure (|position|) over the backtest period. */
   average_exposure?: number | null;
+  /** Resolved risk-management echo — present only when risk rules are active. */
+  risk_management?: RiskManagementResolved | null;
+  /** Risk-exit counts — present only when risk rules are active. */
+  risk_diagnostics?: RiskDiagnostics | null;
   /** Direction mode used (defaults to "long_only" for strategies without it). */
   position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;

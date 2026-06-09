@@ -201,6 +201,115 @@ _POSITION_SIZING_FIELD = Field(
 )
 
 
+# ---------------------------------------------------------------------------
+# Risk management (research v1)
+# ---------------------------------------------------------------------------
+
+# Risk-management rules run *after* a strategy signal generates a position.
+# They only ever **close a position to cash** (never reverse it); a later new
+# signal can re-enter.  Rules are evaluated on daily closes with the same
+# one-bar-delay convention as the signal layer (no lookahead).
+RiskManagementType = Literal[
+    "none",
+    "fixed_stop_take_profit",
+    "trailing_stop",
+    "max_holding_days",
+    "combined",
+]
+
+
+class RiskManagement(BaseModel):
+    """
+    Optional risk-management exits for a single-asset backtest.
+
+    * ``none``                  — no risk exits (default; signal-based exits only,
+      identical to the original behaviour).
+    * ``fixed_stop_take_profit``— ``stop_loss_pct`` and/or ``take_profit_pct``
+      relative to the entry price.
+    * ``trailing_stop``         — ``trailing_stop_pct`` from the peak (long) /
+      trough (short) since entry.
+    * ``max_holding_days``      — exit after ``max_holding_days`` bars.
+    * ``combined``              — any combination of the above (at least one).
+
+    All percentages are decimals (0.10 = 10%).  Exits close to cash only — they
+    never reverse a position.
+    """
+
+    type: RiskManagementType = "none"
+    stop_loss_pct: Optional[float] = Field(
+        default=None, gt=0.0, le=1.0, description="Stop loss as a decimal (0.10 = 10%)."
+    )
+    take_profit_pct: Optional[float] = Field(
+        default=None, gt=0.0, le=5.0, description="Take profit as a decimal (0.20 = 20%)."
+    )
+    trailing_stop_pct: Optional[float] = Field(
+        default=None, gt=0.0, le=1.0, description="Trailing stop as a decimal (0.10 = 10%)."
+    )
+    max_holding_days: Optional[int] = Field(
+        default=None, ge=1, le=10_000, description="Max bars to hold before exiting to cash."
+    )
+
+    @model_validator(mode="after")
+    def check_active_rules(self) -> "RiskManagement":
+        if self.type == "fixed_stop_take_profit":
+            if self.stop_loss_pct is None and self.take_profit_pct is None:
+                raise ValueError(
+                    "fixed_stop_take_profit requires stop_loss_pct and/or take_profit_pct."
+                )
+        elif self.type == "trailing_stop":
+            if self.trailing_stop_pct is None:
+                raise ValueError("trailing_stop requires trailing_stop_pct.")
+        elif self.type == "max_holding_days":
+            if self.max_holding_days is None:
+                raise ValueError("max_holding_days requires max_holding_days.")
+        elif self.type == "combined":
+            if not any(
+                v is not None
+                for v in (
+                    self.stop_loss_pct,
+                    self.take_profit_pct,
+                    self.trailing_stop_pct,
+                    self.max_holding_days,
+                )
+            ):
+                raise ValueError("combined risk management requires at least one active rule.")
+        return self
+
+
+class RiskManagementResolved(BaseModel):
+    """The risk-management config after resolution, echoed on the response."""
+
+    type: RiskManagementType
+    label: str
+    stop_loss_pct: Optional[float] = None
+    take_profit_pct: Optional[float] = None
+    trailing_stop_pct: Optional[float] = None
+    max_holding_days: Optional[int] = None
+
+
+class RiskDiagnostics(BaseModel):
+    """Counts of risk-exit events (present only when risk rules are active)."""
+
+    risk_exit_count: int
+    stop_loss_count: int
+    take_profit_count: int
+    trailing_stop_count: int
+    max_holding_exit_count: int
+    risk_exit_rate: float = Field(
+        description="Fraction of position entries that ended via a risk exit (0–1)."
+    )
+
+
+_RISK_MANAGEMENT_FIELD = Field(
+    default=None,
+    description=(
+        "Optional risk-management rules. When omitted, no risk exits are applied "
+        "(backward-compatible default). Rules close positions to cash only — they "
+        "never reverse a position, and a later new signal can re-enter."
+    ),
+)
+
+
 # ===========================================================================
 # Requests
 # ===========================================================================
@@ -210,6 +319,7 @@ class BacktestRequest(BaseModel):
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
+    risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -258,6 +368,7 @@ class RsiBacktestRequest(BaseModel):
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
+    risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -319,6 +430,7 @@ class BbBacktestRequest(BaseModel):
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
+    risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -373,6 +485,7 @@ class MomentumBacktestRequest(BaseModel):
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
+    risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -525,6 +638,7 @@ class VbBacktestRequest(BaseModel):
 
     cost_model: Optional[CostModel] = _COST_MODEL_FIELD
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
+    risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -607,6 +721,14 @@ class TradeRecord(BaseModel):
     price: float = Field(description="Execution price (adjusted close).")
     shares: float = Field(description="Approximate number of shares traded.")
     cost: float = Field(description="Estimated transaction cost in USD.")
+    reason: Optional[str] = Field(
+        default=None,
+        description=(
+            "Why the trade happened (only when risk management is active): "
+            "signal_entry / signal_exit / signal_flip / stop_loss / take_profit / "
+            "trailing_stop / max_holding_days."
+        ),
+    )
 
 
 class EquityPoint(BaseModel):
@@ -745,6 +867,14 @@ class BacktestResponse(BaseModel):
     average_exposure: Optional[float] = Field(
         default=None,
         description="Mean absolute exposure (|position|) over the backtest period.",
+    )
+    risk_management: Optional[RiskManagementResolved] = Field(
+        default=None,
+        description="Resolved risk-management echo (present only when risk rules are active).",
+    )
+    risk_diagnostics: Optional[RiskDiagnostics] = Field(
+        default=None,
+        description="Risk-exit counts (present only when risk rules are active).",
     )
     position_mode: str = Field(
         default="long_only",

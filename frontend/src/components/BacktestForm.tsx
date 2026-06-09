@@ -10,6 +10,8 @@ import type {
   PositionMode,
   PositionSizing,
   PositionSizingType,
+  RiskManagement,
+  RiskManagementType,
   RsiBacktestRequest,
   StrategyType,
   VbBacktestRequest,
@@ -32,6 +34,15 @@ const SIZING_OPTIONS: { id: PositionSizingType; label: string }[] = [
   { id: "fixed_fraction", label: "Fixed Fraction" },
   { id: "volatility_target", label: "Volatility Target" },
   { id: "max_exposure", label: "Exposure Cap" },
+];
+
+// Risk-management options (single-asset directional strategies).
+const RISK_OPTIONS: { id: RiskManagementType; label: string }[] = [
+  { id: "none", label: "None" },
+  { id: "fixed_stop_take_profit", label: "Stop / Take Profit" },
+  { id: "trailing_stop", label: "Trailing Stop" },
+  { id: "max_holding_days", label: "Max Holding" },
+  { id: "combined", label: "Combined" },
 ];
 
 // Direction modes (supported by SMA Crossover, Momentum, Volatility Breakout).
@@ -262,6 +273,23 @@ export default function BacktestForm({
   const [volMaxExposureStr, setVolMaxExposureStr] = useState(
     String(_initialPs?.type === "volatility_target" ? (_initialPs.max_exposure ?? 1.0) : 1.0),
   );
+  // Risk management (shared; initialised from saved params).
+  const _initialRm = smaParams.risk_management;
+  const [riskType, setRiskType] = useState<RiskManagementType>(
+    _initialRm?.type ?? "none",
+  );
+  const [stopLossStr, setStopLossStr] = useState(
+    String(_initialRm?.stop_loss_pct ?? 0.1),
+  );
+  const [takeProfitStr, setTakeProfitStr] = useState(
+    String(_initialRm?.take_profit_pct ?? 0.2),
+  );
+  const [trailingStr, setTrailingStr] = useState(
+    String(_initialRm?.trailing_stop_pct ?? 0.1),
+  );
+  const [maxHoldStr, setMaxHoldStr] = useState(
+    String(_initialRm?.max_holding_days ?? 20),
+  );
   // SMA Crossover
   const [smaFastStr, setSmaFastStr] = useState(String(smaParams.fast_window));
   const [smaSlowStr, setSmaSlowStr] = useState(String(smaParams.slow_window));
@@ -328,6 +356,7 @@ export default function BacktestForm({
     initial_capital: number;
     cost_model: CostModel | undefined;
     position_sizing: PositionSizing | undefined;
+    risk_management: RiskManagement | undefined;
   }>;
 
   /** Update every strategy's common fields simultaneously so switching strategy
@@ -468,6 +497,67 @@ export default function BacktestForm({
       pushMaxExposure(maxExposureStr);
     } else {
       pushVolTarget(targetVolStr, volLookbackStr, volMaxExposureStr);
+    }
+  }
+
+  // ── Risk management wiring ─────────────────────────────────────────────────
+  // Risk rules are shared too.  "None" omits risk_management so the request is
+  // byte-identical to the old (signal-exit-only) behaviour.  Inputs are decimals
+  // (0.10 = 10%), matching the cost / sizing conventions elsewhere in the form.
+  function pushStopTake(sl: string, tp: string) {
+    const s = sl.trim() === "" ? null : parseFloat(sl);
+    const t = tp.trim() === "" ? null : parseFloat(tp);
+    if (s !== null && (isNaN(s) || s <= 0 || s > 1)) return;
+    if (t !== null && (isNaN(t) || t <= 0)) return;
+    if (s === null && t === null) return; // need at least one
+    const rm: RiskManagement = { type: "fixed_stop_take_profit" };
+    if (s !== null) rm.stop_loss_pct = s;
+    if (t !== null) rm.take_profit_pct = t;
+    setCommon("risk_management", rm);
+  }
+
+  function pushTrailing(ts: string) {
+    const v = parseFloat(ts);
+    if (isNaN(v) || v <= 0 || v > 1) return;
+    setCommon("risk_management", { type: "trailing_stop", trailing_stop_pct: v });
+  }
+
+  function pushMaxHold(mh: string) {
+    const v = parseInt(mh, 10);
+    if (isNaN(v) || v < 1) return;
+    setCommon("risk_management", { type: "max_holding_days", max_holding_days: v });
+  }
+
+  function pushCombined(sl: string, tp: string, ts: string, mh: string) {
+    const s = sl.trim() === "" ? null : parseFloat(sl);
+    const t = tp.trim() === "" ? null : parseFloat(tp);
+    const tr = ts.trim() === "" ? null : parseFloat(ts);
+    const m = mh.trim() === "" ? null : parseInt(mh, 10);
+    if (s !== null && (isNaN(s) || s <= 0 || s > 1)) return;
+    if (t !== null && (isNaN(t) || t <= 0)) return;
+    if (tr !== null && (isNaN(tr) || tr <= 0 || tr > 1)) return;
+    if (m !== null && (isNaN(m) || m < 1)) return;
+    if (s === null && t === null && tr === null && m === null) return;
+    const rm: RiskManagement = { type: "combined" };
+    if (s !== null) rm.stop_loss_pct = s;
+    if (t !== null) rm.take_profit_pct = t;
+    if (tr !== null) rm.trailing_stop_pct = tr;
+    if (m !== null) rm.max_holding_days = m;
+    setCommon("risk_management", rm);
+  }
+
+  function handleRiskTypeChange(t: RiskManagementType) {
+    setRiskType(t);
+    if (t === "none") {
+      setCommon("risk_management", undefined);
+    } else if (t === "fixed_stop_take_profit") {
+      pushStopTake(stopLossStr, takeProfitStr);
+    } else if (t === "trailing_stop") {
+      pushTrailing(trailingStr);
+    } else if (t === "max_holding_days") {
+      pushMaxHold(maxHoldStr);
+    } else {
+      pushCombined(stopLossStr, takeProfitStr, trailingStr, maxHoldStr);
     }
   }
 
@@ -674,8 +764,33 @@ export default function BacktestForm({
             volMaxExposureVal > 0 &&
             volMaxExposureVal <= 1;
 
+  // Risk-management validation (decimals; at least one rule for fixed/combined).
+  const slVal = stopLossStr.trim() === "" ? null : parseFloat(stopLossStr);
+  const tpVal = takeProfitStr.trim() === "" ? null : parseFloat(takeProfitStr);
+  const trVal = trailingStr.trim() === "" ? null : parseFloat(trailingStr);
+  const mhVal = maxHoldStr.trim() === "" ? null : parseInt(maxHoldStr, 10);
+  const slOk = slVal === null || (!isNaN(slVal) && slVal > 0 && slVal <= 1);
+  const tpOk = tpVal === null || (!isNaN(tpVal) && tpVal > 0);
+  const trOk = trVal === null || (!isNaN(trVal) && trVal > 0 && trVal <= 1);
+  const mhOk = mhVal === null || (!isNaN(mhVal) && mhVal >= 1);
+  const riskOk =
+    riskType === "none"
+      ? true
+      : riskType === "fixed_stop_take_profit"
+        ? slOk && tpOk && (slVal !== null || tpVal !== null)
+        : riskType === "trailing_stop"
+          ? trVal !== null && trOk
+          : riskType === "max_holding_days"
+            ? mhVal !== null && mhOk
+            : // combined
+              slOk &&
+              tpOk &&
+              trOk &&
+              mhOk &&
+              (slVal !== null || tpVal !== null || trVal !== null || mhVal !== null);
+
   const commonNumericOk =
-    costOk && sizingOk && !isNaN(capital) && capital > 0;
+    costOk && sizingOk && riskOk && !isNaN(capital) && capital > 0;
   const smaInvalid =
     strategy === "sma_crossover" &&
     (isNaN(smaFast) || isNaN(smaSlow) || smaFast >= smaSlow);
@@ -1077,6 +1192,136 @@ export default function BacktestForm({
               are unchanged. No leverage: |exposure| ≤ 1 (volatility targeting only
               de-levers in high-vol regimes).
             </p>
+          </div>
+        )}
+
+        {/* ── Risk management ───────────────────────────────────────────── */}
+        {strategy !== "pairs" && (
+          <div className="mb-5 rounded-lg border border-slate-200 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                Risk management
+              </span>
+              <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
+                {RISK_OPTIONS.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleRiskTypeChange(o.id)}
+                    className={
+                      "px-3 py-1.5 text-xs font-medium transition-colors " +
+                      (riskType === o.id
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50")
+                    }
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {riskType === "none" && (
+              <p className="text-xs text-slate-500">
+                No additional risk exits. Strategy uses signal-based exits only.
+              </p>
+            )}
+
+            {(riskType === "fixed_stop_take_profit" || riskType === "combined") && (
+              <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field label="Stop loss" hint="0.10 = 10%">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={stopLossStr}
+                    min={0}
+                    step={0.01}
+                    onChange={(e) => {
+                      setStopLossStr(e.target.value);
+                      if (riskType === "combined")
+                        pushCombined(e.target.value, takeProfitStr, trailingStr, maxHoldStr);
+                      else pushStopTake(e.target.value, takeProfitStr);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+                <Field label="Take profit" hint="0.20 = 20%">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={takeProfitStr}
+                    min={0}
+                    step={0.01}
+                    onChange={(e) => {
+                      setTakeProfitStr(e.target.value);
+                      if (riskType === "combined")
+                        pushCombined(stopLossStr, e.target.value, trailingStr, maxHoldStr);
+                      else pushStopTake(stopLossStr, e.target.value);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+              </div>
+            )}
+
+            {(riskType === "trailing_stop" || riskType === "combined") && (
+              <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field label="Trailing stop" hint="0.10 = 10%">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={trailingStr}
+                    min={0}
+                    step={0.01}
+                    onChange={(e) => {
+                      setTrailingStr(e.target.value);
+                      if (riskType === "combined")
+                        pushCombined(stopLossStr, takeProfitStr, e.target.value, maxHoldStr);
+                      else pushTrailing(e.target.value);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+              </div>
+            )}
+
+            {(riskType === "max_holding_days" || riskType === "combined") && (
+              <div className="mb-3 grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field label="Max holding days" hint="bars">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={maxHoldStr}
+                    min={1}
+                    step={1}
+                    onChange={(e) => {
+                      setMaxHoldStr(e.target.value);
+                      if (riskType === "combined")
+                        pushCombined(stopLossStr, takeProfitStr, trailingStr, e.target.value);
+                      else pushMaxHold(e.target.value);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+              </div>
+            )}
+
+            {riskType !== "none" && (
+              <>
+                <p className="text-[11px] text-slate-400">
+                  Risk rules close positions; they do not reverse positions by
+                  themselves.
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Daily close-based risk exits are simplified and may differ from
+                  intraday stop execution.
+                </p>
+                <p className="text-[11px] text-slate-400">
+                  Risk exits interact with position sizing and transaction costs.
+                </p>
+              </>
+            )}
           </div>
         )}
 
@@ -1507,9 +1752,11 @@ export default function BacktestForm({
                   ? "Cost model values must be valid numbers (≥ 0)."
                   : !sizingOk
                     ? "Position sizing values must be valid (fraction / exposure cap in (0–1], target vol > 0, lookback ≥ 2)."
-                    : isNaN(capital)
-                      ? "Initial capital must be a valid number (> 0)."
-                      : "Initial capital must be greater than 0."}
+                    : !riskOk
+                      ? "Risk management needs at least one valid rule (stop / take / trailing in (0–1], max holding ≥ 1)."
+                      : isNaN(capital)
+                        ? "Initial capital must be a valid number (> 0)."
+                        : "Initial capital must be greater than 0."}
               </p>
             )}
             {dateInvalid && (

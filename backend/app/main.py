@@ -53,6 +53,12 @@ from app.position_sizing import (
     average_exposure,
     resolve as resolve_position_sizing,
 )
+from app.risk_management import (
+    apply_risk_management,
+    diagnostics as risk_diagnostics,
+    is_active as is_risk_active,
+    resolve as resolve_risk_management,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -101,6 +107,7 @@ from app.schemas import (
     BbBacktestRequest,
     CostModel,
     PositionSizing,
+    RiskManagement,
     CustomStrategyRequest,
     CustomStrategyTemplateCreate,
     CustomStrategyTemplateExport,
@@ -269,6 +276,7 @@ def _build_response(
     position_mode: str = "long_only",
     cost_model: Optional[CostModel] = None,
     position_sizing: Optional[PositionSizing] = None,
+    risk_management: Optional[RiskManagement] = None,
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response.
 
@@ -288,16 +296,30 @@ def _build_response(
         effective_cost_bps = resolved.effective_bps_per_side
         cost_model_echo = resolved
 
+    # Risk management runs first (signal → mode → risk → sizing → engine).  It
+    # closes positions to cash on a stop/take/trailing/max-holding trigger; with
+    # no rules (none/None) the position is returned untouched.
+    risk_result = apply_risk_management(position, close, risk_management)
+    risk_active = is_risk_active(risk_management)
+    risk_management_echo = resolve_risk_management(risk_management)
+    risk_diagnostics_obj = (
+        risk_diagnostics(risk_result) if risk_active else None
+    )
+
     # Position sizing scales exposure magnitude only.  Full / None is identity.
-    sized_position = apply_sizing(position, close, position_sizing)
+    sized_position = apply_sizing(risk_result.position, close, position_sizing)
     position_sizing_echo = resolve_position_sizing(position_sizing)
     avg_exposure = average_exposure(sized_position)
 
+    # Attach trade reasons only when risk rules are active (preserves the old
+    # trade shape — no `reason` key — for every existing backtest).
+    change_reasons = risk_result.exit_reasons if risk_active else None
     strategy_equity, benchmark_equity, trades = run_backtest(
         close=close,
         position=sized_position,
         transaction_cost_bps=effective_cost_bps,
         initial_capital=initial_capital,
+        position_change_reasons=change_reasons,
     )
 
     strategy_metrics_dict = compute_metrics(strategy_equity)
@@ -356,6 +378,8 @@ def _build_response(
         cost_drag_return=cost_drag_return,
         position_sizing=position_sizing_echo,
         average_exposure=avg_exposure,
+        risk_management=risk_management_echo,
+        risk_diagnostics=risk_diagnostics_obj,
         position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
@@ -507,6 +531,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         strategy="sma_crossover",
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
+        risk_management=request.risk_management,
         fast_window=request.fast_window,
         slow_window=request.slow_window,
         position_mode=request.position_mode,
@@ -560,6 +585,7 @@ def backtest_rsi_mean_reversion(request: RsiBacktestRequest) -> BacktestResponse
         strategy="rsi_mean_reversion",
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
+        risk_management=request.risk_management,
         rsi_window=request.rsi_window,
         oversold_threshold=request.oversold_threshold,
         exit_threshold=request.exit_threshold,
@@ -614,6 +640,7 @@ def backtest_bollinger_band(request: BbBacktestRequest) -> BacktestResponse:
         strategy="bollinger_band",
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
+        risk_management=request.risk_management,
         bb_window=request.bb_window,
         bb_num_std=request.num_std,
         bb_exit_band=request.exit_band,
@@ -671,6 +698,7 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         strategy="momentum",
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
+        risk_management=request.risk_management,
         momentum_window=request.momentum_window,
         momentum_entry_threshold=request.entry_threshold,
         momentum_exit_threshold=request.exit_threshold,
@@ -728,6 +756,7 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         strategy="volatility_breakout",
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
+        risk_management=request.risk_management,
         vb_lookback_window=request.lookback_window,
         vb_breakout_multiplier=request.breakout_multiplier,
         vb_exit_window=request.exit_window,

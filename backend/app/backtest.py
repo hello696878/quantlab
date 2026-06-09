@@ -24,10 +24,19 @@ Design decisions
 
 from __future__ import annotations
 
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import pandas as pd
 import numpy as np
+
+
+def _default_reason(action: str) -> str:
+    """Map a trade action to a default (signal-based) reason."""
+    if action in ("BUY", "SHORT"):
+        return "signal_entry"
+    if action in ("FLIP_TO_LONG", "FLIP_TO_SHORT"):
+        return "signal_flip"
+    return "signal_exit"  # SELL / COVER and any rebalance reduction
 
 
 def run_backtest(
@@ -35,6 +44,7 @@ def run_backtest(
     position: pd.Series,
     transaction_cost_bps: float = 10.0,
     initial_capital: float = 100_000.0,
+    position_change_reasons: Optional[Dict[int, str]] = None,
 ) -> Tuple[pd.Series, pd.Series, List[Dict]]:
     """
     Run a single-asset backtest and return equity curves plus a trade log.
@@ -184,15 +194,20 @@ def run_backtest(
                 trade_shares = new_open_shares
             open_shares = new_open_shares
 
-        trades.append(
-            {
-                "date": date_str,
-                "action": action,
-                "price": round(price, 4),
-                "shares": round(trade_shares, 4),
-                "cost": round(cost_usd, 4),
-            }
-        )
+        trade: Dict = {
+            "date": date_str,
+            "action": action,
+            "price": round(price, 4),
+            "shares": round(trade_shares, 4),
+            "cost": round(cost_usd, 4),
+        }
+        # When risk management is active, every trade gets a reason: risk exits
+        # (keyed by their change-bar index ``i``) use the risk reason, all other
+        # changes fall back to a signal-based reason.  When the map is None,
+        # trades keep their original shape (no ``reason`` key — backward compat).
+        if position_change_reasons is not None:
+            trade["reason"] = position_change_reasons.get(i) or _default_reason(action)
+        trades.append(trade)
 
     return strategy_equity, benchmark_equity, trades
 
