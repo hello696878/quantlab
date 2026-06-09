@@ -65,6 +65,21 @@ class CostModel(BaseModel):
         default=None, ge=0.0, lt=10_000.0, description="commission_slippage: optional half-spread in bps."
     )
 
+    @model_validator(mode="after")
+    def check_effective_cost(self) -> "CostModel":
+        """Ensure resolved commission/slippage totals stay inside engine bounds."""
+        if self.type == "commission_slippage":
+            effective = (
+                (self.commission_bps or 0.0)
+                + (self.slippage_bps or 0.0)
+                + (self.spread_bps or 0.0)
+            )
+            if effective >= 10_000.0:
+                raise ValueError(
+                    "commission_bps + slippage_bps + spread_bps must be less than 10,000 bps."
+                )
+        return self
+
 
 class CostModelResolved(BaseModel):
     """The cost model after resolution, echoed on the response for display."""

@@ -12,7 +12,7 @@ import type {
   StrategyType,
   VbBacktestRequest,
 } from "@/lib/types";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 
 // Cost model options for the single-asset backtest form.
@@ -274,34 +274,76 @@ export default function BacktestForm({
             ? momentumParams
             : vbParams; // covers "volatility_breakout" AND "pairs"
 
+  type CommonPatch = Partial<{
+    ticker: string;
+    start_date: string;
+    end_date: string;
+    transaction_cost_bps: number;
+    initial_capital: number;
+    cost_model: CostModel | undefined;
+  }>;
+
   /** Update every strategy's common fields simultaneously so switching strategy
    *  never loses a date or cost setting.  Skips "ticker" for pairs since
    *  PairsBacktestRequest uses asset_y / asset_x instead. */
-  function setCommon<K extends keyof typeof active>(
-    key: K,
-    value: (typeof active)[K],
-  ) {
-    onSmaParamsChange({ ...smaParams, [key]: value } as BacktestRequest);
-    onRsiParamsChange({ ...rsiParams, [key]: value } as RsiBacktestRequest);
-    onBbParamsChange({ ...bbParams, [key]: value } as BbBacktestRequest);
+  function setCommonFields(patch: CommonPatch) {
+    onSmaParamsChange({ ...smaParams, ...patch } as BacktestRequest);
+    onRsiParamsChange({ ...rsiParams, ...patch } as RsiBacktestRequest);
+    onBbParamsChange({ ...bbParams, ...patch } as BbBacktestRequest);
     onMomentumParamsChange({
       ...momentumParams,
-      [key]: value,
+      ...patch,
     } as MomentumBacktestRequest);
-    onVbParamsChange({ ...vbParams, [key]: value } as VbBacktestRequest);
+    onVbParamsChange({ ...vbParams, ...patch } as VbBacktestRequest);
     // Pairs shares start_date / end_date / cost / capital but NOT ticker.
-    if (key !== "ticker") {
-      onPairsParamsChange({
-        ...pairsParams,
-        [key]: value,
-      } as PairsBacktestRequest);
-    }
+    const { ticker: _ticker, ...pairsPatch } = patch;
+    onPairsParamsChange({
+      ...pairsParams,
+      ...pairsPatch,
+    } as PairsBacktestRequest);
+  }
+
+  function setCommon<K extends keyof CommonPatch>(key: K, value: CommonPatch[K]) {
+    setCommonFields({ [key]: value } as CommonPatch);
   }
 
   // ── Cost model wiring ──────────────────────────────────────────────────────
   // The cost model is a shared field (like cost / capital), so it is synced
-  // across every strategy via setCommon.  Simple BPS leaves cost_model unset so
-  // the request is byte-identical to the old transaction_cost_bps behaviour.
+  // across every strategy.  Legacy callers can still omit cost_model, but the
+  // Backtest form sends the selected mode so reports can echo it.
+  useEffect(() => {
+    const v = parseFloat(costBpsStr);
+    if (!isNaN(v) && v >= 0) {
+      if (
+        _initialCm &&
+        _initialCm.type !== "simple_bps"
+      ) {
+        return;
+      }
+      if (
+        _initialCm?.type === "simple_bps" &&
+        _initialCm.transaction_cost_bps === v
+      ) {
+        return;
+      }
+      setCommonFields({
+        cost_model: { type: "simple_bps", transaction_cost_bps: v },
+      });
+    }
+    // Run once on mount. The form is keyed/remounted when demo/settings
+    // defaults need to re-hydrate local string state.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  function pushSimpleBps(raw: string) {
+    const v = parseFloat(raw);
+    if (isNaN(v) || v < 0) return;
+    setCommonFields({
+      transaction_cost_bps: v,
+      cost_model: { type: "simple_bps", transaction_cost_bps: v },
+    });
+  }
+
   function pushCommissionSlippage(
     commission: string,
     slippage: string,
@@ -322,7 +364,7 @@ export default function BacktestForm({
   function handleCostTypeChange(t: CostModelType) {
     setCostModelType(t);
     if (t === "simple_bps") {
-      setCommon("cost_model", undefined);
+      pushSimpleBps(costBpsStr);
     } else if (t === "conservative") {
       setCommon("cost_model", { type: "conservative" } as CostModel);
     } else {
@@ -700,8 +742,7 @@ export default function BacktestForm({
                   step={1}
                   onChange={(e) => {
                     setCostBpsStr(e.target.value);
-                    const v = parseFloat(e.target.value);
-                    if (!isNaN(v)) setCommon("transaction_cost_bps", v);
+                    pushSimpleBps(e.target.value);
                   }}
                   disabled={loading}
                 />

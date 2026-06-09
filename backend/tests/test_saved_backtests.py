@@ -321,6 +321,35 @@ def test_params_roundtrip(client):
     }
 
 
+def test_cost_model_params_roundtrip(client):
+    """Saved params preserve advanced cost model metadata without schema changes."""
+    payload = {
+        **BASE_PAYLOAD,
+        "params": {
+            "fast_window": 50,
+            "slow_window": 200,
+            "cost_model": {
+                "type": "commission_slippage",
+                "label": "Commission + slippage: 25 bps/side.",
+                "commission_bps": 10.0,
+                "slippage_bps": 10.0,
+                "spread_bps": 5.0,
+                "effective_bps_per_side": 25.0,
+            },
+            "effective_cost_bps": 25.0,
+            "total_transaction_cost": 123.45,
+            "cost_drag_return": 0.0012,
+        },
+        "transaction_cost_bps": 25.0,
+    }
+    item_id = client.post("/saved-backtests", json=payload).json()["id"]
+    params = client.get(f"/saved-backtests/{item_id}").json()["params"]
+
+    assert params["cost_model"]["type"] == "commission_slippage"
+    assert params["cost_model"]["effective_bps_per_side"] == pytest.approx(25.0)
+    assert params["total_transaction_cost"] == pytest.approx(123.45)
+
+
 # ---------------------------------------------------------------------------
 # 8. Notes field
 # ---------------------------------------------------------------------------

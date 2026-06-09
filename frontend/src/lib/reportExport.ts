@@ -173,6 +173,20 @@ function mdText(value: string): string {
   return value.replace(/\r\n/g, "\n").trim();
 }
 
+function formatParamValue(value: unknown): string {
+  if (value == null) return "—";
+  if (typeof value === "object") {
+    const record = value as { label?: unknown };
+    if (typeof record.label === "string") return record.label;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
 /** Wrap a body in a level-2 section heading. */
 function section(heading: string, body: string): string {
   return `## ${heading}\n\n${body}`;
@@ -758,16 +772,14 @@ export function buildSavedBacktestReport(
   const m = (rec.metrics ?? {}) as Partial<PerformanceMetrics> & Record<string, unknown>;
   const num = (v: unknown) => (typeof v === "number" ? v : undefined);
   const params = Object.entries(rec.params ?? {}).map(
-    ([k, v]) => [k, String(v)] as [string, string],
+    ([k, v]) => [k, formatParamValue(v)] as [string, string],
   );
   const equity = (rec.equity_curve ?? []).map((p) => p.strategy);
   const trades = (rec.trades ?? []) as TradeRecord[];
   const caveatTickers = splitTickerLabel(rec.ticker);
   const label = STRATEGY_LABELS[rec.strategy] ?? rec.strategy;
 
-  const metadataBody = mdTable(
-    ["Field", "Value"],
-    [
+  const savedMetaRows: [string, string][] = [
       ["Name", rec.name],
       ["Ticker", rec.ticker],
       ["Strategy", label],
@@ -775,8 +787,25 @@ export function buildSavedBacktestReport(
       ["Initial capital", formatCurrency(rec.initial_capital)],
       ["Transaction cost", `${rec.transaction_cost_bps} bps`],
       ["Saved at", rec.created_at],
-    ],
-  );
+    ];
+  const costModel = rec.params?.cost_model;
+  if (costModel && typeof costModel === "object") {
+    savedMetaRows.push(["Cost model", formatParamValue(costModel)]);
+  }
+  if (typeof rec.params?.total_transaction_cost === "number") {
+    savedMetaRows.push([
+      "Total transaction cost",
+      formatCurrency(rec.params.total_transaction_cost),
+    ]);
+  }
+  if (typeof rec.params?.cost_drag_return === "number") {
+    savedMetaRows.push([
+      "Cost drag (return)",
+      formatPercent(rec.params.cost_drag_return),
+    ]);
+  }
+
+  const metadataBody = mdTable(["Field", "Value"], savedMetaRows);
 
   const execBullets = [
     `- **Total Return:** ${formatPercent(num(m.total_return))}`,

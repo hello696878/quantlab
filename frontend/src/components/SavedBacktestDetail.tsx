@@ -35,6 +35,20 @@ function fmtSavedDate(iso: string): string {
   return iso.replace("T", " ").slice(0, 16) + " UTC";
 }
 
+function formatParamValue(value: unknown): string {
+  if (value == null) return "—";
+  if (typeof value === "object") {
+    const record = value as { label?: unknown };
+    if (typeof record.label === "string") return record.label;
+    try {
+      return JSON.stringify(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
 interface MetricRowProps {
   label: string;
   value: number | null | undefined;
@@ -216,7 +230,7 @@ export default function SavedBacktestDetail({
                            bg-slate-100 text-slate-600 text-xs"
               >
                 <span className="text-slate-400">{k}:</span>
-                <span className="font-mono font-medium">{String(v)}</span>
+                <span className="font-mono font-medium">{formatParamValue(v)}</span>
               </span>
             ))}
             <span

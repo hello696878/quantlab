@@ -24,39 +24,40 @@ function buildDefaultName(result: BacktestResponse): string {
 }
 
 function buildParams(result: BacktestResponse): Record<string, unknown> {
+  let params: Record<string, unknown> = {};
   if (result.strategy === "sma_crossover") {
-    return { fast_window: result.fast_window, slow_window: result.slow_window };
+    params = { fast_window: result.fast_window, slow_window: result.slow_window };
   }
   if (result.strategy === "rsi_mean_reversion") {
-    return {
+    params = {
       rsi_window: result.rsi_window,
       oversold_threshold: result.oversold_threshold,
       exit_threshold: result.exit_threshold,
     };
   }
   if (result.strategy === "bollinger_band") {
-    return {
+    params = {
       bb_window: result.bb_window,
       num_std: result.bb_num_std,
       exit_band: result.bb_exit_band,
     };
   }
   if (result.strategy === "momentum") {
-    return {
+    params = {
       momentum_window: result.momentum_window,
       entry_threshold: result.momentum_entry_threshold,
       exit_threshold: result.momentum_exit_threshold,
     };
   }
   if (result.strategy === "volatility_breakout") {
-    return {
+    params = {
       lookback_window: result.vb_lookback_window,
       breakout_multiplier: result.vb_breakout_multiplier,
       exit_window: result.vb_exit_window,
     };
   }
   if (result.strategy === "pairs") {
-    return {
+    params = {
       asset_y: result.pairs_asset_y,
       asset_x: result.pairs_asset_x,
       lookback_window: result.pairs_lookback_window,
@@ -64,7 +65,20 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
       exit_z_score: result.pairs_exit_z_score,
     };
   }
-  return {};
+
+  if (result.cost_model) {
+    params.cost_model = result.cost_model;
+  }
+  if (typeof result.effective_cost_bps === "number") {
+    params.effective_cost_bps = result.effective_cost_bps;
+  }
+  if (typeof result.total_transaction_cost === "number") {
+    params.total_transaction_cost = result.total_transaction_cost;
+  }
+  if (typeof result.cost_drag_return === "number") {
+    params.cost_drag_return = result.cost_drag_return;
+  }
+  return params;
 }
 
 // ---------------------------------------------------------------------------

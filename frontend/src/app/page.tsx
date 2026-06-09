@@ -223,6 +223,13 @@ function paramSummary(r: BacktestResponse): string {
   return `${cost} · ${trades}`;
 }
 
+function costModelBadgeLabel(r: BacktestResponse): string {
+  if (!r.cost_model) return "";
+  if (r.cost_model.type === "simple_bps") return "Simple BPS";
+  if (r.cost_model.type === "conservative") return "Conservative cost";
+  return "Commission + slippage";
+}
+
 const STRATEGY_HEADINGS: Record<
   StrategyType,
   { title: string; description: string }
@@ -415,6 +422,10 @@ export default function HomePage() {
     const common = {
       initial_capital: s.default_initial_capital,
       transaction_cost_bps: s.default_transaction_cost_bps,
+      cost_model: {
+        type: "simple_bps" as const,
+        transaction_cost_bps: s.default_transaction_cost_bps,
+      },
       start_date,
       end_date,
     };
@@ -800,9 +811,7 @@ export default function HomePage() {
                       className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600"
                       title={result.cost_model.label}
                     >
-                      {result.cost_model.type === "conservative"
-                        ? "Conservative cost"
-                        : "Commission + slippage"}
+                      {costModelBadgeLabel(result)}
                       {" · "}
                       {result.effective_cost_bps ?? result.transaction_cost_bps} bps
                     </span>

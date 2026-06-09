@@ -203,6 +203,22 @@ def test_api_invalid_cost_model_type_rejected(client):
     assert resp.status_code == 422
 
 
+def test_api_commission_slippage_effective_cost_too_high_rejected(client):
+    resp = client.post(
+        "/backtest/sma-crossover",
+        json={
+            "cost_model": {
+                "type": "commission_slippage",
+                "commission_bps": 5000,
+                "slippage_bps": 4000,
+                "spread_bps": 1000,
+            }
+        },
+    )
+    assert resp.status_code == 422
+    assert "less than 10,000 bps" in resp.text
+
+
 def test_api_pairs_cost_model_applied_and_echoed(client):
     body = client.post(
         "/backtest/pairs",
