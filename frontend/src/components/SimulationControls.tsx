@@ -16,14 +16,9 @@ import type {
 // No `parseFloat(value) || default` in any onChange — the raw string is stored
 // and parsed only when computing the emitted config.
 
-// Mirrors the Backtest form's input class (the theme source of truth).  The
-// critical token is `bg-white`, which globals.css remaps to the dark panel
-// background; omitting it is what made these inputs render browser-default white.
-const inputCls =
-  "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm " +
-  "text-slate-900 placeholder-slate-400 shadow-sm " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 " +
-  "disabled:opacity-50 disabled:cursor-not-allowed";
+// Dedicated dark input primitive. This avoids browser-default white fields in
+// Strategy Comparison while preserving the raw-string numeric editing model.
+const inputCls = "ql-input px-2.5 py-1.5";
 
 function Field({
   label,
@@ -57,7 +52,7 @@ function Segmented<T extends string>({
   disabled?: boolean;
 }) {
   return (
-    <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
+    <div className="ql-segmented">
       {options.map((o) => (
         <button
           key={o.id}
@@ -65,10 +60,7 @@ function Segmented<T extends string>({
           disabled={disabled}
           onClick={() => onSelect(o.id)}
           className={
-            "px-3 py-1.5 text-xs font-medium transition-colors " +
-            (value === o.id
-              ? "bg-blue-600 text-white"
-              : "bg-white text-slate-600 hover:bg-slate-50")
+            "ql-segmented-option " + (value === o.id ? "active" : "")
           }
         >
           {o.label}
@@ -279,7 +271,7 @@ export function PositionSizingControl({
 
   function emit(t: PositionSizingType, f: string, tv: string, lb: string, me: string, vme: string) {
     if (t === "full_allocation") {
-      onChange({ positionSizing: undefined, valid: true });
+      onChange({ positionSizing: { type: "full_allocation" }, valid: true });
       return;
     }
     if (t === "fixed_fraction") {
@@ -450,7 +442,7 @@ export function RiskManagementControl({
 
   function emit(t: RiskManagementType, sl: string, tp: string, tr: string, mh: string) {
     if (t === "none") {
-      onChange({ riskManagement: undefined, valid: true });
+      onChange({ riskManagement: { type: "none" }, valid: true });
       return;
     }
     if (t === "trailing_stop") {

@@ -154,7 +154,7 @@ class PositionSizing(BaseModel):
     )
     lookback_days: Optional[int] = Field(
         default=None,
-        ge=2,
+        ge=5,
         le=2520,
         validation_alias=AliasChoices("lookback_days", "vol_lookback"),
         description="volatility_target: realized-vol lookback in trading days (default 20).",
@@ -1499,7 +1499,10 @@ class StrategyComparisonResponse(BaseModel):
     )
     cost_model: Optional[CostModelResolved] = Field(
         default=None,
-        description="Resolved cost model echo (present only when a cost_model was supplied).",
+        description=(
+            "Resolved cost model echo. When cost_model is omitted, this is the "
+            "backward-compatible simple_bps model derived from transaction_cost_bps."
+        ),
     )
     effective_cost_bps: Optional[float] = Field(
         default=None,
@@ -1507,7 +1510,9 @@ class StrategyComparisonResponse(BaseModel):
     )
     position_sizing: Optional[PositionSizingResolved] = Field(
         default=None,
-        description="Resolved position-sizing echo (present only when supplied).",
+        description=(
+            "Resolved position-sizing echo. When omitted, this is full_allocation."
+        ),
     )
     risk_management: Optional[RiskManagementResolved] = Field(
         default=None,

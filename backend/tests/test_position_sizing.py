@@ -89,19 +89,21 @@ def test_volatility_target_delevers_in_high_vol():
 
 
 def test_volatility_target_matches_prior_day_vol_estimate():
-    close = _close([100, 103, 101, 106, 100, 98, 104, 101])
+    # Long enough that a 5-day rolling vol, shifted one bar, yields several
+    # valid (non-zero) scale values — not just NaN fills.
+    close = _close([100, 103, 101, 106, 100, 98, 104, 101, 105, 99, 102, 107])
     pos = _pos([1] * len(close), close.index)
     sizing = PositionSizing(
         type="volatility_target",
         target_volatility=0.20,
-        lookback_days=3,
+        lookback_days=5,
         max_exposure=0.75,
     )
 
     out = apply_sizing(pos, close, sizing)
     daily_returns = close.pct_change()
     target_daily_vol = 0.20 / math.sqrt(252)
-    expected_scale = (target_daily_vol / daily_returns.rolling(3).std()).shift(1)
+    expected_scale = (target_daily_vol / daily_returns.rolling(5).std()).shift(1)
     expected = expected_scale.clip(lower=0.0, upper=0.75).fillna(0.0)
 
     pd.testing.assert_series_equal(out, expected, check_names=False)

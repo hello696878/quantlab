@@ -98,11 +98,9 @@ const BENCHMARK_COLOR = "#8b95ab";
 // ---------------------------------------------------------------------------
 
 const inputCls =
-  "w-full px-3 py-2 text-sm border border-slate-300 rounded-lg " +
-  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 " +
-  "disabled:opacity-50 bg-white";
+  "ql-input px-3 py-2";
 
-const labelCls = "block text-xs font-medium text-slate-600 mb-1";
+const labelCls = "block uplabel mb-1";
 
 // ---------------------------------------------------------------------------
 // Multi-strategy equity curve chart
@@ -504,6 +502,11 @@ export default function StrategyComparisonPanel() {
           <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
             Simulation Settings
           </p>
+          <p className="text-xs text-slate-400">
+            Strategy Comparison uses each strategy&apos;s current default strategy
+            parameters. Simulation settings such as cost model, position sizing,
+            risk management, and direction are applied globally.
+          </p>
 
           <div>
             <label className={labelCls}>Cost model</label>
@@ -523,7 +526,7 @@ export default function StrategyComparisonPanel() {
           {/* Direction mode */}
           <div>
             <label className={labelCls}>Direction</label>
-            <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+            <div className="ql-segmented">
               {CMP_MODE_OPTIONS.map((o) => (
                 <button
                   key={o.id}
@@ -531,10 +534,7 @@ export default function StrategyComparisonPanel() {
                   disabled={loading}
                   onClick={() => setPositionMode(o.id)}
                   className={
-                    "px-3 py-1.5 text-xs font-medium transition-colors " +
-                    (positionMode === o.id
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-slate-600 hover:bg-blue-50")
+                    "ql-segmented-option " + (positionMode === o.id ? "active" : "")
                   }
                 >
                   {o.label}
@@ -562,8 +562,7 @@ export default function StrategyComparisonPanel() {
           <p>Volatility Breakout — lookback=20, multiplier=0.3×, exit=10-day mean</p>
           <p className="pt-1 text-slate-400">
             Strategy-specific parameters are fixed; the simulation settings above
-            (cost model, position sizing, risk management, direction) are applied
-            globally to every strategy.
+            are shared assumptions applied globally to every strategy.
           </p>
         </div>
 

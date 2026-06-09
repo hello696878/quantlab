@@ -2256,22 +2256,10 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
 
     # Resolve the shared simulation controls once; they apply to *every* strategy
     # (signal → mode → risk → sizing → engine), exactly like a single backtest.
-    resolved_cost = (
-        resolve_cost_model(request.cost_model, request.transaction_cost_bps)
-        if request.cost_model is not None
-        else None
-    )
-    effective_cost_bps = (
-        resolved_cost.effective_bps_per_side
-        if resolved_cost is not None
-        else request.transaction_cost_bps
-    )
+    resolved_cost = resolve_cost_model(request.cost_model, request.transaction_cost_bps)
+    effective_cost_bps = resolved_cost.effective_bps_per_side
     risk_active = is_risk_active(request.risk_management)
-    position_sizing_echo = (
-        resolve_position_sizing(request.position_sizing)
-        if request.position_sizing is not None
-        else None
-    )
+    position_sizing_echo = resolve_position_sizing(request.position_sizing)
     risk_management_echo = resolve_risk_management(request.risk_management)
 
     def _run_strategy(raw_position):

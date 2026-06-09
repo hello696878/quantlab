@@ -590,8 +590,9 @@ def test_comparison_old_request_still_works(cmp_client):
     body = _cmp(cmp_client)
     assert len(body["strategies"]) == 5
     assert body["effective_cost_bps"] == 10.0
-    assert body["cost_model"] is None
-    assert body["position_sizing"] is None
+    assert body["cost_model"]["type"] == "simple_bps"
+    assert body["cost_model"]["effective_bps_per_side"] == 10.0
+    assert body["position_sizing"]["type"] == "full_allocation"
     assert body["risk_management"] is None
 
 
@@ -634,6 +635,12 @@ def test_comparison_fixed_fraction_position_sizing(cmp_client):
     for f, h in zip(full["strategies"], half["strategies"]):
         if f["average_exposure"] and f["average_exposure"] > 0:
             assert h["average_exposure"] == pytest.approx(f["average_exposure"] * 0.5, rel=1e-6)
+
+
+def test_comparison_explicit_full_allocation_position_sizing(cmp_client):
+    body = _cmp(cmp_client, position_sizing={"type": "full_allocation"})
+    assert body["position_sizing"]["type"] == "full_allocation"
+    assert body["position_sizing"]["label"].lower().startswith("full allocation")
 
 
 def test_comparison_volatility_target_position_sizing(cmp_client):
@@ -699,5 +706,42 @@ def test_comparison_invalid_cost_model_rejected(cmp_client):
     resp = cmp_client.post(
         "/research/strategy-comparison",
         json={**_BASE_PAYLOAD, "cost_model": {"type": "commission_slippage", "commission_bps": -1}},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "position_sizing",
+    [
+        {"type": "fixed_fraction", "fraction": 0},
+        {"type": "volatility_target", "target_volatility": 0.1, "lookback_days": 2},
+        {"type": "volatility_target", "target_volatility": 0.1, "lookback_days": 20, "max_exposure": 1.5},
+        {"type": "max_exposure"},
+        {"type": "mystery"},
+    ],
+)
+def test_comparison_invalid_position_sizing_rejected(cmp_client, position_sizing):
+    resp = cmp_client.post(
+        "/research/strategy-comparison",
+        json={**_BASE_PAYLOAD, "position_sizing": position_sizing},
+    )
+    assert resp.status_code == 422
+
+
+@pytest.mark.parametrize(
+    "risk_management",
+    [
+        {"type": "fixed_stop_take_profit"},
+        {"type": "trailing_stop"},
+        {"type": "max_holding_days"},
+        {"type": "combined"},
+        {"type": "fixed_stop_take_profit", "stop_loss_pct": -0.01},
+        {"type": "trailing_stop", "trailing_stop_pct": 1.5},
+    ],
+)
+def test_comparison_invalid_risk_management_rejected(cmp_client, risk_management):
+    resp = cmp_client.post(
+        "/research/strategy-comparison",
+        json={**_BASE_PAYLOAD, "risk_management": risk_management},
     )
     assert resp.status_code == 422
