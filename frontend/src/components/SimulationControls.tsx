@@ -16,10 +16,14 @@ import type {
 // No `parseFloat(value) || default` in any onChange — the raw string is stored
 // and parsed only when computing the emitted config.
 
+// Mirrors the Backtest form's input class (the theme source of truth).  The
+// critical token is `bg-white`, which globals.css remaps to the dark panel
+// background; omitting it is what made these inputs render browser-default white.
 const inputCls =
-  "w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-sm text-slate-900 " +
-  "shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 " +
-  "disabled:opacity-50";
+  "w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-sm " +
+  "text-slate-900 placeholder-slate-400 shadow-sm " +
+  "focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 " +
+  "disabled:opacity-50 disabled:cursor-not-allowed";
 
 function Field({
   label,
