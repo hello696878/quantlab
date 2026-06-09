@@ -145,6 +145,44 @@ def test_exit_trade_logs_previous_close_execution_price():
     assert trades[1]["shares"] == 1000.0
 
 
+def test_fractional_exposure_cost_uses_effective_turnover():
+    """A 50% allocation pays half-sized entry/exit costs and logs real trades."""
+    close = make_close([100.0, 100.0, 100.0])
+    pos = pd.Series([0.0, 0.5, 0.0], index=close.index, name="position")
+
+    strat_eq, _, trades = run_backtest(
+        close,
+        pos,
+        transaction_cost_bps=100.0,
+        initial_capital=1000.0,
+    )
+
+    assert [t["action"] for t in trades] == ["BUY", "SELL"]
+    assert trades[0]["cost"] == pytest.approx(5.0)
+    assert trades[0]["shares"] == pytest.approx(4.975)
+    assert trades[1]["cost"] == pytest.approx(4.975)
+    assert strat_eq.iloc[1] == pytest.approx(995.0)
+    assert strat_eq.iloc[2] == pytest.approx(990.025)
+
+
+def test_fractional_long_short_flip_cost_uses_exposure_delta():
+    close = make_close([100.0, 100.0, 100.0])
+    pos = pd.Series([0.5, -0.5, 0.0], index=close.index, name="position")
+
+    strat_eq, _, trades = run_backtest(
+        close,
+        pos,
+        transaction_cost_bps=100.0,
+        initial_capital=1000.0,
+    )
+
+    assert [t["action"] for t in trades] == ["BUY", "FLIP_TO_SHORT", "COVER"]
+    assert trades[0]["cost"] == pytest.approx(5.0)
+    assert trades[1]["cost"] == pytest.approx(9.95)
+    assert trades[2]["cost"] == pytest.approx(4.9253)
+    assert strat_eq.iloc[-1] == pytest.approx(980.12475)
+
+
 def test_sparse_position_is_forward_filled():
     """Missing position dates mean keep the last known exposure, not go flat."""
     close = make_close([100.0, 110.0, 121.0])

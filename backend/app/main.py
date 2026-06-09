@@ -279,7 +279,7 @@ def _build_response(
 
     When ``position_sizing`` is supplied the position magnitude is scaled
     (signal timing / direction unchanged) before the engine runs; with no
-    sizing (``full``) the position is used as-is.
+    sizing (``full_allocation``) the position is used as-is.
     """
     cost_model_echo = None
     effective_cost_bps = transaction_cost_bps
@@ -290,9 +290,7 @@ def _build_response(
 
     # Position sizing scales exposure magnitude only.  Full / None is identity.
     sized_position = apply_sizing(position, close, position_sizing)
-    position_sizing_echo = (
-        resolve_position_sizing(position_sizing) if position_sizing is not None else None
-    )
+    position_sizing_echo = resolve_position_sizing(position_sizing)
     avg_exposure = average_exposure(sized_position)
 
     strategy_equity, benchmark_equity, trades = run_backtest(
@@ -2620,6 +2618,8 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
         transaction_cost_bps=req.transaction_cost_bps,
         initial_capital=req.initial_capital,
         close=close,
+        cost_model=req.cost_model,
+        position_sizing=req.position_sizing,
     )
 
     if strategy == "sma_crossover":
@@ -2641,7 +2641,10 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
                 ),
             )
         position = sma_crossover_signals(
-            close, fast_window=req.fast_window, slow_window=req.slow_window
+            close,
+            fast_window=req.fast_window,
+            slow_window=req.slow_window,
+            position_mode=req.position_mode,
         )
         return _build_response(
             **common,
@@ -2649,6 +2652,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
             strategy="sma_crossover",
             fast_window=req.fast_window,
             slow_window=req.slow_window,
+            position_mode=req.position_mode,
         )
 
     if strategy == "rsi_mean_reversion":
@@ -2716,6 +2720,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
             momentum_window=req.momentum_window,
             entry_threshold=req.entry_threshold,
             exit_threshold=req.exit_threshold,
+            position_mode=req.position_mode,
         )
         return _build_response(
             **common,
@@ -2724,6 +2729,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
             momentum_window=req.momentum_window,
             momentum_entry_threshold=req.entry_threshold,
             momentum_exit_threshold=req.exit_threshold,
+            position_mode=req.position_mode,
         )
 
     # volatility_breakout (only remaining supported strategy)
@@ -2741,6 +2747,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
         lookback_window=req.lookback_window,
         breakout_multiplier=req.breakout_multiplier,
         exit_window=req.exit_window,
+        position_mode=req.position_mode,
     )
     return _build_response(
         **common,
@@ -2749,6 +2756,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
         vb_lookback_window=req.lookback_window,
         vb_breakout_multiplier=req.breakout_multiplier,
         vb_exit_window=req.exit_window,
+        position_mode=req.position_mode,
     )
 
 

@@ -82,6 +82,11 @@ interface BacktestReportOptions {
   sourceType?: SavedReportSourceType;
 }
 
+interface PositionSizingMeta {
+  type?: string;
+  label?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Download helper
 // ---------------------------------------------------------------------------
@@ -185,6 +190,31 @@ function formatParamValue(value: unknown): string {
     }
   }
   return String(value);
+}
+
+function positionSizingMeta(value: unknown): PositionSizingMeta | undefined {
+  if (!value || typeof value !== "object") return undefined;
+  const record = value as { type?: unknown; label?: unknown };
+  return {
+    type: typeof record.type === "string" ? record.type : undefined,
+    label: typeof record.label === "string" ? record.label : undefined,
+  };
+}
+
+function positionSizingCaveat(positionSizing?: PositionSizingMeta): string {
+  if (!positionSizing) return "";
+  if (
+    positionSizing.type === "full_allocation" ||
+    positionSizing.type === "full"
+  ) {
+    return "";
+  }
+  const label = positionSizing.label ?? positionSizing.type ?? "custom sizing";
+  return (
+    `\n- **Position sizing.** Results reflect effective scaled exposure (${label}); ` +
+    `returns, drawdowns, transaction costs, and trade events are based on ` +
+    `exposure changes after sizing.`
+  );
 }
 
 /** Wrap a body in a level-2 section heading. */
@@ -383,6 +413,7 @@ function riskCaveats(
   tickers: string[],
   dataSource: BacktestReportOptions["dataSource"] = "yfinance",
   positionMode?: string,
+  positionSizing?: PositionSizingMeta,
 ): string {
   const dataLine =
     dataSource === "csv"
@@ -398,7 +429,7 @@ function riskCaveats(
 - **Historical backtest only.** Results reflect simulated performance on past data.
 - **No guarantee of future performance.** Past results do not predict future returns.
 ${dataLine}
-- **Transaction cost & slippage.** Costs use a simple basis-point assumption; real fills, slippage, and market impact are not modelled.
+- **Transaction cost & slippage.** Costs use a simple basis-point assumption; real fills, slippage, and market impact are not modelled.${positionSizingCaveat(positionSizing)}
 - **Possible overfitting.** Parameters or weights chosen on historical data may not generalise out-of-sample.
 - This report is for research and educational purposes only and is **not investment advice**.${shortSellingCaveat(positionMode)}
 ${cryptoLine}
@@ -410,6 +441,7 @@ function keyCaveats(
   tickers: string[],
   dataSource: BacktestReportOptions["dataSource"] = "yfinance",
   positionMode?: string,
+  positionSizing?: PositionSizingMeta,
 ): string {
   const cryptoTickers = Array.from(new Set(tickers.filter(isCryptoTicker)));
   const cryptoLine = cryptoTickers.length
@@ -419,7 +451,7 @@ function keyCaveats(
   return `## Key Caveats
 
 - **Historical only — no guarantee.** Simulated past performance does not predict future returns.
-- **Simplified costs & data.** ${dataWord} with basis-point cost assumptions; slippage and market impact are not modelled.
+- **Simplified costs & data.** ${dataWord} with basis-point cost assumptions; slippage and market impact are not modelled.${positionSizingCaveat(positionSizing)}
 - Research and educational purposes only — **not investment advice**.${shortSellingCaveat(positionMode)}${cryptoLine}
 `;
 }
@@ -464,6 +496,8 @@ interface ReportDoc {
   dataSource?: "yfinance" | "csv";
   /** Direction mode, when applicable — drives the short-selling caveat. */
   positionMode?: string;
+  /** Position sizing, when applicable — drives the sizing caveat. */
+  positionSizing?: PositionSizingMeta;
   fileSlug: string;
   save: ReportSaveMeta;
 
@@ -502,7 +536,12 @@ function renderStandard(doc: ReportDoc): string {
   return joinBlocks([
     header(doc.analysisType),
     ...doc.standardBlocks,
-    riskCaveats(doc.caveatTickers, doc.dataSource, doc.positionMode),
+    riskCaveats(
+      doc.caveatTickers,
+      doc.dataSource,
+      doc.positionMode,
+      doc.positionSizing,
+    ),
   ]);
 }
 
@@ -518,7 +557,12 @@ function renderExecutive(doc: ReportDoc): string {
     head,
     top.length ? section("Key Metrics", mdTable(["Metric", "Value"], top)) : "",
     doc.interpretation ? section("Interpretation", doc.interpretation) : "",
-    keyCaveats(doc.caveatTickers, doc.dataSource, doc.positionMode),
+    keyCaveats(
+      doc.caveatTickers,
+      doc.dataSource,
+      doc.positionMode,
+      doc.positionSizing,
+    ),
   ]);
 }
 
@@ -533,7 +577,12 @@ function renderTearSheet(doc: ReportDoc): string {
     t.drawdownSummary ? section("Drawdown Summary", t.drawdownSummary) : "",
     t.tradesOrEvents ? section("Trades / Events Summary", t.tradesOrEvents) : "",
     annualizationNote(),
-    riskCaveats(doc.caveatTickers, doc.dataSource, doc.positionMode),
+    riskCaveats(
+      doc.caveatTickers,
+      doc.dataSource,
+      doc.positionMode,
+      doc.positionSizing,
+    ),
   ]);
 }
 
@@ -550,7 +599,12 @@ function renderRiskReport(doc: ReportDoc): string {
     r.correlation ? section("Correlation Diagnostics", r.correlation) : "",
     r.riskContribution ? section("Risk Contribution", r.riskContribution) : "",
     r.diagnostics ? section("Diagnostics", r.diagnostics) : "",
-    riskCaveats(doc.caveatTickers, doc.dataSource, doc.positionMode),
+    riskCaveats(
+      doc.caveatTickers,
+      doc.dataSource,
+      doc.positionMode,
+      doc.positionSizing,
+    ),
   ]);
 }
 
@@ -647,6 +701,7 @@ export function buildBacktestReport(
   const m = r.strategy_metrics;
   const params = [...backtestParams(r), ...(options.extraParameters ?? [])];
   const analysisType = options.analysisType ?? "Single-Strategy Backtest";
+  const sizingMeta = positionSizingMeta(r.position_sizing);
   const caveatTickers =
     r.strategy === "pairs"
       ? [r.pairs_asset_y, r.pairs_asset_x].filter((t): t is string => Boolean(t))
@@ -703,6 +758,7 @@ export function buildBacktestReport(
     caveatTickers,
     dataSource: options.dataSource,
     positionMode: r.position_mode,
+    positionSizing: sizingMeta,
     fileSlug: `${slug(r.ticker)}-${slug(r.strategy)}-${r.start_date}-${r.end_date}`,
     metadataBody,
     standardBlocks: [
@@ -764,6 +820,8 @@ export function buildBacktestReport(
         max_drawdown: m.max_drawdown,
         volatility: m.volatility,
         num_trades: r.num_trades,
+        position_sizing: r.position_sizing ?? null,
+        average_exposure: r.average_exposure ?? null,
       },
     },
   };
@@ -784,6 +842,11 @@ export function buildSavedBacktestReport(
   const trades = (rec.trades ?? []) as TradeRecord[];
   const caveatTickers = splitTickerLabel(rec.ticker);
   const label = STRATEGY_LABELS[rec.strategy] ?? rec.strategy;
+  const savedPositionMode =
+    typeof rec.params?.position_mode === "string"
+      ? rec.params.position_mode
+      : undefined;
+  const savedPositionSizing = positionSizingMeta(rec.params?.position_sizing);
 
   const savedMetaRows: [string, string][] = [
       ["Name", rec.name],
@@ -810,6 +873,18 @@ export function buildSavedBacktestReport(
       formatPercent(rec.params.cost_drag_return),
     ]);
   }
+  if (savedPositionSizing) {
+    savedMetaRows.push([
+      "Position sizing",
+      savedPositionSizing.label ?? formatParamValue(rec.params.position_sizing),
+    ]);
+  }
+  if (typeof rec.params?.average_exposure === "number") {
+    savedMetaRows.push([
+      "Average exposure",
+      formatPercent(rec.params.average_exposure),
+    ]);
+  }
 
   const metadataBody = mdTable(["Field", "Value"], savedMetaRows);
 
@@ -826,6 +901,8 @@ export function buildSavedBacktestReport(
   const doc: ReportDoc = {
     analysisType: "Saved Backtest",
     caveatTickers,
+    positionMode: savedPositionMode,
+    positionSizing: savedPositionSizing,
     fileSlug: `saved-${slug(rec.name)}`,
     metadataBody,
     standardBlocks: [
@@ -882,6 +959,12 @@ export function buildSavedBacktestReport(
         cagr: num(m.cagr),
         sharpe_ratio: num(m.sharpe_ratio),
         max_drawdown: num(m.max_drawdown),
+        position_mode: savedPositionMode ?? "long_only",
+        position_sizing: rec.params?.position_sizing ?? null,
+        average_exposure:
+          typeof rec.params?.average_exposure === "number"
+            ? rec.params.average_exposure
+            : null,
         saved_backtest_id: rec.id,
       },
     },

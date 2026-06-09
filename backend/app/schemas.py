@@ -6,7 +6,14 @@ import math
 from datetime import date
 from typing import Annotated, Dict, List, Literal, Optional, Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    AliasChoices,
+    BaseModel,
+    ConfigDict,
+    Field,
+    field_validator,
+    model_validator,
+)
 
 
 # Strategy direction modes.  Long-only (the default, original behaviour),
@@ -111,7 +118,10 @@ _COST_MODEL_FIELD = Field(
 # are generated — it never changes signal timing or direction.  All modes keep
 # |exposure| ≤ 1 (no leverage by default).
 PositionSizingType = Literal[
-    "full", "fixed_fraction", "volatility_target", "max_exposure"
+    "full_allocation", "fixed_fraction", "volatility_target", "max_exposure"
+]
+PositionSizingInputType = Literal[
+    "full", "full_allocation", "fixed_fraction", "volatility_target", "max_exposure"
 ]
 
 
@@ -119,19 +129,20 @@ class PositionSizing(BaseModel):
     """
     Optional position-sizing model for a single-asset backtest.
 
-    * ``full``               — full allocation (default; ±100% on a signal,
-      identical to the original behaviour).
+    * ``full_allocation``    — full allocation (default; ±100% on a signal,
+      identical to the original behaviour).  Legacy ``"full"`` is still
+      accepted and normalized.
     * ``fixed_fraction``     — allocate a fixed ``fraction`` (0–1) of capital on
       each signal; the rest stays in cash.
     * ``volatility_target``  — scale exposure toward an annualized
       ``target_volatility`` using a rolling realized-vol estimate
-      (``vol_lookback`` days, default 20).  Capped at 100% — it only
-      de-levers in high-vol regimes (no leverage).
+      (``lookback_days`` days, default 20).  Capped by ``max_exposure`` (default
+      1.0) — it only de-levers in high-vol regimes (no leverage).
     * ``max_exposure``       — cash reserve: cap ``|exposure|`` at
       ``max_exposure`` (0–1); the remainder is always held in cash.
     """
 
-    type: PositionSizingType = "full"
+    type: PositionSizingInputType = "full_allocation"
     fraction: Optional[float] = Field(
         default=None, gt=0.0, le=1.0, description="fixed_fraction: capital fraction (0–1]."
     )
@@ -141,18 +152,32 @@ class PositionSizing(BaseModel):
         le=2.0,
         description="volatility_target: annualized target volatility (e.g. 0.15 = 15%).",
     )
-    vol_lookback: Optional[int] = Field(
+    lookback_days: Optional[int] = Field(
         default=None,
         ge=2,
         le=2520,
+        validation_alias=AliasChoices("lookback_days", "vol_lookback"),
         description="volatility_target: realized-vol lookback in trading days (default 20).",
     )
     max_exposure: Optional[float] = Field(
         default=None,
         gt=0.0,
         le=1.0,
-        description="max_exposure: cap on |exposure| (0–1]; the remainder stays in cash.",
+        description=(
+            "max_exposure / volatility_target: cap on |exposure| (0–1]; "
+            "the remainder stays in cash."
+        ),
     )
+
+    @model_validator(mode="after")
+    def normalize_and_check(self) -> "PositionSizing":
+        if self.type == "full":
+            self.type = "full_allocation"
+        if self.type == "fixed_fraction" and self.fraction is None:
+            raise ValueError("fixed_fraction position sizing requires fraction.")
+        if self.type == "max_exposure" and self.max_exposure is None:
+            raise ValueError("max_exposure position sizing requires max_exposure.")
+        return self
 
 
 class PositionSizingResolved(BaseModel):
@@ -162,14 +187,14 @@ class PositionSizingResolved(BaseModel):
     label: str
     fraction: Optional[float] = None
     target_volatility: Optional[float] = None
-    vol_lookback: Optional[int] = None
+    lookback_days: Optional[int] = None
     max_exposure: Optional[float] = None
 
 
 _POSITION_SIZING_FIELD = Field(
     default=None,
     description=(
-        "Optional position-sizing model. When omitted, full allocation is used "
+        "Optional position-sizing model. When omitted, full_allocation is used "
         "(backward-compatible default). Sizing scales exposure magnitude only — "
         "signal timing / direction are unchanged, and |exposure| ≤ 1."
     ),
@@ -715,7 +740,7 @@ class BacktestResponse(BaseModel):
     )
     position_sizing: Optional[PositionSizingResolved] = Field(
         default=None,
-        description="Resolved position-sizing echo (present only when a position_sizing was supplied).",
+        description="Resolved position-sizing echo (full_allocation when omitted).",
     )
     average_exposure: Optional[float] = Field(
         default=None,

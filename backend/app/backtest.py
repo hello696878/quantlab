@@ -39,9 +39,9 @@ def run_backtest(
     """
     Run a single-asset backtest and return equity curves plus a trade log.
 
-    Supports long, cash and short exposure: ``position`` ∈ {−1, 0, +1}.  The
-    return (``position[t] * asset_return[t]``) and cost (``|Δposition| *
-    cost_rate``) math is the same for all three, so long-only callers
+    Supports long, cash, short and fractional exposure: ``-1 ≤ position ≤ 1``.
+    The return (``position[t] * asset_return[t]``) and cost (``|Δposition| *
+    cost_rate``) math is the same for all exposures, so long-only callers
     (position ∈ {0, 1}) are completely unaffected.
 
     Parameters
@@ -49,7 +49,8 @@ def run_backtest(
     close : pd.Series
         Adjusted daily closing prices (DatetimeIndex, no NaN).
     position : pd.Series
-        Pre-shifted position series (−1 = short, 0 = flat, +1 = long).
+        Pre-shifted position series (−1 = short, 0 = flat, +1 = long, with
+        fractional values allowed for position sizing).
         Must already account for lookahead-bias prevention.
     transaction_cost_bps : float
         One-way transaction cost in basis points.  Charged on both entry and
@@ -92,9 +93,9 @@ def run_backtest(
     position = position.reindex(close.index).ffill().fillna(0.0)
     if position.isna().any():
         raise ValueError("position must not contain NaN values after alignment.")
-    # Single-asset positions are −1 (short), 0 (cash) or +1 (long).  The return
-    # and cost math below is identical for all three; long-only callers
-    # (position ∈ {0, 1}) are unaffected.
+    # Single-asset exposure is bounded to no-leverage v1 behaviour.  Fractional
+    # values are allowed so position sizing can reduce exposure without
+    # duplicating P&L logic.
     if ((position < -1) | (position > 1)).any():
         raise ValueError("position must be between -1 (short) and 1 (long).")
 
@@ -123,12 +124,14 @@ def run_backtest(
     # -----------------------------------------------------------------------
     # 5. Trade log
     # -----------------------------------------------------------------------
-    # Actions by transition (prev → new position):
-    #   0 → +1  BUY            +1 → 0  SELL
-    #   0 → -1  SHORT          -1 → 0  COVER
-    #   -1 → +1 FLIP_TO_LONG   +1 → -1 FLIP_TO_SHORT
-    # For a long-only series (position ∈ {0, 1}) only BUY/SELL ever occur, and
-    # the prices/shares/costs are byte-for-byte identical to the original model.
+    # Actions by transition (prev → new exposure):
+    #   0 → +   BUY            + → 0  SELL
+    #   0 → -   SHORT          - → 0  COVER
+    #   - → +   FLIP_TO_LONG   + → -  FLIP_TO_SHORT
+    # Same-sign fractional rebalances are logged as BUY/SELL/SHORT/COVER
+    # depending on whether exposure increased or decreased.  Cost is always
+    # based on effective turnover (|Δexposure|), matching the vectorised equity
+    # math above.
     trades: List[Dict] = []
     # Absolute share count of the currently open position (long or short).
     open_shares: float = 0.0
@@ -137,8 +140,8 @@ def run_backtest(
         if abs(float(chg)) < 1e-9:
             continue  # no trade on this day
 
-        prev_pos = int(round(float(position.iloc[i - 1]))) if i > 0 else 0
-        new_pos = int(round(float(position.iloc[i])))
+        prev_pos = float(position.iloc[i - 1]) if i > 0 else 0.0
+        new_pos = float(position.iloc[i])
 
         execution_i = max(i - 1, 0)
         execution_date = close.index[execution_i]
@@ -151,40 +154,45 @@ def run_backtest(
 
         # Equity at the execution close, before the new trade cost is deducted.
         equity_before = float(strategy_equity.iloc[i - 1]) if i > 0 else initial_capital
+        cost_usd = equity_before * abs(float(chg)) * cost_rate
 
-        if new_pos == 0:
-            # ---- Closing to cash: SELL (from long) or COVER (from short) ----
+        # Choose a familiar action label without collapsing fractional exposure
+        # to an integer state.
+        if abs(new_pos) < 1e-9:
             action = "SELL" if prev_pos > 0 else "COVER"
-            close_gross = open_shares * price
-            cost_usd = close_gross * abs(float(chg)) * cost_rate
-            trades.append(
-                {
-                    "date": date_str,
-                    "action": action,
-                    "price": round(price, 4),
-                    "shares": round(open_shares, 4),
-                    "cost": round(cost_usd, 4),
-                }
-            )
+        elif abs(prev_pos) < 1e-9:
+            action = "BUY" if new_pos > 0 else "SHORT"
+        elif prev_pos <= 0 < new_pos:
+            action = "FLIP_TO_LONG"
+        elif prev_pos >= 0 > new_pos:
+            action = "FLIP_TO_SHORT"
+        elif new_pos > 0:
+            action = "BUY" if new_pos > prev_pos else "SELL"
+        else:
+            action = "SHORT" if abs(new_pos) > abs(prev_pos) else "COVER"
+
+        if abs(new_pos) < 1e-9:
+            trade_shares = open_shares
             open_shares = 0.0
         else:
-            # ---- Opening or flipping into a long/short position -------------
-            cost_usd = equity_before * abs(float(chg)) * cost_rate
-            new_shares = (equity_before - cost_usd) / price
-            if prev_pos == 0:
-                action = "BUY" if new_pos > 0 else "SHORT"
+            new_open_shares = abs(new_pos) * max(equity_before - cost_usd, 0.0) / price
+            if prev_pos * new_pos > 0:
+                trade_shares = abs(new_open_shares - open_shares)
+            elif prev_pos * new_pos < 0:
+                trade_shares = open_shares + new_open_shares
             else:
-                action = "FLIP_TO_LONG" if new_pos > 0 else "FLIP_TO_SHORT"
-            trades.append(
-                {
-                    "date": date_str,
-                    "action": action,
-                    "price": round(price, 4),
-                    "shares": round(new_shares, 4),
-                    "cost": round(cost_usd, 4),
-                }
-            )
-            open_shares = new_shares
+                trade_shares = new_open_shares
+            open_shares = new_open_shares
+
+        trades.append(
+            {
+                "date": date_str,
+                "action": action,
+                "price": round(price, 4),
+                "shares": round(trade_shares, 4),
+                "cost": round(cost_usd, 4),
+            }
+        )
 
     return strategy_equity, benchmark_equity, trades
 
@@ -238,12 +246,13 @@ def compute_position_diagnostics(
     else:
         turnover = 0.0
 
-    long_entries = sum(
-        1 for t in trades if t.get("action") in ("BUY", "FLIP_TO_LONG")
-    )
-    short_entries = sum(
-        1 for t in trades if t.get("action") in ("SHORT", "FLIP_TO_SHORT")
-    )
+    if n:
+        prev = pos.shift(1).fillna(0.0)
+        long_entries = int(((prev <= 0) & (pos > 0)).sum())
+        short_entries = int(((prev >= 0) & (pos < 0)).sum())
+    else:
+        long_entries = 0
+        short_entries = 0
 
     return {
         "long_trade_count": long_entries,

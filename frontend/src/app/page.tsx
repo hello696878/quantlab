@@ -69,6 +69,7 @@ const DEFAULT_SMA_PARAMS: BacktestRequest = {
   transaction_cost_bps: 10,
   initial_capital: 100_000,
   position_mode: "long_only",
+  position_sizing: { type: "full_allocation" },
 };
 
 const DEFAULT_RSI_PARAMS: RsiBacktestRequest = {
@@ -80,6 +81,7 @@ const DEFAULT_RSI_PARAMS: RsiBacktestRequest = {
   exit_threshold: 55,
   transaction_cost_bps: 10,
   initial_capital: 100_000,
+  position_sizing: { type: "full_allocation" },
 };
 
 const DEFAULT_BB_PARAMS: BbBacktestRequest = {
@@ -91,6 +93,7 @@ const DEFAULT_BB_PARAMS: BbBacktestRequest = {
   exit_band: "middle",
   transaction_cost_bps: 10,
   initial_capital: 100_000,
+  position_sizing: { type: "full_allocation" },
 };
 
 const DEFAULT_MOMENTUM_PARAMS: MomentumBacktestRequest = {
@@ -103,6 +106,7 @@ const DEFAULT_MOMENTUM_PARAMS: MomentumBacktestRequest = {
   transaction_cost_bps: 10,
   initial_capital: 100_000,
   position_mode: "long_only",
+  position_sizing: { type: "full_allocation" },
 };
 
 const DEFAULT_VB_PARAMS: VbBacktestRequest = {
@@ -115,6 +119,7 @@ const DEFAULT_VB_PARAMS: VbBacktestRequest = {
   transaction_cost_bps: 10,
   initial_capital: 100_000,
   position_mode: "long_only",
+  position_sizing: { type: "full_allocation" },
 };
 
 const DEFAULT_PAIRS_PARAMS: PairsBacktestRequest = {

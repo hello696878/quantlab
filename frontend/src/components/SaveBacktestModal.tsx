@@ -78,6 +78,12 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
   if (typeof result.cost_drag_return === "number") {
     params.cost_drag_return = result.cost_drag_return;
   }
+  if (result.position_sizing) {
+    params.position_sizing = result.position_sizing;
+  }
+  if (typeof result.average_exposure === "number") {
+    params.average_exposure = result.average_exposure;
+  }
   return params;
 }
 

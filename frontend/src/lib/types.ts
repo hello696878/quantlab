@@ -45,7 +45,7 @@ export interface CostModelResolved {
 
 /** Position-sizing model (research v1). Scales exposure magnitude only; |exposure| ≤ 1. */
 export type PositionSizingType =
-  | "full"
+  | "full_allocation"
   | "fixed_fraction"
   | "volatility_target"
   | "max_exposure";
@@ -57,18 +57,18 @@ export interface PositionSizing {
   /** volatility_target: annualized target volatility (e.g. 0.15). */
   target_volatility?: number;
   /** volatility_target: realized-vol lookback in trading days (default 20). */
-  vol_lookback?: number;
-  /** max_exposure: cap on |exposure| (0–1]; remainder stays in cash. */
+  lookback_days?: number;
+  /** max_exposure / volatility_target: cap on |exposure| (0–1]; remainder stays in cash. */
   max_exposure?: number;
 }
 
-/** Resolved position sizing echoed on the response (present only when supplied). */
+/** Resolved position sizing echoed on the response (full_allocation when omitted). */
 export interface PositionSizingResolved {
   type: PositionSizingType;
   label: string;
   fraction?: number | null;
   target_volatility?: number | null;
-  vol_lookback?: number | null;
+  lookback_days?: number | null;
   max_exposure?: number | null;
 }
 
@@ -272,7 +272,7 @@ export interface BacktestResponse {
   total_transaction_cost?: number | null;
   /** Total return given up to transaction costs (gross-of-cost minus net). */
   cost_drag_return?: number | null;
-  /** Resolved position-sizing echo — present only when a position_sizing was supplied. */
+  /** Resolved position-sizing echo — full_allocation when omitted by older callers. */
   position_sizing?: PositionSizingResolved | null;
   /** Mean absolute exposure (|position|) over the backtest period. */
   average_exposure?: number | null;

@@ -8,11 +8,11 @@ with long / short modes.
 
 All v1 modes keep ``|exposure| ≤ 1`` (no leverage by default):
 
-* ``full``              — identity (±100% on a signal).
+* ``full_allocation``   — identity (±100% on a signal).
 * ``fixed_fraction``    — multiply the position by a fixed fraction (0–1].
 * ``volatility_target`` — scale toward an annualized target volatility using a
-  *prior* rolling realized-vol estimate (no lookahead), capped at 100%.
-* ``max_exposure``      — clip ``|position|`` to a cap (cash reserve).
+  *prior* rolling realized-vol estimate (no lookahead), capped at max exposure.
+* ``max_exposure``      — clip ``|position|`` to an exposure cap (cash reserve).
 """
 
 from __future__ import annotations
@@ -35,16 +35,14 @@ def apply_sizing(
     sizing: Optional[PositionSizing],
 ) -> pd.Series:
     """Return *position* scaled by the sizing model (full allocation if None)."""
-    if sizing is None or sizing.type == "full":
+    if sizing is None or sizing.type in ("full", "full_allocation"):
         return position
 
     if sizing.type == "fixed_fraction":
-        frac = sizing.fraction if sizing.fraction is not None else 1.0
-        return position * float(frac)
+        return position * float(sizing.fraction)
 
     if sizing.type == "max_exposure":
-        cap = sizing.max_exposure if sizing.max_exposure is not None else 1.0
-        return position.clip(lower=-float(cap), upper=float(cap))
+        return position.clip(lower=-float(sizing.max_exposure), upper=float(sizing.max_exposure))
 
     if sizing.type == "volatility_target":
         target = (
@@ -52,14 +50,15 @@ def apply_sizing(
             if sizing.target_volatility is not None
             else DEFAULT_TARGET_VOL
         )
-        lookback = int(sizing.vol_lookback or DEFAULT_VOL_LOOKBACK)
+        lookback = int(sizing.lookback_days or DEFAULT_VOL_LOOKBACK)
+        max_exposure = float(sizing.max_exposure if sizing.max_exposure is not None else 1.0)
         daily_returns = close.pct_change()
         realized_daily_vol = daily_returns.rolling(lookback).std()
         target_daily_vol = float(target) / math.sqrt(TRADING_DAYS)
-        # Use the *prior* day's vol estimate (shift 1) so no lookahead, and cap
-        # the scale at 1.0 — vol targeting only de-levers in high-vol regimes.
+        # Use the *prior* day's vol estimate (shift 1) so no lookahead.  The
+        # exposure cap keeps v1 non-levered even when realized vol is very low.
         scale = (target_daily_vol / realized_daily_vol).shift(1)
-        scale = scale.clip(lower=0.0, upper=1.0).fillna(0.0)
+        scale = scale.clip(lower=0.0, upper=max_exposure).fillna(0.0)
         return position * scale
 
     return position
@@ -67,21 +66,21 @@ def apply_sizing(
 
 def resolve(sizing: Optional[PositionSizing]) -> PositionSizingResolved:
     """Resolve *sizing* into a display echo with a human-readable label."""
-    if sizing is None or sizing.type == "full":
+    if sizing is None or sizing.type in ("full", "full_allocation"):
         return PositionSizingResolved(
-            type="full", label="Full allocation (±100% on signal)."
+            type="full_allocation", label="Full allocation (±100% on signal)."
         )
 
     if sizing.type == "fixed_fraction":
-        frac = sizing.fraction if sizing.fraction is not None else 1.0
+        frac = float(sizing.fraction)
         return PositionSizingResolved(
             type="fixed_fraction",
             label=f"Fixed fraction: {frac:g}× capital per signal.",
-            fraction=float(frac),
+            fraction=frac,
         )
 
     if sizing.type == "max_exposure":
-        cap = sizing.max_exposure if sizing.max_exposure is not None else 1.0
+        cap = float(sizing.max_exposure)
         reserve = round(1.0 - float(cap), 4)
         return PositionSizingResolved(
             type="max_exposure",
@@ -95,15 +94,17 @@ def resolve(sizing: Optional[PositionSizing]) -> PositionSizingResolved:
         if sizing.target_volatility is not None
         else DEFAULT_TARGET_VOL
     )
-    lookback = int(sizing.vol_lookback or DEFAULT_VOL_LOOKBACK)
+    lookback = int(sizing.lookback_days or DEFAULT_VOL_LOOKBACK)
+    max_exposure = float(sizing.max_exposure if sizing.max_exposure is not None else 1.0)
     return PositionSizingResolved(
         type="volatility_target",
         label=(
             f"Volatility target: {target:.0%} annualized "
-            f"({lookback}-day vol), capped at 100%."
+            f"({lookback}-day vol), capped at {max_exposure:.0%}."
         ),
         target_volatility=float(target),
-        vol_lookback=lookback,
+        lookback_days=lookback,
+        max_exposure=max_exposure,
     )
 
 

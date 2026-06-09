@@ -28,10 +28,10 @@ const CONSERVATIVE = { commission: 10, slippage: 10, spread: 5 } as const;
 
 // Position sizing options (single-asset directional strategies).
 const SIZING_OPTIONS: { id: PositionSizingType; label: string }[] = [
-  { id: "full", label: "Full Allocation" },
+  { id: "full_allocation", label: "Full Allocation" },
   { id: "fixed_fraction", label: "Fixed Fraction" },
   { id: "volatility_target", label: "Volatility Target" },
-  { id: "max_exposure", label: "Max Exposure" },
+  { id: "max_exposure", label: "Exposure Cap" },
 ];
 
 // Direction modes (supported by SMA Crossover, Momentum, Volatility Breakout).
@@ -56,6 +56,22 @@ const POPULAR_PAIRS: { y: string; x: string }[] = [
   { y: "GS", x: "MS" },
   { y: "XOM", x: "CVX" },
 ];
+
+type LegacyPositionSizing = PositionSizing & {
+  type?: string;
+  vol_lookback?: number | null;
+};
+
+function normalizeSizingType(type: string | null | undefined): PositionSizingType {
+  if (
+    type === "fixed_fraction" ||
+    type === "volatility_target" ||
+    type === "max_exposure"
+  ) {
+    return type;
+  }
+  return "full_allocation";
+}
 
 interface Props {
   strategy: StrategyType;
@@ -227,9 +243,9 @@ export default function BacktestForm({
   );
   const [spreadStr, setSpreadStr] = useState(String(_initialCm?.spread_bps ?? 2));
   // Position sizing (shared across all strategies; initialised from saved params).
-  const _initialPs = smaParams.position_sizing;
+  const _initialPs = smaParams.position_sizing as LegacyPositionSizing | undefined;
   const [sizingType, setSizingType] = useState<PositionSizingType>(
-    _initialPs?.type ?? "full",
+    normalizeSizingType(_initialPs?.type),
   );
   const [fractionStr, setFractionStr] = useState(
     String(_initialPs?.fraction ?? 0.5),
@@ -238,10 +254,13 @@ export default function BacktestForm({
     String(_initialPs?.target_volatility ?? 0.15),
   );
   const [volLookbackStr, setVolLookbackStr] = useState(
-    String(_initialPs?.vol_lookback ?? 20),
+    String(_initialPs?.lookback_days ?? _initialPs?.vol_lookback ?? 20),
   );
   const [maxExposureStr, setMaxExposureStr] = useState(
     String(_initialPs?.max_exposure ?? 0.8),
+  );
+  const [volMaxExposureStr, setVolMaxExposureStr] = useState(
+    String(_initialPs?.type === "volatility_target" ? (_initialPs.max_exposure ?? 1.0) : 1.0),
   );
   // SMA Crossover
   const [smaFastStr, setSmaFastStr] = useState(String(smaParams.fast_window));
@@ -401,8 +420,13 @@ export default function BacktestForm({
   }
 
   // ── Position sizing wiring ─────────────────────────────────────────────────
-  // Sizing is a shared field too.  "Full Allocation" omits position_sizing so
-  // the request is byte-identical to the old full-allocation behaviour.
+  // Sizing is a shared field too.  "Full Allocation" is sent explicitly in the
+  // app UI; the backend still treats an omitted position_sizing as full
+  // allocation for older callers.
+  function pushFullAllocation() {
+    setCommon("position_sizing", { type: "full_allocation" } as PositionSizing);
+  }
+
   function pushFixedFraction(fraction: string) {
     const f = parseFloat(fraction);
     if (isNaN(f) || f <= 0 || f > 1) return;
@@ -421,27 +445,29 @@ export default function BacktestForm({
     } as PositionSizing);
   }
 
-  function pushVolTarget(targetVol: string, lookback: string) {
+  function pushVolTarget(targetVol: string, lookback: string, maxExposure: string) {
     const tv = parseFloat(targetVol);
     const lb = parseInt(lookback, 10);
-    if (isNaN(tv) || tv <= 0 || isNaN(lb) || lb < 2) return;
+    const mx = parseFloat(maxExposure);
+    if (isNaN(tv) || tv <= 0 || isNaN(lb) || lb < 2 || isNaN(mx) || mx <= 0 || mx > 1) return;
     setCommon("position_sizing", {
       type: "volatility_target",
       target_volatility: tv,
-      vol_lookback: lb,
+      lookback_days: lb,
+      max_exposure: mx,
     } as PositionSizing);
   }
 
   function handleSizingTypeChange(t: PositionSizingType) {
     setSizingType(t);
-    if (t === "full") {
-      setCommon("position_sizing", undefined);
+    if (t === "full_allocation") {
+      pushFullAllocation();
     } else if (t === "fixed_fraction") {
       pushFixedFraction(fractionStr);
     } else if (t === "max_exposure") {
       pushMaxExposure(maxExposureStr);
     } else {
-      pushVolTarget(targetVolStr, volLookbackStr);
+      pushVolTarget(targetVolStr, volLookbackStr, volMaxExposureStr);
     }
   }
 
@@ -632,8 +658,9 @@ export default function BacktestForm({
   const targetVolVal = parseFloat(targetVolStr);
   const volLookbackVal = parseInt(volLookbackStr, 10);
   const maxExposureVal = parseFloat(maxExposureStr);
+  const volMaxExposureVal = parseFloat(volMaxExposureStr);
   const sizingOk =
-    sizingType === "full"
+    sizingType === "full_allocation"
       ? true
       : sizingType === "fixed_fraction"
         ? !isNaN(fractionVal) && fractionVal > 0 && fractionVal <= 1
@@ -642,7 +669,10 @@ export default function BacktestForm({
           : !isNaN(targetVolVal) &&
             targetVolVal > 0 &&
             !isNaN(volLookbackVal) &&
-            volLookbackVal >= 2;
+            volLookbackVal >= 2 &&
+            !isNaN(volMaxExposureVal) &&
+            volMaxExposureVal > 0 &&
+            volMaxExposureVal <= 1;
 
   const commonNumericOk =
     costOk && sizingOk && !isNaN(capital) && capital > 0;
@@ -922,116 +952,133 @@ export default function BacktestForm({
         </div>
 
         {/* ── Position sizing ───────────────────────────────────────────── */}
-        <div className="mb-5 rounded-lg border border-slate-200 p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
-              Position sizing
-            </span>
-            <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
-              {SIZING_OPTIONS.map((o) => (
-                <button
-                  key={o.id}
-                  type="button"
-                  disabled={loading}
-                  onClick={() => handleSizingTypeChange(o.id)}
-                  className={
-                    "px-3 py-1.5 text-xs font-medium transition-colors " +
-                    (sizingType === o.id
-                      ? "bg-blue-600 text-white"
-                      : "bg-white text-slate-600 hover:bg-slate-50")
-                  }
-                >
-                  {o.label}
-                </button>
-              ))}
+        {strategy !== "pairs" && (
+          <div className="mb-5 rounded-lg border border-slate-200 p-4">
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                Position sizing
+              </span>
+              <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
+                {SIZING_OPTIONS.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleSizingTypeChange(o.id)}
+                    className={
+                      "px-3 py-1.5 text-xs font-medium transition-colors " +
+                      (sizingType === o.id
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50")
+                    }
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {sizingType === "full" && (
-            <p className="text-xs text-slate-500">
-              Full allocation: ±100% exposure on a signal (current default).
+            {sizingType === "full_allocation" && (
+              <p className="text-xs text-slate-500">
+                Full allocation: ±100% exposure on a signal (current default).
+              </p>
+            )}
+
+            {sizingType === "fixed_fraction" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field label="Fraction" hint="0–1">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={fractionStr}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    onChange={(e) => {
+                      setFractionStr(e.target.value);
+                      pushFixedFraction(e.target.value);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+              </div>
+            )}
+
+            {sizingType === "max_exposure" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field label="Exposure cap" hint="0–1">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={maxExposureStr}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    onChange={(e) => {
+                      setMaxExposureStr(e.target.value);
+                      pushMaxExposure(e.target.value);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+              </div>
+            )}
+
+            {sizingType === "volatility_target" && (
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                <Field label="Target vol" hint="annualized, e.g. 0.15">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={targetVolStr}
+                    min={0}
+                    step={0.01}
+                    onChange={(e) => {
+                      setTargetVolStr(e.target.value);
+                      pushVolTarget(e.target.value, volLookbackStr, volMaxExposureStr);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+                <Field label="Vol lookback" hint="days">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={volLookbackStr}
+                    min={2}
+                    step={1}
+                    onChange={(e) => {
+                      setVolLookbackStr(e.target.value);
+                      pushVolTarget(targetVolStr, e.target.value, volMaxExposureStr);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+                <Field label="Exposure cap" hint="0–1">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={volMaxExposureStr}
+                    min={0}
+                    max={1}
+                    step={0.05}
+                    onChange={(e) => {
+                      setVolMaxExposureStr(e.target.value);
+                      pushVolTarget(targetVolStr, volLookbackStr, e.target.value);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+              </div>
+            )}
+
+            <p className="mt-2.5 text-[11px] text-slate-400">
+              Sizing scales exposure magnitude only — signal timing and direction
+              are unchanged. No leverage: |exposure| ≤ 1 (volatility targeting only
+              de-levers in high-vol regimes).
             </p>
-          )}
-
-          {sizingType === "fixed_fraction" && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Field label="Fraction" hint="0–1">
-                <input
-                  type="number"
-                  className={inputCls}
-                  value={fractionStr}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  onChange={(e) => {
-                    setFractionStr(e.target.value);
-                    pushFixedFraction(e.target.value);
-                  }}
-                  disabled={loading}
-                />
-              </Field>
-            </div>
-          )}
-
-          {sizingType === "max_exposure" && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Field label="Max exposure" hint="0–1">
-                <input
-                  type="number"
-                  className={inputCls}
-                  value={maxExposureStr}
-                  min={0}
-                  max={1}
-                  step={0.05}
-                  onChange={(e) => {
-                    setMaxExposureStr(e.target.value);
-                    pushMaxExposure(e.target.value);
-                  }}
-                  disabled={loading}
-                />
-              </Field>
-            </div>
-          )}
-
-          {sizingType === "volatility_target" && (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-              <Field label="Target vol" hint="annualized, e.g. 0.15">
-                <input
-                  type="number"
-                  className={inputCls}
-                  value={targetVolStr}
-                  min={0}
-                  step={0.01}
-                  onChange={(e) => {
-                    setTargetVolStr(e.target.value);
-                    pushVolTarget(e.target.value, volLookbackStr);
-                  }}
-                  disabled={loading}
-                />
-              </Field>
-              <Field label="Vol lookback" hint="days">
-                <input
-                  type="number"
-                  className={inputCls}
-                  value={volLookbackStr}
-                  min={2}
-                  step={1}
-                  onChange={(e) => {
-                    setVolLookbackStr(e.target.value);
-                    pushVolTarget(targetVolStr, e.target.value);
-                  }}
-                  disabled={loading}
-                />
-              </Field>
-            </div>
-          )}
-
-          <p className="mt-2.5 text-[11px] text-slate-400">
-            Sizing scales exposure magnitude only — signal timing and direction
-            are unchanged. No leverage: |exposure| ≤ 1 (volatility targeting only
-            de-levers in high-vol regimes).
-          </p>
-        </div>
+          </div>
+        )}
 
         {/* ── Strategy-specific fields ───────────────────────────────────── */}
         <div className="mb-5 p-4 rounded-lg bg-blue-50/60 border border-blue-100">
@@ -1459,7 +1506,7 @@ export default function BacktestForm({
                 ⚠ {!costOk
                   ? "Cost model values must be valid numbers (≥ 0)."
                   : !sizingOk
-                    ? "Position sizing values must be valid (fraction / max exposure in (0–1], target vol > 0, lookback ≥ 2)."
+                    ? "Position sizing values must be valid (fraction / exposure cap in (0–1], target vol > 0, lookback ≥ 2)."
                     : isNaN(capital)
                       ? "Initial capital must be a valid number (> 0)."
                       : "Initial capital must be greater than 0."}
