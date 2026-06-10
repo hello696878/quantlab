@@ -110,6 +110,26 @@ export interface RiskDiagnostics {
 /** Annualization convention for risk metrics (research v1). */
 export type AnnualizationMode = "trading_days_252" | "crypto_365" | "auto";
 
+/** Diagnostics for the price series fed to the engine (informational only). */
+export interface DataQuality {
+  provider: string;
+  ticker: string;
+  requested_start_date: string;
+  requested_end_date: string;
+  actual_start_date?: string | null;
+  actual_end_date?: string | null;
+  row_count: number;
+  missing_value_count: number;
+  duplicate_date_count: number;
+  inferred_frequency: string;
+  calendar_gap_count: number;
+  first_price?: number | null;
+  last_price?: number | null;
+  price_column_used: string;
+  adjusted: boolean;
+  warnings: string[];
+}
+
 /** Why a trade happened (only present when risk management is active). */
 export type TradeReason =
   | "signal_entry"
@@ -345,6 +365,9 @@ export interface BacktestResponse {
   annualization_mode_used?: string | null;
   periods_per_year?: number | null;
   annualization_warning?: string | null;
+  /** Market-data provider + diagnostics (research v1) — present on new responses. */
+  data_provider?: string | null;
+  data_quality?: DataQuality | null;
   /** Direction mode used (defaults to "long_only" for strategies without it). */
   position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;
@@ -586,6 +609,8 @@ export interface StrategyComparisonResponse {
   annualization_mode_used?: string | null;
   periods_per_year?: number | null;
   annualization_warning?: string | null;
+  data_provider?: string | null;
+  data_quality?: DataQuality | null;
   strategies: StrategyResultItem[];
   /** Buy-and-hold equity curve — strategy and benchmark fields both carry the benchmark value. */
   benchmark: EquityPoint[];

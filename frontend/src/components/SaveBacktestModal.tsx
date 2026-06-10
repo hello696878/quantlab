@@ -96,6 +96,12 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
     params.periods_per_year = result.periods_per_year;
     params.annualization_warning = result.annualization_warning ?? null;
   }
+  if (result.data_provider) {
+    params.data_provider = result.data_provider;
+  }
+  if (result.data_quality) {
+    params.data_quality = result.data_quality;
+  }
   return params;
 }
 

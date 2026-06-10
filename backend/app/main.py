@@ -60,6 +60,7 @@ from app.risk_management import (
     resolve as resolve_risk_management,
 )
 from app.annualization import resolve_annualization
+from app.market_data import assess_data_quality
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -279,6 +280,7 @@ def _build_response(
     position_sizing: Optional[PositionSizing] = None,
     risk_management: Optional[RiskManagement] = None,
     annualization_mode: Optional[str] = None,
+    data_provider: str = "yfinance",
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response.
 
@@ -328,6 +330,18 @@ def _build_response(
     # to the historical default); never changes trades / equity / total return.
     annualization = resolve_annualization(request_ticker, annualization_mode)
     ppy = annualization.periods_per_year
+
+    # Data-quality diagnostics observe the close series the engine actually
+    # uses — informational only, results are unchanged.  yfinance Close is
+    # auto-adjusted (splits/dividends) in data.fetch_ohlcv; CSV is as-uploaded.
+    data_quality = assess_data_quality(
+        close,
+        ticker=request_ticker.upper(),
+        requested_start_date=start_date,
+        requested_end_date=end_date,
+        provider=data_provider,
+        adjusted=(data_provider == "yfinance"),
+    )
 
     strategy_metrics_dict = compute_metrics(strategy_equity, periods_per_year=ppy)
     benchmark_metrics_dict = compute_metrics(benchmark_equity, periods_per_year=ppy)
@@ -391,6 +405,8 @@ def _build_response(
         annualization_mode_used=annualization.mode_used,
         periods_per_year=annualization.periods_per_year,
         annualization_warning=annualization.warning,
+        data_provider=data_provider,
+        data_quality=data_quality,
         position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
@@ -2282,6 +2298,15 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
     annualization = resolve_annualization(request.ticker, request.annualization_mode)
     ppy = annualization.periods_per_year
 
+    # One shared data fetch → one data-quality assessment for all strategies.
+    data_quality = assess_data_quality(
+        close,
+        ticker=request.ticker.strip().upper(),
+        requested_start_date=request.start_date,
+        requested_end_date=request.end_date,
+        provider="yfinance",
+    )
+
     def _run_strategy(raw_position):
         """Apply risk → sizing → engine to a raw signal (shared assumptions)."""
         nonlocal bench_eq
@@ -2429,6 +2454,8 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         annualization_mode_used=annualization.mode_used,
         periods_per_year=annualization.periods_per_year,
         annualization_warning=annualization.warning,
+        data_provider="yfinance",
+        data_quality=data_quality,
         strategies=results,
         benchmark=bench_curve,
         benchmark_metrics=PerformanceMetrics(**bench_m),
@@ -2678,6 +2705,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
         close=close,
         cost_model=req.cost_model,
         position_sizing=req.position_sizing,
+        data_provider="csv_upload",
     )
 
     if strategy == "sma_crossover":

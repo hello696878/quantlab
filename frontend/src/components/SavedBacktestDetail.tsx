@@ -184,10 +184,14 @@ export default function SavedBacktestDetail({
   const equityCurve = record.equity_curve as EquityPoint[];
   const trades = record.trades as TradeRecord[];
 
-  // Strategy params as key-value pairs for display
+  // Strategy params as key-value pairs for display.  data_quality is a nested
+  // diagnostics object — summarized as a compact pill below, not raw JSON.
   const paramEntries = Object.entries(record.params).filter(
-    ([, v]) => v != null,
+    ([k, v]) => v != null && k !== "data_quality",
   );
+  const savedQuality = record.params?.data_quality as
+    | { row_count?: number; actual_start_date?: string | null; actual_end_date?: string | null }
+    | undefined;
 
   return (
     <div className="space-y-6">
@@ -242,6 +246,22 @@ export default function SavedBacktestDetail({
                 {fmtDollar(record.initial_capital)}
               </span>
             </span>
+            {savedQuality && typeof savedQuality.row_count === "number" && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                           bg-slate-100 text-slate-600 text-xs"
+                title={
+                  savedQuality.actual_start_date && savedQuality.actual_end_date
+                    ? `Actual data range ${savedQuality.actual_start_date} → ${savedQuality.actual_end_date}`
+                    : undefined
+                }
+              >
+                <span className="text-slate-400">data:</span>
+                <span className="font-mono font-medium">
+                  {savedQuality.row_count.toLocaleString("en-US")} rows
+                </span>
+              </span>
+            )}
             <span
               className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
                          bg-slate-100 text-slate-600 text-xs"

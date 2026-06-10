@@ -709,7 +709,33 @@ export default function StrategyComparisonPanel() {
                   )}
                 </span>
               </p>
+              {result.data_quality && (
+                <p>
+                  Data:{" "}
+                  <span className="font-medium text-slate-700">
+                    {result.data_provider === "yfinance"
+                      ? "Yahoo Finance"
+                      : result.data_provider}{" "}
+                    · {result.data_quality.row_count.toLocaleString("en-US")} rows
+                    {result.data_quality.actual_start_date &&
+                      result.data_quality.actual_end_date && (
+                        <>
+                          {" "}
+                          · {result.data_quality.actual_start_date} →{" "}
+                          {result.data_quality.actual_end_date}
+                        </>
+                      )}
+                  </span>
+                </p>
+              )}
             </div>
+            {result.data_quality && result.data_quality.warnings.length > 0 && (
+              <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-amber-700">
+                {result.data_quality.warnings.map((w, i) => (
+                  <li key={`dq-${i}`}>{w}</li>
+                ))}
+              </ul>
+            )}
             {result.annualization_warning && (
               <p className="mt-2 text-[11px] text-slate-400">
                 {result.annualization_warning}

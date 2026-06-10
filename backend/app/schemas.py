@@ -331,6 +331,45 @@ _ANNUALIZATION_FIELD = Field(
 )
 
 
+# ---------------------------------------------------------------------------
+# Market data quality (research v1)
+# ---------------------------------------------------------------------------
+
+class DataQuality(BaseModel):
+    """Diagnostics for the price series actually fed to the backtest engine.
+
+    Purely informational — warnings never block a run, and computing the
+    diagnostics never modifies prices or results.
+    """
+
+    provider: str = Field(description="Data provider: 'yfinance', 'csv_upload', or 'synthetic'.")
+    ticker: str = Field(description="Ticker / dataset label the data belongs to.")
+    requested_start_date: str = Field(description="Start date the user requested.")
+    requested_end_date: str = Field(description="End date the user requested.")
+    actual_start_date: Optional[str] = Field(
+        default=None, description="First date present in the data (None when empty)."
+    )
+    actual_end_date: Optional[str] = Field(
+        default=None, description="Last date present in the data (None when empty)."
+    )
+    row_count: int = Field(description="Number of price rows used.")
+    missing_value_count: int = Field(description="NaN close values found.")
+    duplicate_date_count: int = Field(description="Duplicate index dates found.")
+    inferred_frequency: str = Field(
+        description="Lightweight frequency guess: business_day / calendar_day / weekly / monthly / unknown."
+    )
+    calendar_gap_count: int = Field(description="Gaps longer than 5 calendar days.")
+    first_price: Optional[float] = Field(default=None, description="First close price.")
+    last_price: Optional[float] = Field(default=None, description="Last close price.")
+    price_column_used: str = Field(description="Which price column fed the engine.")
+    adjusted: bool = Field(
+        description="True when prices are split/dividend-adjusted (yfinance auto_adjust)."
+    )
+    warnings: List[str] = Field(
+        default_factory=list, description="Informational data warnings (never blocking)."
+    )
+
+
 class AnnualizationResolved(BaseModel):
     """Resolved annualization echo (present on backtest / comparison responses)."""
 
@@ -926,6 +965,12 @@ class BacktestResponse(BaseModel):
     )
     annualization_warning: Optional[str] = Field(
         default=None, description="Set when 'auto' could not confirm the asset class."
+    )
+    data_provider: Optional[str] = Field(
+        default=None, description="Market-data provider used ('yfinance' / 'csv_upload')."
+    )
+    data_quality: Optional[DataQuality] = Field(
+        default=None, description="Diagnostics for the price series fed to the engine."
     )
     position_mode: str = Field(
         default="long_only",
@@ -1585,6 +1630,12 @@ class StrategyComparisonResponse(BaseModel):
     )
     annualization_warning: Optional[str] = Field(
         default=None, description="Set when 'auto' could not confirm the asset class."
+    )
+    data_provider: Optional[str] = Field(
+        default=None, description="Market-data provider used (one shared fetch for all strategies)."
+    )
+    data_quality: Optional[DataQuality] = Field(
+        default=None, description="Diagnostics for the shared price series (computed once)."
     )
 
     strategies: List[StrategyResultItem] = Field(

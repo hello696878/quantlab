@@ -20,6 +20,7 @@ import SaveBacktestModal from "@/components/SaveBacktestModal";
 import SignalDiagnostics from "@/components/SignalDiagnostics";
 import ShortModeDiagnostics from "@/components/ShortModeDiagnostics";
 import RiskDiagnosticsCard from "@/components/RiskDiagnosticsCard";
+import DataQualityCard from "@/components/DataQualityCard";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildBacktestReport, downloadTextFile } from "@/lib/reportExport";
@@ -924,6 +925,13 @@ export default function HomePage() {
                   <RiskDiagnosticsCard
                     risk={result.risk_management}
                     diagnostics={result.risk_diagnostics ?? null}
+                  />
+                )}
+
+                {result.data_quality && (
+                  <DataQualityCard
+                    provider={result.data_provider}
+                    quality={result.data_quality}
                   />
                 )}
 

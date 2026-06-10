@@ -52,6 +52,10 @@ def fetch_ohlcv(ticker: str, start: str, end: str) -> pd.DataFrame:
     df = df[cols].copy()
     df.dropna(subset=["Close"], inplace=True)
 
+    # Guarantee ascending dates (yfinance returns ascending; this is defensive).
+    if not df.index.is_monotonic_increasing:
+        df.sort_index(inplace=True)
+
     return df
 
 

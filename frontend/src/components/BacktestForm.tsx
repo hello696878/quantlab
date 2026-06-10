@@ -918,6 +918,10 @@ export default function BacktestForm({
                 </div>
               </div>
             </Field>
+            <p className="mt-1.5 text-[11px] text-slate-400">
+              Data source: Yahoo Finance (default provider). CSV upload is
+              available in the CSV Backtest workspace.
+            </p>
           </div>
         )}
 

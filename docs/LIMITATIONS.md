@@ -15,7 +15,17 @@ Price data is sourced from yfinance (Yahoo Finance). This data:
 - Is not suitable for production trading systems
 - May return adjusted or unadjusted prices depending on the ticker and date range
 
-Always sanity-check results that look unusually good or bad.
+QuantLab fetches with `auto_adjust=True`, so the `Close` column used by every backtest is **split/dividend-adjusted**. Always sanity-check results that look unusually good or bad.
+
+### Data provider abstraction is v1 — yfinance and CSV only
+
+Backtest responses now report `data_provider` and `data_quality` diagnostics (actual range, row count, missing values, duplicate dates, inferred frequency, calendar gaps, warnings). These diagnostics are **observational**: they describe the series the engine used; they never repair, fill, or block data. Current limits:
+
+- **No paid/institutional data provider integration yet** (Polygon, Tiingo, Alpaca, Binance, …) — the abstraction is prepared for them, but yfinance and CSV upload are the only live providers.
+- **No intraday provider abstraction** — daily bars only.
+- **No exchange-native crypto data provider** — crypto goes through Yahoo Finance's `-USD` pairs.
+- Data-quality warnings are heuristics (frequency inference, gap detection with a 5-day threshold, 7-day edge tolerance); absence of warnings does not certify the data is correct.
+- Portfolio endpoints (multi-ticker) do not yet report per-ticker data quality.
 
 ### No survivorship-bias-free database
 

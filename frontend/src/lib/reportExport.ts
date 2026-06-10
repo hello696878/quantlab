@@ -443,8 +443,8 @@ function riskCaveats(
 ): string {
   const dataLine =
     dataSource === "csv"
-      ? "- **Data source limitations.** Prices come from the uploaded CSV file; column choices, missing rows, date cleaning, and stale or erroneous prices affect results."
-      : "- **Data source limitations.** Prices come from Yahoo Finance (yfinance) and may contain gaps or errors.";
+      ? "- **Data source limitations.** Prices come from the uploaded CSV file; column choices, missing rows, date cleaning, and stale or erroneous prices affect results. Market data from any provider may contain gaps, revisions, missing values, corporate action adjustments, or provider-specific errors."
+      : "- **Data source limitations.** Market data comes from the selected provider and may contain gaps, revisions, missing values, corporate action adjustments, or provider-specific errors. Yahoo Finance / yfinance data is convenient for research but is not a professional-grade data feed.";
   const cryptoTickers = Array.from(new Set(tickers.filter(isCryptoTicker)));
   const cryptoLine = cryptoTickers.length
     ? `\n- **Crypto / 24/7 markets.** ${cryptoTickers.join(", ")} trades outside equity market hours; annualized return, volatility, Sharpe, Sortino, Calmar, and CAGR use QuantLab's standard daily-return convention and should be compared with care.`
@@ -831,6 +831,18 @@ export function buildBacktestReport(
       metaRows.push(["Annualization warning", r.annualization_warning]);
     }
   }
+  if (r.data_quality) {
+    const q = r.data_quality;
+    metaRows.push(["Data provider", r.data_provider ?? q.provider]);
+    if (q.actual_start_date && q.actual_end_date) {
+      metaRows.push(["Actual data range", `${q.actual_start_date} → ${q.actual_end_date}`]);
+    }
+    metaRows.push(["Data rows", String(q.row_count)]);
+    metaRows.push(["Price column", `${q.price_column_used}${q.adjusted ? " (adjusted)" : ""}`]);
+    if (q.warnings.length > 0) {
+      metaRows.push(["Data warnings", q.warnings.join(" ")]);
+    }
+  }
   const metadataBody = mdTable(["Field", "Value"], metaRows);
 
   const execBullets = [
@@ -1012,6 +1024,26 @@ export function buildSavedBacktestReport(
       ? rec.params.annualization_warning
       : null,
   );
+  if (typeof rec.params?.data_provider === "string") {
+    savedMetaRows.push(["Data provider", rec.params.data_provider]);
+  }
+  const savedQuality = rec.params?.data_quality as
+    | { actual_start_date?: string | null; actual_end_date?: string | null; row_count?: number; warnings?: string[] }
+    | undefined;
+  if (savedQuality && typeof savedQuality === "object") {
+    if (savedQuality.actual_start_date && savedQuality.actual_end_date) {
+      savedMetaRows.push([
+        "Actual data range",
+        `${savedQuality.actual_start_date} → ${savedQuality.actual_end_date}`,
+      ]);
+    }
+    if (typeof savedQuality.row_count === "number") {
+      savedMetaRows.push(["Data rows", String(savedQuality.row_count)]);
+    }
+    if (Array.isArray(savedQuality.warnings) && savedQuality.warnings.length > 0) {
+      savedMetaRows.push(["Data warnings", savedQuality.warnings.join(" ")]);
+    }
+  }
 
   const metadataBody = mdTable(["Field", "Value"], savedMetaRows);
 
