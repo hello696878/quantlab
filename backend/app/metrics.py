@@ -1,7 +1,8 @@
 """
 Performance metrics computed from a daily equity curve.
 
-All annualised metrics assume 252 trading days per year.
+Annualized metrics use a configurable ``periods_per_year`` convention.  The
+default remains 252 trading days per year for backward compatibility.
 The risk-free rate defaults to 0 % (typical for US-equity strategy benchmarks).
 """
 
@@ -33,8 +34,9 @@ def compute_metrics(
     periods_per_year : int
         Annualization convention — return periods per year (default 252 for
         equities; 365 for 24/7 crypto daily data).  Affects CAGR, volatility,
-        Sharpe and Sortino only; it never changes total return, drawdown, or
-        the equity curve.  The default keeps results identical to before.
+        Sharpe, Sortino, and Calmar only; it never changes total return,
+        drawdown, or the equity curve.  The default keeps results identical to
+        before.
 
     Returns
     -------

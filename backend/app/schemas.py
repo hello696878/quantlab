@@ -314,9 +314,9 @@ _RISK_MANAGEMENT_FIELD = Field(
 # Annualization convention (research v1)
 # ---------------------------------------------------------------------------
 
-# Annualized metrics (volatility, Sharpe, Sortino) and CAGR depend on how many
-# return periods make up a year.  This only rescales metrics — it never changes
-# trades, the equity curve, or total return.
+# Annualized metrics (CAGR, volatility, Sharpe, Sortino, Calmar) depend on how
+# many return periods make up a year.  This only rescales metrics — it never
+# changes trades, the equity curve, or total return.
 AnnualizationMode = Literal["trading_days_252", "crypto_365", "auto"]
 
 _ANNUALIZATION_FIELD = Field(
@@ -325,8 +325,8 @@ _ANNUALIZATION_FIELD = Field(
         "Optional annualization convention for risk metrics: 'trading_days_252' "
         "(default, equities/ETFs), 'crypto_365' (24/7 crypto daily data), or "
         "'auto' (infer from the ticker). When omitted, 252 is used "
-        "(backward-compatible). Affects volatility / Sharpe / Sortino / CAGR "
-        "scaling only — trades and total return are unchanged."
+        "(backward-compatible). Affects CAGR / Calmar / volatility / Sharpe / "
+        "Sortino scaling only — trades and total return are unchanged."
     ),
 )
 

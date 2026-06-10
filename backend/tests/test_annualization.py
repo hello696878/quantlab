@@ -61,6 +61,13 @@ def test_resolve_auto_unknown_defaults_252_with_warning():
     assert r.warning is not None  # uncertain → 252 + caveat
 
 
+def test_resolve_auto_unknown_usd_pair_defaults_252_with_warning():
+    r = resolve_annualization("ZZZ-USD", "auto")
+    assert r.mode_used == "trading_days_252"
+    assert r.periods_per_year == 252
+    assert r.warning is not None
+
+
 # ---------------------------------------------------------------------------
 # Metrics-engine scaling
 # ---------------------------------------------------------------------------
@@ -97,6 +104,7 @@ def test_metrics_total_return_and_drawdown_unchanged_by_convention():
     assert m365["max_drawdown"] == m252["max_drawdown"]
     # CAGR differs (fewer years implied by more periods/year).
     assert m365["cagr"] != m252["cagr"]
+    assert m365["calmar_ratio"] != m252["calmar_ratio"]
 
 
 def test_metrics_rejects_nonpositive_periods():
@@ -196,3 +204,29 @@ def test_api_comparison_default_is_252(client):
     body = client.post("/research/strategy-comparison", json={}).json()
     assert body["annualization_mode_used"] == "trading_days_252"
     assert body["periods_per_year"] == 252
+
+
+def test_api_comparison_convention_changes_metrics_not_curves(client):
+    a = client.post(
+        "/research/strategy-comparison",
+        json={"annualization_mode": "trading_days_252"},
+    ).json()
+    b = client.post(
+        "/research/strategy-comparison",
+        json={"annualization_mode": "crypto_365"},
+    ).json()
+
+    assert a["benchmark"] == b["benchmark"]
+    assert a["benchmark_metrics"]["total_return"] == b["benchmark_metrics"]["total_return"]
+    assert a["benchmark_metrics"]["max_drawdown"] == b["benchmark_metrics"]["max_drawdown"]
+    assert a["benchmark_metrics"]["volatility"] != b["benchmark_metrics"]["volatility"]
+    assert a["benchmark_metrics"]["calmar_ratio"] != b["benchmark_metrics"]["calmar_ratio"]
+
+    for sa, sb in zip(a["strategies"], b["strategies"]):
+        assert sa["strategy"] == sb["strategy"]
+        assert sa["equity_curve"] == sb["equity_curve"]
+        assert sa["num_trades"] == sb["num_trades"]
+        assert sa["metrics"]["total_return"] == sb["metrics"]["total_return"]
+        assert sa["metrics"]["max_drawdown"] == sb["metrics"]["max_drawdown"]
+        assert sa["metrics"]["volatility"] != sb["metrics"]["volatility"]
+        assert sa["metrics"]["calmar_ratio"] != sb["metrics"]["calmar_ratio"]

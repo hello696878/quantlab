@@ -350,6 +350,28 @@ def test_cost_model_params_roundtrip(client):
     assert params["total_transaction_cost"] == pytest.approx(123.45)
 
 
+def test_annualization_params_roundtrip(client):
+    """Saved params preserve annualization metadata for report/export reloads."""
+    payload = {
+        **BASE_PAYLOAD,
+        "params": {
+            "fast_window": 50,
+            "slow_window": 200,
+            "annualization_mode": "auto",
+            "annualization_mode_used": "crypto_365",
+            "periods_per_year": 365,
+            "annualization_warning": None,
+        },
+    }
+    item_id = client.post("/saved-backtests", json=payload).json()["id"]
+    params = client.get(f"/saved-backtests/{item_id}").json()["params"]
+
+    assert params["annualization_mode"] == "auto"
+    assert params["annualization_mode_used"] == "crypto_365"
+    assert params["periods_per_year"] == 365
+    assert params["annualization_warning"] is None
+
+
 # ---------------------------------------------------------------------------
 # 8. Notes field
 # ---------------------------------------------------------------------------

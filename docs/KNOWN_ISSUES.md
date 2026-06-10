@@ -52,10 +52,10 @@ of a **research tool**.
 
 ## Metrics
 
-- **Annualization assumes 252 trading days** (US-equity convention). The
-  **crypto 365-day convention** is currently stored as a *preference only* — the
-  backend still annualizes with 252, so crypto annualized figures may need future
-  refinement.
+- **Annualization is selectable for single-asset backtests and Strategy
+  Comparison only.** Use `trading_days_252`, `crypto_365`, or `auto` depending
+  on the asset. Portfolio analytics, CSV upload, pairs trading, and SMA research
+  tools still use the existing 252 trading-day convention in this version.
 - **Risk-free rate is 0** in Sharpe/Sortino (a portfolio-level `risk_free_rate`
   is used in the efficient frontier / optimization Sharpe objective).
 

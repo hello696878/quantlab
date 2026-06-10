@@ -612,9 +612,9 @@ export function AnnualizationControl({
         disabled={disabled}
       />
       <p className="mt-2 text-[11px] text-slate-400">
-        Annualization affects Sharpe, Sortino, and volatility (252 for equities,
-        365 for 24/7 crypto daily data). It changes metric scaling only — not
-        trades or returns.
+        Annualization affects CAGR, Calmar, Sharpe, Sortino, and volatility
+        (252 for equities, 365 for 24/7 crypto daily data). It changes metric
+        scaling only — not trades, equity curves, total return, or drawdown.
         {value === "auto" &&
           " Auto uses Crypto 365 for recognized crypto tickers and 252 otherwise."}
       </p>

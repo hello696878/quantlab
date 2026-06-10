@@ -3,9 +3,9 @@
  *
  * Single-user, browser-only: everything is persisted in `localStorage` — there
  * is no account system and no cloud sync.  Settings prefill new forms and
- * control display conventions (theme accent, default report template).  They
- * never change backend analytics; the annualization convention is stored for
- * future use only.
+ * control display conventions (theme accent, default report template).  The
+ * annualization convention is sent with new single-asset Backtest and Strategy
+ * Comparison requests; portfolio tools keep their own 252-day convention.
  */
 
 import type { ReportTemplate } from "./reportExport";
@@ -17,7 +17,7 @@ export type DateRangeOption =
   | "last_10y"
   | "custom";
 
-export type AnnualizationConvention = "trading_days_252" | "crypto_365";
+export type AnnualizationConvention = "trading_days_252" | "crypto_365" | "auto";
 
 export type AccentColor =
   | "cyan"
@@ -72,6 +72,7 @@ export const ANNUALIZATION_OPTIONS: {
 }[] = [
   { id: "trading_days_252", label: "252 trading days (equities)" },
   { id: "crypto_365", label: "365 days (crypto / 24-7)" },
+  { id: "auto", label: "Auto (ticker-based)" },
 ];
 
 export const ACCENT_OPTIONS: { id: AccentColor; label: string; swatch: string }[] = [

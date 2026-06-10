@@ -64,7 +64,7 @@ The benchmark is always buy-and-hold of the primary asset with no transaction co
 
 ### Annualization convention is selectable but still simplified
 
-Single-asset backtests and Strategy Comparison support an **annualization convention** (`annualization_mode`): `trading_days_252` (default, equities/ETFs), `crypto_365` (24/7 crypto daily data), or `auto` (recognized crypto tickers → 365, otherwise 252 with a caveat). The convention rescales **CAGR, Sharpe, Sortino, and volatility** only — it never changes trades, the equity curve, total return, or max drawdown. The default (252) is identical to previous behaviour.
+Single-asset backtests and Strategy Comparison support an **annualization convention** (`annualization_mode`): `trading_days_252` (default, equities/ETFs), `crypto_365` (24/7 crypto daily data), or `auto` (recognized crypto tickers → 365, otherwise 252 with a caveat). The convention rescales **CAGR, Calmar, Sharpe, Sortino, and volatility** only — it never changes trades, the equity curve, total return, or max drawdown. The default (252) is identical to previous behaviour.
 
 This is still a simplified convention:
 

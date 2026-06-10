@@ -82,7 +82,7 @@ A full pre-release checklist is in [`docs/RELEASE_CHECKLIST.md`](RELEASE_CHECKLI
 - **Execution realism:** flat-bps turnover cost only — no slippage or market-impact model yet.
 - **Short selling is simplified:** no borrow fees, margin, liquidation, or funding modelled (`|position| ≤ 1`, no leverage).
 - **Portfolio optimization is historical / in-sample** and can overfit — descriptive, not a forecast.
-- **Annualization** assumes 252 trading days (US-equity convention; crypto 365 is a stored preference only).
+- **Annualization** defaults to 252 trading days, with selectable `crypto_365` and `auto` conventions for single-asset Backtest and Strategy Comparison runs.
 - **Local SQLite only** — single-user, no authentication or cloud sync.
 - **PDF export** uses the browser print dialog (text + tables; embedded chart images are future work).
 

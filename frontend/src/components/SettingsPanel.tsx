@@ -264,18 +264,22 @@ export default function SettingsPanel() {
             </select>
           </Field>
         </div>
-        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
-          <span className="font-semibold">Note:</span> backend metrics currently
-          annualize with <span className="font-mono">252</span> trading days. This
-          preference is stored for future use and does <span className="font-semibold">not</span>{" "}
-          change today&apos;s calculations.
-          {annualization === "crypto_365" && (
+        <div className="mt-3 rounded-lg border border-slate-200 bg-slate-50 p-3 text-xs text-slate-500">
+          <span className="font-semibold text-slate-700">Applied to new runs:</span>{" "}
+          single-asset Backtest and Strategy Comparison requests use this
+          convention for CAGR, Calmar, volatility, Sharpe, and Sortino. It does
+          not change trades, equity curves, total return, or drawdown.
+          {annualization === "auto" && (
             <>
-              {" "}
-              <span className="font-semibold">Crypto 365-day annualization is
-              experimental</span> and not yet applied server-side.
+              {" "}Auto resolves recognized crypto tickers to 365 periods/year
+              and otherwise falls back to 252 with a backend caveat when the
+              asset class is uncertain.
             </>
           )}
+          <span className="block pt-1 text-slate-400">
+            Portfolio analytics remain on the existing 252 trading-day
+            convention in this version.
+          </span>
         </div>
       </div>
 

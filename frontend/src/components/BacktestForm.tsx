@@ -1373,8 +1373,8 @@ export default function BacktestForm({
               </div>
             </div>
             <p className="text-[11px] text-slate-400">
-              Annualization affects Sharpe, Sortino, and volatility. Use 365 for
-              24/7 crypto daily data.
+              Annualization affects CAGR, Calmar, Sharpe, Sortino, and
+              volatility. Use 365 for 24/7 crypto daily data.
             </p>
             {annualizationMode === "auto" && (
               <p className="text-[11px] text-slate-400">
@@ -1384,7 +1384,7 @@ export default function BacktestForm({
             )}
             <p className="text-[11px] text-slate-400">
               Annualization changes metric scaling only; it does not change trades
-              or returns.
+              equity curves, total return, or drawdown.
             </p>
             {looksLikeCrypto(smaParams.ticker) &&
               annualizationMode === "trading_days_252" && (

@@ -94,6 +94,7 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
     params.annualization_mode = result.annualization_mode;
     params.annualization_mode_used = result.annualization_mode_used;
     params.periods_per_year = result.periods_per_year;
+    params.annualization_warning = result.annualization_warning ?? null;
   }
   return params;
 }

@@ -326,9 +326,11 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
   Stress Test, and the report template selector
 - Theme accent applies live via existing `[data-accent]` CSS (violet/amber
   added) + a pre-paint script in `layout.tsx` to avoid a flash on reload
-- Annualization convention is **stored for future use only** — backend still
-  uses 252 trading days; the panel shows a clear (crypto = experimental) note
-- Frontend-only (`tsc --noEmit` clean); no backend or quant-logic changes
+- Annualization convention is now applied to new single-asset Backtest and
+  Strategy Comparison runs (`trading_days_252`, `crypto_365`, or `auto`);
+  portfolio analytics remain on the existing 252 trading-day convention
+- Affects annualized metrics only (CAGR, Calmar, volatility, Sharpe, Sortino);
+  trades, equity curves, total return, and drawdown are unchanged
 
 ### Phase 9.2 — Neon Quant Terminal Theme System ✅
 
@@ -732,8 +734,9 @@ candidate next steps; order and scope may change, and none are commitments.
   environment config, image hardening, basic rate limiting.
 - **Richer PDF reports** — embed equity/drawdown chart images in the print/PDF
   export (currently text + tables only).
-- **Crypto annualization (365-day)** wired end-to-end (currently a stored
-  preference only; backend still annualizes with 252).
+- **Broader annualization integration** — extend the selectable convention
+  beyond single-asset Backtest and Strategy Comparison into portfolio, CSV,
+  pairs, and research-tool endpoints where the architecture supports it.
 - **Real data-provider integrations** beyond yfinance, with data-quality
   warnings (gaps, splits, anomalies) and a dividend-adjusted toggle.
 

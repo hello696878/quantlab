@@ -1,14 +1,14 @@
 """
 Annualization convention engine (research v1).
 
-Annualized risk metrics (volatility, Sharpe, Sortino) and CAGR depend on how many
-return periods make up a year:
+Annualized metrics (CAGR, volatility, Sharpe, Sortino, Calmar) depend on how
+many return periods make up a year:
 
 * ``trading_days_252`` — 252 trading days/year (equities, ETFs; the default and
   the historical behaviour).
 * ``crypto_365``       — 365 days/year (24/7 crypto daily data).
-* ``auto``             — infer from the ticker: recognized crypto → 365, else 252
-  (with a warning when the asset class can't be confirmed).
+* ``auto``             — infer from the ticker: recognized crypto → 365, else
+  252 (with a warning when the asset class can't be confirmed).
 
 Changing the convention only rescales annualized metrics — it never changes
 trades, the equity curve, or total return.
@@ -62,10 +62,10 @@ def _looks_like_crypto(ticker: str) -> bool:
     t = ticker.strip().upper()
     if t.endswith("-USD"):
         base = t[:-4]
-        # A ``-USD`` pair is the Yahoo crypto convention; treat known bases as
-        # crypto with confidence, and any other ``-USD`` pair as crypto too
-        # (equities/ETFs never carry a ``-USD`` suffix on Yahoo).
-        return base in _KNOWN_CRYPTO_BASES or base.isalpha()
+        # Be conservative: only recognized crypto bases auto-resolve to 365.
+        # Unknown ``*-USD`` symbols fall through to 252 with a warning instead
+        # of silently applying a crypto convention to an unconfirmed ticker.
+        return base in _KNOWN_CRYPTO_BASES
     return t in _KNOWN_CRYPTO_BASES
 
 

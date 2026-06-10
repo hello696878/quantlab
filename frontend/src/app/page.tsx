@@ -427,23 +427,26 @@ export default function HomePage() {
     const s = loadSettings();
     applyAccent(s.accent_color);
     const { start_date, end_date } = resolveDateRange(s);
-    const common = {
+    const commonBase = {
       initial_capital: s.default_initial_capital,
       transaction_cost_bps: s.default_transaction_cost_bps,
       cost_model: {
         type: "simple_bps" as const,
         transaction_cost_bps: s.default_transaction_cost_bps,
       },
-      annualization_mode: s.annualization_convention,
       start_date,
       end_date,
     };
-    setSmaParams((p) => ({ ...p, ...common }));
-    setRsiParams((p) => ({ ...p, ...common }));
-    setBbParams((p) => ({ ...p, ...common }));
-    setMomentumParams((p) => ({ ...p, ...common }));
-    setVbParams((p) => ({ ...p, ...common }));
-    setPairsParams((p) => ({ ...p, ...common }));
+    const commonSingleAsset = {
+      ...commonBase,
+      annualization_mode: s.annualization_convention,
+    };
+    setSmaParams((p) => ({ ...p, ...commonSingleAsset }));
+    setRsiParams((p) => ({ ...p, ...commonSingleAsset }));
+    setBbParams((p) => ({ ...p, ...commonSingleAsset }));
+    setMomentumParams((p) => ({ ...p, ...commonSingleAsset }));
+    setVbParams((p) => ({ ...p, ...commonSingleAsset }));
+    setPairsParams((p) => ({ ...p, ...commonBase }));
     setFormKey((k) => k + 1);
   }, []);
 
@@ -510,6 +513,7 @@ export default function HomePage() {
         break;
       case "crypto_momentum":
         setStrategy("momentum");
+        setSmaParams((p) => ({ ...p, annualization_mode: "auto" }));
         setMomentumParams(DEMO_CRYPTO_MOMENTUM_PARAMS);
         setResult(null);
         setError(null);
@@ -858,12 +862,18 @@ export default function HomePage() {
                       className="rounded bg-slate-100 px-1.5 py-0.5 text-[11px] font-medium text-slate-600"
                       title={
                         result.annualization_warning ??
-                        "Annualization convention for Sharpe / Sortino / volatility"
+                        "Annualization convention for CAGR / Calmar / Sharpe / Sortino / volatility"
                       }
                     >
                       {result.annualization_mode === "auto"
-                        ? `Auto → ${result.periods_per_year}d`
-                        : `${result.periods_per_year}d/yr`}
+                        ? `Auto → ${
+                            result.annualization_mode_used === "crypto_365"
+                              ? "Crypto 365"
+                              : "Trading 252"
+                          }`
+                        : result.annualization_mode_used === "crypto_365"
+                          ? "Crypto 365"
+                          : "Trading 252"}
                     </span>
                   )}
                   <span className="ml-auto flex items-center gap-2">

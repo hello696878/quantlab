@@ -447,7 +447,7 @@ function riskCaveats(
       : "- **Data source limitations.** Prices come from Yahoo Finance (yfinance) and may contain gaps or errors.";
   const cryptoTickers = Array.from(new Set(tickers.filter(isCryptoTicker)));
   const cryptoLine = cryptoTickers.length
-    ? `\n- **Crypto / 24/7 markets.** ${cryptoTickers.join(", ")} trades outside equity market hours; annualized return, volatility, Sharpe, Sortino, and CAGR use QuantLab's standard daily-return convention and should be compared with care.`
+    ? `\n- **Crypto / 24/7 markets.** ${cryptoTickers.join(", ")} trades outside equity market hours; annualized return, volatility, Sharpe, Sortino, Calmar, and CAGR use QuantLab's standard daily-return convention and should be compared with care.`
     : "";
 
   return `## Risk / Caveats
@@ -456,7 +456,7 @@ function riskCaveats(
 - **No guarantee of future performance.** Past results do not predict future returns.
 ${dataLine}
 - **Transaction cost & slippage.** Costs use a simple basis-point assumption; real fills, slippage, and market impact are not modelled.${positionSizingCaveat(positionSizing)}${riskManagementCaveat(riskManagement)}
-- **Annualization convention.** Annualized metrics depend on the selected annualization convention. Crypto assets may be more appropriately annualized with 365 periods per year, while equities often use 252 trading days. The convention rescales Sharpe / Sortino / volatility / CAGR only — it does not change trades or total return.
+- **Annualization convention.** Annualized metrics depend on the selected annualization convention. Crypto assets may be more appropriately annualized with 365 periods per year, while equities often use 252 trading days. The convention rescales CAGR / Calmar / Sharpe / Sortino / volatility only — it does not change trades or total return.
 - **Possible overfitting.** Parameters or weights chosen on historical data may not generalise out-of-sample.
 - This report is for research and educational purposes only and is **not investment advice**.${shortSellingCaveat(positionMode)}
 ${cryptoLine}
@@ -484,9 +484,31 @@ function keyCaveats(
 `;
 }
 
+function annualizationSummary(
+  mode?: string | null,
+  modeUsed?: string | null,
+  periods?: number | null,
+  warning?: string | null,
+): string | undefined {
+  if (!periods) return undefined;
+  const requested = mode ?? "trading_days_252";
+  const used = modeUsed ?? requested;
+  const usedLabel = used === "crypto_365" ? "Crypto 365" : "Trading days 252";
+  const requestLabel =
+    requested === "auto"
+      ? `Auto → ${usedLabel}`
+      : requested === "crypto_365"
+        ? "Crypto 365"
+        : "Trading days 252";
+  return `${requestLabel} (${periods} periods/year)${warning ? ` — ${warning}` : ""}`;
+}
+
 /** Annualization note appended to the Quant Tear Sheet. */
-function annualizationNote(): string {
-  return "> **Annualization note.** CAGR, volatility, Sharpe, and Sortino assume ~252 trading days per year and are extrapolated from the sampled window; short periods can distort them.";
+function annualizationNote(summary?: string): string {
+  const convention = summary
+    ? `This report uses ${summary}.`
+    : "This report uses QuantLab's current default annualization convention.";
+  return `> **Annualization note.** ${convention} CAGR, Calmar, volatility, Sharpe, and Sortino are extrapolated from the sampled window; short periods can distort them. Annualization does not change trades, equity curves, total return, or drawdown.`;
 }
 
 function header(analysisType: string): string {
@@ -528,6 +550,8 @@ interface ReportDoc {
   positionSizing?: PositionSizingMeta;
   /** Risk management, when active — drives the risk caveat. */
   riskManagement?: RiskManagementMeta;
+  /** Human-readable annualization convention, when available. */
+  annualization?: string;
   fileSlug: string;
   save: ReportSaveMeta;
 
@@ -608,7 +632,7 @@ function renderTearSheet(doc: ReportDoc): string {
     t.equitySummary ? section("Equity Curve Summary", t.equitySummary) : "",
     t.drawdownSummary ? section("Drawdown Summary", t.drawdownSummary) : "",
     t.tradesOrEvents ? section("Trades / Events Summary", t.tradesOrEvents) : "",
-    annualizationNote(),
+    annualizationNote(doc.annualization),
     riskCaveats(
       doc.caveatTickers,
       doc.dataSource,
@@ -737,6 +761,12 @@ export function buildBacktestReport(
   const analysisType = options.analysisType ?? "Single-Strategy Backtest";
   const sizingMeta = positionSizingMeta(r.position_sizing);
   const riskMeta = riskManagementMeta(r.risk_management);
+  const annualization = annualizationSummary(
+    r.annualization_mode,
+    r.annualization_mode_used,
+    r.periods_per_year,
+    r.annualization_warning,
+  );
   const caveatTickers =
     r.strategy === "pairs"
       ? [r.pairs_asset_y, r.pairs_asset_x].filter((t): t is string => Boolean(t))
@@ -797,6 +827,9 @@ export function buildBacktestReport(
       metaRows.push(["Annualization resolved", String(r.annualization_mode_used)]);
     }
     metaRows.push(["Periods per year", String(r.periods_per_year)]);
+    if (r.annualization_warning) {
+      metaRows.push(["Annualization warning", r.annualization_warning]);
+    }
   }
   const metadataBody = mdTable(["Field", "Value"], metaRows);
 
@@ -817,6 +850,7 @@ export function buildBacktestReport(
     positionMode: r.position_mode,
     positionSizing: sizingMeta,
     riskManagement: riskMeta,
+    annualization,
     fileSlug: `${slug(r.ticker)}-${slug(r.strategy)}-${r.start_date}-${r.end_date}`,
     metadataBody,
     standardBlocks: [
@@ -880,6 +914,10 @@ export function buildBacktestReport(
         num_trades: r.num_trades,
         position_sizing: r.position_sizing ?? null,
         average_exposure: r.average_exposure ?? null,
+        annualization_mode: r.annualization_mode ?? "trading_days_252",
+        annualization_mode_used: r.annualization_mode_used ?? "trading_days_252",
+        periods_per_year: r.periods_per_year ?? 252,
+        annualization_warning: r.annualization_warning ?? null,
       },
     },
   };
@@ -955,7 +993,25 @@ export function buildSavedBacktestReport(
       "Annualization",
       `${rec.params.annualization_mode ?? "trading_days_252"} (${rec.params.periods_per_year}/yr)`,
     ]);
+    if (typeof rec.params?.annualization_mode_used === "string") {
+      savedMetaRows.push(["Annualization resolved", rec.params.annualization_mode_used]);
+    }
+    if (typeof rec.params?.annualization_warning === "string") {
+      savedMetaRows.push(["Annualization warning", rec.params.annualization_warning]);
+    }
   }
+  const savedAnnualization = annualizationSummary(
+    typeof rec.params?.annualization_mode === "string"
+      ? rec.params.annualization_mode
+      : "trading_days_252",
+    typeof rec.params?.annualization_mode_used === "string"
+      ? rec.params.annualization_mode_used
+      : "trading_days_252",
+    typeof rec.params?.periods_per_year === "number" ? rec.params.periods_per_year : 252,
+    typeof rec.params?.annualization_warning === "string"
+      ? rec.params.annualization_warning
+      : null,
+  );
 
   const metadataBody = mdTable(["Field", "Value"], savedMetaRows);
 
@@ -975,6 +1031,7 @@ export function buildSavedBacktestReport(
     positionMode: savedPositionMode,
     positionSizing: savedPositionSizing,
     riskManagement: savedRisk,
+    annualization: savedAnnualization,
     fileSlug: `saved-${slug(rec.name)}`,
     metadataBody,
     standardBlocks: [
@@ -1036,6 +1093,22 @@ export function buildSavedBacktestReport(
         average_exposure:
           typeof rec.params?.average_exposure === "number"
             ? rec.params.average_exposure
+            : null,
+        annualization_mode:
+          typeof rec.params?.annualization_mode === "string"
+            ? rec.params.annualization_mode
+            : "trading_days_252",
+        annualization_mode_used:
+          typeof rec.params?.annualization_mode_used === "string"
+            ? rec.params.annualization_mode_used
+            : "trading_days_252",
+        periods_per_year:
+          typeof rec.params?.periods_per_year === "number"
+            ? rec.params.periods_per_year
+            : 252,
+        annualization_warning:
+          typeof rec.params?.annualization_warning === "string"
+            ? rec.params.annualization_warning
             : null,
         saved_backtest_id: rec.id,
       },
