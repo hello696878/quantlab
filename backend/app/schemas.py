@@ -332,6 +332,122 @@ _ANNUALIZATION_FIELD = Field(
 
 
 # ---------------------------------------------------------------------------
+# Benchmark / active performance analytics (research v1)
+# ---------------------------------------------------------------------------
+
+# Benchmark comparison never changes strategy trades — it only compares the
+# strategy's performance against a reference asset on date-aligned returns.
+BenchmarkMode = Literal["none", "buy_and_hold_same_asset", "custom_ticker"]
+
+
+class BenchmarkConfig(BaseModel):
+    """
+    Optional benchmark configuration for a backtest / comparison.
+
+    * ``buy_and_hold_same_asset`` — hold the strategy's own asset over the same
+      period (default; no transaction costs on the benchmark).
+    * ``custom_ticker``           — buy-and-hold of another ticker (e.g. SPY),
+      fetched via the same data provider and aligned by date (inner join).
+    * ``none``                    — no benchmark analytics.
+    """
+
+    mode: BenchmarkMode = "buy_and_hold_same_asset"
+    ticker: Optional[str] = Field(
+        default=None, description="Benchmark ticker — required for custom_ticker."
+    )
+
+    @model_validator(mode="after")
+    def check_ticker(self) -> "BenchmarkConfig":
+        if self.mode == "custom_ticker":
+            if self.ticker is None or not self.ticker.strip():
+                raise ValueError("custom_ticker benchmark requires a non-empty ticker.")
+            self.ticker = self.ticker.strip().upper()
+        else:
+            self.ticker = None  # ignored for none / buy_and_hold_same_asset
+        return self
+
+
+_BENCHMARK_FIELD = Field(
+    default=None,
+    description=(
+        "Optional benchmark configuration. When omitted, buy-and-hold of the "
+        "same asset is used (matches the engine's built-in benchmark). "
+        "Benchmark analytics never change strategy trades or results."
+    ),
+)
+
+
+class BenchmarkMetricsBlock(BaseModel):
+    """Benchmark performance over the aligned comparison window."""
+
+    total_return: float
+    cagr: float
+    volatility: float
+    sharpe: float
+    max_drawdown: float
+
+
+class ActiveMetrics(BaseModel):
+    """Strategy-vs-benchmark metrics on date-aligned returns (risk-free rate 0).
+
+    Any metric that is not computable (zero variance, zero tracking error,
+    insufficient overlap) is null, with an explanatory warning on the parent
+    block — never NaN/inf.
+    """
+
+    excess_total_return: Optional[float] = None
+    excess_cagr: Optional[float] = None
+    alpha: Optional[float] = Field(
+        default=None,
+        description="Annualized: mean(strategy) − beta × mean(benchmark), rf = 0.",
+    )
+    beta: Optional[float] = None
+    correlation: Optional[float] = None
+    tracking_error: Optional[float] = Field(
+        default=None, description="std(strategy − benchmark returns) × √periods_per_year."
+    )
+    information_ratio: Optional[float] = None
+    aligned_points: Optional[int] = Field(
+        default=None, description="Number of aligned return observations used."
+    )
+
+
+class BenchmarkEquityPoint(BaseModel):
+    """One point on a custom benchmark's normalized equity curve."""
+
+    date: str
+    equity: float
+
+
+class BenchmarkAnalytics(BaseModel):
+    """Benchmark + active-performance block (absent when mode is 'none')."""
+
+    mode: BenchmarkMode
+    ticker: Optional[str] = Field(
+        default=None, description="Benchmark ticker (the asset itself for buy-and-hold)."
+    )
+    display_name: str
+    metrics: Optional[BenchmarkMetricsBlock] = Field(
+        default=None, description="Null when benchmark data could not be used."
+    )
+    active_metrics: Optional[ActiveMetrics] = None
+    equity_curve: Optional[List[BenchmarkEquityPoint]] = Field(
+        default=None,
+        description=(
+            "Normalized benchmark equity (custom_ticker only — the same-asset "
+            "benchmark curve is already on the response equity_curve)."
+        ),
+    )
+    data_provider: Optional[str] = Field(
+        default=None, description="Provider used for a custom benchmark fetch."
+    )
+    data_quality: Optional["DataQuality"] = Field(
+        default=None, description="Diagnostics for a custom benchmark's data."
+    )
+    warnings: List[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Market data quality (research v1)
 # ---------------------------------------------------------------------------
 
@@ -394,6 +510,7 @@ class BacktestRequest(BaseModel):
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
+    benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -444,6 +561,7 @@ class RsiBacktestRequest(BaseModel):
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
+    benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -507,6 +625,7 @@ class BbBacktestRequest(BaseModel):
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
+    benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -563,6 +682,7 @@ class MomentumBacktestRequest(BaseModel):
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
+    benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -717,6 +837,7 @@ class VbBacktestRequest(BaseModel):
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
+    benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -971,6 +1092,14 @@ class BacktestResponse(BaseModel):
     )
     data_quality: Optional[DataQuality] = Field(
         default=None, description="Diagnostics for the price series fed to the engine."
+    )
+    benchmark_analytics: Optional[BenchmarkAnalytics] = Field(
+        default=None,
+        description=(
+            "Benchmark + active-performance block (absent when benchmark mode is "
+            "'none'). The legacy benchmark_metrics / equity_curve benchmark values "
+            "always remain the same-asset buy-and-hold for backward compatibility."
+        ),
     )
     position_mode: str = Field(
         default="long_only",
@@ -1504,6 +1633,7 @@ class StrategyComparisonRequest(BaseModel):
     position_sizing: Optional[PositionSizing] = _POSITION_SIZING_FIELD
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
+    benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
 
     @model_validator(mode="after")
     def check_dates(self) -> "StrategyComparisonRequest":
@@ -1557,6 +1687,13 @@ class StrategyResultItem(BaseModel):
     warnings: List[str] = Field(
         default_factory=list,
         description="Human-readable notes for this strategy row (e.g. 'ran long-only').",
+    )
+    active_metrics: Optional[ActiveMetrics] = Field(
+        default=None,
+        description=(
+            "Strategy-vs-benchmark metrics against the comparison's configured "
+            "benchmark (absent when benchmark mode is 'none')."
+        ),
     )
 
 
@@ -1636,6 +1773,14 @@ class StrategyComparisonResponse(BaseModel):
     )
     data_quality: Optional[DataQuality] = Field(
         default=None, description="Diagnostics for the shared price series (computed once)."
+    )
+    benchmark_analytics: Optional[BenchmarkAnalytics] = Field(
+        default=None,
+        description=(
+            "Shared benchmark block for the comparison (absent when benchmark "
+            "mode is 'none'). The legacy `benchmark` curve / `benchmark_metrics` "
+            "always remain the same-asset buy-and-hold."
+        ),
     )
 
     strategies: List[StrategyResultItem] = Field(

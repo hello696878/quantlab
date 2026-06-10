@@ -61,6 +61,12 @@ from app.risk_management import (
 )
 from app.annualization import resolve_annualization
 from app.market_data import assess_data_quality
+from app.benchmark import (
+    build_benchmark_analytics,
+    compute_active_metrics,
+    metrics_block as benchmark_metrics_block,
+    normalize_config as normalize_benchmark_config,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -107,6 +113,8 @@ from app.schemas import (
     BacktestRequest,
     BacktestResponse,
     BbBacktestRequest,
+    BenchmarkAnalytics,
+    BenchmarkConfig,
     CostModel,
     PositionSizing,
     RiskManagement,
@@ -281,6 +289,7 @@ def _build_response(
     risk_management: Optional[RiskManagement] = None,
     annualization_mode: Optional[str] = None,
     data_provider: str = "yfinance",
+    benchmark: Optional[BenchmarkConfig] = None,
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response.
 
@@ -363,6 +372,54 @@ def _build_response(
         gross_total_return - float(strategy_metrics_dict["total_return"]), 6
     )
 
+    # Benchmark / active analytics — observational only (never changes trades,
+    # equity, or metrics).  Missing config normalizes to buy-and-hold same asset,
+    # which reuses the engine's built-in costless benchmark (no refetch).
+    bench_config = normalize_benchmark_config(benchmark)
+    custom_close = None
+    custom_fetch_error = None
+    custom_provider = None
+    custom_quality = None
+    if bench_config.mode == "custom_ticker":
+        bench_ticker = bench_config.ticker or ""
+        if data_provider == "csv_upload":
+            custom_fetch_error = (
+                "Custom benchmark tickers are not supported for CSV backtests; "
+                "use buy-and-hold of the uploaded series or no benchmark."
+            )
+        elif bench_ticker == request_ticker.upper():
+            custom_close = close  # same asset — reuse, don't refetch
+            custom_provider = data_provider
+        else:
+            try:
+                custom_close = _fetch(bench_ticker, start_date, end_date)["Close"]
+                custom_provider = "yfinance"
+            except HTTPException as exc:
+                custom_fetch_error = (
+                    f"Benchmark '{bench_ticker}' could not be fetched: {exc.detail}"
+                )
+        if custom_close is not None:
+            custom_quality = assess_data_quality(
+                custom_close,
+                ticker=bench_ticker,
+                requested_start_date=start_date,
+                requested_end_date=end_date,
+                provider=custom_provider or "yfinance",
+                adjusted=(custom_provider == "yfinance"),
+            )
+    benchmark_analytics = build_benchmark_analytics(
+        config=bench_config,
+        strategy_ticker=request_ticker,
+        strategy_equity=strategy_equity,
+        same_asset_benchmark_equity=benchmark_equity,
+        periods_per_year=ppy,
+        initial_capital=initial_capital,
+        custom_close=custom_close,
+        custom_fetch_error=custom_fetch_error,
+        custom_data_provider=custom_provider,
+        custom_data_quality=custom_quality,
+    )
+
     equity_curve = [
         EquityPoint(
             date=str(d.date()) if hasattr(d, "date") else str(d),
@@ -407,6 +464,7 @@ def _build_response(
         annualization_warning=annualization.warning,
         data_provider=data_provider,
         data_quality=data_quality,
+        benchmark_analytics=benchmark_analytics,
         position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
@@ -560,6 +618,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
+        benchmark=request.benchmark,
         fast_window=request.fast_window,
         slow_window=request.slow_window,
         position_mode=request.position_mode,
@@ -615,6 +674,7 @@ def backtest_rsi_mean_reversion(request: RsiBacktestRequest) -> BacktestResponse
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
+        benchmark=request.benchmark,
         rsi_window=request.rsi_window,
         oversold_threshold=request.oversold_threshold,
         exit_threshold=request.exit_threshold,
@@ -671,6 +731,7 @@ def backtest_bollinger_band(request: BbBacktestRequest) -> BacktestResponse:
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
+        benchmark=request.benchmark,
         bb_window=request.bb_window,
         bb_num_std=request.num_std,
         bb_exit_band=request.exit_band,
@@ -730,6 +791,7 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
+        benchmark=request.benchmark,
         momentum_window=request.momentum_window,
         momentum_entry_threshold=request.entry_threshold,
         momentum_exit_threshold=request.exit_threshold,
@@ -789,6 +851,7 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
+        benchmark=request.benchmark,
         vb_lookback_window=request.lookback_window,
         vb_breakout_multiplier=request.breakout_multiplier,
         vb_exit_window=request.exit_window,
@@ -2307,6 +2370,46 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         provider="yfinance",
     )
 
+    # Shared benchmark for the whole comparison (one reference for all five
+    # strategies).  buy_and_hold_same_asset reuses the engine benchmark; a
+    # custom ticker is fetched once and aligned to the shared close index.
+    bench_config = normalize_benchmark_config(request.benchmark)
+    custom_bench_equity = None
+    custom_bench_error = None
+    custom_bench_quality = None
+    if bench_config.mode == "custom_ticker":
+        bench_ticker = bench_config.ticker or ""
+        custom_bench_close = None
+        if bench_ticker == request.ticker.strip().upper():
+            custom_bench_close = close
+        else:
+            try:
+                raw_bench = _fetch(bench_ticker, request.start_date, request.end_date)["Close"]
+                custom_bench_close = raw_bench[
+                    (raw_bench.index >= start_ts) & (raw_bench.index <= end_ts)
+                ]
+            except HTTPException as exc:
+                custom_bench_error = (
+                    f"Benchmark '{bench_ticker}' could not be fetched: {exc.detail}"
+                )
+        if custom_bench_close is not None and len(custom_bench_close) > 0:
+            custom_bench_quality = assess_data_quality(
+                custom_bench_close,
+                ticker=bench_ticker,
+                requested_start_date=request.start_date,
+                requested_end_date=request.end_date,
+                provider="yfinance",
+            )
+            common_idx = close.index.intersection(custom_bench_close.index)
+            if len(common_idx) >= 2:
+                cb = custom_bench_close.loc[common_idx]
+                custom_bench_equity = cb / float(cb.iloc[0]) * request.initial_capital
+            else:
+                custom_bench_error = (
+                    f"Benchmark '{bench_ticker}' has no overlapping dates with the "
+                    "comparison period; benchmark analytics are not computable."
+                )
+
     def _run_strategy(raw_position):
         """Apply risk → sizing → engine to a raw signal (shared assumptions)."""
         nonlocal bench_eq
@@ -2324,11 +2427,23 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         risk_exits = sum(risk_result.counts.values()) if risk_active else None
         return eq, trades, round(average_exposure(sized), 6), risk_exits
 
+    def _reference_benchmark_equity():
+        """The shared benchmark equity each strategy is measured against."""
+        if bench_config.mode == "none":
+            return None
+        if bench_config.mode == "custom_ticker":
+            return custom_bench_equity  # None when fetch/alignment failed
+        return bench_eq  # buy-and-hold same asset (set by the first run)
+
     def _item(strategy, display_name, params, eq, trades, avg_exp, risk_exits,
               mode_used, unsupported):
         item_warnings = []
         if "position_mode" in unsupported:
             item_warnings.append("Does not support short modes — ran long-only.")
+        ref_eq = _reference_benchmark_equity()
+        active = (
+            compute_active_metrics(eq, ref_eq, ppy)[0] if ref_eq is not None else None
+        )
         return StrategyResultItem(
             strategy=strategy,
             display_name=display_name,
@@ -2342,6 +2457,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
             effective_cost_bps=effective_cost_bps,
             unsupported_features=unsupported,
             warnings=item_warnings,
+            active_metrics=active,
         )
 
     mode_unsupported = ["position_mode"] if cmp_mode != "long_only" else []
@@ -2408,6 +2524,33 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
             "and ran long-only."
         )
 
+    # ── Shared benchmark-analytics block (per-strategy active metrics live
+    #    on each StrategyResultItem; this echoes the reference itself). ──────
+    benchmark_analytics = None
+    if bench_config.mode == "buy_and_hold_same_asset":
+        benchmark_analytics = BenchmarkAnalytics(
+            mode=bench_config.mode,
+            ticker=request.ticker.strip().upper(),
+            display_name=f"Buy & Hold {request.ticker.strip().upper()}",
+            metrics=benchmark_metrics_block(bench_eq, ppy),
+            warnings=[],
+        )
+    elif bench_config.mode == "custom_ticker":
+        bench_ticker = bench_config.ticker or ""
+        benchmark_analytics = BenchmarkAnalytics(
+            mode=bench_config.mode,
+            ticker=bench_ticker,
+            display_name=f"Buy & Hold {bench_ticker}",
+            metrics=(
+                benchmark_metrics_block(custom_bench_equity, ppy)
+                if custom_bench_equity is not None
+                else None
+            ),
+            data_provider="yfinance" if custom_bench_equity is not None else None,
+            data_quality=custom_bench_quality,
+            warnings=[custom_bench_error] if custom_bench_error else [],
+        )
+
     # ── Benchmark metrics + curve ─────────────────────────────────────────
     bench_m = compute_metrics(bench_eq, periods_per_year=ppy)
     bench_curve = [
@@ -2456,6 +2599,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         annualization_warning=annualization.warning,
         data_provider="yfinance",
         data_quality=data_quality,
+        benchmark_analytics=benchmark_analytics,
         strategies=results,
         benchmark=bench_curve,
         benchmark_metrics=PerformanceMetrics(**bench_m),
@@ -2706,6 +2850,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
         cost_model=req.cost_model,
         position_sizing=req.position_sizing,
         data_provider="csv_upload",
+        benchmark=req.benchmark,
     )
 
     if strategy == "sma_crossover":

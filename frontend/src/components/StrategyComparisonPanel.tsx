@@ -41,6 +41,8 @@ import {
 } from "@/components/SimulationControls";
 import type {
   AnnualizationMode,
+  BenchmarkConfig,
+  BenchmarkMode,
   PositionMode,
   StrategyComparisonRequest,
   StrategyComparisonResponse,
@@ -109,6 +111,12 @@ function annualizationLabel(
   const used = modeUsed === "crypto_365" ? "Crypto 365" : "Trading days 252";
   return mode === "auto" ? `Auto → ${used}` : used;
 }
+
+const CMP_BENCHMARK_OPTIONS: { id: BenchmarkMode; label: string }[] = [
+  { id: "buy_and_hold_same_asset", label: "Buy & Hold Same Asset" },
+  { id: "custom_ticker", label: "Custom Benchmark" },
+  { id: "none", label: "None" },
+];
 
 // ---------------------------------------------------------------------------
 // Styling
@@ -376,6 +384,11 @@ export default function StrategyComparisonPanel() {
   const [riskCtl, setRiskCtl] = useState<RiskManagementControlValue | null>(null);
   const [annualizationMode, setAnnualizationMode] =
     useState<AnnualizationMode>("trading_days_252");
+  const [benchMode, setBenchMode] = useState<BenchmarkMode>(
+    "buy_and_hold_same_asset",
+  );
+  const [benchTicker, setBenchTicker] = useState("SPY");
+  const [showBenchCols, setShowBenchCols] = useState(false);
 
   // Seed annualization default from saved settings (client-only, on mount).
   useEffect(() => {
@@ -393,8 +406,9 @@ export default function StrategyComparisonPanel() {
   const datesOk = startDate < endDate;
   const moneyOk = !isNaN(capital) && capital > 0;
   const controlsOk = !!costCtl?.valid && !!sizingCtl?.valid && !!riskCtl?.valid;
+  const benchOk = benchMode !== "custom_ticker" || benchTicker.trim() !== "";
   const formInvalid =
-    !ticker.trim() || !datesOk || !moneyOk || !controlsOk || loading;
+    !ticker.trim() || !datesOk || !moneyOk || !controlsOk || !benchOk || loading;
 
   let validationMsg: string | null = null;
   if (!ticker.trim()) {
@@ -408,6 +422,8 @@ export default function StrategyComparisonPanel() {
   } else if (!controlsOk) {
     validationMsg =
       "Check the simulation settings (cost / position sizing / risk values).";
+  } else if (!benchOk) {
+    validationMsg = "Custom benchmark requires a ticker.";
   }
 
   // ── Submit ────────────────────────────────────────────────────────────
@@ -428,6 +444,15 @@ export default function StrategyComparisonPanel() {
         position_sizing: sizingCtl?.positionSizing,
         risk_management: riskCtl?.riskManagement,
         annualization_mode: annualizationMode,
+        benchmark:
+          benchMode === "buy_and_hold_same_asset"
+            ? undefined
+            : benchMode === "none"
+              ? ({ mode: "none" } as BenchmarkConfig)
+              : ({
+                  mode: "custom_ticker",
+                  ticker: benchTicker.trim().toUpperCase(),
+                } as BenchmarkConfig),
       });
       setResult(data);
     } catch (err) {
@@ -562,6 +587,46 @@ export default function StrategyComparisonPanel() {
                   appropriate.
                 </p>
               )}
+          </div>
+
+          <div>
+            <label className={labelCls}>Benchmark</label>
+            <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
+              {CMP_BENCHMARK_OPTIONS.map((o) => (
+                <button
+                  key={o.id}
+                  type="button"
+                  disabled={loading}
+                  onClick={() => setBenchMode(o.id)}
+                  className={
+                    "px-3 py-1.5 text-xs font-medium transition-colors " +
+                    (benchMode === o.id
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-slate-600 hover:bg-blue-50")
+                  }
+                >
+                  {o.label}
+                </button>
+              ))}
+            </div>
+            {benchMode === "custom_ticker" && (
+              <div className="mt-2">
+                <input
+                  type="text"
+                  className={inputCls + " max-w-[160px]"}
+                  value={benchTicker}
+                  placeholder="e.g. SPY"
+                  onChange={(e) => setBenchTicker(e.target.value)}
+                  disabled={loading}
+                />
+              </div>
+            )}
+            <p className="mt-1.5 text-[11px] text-slate-400">
+              Benchmark comparison does not change strategy trades — all five
+              strategies are measured against the same reference.
+              {benchMode === "custom_ticker" &&
+                " Benchmark data is aligned by date; limited overlap may affect active metrics."}
+            </p>
           </div>
 
           {/* Direction mode */}
@@ -728,7 +793,23 @@ export default function StrategyComparisonPanel() {
                   </span>
                 </p>
               )}
+              <p>
+                Benchmark:{" "}
+                <span className="font-medium text-slate-700">
+                  {result.benchmark_analytics
+                    ? result.benchmark_analytics.display_name
+                    : "None"}
+                </span>
+              </p>
             </div>
+            {result.benchmark_analytics &&
+              result.benchmark_analytics.warnings.length > 0 && (
+                <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-amber-700">
+                  {result.benchmark_analytics.warnings.map((w, i) => (
+                    <li key={`bw-${i}`}>{w}</li>
+                  ))}
+                </ul>
+              )}
             {result.data_quality && result.data_quality.warnings.length > 0 && (
               <ul className="mt-2 list-disc space-y-0.5 pl-4 text-[11px] text-amber-700">
                 {result.data_quality.warnings.map((w, i) => (
@@ -876,6 +957,92 @@ export default function StrategyComparisonPanel() {
                 </tbody>
               </table>
             </div>
+
+            {/* ── vs Benchmark (active metrics) ──────────────────────── */}
+            {result.benchmark_analytics && (
+              <div>
+                <button
+                  type="button"
+                  onClick={() => setShowBenchCols((v) => !v)}
+                  className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  {showBenchCols ? "Hide" : "Show"} benchmark metrics · vs{" "}
+                  {result.benchmark_analytics.display_name}
+                </button>
+                {showBenchCols && (
+                  <div className="mt-2 overflow-x-auto">
+                    <table className="w-full border-collapse text-sm">
+                      <thead>
+                        <tr className="border-b-2 border-slate-200">
+                          <th className="px-3 py-2 text-left font-semibold text-slate-600">
+                            Strategy
+                          </th>
+                          <th className="px-3 py-2 text-right font-semibold text-slate-600">
+                            Excess Return
+                          </th>
+                          <th className="px-3 py-2 text-right font-semibold text-slate-600">
+                            Alpha (ann.)
+                          </th>
+                          <th className="px-3 py-2 text-right font-semibold text-slate-600">
+                            Beta
+                          </th>
+                          <th className="px-3 py-2 text-right font-semibold text-slate-600">
+                            Correlation
+                          </th>
+                          <th className="px-3 py-2 text-right font-semibold text-slate-600">
+                            Info Ratio
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {result.strategies.map((s) => {
+                          const a = s.active_metrics;
+                          const cell = (v?: number | null, isPct = false) =>
+                            typeof v === "number" ? (isPct ? fmtPct(v) : fmtRatio(v)) : "—";
+                          return (
+                            <tr key={`bench-${s.strategy}`} className="border-b border-slate-100">
+                              <td
+                                className="px-3 py-2 text-sm font-medium"
+                                style={{ color: STRATEGY_META[s.strategy]?.color ?? "#64748b" }}
+                              >
+                                {s.display_name}
+                              </td>
+                              <td
+                                className={
+                                  "px-3 py-2 text-right text-sm tabular-nums font-medium " +
+                                  ((a?.excess_total_return ?? 0) >= 0
+                                    ? "text-emerald-700"
+                                    : "text-red-600")
+                                }
+                              >
+                                {cell(a?.excess_total_return, true)}
+                              </td>
+                              <td className="px-3 py-2 text-right text-sm tabular-nums">
+                                {cell(a?.alpha, true)}
+                              </td>
+                              <td className="px-3 py-2 text-right text-sm tabular-nums">
+                                {cell(a?.beta)}
+                              </td>
+                              <td className="px-3 py-2 text-right text-sm tabular-nums">
+                                {cell(a?.correlation)}
+                              </td>
+                              <td className="px-3 py-2 text-right text-sm tabular-nums">
+                                {cell(a?.information_ratio)}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                    <p className="mt-1.5 text-[11px] text-slate-400">
+                      Active metrics vs {result.benchmark_analytics.display_name} on
+                      date-aligned returns (risk-free rate 0). “—” means not
+                      computable for this run.
+                    </p>
+                  </div>
+                )}
+              </div>
+            )}
             <p className="text-xs text-slate-400">
               Highlighted row = best Sharpe ratio.  Max DD in red when below −20%.
             </p>

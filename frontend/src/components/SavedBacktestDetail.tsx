@@ -209,10 +209,15 @@ export default function SavedBacktestDetail({
   const equityCurve = record.equity_curve as EquityPoint[];
   const trades = record.trades as TradeRecord[];
 
-  // Strategy params as key-value pairs for display.  data_quality is a nested
-  // diagnostics object — summarized as a compact pill below, not raw JSON.
+  // Strategy params as key-value pairs for display.  data_quality and
+  // benchmark_analytics are nested objects — summarized as compact pills, not
+  // raw JSON.
   const paramEntries = Object.entries(record.params).filter(
-    ([k, v]) => v != null && k !== "data_quality" && k !== "data_provider",
+    ([k, v]) =>
+      v != null &&
+      k !== "data_quality" &&
+      k !== "data_provider" &&
+      k !== "benchmark_analytics",
   );
   const savedQuality = isDataQuality(record.params?.data_quality)
     ? record.params.data_quality
@@ -221,6 +226,13 @@ export default function SavedBacktestDetail({
     typeof record.params?.data_provider === "string"
       ? record.params.data_provider
       : savedQuality?.provider;
+  const savedBenchmarkRaw = record.params?.benchmark_analytics;
+  const savedBenchmarkName =
+    savedBenchmarkRaw &&
+    typeof savedBenchmarkRaw === "object" &&
+    typeof (savedBenchmarkRaw as { display_name?: unknown }).display_name === "string"
+      ? (savedBenchmarkRaw as { display_name: string }).display_name
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -289,6 +301,15 @@ export default function SavedBacktestDetail({
                 <span className="font-mono font-medium">
                   {savedQuality.row_count.toLocaleString("en-US")} rows
                 </span>
+              </span>
+            )}
+            {savedBenchmarkName && (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                           bg-slate-100 text-slate-600 text-xs"
+              >
+                <span className="text-slate-400">benchmark:</span>
+                <span className="font-mono font-medium">{savedBenchmarkName}</span>
               </span>
             )}
             <span

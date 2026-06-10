@@ -110,6 +110,52 @@ export interface RiskDiagnostics {
 /** Annualization convention for risk metrics (research v1). */
 export type AnnualizationMode = "trading_days_252" | "crypto_365" | "auto";
 
+/** Benchmark comparison (research v1). Never changes strategy trades/results. */
+export type BenchmarkMode = "none" | "buy_and_hold_same_asset" | "custom_ticker";
+
+export interface BenchmarkConfig {
+  mode: BenchmarkMode;
+  /** Required for custom_ticker; ignored otherwise. */
+  ticker?: string;
+}
+
+export interface BenchmarkMetricsBlock {
+  total_return: number;
+  cagr: number;
+  volatility: number;
+  sharpe: number;
+  max_drawdown: number;
+}
+
+/** Strategy-vs-benchmark metrics on aligned returns (null = not computable). */
+export interface ActiveMetrics {
+  excess_total_return?: number | null;
+  excess_cagr?: number | null;
+  alpha?: number | null;
+  beta?: number | null;
+  correlation?: number | null;
+  tracking_error?: number | null;
+  information_ratio?: number | null;
+  aligned_points?: number | null;
+}
+
+export interface BenchmarkEquityPoint {
+  date: string;
+  equity: number;
+}
+
+export interface BenchmarkAnalytics {
+  mode: BenchmarkMode;
+  ticker?: string | null;
+  display_name: string;
+  metrics?: BenchmarkMetricsBlock | null;
+  active_metrics?: ActiveMetrics | null;
+  equity_curve?: BenchmarkEquityPoint[] | null;
+  data_provider?: string | null;
+  data_quality?: DataQuality | null;
+  warnings: string[];
+}
+
 /** Diagnostics for the price series fed to the engine (informational only). */
 export interface DataQuality {
   provider: string;
@@ -153,6 +199,7 @@ export interface BacktestRequest {
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
+  benchmark?: BenchmarkConfig;
 }
 
 export interface RsiBacktestRequest {
@@ -168,6 +215,7 @@ export interface RsiBacktestRequest {
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
+  benchmark?: BenchmarkConfig;
 }
 
 export interface BbBacktestRequest {
@@ -183,6 +231,7 @@ export interface BbBacktestRequest {
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
+  benchmark?: BenchmarkConfig;
 }
 
 export interface MomentumBacktestRequest {
@@ -199,6 +248,7 @@ export interface MomentumBacktestRequest {
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
+  benchmark?: BenchmarkConfig;
 }
 
 export interface VbBacktestRequest {
@@ -215,6 +265,7 @@ export interface VbBacktestRequest {
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
+  benchmark?: BenchmarkConfig;
 }
 
 export interface PairsBacktestRequest {
@@ -368,6 +419,8 @@ export interface BacktestResponse {
   /** Market-data provider + diagnostics (research v1) — present on new responses. */
   data_provider?: string | null;
   data_quality?: DataQuality | null;
+  /** Benchmark + active analytics (absent when benchmark mode is "none"). */
+  benchmark_analytics?: BenchmarkAnalytics | null;
   /** Direction mode used (defaults to "long_only" for strategies without it). */
   position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;
@@ -567,6 +620,7 @@ export interface StrategyComparisonRequest {
   position_sizing?: PositionSizing;
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
+  benchmark?: BenchmarkConfig;
 }
 
 export interface StrategyResultItem {
@@ -583,6 +637,8 @@ export interface StrategyResultItem {
   effective_cost_bps?: number | null;
   unsupported_features?: string[];
   warnings?: string[];
+  /** Strategy-vs-benchmark metrics (absent when benchmark mode is "none"). */
+  active_metrics?: ActiveMetrics | null;
 }
 
 export interface StrategyComparisonRanking {
@@ -611,6 +667,8 @@ export interface StrategyComparisonResponse {
   annualization_warning?: string | null;
   data_provider?: string | null;
   data_quality?: DataQuality | null;
+  /** Shared benchmark block (absent when benchmark mode is "none"). */
+  benchmark_analytics?: BenchmarkAnalytics | null;
   strategies: StrategyResultItem[];
   /** Buy-and-hold equity curve — strategy and benchmark fields both carry the benchmark value. */
   benchmark: EquityPoint[];

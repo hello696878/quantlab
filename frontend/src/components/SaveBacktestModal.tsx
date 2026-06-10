@@ -102,6 +102,12 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
   if (result.data_quality) {
     params.data_quality = result.data_quality;
   }
+  if (result.benchmark_analytics) {
+    // Persist config + metrics; drop the bulky curve / nested diagnostics.
+    const { equity_curve: _curve, data_quality: _dq, ...trimmed } =
+      result.benchmark_analytics;
+    params.benchmark_analytics = trimmed;
+  }
   return params;
 }
 

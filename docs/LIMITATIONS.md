@@ -90,6 +90,17 @@ Using 252 for crypto assets will understate annual returns and overstate risk me
 
 The Sharpe and Sortino ratios are computed with a risk-free rate of 0%. During periods of elevated interest rates, a non-zero risk-free rate would lower the Sharpe ratio of strategies that hold cash during flat periods.
 
+### Benchmark / active analytics are simplified research metrics
+
+Benchmark comparison (buy-and-hold same asset, custom ticker, or none) computes alpha, beta, correlation, tracking error, and the information ratio on **date-aligned daily returns** with a **zero risk-free rate** (so "alpha" is a CAPM-style regression intercept against the chosen benchmark, not a risk-free-adjusted alpha). Caveats:
+
+- Benchmark returns are aligned by available dates (inner join); limited overlap shrinks the sample and is flagged with a warning.
+- The buy-and-hold benchmark pays **no transaction costs** — a deliberate, documented convention that slightly flatters the benchmark.
+- Benchmark data quality depends on the provider (yfinance gaps/revisions apply to benchmarks too).
+- Results are sensitive to the **chosen benchmark** — comparing against a weak benchmark can make any strategy look good; choose a benchmark that matches the asset class.
+- Non-computable metrics (zero benchmark variance, zero tracking error, too few aligned points) are reported as null with warnings.
+- Benchmark analytics never change strategy trades, and they are research metrics — **not investment advice**.
+
 ### Calmar ratio edge cases
 
 The Calmar ratio is defined as `CAGR / |max_drawdown|`. If max drawdown is zero (impossible in real markets but possible in tests with synthetic constant prices), it is reported as 0.0 rather than infinity.

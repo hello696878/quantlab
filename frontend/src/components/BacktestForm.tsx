@@ -8,6 +8,8 @@ import type {
   MomentumBacktestRequest,
   PairsBacktestRequest,
   AnnualizationMode,
+  BenchmarkConfig,
+  BenchmarkMode,
   PositionMode,
   PositionSizing,
   PositionSizingType,
@@ -52,6 +54,14 @@ const ANNUALIZATION_OPTIONS: { id: AnnualizationMode; label: string }[] = [
   { id: "crypto_365", label: "Crypto · 365" },
   { id: "auto", label: "Auto" },
 ];
+
+// Benchmark comparison options.
+const BENCHMARK_OPTIONS: { id: BenchmarkMode; label: string }[] = [
+  { id: "buy_and_hold_same_asset", label: "Buy & Hold Same Asset" },
+  { id: "custom_ticker", label: "Custom Benchmark" },
+  { id: "none", label: "None" },
+];
+const BENCHMARK_PRESETS = ["SPY", "QQQ", "BTC-USD"];
 
 /** Heuristic: does this ticker look like a 24/7 crypto pair? (UI hint only.) */
 function looksLikeCrypto(ticker: string): boolean {
@@ -307,6 +317,14 @@ export default function BacktestForm({
   const [annualizationMode, setAnnualizationMode] = useState<AnnualizationMode>(
     smaParams.annualization_mode ?? "trading_days_252",
   );
+  // Benchmark comparison (shared; initialised from saved params).
+  const _initialBm = smaParams.benchmark;
+  const [benchMode, setBenchMode] = useState<BenchmarkMode>(
+    _initialBm?.mode ?? "buy_and_hold_same_asset",
+  );
+  const [benchTickerStr, setBenchTickerStr] = useState(
+    _initialBm?.ticker ?? "SPY",
+  );
   // SMA Crossover
   const [smaFastStr, setSmaFastStr] = useState(String(smaParams.fast_window));
   const [smaSlowStr, setSmaSlowStr] = useState(String(smaParams.slow_window));
@@ -375,6 +393,7 @@ export default function BacktestForm({
     position_sizing: PositionSizing | undefined;
     risk_management: RiskManagement | undefined;
     annualization_mode: AnnualizationMode | undefined;
+    benchmark: BenchmarkConfig | undefined;
   }>;
 
   /** Update every strategy's common fields simultaneously so switching strategy
@@ -577,6 +596,27 @@ export default function BacktestForm({
     } else {
       pushCombined(stopLossStr, takeProfitStr, trailingStr, maxHoldStr);
     }
+  }
+
+  // ── Benchmark wiring ───────────────────────────────────────────────────────
+  // Buy & Hold Same Asset is the default — omitted from the request so default
+  // requests stay byte-identical to before (the backend normalizes missing →
+  // buy_and_hold_same_asset).  Benchmark choice never changes strategy trades.
+  function pushBenchmark(mode: BenchmarkMode, ticker: string) {
+    if (mode === "buy_and_hold_same_asset") {
+      setCommon("benchmark", undefined);
+    } else if (mode === "none") {
+      setCommon("benchmark", { mode: "none" });
+    } else {
+      const t = ticker.trim().toUpperCase();
+      if (!t) return; // invalid — submit gate blocks until a ticker is entered
+      setCommon("benchmark", { mode: "custom_ticker", ticker: t });
+    }
+  }
+
+  function handleBenchModeChange(mode: BenchmarkMode) {
+    setBenchMode(mode);
+    pushBenchmark(mode, benchTickerStr);
   }
 
   function setSma<K extends keyof BacktestRequest>(
@@ -807,8 +847,10 @@ export default function BacktestForm({
               mhOk &&
               (slVal !== null || tpVal !== null || trVal !== null || mhVal !== null);
 
+  const benchOk = benchMode !== "custom_ticker" || benchTickerStr.trim() !== "";
+
   const commonNumericOk =
-    costOk && sizingOk && riskOk && !isNaN(capital) && capital > 0;
+    costOk && sizingOk && riskOk && benchOk && !isNaN(capital) && capital > 0;
   const smaInvalid =
     strategy === "sma_crossover" &&
     (isNaN(smaFast) || isNaN(smaSlow) || smaFast >= smaSlow);
@@ -1400,6 +1442,87 @@ export default function BacktestForm({
           </div>
         )}
 
+        {/* ── Benchmark comparison ─────────────────────────────────────── */}
+        {strategy !== "pairs" && (
+          <div className="mb-5 rounded-lg border border-slate-200 p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                Benchmark
+              </span>
+              <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
+                {BENCHMARK_OPTIONS.map((o) => (
+                  <button
+                    key={o.id}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => handleBenchModeChange(o.id)}
+                    className={
+                      "px-3 py-1.5 text-xs font-medium transition-colors " +
+                      (benchMode === o.id
+                        ? "bg-blue-600 text-white"
+                        : "bg-white text-slate-600 hover:bg-slate-50")
+                    }
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {benchMode === "custom_ticker" && (
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  className={inputCls + " max-w-[160px]"}
+                  value={benchTickerStr}
+                  placeholder="e.g. SPY"
+                  onChange={(e) => {
+                    setBenchTickerStr(e.target.value);
+                    pushBenchmark("custom_ticker", e.target.value);
+                  }}
+                  disabled={loading}
+                />
+                {BENCHMARK_PRESETS.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    disabled={loading}
+                    onClick={() => {
+                      setBenchTickerStr(t);
+                      pushBenchmark("custom_ticker", t);
+                    }}
+                    className={
+                      "px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors " +
+                      (benchTickerStr.trim().toUpperCase() === t
+                        ? "bg-blue-600 text-white border-blue-600"
+                        : "bg-white text-slate-600 border-slate-300 hover:border-blue-400")
+                    }
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            <p className="text-[11px] text-slate-400">
+              Benchmark comparison does not change strategy trades. It only
+              compares performance against a reference asset.
+            </p>
+            {benchMode === "buy_and_hold_same_asset" && (
+              <p className="text-[11px] text-slate-400">
+                Compares the strategy against holding the same asset over the same
+                period.
+              </p>
+            )}
+            {benchMode === "custom_ticker" && (
+              <p className="text-[11px] text-slate-400">
+                Benchmark data is aligned by date. Limited overlap may affect
+                active metrics.
+              </p>
+            )}
+          </div>
+        )}
+
         {/* ── Strategy-specific fields ───────────────────────────────────── */}
         <div className="mb-5 p-4 rounded-lg bg-blue-50/60 border border-blue-100">
           {supportsMode && (
@@ -1829,9 +1952,11 @@ export default function BacktestForm({
                     ? "Position sizing values must be valid (fraction / exposure cap in (0–1], target vol > 0, lookback ≥ 2)."
                     : !riskOk
                       ? "Risk management needs at least one valid rule (stop / take / trailing in (0–1], max holding ≥ 1)."
-                      : isNaN(capital)
-                        ? "Initial capital must be a valid number (> 0)."
-                        : "Initial capital must be greater than 0."}
+                      : !benchOk
+                        ? "Custom benchmark requires a ticker."
+                        : isNaN(capital)
+                          ? "Initial capital must be a valid number (> 0)."
+                          : "Initial capital must be greater than 0."}
               </p>
             )}
             {dateInvalid && (

@@ -484,6 +484,88 @@ function keyCaveats(
 `;
 }
 
+/** "Benchmark Comparison" report section (empty string when no benchmark). */
+function benchmarkSection(
+  b: unknown,
+  strategyTotalReturn?: number | null,
+): string {
+  if (!b || typeof b !== "object") return "";
+  const block = b as {
+    mode?: string;
+    ticker?: string | null;
+    display_name?: string;
+    data_provider?: string | null;
+    metrics?: {
+      total_return?: number;
+      cagr?: number;
+      volatility?: number;
+      sharpe?: number;
+      max_drawdown?: number;
+    } | null;
+    active_metrics?: {
+      excess_total_return?: number | null;
+      alpha?: number | null;
+      beta?: number | null;
+      correlation?: number | null;
+      tracking_error?: number | null;
+      information_ratio?: number | null;
+      aligned_points?: number | null;
+    } | null;
+    warnings?: string[];
+  };
+  if (!block.mode || block.mode === "none") return "";
+  const pctOrDash = (v?: number | null) =>
+    typeof v === "number" ? formatPercent(v) : "—";
+  const ratioOrDash = (v?: number | null) =>
+    typeof v === "number" ? formatRatio(v) : "—";
+
+  const rows: [string, string][] = [
+    ["Benchmark", block.display_name ?? block.ticker ?? block.mode],
+    ["Mode", block.mode],
+  ];
+  if (block.data_provider) rows.push(["Benchmark data provider", block.data_provider]);
+  if (block.metrics) {
+    if (typeof strategyTotalReturn === "number") {
+      rows.push(["Strategy total return", formatPercent(strategyTotalReturn)]);
+    }
+    rows.push(
+      ["Benchmark total return", pctOrDash(block.metrics.total_return)],
+      ["Benchmark CAGR", pctOrDash(block.metrics.cagr)],
+      ["Benchmark volatility", pctOrDash(block.metrics.volatility)],
+      ["Benchmark Sharpe", ratioOrDash(block.metrics.sharpe)],
+      ["Benchmark max drawdown", pctOrDash(block.metrics.max_drawdown)],
+    );
+  }
+  const a = block.active_metrics;
+  if (a) {
+    rows.push(
+      ["Excess total return", pctOrDash(a.excess_total_return)],
+      ["Alpha (annualized)", pctOrDash(a.alpha)],
+      ["Beta", ratioOrDash(a.beta)],
+      ["Correlation", ratioOrDash(a.correlation)],
+      ["Tracking error", pctOrDash(a.tracking_error)],
+      ["Information ratio", ratioOrDash(a.information_ratio)],
+      [
+        "Aligned observations",
+        a.aligned_points != null ? String(a.aligned_points) : "—",
+      ],
+    );
+  }
+  const warningLines =
+    block.warnings && block.warnings.length
+      ? "\n\n" + block.warnings.map((w) => `- ⚠ ${w}`).join("\n")
+      : "";
+  const caveat =
+    "\n\n_Benchmark analytics are based on aligned historical returns. They are " +
+    "sensitive to data quality, date alignment, the annualization convention, and " +
+    "the chosen benchmark. Benchmark comparison never changes strategy trades._";
+  return section(
+    "Benchmark Comparison",
+    mdTable(["Field", "Value"], rows) + warningLines + caveat,
+  );
+}
+
+
 function annualizationSummary(
   mode?: string | null,
   modeUsed?: string | null,
@@ -843,6 +925,9 @@ export function buildBacktestReport(
       metaRows.push(["Data warnings", q.warnings.join(" ")]);
     }
   }
+  if (r.benchmark_analytics) {
+    metaRows.push(["Benchmark", r.benchmark_analytics.display_name]);
+  }
   const metadataBody = mdTable(["Field", "Value"], metaRows);
 
   const execBullets = [
@@ -870,6 +955,7 @@ export function buildBacktestReport(
       section("Executive Summary", execBullets),
       section("Parameters", params.length ? mdTable(["Parameter", "Value"], params) : "_No parameters._"),
       section("Performance Metrics", metricsTable(m, r.benchmark_metrics)),
+      benchmarkSection(r.benchmark_analytics, m.total_return),
       section("Equity Curve Summary", equitySummary(equity)),
       section("Trades Summary", tradesSummary(r.trades)),
     ],
@@ -1044,6 +1130,12 @@ export function buildSavedBacktestReport(
       savedMetaRows.push(["Data warnings", savedQuality.warnings.join(" ")]);
     }
   }
+  const savedBench = rec.params?.benchmark_analytics as
+    | { display_name?: string }
+    | undefined;
+  if (savedBench && typeof savedBench === "object" && savedBench.display_name) {
+    savedMetaRows.push(["Benchmark", savedBench.display_name]);
+  }
 
   const metadataBody = mdTable(["Field", "Value"], savedMetaRows);
 
@@ -1072,6 +1164,7 @@ export function buildSavedBacktestReport(
       ...(rec.notes ? [section("Notes", mdText(rec.notes))] : []),
       section("Parameters", params.length ? mdTable(["Parameter", "Value"], params) : "_No parameters._"),
       section("Performance Metrics", metricsTable(m)),
+      benchmarkSection(rec.params?.benchmark_analytics, num(m.total_return) ?? null),
       section("Equity Curve Summary", equitySummary(equity)),
       section("Trades Summary", tradesSummary(trades)),
     ],
