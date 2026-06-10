@@ -20,6 +20,7 @@ from __future__ import annotations
 import io
 import warnings
 
+import numpy as np
 import pandas as pd
 
 # Accepted column names after normalisation (lower-case, spaces/hyphens → "_").
@@ -88,6 +89,8 @@ def parse_price_csv(content: bytes) -> pd.Series:
         )
         dates = pd.to_datetime(df[date_col], errors="coerce")
     closes = pd.to_numeric(df[close_col], errors="coerce")
+    invalid_date_count = int(dates.isna().sum())
+    missing_close_count = int(closes.isna().sum())
 
     series = pd.Series(closes.to_numpy(), index=pd.DatetimeIndex(dates))
     series = series[~series.index.isna()]   # drop rows whose date failed to parse
@@ -106,11 +109,26 @@ def parse_price_csv(content: bytes) -> pd.Series:
     series.index = pd.to_datetime(idx.date)
     series.index.name = "Date"
 
+    finite_mask = np.isfinite(series.to_numpy(dtype=float))
+    if not bool(finite_mask.all()):
+        raise ValueError("Close prices must be finite; found infinite values.")
+
     # Keep the last uploaded row for duplicate dates, then sort chronologically.
+    duplicate_date_count = int(series.index.duplicated().sum())
     series = series[~series.index.duplicated(keep="last")]
     series = series.sort_index()
     series = series.astype(float)
     series.name = "Close"
+    series.attrs["price_column_used"] = str(close_col)
+    series.attrs["adjusted"] = _normalize(close_col) in ("adj_close", "adjusted_close")
+    series.attrs["source_missing_value_count"] = missing_close_count
+    series.attrs["source_duplicate_date_count"] = duplicate_date_count
+    warnings_meta: list[str] = []
+    if invalid_date_count > 0:
+        warnings_meta.append(
+            f"{invalid_date_count} row(s) had invalid dates and were dropped."
+        )
+    series.attrs["data_quality_warnings"] = warnings_meta
 
     if (series <= 0).any():
         raise ValueError(

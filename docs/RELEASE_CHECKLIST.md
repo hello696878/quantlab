@@ -31,7 +31,7 @@ cd backend
 python -m pytest -q
 ```
 
-- [ ] **All tests pass** — 840+ tests across 44 files, all on synthetic data (no network calls at test time).
+- [ ] **All tests pass** — 980+ tests across 48 files, all on synthetic data (no network calls at test time).
 - [ ] **No real database polluted by tests** — persistence tests redirect to a temporary SQLite file via the `fresh_db` / `monkeypatch` fixture; the guard test `test_tests_use_temp_database_not_real_database` asserts the active DB path is **never** the real `backend/data/quantlab.db`. After a test run, confirm your real DB's row counts are unchanged.
 - [ ] **Health endpoint works** — `curl http://localhost:8000/health` returns a healthy JSON payload; `GET /api/health` works through the frontend proxy.
 - [ ] **Swagger loads** — <http://localhost:8000/docs> lists endpoints grouped by tag (`backtest`, `research`, `portfolio`, persistence, `ops`).

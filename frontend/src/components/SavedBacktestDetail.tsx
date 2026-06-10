@@ -2,11 +2,17 @@
 
 import { useEffect, useState } from "react";
 import { classifyApiError, getSavedBacktest } from "@/lib/api";
-import type { EquityPoint, SavedBacktestFull, TradeRecord } from "@/lib/types";
+import type {
+  DataQuality,
+  EquityPoint,
+  SavedBacktestFull,
+  TradeRecord,
+} from "@/lib/types";
 import { notifyBackendOffline } from "@/lib/toast";
 import OfflineState from "@/components/ui/OfflineState";
 import ErrorState from "@/components/ui/ErrorState";
 import { Skeleton } from "@/components/ui/LoadingSkeleton";
+import DataQualityCard from "@/components/DataQualityCard";
 import EquityCurveChart from "@/components/EquityCurveChart";
 import DrawdownChart from "@/components/DrawdownChart";
 import TradeTable from "@/components/TradeTable";
@@ -47,6 +53,25 @@ function formatParamValue(value: unknown): string {
     }
   }
   return String(value);
+}
+
+function isDataQuality(value: unknown): value is DataQuality {
+  if (!value || typeof value !== "object") return false;
+  const q = value as Partial<DataQuality>;
+  return (
+    typeof q.provider === "string" &&
+    typeof q.ticker === "string" &&
+    typeof q.requested_start_date === "string" &&
+    typeof q.requested_end_date === "string" &&
+    typeof q.row_count === "number" &&
+    typeof q.missing_value_count === "number" &&
+    typeof q.duplicate_date_count === "number" &&
+    typeof q.inferred_frequency === "string" &&
+    typeof q.calendar_gap_count === "number" &&
+    typeof q.price_column_used === "string" &&
+    typeof q.adjusted === "boolean" &&
+    Array.isArray(q.warnings)
+  );
 }
 
 interface MetricRowProps {
@@ -187,11 +212,15 @@ export default function SavedBacktestDetail({
   // Strategy params as key-value pairs for display.  data_quality is a nested
   // diagnostics object — summarized as a compact pill below, not raw JSON.
   const paramEntries = Object.entries(record.params).filter(
-    ([k, v]) => v != null && k !== "data_quality",
+    ([k, v]) => v != null && k !== "data_quality" && k !== "data_provider",
   );
-  const savedQuality = record.params?.data_quality as
-    | { row_count?: number; actual_start_date?: string | null; actual_end_date?: string | null }
-    | undefined;
+  const savedQuality = isDataQuality(record.params?.data_quality)
+    ? record.params.data_quality
+    : undefined;
+  const savedProvider =
+    typeof record.params?.data_provider === "string"
+      ? record.params.data_provider
+      : savedQuality?.provider;
 
   return (
     <div className="space-y-6">
@@ -281,6 +310,10 @@ export default function SavedBacktestDetail({
           </div>
         )}
       </div>
+
+      {savedQuality && (
+        <DataQualityCard provider={savedProvider} quality={savedQuality} />
+      )}
 
       {/* Metrics */}
       {Object.keys(m).length > 0 && (

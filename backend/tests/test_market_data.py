@@ -19,6 +19,7 @@ import numpy as np
 import pandas as pd
 import pytest
 
+from app import data as data_module
 from app.market_data import assess_data_quality
 
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
@@ -78,6 +79,44 @@ def test_quality_detects_duplicate_dates():
     )
     assert q.duplicate_date_count == 1
     assert any("duplicate" in w.lower() for w in q.warnings)
+
+
+def test_quality_uses_source_metadata_for_cleaned_rows():
+    idx = pd.date_range("2020-01-06", periods=5, freq="B")
+    close = _close(range(100, 105), idx)
+    close.attrs["source_missing_value_count"] = 2
+    close.attrs["source_duplicate_date_count"] = 1
+    close.attrs["price_column_used"] = "Adj Close"
+    close.attrs["adjusted"] = True
+
+    q = assess_data_quality(
+        close,
+        ticker="CSV_UPLOAD",
+        requested_start_date="2020-01-06",
+        requested_end_date="2020-01-10",
+        provider="csv_upload",
+        adjusted=False,
+    )
+
+    assert q.missing_value_count == 2
+    assert q.duplicate_date_count == 1
+    assert q.price_column_used == "Adj Close"
+    assert q.adjusted is True
+    assert any("dropped" in w.lower() for w in q.warnings)
+    assert any("removed" in w.lower() for w in q.warnings)
+
+
+def test_quality_sanitizes_nonfinite_first_or_last_price():
+    idx = pd.date_range("2020-01-06", periods=3, freq="B")
+    q = assess_data_quality(
+        pd.Series([float("inf"), 101.0, float("-inf")], index=idx, name="Close"),
+        ticker="BAD",
+        requested_start_date="2020-01-06",
+        requested_end_date="2020-01-08",
+    )
+    assert q.first_price is None
+    assert q.last_price is None
+    assert any("non-finite" in w.lower() for w in q.warnings)
 
 
 def test_quality_detects_truncated_range():
@@ -140,6 +179,58 @@ def test_quality_detects_large_gaps():
     )
     assert q.calendar_gap_count >= 1
     assert any("gap" in w.lower() for w in q.warnings)
+
+
+def test_yfinance_provider_wrapper_preserves_shape_and_metadata(monkeypatch):
+    class FakeTicker:
+        def __init__(self, ticker: str):
+            self.ticker = ticker
+
+        def history(self, start: str, end: str, auto_adjust: bool):
+            assert self.ticker == "SPY"
+            assert start == "2020-01-01"
+            assert end == "2020-01-10"
+            assert auto_adjust is True
+            idx = pd.DatetimeIndex(
+                ["2020-01-03", "2020-01-02", "2020-01-02", "2020-01-06"],
+                tz="UTC",
+            )
+            return pd.DataFrame(
+                {
+                    "Open": [99.0, 100.0, 101.0, 102.0],
+                    "High": [100.0, 101.0, 102.0, 103.0],
+                    "Low": [98.0, 99.0, 100.0, 101.0],
+                    "Close": [100.0, 101.0, 102.0, np.nan],
+                    "Volume": [1_000, 1_100, 1_200, 1_300],
+                    "Dividends": [0.0, 0.0, 0.0, 0.0],
+                },
+                index=idx,
+            )
+
+    monkeypatch.setattr(data_module.yf, "Ticker", FakeTicker)
+
+    df = data_module.fetch_ohlcv("SPY", "2020-01-01", "2020-01-10")
+
+    assert list(df.columns) == ["Open", "High", "Low", "Close", "Volume"]
+    assert df.index.tz is None
+    assert df.index.is_monotonic_increasing
+    assert not df.index.has_duplicates
+    assert len(df) == 2
+    assert float(df.loc[pd.Timestamp("2020-01-02"), "Close"]) == 102.0
+    assert df.attrs["price_column_used"] == "Close"
+    assert df.attrs["adjusted"] is True
+    assert df.attrs["source_missing_value_count"] == 1
+    assert df.attrs["source_duplicate_date_count"] == 1
+
+    q = assess_data_quality(
+        df["Close"],
+        ticker="SPY",
+        requested_start_date="2020-01-01",
+        requested_end_date="2020-01-10",
+    )
+    assert q.missing_value_count == 1
+    assert q.duplicate_date_count == 1
+    assert any("dropped" in w.lower() for w in q.warnings)
 
 
 # ---------------------------------------------------------------------------
@@ -227,3 +318,36 @@ def test_api_csv_upload_quality_is_csv_provider():
     assert body["data_quality"]["provider"] == "csv_upload"
     assert body["data_quality"]["adjusted"] is False
     assert body["data_quality"]["row_count"] == 160
+
+
+def test_api_csv_upload_quality_preserves_price_column_and_duplicate_count():
+    dates = pd.date_range("2020-01-01", periods=160, freq="B")
+    rows = [f"{d.date()},{100 + i * 0.5}" for i, d in enumerate(dates)]
+    rows.append(f"{dates[0].date()},250.0")  # duplicate date; parser keeps last
+    csv_text = "Date,Adj Close\n" + "\n".join(rows)
+    client = TestClient(main_module.app)
+    resp = client.post(
+        "/backtest/csv",
+        files={"file": ("prices.csv", io.BytesIO(csv_text.encode()), "text/csv")},
+        data={"strategy": "sma_crossover", "params": '{"fast_window": 10, "slow_window": 30}'},
+    )
+    assert resp.status_code == 200
+    q = resp.json()["data_quality"]
+    assert q["provider"] == "csv_upload"
+    assert q["price_column_used"] == "Adj Close"
+    assert q["adjusted"] is True
+    assert q["row_count"] == 160
+    assert q["duplicate_date_count"] == 1
+    assert any("duplicate" in w.lower() for w in q["warnings"])
+
+
+def test_api_csv_upload_rejects_infinite_close():
+    csv_text = "Date,Close\n2020-01-01,100\n2020-01-02,inf\n2020-01-03,101\n"
+    client = TestClient(main_module.app)
+    resp = client.post(
+        "/backtest/csv",
+        files={"file": ("prices.csv", io.BytesIO(csv_text.encode()), "text/csv")},
+        data={"strategy": "sma_crossover", "params": '{"fast_window": 2, "slow_window": 3}'},
+    )
+    assert resp.status_code == 422
+    assert "finite" in resp.json()["detail"].lower()

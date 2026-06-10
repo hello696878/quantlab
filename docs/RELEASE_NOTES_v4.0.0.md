@@ -63,7 +63,7 @@ npm run dev
 ## Testing
 
 ```bash
-# backend — 840+ tests across 44 files, synthetic data (no network)
+# backend — 980+ tests across 48 files, synthetic data (no network)
 cd backend
 python -m pytest -q
 

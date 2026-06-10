@@ -10,7 +10,6 @@ interface Props {
 const PROVIDER_LABEL: Record<string, string> = {
   yfinance: "Yahoo Finance (yfinance)",
   csv_upload: "CSV upload",
-  synthetic: "Synthetic (test)",
 };
 
 function Item({ label, value }: { label: string; value: string }) {

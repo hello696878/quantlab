@@ -17,6 +17,7 @@ series the engine actually uses; it never mutates prices or blocks a backtest
 
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 import pandas as pd
@@ -32,6 +33,31 @@ _LARGE_GAP_DAYS = 5
 # Tolerance before warning that the actual range is narrower than requested —
 # avoids noisy warnings for weekends/holidays at the range edges.
 _EDGE_TOLERANCE_DAYS = 7
+
+
+def _finite_price(value: object) -> Optional[float]:
+    """Return a rounded finite float for JSON, or None for NaN/inf/non-numeric."""
+    try:
+        f = float(value)
+    except (TypeError, ValueError):
+        return None
+    return round(f, 6) if math.isfinite(f) else None
+
+
+def _metadata_int(close: pd.Series, key: str, fallback: int) -> int:
+    """Read a non-negative integer diagnostic override from Series attrs."""
+    try:
+        value = int(close.attrs.get(key, fallback))
+    except (TypeError, ValueError):
+        return fallback
+    return max(value, 0)
+
+
+def _metadata_warnings(close: pd.Series) -> list[str]:
+    raw = close.attrs.get("data_quality_warnings", [])
+    if not isinstance(raw, list):
+        return []
+    return [str(w) for w in raw if str(w).strip()]
 
 
 def _infer_frequency(idx: pd.DatetimeIndex) -> str:
@@ -91,20 +117,49 @@ def assess_data_quality(
         )
 
     idx = pd.DatetimeIndex(close.index)
-    missing = int(close.isna().sum())
-    duplicates = int(idx.duplicated().sum())
+    current_missing = int(close.isna().sum())
+    current_duplicates = int(idx.duplicated().sum())
+    missing = _metadata_int(close, "source_missing_value_count", current_missing)
+    duplicates = _metadata_int(close, "source_duplicate_date_count", current_duplicates)
+    price_column_used = str(close.attrs.get("price_column_used", price_column_used))
+    adjusted = bool(close.attrs.get("adjusted", adjusted))
 
     actual_start = idx[0]
     actual_end = idx[-1]
     diffs = idx.to_series().diff().dropna().dt.days
     gap_count = int((diffs > _LARGE_GAP_DAYS).sum())
 
+    warnings.extend(_metadata_warnings(close))
     if missing > 0:
-        warnings.append(f"{missing} missing close value(s) found in the data.")
+        if "source_missing_value_count" in close.attrs:
+            warnings.append(
+                f"{missing} missing or non-numeric close value(s) were dropped "
+                "before backtesting."
+            )
+        else:
+            warnings.append(f"{missing} missing close value(s) found in the data.")
     if duplicates > 0:
-        warnings.append(f"{duplicates} duplicate date(s) found in the data.")
+        if "source_duplicate_date_count" in close.attrs:
+            warnings.append(
+                f"{duplicates} duplicate date(s) were removed before backtesting."
+            )
+        else:
+            warnings.append(f"{duplicates} duplicate date(s) found in the data.")
     if not idx.is_monotonic_increasing:
         warnings.append("Dates are not sorted ascending.")
+    nonfinite_count = sum(
+        1
+        for value in close
+        if pd.notna(value) and _finite_price(value) is None
+    )
+    if nonfinite_count > 0:
+        warnings.append(f"{nonfinite_count} non-finite close value(s) found in the data.")
+    first_price = _finite_price(close.iloc[0])
+    last_price = _finite_price(close.iloc[-1])
+    if (pd.notna(close.iloc[0]) and first_price is None) or (
+        pd.notna(close.iloc[-1]) and last_price is None
+    ):
+        warnings.append("Non-finite first or last close price found in the data.")
 
     try:
         req_start = pd.Timestamp(requested_start_date)
@@ -140,8 +195,8 @@ def assess_data_quality(
         duplicate_date_count=duplicates,
         inferred_frequency=_infer_frequency(idx),
         calendar_gap_count=gap_count,
-        first_price=round(float(close.iloc[0]), 6) if pd.notna(close.iloc[0]) else None,
-        last_price=round(float(close.iloc[-1]), 6) if pd.notna(close.iloc[-1]) else None,
+        first_price=first_price,
+        last_price=last_price,
         price_column_used=price_column_used,
         adjusted=adjusted,
         warnings=warnings,

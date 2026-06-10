@@ -40,6 +40,12 @@ def fetch_ohlcv(ticker: str, start: str, end: str) -> pd.DataFrame:
             f"No data returned for ticker '{ticker}' between {start} and {end}. "
             "Check the ticker symbol and date range."
         )
+    if "Close" not in df.columns:
+        raise ValueError(
+            f"Yahoo Finance did not return a Close column for ticker '{ticker}' "
+            f"between {start} and {end}."
+        )
+    missing_close_count = int(df["Close"].isna().sum())
 
     # Normalise the index to timezone-naive dates (yfinance may return tz-aware).
     if df.index.tz is not None:
@@ -55,6 +61,14 @@ def fetch_ohlcv(ticker: str, start: str, end: str) -> pd.DataFrame:
     # Guarantee ascending dates (yfinance returns ascending; this is defensive).
     if not df.index.is_monotonic_increasing:
         df.sort_index(inplace=True)
+    duplicate_date_count = int(df.index.duplicated().sum())
+    if duplicate_date_count > 0:
+        df = df[~df.index.duplicated(keep="last")]
+
+    df.attrs["price_column_used"] = "Close"
+    df.attrs["adjusted"] = True
+    df.attrs["source_missing_value_count"] = missing_close_count
+    df.attrs["source_duplicate_date_count"] = duplicate_date_count
 
     return df
 

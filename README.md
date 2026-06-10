@@ -97,7 +97,7 @@ A tour of the running app — every chart and metric below is a **real backend r
 | Styling | Tailwind CSS · CSS-variable neon theme |
 | Charts | Recharts |
 | Local persistence | SQLite (saved backtests, reports & strategy templates) |
-| Testing | pytest (840+ tests across 44 files, synthetic data) |
+| Testing | pytest (980+ tests across 48 files, synthetic data) |
 | CI | GitHub Actions |
 | Containerisation | Docker · Docker Compose |
 
@@ -542,7 +542,7 @@ Frontend: http://localhost:3000
 
 ## Testing
 
-**Backend** — 840+ tests across 44 files, all on synthetic price data (no network calls, no yfinance dependency at test time):
+**Backend** — 980+ tests across 48 files, all on synthetic price data (no network calls, no yfinance dependency at test time):
 
 ```powershell
 cd backend
@@ -585,7 +585,7 @@ quantlab/
 │   │   ├── schemas.py       Pydantic v2 request / response models
 │   │   ├── data.py          yfinance OHLCV download layer
 │   │   └── utils.py         Shared helpers (date validation, etc.)
-│   ├── tests/               pytest suite (840+ tests, synthetic data)
+│   ├── tests/               pytest suite (980+ tests, synthetic data)
 │   ├── Dockerfile
 │   ├── .dockerignore
 │   └── requirements.txt
