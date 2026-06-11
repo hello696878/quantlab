@@ -9,12 +9,15 @@ import {
   type ModelStatus,
 } from "@/lib/modelRegistry";
 import type { StrategyType } from "@/lib/types";
+import { papersForStrategy } from "@/lib/paperRegistry";
 
 interface Props {
   /** Navigate to Backtest Studio with the strategy preselected + defaults. */
   onRunStrategy: (strategy: StrategyType) => void;
   /** Navigate to Strategy Comparison. */
   onOpenComparison: () => void;
+  /** Open a Paper Replications page (related-papers links). */
+  onOpenPaper?: (slug: string) => void;
   /** Initial detail slug (e.g. from the command palette); null = index. */
   initialSlug?: string | null;
 }
@@ -86,6 +89,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function StrategyLibraryPanel({
   onRunStrategy,
   onOpenComparison,
+  onOpenPaper,
   initialSlug = null,
 }: Props) {
   const [slug, setSlug] = useState<string | null>(initialSlug);
@@ -114,6 +118,7 @@ export default function StrategyLibraryPanel({
         onBack={() => setSlug(null)}
         onRunStrategy={onRunStrategy}
         onOpenComparison={onOpenComparison}
+        onOpenPaper={onOpenPaper}
       />
     );
   }
@@ -197,12 +202,15 @@ function ModelDetail({
   onBack,
   onRunStrategy,
   onOpenComparison,
+  onOpenPaper,
 }: {
   model: ModelEntry;
   onBack: () => void;
   onRunStrategy: (strategy: StrategyType) => void;
   onOpenComparison: () => void;
+  onOpenPaper?: (slug: string) => void;
 }) {
+  const relatedPapers = papersForStrategy(model.id);
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -306,6 +314,27 @@ function ModelDetail({
           {model.interactionNotes && (
             <p className="mt-2 text-sm text-slate-600">{model.interactionNotes}</p>
           )}
+        </Section>
+      )}
+
+      {relatedPapers.length > 0 && onOpenPaper && (
+        <Section title="Related Papers">
+          <div className="flex flex-wrap gap-2">
+            {relatedPapers.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => onOpenPaper(p.slug)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-blue-400 hover:text-blue-600"
+              >
+                {p.authors} ({p.year}) — {p.title.length > 44 ? p.title.slice(0, 41) + "…" : p.title}
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">
+            Paper pages explain the original research and what QuantLab can
+            honestly approximate today.
+          </p>
         </Section>
       )}
 

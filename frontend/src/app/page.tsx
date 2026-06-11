@@ -28,6 +28,12 @@ import RobustnessLabCard from "@/components/RobustnessLabCard";
 import StabilityLabCard from "@/components/StabilityLabCard";
 import StrategyLibraryPanel from "@/components/StrategyLibraryPanel";
 import { LIVE_MODELS } from "@/lib/modelRegistry";
+import PaperReplicationsPanel from "@/components/PaperReplicationsPanel";
+import {
+  LIVE_PAPERS,
+  type PaperEntry,
+  type PaperRunPreset,
+} from "@/lib/paperRegistry";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -319,6 +325,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "What each strategy tests, when it fails, and how to validate it — research notes, not advice.",
   },
+  replications: {
+    title: "Paper Replications",
+    subtitle:
+      "Classic quant papers explained, with honest simplified demos — not full academic replications.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -409,6 +420,9 @@ export default function HomePage() {
   // Strategy Library: which model page is open (null = index); key remounts.
   const [librarySlug, setLibrarySlug] = useState<string | null>(null);
   const [libraryKey, setLibraryKey] = useState(0);
+  // Paper Replications: same pattern.
+  const [paperSlug, setPaperSlug] = useState<string | null>(null);
+  const [paperKey, setPaperKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -510,6 +524,8 @@ export default function HomePage() {
     // deep-open a specific model page instead).
     setLibrarySlug(null);
     setLibraryKey((k) => k + 1);
+    setPaperSlug(null);
+    setPaperKey((k) => k + 1);
   }
 
   /** Open the Strategy Library on a specific model page (command palette). */
@@ -519,6 +535,35 @@ export default function HomePage() {
     setLibrarySlug(slug);
     setLibraryKey((k) => k + 1);
     setView("library");
+  }
+
+  /** Open Paper Replications on a specific paper page. */
+  function openPaperPage(slug: string | null) {
+    setSavedDetailId(null);
+    setSavedReportDetailId(null);
+    setPaperSlug(slug);
+    setPaperKey((k) => k + 1);
+    setView("replications");
+  }
+
+  /**
+   * Launch a paper-inspired preset: preselect the strategy, load its demo
+   * defaults (with the preset's ticker), and navigate.  Never auto-runs and
+   * never claims full replication — the notice says "inspired demo".
+   */
+  function handleRunPaperPreset(preset: PaperRunPreset, paper: PaperEntry) {
+    handleRunFromLibrary(preset.strategyId);
+    if (preset.ticker) {
+      if (preset.strategyId === "momentum") {
+        setMomentumParams({ ...DEFAULT_MOMENTUM_PARAMS, ticker: preset.ticker });
+      } else if (preset.strategyId === "sma_crossover") {
+        setSmaParams({ ...DEFAULT_SMA_PARAMS, ticker: preset.ticker });
+      }
+    }
+    setDemoNotice(
+      `Paper-inspired preset loaded (${paper.authors} ${paper.year}). This is a ` +
+        "simplified educational demo, not a full replication. Click Run to execute.",
+    );
   }
 
   /**
@@ -667,6 +712,7 @@ export default function HomePage() {
     { view: "home", title: "Go to Home", keywords: "command center dashboard" },
     { view: "backtest", title: "Go to Backtest", keywords: "single asset run strategy" },
     { view: "library", title: "Open Strategy Library", keywords: "models catalog docs education strategy pages" },
+    { view: "replications", title: "Open Paper Replications", keywords: "papers research academic momentum pairs replication" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -735,6 +781,21 @@ export default function HomePage() {
       keywords: `strategy library run backtest ${m.slug}`,
       hint: "prefill",
       run: () => handleRunFromLibrary(m.strategyId!),
+    })),
+    ...LIVE_PAPERS.map((p) => ({
+      id: `paper-${p.slug}`,
+      group: "Paper Replications",
+      title: `Open ${p.authors} (${p.year}) replication page`,
+      keywords: `paper replication ${p.title} ${p.category} ${p.slug}`,
+      run: () => openPaperPage(p.slug),
+    })),
+    ...LIVE_PAPERS.filter((p) => p.runPreset).map((p) => ({
+      id: `paper-run-${p.slug}`,
+      group: "Paper Replications",
+      title: `Run ${p.authors} (${p.year}) inspired demo`,
+      keywords: `paper replication demo run ${p.slug}`,
+      hint: "prefill",
+      run: () => handleRunPaperPreset(p.runPreset!, p),
     })),
     // Report actions are only offered when they actually work (a result exists).
     ...(result
@@ -1132,6 +1193,17 @@ export default function HomePage() {
             initialSlug={librarySlug}
             onRunStrategy={handleRunFromLibrary}
             onOpenComparison={() => handleNav("comparison")}
+            onOpenPaper={openPaperPage}
+          />
+        )}
+
+        {/* ── Paper Replications ───────────────────────────────────────── */}
+        {view === "replications" && (
+          <PaperReplicationsPanel
+            key={paperKey}
+            initialSlug={paperSlug}
+            onRunPreset={handleRunPaperPreset}
+            onOpenStrategy={openLibraryPage}
           />
         )}
 

@@ -53,7 +53,7 @@ reproducible and every limitation explicit.
 | Reproducible Backtest Permalinks / config hash | **built** (v1: canonical config hash + CSV content fingerprint; replay-by-hash routing + dataset version hashes future) |
 | Robustness Lab (bootstrap Monte Carlo, deflated Sharpe, sensitivity heatmaps, PBO if feasible) | **built** (v1: block bootstrap + heuristic grade; 12.9 added the SMA parameter-sensitivity heatmap / Stability Lab. Deflated Sharpe / PBO / multi-strategy sweeps remain v2 — not implemented) |
 | Quant Disasters Series (what blew up and why — LTCM, Aug 2007, vol short 2018, …) | future |
-| Paper Replication Series (classic papers, honest deviations) | planned |
+| Paper Replication Series (classic papers, honest deviations) | **built** (v1: 8 paper pages + 3 inspired demos clearly labelled as simplified; full replications future — need universe data) |
 | AI Explainer Copilot (explains results; never recommends trades) | future |
 | 3D Visualization Engine (vol surfaces, sweep landscapes) | future |
 | Strategy Ensemble Builder | research |
@@ -90,7 +90,7 @@ reproducible and every limitation explicit.
    deflated Sharpe, PBO, multi-strategy sweeps)
 4. ~~Strategy Library v1 pages~~ — **built** (13.0: six live strategy pages +
    honest planned catalog; registry in `frontend/src/lib/modelRegistry.ts`)
-5. Paper Replication Series v1
+5. ~~Paper Replication Series v1~~ — **built** (13.1)
 6. Options Pricing Engine v1
 7. Volatility Lab v1
 8. Event-Driven & Arbitrage Module

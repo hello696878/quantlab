@@ -9,6 +9,7 @@ export type View =
   | "home"
   | "backtest"
   | "library"
+  | "replications"
   | "csv"
   | "builder"
   | "portfolio"

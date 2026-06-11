@@ -749,6 +749,18 @@ single-asset Backtest + Strategy Comparison:
   auto-runs); model registry (`frontend/src/lib/modelRegistry.ts`) is the
   single metadata source
 
+### Phase 13.1 — Paper Replication Series v1 ✅
+
+- New **Paper Replications** workspace: 8 classic papers (momentum, pairs,
+  TSMOM, Fama–French, BAB, Avellaneda–Stoikov, Black–Scholes,
+  Black–Litterman) with research question, core idea, original-method summary,
+  honest implementation status, data requirements, and limitations
+- Three **inspired demos** (Jegadeesh–Titman, Gatev pairs, MOP TSMOM) preload
+  Backtest Studio with clear "simplified educational demo — not a full
+  replication" labelling; planned papers have no run buttons
+- Registry (`frontend/src/lib/paperRegistry.ts`) cross-links Strategy Library
+  pages (Related Papers) and powers command-palette commands
+
 ---
 
 ## Future Phases — aligned with Master Blueprint v3
@@ -786,8 +798,8 @@ search · toasts, error boundary, loading/offline states.
    Momentum, comparison-mode robustness
 4. ~~Strategy Library v1 pages~~ — **built** (13.0: research pages for the six
    live strategies + honest planned-model catalog)
-5. **Paper Replication Series v1** — classic papers (e.g. momentum, low-vol)
-   replicated with honest deviation notes
+5. ~~Paper Replication Series v1~~ — **built** (13.1: 8 paper pages, 3 honest
+   inspired demos; full replications remain future work pending universe data)
 6. **Options Pricing Engine v1** — Black–Scholes, Greeks, simple IV surface
    (educational; no options data feed)
 7. **Volatility Lab v1** — realized vol estimators, vol targeting deep-dive,
