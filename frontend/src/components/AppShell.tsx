@@ -8,6 +8,7 @@ import TopBar from "@/components/TopBar";
 export type View =
   | "home"
   | "backtest"
+  | "library"
   | "csv"
   | "builder"
   | "portfolio"

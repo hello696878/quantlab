@@ -26,6 +26,8 @@ import ExcessReturnChart from "@/components/ExcessReturnChart";
 import ReproducibilityCard from "@/components/ReproducibilityCard";
 import RobustnessLabCard from "@/components/RobustnessLabCard";
 import StabilityLabCard from "@/components/StabilityLabCard";
+import StrategyLibraryPanel from "@/components/StrategyLibraryPanel";
+import { LIVE_MODELS } from "@/lib/modelRegistry";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -312,6 +314,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Backtest",
     subtitle: "Run a single strategy on real historical market data.",
   },
+  library: {
+    title: "Strategy Library",
+    subtitle:
+      "What each strategy tests, when it fails, and how to validate it — research notes, not advice.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -399,6 +406,9 @@ export default function HomePage() {
   const [showSaveForm, setShowSaveForm] = useState(false);
   const [savedRefreshKey, setSavedRefreshKey] = useState(0);
   const [savedDetailId, setSavedDetailId] = useState<number | null>(null);
+  // Strategy Library: which model page is open (null = index); key remounts.
+  const [librarySlug, setLibrarySlug] = useState<string | null>(null);
+  const [libraryKey, setLibraryKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -496,6 +506,44 @@ export default function HomePage() {
     setBuilderDemoTemplateId(null);
     if (next !== "saved") setSavedDetailId(null);
     if (next !== "reports") setSavedReportDetailId(null);
+    // Sidebar navigation always lands on the library index (palette commands
+    // deep-open a specific model page instead).
+    setLibrarySlug(null);
+    setLibraryKey((k) => k + 1);
+  }
+
+  /** Open the Strategy Library on a specific model page (command palette). */
+  function openLibraryPage(slug: string | null) {
+    setSavedDetailId(null);
+    setSavedReportDetailId(null);
+    setLibrarySlug(slug);
+    setLibraryKey((k) => k + 1);
+    setView("library");
+  }
+
+  /**
+   * "Run in Backtest Studio" from the Strategy Library: preselect the strategy,
+   * load its demo defaults, and navigate.  Never auto-runs, never fabricates
+   * results, and leaves global preferences (cost defaults, annualization,
+   * theme) untouched.
+   */
+  function handleRunFromLibrary(id: StrategyType) {
+    setSavedDetailId(null);
+    setSavedReportDetailId(null);
+    setStrategy(id);
+    if (id === "sma_crossover") setSmaParams(DEFAULT_SMA_PARAMS);
+    else if (id === "rsi_mean_reversion") setRsiParams(DEFAULT_RSI_PARAMS);
+    else if (id === "bollinger_band") setBbParams(DEFAULT_BB_PARAMS);
+    else if (id === "momentum") setMomentumParams(DEFAULT_MOMENTUM_PARAMS);
+    else if (id === "volatility_breakout") setVbParams(DEFAULT_VB_PARAMS);
+    else if (id === "pairs") setPairsParams(DEFAULT_PAIRS_PARAMS);
+    setResult(null);
+    setError(null);
+    setFormKey((k) => k + 1);
+    setDemoNotice(
+      "Strategy loaded from the Strategy Library with default parameters. Click Run to execute.",
+    );
+    setView("backtest");
   }
 
   /**
@@ -618,6 +666,7 @@ export default function HomePage() {
   const NAV_COMMANDS: { view: View; title: string; keywords: string }[] = [
     { view: "home", title: "Go to Home", keywords: "command center dashboard" },
     { view: "backtest", title: "Go to Backtest", keywords: "single asset run strategy" },
+    { view: "library", title: "Open Strategy Library", keywords: "models catalog docs education strategy pages" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -671,6 +720,21 @@ export default function HomePage() {
       title: c.title,
       keywords: c.keywords,
       run: () => goToPortfolioTab(c.tab),
+    })),
+    ...LIVE_MODELS.map((m) => ({
+      id: `library-${m.slug}`,
+      group: "Strategy Library",
+      title: `Open ${m.name} page`,
+      keywords: `strategy library docs ${m.category} ${m.slug}`,
+      run: () => openLibraryPage(m.slug),
+    })),
+    ...LIVE_MODELS.filter((m) => m.strategyId).map((m) => ({
+      id: `library-run-${m.slug}`,
+      group: "Strategy Library",
+      title: `Run ${m.name} backtest`,
+      keywords: `strategy library run backtest ${m.slug}`,
+      hint: "prefill",
+      run: () => handleRunFromLibrary(m.strategyId!),
     })),
     // Report actions are only offered when they actually work (a result exists).
     ...(result
@@ -1059,6 +1123,16 @@ export default function HomePage() {
               </>
             )}
           </>
+        )}
+
+        {/* ── Strategy Library ─────────────────────────────────────────── */}
+        {view === "library" && (
+          <StrategyLibraryPanel
+            key={libraryKey}
+            initialSlug={librarySlug}
+            onRunStrategy={handleRunFromLibrary}
+            onOpenComparison={() => handleNav("comparison")}
+          />
         )}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}

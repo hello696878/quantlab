@@ -737,6 +737,18 @@ single-asset Backtest + Strategy Comparison:
   metrics only); selected/best points, heuristic stability score + fragility
   flag; saved + report integration; other strategies clearly unsupported
 
+### Phase 13.0 — Strategy Library v1 ✅
+
+- New **Strategy Library** workspace (sidebar + command palette): index cards
+  for the six live strategies + an honest planned/research catalog (no run
+  buttons for unimplemented models)
+- Per-strategy research pages: overview, hypothesis, signal logic, parameter
+  table (defaults / ranges / extreme-value risks), strengths, failure modes,
+  cost & risk-interaction notes, Trust Layer validation checklist
+- "Run in Backtest Studio" preloads the strategy + demo defaults (never
+  auto-runs); model registry (`frontend/src/lib/modelRegistry.ts`) is the
+  single metadata source
+
 ---
 
 ## Future Phases — aligned with Master Blueprint v3
@@ -772,8 +784,8 @@ search · toasts, error boundary, loading/offline states.
    Stability Lab v1, SMA only). **Robustness/Stability v2** stays planned:
    deflated Sharpe (needs trial tracking), PBO, sweeps for RSI / Bollinger /
    Momentum, comparison-mode robustness
-4. **Strategy Library v1 pages** — intuition, math, parameters, strengths /
-   failure modes for each built strategy
+4. ~~Strategy Library v1 pages~~ — **built** (13.0: research pages for the six
+   live strategies + honest planned-model catalog)
 5. **Paper Replication Series v1** — classic papers (e.g. momentum, low-vol)
    replicated with honest deviation notes
 6. **Options Pricing Engine v1** — Black–Scholes, Greeks, simple IV surface

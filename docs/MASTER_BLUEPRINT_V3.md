@@ -86,9 +86,10 @@ reproducible and every limitation explicit.
 
 1. ~~Benchmark visualization~~ — **built** (12.6.1)
 2. ~~Reproducible Backtest Permalinks / Config Hash~~ — **built** (12.7)
-3. ~~Robustness Lab v1~~ — **built** (12.8; v2 = deflated Sharpe, PBO,
-   sensitivity heatmaps)
-4. Strategy Library v1 pages
+3. ~~Robustness Lab v1~~ — **built** (12.8 + 12.9 Stability Lab heatmap; v2 =
+   deflated Sharpe, PBO, multi-strategy sweeps)
+4. ~~Strategy Library v1 pages~~ — **built** (13.0: six live strategy pages +
+   honest planned catalog; registry in `frontend/src/lib/modelRegistry.ts`)
 5. Paper Replication Series v1
 6. Options Pricing Engine v1
 7. Volatility Lab v1

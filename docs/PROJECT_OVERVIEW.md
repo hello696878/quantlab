@@ -20,8 +20,8 @@ Browser
   │  http://localhost:3000
   ▼
 Next.js Frontend (App Router)
-  │  Command Center · Backtest · CSV · Strategy Builder · Portfolio Lab
-  │  Research tools · Saved Backtests/Reports · Settings
+  │  Command Center · Backtest · Strategy Library · CSV · Strategy Builder
+  │  Portfolio Lab · Research tools · Saved Backtests/Reports · Settings
   │  Command palette (Ctrl/Cmd+K) · global search · toasts · error boundary
   │  EquityCurveChart · DrawdownChart · MetricsGrid · TradeTable (neon charts)
   │
