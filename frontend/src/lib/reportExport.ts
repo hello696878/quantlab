@@ -567,6 +567,198 @@ function benchmarkSection(
 }
 
 
+/**
+ * Keys in a saved backtest's `params` blob that are simulation/result metadata
+ * rather than strategy parameters.  They render in their own structured report
+ * sections (Simulation Settings, Data Quality, Benchmark, Robustness,
+ * Reproducibility) — never as raw values in the Strategy Parameters table.
+ */
+const NON_STRATEGY_PARAM_KEYS = new Set([
+  "cost_model",
+  "effective_cost_bps",
+  "total_transaction_cost",
+  "cost_drag_return",
+  "position_sizing",
+  "average_exposure",
+  "risk_management",
+  "risk_diagnostics",
+  "annualization_mode",
+  "annualization_mode_used",
+  "periods_per_year",
+  "annualization_warning",
+  "data_provider",
+  "data_quality",
+  "benchmark",
+  "benchmark_analytics",
+  "reproducibility",
+  "robustness",
+  "position_mode",
+  "equity_curve",
+  "trades",
+  "metrics",
+]);
+
+/** Strategy-parameter rows from a saved params blob: scalars only, no metadata. */
+function savedStrategyParams(params: Record<string, unknown>): [string, string][] {
+  return Object.entries(params)
+    .filter(
+      ([k, v]) =>
+        !NON_STRATEGY_PARAM_KEYS.has(k) &&
+        v != null &&
+        typeof v !== "object" && // structural guard: objects never print raw
+        typeof v !== "function",
+    )
+    .map(([k, v]) => [k, String(v)] as [string, string]);
+}
+
+/** "Data Quality" report section as a structured table (never raw JSON). */
+function dataQualitySection(raw: unknown, providerOverride?: string | null): string {
+  if (!raw || typeof raw !== "object") return "";
+  const q = raw as {
+    provider?: string;
+    ticker?: string;
+    requested_start_date?: string;
+    requested_end_date?: string;
+    actual_start_date?: string | null;
+    actual_end_date?: string | null;
+    row_count?: number;
+    missing_value_count?: number;
+    duplicate_date_count?: number;
+    inferred_frequency?: string;
+    calendar_gap_count?: number;
+    first_price?: number | null;
+    last_price?: number | null;
+    price_column_used?: string;
+    adjusted?: boolean;
+    warnings?: string[];
+  };
+  if (typeof q.row_count !== "number") return "";
+  const rows: [string, string][] = [
+    ["Provider", providerOverride ?? q.provider ?? "—"],
+    ["Ticker", q.ticker ?? "—"],
+    [
+      "Requested range",
+      q.requested_start_date && q.requested_end_date
+        ? `${q.requested_start_date} → ${q.requested_end_date}`
+        : "—",
+    ],
+    [
+      "Actual range",
+      q.actual_start_date && q.actual_end_date
+        ? `${q.actual_start_date} → ${q.actual_end_date}`
+        : "—",
+    ],
+    ["Rows", String(q.row_count)],
+    ["Missing values", String(q.missing_value_count ?? 0)],
+    ["Duplicate dates", String(q.duplicate_date_count ?? 0)],
+    ["Inferred frequency", q.inferred_frequency ?? "—"],
+    ["Calendar gaps (>5d)", String(q.calendar_gap_count ?? 0)],
+    [
+      "Price column",
+      `${q.price_column_used ?? "Close"}${q.adjusted ? " (adjusted)" : ""}`,
+    ],
+    ["First price", typeof q.first_price === "number" ? String(q.first_price) : "—"],
+    ["Last price", typeof q.last_price === "number" ? String(q.last_price) : "—"],
+    [
+      "Warnings",
+      q.warnings && q.warnings.length > 0 ? q.warnings.join(" ") : "None",
+    ],
+  ];
+  return section("Data Quality", mdTable(["Field", "Value"], rows));
+}
+
+/** "Reproducibility" report section — hashes only, never the canonical JSON. */
+function reproducibilitySection(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "";
+  const r = raw as {
+    config_hash?: string;
+    config_hash_full?: string;
+    schema_version?: string;
+  };
+  if (!r.config_hash) return "";
+  const rows: [string, string][] = [["Config hash", r.config_hash]];
+  if (r.config_hash_full) rows.push(["Config hash (full)", r.config_hash_full]);
+  if (r.schema_version) rows.push(["Config schema", r.schema_version]);
+  rows.push([
+    "Canonical config",
+    "JSON omitted from the printable report for readability (kept in saved metadata).",
+  ]);
+  return section(
+    "Reproducibility",
+    mdTable(["Field", "Value"], rows) +
+      "\n\n_Config hashes identify normalized input assumptions; they do not " +
+      "guarantee identical future results if the external data provider revises " +
+      "historical data._",
+  );
+}
+
+/** "Robustness Lab" report section (empty string when analysis was not run). */
+function robustnessSection(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "";
+  const r = raw as {
+    method?: string;
+    n_simulations?: number;
+    block_size?: number;
+    seed?: number;
+    grade?: string | null;
+    summary?: {
+      median_final_return?: number;
+      p05_final_return?: number;
+      p95_final_return?: number;
+      probability_of_loss?: number;
+      probability_of_outperforming_benchmark?: number | null;
+      median_max_drawdown?: number;
+      p95_max_drawdown?: number;
+      median_sharpe?: number;
+      p05_sharpe?: number;
+      p95_sharpe?: number;
+    } | null;
+    warnings?: string[];
+  };
+  if (typeof r.n_simulations !== "number") return "";
+  const pct = (v?: number | null) => (typeof v === "number" ? formatPercent(v) : "—");
+  const ratio = (v?: number | null) => (typeof v === "number" ? formatRatio(v) : "—");
+  const rows: [string, string][] = [
+    ["Method", r.method ?? "block_bootstrap_returns"],
+    ["Simulations", String(r.n_simulations)],
+    ["Block size", String(r.block_size ?? "—")],
+    ["Seed", String(r.seed ?? "—")],
+    ["Robustness grade (heuristic)", r.grade ?? "—"],
+  ];
+  const s = r.summary;
+  if (s) {
+    rows.push(
+      ["Probability of loss", pct(s.probability_of_loss)],
+      ["Median final return", pct(s.median_final_return)],
+      ["5th–95th pct final return", `${pct(s.p05_final_return)} … ${pct(s.p95_final_return)}`],
+      ["Median max drawdown", pct(s.median_max_drawdown)],
+      ["95th-pct max drawdown (severity)", pct(s.p95_max_drawdown)],
+      ["Median Sharpe", ratio(s.median_sharpe)],
+      ["5th–95th pct Sharpe", `${ratio(s.p05_sharpe)} … ${ratio(s.p95_sharpe)}`],
+    );
+    if (typeof s.probability_of_outperforming_benchmark === "number") {
+      rows.push([
+        "Probability of beating benchmark",
+        pct(s.probability_of_outperforming_benchmark),
+      ]);
+    }
+  }
+  const warningLines =
+    r.warnings && r.warnings.length
+      ? "\n\n" + r.warnings.map((w) => `- ⚠ ${w}`).join("\n")
+      : "";
+  const caveat =
+    "\n\n_Bootstrap robustness resamples historical returns and does not " +
+    "guarantee future performance. It may understate regime shifts, liquidity " +
+    "shocks, and structural breaks. The grade is a heuristic, not a trading " +
+    "recommendation._";
+  return section(
+    "Robustness Lab",
+    mdTable(["Field", "Value"], rows) + warningLines + caveat,
+  );
+}
+
+
 function annualizationSummary(
   mode?: string | null,
   modeUsed?: string | null,
@@ -861,6 +1053,8 @@ export function buildBacktestReport(
     short_only: "Short only",
     long_short: "Long / Short",
   };
+  // Metadata stays lean (identity only); simulation assumptions get their own
+  // structured section below — never raw objects, never duplicated JSON.
   const metaRows: [string, string][] = [
     ["Ticker", r.ticker],
     ["Strategy", label],
@@ -871,70 +1065,74 @@ export function buildBacktestReport(
       `${r.transaction_cost_bps} bps${r.cost_model ? " per side (effective)" : ""}`,
     ],
   ];
-  if (r.cost_model) {
-    metaRows.push(["Cost model", r.cost_model.label]);
-  }
-  if (typeof r.total_transaction_cost === "number") {
-    metaRows.push(["Total transaction cost", formatCurrency(r.total_transaction_cost)]);
-  }
-  if (typeof r.cost_drag_return === "number") {
-    metaRows.push(["Cost drag (return)", formatPercent(r.cost_drag_return)]);
-  }
-  if (r.position_sizing) {
-    metaRows.push(["Position sizing", r.position_sizing.label]);
-  }
-  if (typeof r.average_exposure === "number") {
-    metaRows.push(["Average exposure", formatPercent(r.average_exposure)]);
-  }
-  if (r.risk_management) {
-    metaRows.push(["Risk management", r.risk_management.label]);
-    const rm = r.risk_management;
-    if (typeof rm.stop_loss_pct === "number")
-      metaRows.push(["Stop loss", formatPercent(rm.stop_loss_pct)]);
-    if (typeof rm.take_profit_pct === "number")
-      metaRows.push(["Take profit", formatPercent(rm.take_profit_pct)]);
-    if (typeof rm.trailing_stop_pct === "number")
-      metaRows.push(["Trailing stop", formatPercent(rm.trailing_stop_pct)]);
-    if (typeof rm.max_holding_days === "number")
-      metaRows.push(["Max holding days", String(rm.max_holding_days)]);
-    if (r.risk_diagnostics) {
-      metaRows.push(["Risk exits", String(r.risk_diagnostics.risk_exit_count)]);
-    }
-  }
-  if (r.position_mode) {
-    metaRows.push(["Direction", modeLabels[r.position_mode] ?? r.position_mode]);
-  }
-  if (r.periods_per_year) {
-    metaRows.push(["Annualization mode", String(r.annualization_mode ?? "trading_days_252")]);
-    if (r.annualization_mode_used) {
-      metaRows.push(["Annualization resolved", String(r.annualization_mode_used)]);
-    }
-    metaRows.push(["Periods per year", String(r.periods_per_year)]);
-    if (r.annualization_warning) {
-      metaRows.push(["Annualization warning", r.annualization_warning]);
-    }
-  }
-  if (r.data_quality) {
-    const q = r.data_quality;
-    metaRows.push(["Data provider", r.data_provider ?? q.provider]);
-    if (q.actual_start_date && q.actual_end_date) {
-      metaRows.push(["Actual data range", `${q.actual_start_date} → ${q.actual_end_date}`]);
-    }
-    metaRows.push(["Data rows", String(q.row_count)]);
-    metaRows.push(["Price column", `${q.price_column_used}${q.adjusted ? " (adjusted)" : ""}`]);
-    if (q.warnings.length > 0) {
-      metaRows.push(["Data warnings", q.warnings.join(" ")]);
-    }
-  }
-  if (r.benchmark_analytics) {
-    metaRows.push(["Benchmark", r.benchmark_analytics.display_name]);
-  }
   if (r.reproducibility) {
     metaRows.push(["Config hash", r.reproducibility.config_hash]);
-    metaRows.push(["Config hash (full)", r.reproducibility.config_hash_full]);
-    metaRows.push(["Config schema", r.reproducibility.schema_version]);
   }
   const metadataBody = mdTable(["Field", "Value"], metaRows);
+
+  const simRows: [string, string][] = [];
+  if (r.cost_model) {
+    simRows.push(["Cost model", r.cost_model.label]);
+  } else {
+    simRows.push(["Cost model", `Simple, ${r.transaction_cost_bps} bps per side`]);
+  }
+  if (typeof r.total_transaction_cost === "number") {
+    simRows.push(["Total transaction cost", formatCurrency(r.total_transaction_cost)]);
+  }
+  if (typeof r.cost_drag_return === "number") {
+    simRows.push(["Cost drag (return)", formatPercent(r.cost_drag_return)]);
+  }
+  simRows.push([
+    "Position sizing",
+    `${r.position_sizing ? r.position_sizing.label : "Full allocation"}${
+      typeof r.average_exposure === "number"
+        ? `, average exposure ${formatPercent(r.average_exposure)}`
+        : ""
+    }`,
+  ]);
+  if (r.risk_management) {
+    const rm = r.risk_management;
+    const riskBits: string[] = [];
+    if (typeof rm.stop_loss_pct === "number")
+      riskBits.push(`stop ${formatPercent(rm.stop_loss_pct)}`);
+    if (typeof rm.take_profit_pct === "number")
+      riskBits.push(`take ${formatPercent(rm.take_profit_pct)}`);
+    if (typeof rm.trailing_stop_pct === "number")
+      riskBits.push(`trailing ${formatPercent(rm.trailing_stop_pct)}`);
+    if (typeof rm.max_holding_days === "number")
+      riskBits.push(`max ${rm.max_holding_days} days`);
+    if (r.risk_diagnostics)
+      riskBits.push(`${r.risk_diagnostics.risk_exit_count} risk exits`);
+    simRows.push([
+      "Risk management",
+      rm.label + (riskBits.length ? ` (${riskBits.join(", ")})` : ""),
+    ]);
+  } else {
+    simRows.push(["Risk management", "None"]);
+  }
+  if (r.position_mode) {
+    simRows.push(["Position mode", modeLabels[r.position_mode] ?? r.position_mode]);
+  }
+  if (r.periods_per_year) {
+    simRows.push([
+      "Annualization",
+      `${r.annualization_mode ?? "trading_days_252"}, resolved ${
+        r.annualization_mode_used ?? "trading_days_252"
+      }, ${r.periods_per_year} periods/year${
+        r.annualization_warning ? ` — ${r.annualization_warning}` : ""
+      }`,
+    ]);
+  }
+  simRows.push([
+    "Benchmark",
+    r.benchmark_analytics
+      ? r.benchmark_analytics.display_name
+      : "Benchmark comparison not enabled.",
+  ]);
+  if (r.data_provider) {
+    simRows.push(["Data provider", r.data_provider]);
+  }
+  const simulationSettingsBody = mdTable(["Setting", "Value"], simRows);
 
   const execBullets = [
     `- **Total Return:** ${formatPercent(m.total_return)}`,
@@ -959,9 +1157,18 @@ export function buildBacktestReport(
     standardBlocks: [
       section("Metadata", metadataBody),
       section("Executive Summary", execBullets),
-      section("Parameters", params.length ? mdTable(["Parameter", "Value"], params) : "_No parameters._"),
       section("Performance Metrics", metricsTable(m, r.benchmark_metrics)),
+      section(
+        "Strategy Parameters",
+        params.length
+          ? mdTable(["Parameter", "Value"], params)
+          : "_No strategy-specific parameters._",
+      ),
+      section("Simulation Settings", simulationSettingsBody),
+      dataQualitySection(r.data_quality, r.data_provider),
       benchmarkSection(r.benchmark_analytics, m.total_return),
+      robustnessSection(r.robustness),
+      reproducibilitySection(r.reproducibility),
       section("Equity Curve Summary", equitySummary(equity)),
       section("Trades Summary", tradesSummary(r.trades)),
     ],
@@ -1035,9 +1242,9 @@ export function buildSavedBacktestReport(
 ): Report {
   const m = (rec.metrics ?? {}) as Partial<PerformanceMetrics> & Record<string, unknown>;
   const num = (v: unknown) => (typeof v === "number" ? v : undefined);
-  const params = Object.entries(rec.params ?? {}).map(
-    ([k, v]) => [k, formatParamValue(v)] as [string, string],
-  );
+  // Strategy parameters only — simulation/result metadata renders in its own
+  // structured sections below, never as raw values (or JSON) in this table.
+  const params = savedStrategyParams(rec.params ?? {});
   const equity = (rec.equity_curve ?? []).map((p) => p.strategy);
   const trades = (rec.trades ?? []) as TradeRecord[];
   const caveatTickers = splitTickerLabel(rec.ticker);
@@ -1048,6 +1255,11 @@ export function buildSavedBacktestReport(
       : undefined;
   const savedPositionSizing = positionSizingMeta(rec.params?.position_sizing);
 
+  // Metadata stays lean (identity only); simulation assumptions render in the
+  // Simulation Settings / Data Quality / Reproducibility sections below.
+  const savedRepro = rec.params?.reproducibility as
+    | { config_hash?: string; config_hash_full?: string; schema_version?: string }
+    | undefined;
   const savedMetaRows: [string, string][] = [
       ["Name", rec.name],
       ["Ticker", rec.ticker],
@@ -1057,53 +1269,12 @@ export function buildSavedBacktestReport(
       ["Transaction cost", `${rec.transaction_cost_bps} bps`],
       ["Saved at", rec.created_at],
     ];
-  const costModel = rec.params?.cost_model;
-  if (costModel && typeof costModel === "object") {
-    savedMetaRows.push(["Cost model", formatParamValue(costModel)]);
+  if (savedRepro && typeof savedRepro === "object" && savedRepro.config_hash) {
+    savedMetaRows.push(["Config hash", savedRepro.config_hash]);
   }
-  if (typeof rec.params?.total_transaction_cost === "number") {
-    savedMetaRows.push([
-      "Total transaction cost",
-      formatCurrency(rec.params.total_transaction_cost),
-    ]);
-  }
-  if (typeof rec.params?.cost_drag_return === "number") {
-    savedMetaRows.push([
-      "Cost drag (return)",
-      formatPercent(rec.params.cost_drag_return),
-    ]);
-  }
-  if (savedPositionSizing) {
-    savedMetaRows.push([
-      "Position sizing",
-      savedPositionSizing.label ?? formatParamValue(rec.params.position_sizing),
-    ]);
-  }
-  if (typeof rec.params?.average_exposure === "number") {
-    savedMetaRows.push([
-      "Average exposure",
-      formatPercent(rec.params.average_exposure),
-    ]);
-  }
+  const metadataBody = mdTable(["Field", "Value"], savedMetaRows);
+
   const savedRisk = riskManagementMeta(rec.params?.risk_management);
-  if (savedRisk) {
-    savedMetaRows.push([
-      "Risk management",
-      savedRisk.label ?? formatParamValue(rec.params.risk_management),
-    ]);
-  }
-  if (typeof rec.params?.periods_per_year === "number") {
-    savedMetaRows.push([
-      "Annualization",
-      `${rec.params.annualization_mode ?? "trading_days_252"} (${rec.params.periods_per_year}/yr)`,
-    ]);
-    if (typeof rec.params?.annualization_mode_used === "string") {
-      savedMetaRows.push(["Annualization resolved", rec.params.annualization_mode_used]);
-    }
-    if (typeof rec.params?.annualization_warning === "string") {
-      savedMetaRows.push(["Annualization warning", rec.params.annualization_warning]);
-    }
-  }
   const savedAnnualization = annualizationSummary(
     typeof rec.params?.annualization_mode === "string"
       ? rec.params.annualization_mode
@@ -1116,46 +1287,51 @@ export function buildSavedBacktestReport(
       ? rec.params.annualization_warning
       : null,
   );
-  if (typeof rec.params?.data_provider === "string") {
-    savedMetaRows.push(["Data provider", rec.params.data_provider]);
+
+  const savedSimRows: [string, string][] = [];
+  const costModel = rec.params?.cost_model;
+  if (costModel && typeof costModel === "object") {
+    savedSimRows.push(["Cost model", formatParamValue(costModel)]);
+  } else {
+    savedSimRows.push(["Cost model", `Simple, ${rec.transaction_cost_bps} bps per side`]);
   }
-  const savedQuality = rec.params?.data_quality as
-    | { actual_start_date?: string | null; actual_end_date?: string | null; row_count?: number; warnings?: string[] }
-    | undefined;
-  if (savedQuality && typeof savedQuality === "object") {
-    if (savedQuality.actual_start_date && savedQuality.actual_end_date) {
-      savedMetaRows.push([
-        "Actual data range",
-        `${savedQuality.actual_start_date} → ${savedQuality.actual_end_date}`,
-      ]);
-    }
-    if (typeof savedQuality.row_count === "number") {
-      savedMetaRows.push(["Data rows", String(savedQuality.row_count)]);
-    }
-    if (Array.isArray(savedQuality.warnings) && savedQuality.warnings.length > 0) {
-      savedMetaRows.push(["Data warnings", savedQuality.warnings.join(" ")]);
-    }
+  if (typeof rec.params?.total_transaction_cost === "number") {
+    savedSimRows.push([
+      "Total transaction cost",
+      formatCurrency(rec.params.total_transaction_cost),
+    ]);
+  }
+  if (typeof rec.params?.cost_drag_return === "number") {
+    savedSimRows.push(["Cost drag (return)", formatPercent(rec.params.cost_drag_return)]);
+  }
+  savedSimRows.push([
+    "Position sizing",
+    `${savedPositionSizing?.label ?? "Full allocation"}${
+      typeof rec.params?.average_exposure === "number"
+        ? `, average exposure ${formatPercent(rec.params.average_exposure)}`
+        : ""
+    }`,
+  ]);
+  savedSimRows.push(["Risk management", savedRisk?.label ?? "None"]);
+  if (savedPositionMode) {
+    savedSimRows.push(["Position mode", savedPositionMode]);
+  }
+  if (savedAnnualization) {
+    savedSimRows.push(["Annualization", savedAnnualization]);
   }
   const savedBench = rec.params?.benchmark_analytics as
     | { display_name?: string }
     | undefined;
-  if (savedBench && typeof savedBench === "object" && savedBench.display_name) {
-    savedMetaRows.push(["Benchmark", savedBench.display_name]);
+  savedSimRows.push([
+    "Benchmark",
+    savedBench && typeof savedBench === "object" && savedBench.display_name
+      ? savedBench.display_name
+      : "Benchmark comparison not enabled.",
+  ]);
+  if (typeof rec.params?.data_provider === "string") {
+    savedSimRows.push(["Data provider", rec.params.data_provider]);
   }
-  const savedRepro = rec.params?.reproducibility as
-    | { config_hash?: string; config_hash_full?: string; schema_version?: string }
-    | undefined;
-  if (savedRepro && typeof savedRepro === "object" && savedRepro.config_hash) {
-    savedMetaRows.push(["Config hash", savedRepro.config_hash]);
-    if (savedRepro.config_hash_full) {
-      savedMetaRows.push(["Config hash (full)", savedRepro.config_hash_full]);
-    }
-    if (savedRepro.schema_version) {
-      savedMetaRows.push(["Config schema", savedRepro.schema_version]);
-    }
-  }
-
-  const metadataBody = mdTable(["Field", "Value"], savedMetaRows);
+  const savedSimulationSettingsBody = mdTable(["Setting", "Value"], savedSimRows);
 
   const execBullets = [
     `- **Total Return:** ${formatPercent(num(m.total_return))}`,
@@ -1180,9 +1356,21 @@ export function buildSavedBacktestReport(
       section("Metadata", metadataBody),
       section("Executive Summary", execBullets),
       ...(rec.notes ? [section("Notes", mdText(rec.notes))] : []),
-      section("Parameters", params.length ? mdTable(["Parameter", "Value"], params) : "_No parameters._"),
       section("Performance Metrics", metricsTable(m)),
+      section(
+        "Strategy Parameters",
+        params.length
+          ? mdTable(["Parameter", "Value"], params)
+          : "_No strategy-specific parameters._",
+      ),
+      section("Simulation Settings", savedSimulationSettingsBody),
+      dataQualitySection(
+        rec.params?.data_quality,
+        typeof rec.params?.data_provider === "string" ? rec.params.data_provider : null,
+      ),
       benchmarkSection(rec.params?.benchmark_analytics, num(m.total_return) ?? null),
+      robustnessSection(rec.params?.robustness),
+      reproducibilitySection(rec.params?.reproducibility),
       section("Equity Curve Summary", equitySummary(equity)),
       section("Trades Summary", tradesSummary(trades)),
     ],

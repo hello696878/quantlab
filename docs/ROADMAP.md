@@ -727,6 +727,11 @@ single-asset Backtest + Strategy Comparison:
   (defaults + legacy forms normalized first); Reproducibility card with copy
   hash / copy canonical config; persisted in saved backtests + reports; CSV
   content fingerprint; local-first (no public URLs; replay-by-hash future)
+- **12.8 Robustness Lab v1** — opt-in block-bootstrap Monte Carlo on daily
+  strategy returns (deterministic per seed): P(loss), final-return / drawdown /
+  Sharpe percentiles, P(beat benchmark), final-return histogram, heuristic A–F
+  grade; saved + report integration; deflated Sharpe deliberately null
+  (needs trial counts — v2 with PBO + sensitivity heatmaps)
 
 ---
 
@@ -758,9 +763,10 @@ search · toasts, error boundary, loading/offline states.
 1. ~~Benchmark visualization~~ — **built** (12.6.1)
 2. ~~Reproducible Backtest Permalinks / Config Hash~~ — **built** (12.7: config
    hash + CSV fingerprint; replay-by-hash routing remains future work)
-3. **Robustness Lab v1** — bootstrap Monte Carlo resampling, deflated Sharpe
-   ratio, sensitivity heatmaps; PBO (probability of backtest overfitting) if
-   feasible
+3. ~~Robustness Lab v1~~ — **built** (12.8: block-bootstrap Monte Carlo +
+   heuristic grade). **Robustness Lab v2** stays planned: deflated Sharpe
+   (needs trial tracking), PBO, parameter-sensitivity heatmaps, comparison-mode
+   robustness
 4. **Strategy Library v1 pages** — intuition, math, parameters, strengths /
    failure modes for each built strategy
 5. **Paper Replication Series v1** — classic papers (e.g. momentum, low-vol)

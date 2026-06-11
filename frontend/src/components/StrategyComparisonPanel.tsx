@@ -671,6 +671,10 @@ export default function StrategyComparisonPanel() {
             Strategy-specific parameters are fixed; the simulation settings above
             are shared assumptions applied globally to every strategy.
           </p>
+          <p className="text-slate-400">
+            Robustness Lab is available on single backtest results.
+            Strategy-level robustness comparison is planned.
+          </p>
         </div>
 
         {validationMsg && (

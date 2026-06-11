@@ -332,6 +332,104 @@ _ANNUALIZATION_FIELD = Field(
 
 
 # ---------------------------------------------------------------------------
+# Robustness Lab (research v1)
+# ---------------------------------------------------------------------------
+
+class RobustnessConfig(BaseModel):
+    """
+    Optional bootstrap robustness analysis for a single-asset backtest.
+
+    Disabled by default — normal backtests run exactly as before.  When
+    enabled, daily strategy returns are block-bootstrap resampled (blocks
+    preserve short-term autocorrelation; ``block_size=1`` degenerates to an
+    i.i.d. bootstrap) to estimate how sensitive the result is to the ordering
+    and sampling of historical returns.  Deterministic for a given seed.
+    """
+
+    enabled: bool = False
+    method: Literal["block_bootstrap_returns"] = "block_bootstrap_returns"
+    n_simulations: int = Field(default=1000, ge=100, le=5000)
+    block_size: int = Field(default=5, ge=1, le=60)
+    seed: int = Field(default=42, ge=0, le=2**31 - 1)
+
+
+_ROBUSTNESS_FIELD = Field(
+    default=None,
+    description=(
+        "Optional bootstrap robustness analysis. When omitted or disabled, the "
+        "backtest runs exactly as before with no extra computation. Robustness "
+        "diagnostics are research tools, not guarantees."
+    ),
+)
+
+
+class RobustnessSummary(BaseModel):
+    """Percentile summary of the bootstrap simulation distribution."""
+
+    median_final_return: float
+    p05_final_return: float
+    p95_final_return: float
+    probability_of_loss: float = Field(ge=0.0, le=1.0)
+    probability_of_outperforming_benchmark: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description=(
+            "Fraction of simulations whose final return beats the configured "
+            "benchmark's actual total return (absent when benchmark mode is none "
+            "or benchmark data was unavailable)."
+        ),
+    )
+    median_max_drawdown: float
+    p95_max_drawdown: float = Field(
+        description="95th-percentile drawdown *severity* (the bad tail; more negative than the median)."
+    )
+    median_sharpe: float
+    p05_sharpe: float
+    p95_sharpe: float
+
+
+class RobustnessHistogramBin(BaseModel):
+    """One bin of the simulated final-return histogram (compact chart payload)."""
+
+    lower: float
+    upper: float
+    count: int
+
+
+class RobustnessResult(BaseModel):
+    """Bootstrap robustness block (present only when analysis was requested)."""
+
+    enabled: bool = True
+    method: str = "block_bootstrap_returns"
+    n_simulations: int
+    block_size: int
+    seed: int
+    summary: Optional[RobustnessSummary] = Field(
+        default=None, description="Null when there was not enough data to simulate."
+    )
+    final_return_histogram: List[RobustnessHistogramBin] = Field(
+        default_factory=list,
+        description="~20-bin histogram of simulated final returns (chart payload).",
+    )
+    grade: Optional[Literal["A", "B", "C", "D", "F"]] = Field(
+        default=None,
+        description=(
+            "Heuristic robustness grade — a transparent rule-of-thumb summary, "
+            "not a trading recommendation (null when not computable)."
+        ),
+    )
+    deflated_sharpe: Optional[float] = Field(
+        default=None,
+        description=(
+            "Always null in v1: a deflated Sharpe needs the number of tried "
+            "configurations and distributional assumptions. Planned for v2."
+        ),
+    )
+    warnings: List[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Reproducibility / config hash (research v1)
 # ---------------------------------------------------------------------------
 
@@ -532,6 +630,7 @@ class BacktestRequest(BaseModel):
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
+    robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -583,6 +682,7 @@ class RsiBacktestRequest(BaseModel):
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
+    robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -647,6 +747,7 @@ class BbBacktestRequest(BaseModel):
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
+    robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -704,6 +805,7 @@ class MomentumBacktestRequest(BaseModel):
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
+    robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -859,6 +961,7 @@ class VbBacktestRequest(BaseModel):
     risk_management: Optional[RiskManagement] = _RISK_MANAGEMENT_FIELD
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
+    robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -1125,6 +1228,13 @@ class BacktestResponse(BaseModel):
     reproducibility: Optional[Reproducibility] = Field(
         default=None,
         description="Deterministic config hash of the normalized result-changing inputs.",
+    )
+    robustness: Optional[RobustnessResult] = Field(
+        default=None,
+        description=(
+            "Bootstrap robustness block (present only when requested via the "
+            "robustness config; never changes core backtest results)."
+        ),
     )
     position_mode: str = Field(
         default="long_only",

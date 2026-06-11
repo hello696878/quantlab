@@ -111,6 +111,9 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
   if (result.reproducibility) {
     params.reproducibility = result.reproducibility;
   }
+  if (result.robustness) {
+    params.robustness = result.robustness;
+  }
   return params;
 }
 

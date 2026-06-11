@@ -90,6 +90,16 @@ Using 252 for crypto assets will understate annual returns and overstate risk me
 
 The Sharpe and Sortino ratios are computed with a risk-free rate of 0%. During periods of elevated interest rates, a non-zero risk-free rate would lower the Sharpe ratio of strategies that hold cash during flat periods.
 
+### Robustness Lab is a bootstrap, not a proof
+
+Robustness Lab v1 block-bootstraps the realized daily strategy returns (blocks preserve short-term autocorrelation; `block_size=1` is a plain i.i.d. bootstrap) and summarizes the simulated distribution. Honest limits:
+
+- Bootstrap **resamples history** — it estimates sensitivity to return ordering/sampling, not future performance. Regime shifts, liquidity shocks, and structural breaks violate its assumptions, and small samples limit interpretation.
+- A fragile strategy can still look good in one backtest — and a good-looking bootstrap does not prove alpha.
+- The **A–F grade is a transparent heuristic** (thresholds on probability of loss, tail return, tail drawdown, median Sharpe) — a rule-of-thumb summary, never a trading recommendation.
+- **Deflated Sharpe is null in v1**: it requires the number of tried configurations and distributional assumptions, which the app cannot know. Full deflated Sharpe, PBO (probability of backtest overfitting), and parameter-sensitivity heatmaps are planned for Robustness Lab v2 — they are **not implemented yet**.
+- Robustness quality inherits data quality: warnings from the data layer are surfaced because the bootstrap assumes the input return series is valid.
+
 ### Config hashes identify inputs, not guaranteed outputs
 
 Every backtest gets a deterministic **config hash**: SHA-256 over the canonical, normalized, result-changing inputs (same normalized config → same hash; defaults are normalized first, so legacy requests hash like their explicit equivalents). Limits to keep in mind:

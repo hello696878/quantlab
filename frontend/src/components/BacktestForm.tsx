@@ -12,6 +12,7 @@ import type {
   BenchmarkMode,
   PositionMode,
   PositionSizing,
+  RobustnessConfig,
   PositionSizingType,
   RiskManagement,
   RiskManagementType,
@@ -325,6 +326,16 @@ export default function BacktestForm({
   const [benchTickerStr, setBenchTickerStr] = useState(
     _initialBm?.ticker ?? "SPY",
   );
+  // Robustness Lab (shared; opt-in — disabled keeps backtests fast).
+  const _initialRob = smaParams.robustness;
+  const [robEnabled, setRobEnabled] = useState(_initialRob?.enabled ?? false);
+  const [robSimsStr, setRobSimsStr] = useState(
+    String(_initialRob?.n_simulations ?? 1000),
+  );
+  const [robBlockStr, setRobBlockStr] = useState(
+    String(_initialRob?.block_size ?? 5),
+  );
+  const [robSeedStr, setRobSeedStr] = useState(String(_initialRob?.seed ?? 42));
   // SMA Crossover
   const [smaFastStr, setSmaFastStr] = useState(String(smaParams.fast_window));
   const [smaSlowStr, setSmaSlowStr] = useState(String(smaParams.slow_window));
@@ -394,6 +405,7 @@ export default function BacktestForm({
     risk_management: RiskManagement | undefined;
     annualization_mode: AnnualizationMode | undefined;
     benchmark: BenchmarkConfig | undefined;
+    robustness: RobustnessConfig | undefined;
   }>;
 
   /** Update every strategy's common fields simultaneously so switching strategy
@@ -617,6 +629,28 @@ export default function BacktestForm({
   function handleBenchModeChange(mode: BenchmarkMode) {
     setBenchMode(mode);
     pushBenchmark(mode, benchTickerStr);
+  }
+
+  // ── Robustness wiring ──────────────────────────────────────────────────────
+  // Off (the default) omits the config entirely so normal backtests stay fast
+  // and byte-identical.  Robustness never changes core backtest results.
+  function pushRobustness(enabled: boolean, sims: string, block: string, seed: string) {
+    if (!enabled) {
+      setCommon("robustness", undefined);
+      return;
+    }
+    const n = parseInt(sims, 10);
+    const b = parseInt(block, 10);
+    const s = parseInt(seed, 10);
+    if (isNaN(n) || n < 100 || n > 5000) return;
+    if (isNaN(b) || b < 1 || b > 60) return;
+    if (isNaN(s) || s < 0) return;
+    setCommon("robustness", {
+      enabled: true,
+      n_simulations: n,
+      block_size: b,
+      seed: s,
+    });
   }
 
   function setSma<K extends keyof BacktestRequest>(
@@ -849,8 +883,17 @@ export default function BacktestForm({
 
   const benchOk = benchMode !== "custom_ticker" || benchTickerStr.trim() !== "";
 
+  const robSimsVal = parseInt(robSimsStr, 10);
+  const robBlockVal = parseInt(robBlockStr, 10);
+  const robSeedVal = parseInt(robSeedStr, 10);
+  const robOk =
+    !robEnabled ||
+    (!isNaN(robSimsVal) && robSimsVal >= 100 && robSimsVal <= 5000 &&
+      !isNaN(robBlockVal) && robBlockVal >= 1 && robBlockVal <= 60 &&
+      !isNaN(robSeedVal) && robSeedVal >= 0);
+
   const commonNumericOk =
-    costOk && sizingOk && riskOk && benchOk && !isNaN(capital) && capital > 0;
+    costOk && sizingOk && riskOk && benchOk && robOk && !isNaN(capital) && capital > 0;
   const smaInvalid =
     strategy === "sma_crossover" &&
     (isNaN(smaFast) || isNaN(smaSlow) || smaFast >= smaSlow);
@@ -1523,6 +1566,89 @@ export default function BacktestForm({
           </div>
         )}
 
+        {/* ── Robustness Lab ────────────────────────────────────────────── */}
+        {strategy !== "pairs" && (
+          <div className="mb-5 rounded-lg border border-slate-200 p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                Robustness Lab
+              </span>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  const next = !robEnabled;
+                  setRobEnabled(next);
+                  pushRobustness(next, robSimsStr, robBlockStr, robSeedStr);
+                }}
+                className={
+                  "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors " +
+                  (robEnabled
+                    ? "bg-blue-600 text-white border-blue-600"
+                    : "bg-white text-slate-600 border-slate-300 hover:border-blue-400")
+                }
+              >
+                {robEnabled ? "Robustness analysis: ON" : "Run robustness analysis"}
+              </button>
+            </div>
+
+            {robEnabled && (
+              <div className="mb-2 grid grid-cols-3 gap-4">
+                <Field label="Simulations" hint="100–5000">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={robSimsStr}
+                    min={100}
+                    max={5000}
+                    step={100}
+                    onChange={(e) => {
+                      setRobSimsStr(e.target.value);
+                      pushRobustness(true, e.target.value, robBlockStr, robSeedStr);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+                <Field label="Block size" hint="days">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={robBlockStr}
+                    min={1}
+                    max={60}
+                    step={1}
+                    onChange={(e) => {
+                      setRobBlockStr(e.target.value);
+                      pushRobustness(true, robSimsStr, e.target.value, robSeedStr);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+                <Field label="Seed" hint="deterministic">
+                  <input
+                    type="number"
+                    className={inputCls}
+                    value={robSeedStr}
+                    min={0}
+                    step={1}
+                    onChange={(e) => {
+                      setRobSeedStr(e.target.value);
+                      pushRobustness(true, robSimsStr, robBlockStr, e.target.value);
+                    }}
+                    disabled={loading}
+                  />
+                </Field>
+              </div>
+            )}
+
+            <p className="text-[11px] text-slate-400">
+              Block-bootstrap resampling of daily strategy returns estimates how
+              sensitive the result is to return ordering and sampling. Research
+              diagnostics, not guarantees — it never changes the backtest itself.
+            </p>
+          </div>
+        )}
+
         {/* ── Strategy-specific fields ───────────────────────────────────── */}
         <div className="mb-5 p-4 rounded-lg bg-blue-50/60 border border-blue-100">
           {supportsMode && (
@@ -1954,9 +2080,11 @@ export default function BacktestForm({
                       ? "Risk management needs at least one valid rule (stop / take / trailing in (0–1], max holding ≥ 1)."
                       : !benchOk
                         ? "Custom benchmark requires a ticker."
-                        : isNaN(capital)
-                          ? "Initial capital must be a valid number (> 0)."
-                          : "Initial capital must be greater than 0."}
+                        : !robOk
+                          ? "Robustness needs simulations 100–5000, block 1–60, seed ≥ 0."
+                          : isNaN(capital)
+                            ? "Initial capital must be a valid number (> 0)."
+                            : "Initial capital must be greater than 0."}
               </p>
             )}
             {dateInvalid && (

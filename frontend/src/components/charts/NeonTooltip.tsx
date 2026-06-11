@@ -11,9 +11,16 @@ interface TooltipEntry {
 interface NeonTooltipProps {
   active?: boolean;
   payload?: TooltipEntry[];
-  label?: string;
+  /** Recharts passes the x-axis datum here — string date, number, or anything. */
+  label?: unknown;
   /** Format a numeric series value (e.g. dollars or percent). */
   formatValue: (v: number) => string;
+  /**
+   * Format the header label. Defaults to defensive month/year date formatting;
+   * pass a custom formatter when the x-axis is not date-based (e.g. histogram
+   * buckets) so the header stays semantically correct.
+   */
+  formatLabel?: (label: unknown) => string;
   /** Border color — defaults to the accent; pass a semantic color for e.g. drawdown. */
   borderColor?: string;
   /** Box-shadow glow — defaults to the accent glow token. */
@@ -31,6 +38,7 @@ export default function NeonTooltip({
   payload,
   label,
   formatValue,
+  formatLabel = fmtMonthYear,
   borderColor = "var(--accent-border)",
   glow = "var(--accent-glow)",
 }: NeonTooltipProps) {
@@ -57,7 +65,7 @@ export default function NeonTooltip({
       }}
     >
       <p className="mb-1 font-semibold" style={{ color: "var(--text-hi)" }}>
-        {label ? fmtMonthYear(label) : ""}
+        {label != null ? formatLabel(label) : ""}
       </p>
       {rows.map((p) => (
         <div key={p.name} className="flex items-center justify-between gap-5">

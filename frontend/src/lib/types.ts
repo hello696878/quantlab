@@ -110,6 +110,49 @@ export interface RiskDiagnostics {
 /** Annualization convention for risk metrics (research v1). */
 export type AnnualizationMode = "trading_days_252" | "crypto_365" | "auto";
 
+/** Robustness Lab v1 — opt-in bootstrap on daily strategy returns. */
+export interface RobustnessConfig {
+  enabled: boolean;
+  method?: "block_bootstrap_returns";
+  n_simulations?: number;
+  block_size?: number;
+  seed?: number;
+}
+
+export interface RobustnessSummary {
+  median_final_return: number;
+  p05_final_return: number;
+  p95_final_return: number;
+  probability_of_loss: number;
+  probability_of_outperforming_benchmark?: number | null;
+  median_max_drawdown: number;
+  /** The bad tail: 95th-percentile drawdown severity (more negative than median). */
+  p95_max_drawdown: number;
+  median_sharpe: number;
+  p05_sharpe: number;
+  p95_sharpe: number;
+}
+
+export interface RobustnessHistogramBin {
+  lower: number;
+  upper: number;
+  count: number;
+}
+
+export interface RobustnessResult {
+  enabled: boolean;
+  method: string;
+  n_simulations: number;
+  block_size: number;
+  seed: number;
+  summary?: RobustnessSummary | null;
+  final_return_histogram: RobustnessHistogramBin[];
+  /** Heuristic A–F grade (null when not computable) — not a recommendation. */
+  grade?: "A" | "B" | "C" | "D" | "F" | null;
+  deflated_sharpe?: number | null;
+  warnings: string[];
+}
+
 /** Deterministic fingerprint of the normalized result-changing inputs. */
 export interface Reproducibility {
   schema_version: string;
@@ -211,6 +254,7 @@ export interface BacktestRequest {
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
+  robustness?: RobustnessConfig;
 }
 
 export interface RsiBacktestRequest {
@@ -227,6 +271,7 @@ export interface RsiBacktestRequest {
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
+  robustness?: RobustnessConfig;
 }
 
 export interface BbBacktestRequest {
@@ -243,6 +288,7 @@ export interface BbBacktestRequest {
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
+  robustness?: RobustnessConfig;
 }
 
 export interface MomentumBacktestRequest {
@@ -260,6 +306,7 @@ export interface MomentumBacktestRequest {
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
+  robustness?: RobustnessConfig;
 }
 
 export interface VbBacktestRequest {
@@ -277,6 +324,7 @@ export interface VbBacktestRequest {
   risk_management?: RiskManagement;
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
+  robustness?: RobustnessConfig;
 }
 
 export interface PairsBacktestRequest {
@@ -434,6 +482,8 @@ export interface BacktestResponse {
   benchmark_analytics?: BenchmarkAnalytics | null;
   /** Reproducible config hash of the normalized inputs. */
   reproducibility?: Reproducibility | null;
+  /** Robustness Lab block (present only when requested). */
+  robustness?: RobustnessResult | null;
   /** Direction mode used (defaults to "long_only" for strategies without it). */
   position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;

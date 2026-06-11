@@ -73,6 +73,7 @@ from app.reproducibility import (
     normalize_backtest_config,
     normalize_comparison_config,
 )
+from app.robustness import build_robustness_report
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -124,6 +125,7 @@ from app.schemas import (
     CostModel,
     PositionSizing,
     RiskManagement,
+    RobustnessConfig,
     CustomStrategyRequest,
     CustomStrategyTemplateCreate,
     CustomStrategyTemplateExport,
@@ -296,6 +298,7 @@ def _build_response(
     annualization_mode: Optional[str] = None,
     data_provider: str = "yfinance",
     benchmark: Optional[BenchmarkConfig] = None,
+    robustness: Optional[RobustnessConfig] = None,
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response.
 
@@ -426,6 +429,31 @@ def _build_response(
         custom_data_quality=custom_quality,
     )
 
+    # Robustness Lab — opt-in bootstrap on the realized daily strategy returns.
+    # Never changes core results; disabled/missing config costs nothing.
+    robustness_result = None
+    if robustness is not None and robustness.enabled:
+        bench_total_for_robustness = (
+            benchmark_analytics.metrics.total_return
+            if benchmark_analytics is not None and benchmark_analytics.metrics is not None
+            else None
+        )
+        dq_warnings = (
+            [
+                "Data quality warnings exist; robustness analysis assumes the "
+                "input return series is valid."
+            ]
+            if data_quality.warnings
+            else []
+        )
+        robustness_result = build_robustness_report(
+            strategy_equity.pct_change().dropna().to_numpy(),
+            config=robustness,
+            periods_per_year=ppy,
+            benchmark_total_return=bench_total_for_robustness,
+            extra_warnings=dq_warnings,
+        )
+
     # Reproducible config hash — normalized, result-changing inputs only.
     # SMA windows use a 0 sentinel when not applicable; everything else is None.
     strategy_params = {
@@ -513,6 +541,7 @@ def _build_response(
         data_quality=data_quality,
         benchmark_analytics=benchmark_analytics,
         reproducibility=reproducibility,
+        robustness=robustness_result,
         position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
@@ -667,6 +696,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
+        robustness=request.robustness,
         fast_window=request.fast_window,
         slow_window=request.slow_window,
         position_mode=request.position_mode,
@@ -723,6 +753,7 @@ def backtest_rsi_mean_reversion(request: RsiBacktestRequest) -> BacktestResponse
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
+        robustness=request.robustness,
         rsi_window=request.rsi_window,
         oversold_threshold=request.oversold_threshold,
         exit_threshold=request.exit_threshold,
@@ -780,6 +811,7 @@ def backtest_bollinger_band(request: BbBacktestRequest) -> BacktestResponse:
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
+        robustness=request.robustness,
         bb_window=request.bb_window,
         bb_num_std=request.num_std,
         bb_exit_band=request.exit_band,
@@ -840,6 +872,7 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
+        robustness=request.robustness,
         momentum_window=request.momentum_window,
         momentum_entry_threshold=request.entry_threshold,
         momentum_exit_threshold=request.exit_threshold,
@@ -900,6 +933,7 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         risk_management=request.risk_management,
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
+        robustness=request.robustness,
         vb_lookback_window=request.lookback_window,
         vb_breakout_multiplier=request.breakout_multiplier,
         vb_exit_window=request.exit_window,
@@ -2918,6 +2952,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
         position_sizing=req.position_sizing,
         data_provider="csv_upload",
         benchmark=req.benchmark,
+        robustness=req.robustness,
     )
 
     if strategy == "sma_crossover":

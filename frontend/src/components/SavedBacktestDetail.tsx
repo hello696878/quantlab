@@ -7,11 +7,13 @@ import type {
   DataQuality,
   EquityPoint,
   Reproducibility,
+  RobustnessResult,
   SavedBacktestFull,
   TradeRecord,
 } from "@/lib/types";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import { copyText } from "@/components/ReproducibilityCard";
+import RobustnessLabCard from "@/components/RobustnessLabCard";
 import { notifyBackendOffline } from "@/lib/toast";
 import OfflineState from "@/components/ui/OfflineState";
 import ErrorState from "@/components/ui/ErrorState";
@@ -222,7 +224,8 @@ export default function SavedBacktestDetail({
       k !== "data_quality" &&
       k !== "data_provider" &&
       k !== "benchmark_analytics" &&
-      k !== "reproducibility",
+      k !== "reproducibility" &&
+      k !== "robustness",
   );
   const savedQuality = isDataQuality(record.params?.data_quality)
     ? record.params.data_quality
@@ -245,6 +248,14 @@ export default function SavedBacktestDetail({
     typeof savedReproRaw === "object" &&
     typeof (savedReproRaw as { config_hash?: unknown }).config_hash === "string"
       ? (savedReproRaw as Reproducibility)
+      : undefined;
+  const savedRobustnessRaw = record.params?.robustness;
+  const savedRobustness =
+    savedRobustnessRaw &&
+    typeof savedRobustnessRaw === "object" &&
+    typeof (savedRobustnessRaw as { n_simulations?: unknown }).n_simulations ===
+      "number"
+      ? (savedRobustnessRaw as RobustnessResult)
       : undefined;
 
   return (
@@ -479,6 +490,15 @@ export default function SavedBacktestDetail({
             <DrawdownChart data={equityCurve} />
           </div>
         </>
+      )}
+
+      {/* Robustness Lab (only when this record saved an analysis) */}
+      {savedRobustness ? (
+        <RobustnessLabCard robustness={savedRobustness} />
+      ) : (
+        <p className="text-xs text-slate-400">
+          Robustness analysis was not run for this saved backtest.
+        </p>
       )}
 
       {/* Trades */}
