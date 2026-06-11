@@ -430,6 +430,137 @@ class RobustnessResult(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Stability Lab / parameter sensitivity (research v1)
+# ---------------------------------------------------------------------------
+
+SensitivityMetric = Literal[
+    "sharpe", "total_return", "cagr", "max_drawdown", "calmar"
+]
+
+
+class SensitivityConfig(BaseModel):
+    """
+    Optional parameter-sensitivity sweep for a single-asset backtest.
+
+    Disabled by default — normal backtests run exactly as before.  When
+    enabled, the strategy is re-run over a small parameter grid (same data,
+    same cost/sizing/risk/annualization settings) to show whether the selected
+    parameters sit in a stable region or an isolated spike.  v1 supports SMA
+    Crossover (fast_window × slow_window).  A research diagnostic — not an
+    optimization recommendation.
+    """
+
+    enabled: bool = False
+    metric: SensitivityMetric = "sharpe"
+    x_param: Literal["fast_window"] = "fast_window"
+    y_param: Literal["slow_window"] = "slow_window"
+    x_values: Optional[List[int]] = Field(
+        default=None,
+        max_length=15,
+        description="fast_window grid (default 10,15,20,25,30,40,50).",
+    )
+    y_values: Optional[List[int]] = Field(
+        default=None,
+        max_length=15,
+        description="slow_window grid (default 60,80,100,120,150,200).",
+    )
+    max_runs: int = Field(default=100, ge=4, le=200)
+
+    @field_validator("x_values", "y_values")
+    @classmethod
+    def check_windows(cls, v: Optional[List[int]]) -> Optional[List[int]]:
+        if v is not None:
+            if len(v) == 0:
+                raise ValueError("Grid values must be non-empty when provided.")
+            for w in v:
+                if w < 2 or w > 500:
+                    raise ValueError(f"Window values must be in [2, 500]; got {w}.")
+        return v
+
+
+_SENSITIVITY_FIELD = Field(
+    default=None,
+    description=(
+        "Optional parameter-sensitivity sweep (Stability Lab). When omitted or "
+        "disabled, the backtest runs exactly as before. v1 supports SMA "
+        "Crossover; a research diagnostic, not an optimization recommendation."
+    ),
+)
+
+
+class SensitivityRunMetrics(BaseModel):
+    """Summary metrics for one grid cell (no equity curves)."""
+
+    sharpe: float
+    total_return: float
+    cagr: float
+    max_drawdown: float
+    calmar: float
+
+
+class SensitivityRun(BaseModel):
+    """One parameter combination in the sweep."""
+
+    fast_window: int
+    slow_window: int
+    valid: bool
+    metrics: Optional[SensitivityRunMetrics] = Field(
+        default=None, description="Null for invalid combinations (fast ≥ slow)."
+    )
+    num_trades: Optional[int] = None
+    warning: Optional[str] = None
+
+
+class SensitivityPoint(BaseModel):
+    """A highlighted grid point (selected / best) with its metric value."""
+
+    fast_window: int
+    slow_window: int
+    value: Optional[float] = None
+
+
+class SensitivitySummary(BaseModel):
+    """Stability summary around the selected parameters (heuristic)."""
+
+    best_value: Optional[float] = None
+    best_params: Optional[SensitivityPoint] = None
+    selected_value: Optional[float] = None
+    neighbor_median: Optional[float] = None
+    neighbor_min: Optional[float] = None
+    stability_score: Optional[float] = Field(
+        default=None,
+        ge=0.0,
+        le=1.0,
+        description="Heuristic 0–1 (null when too few valid neighbors).",
+    )
+    fragility_flag: bool = False
+    explanation: str = ""
+
+
+class SensitivityResult(BaseModel):
+    """Stability Lab block (present only when a sweep was requested)."""
+
+    enabled: bool = True
+    supported: bool = Field(
+        default=True, description="False when the strategy has no v1 sweep support."
+    )
+    strategy: str
+    metric: SensitivityMetric
+    x_param: str = "fast_window"
+    y_param: str = "slow_window"
+    x_values: List[int] = Field(default_factory=list)
+    y_values: List[int] = Field(default_factory=list)
+    selected_point: Optional[SensitivityPoint] = None
+    matrix: List[List[Optional[float]]] = Field(
+        default_factory=list,
+        description="Rows = y_values, columns = x_values; null = invalid cell.",
+    )
+    runs: List[SensitivityRun] = Field(default_factory=list)
+    summary: Optional[SensitivitySummary] = None
+    warnings: List[str] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Reproducibility / config hash (research v1)
 # ---------------------------------------------------------------------------
 
@@ -631,6 +762,7 @@ class BacktestRequest(BaseModel):
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
     robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
+    sensitivity: Optional[SensitivityConfig] = _SENSITIVITY_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -683,6 +815,7 @@ class RsiBacktestRequest(BaseModel):
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
     robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
+    sensitivity: Optional[SensitivityConfig] = _SENSITIVITY_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -748,6 +881,7 @@ class BbBacktestRequest(BaseModel):
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
     robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
+    sensitivity: Optional[SensitivityConfig] = _SENSITIVITY_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -806,6 +940,7 @@ class MomentumBacktestRequest(BaseModel):
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
     robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
+    sensitivity: Optional[SensitivityConfig] = _SENSITIVITY_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -962,6 +1097,7 @@ class VbBacktestRequest(BaseModel):
     annualization_mode: Optional[AnnualizationMode] = _ANNUALIZATION_FIELD
     benchmark: Optional[BenchmarkConfig] = _BENCHMARK_FIELD
     robustness: Optional[RobustnessConfig] = _ROBUSTNESS_FIELD
+    sensitivity: Optional[SensitivityConfig] = _SENSITIVITY_FIELD
 
     ticker: str = Field(
         default="SPY",
@@ -1234,6 +1370,13 @@ class BacktestResponse(BaseModel):
         description=(
             "Bootstrap robustness block (present only when requested via the "
             "robustness config; never changes core backtest results)."
+        ),
+    )
+    sensitivity: Optional[SensitivityResult] = Field(
+        default=None,
+        description=(
+            "Stability Lab parameter-sensitivity block (present only when "
+            "requested; never changes core backtest results)."
         ),
     )
     position_mode: str = Field(

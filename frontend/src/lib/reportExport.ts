@@ -592,6 +592,7 @@ const NON_STRATEGY_PARAM_KEYS = new Set([
   "benchmark_analytics",
   "reproducibility",
   "robustness",
+  "sensitivity",
   "position_mode",
   "equity_curve",
   "trades",
@@ -689,6 +690,78 @@ function reproducibilitySection(raw: unknown): string {
       "\n\n_Config hashes identify normalized input assumptions; they do not " +
       "guarantee identical future results if the external data provider revises " +
       "historical data._",
+  );
+}
+
+/** "Stability Lab" report section — summary only, never the raw matrix. */
+function sensitivitySection(raw: unknown): string {
+  if (!raw || typeof raw !== "object") return "";
+  const s = raw as {
+    supported?: boolean;
+    strategy?: string;
+    metric?: string;
+    x_param?: string;
+    y_param?: string;
+    x_values?: number[];
+    y_values?: number[];
+    selected_point?: { fast_window?: number; slow_window?: number; value?: number | null } | null;
+    summary?: {
+      best_value?: number | null;
+      best_params?: { fast_window?: number; slow_window?: number } | null;
+      selected_value?: number | null;
+      neighbor_median?: number | null;
+      stability_score?: number | null;
+      fragility_flag?: boolean;
+      explanation?: string;
+    } | null;
+    warnings?: string[];
+  };
+  if (typeof s.strategy !== "string") return "";
+  if (s.supported === false) {
+    return section(
+      "Stability Lab",
+      "_Sensitivity analysis is not supported for this strategy in v1 (SMA Crossover only)._",
+    );
+  }
+  const numOrDash = (v?: number | null) =>
+    typeof v === "number" ? String(Math.round(v * 1e6) / 1e6) : "—";
+  const rows: [string, string][] = [
+    ["Strategy", s.strategy],
+    ["Metric", s.metric ?? "—"],
+    ["Grid", `${s.x_param ?? "x"} × ${s.y_param ?? "y"} (${s.x_values?.length ?? 0} × ${s.y_values?.length ?? 0})`],
+  ];
+  if (s.selected_point) {
+    rows.push([
+      "Selected point",
+      `fast ${s.selected_point.fast_window} / slow ${s.selected_point.slow_window} → ${numOrDash(s.selected_point.value)}`,
+    ]);
+  }
+  const sum = s.summary;
+  if (sum) {
+    if (sum.best_params) {
+      rows.push([
+        "Best in grid",
+        `fast ${sum.best_params.fast_window} / slow ${sum.best_params.slow_window} → ${numOrDash(sum.best_value)}`,
+      ]);
+    }
+    rows.push(
+      ["Neighbor median", numOrDash(sum.neighbor_median)],
+      ["Stability score (heuristic)", numOrDash(sum.stability_score)],
+      ["Fragility flag", sum.fragility_flag ? "Yes" : "No"],
+    );
+    if (sum.explanation) rows.push(["Assessment", sum.explanation]);
+  }
+  const warningLines =
+    s.warnings && s.warnings.length
+      ? "\n\n" + s.warnings.map((w) => `- ⚠ ${w}`).join("\n")
+      : "";
+  const caveat =
+    "\n\n_Parameter sensitivity analysis is a diagnostic. Choosing the " +
+    "best-performing cell after viewing the heatmap can itself create " +
+    "overfitting._";
+  return section(
+    "Stability Lab",
+    mdTable(["Field", "Value"], rows) + warningLines + caveat,
   );
 }
 
@@ -1168,6 +1241,7 @@ export function buildBacktestReport(
       dataQualitySection(r.data_quality, r.data_provider),
       benchmarkSection(r.benchmark_analytics, m.total_return),
       robustnessSection(r.robustness),
+      sensitivitySection(r.sensitivity),
       reproducibilitySection(r.reproducibility),
       section("Equity Curve Summary", equitySummary(equity)),
       section("Trades Summary", tradesSummary(r.trades)),
@@ -1370,6 +1444,7 @@ export function buildSavedBacktestReport(
       ),
       benchmarkSection(rec.params?.benchmark_analytics, num(m.total_return) ?? null),
       robustnessSection(rec.params?.robustness),
+      sensitivitySection(rec.params?.sensitivity),
       reproducibilitySection(rec.params?.reproducibility),
       section("Equity Curve Summary", equitySummary(equity)),
       section("Trades Summary", tradesSummary(trades)),

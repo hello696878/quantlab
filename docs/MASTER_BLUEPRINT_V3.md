@@ -51,7 +51,7 @@ reproducible and every limitation explicit.
 | Data Quality Layer (provider metadata, gap/duplicate/missing diagnostics) | **built** (v1) |
 | Honest caveats in every report (costs, overfitting, short selling, data) | **built** |
 | Reproducible Backtest Permalinks / config hash | **built** (v1: canonical config hash + CSV content fingerprint; replay-by-hash routing + dataset version hashes future) |
-| Robustness Lab (bootstrap Monte Carlo, deflated Sharpe, sensitivity heatmaps, PBO if feasible) | **built** (v1: block bootstrap + heuristic grade; deflated Sharpe / PBO / sensitivity heatmaps remain v2 — not implemented) |
+| Robustness Lab (bootstrap Monte Carlo, deflated Sharpe, sensitivity heatmaps, PBO if feasible) | **built** (v1: block bootstrap + heuristic grade; 12.9 added the SMA parameter-sensitivity heatmap / Stability Lab. Deflated Sharpe / PBO / multi-strategy sweeps remain v2 — not implemented) |
 | Quant Disasters Series (what blew up and why — LTCM, Aug 2007, vol short 2018, …) | future |
 | Paper Replication Series (classic papers, honest deviations) | planned |
 | AI Explainer Copilot (explains results; never recommends trades) | future |

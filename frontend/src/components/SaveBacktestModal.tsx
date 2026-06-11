@@ -114,6 +114,9 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
   if (result.robustness) {
     params.robustness = result.robustness;
   }
+  if (result.sensitivity) {
+    params.sensitivity = result.sensitivity;
+  }
   return params;
 }
 

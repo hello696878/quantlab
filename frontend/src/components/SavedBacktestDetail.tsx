@@ -9,11 +9,13 @@ import type {
   Reproducibility,
   RobustnessResult,
   SavedBacktestFull,
+  SensitivityResult,
   TradeRecord,
 } from "@/lib/types";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import { copyText } from "@/components/ReproducibilityCard";
 import RobustnessLabCard from "@/components/RobustnessLabCard";
+import StabilityLabCard from "@/components/StabilityLabCard";
 import { notifyBackendOffline } from "@/lib/toast";
 import OfflineState from "@/components/ui/OfflineState";
 import ErrorState from "@/components/ui/ErrorState";
@@ -225,7 +227,8 @@ export default function SavedBacktestDetail({
       k !== "data_provider" &&
       k !== "benchmark_analytics" &&
       k !== "reproducibility" &&
-      k !== "robustness",
+      k !== "robustness" &&
+      k !== "sensitivity",
   );
   const savedQuality = isDataQuality(record.params?.data_quality)
     ? record.params.data_quality
@@ -256,6 +259,13 @@ export default function SavedBacktestDetail({
     typeof (savedRobustnessRaw as { n_simulations?: unknown }).n_simulations ===
       "number"
       ? (savedRobustnessRaw as RobustnessResult)
+      : undefined;
+  const savedSensitivityRaw = record.params?.sensitivity;
+  const savedSensitivity =
+    savedSensitivityRaw &&
+    typeof savedSensitivityRaw === "object" &&
+    typeof (savedSensitivityRaw as { strategy?: unknown }).strategy === "string"
+      ? (savedSensitivityRaw as SensitivityResult)
       : undefined;
 
   return (
@@ -498,6 +508,15 @@ export default function SavedBacktestDetail({
       ) : (
         <p className="text-xs text-slate-400">
           Robustness analysis was not run for this saved backtest.
+        </p>
+      )}
+
+      {/* Stability Lab (only when this record saved a sweep) */}
+      {savedSensitivity ? (
+        <StabilityLabCard sensitivity={savedSensitivity} />
+      ) : (
+        <p className="text-xs text-slate-400">
+          Sensitivity analysis was not run for this saved backtest.
         </p>
       )}
 

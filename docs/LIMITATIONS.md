@@ -100,6 +100,16 @@ Robustness Lab v1 block-bootstraps the realized daily strategy returns (blocks p
 - **Deflated Sharpe is null in v1**: it requires the number of tried configurations and distributional assumptions, which the app cannot know. Full deflated Sharpe, PBO (probability of backtest overfitting), and parameter-sensitivity heatmaps are planned for Robustness Lab v2 — they are **not implemented yet**.
 - Robustness quality inherits data quality: warnings from the data layer are surfaced because the bootstrap assumes the input return series is valid.
 
+### Stability Lab explores parameters; it cannot bless them
+
+Stability Lab v1 sweeps an SMA fast × slow grid with the same simulation settings and summarizes whether the selected parameters sit in a stable neighborhood. Honest limits:
+
+- **Broad stable regions are generally more credible than isolated spikes** — but a stable region in one historical window can still fail out-of-sample.
+- **Parameter sweeps can overfit**: choosing the best-performing cell after viewing the heatmap is itself a selection bias. The best cell is shown for context, never as a recommended trading setting.
+- The **stability score is a transparent heuristic** (selected value vs. its up-to-8 grid neighbors, penalized for invalid/missing neighbors) — a rule-of-thumb, not a statistical test. PBO (probability of backtest overfitting) is **not implemented**.
+- v1 supports **SMA Crossover only**; other strategies return a clear unsupported note. RSI / Bollinger / Momentum sweeps are planned.
+- Grid runs share one data fetch and return summary metrics only; benchmark-relative metrics (information ratio) per cell are not computed in v1.
+
 ### Config hashes identify inputs, not guaranteed outputs
 
 Every backtest gets a deterministic **config hash**: SHA-256 over the canonical, normalized, result-changing inputs (same normalized config → same hash; defaults are normalized first, so legacy requests hash like their explicit equivalents). Limits to keep in mind:

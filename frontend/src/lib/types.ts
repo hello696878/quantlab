@@ -153,6 +153,76 @@ export interface RobustnessResult {
   warnings: string[];
 }
 
+/** Stability Lab v1 — opt-in parameter-sensitivity sweep (SMA Crossover). */
+export type SensitivityMetric =
+  | "sharpe"
+  | "total_return"
+  | "cagr"
+  | "max_drawdown"
+  | "calmar";
+
+export interface SensitivityConfig {
+  enabled: boolean;
+  metric?: SensitivityMetric;
+  x_param?: "fast_window";
+  y_param?: "slow_window";
+  x_values?: number[];
+  y_values?: number[];
+  max_runs?: number;
+}
+
+export interface SensitivityRunMetrics {
+  sharpe: number;
+  total_return: number;
+  cagr: number;
+  max_drawdown: number;
+  calmar: number;
+}
+
+export interface SensitivityRun {
+  fast_window: number;
+  slow_window: number;
+  valid: boolean;
+  metrics?: SensitivityRunMetrics | null;
+  num_trades?: number | null;
+  warning?: string | null;
+}
+
+export interface SensitivityPoint {
+  fast_window: number;
+  slow_window: number;
+  value?: number | null;
+}
+
+export interface SensitivitySummary {
+  best_value?: number | null;
+  best_params?: SensitivityPoint | null;
+  selected_value?: number | null;
+  neighbor_median?: number | null;
+  neighbor_min?: number | null;
+  /** Heuristic 0–1 (null when too few valid neighbors). */
+  stability_score?: number | null;
+  fragility_flag: boolean;
+  explanation: string;
+}
+
+export interface SensitivityResult {
+  enabled: boolean;
+  supported: boolean;
+  strategy: string;
+  metric: SensitivityMetric;
+  x_param: string;
+  y_param: string;
+  x_values: number[];
+  y_values: number[];
+  selected_point?: SensitivityPoint | null;
+  /** Rows = y_values, columns = x_values; null = invalid cell. */
+  matrix: (number | null)[][];
+  runs: SensitivityRun[];
+  summary?: SensitivitySummary | null;
+  warnings: string[];
+}
+
 /** Deterministic fingerprint of the normalized result-changing inputs. */
 export interface Reproducibility {
   schema_version: string;
@@ -255,6 +325,7 @@ export interface BacktestRequest {
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
   robustness?: RobustnessConfig;
+  sensitivity?: SensitivityConfig;
 }
 
 export interface RsiBacktestRequest {
@@ -272,6 +343,7 @@ export interface RsiBacktestRequest {
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
   robustness?: RobustnessConfig;
+  sensitivity?: SensitivityConfig;
 }
 
 export interface BbBacktestRequest {
@@ -289,6 +361,7 @@ export interface BbBacktestRequest {
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
   robustness?: RobustnessConfig;
+  sensitivity?: SensitivityConfig;
 }
 
 export interface MomentumBacktestRequest {
@@ -307,6 +380,7 @@ export interface MomentumBacktestRequest {
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
   robustness?: RobustnessConfig;
+  sensitivity?: SensitivityConfig;
 }
 
 export interface VbBacktestRequest {
@@ -325,6 +399,7 @@ export interface VbBacktestRequest {
   annualization_mode?: AnnualizationMode;
   benchmark?: BenchmarkConfig;
   robustness?: RobustnessConfig;
+  sensitivity?: SensitivityConfig;
 }
 
 export interface PairsBacktestRequest {
@@ -484,6 +559,8 @@ export interface BacktestResponse {
   reproducibility?: Reproducibility | null;
   /** Robustness Lab block (present only when requested). */
   robustness?: RobustnessResult | null;
+  /** Stability Lab parameter-sensitivity block (present only when requested). */
+  sensitivity?: SensitivityResult | null;
   /** Direction mode used (defaults to "long_only" for strategies without it). */
   position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;

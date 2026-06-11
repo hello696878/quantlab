@@ -44,6 +44,7 @@ FastAPI Backend
   ├── benchmark.py                  Benchmark + active metrics (alpha/beta/TE/IR) on aligned returns
   ├── reproducibility.py            Canonical config normalization + SHA-256 config hash
   ├── robustness.py                 Robustness Lab v1: block-bootstrap Monte Carlo + heuristic grade
+  ├── sensitivity.py                Stability Lab v1: SMA parameter-sensitivity sweep + stability score
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD

@@ -732,6 +732,10 @@ single-asset Backtest + Strategy Comparison:
   Sharpe percentiles, P(beat benchmark), final-return histogram, heuristic A–F
   grade; saved + report integration; deflated Sharpe deliberately null
   (needs trial counts — v2 with PBO + sensitivity heatmaps)
+- **12.9 Stability Lab v1** — opt-in SMA fast×slow parameter-sensitivity
+  heatmap (full pipeline per cell, 42 default runs, 200 hard cap, summary
+  metrics only); selected/best points, heuristic stability score + fragility
+  flag; saved + report integration; other strategies clearly unsupported
 
 ---
 
@@ -764,9 +768,10 @@ search · toasts, error boundary, loading/offline states.
 2. ~~Reproducible Backtest Permalinks / Config Hash~~ — **built** (12.7: config
    hash + CSV fingerprint; replay-by-hash routing remains future work)
 3. ~~Robustness Lab v1~~ — **built** (12.8: block-bootstrap Monte Carlo +
-   heuristic grade). **Robustness Lab v2** stays planned: deflated Sharpe
-   (needs trial tracking), PBO, parameter-sensitivity heatmaps, comparison-mode
-   robustness
+   heuristic grade). ~~Parameter-sensitivity heatmaps~~ — **built** (12.9:
+   Stability Lab v1, SMA only). **Robustness/Stability v2** stays planned:
+   deflated Sharpe (needs trial tracking), PBO, sweeps for RSI / Bollinger /
+   Momentum, comparison-mode robustness
 4. **Strategy Library v1 pages** — intuition, math, parameters, strengths /
    failure modes for each built strategy
 5. **Paper Replication Series v1** — classic papers (e.g. momentum, low-vol)

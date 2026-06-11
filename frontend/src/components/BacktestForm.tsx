@@ -13,6 +13,8 @@ import type {
   PositionMode,
   PositionSizing,
   RobustnessConfig,
+  SensitivityConfig,
+  SensitivityMetric,
   PositionSizingType,
   RiskManagement,
   RiskManagementType,
@@ -326,6 +328,12 @@ export default function BacktestForm({
   const [benchTickerStr, setBenchTickerStr] = useState(
     _initialBm?.ticker ?? "SPY",
   );
+  // Stability Lab (SMA-only sweep; opt-in — disabled keeps backtests fast).
+  const _initialSens = smaParams.sensitivity;
+  const [stabEnabled, setStabEnabled] = useState(_initialSens?.enabled ?? false);
+  const [stabMetric, setStabMetric] = useState<SensitivityMetric>(
+    _initialSens?.metric ?? "sharpe",
+  );
   // Robustness Lab (shared; opt-in — disabled keeps backtests fast).
   const _initialRob = smaParams.robustness;
   const [robEnabled, setRobEnabled] = useState(_initialRob?.enabled ?? false);
@@ -406,6 +414,7 @@ export default function BacktestForm({
     annualization_mode: AnnualizationMode | undefined;
     benchmark: BenchmarkConfig | undefined;
     robustness: RobustnessConfig | undefined;
+    sensitivity: SensitivityConfig | undefined;
   }>;
 
   /** Update every strategy's common fields simultaneously so switching strategy
@@ -629,6 +638,16 @@ export default function BacktestForm({
   function handleBenchModeChange(mode: BenchmarkMode) {
     setBenchMode(mode);
     pushBenchmark(mode, benchTickerStr);
+  }
+
+  // ── Stability Lab wiring ───────────────────────────────────────────────────
+  // Off (the default) omits the config so normal backtests stay fast.  Uses the
+  // backend's default 7×6 SMA grid; the sweep never changes core results.
+  function pushSensitivity(enabled: boolean, metric: SensitivityMetric) {
+    setCommon(
+      "sensitivity",
+      enabled ? { enabled: true, metric } : undefined,
+    );
   }
 
   // ── Robustness wiring ──────────────────────────────────────────────────────
@@ -1646,6 +1665,86 @@ export default function BacktestForm({
               sensitive the result is to return ordering and sampling. Research
               diagnostics, not guarantees — it never changes the backtest itself.
             </p>
+          </div>
+        )}
+
+        {/* ── Stability Lab (parameter sensitivity) ─────────────────────── */}
+        {strategy !== "pairs" && (
+          <div className="mb-5 rounded-lg border border-slate-200 p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <span className="text-[11px] font-medium uppercase tracking-wide text-slate-400">
+                Stability Lab
+              </span>
+              {strategy === "sma_crossover" ? (
+                <button
+                  type="button"
+                  disabled={loading}
+                  onClick={() => {
+                    const next = !stabEnabled;
+                    setStabEnabled(next);
+                    pushSensitivity(next, stabMetric);
+                  }}
+                  className={
+                    "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors " +
+                    (stabEnabled
+                      ? "bg-blue-600 text-white border-blue-600"
+                      : "bg-white text-slate-600 border-slate-300 hover:border-blue-400")
+                  }
+                >
+                  {stabEnabled ? "Stability Lab: ON" : "Run Stability Lab"}
+                </button>
+              ) : (
+                <span className="text-[11px] text-slate-400">
+                  v1 supports SMA Crossover
+                </span>
+              )}
+            </div>
+
+            {strategy === "sma_crossover" ? (
+              <>
+                {stabEnabled && (
+                  <div className="mb-2 flex flex-wrap items-center gap-2">
+                    <span className="text-[11px] text-slate-400">Metric:</span>
+                    {(["sharpe", "total_return", "max_drawdown"] as SensitivityMetric[]).map(
+                      (mId) => (
+                        <button
+                          key={mId}
+                          type="button"
+                          disabled={loading}
+                          onClick={() => {
+                            setStabMetric(mId);
+                            pushSensitivity(true, mId);
+                          }}
+                          className={
+                            "px-2.5 py-1 rounded-lg text-xs font-medium border transition-colors " +
+                            (stabMetric === mId
+                              ? "bg-blue-600 text-white border-blue-600"
+                              : "bg-white text-slate-600 border-slate-300 hover:border-blue-400")
+                          }
+                        >
+                          {mId === "sharpe"
+                            ? "Sharpe"
+                            : mId === "total_return"
+                              ? "Total Return"
+                              : "Max Drawdown"}
+                        </button>
+                      ),
+                    )}
+                  </div>
+                )}
+                <p className="text-[11px] text-slate-400">
+                  Sweeps a fast × slow window grid (default 7×6 = 42 runs) with the
+                  same cost, sizing, and risk settings to check whether the selected
+                  parameters sit in a stable region or an isolated spike. A research
+                  diagnostic, not an optimization recommendation.
+                </p>
+              </>
+            ) : (
+              <p className="text-[11px] text-slate-400">
+                Stability Lab v1 currently supports SMA Crossover. Sweeps for other
+                strategies are planned.
+              </p>
+            )}
           </div>
         )}
 

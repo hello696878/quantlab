@@ -25,6 +25,7 @@ import BenchmarkComparisonCard from "@/components/BenchmarkComparisonCard";
 import ExcessReturnChart from "@/components/ExcessReturnChart";
 import ReproducibilityCard from "@/components/ReproducibilityCard";
 import RobustnessLabCard from "@/components/RobustnessLabCard";
+import StabilityLabCard from "@/components/StabilityLabCard";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -952,6 +953,8 @@ export default function HomePage() {
                 )}
 
                 <RobustnessLabCard robustness={result.robustness} />
+
+                <StabilityLabCard sensitivity={result.sensitivity} />
 
                 {(result.position_mode === "short_only" ||
                   result.position_mode === "long_short") && (

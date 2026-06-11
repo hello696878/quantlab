@@ -74,6 +74,7 @@ from app.reproducibility import (
     normalize_comparison_config,
 )
 from app.robustness import build_robustness_report
+from app.sensitivity import run_sensitivity_grid, unsupported_sensitivity
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -126,6 +127,7 @@ from app.schemas import (
     PositionSizing,
     RiskManagement,
     RobustnessConfig,
+    SensitivityConfig,
     CustomStrategyRequest,
     CustomStrategyTemplateCreate,
     CustomStrategyTemplateExport,
@@ -299,6 +301,7 @@ def _build_response(
     data_provider: str = "yfinance",
     benchmark: Optional[BenchmarkConfig] = None,
     robustness: Optional[RobustnessConfig] = None,
+    sensitivity: Optional[SensitivityConfig] = None,
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response.
 
@@ -454,6 +457,29 @@ def _build_response(
             extra_warnings=dq_warnings,
         )
 
+    # Stability Lab — opt-in parameter-sensitivity sweep (SMA v1).  Re-runs the
+    # same pipeline per grid cell; never changes the core backtest results.
+    sensitivity_result = None
+    if sensitivity is not None and sensitivity.enabled:
+        if strategy == "sma_crossover" and fast_window and slow_window:
+            try:
+                sensitivity_result = run_sensitivity_grid(
+                    close,
+                    sensitivity,
+                    current_fast=fast_window,
+                    current_slow=slow_window,
+                    position_mode=position_mode,
+                    risk_management=risk_management,
+                    position_sizing=position_sizing,
+                    effective_cost_bps=effective_cost_bps,
+                    initial_capital=initial_capital,
+                    periods_per_year=ppy,
+                )
+            except ValueError as exc:  # oversized grid — reject safely
+                raise HTTPException(status_code=422, detail=str(exc)) from exc
+        else:
+            sensitivity_result = unsupported_sensitivity(strategy, sensitivity)
+
     # Reproducible config hash — normalized, result-changing inputs only.
     # SMA windows use a 0 sentinel when not applicable; everything else is None.
     strategy_params = {
@@ -542,6 +568,7 @@ def _build_response(
         benchmark_analytics=benchmark_analytics,
         reproducibility=reproducibility,
         robustness=robustness_result,
+        sensitivity=sensitivity_result,
         position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
@@ -697,6 +724,7 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
         robustness=request.robustness,
+        sensitivity=request.sensitivity,
         fast_window=request.fast_window,
         slow_window=request.slow_window,
         position_mode=request.position_mode,
@@ -754,6 +782,7 @@ def backtest_rsi_mean_reversion(request: RsiBacktestRequest) -> BacktestResponse
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
         robustness=request.robustness,
+        sensitivity=request.sensitivity,
         rsi_window=request.rsi_window,
         oversold_threshold=request.oversold_threshold,
         exit_threshold=request.exit_threshold,
@@ -812,6 +841,7 @@ def backtest_bollinger_band(request: BbBacktestRequest) -> BacktestResponse:
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
         robustness=request.robustness,
+        sensitivity=request.sensitivity,
         bb_window=request.bb_window,
         bb_num_std=request.num_std,
         bb_exit_band=request.exit_band,
@@ -873,6 +903,7 @@ def backtest_momentum(request: MomentumBacktestRequest) -> BacktestResponse:
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
         robustness=request.robustness,
+        sensitivity=request.sensitivity,
         momentum_window=request.momentum_window,
         momentum_entry_threshold=request.entry_threshold,
         momentum_exit_threshold=request.exit_threshold,
@@ -934,6 +965,7 @@ def backtest_volatility_breakout(request: VbBacktestRequest) -> BacktestResponse
         annualization_mode=request.annualization_mode,
         benchmark=request.benchmark,
         robustness=request.robustness,
+        sensitivity=request.sensitivity,
         vb_lookback_window=request.lookback_window,
         vb_breakout_multiplier=request.breakout_multiplier,
         vb_exit_window=request.exit_window,
@@ -2953,6 +2985,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
         data_provider="csv_upload",
         benchmark=req.benchmark,
         robustness=req.robustness,
+        sensitivity=req.sensitivity,
     )
 
     if strategy == "sma_crossover":
