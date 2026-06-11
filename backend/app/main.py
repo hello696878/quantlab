@@ -2982,6 +2982,8 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
         close=close,
         cost_model=req.cost_model,
         position_sizing=req.position_sizing,
+        risk_management=req.risk_management,
+        annualization_mode=req.annualization_mode,
         data_provider="csv_upload",
         benchmark=req.benchmark,
         robustness=req.robustness,

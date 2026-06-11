@@ -723,17 +723,29 @@ function sensitivitySection(raw: unknown): string {
       "_Sensitivity analysis is not supported for this strategy in v1 (SMA Crossover only)._",
     );
   }
-  const numOrDash = (v?: number | null) =>
-    typeof v === "number" ? String(Math.round(v * 1e6) / 1e6) : "—";
+  const metricName = s.metric ?? "—";
+  const formatSensitivityValue = (v?: number | null) => {
+    if (typeof v !== "number") return "—";
+    if (
+      metricName === "total_return" ||
+      metricName === "cagr" ||
+      metricName === "max_drawdown"
+    ) {
+      return formatPercent(v);
+    }
+    return formatRatio(v);
+  };
+  const formatStabilityValue = (v?: number | null) =>
+    typeof v === "number" ? formatRatio(v, 3) : "—";
   const rows: [string, string][] = [
     ["Strategy", s.strategy],
-    ["Metric", s.metric ?? "—"],
+    ["Metric", metricName],
     ["Grid", `${s.x_param ?? "x"} × ${s.y_param ?? "y"} (${s.x_values?.length ?? 0} × ${s.y_values?.length ?? 0})`],
   ];
   if (s.selected_point) {
     rows.push([
       "Selected point",
-      `fast ${s.selected_point.fast_window} / slow ${s.selected_point.slow_window} → ${numOrDash(s.selected_point.value)}`,
+      `fast ${s.selected_point.fast_window} / slow ${s.selected_point.slow_window} → ${formatSensitivityValue(s.selected_point.value)}`,
     ]);
   }
   const sum = s.summary;
@@ -741,12 +753,12 @@ function sensitivitySection(raw: unknown): string {
     if (sum.best_params) {
       rows.push([
         "Best in grid",
-        `fast ${sum.best_params.fast_window} / slow ${sum.best_params.slow_window} → ${numOrDash(sum.best_value)}`,
+        `fast ${sum.best_params.fast_window} / slow ${sum.best_params.slow_window} → ${formatSensitivityValue(sum.best_value)}`,
       ]);
     }
     rows.push(
-      ["Neighbor median", numOrDash(sum.neighbor_median)],
-      ["Stability score (heuristic)", numOrDash(sum.stability_score)],
+      ["Neighbor median", formatSensitivityValue(sum.neighbor_median)],
+      ["Stability score (heuristic)", formatStabilityValue(sum.stability_score)],
       ["Fragility flag", sum.fragility_flag ? "Yes" : "No"],
     );
     if (sum.explanation) rows.push(["Assessment", sum.explanation]);

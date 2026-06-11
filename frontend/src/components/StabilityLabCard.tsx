@@ -12,12 +12,6 @@ interface Props {
   sensitivity?: SensitivityResult | null;
 }
 
-const METRIC_TABS: { id: SensitivityMetric; label: string; isPct: boolean }[] = [
-  { id: "sharpe", label: "Sharpe", isPct: false },
-  { id: "total_return", label: "Total Return", isPct: true },
-  { id: "max_drawdown", label: "Max Drawdown", isPct: true },
-];
-
 const METRIC_LABEL: Record<SensitivityMetric, string> = {
   sharpe: "Sharpe",
   total_return: "Total Return",
@@ -26,9 +20,21 @@ const METRIC_LABEL: Record<SensitivityMetric, string> = {
   calmar: "Calmar",
 };
 
-function fmtMetric(v: number | null | undefined, isPct: boolean): string {
+const METRIC_TABS: { id: SensitivityMetric; label: string }[] = [
+  { id: "sharpe", label: METRIC_LABEL.sharpe },
+  { id: "total_return", label: METRIC_LABEL.total_return },
+  { id: "cagr", label: METRIC_LABEL.cagr },
+  { id: "max_drawdown", label: METRIC_LABEL.max_drawdown },
+  { id: "calmar", label: METRIC_LABEL.calmar },
+];
+
+function metricIsPercent(metric: SensitivityMetric): boolean {
+  return metric === "total_return" || metric === "cagr" || metric === "max_drawdown";
+}
+
+function fmtMetric(v: number | null | undefined, metric: SensitivityMetric): string {
   if (typeof v !== "number") return "—";
-  return isPct ? fmtPct(v) : fmtRatio(v);
+  return metricIsPercent(metric) ? fmtPct(v) : fmtRatio(v);
 }
 
 function Stat({ label, value }: { label: string; value: string }) {
@@ -55,7 +61,6 @@ export default function StabilityLabCard({ sensitivity }: Props) {
   // back to the server-configured metric.
   const s = sensitivity;
   const activeMetric: SensitivityMetric = metricTab ?? s?.metric ?? "sharpe";
-  const activeIsPct = METRIC_TABS.find((t) => t.id === activeMetric)?.isPct ?? false;
 
   const runByCell = useMemo(() => {
     const map = new Map<string, SensitivityRun>();
@@ -161,7 +166,6 @@ export default function StabilityLabCard({ sensitivity }: Props) {
                 xValues={s.x_values}
                 runByCell={runByCell}
                 activeMetric={activeMetric}
-                activeIsPct={activeIsPct}
                 intensity={intensity}
                 selected={sel ?? null}
                 best={best ?? null}
@@ -201,17 +205,17 @@ export default function StabilityLabCard({ sensitivity }: Props) {
           />
           <Stat
             label={`Selected ${METRIC_LABEL[s.metric]}`}
-            value={fmtMetric(summary.selected_value, s.metric !== "sharpe" && s.metric !== "calmar")}
+            value={fmtMetric(summary.selected_value, s.metric)}
           />
           <Stat
             label="Neighbor median"
-            value={fmtMetric(summary.neighbor_median, s.metric !== "sharpe" && s.metric !== "calmar")}
+            value={fmtMetric(summary.neighbor_median, s.metric)}
           />
           <Stat
             label="Best in grid"
             value={
               best
-                ? `${fmtMetric(summary.best_value, s.metric !== "sharpe" && s.metric !== "calmar")} @ ${best.fast_window}/${best.slow_window}`
+                ? `${fmtMetric(summary.best_value, s.metric)} @ ${best.fast_window}/${best.slow_window}`
                 : "—"
             }
           />
@@ -250,7 +254,6 @@ function FragmentRow({
   xValues,
   runByCell,
   activeMetric,
-  activeIsPct,
   intensity,
   selected,
   best,
@@ -259,7 +262,6 @@ function FragmentRow({
   xValues: number[];
   runByCell: Map<string, SensitivityRun>;
   activeMetric: SensitivityMetric;
-  activeIsPct: boolean;
   intensity: (v: number) => number;
   selected: { fast_window: number; slow_window: number } | null;
   best: { fast_window: number; slow_window: number } | null;
@@ -277,7 +279,7 @@ function FragmentRow({
         const isBest = best?.fast_window === fast && best?.slow_window === slow;
         const title = run
           ? run.valid && run.metrics
-            ? `fast ${fast} / slow ${slow}\n${activeMetric}: ${fmtMetric(value, activeIsPct)}\ntotal return: ${fmtPct(run.metrics.total_return)}\nmax drawdown: ${fmtPct(run.metrics.max_drawdown)}\ntrades: ${run.num_trades ?? "—"}`
+            ? `fast ${fast} / slow ${slow}\n${METRIC_LABEL[activeMetric]}: ${fmtMetric(value, activeMetric)}\ntotal return: ${fmtPct(run.metrics.total_return)}\nCAGR: ${fmtPct(run.metrics.cagr)}\nmax drawdown: ${fmtPct(run.metrics.max_drawdown)}\ntrades: ${run.num_trades ?? "—"}`
             : `fast ${fast} / slow ${slow}\ninvalid: ${run.warning ?? "fast ≥ slow"}`
           : `fast ${fast} / slow ${slow}`;
         return (
@@ -296,7 +298,7 @@ function FragmentRow({
                   : `rgba(var(--accent-rgb), ${(0.12 + 0.78 * intensity(value)).toFixed(3)})`,
             }}
           >
-            {value == null ? "·" : fmtMetric(value, activeIsPct)}
+            {value == null ? "·" : fmtMetric(value, activeMetric)}
             {isBest && <span className="ml-0.5">★</span>}
           </div>
         );

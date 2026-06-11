@@ -83,6 +83,14 @@ const MODE_STRATEGIES = new Set<StrategyType>([
   "volatility_breakout",
 ]);
 
+const SENSITIVITY_METRICS: { id: SensitivityMetric; label: string }[] = [
+  { id: "sharpe", label: "Sharpe" },
+  { id: "total_return", label: "Total Return" },
+  { id: "cagr", label: "CAGR" },
+  { id: "max_drawdown", label: "Max Drawdown" },
+  { id: "calmar", label: "Calmar" },
+];
+
 // Quick-pick tickers (single-asset strategies only)
 const POPULAR_TICKERS = ["SPY", "QQQ", "AAPL", "MSFT", "GLD", "BTC-USD"];
 
@@ -1705,8 +1713,8 @@ export default function BacktestForm({
                 {stabEnabled && (
                   <div className="mb-2 flex flex-wrap items-center gap-2">
                     <span className="text-[11px] text-slate-400">Metric:</span>
-                    {(["sharpe", "total_return", "max_drawdown"] as SensitivityMetric[]).map(
-                      (mId) => (
+                    {SENSITIVITY_METRICS.map(
+                      ({ id: mId, label }) => (
                         <button
                           key={mId}
                           type="button"
@@ -1722,11 +1730,7 @@ export default function BacktestForm({
                               : "bg-white text-slate-600 border-slate-300 hover:border-blue-400")
                           }
                         >
-                          {mId === "sharpe"
-                            ? "Sharpe"
-                            : mId === "total_return"
-                              ? "Total Return"
-                              : "Max Drawdown"}
+                          {label}
                         </button>
                       ),
                     )}

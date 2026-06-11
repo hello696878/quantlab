@@ -97,7 +97,7 @@ Robustness Lab v1 block-bootstraps the realized daily strategy returns (blocks p
 - Bootstrap **resamples history** — it estimates sensitivity to return ordering/sampling, not future performance. Regime shifts, liquidity shocks, and structural breaks violate its assumptions, and small samples limit interpretation.
 - A fragile strategy can still look good in one backtest — and a good-looking bootstrap does not prove alpha.
 - The **A–F grade is a transparent heuristic** (thresholds on probability of loss, tail return, tail drawdown, median Sharpe) — a rule-of-thumb summary, never a trading recommendation.
-- **Deflated Sharpe is null in v1**: it requires the number of tried configurations and distributional assumptions, which the app cannot know. Full deflated Sharpe, PBO (probability of backtest overfitting), and parameter-sensitivity heatmaps are planned for Robustness Lab v2 — they are **not implemented yet**.
+- **Deflated Sharpe is null in v1**: it requires the number of tried configurations and distributional assumptions, which the app cannot know. Full deflated Sharpe and PBO (probability of backtest overfitting) are planned for Robustness/Stability v2 — they are **not implemented yet**. The SMA parameter-sensitivity heatmap exists as Stability Lab v1 below.
 - Robustness quality inherits data quality: warnings from the data layer are surfaced because the bootstrap assumes the input return series is valid.
 
 ### Stability Lab explores parameters; it cannot bless them

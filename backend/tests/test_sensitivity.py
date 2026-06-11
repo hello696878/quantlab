@@ -279,3 +279,31 @@ def test_api_invalid_sensitivity_config_rejected(client):
         json={"sensitivity": {"enabled": True, "metric": "alpha_magic"}},
     )
     assert resp.status_code == 422
+
+
+def test_api_sensitivity_respects_shared_simulation_settings(client):
+    """Selected grid cell should match the base backtest under all shared controls."""
+    req = {
+        "fast_window": 10,
+        "slow_window": 30,
+        "cost_model": {"type": "conservative"},
+        "position_sizing": {"type": "fixed_fraction", "fraction": 0.5},
+        "risk_management": {"type": "max_holding_days", "max_holding_days": 8},
+        "annualization_mode": "crypto_365",
+        "sensitivity": {
+            "enabled": True,
+            "metric": "cagr",
+            "x_values": [10],
+            "y_values": [30],
+        },
+    }
+    body = client.post("/backtest/sma-crossover", json=req).json()
+
+    assert body["periods_per_year"] == 365
+    assert body["cost_model"]["effective_bps_per_side"] == 25.0
+    assert body["position_sizing"]["type"] == "fixed_fraction"
+    assert body["risk_management"]["type"] == "max_holding_days"
+    assert body["risk_diagnostics"]["risk_exit_count"] > 0
+    assert body["sensitivity"]["selected_point"]["value"] == pytest.approx(
+        body["strategy_metrics"]["cagr"], abs=1e-9
+    )
