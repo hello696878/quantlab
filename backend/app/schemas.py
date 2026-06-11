@@ -332,6 +332,27 @@ _ANNUALIZATION_FIELD = Field(
 
 
 # ---------------------------------------------------------------------------
+# Reproducibility / config hash (research v1)
+# ---------------------------------------------------------------------------
+
+class Reproducibility(BaseModel):
+    """Deterministic fingerprint of the normalized, result-changing inputs.
+
+    Same normalized config → same hash.  The hash identifies *input
+    assumptions* only — external data providers can revise history, so exact
+    output reproducibility additionally needs the data-quality metadata (and,
+    in future, dataset version hashes).
+    """
+
+    schema_version: str = Field(description="Canonical-config schema version.")
+    config_hash: str = Field(description="Short display hash (first 12 hex chars).")
+    config_hash_full: str = Field(description="Full SHA-256 hex of the canonical config.")
+    canonical_config_json: str = Field(
+        description="Compact canonical JSON the hash was computed over (for audit)."
+    )
+
+
+# ---------------------------------------------------------------------------
 # Benchmark / active performance analytics (research v1)
 # ---------------------------------------------------------------------------
 
@@ -1101,6 +1122,10 @@ class BacktestResponse(BaseModel):
             "always remain the same-asset buy-and-hold for backward compatibility."
         ),
     )
+    reproducibility: Optional[Reproducibility] = Field(
+        default=None,
+        description="Deterministic config hash of the normalized result-changing inputs.",
+    )
     position_mode: str = Field(
         default="long_only",
         description="Strategy direction mode used (long_only / short_only / long_short).",
@@ -1781,6 +1806,10 @@ class StrategyComparisonResponse(BaseModel):
             "mode is 'none'). The legacy `benchmark` curve / `benchmark_metrics` "
             "always remain the same-asset buy-and-hold."
         ),
+    )
+    reproducibility: Optional[Reproducibility] = Field(
+        default=None,
+        description="Deterministic config hash of the normalized comparison inputs.",
     )
 
     strategies: List[StrategyResultItem] = Field(

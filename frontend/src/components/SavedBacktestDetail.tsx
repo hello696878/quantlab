@@ -6,10 +6,12 @@ import type {
   BenchmarkAnalytics,
   DataQuality,
   EquityPoint,
+  Reproducibility,
   SavedBacktestFull,
   TradeRecord,
 } from "@/lib/types";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
+import { copyText } from "@/components/ReproducibilityCard";
 import { notifyBackendOffline } from "@/lib/toast";
 import OfflineState from "@/components/ui/OfflineState";
 import ErrorState from "@/components/ui/ErrorState";
@@ -219,7 +221,8 @@ export default function SavedBacktestDetail({
       v != null &&
       k !== "data_quality" &&
       k !== "data_provider" &&
-      k !== "benchmark_analytics",
+      k !== "benchmark_analytics" &&
+      k !== "reproducibility",
   );
   const savedQuality = isDataQuality(record.params?.data_quality)
     ? record.params.data_quality
@@ -236,6 +239,13 @@ export default function SavedBacktestDetail({
       ? (savedBenchmarkRaw as BenchmarkAnalytics)
       : undefined;
   const savedBenchmarkName = savedBenchmarkBlock?.display_name;
+  const savedReproRaw = record.params?.reproducibility;
+  const savedRepro =
+    savedReproRaw &&
+    typeof savedReproRaw === "object" &&
+    typeof (savedReproRaw as { config_hash?: unknown }).config_hash === "string"
+      ? (savedReproRaw as Reproducibility)
+      : undefined;
 
   return (
     <div className="space-y-6">
@@ -313,6 +323,29 @@ export default function SavedBacktestDetail({
               >
                 <span className="text-slate-400">benchmark:</span>
                 <span className="font-mono font-medium">{savedBenchmarkName}</span>
+              </span>
+            )}
+            {savedRepro ? (
+              <button
+                type="button"
+                onClick={() =>
+                  copyText(savedRepro.config_hash_full, "Config hash copied")
+                }
+                title={`${savedRepro.config_hash_full} — click to copy`}
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                           bg-slate-100 text-slate-600 text-xs transition-colors
+                           hover:bg-slate-200"
+              >
+                <span className="text-slate-400">config:</span>
+                <span className="font-mono font-medium">{savedRepro.config_hash}</span>
+              </button>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full
+                           bg-slate-100 text-slate-400 text-xs"
+                title="Config hash unavailable for older saved backtests."
+              >
+                config: —
               </span>
             )}
             <span

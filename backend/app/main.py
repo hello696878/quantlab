@@ -34,6 +34,7 @@ POST /research/sma-walk-forward        — SMA walk-forward optimization
 POST /research/strategy-comparison     — compare five single-asset strategies
 """
 
+import hashlib
 import json
 from contextlib import asynccontextmanager
 from typing import Optional
@@ -66,6 +67,11 @@ from app.benchmark import (
     compute_active_metrics,
     metrics_block as benchmark_metrics_block,
     normalize_config as normalize_benchmark_config,
+)
+from app.reproducibility import (
+    build_reproducibility,
+    normalize_backtest_config,
+    normalize_comparison_config,
 )
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
@@ -420,6 +426,47 @@ def _build_response(
         custom_data_quality=custom_quality,
     )
 
+    # Reproducible config hash — normalized, result-changing inputs only.
+    # SMA windows use a 0 sentinel when not applicable; everything else is None.
+    strategy_params = {
+        k: v
+        for k, v in {
+            "fast_window": fast_window if fast_window else None,
+            "slow_window": slow_window if slow_window else None,
+            "rsi_window": rsi_window,
+            "oversold_threshold": oversold_threshold,
+            "exit_threshold": exit_threshold,
+            "bb_window": bb_window,
+            "bb_num_std": bb_num_std,
+            "bb_exit_band": bb_exit_band,
+            "momentum_window": momentum_window,
+            "momentum_entry_threshold": momentum_entry_threshold,
+            "momentum_exit_threshold": momentum_exit_threshold,
+            "vb_lookback_window": vb_lookback_window,
+            "vb_breakout_multiplier": vb_breakout_multiplier,
+            "vb_exit_window": vb_exit_window,
+        }.items()
+        if v is not None
+    }
+    reproducibility = build_reproducibility(
+        normalize_backtest_config(
+            strategy=strategy,
+            ticker=request_ticker,
+            start_date=start_date,
+            end_date=end_date,
+            initial_capital=initial_capital,
+            strategy_params=strategy_params,
+            effective_cost_bps=effective_cost_bps,
+            position_sizing=position_sizing,
+            risk_management=risk_management,
+            annualization_mode_used=annualization.mode_used,
+            benchmark=benchmark,
+            position_mode=position_mode,
+            data_provider=data_provider,
+            dataset_fingerprint=close.attrs.get("csv_content_sha256"),
+        )
+    )
+
     equity_curve = [
         EquityPoint(
             date=str(d.date()) if hasattr(d, "date") else str(d),
@@ -465,6 +512,7 @@ def _build_response(
         data_provider=data_provider,
         data_quality=data_quality,
         benchmark_analytics=benchmark_analytics,
+        reproducibility=reproducibility,
         position_mode=position_mode,
         strategy_metrics=PerformanceMetrics(**strategy_metrics_dict),
         benchmark_metrics=PerformanceMetrics(**benchmark_metrics_dict),
@@ -2551,6 +2599,24 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
             warnings=[custom_bench_error] if custom_bench_error else [],
         )
 
+    # Reproducible config hash for the whole comparison (shared settings; the
+    # five strategies' demo-default parameters are fixed by the endpoint).
+    comparison_reproducibility = build_reproducibility(
+        normalize_comparison_config(
+            ticker=request.ticker,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            initial_capital=request.initial_capital,
+            effective_cost_bps=effective_cost_bps,
+            position_sizing=request.position_sizing,
+            risk_management=request.risk_management,
+            annualization_mode_used=annualization.mode_used,
+            benchmark=request.benchmark,
+            position_mode=request.position_mode,
+            strategies=[item.strategy for item in results],
+        )
+    )
+
     # ── Benchmark metrics + curve ─────────────────────────────────────────
     bench_m = compute_metrics(bench_eq, periods_per_year=ppy)
     bench_curve = [
@@ -2600,6 +2666,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         data_provider="yfinance",
         data_quality=data_quality,
         benchmark_analytics=benchmark_analytics,
+        reproducibility=comparison_reproducibility,
         strategies=results,
         benchmark=bench_curve,
         benchmark_metrics=PerformanceMetrics(**bench_m),
@@ -3022,6 +3089,11 @@ async def backtest_csv(
         close = parse_price_csv(raw)
     except ValueError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    # Dataset fingerprint for the reproducibility hash: same CSV content →
+    # same fingerprint; a different file with identical label/params changes
+    # the config hash (config alone can't identify uploaded data).
+    close.attrs["csv_content_sha256"] = hashlib.sha256(raw).hexdigest()
 
     try:
         params_dict = json.loads(params) if params else {}

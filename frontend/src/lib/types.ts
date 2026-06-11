@@ -110,6 +110,17 @@ export interface RiskDiagnostics {
 /** Annualization convention for risk metrics (research v1). */
 export type AnnualizationMode = "trading_days_252" | "crypto_365" | "auto";
 
+/** Deterministic fingerprint of the normalized result-changing inputs. */
+export interface Reproducibility {
+  schema_version: string;
+  /** Short display hash (first 12 hex chars of the SHA-256). */
+  config_hash: string;
+  /** Full SHA-256 hex of the canonical config JSON. */
+  config_hash_full: string;
+  /** Compact canonical JSON the hash was computed over (for audit). */
+  canonical_config_json: string;
+}
+
 /** Benchmark comparison (research v1). Never changes strategy trades/results. */
 export type BenchmarkMode = "none" | "buy_and_hold_same_asset" | "custom_ticker";
 
@@ -421,6 +432,8 @@ export interface BacktestResponse {
   data_quality?: DataQuality | null;
   /** Benchmark + active analytics (absent when benchmark mode is "none"). */
   benchmark_analytics?: BenchmarkAnalytics | null;
+  /** Reproducible config hash of the normalized inputs. */
+  reproducibility?: Reproducibility | null;
   /** Direction mode used (defaults to "long_only" for strategies without it). */
   position_mode?: PositionMode;
   strategy_metrics: PerformanceMetrics;
@@ -669,6 +682,8 @@ export interface StrategyComparisonResponse {
   data_quality?: DataQuality | null;
   /** Shared benchmark block (absent when benchmark mode is "none"). */
   benchmark_analytics?: BenchmarkAnalytics | null;
+  /** Reproducible config hash of the normalized comparison inputs. */
+  reproducibility?: Reproducibility | null;
   strategies: StrategyResultItem[];
   /** Buy-and-hold equity curve — strategy and benchmark fields both carry the benchmark value. */
   benchmark: EquityPoint[];

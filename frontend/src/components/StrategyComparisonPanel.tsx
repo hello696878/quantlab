@@ -49,6 +49,7 @@ import type {
 } from "@/lib/types";
 import { loadSettings } from "@/lib/settings";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
+import { copyText } from "@/components/ReproducibilityCard";
 
 // Direction modes; applied to SMA/Momentum/Volatility Breakout, RSI/Bollinger
 // stay long-only.
@@ -728,9 +729,26 @@ export default function StrategyComparisonPanel() {
             <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[11px] font-medium uppercase tracking-wide text-slate-500">
               {CMP_MODE_LABEL[result.position_mode ?? "long_only"]}
             </span>
-            <span className="ml-auto text-xs text-slate-400">
-              {result.effective_cost_bps ?? result.transaction_cost_bps} bps · $
-              {result.initial_capital.toLocaleString()}
+            <span className="ml-auto flex items-center gap-2 text-xs text-slate-400">
+              {result.reproducibility && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    copyText(
+                      result.reproducibility!.config_hash_full,
+                      "Config hash copied",
+                    )
+                  }
+                  title={`${result.reproducibility.config_hash_full} — click to copy`}
+                  className="rounded-full bg-slate-100 px-2 py-0.5 font-mono text-[11px] font-medium text-slate-500 transition-colors hover:bg-slate-200"
+                >
+                  config {result.reproducibility.config_hash}
+                </button>
+              )}
+              <span>
+                {result.effective_cost_bps ?? result.transaction_cost_bps} bps · $
+                {result.initial_capital.toLocaleString()}
+              </span>
             </span>
           </div>
 

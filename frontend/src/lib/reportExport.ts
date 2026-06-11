@@ -457,6 +457,7 @@ function riskCaveats(
 ${dataLine}
 - **Transaction cost & slippage.** Costs use a simple basis-point assumption; real fills, slippage, and market impact are not modelled.${positionSizingCaveat(positionSizing)}${riskManagementCaveat(riskManagement)}
 - **Annualization convention.** Annualized metrics depend on the selected annualization convention. Crypto assets may be more appropriately annualized with 365 periods per year, while equities often use 252 trading days. The convention rescales CAGR / Calmar / Sharpe / Sortino / volatility only — it does not change trades or total return.
+- **Reproducibility.** Config hashes identify normalized input assumptions. They do not guarantee identical future results if the underlying external data provider revises historical data. Use data-quality metadata and provider/version information when auditing reproducibility.
 - **Possible overfitting.** Parameters or weights chosen on historical data may not generalise out-of-sample.
 - This report is for research and educational purposes only and is **not investment advice**.${shortSellingCaveat(positionMode)}
 ${cryptoLine}
@@ -928,6 +929,11 @@ export function buildBacktestReport(
   if (r.benchmark_analytics) {
     metaRows.push(["Benchmark", r.benchmark_analytics.display_name]);
   }
+  if (r.reproducibility) {
+    metaRows.push(["Config hash", r.reproducibility.config_hash]);
+    metaRows.push(["Config hash (full)", r.reproducibility.config_hash_full]);
+    metaRows.push(["Config schema", r.reproducibility.schema_version]);
+  }
   const metadataBody = mdTable(["Field", "Value"], metaRows);
 
   const execBullets = [
@@ -1135,6 +1141,18 @@ export function buildSavedBacktestReport(
     | undefined;
   if (savedBench && typeof savedBench === "object" && savedBench.display_name) {
     savedMetaRows.push(["Benchmark", savedBench.display_name]);
+  }
+  const savedRepro = rec.params?.reproducibility as
+    | { config_hash?: string; config_hash_full?: string; schema_version?: string }
+    | undefined;
+  if (savedRepro && typeof savedRepro === "object" && savedRepro.config_hash) {
+    savedMetaRows.push(["Config hash", savedRepro.config_hash]);
+    if (savedRepro.config_hash_full) {
+      savedMetaRows.push(["Config hash (full)", savedRepro.config_hash_full]);
+    }
+    if (savedRepro.schema_version) {
+      savedMetaRows.push(["Config schema", savedRepro.schema_version]);
+    }
   }
 
   const metadataBody = mdTable(["Field", "Value"], savedMetaRows);

@@ -23,6 +23,7 @@ import RiskDiagnosticsCard from "@/components/RiskDiagnosticsCard";
 import DataQualityCard from "@/components/DataQualityCard";
 import BenchmarkComparisonCard from "@/components/BenchmarkComparisonCard";
 import ExcessReturnChart from "@/components/ExcessReturnChart";
+import ReproducibilityCard from "@/components/ReproducibilityCard";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -943,6 +944,10 @@ export default function HomePage() {
                     provider={result.data_provider}
                     quality={result.data_quality}
                   />
+                )}
+
+                {result.reproducibility && (
+                  <ReproducibilityCard reproducibility={result.reproducibility} />
                 )}
 
                 {(result.position_mode === "short_only" ||

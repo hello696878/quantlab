@@ -50,7 +50,7 @@ reproducible and every limitation explicit.
 |---|---|
 | Data Quality Layer (provider metadata, gap/duplicate/missing diagnostics) | **built** (v1) |
 | Honest caveats in every report (costs, overfitting, short selling, data) | **built** |
-| Reproducible Backtest Permalinks / config hash | planned |
+| Reproducible Backtest Permalinks / config hash | **built** (v1: canonical config hash + CSV content fingerprint; replay-by-hash routing + dataset version hashes future) |
 | Robustness Lab (bootstrap Monte Carlo, deflated Sharpe, sensitivity heatmaps, PBO if feasible) | planned |
 | Quant Disasters Series (what blew up and why — LTCM, Aug 2007, vol short 2018, …) | future |
 | Paper Replication Series (classic papers, honest deviations) | planned |
@@ -85,7 +85,7 @@ reproducible and every limitation explicit.
 ## 5. Phase order (near-term first)
 
 1. ~~Benchmark visualization~~ — **built** (12.6.1)
-2. Reproducible Backtest Permalinks / Config Hash
+2. ~~Reproducible Backtest Permalinks / Config Hash~~ — **built** (12.7)
 3. Robustness Lab v1
 4. Strategy Library v1 pages
 5. Paper Replication Series v1

@@ -108,6 +108,9 @@ function buildParams(result: BacktestResponse): Record<string, unknown> {
     const { data_quality: _dq, ...trimmed } = result.benchmark_analytics;
     params.benchmark_analytics = trimmed;
   }
+  if (result.reproducibility) {
+    params.reproducibility = result.reproducibility;
+  }
   return params;
 }
 

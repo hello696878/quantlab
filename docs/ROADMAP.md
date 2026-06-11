@@ -723,6 +723,10 @@ single-asset Backtest + Strategy Comparison:
   ticker / none; alpha, beta, correlation, tracking error, information ratio
 - **12.6.1 Benchmark Visualization** — labelled strategy-vs-benchmark equity +
   drawdown overlays and a cumulative excess return chart; saved-backtest reopen
+- **12.7 Reproducible Config Hash** — SHA-256 over canonical normalized inputs
+  (defaults + legacy forms normalized first); Reproducibility card with copy
+  hash / copy canonical config; persisted in saved backtests + reports; CSV
+  content fingerprint; local-first (no public URLs; replay-by-hash future)
 
 ---
 
@@ -752,8 +756,8 @@ search · toasts, error boundary, loading/offline states.
 ### Near-term next phases (planned)
 
 1. ~~Benchmark visualization~~ — **built** (12.6.1)
-2. **Reproducible Backtest Permalinks / Config Hash** — deterministic config
-   hashing so any result can be reproduced and shared locally
+2. ~~Reproducible Backtest Permalinks / Config Hash~~ — **built** (12.7: config
+   hash + CSV fingerprint; replay-by-hash routing remains future work)
 3. **Robustness Lab v1** — bootstrap Monte Carlo resampling, deflated Sharpe
    ratio, sensitivity heatmaps; PBO (probability of backtest overfitting) if
    feasible

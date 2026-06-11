@@ -36,6 +36,13 @@ FastAPI Backend
   ├── custom_strategy.py            No-code rule evaluation (whitelisted operands, no eval)
   ├── portfolio.py                  Equal-weight, optimization, walk-forward, frontier, risk, stress, factor
   ├── metrics.py                    Performance statistics from an equity curve
+  ├── cost_model.py                 Transaction-cost model resolution (simple/commission/conservative)
+  ├── position_sizing.py            Exposure scaling (full/fraction/vol-target/cap, no leverage)
+  ├── risk_management.py            Stop/take/trailing/max-holding exits (close-to-cash overlay)
+  ├── annualization.py              252/365/auto metric-scaling convention
+  ├── market_data.py                Provider abstraction + data-quality diagnostics
+  ├── benchmark.py                  Benchmark + active metrics (alpha/beta/TE/IR) on aligned returns
+  ├── reproducibility.py            Canonical config normalization + SHA-256 config hash
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD

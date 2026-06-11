@@ -90,6 +90,15 @@ Using 252 for crypto assets will understate annual returns and overstate risk me
 
 The Sharpe and Sortino ratios are computed with a risk-free rate of 0%. During periods of elevated interest rates, a non-zero risk-free rate would lower the Sharpe ratio of strategies that hold cash during flat periods.
 
+### Config hashes identify inputs, not guaranteed outputs
+
+Every backtest gets a deterministic **config hash**: SHA-256 over the canonical, normalized, result-changing inputs (same normalized config → same hash; defaults are normalized first, so legacy requests hash like their explicit equivalents). Limits to keep in mind:
+
+- The hash fingerprints **input assumptions only**. yfinance can revise historical data, so the same config hash can produce different output later. Exact output reproducibility requires both the config hash **and a stable data snapshot** — v1 hashes configs; future versions will add dataset version hashes (provider snapshot ids / parquet/CSV file hashes). CSV backtests already include a SHA-256 fingerprint of the uploaded file content.
+- Settings that resolve to identical engine behaviour hash identically by design (e.g. the conservative cost preset ≡ simple 25 bps; `auto` annualization ≡ its resolved convention).
+- The "permalink" is **local-first**: a config fingerprint plus your local saved backtests — not a public or cloud URL. Replay-by-hash (restoring a form from a hash) is future work.
+- Old saved backtests created before this feature have no stored hash; they load fine and show "config: —".
+
 ### Benchmark / active analytics are simplified research metrics
 
 Benchmark comparison (buy-and-hold same asset, custom ticker, or none) computes alpha, beta, correlation, tracking error, and the information ratio on **date-aligned daily returns** with a **zero risk-free rate** (so "alpha" is a CAPM-style regression intercept against the chosen benchmark, not a risk-free-adjusted alpha). Caveats:
