@@ -800,6 +800,14 @@ export default function StrategyComparisonPanel() {
                     ? result.benchmark_analytics.display_name
                     : "None"}
                 </span>
+                {result.benchmark_analytics?.metrics && (
+                  <span className="text-slate-500">
+                    {" "}
+                    · {fmtPct(result.benchmark_analytics.metrics.total_return)} ·
+                    Sharpe {fmtRatio(result.benchmark_analytics.metrics.sharpe)} ·
+                    max DD {fmtPct(result.benchmark_analytics.metrics.max_drawdown)}
+                  </span>
+                )}
               </p>
             </div>
             {result.benchmark_analytics &&

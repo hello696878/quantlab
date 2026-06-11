@@ -22,6 +22,8 @@ import ShortModeDiagnostics from "@/components/ShortModeDiagnostics";
 import RiskDiagnosticsCard from "@/components/RiskDiagnosticsCard";
 import DataQualityCard from "@/components/DataQualityCard";
 import BenchmarkComparisonCard from "@/components/BenchmarkComparisonCard";
+import ExcessReturnChart from "@/components/ExcessReturnChart";
+import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildBacktestReport, downloadTextFile } from "@/lib/reportExport";
@@ -956,15 +958,76 @@ export default function HomePage() {
                   </>
                 )}
 
-                <div className="card p-6">
-                  <p className="section-title mb-4">Equity Curve</p>
-                  <EquityCurveChart data={result.equity_curve} />
-                </div>
+                {(() => {
+                  const bench = buildBenchmarkChartSeries(
+                    result.equity_curve,
+                    result.benchmark_analytics,
+                  );
+                  return (
+                    <>
+                      <div className="card p-6">
+                        <p className="section-title mb-4">
+                          Equity Curve
+                          {bench.showBenchmark && (
+                            <span className="normal-case font-normal text-slate-400 ml-1">
+                              vs {bench.benchmarkLabel}
+                            </span>
+                          )}
+                        </p>
+                        <EquityCurveChart
+                          data={bench.data}
+                          benchmarkLabel={bench.benchmarkLabel}
+                          showBenchmark={bench.showBenchmark}
+                        />
+                        {bench.showBenchmark && (
+                          <p className="mt-2 text-[11px] text-slate-400">
+                            Benchmark comparison does not change strategy trades. It
+                            compares the strategy against a reference asset over
+                            aligned dates.
+                            {result.benchmark_analytics?.mode === "custom_ticker" &&
+                              " Custom benchmark returns are aligned by date; limited overlap may affect alpha, beta, and information ratio."}
+                          </p>
+                        )}
+                      </div>
 
-                <div className="card p-6">
-                  <p className="section-title mb-4">Drawdown</p>
-                  <DrawdownChart data={result.equity_curve} />
-                </div>
+                      <div className="card p-6">
+                        <p className="section-title mb-4">
+                          Drawdown
+                          {bench.showBenchmark && (
+                            <span className="normal-case font-normal text-slate-400 ml-1">
+                              vs {bench.benchmarkLabel}
+                            </span>
+                          )}
+                        </p>
+                        <DrawdownChart
+                          data={bench.data}
+                          benchmarkLabel={bench.benchmarkLabel}
+                          showBenchmark={bench.showBenchmark}
+                        />
+                      </div>
+
+                      {bench.showBenchmark && (
+                        <div className="card p-6">
+                          <p className="section-title mb-4">
+                            Cumulative Excess Return
+                            <span className="normal-case font-normal text-slate-400 ml-1">
+                              strategy − {bench.benchmarkLabel}
+                            </span>
+                          </p>
+                          <ExcessReturnChart
+                            data={bench.data}
+                            benchmarkLabel={bench.benchmarkLabel}
+                          />
+                          <p className="mt-2 text-[11px] text-slate-400">
+                            Difference of cumulative returns from the first aligned
+                            date (not a compounded active-equity curve). Above zero =
+                            ahead of the benchmark; below = behind.
+                          </p>
+                        </div>
+                      )}
+                    </>
+                  );
+                })()}
 
                 <div className="card p-6">
                   <p className="section-title mb-4">

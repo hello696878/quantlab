@@ -3,11 +3,13 @@
 import { useEffect, useState } from "react";
 import { classifyApiError, getSavedBacktest } from "@/lib/api";
 import type {
+  BenchmarkAnalytics,
   DataQuality,
   EquityPoint,
   SavedBacktestFull,
   TradeRecord,
 } from "@/lib/types";
+import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import { notifyBackendOffline } from "@/lib/toast";
 import OfflineState from "@/components/ui/OfflineState";
 import ErrorState from "@/components/ui/ErrorState";
@@ -227,12 +229,13 @@ export default function SavedBacktestDetail({
       ? record.params.data_provider
       : savedQuality?.provider;
   const savedBenchmarkRaw = record.params?.benchmark_analytics;
-  const savedBenchmarkName =
+  const savedBenchmarkBlock =
     savedBenchmarkRaw &&
     typeof savedBenchmarkRaw === "object" &&
-    typeof (savedBenchmarkRaw as { display_name?: unknown }).display_name === "string"
-      ? (savedBenchmarkRaw as { display_name: string }).display_name
+    typeof (savedBenchmarkRaw as { mode?: unknown }).mode === "string"
+      ? (savedBenchmarkRaw as BenchmarkAnalytics)
       : undefined;
+  const savedBenchmarkName = savedBenchmarkBlock?.display_name;
 
   return (
     <div className="space-y-6">
@@ -399,15 +402,51 @@ export default function SavedBacktestDetail({
         </div>
       )}
 
-      {/* Equity curve */}
-      <div className="card p-6">
-        <p className="section-title mb-4">Equity Curve</p>
-        <EquityCurveChart data={equityCurve} />
-      </div>
-      <div className="card p-6">
-        <p className="section-title mb-4">Drawdown</p>
-        <DrawdownChart data={equityCurve} />
-      </div>
+      {/* Equity curve (+ benchmark overlay when this record saved a benchmark
+          block; old records without one keep the legacy rendering) */}
+      {savedBenchmarkBlock ? (
+        (() => {
+          const bench = buildBenchmarkChartSeries(equityCurve, savedBenchmarkBlock);
+          return (
+            <>
+              <div className="card p-6">
+                <p className="section-title mb-4">
+                  Equity Curve
+                  {bench.showBenchmark && (
+                    <span className="normal-case font-normal text-slate-400 ml-1">
+                      vs {bench.benchmarkLabel}
+                    </span>
+                  )}
+                </p>
+                <EquityCurveChart
+                  data={bench.data}
+                  benchmarkLabel={bench.benchmarkLabel}
+                  showBenchmark={bench.showBenchmark}
+                />
+              </div>
+              <div className="card p-6">
+                <p className="section-title mb-4">Drawdown</p>
+                <DrawdownChart
+                  data={bench.data}
+                  benchmarkLabel={bench.benchmarkLabel}
+                  showBenchmark={bench.showBenchmark}
+                />
+              </div>
+            </>
+          );
+        })()
+      ) : (
+        <>
+          <div className="card p-6">
+            <p className="section-title mb-4">Equity Curve</p>
+            <EquityCurveChart data={equityCurve} />
+          </div>
+          <div className="card p-6">
+            <p className="section-title mb-4">Drawdown</p>
+            <DrawdownChart data={equityCurve} />
+          </div>
+        </>
+      )}
 
       {/* Trades */}
       <div className="card p-6">

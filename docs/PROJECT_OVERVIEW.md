@@ -2,11 +2,13 @@
 
 ## Purpose
 
-QuantLab is an interactive quantitative research and backtesting platform.
+QuantLab is a **local-first** interactive quantitative research and backtesting platform, built for education and research — not live trading and not investment advice.
 
 The goal is to let users explore trading strategies, understand their mathematical logic, tune parameters, and evaluate performance on real historical data — all through a clean web interface with no lookahead bias.
 
 This document describes the system architecture, module responsibilities, and the flow of data from a browser request through to a backtest result.
+
+> **Direction:** future development follows [Master Blueprint v3](MASTER_BLUEPRINT_V3.md) (long-term model catalog + platform trust features) via the phased plan in [ROADMAP.md](ROADMAP.md). The blueprint is a direction, not a feature list — only items labelled "built" exist today.
 
 ---
 

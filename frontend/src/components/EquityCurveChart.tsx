@@ -30,6 +30,10 @@ import {
 
 interface Props {
   data: EquityPoint[];
+  /** Legend label for the benchmark line (e.g. "Buy & Hold SPY", "QQQ"). */
+  benchmarkLabel?: string;
+  /** Hide the benchmark line entirely (benchmark mode "none" / unavailable). */
+  showBenchmark?: boolean;
 }
 
 // Show year ticks: keep only the first data point of each calendar year.
@@ -46,7 +50,11 @@ function buildYearTicks(data: EquityPoint[]): string[] {
   return ticks;
 }
 
-export default function EquityCurveChart({ data }: Props) {
+export default function EquityCurveChart({
+  data,
+  benchmarkLabel = "Benchmark",
+  showBenchmark = true,
+}: Props) {
   const colors = useAccentColors();
   const gradId = useId().replace(/:/g, "");
   const fillId = `equityFill-${gradId}`;
@@ -106,13 +114,17 @@ export default function EquityCurveChart({ data }: Props) {
               color: colors.accent,
               payload: { strokeDasharray: "0" },
             },
-            {
-              value: "Benchmark",
-              type: "plainline",
-              id: "benchmark",
-              color: BENCHMARK_MUTED,
-              payload: { strokeDasharray: "5 3" },
-            },
+            ...(showBenchmark
+              ? [
+                  {
+                    value: benchmarkLabel,
+                    type: "plainline" as const,
+                    id: "benchmark",
+                    color: BENCHMARK_MUTED,
+                    payload: { strokeDasharray: "5 3" },
+                  },
+                ]
+              : []),
           ]}
         />
 
@@ -139,18 +151,20 @@ export default function EquityCurveChart({ data }: Props) {
         />
 
         {/* Benchmark — muted slate, dashed, subordinate (no strong glow) */}
-        <Line
-          type="monotone"
-          dataKey="benchmark"
-          name="Benchmark"
-          stroke={BENCHMARK_MUTED}
-          strokeWidth={1.5}
-          strokeDasharray="5 3"
-          strokeOpacity={0.6}
-          dot={false}
-          activeDot={{ r: 3 }}
-          isAnimationActive={false}
-        />
+        {showBenchmark && (
+          <Line
+            type="monotone"
+            dataKey="benchmark"
+            name={benchmarkLabel}
+            stroke={BENCHMARK_MUTED}
+            strokeWidth={1.5}
+            strokeDasharray="5 3"
+            strokeOpacity={0.6}
+            dot={false}
+            activeDot={{ r: 3 }}
+            isAnimationActive={false}
+          />
+        )}
 
         {/* Strategy glow underlay — wide + low opacity accent halo */}
         <Line

@@ -702,66 +702,102 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ---
 
-## Future Phases
+### Phase 12 — Simulation Realism & Analytics Engines ✅
 
-### Release track (next stages)
+Post-v4.0 engine series — all optional, backward-compatible, and applied to
+single-asset Backtest + Strategy Comparison:
 
-1. **v4.0 release candidate** — QA-harden and present the current build: run
-   `RELEASE_CHECKLIST.md`, rehearse `DEMO_SCRIPT.md`, capture `SCREENSHOT_PLAN.md`,
-   and tag `v4.0-rc`.
-2. **Quant research depth** — execution realism (slippage / market impact),
-   robust crypto (365-day) annualization, richer PDF reports with embedded
-   charts, more data providers, and advanced models.
-3. **Commercialization foundation** *(only if pursued)* — deployment polish
-   (hosted demo, image hardening), then optional auth / multi-user. Broker /
-   live-trading remains far-future and out of scope for a research tool.
+- **12.1 Cost Model** — simple bps / commission + slippage (+ spread) /
+  conservative preset; `effective_cost_bps`, total cost, cost-drag reporting
+- **12.2 Position Sizing** — full allocation / fixed fraction / volatility
+  target / exposure cap; no leverage (`|exposure| ≤ 1`); `average_exposure`
+- **12.3 Risk Management** — stop loss / take profit / trailing stop / max
+  holding days / combined; close-to-cash only; trade `reason` tags + diagnostics
+- **12.3.1 Strategy Comparison simulation settings** — the shared controls
+  applied globally to all five strategies, with unsupported-mode labelling
+- **12.4 Annualization Convention** — 252 / 365 / auto (ticker-aware), affects
+  metric scaling only
+- **12.5 Data Provider Abstraction + Data Quality Diagnostics** — yfinance /
+  CSV provider metadata, row/gap/duplicate/missing diagnostics, Data Source card
+- **12.6 Benchmark & Active Analytics** — buy-and-hold same asset / custom
+  ticker / none; alpha, beta, correlation, tracking error, information ratio
+- **12.6.1 Benchmark Visualization** — labelled strategy-vs-benchmark equity +
+  drawdown overlays and a cumulative excess return chart; saved-backtest reopen
 
-The detailed candidate backlog below feeds those stages.
+---
 
+## Future Phases — aligned with Master Blueprint v3
 
+Development now follows **[Master Blueprint v3](MASTER_BLUEPRINT_V3.md)**: a
+long-term catalog of ~100 educational quant models across 12 categories plus
+platform trust features. The blueprint is a direction, not a promise — phases
+ship in small, usable increments, and **none of the not-yet-built items below
+are claimed as existing features**.
 
-Most of the original roadmap has shipped — **saved backtests + database**, **CSV
-upload backtesting**, the full **multi-asset Portfolio Lab** (equal-weight,
-optimization, walk-forward, efficient frontier, risk dashboard, stress test,
-**factor analysis**), **report export** (Markdown/PDF/templates/gallery),
-**settings + neon theme/charts**, the **Command Center / palette / global
-search**, and **toasts / error boundary / state polish**. The items below are
-candidate next steps; order and scope may change, and none are commitments.
+Status labels: **built** · **planned** (next phases) · **research** (needs
+design/feasibility work) · **future** (long-term).
 
-### Near-term
+### Completed foundation (built)
 
-- **Deployment polish** — hosted public demo (Render / Fly.io / Railway),
-  environment config, image hardening, basic rate limiting.
-- **Richer PDF reports** — embed equity/drawdown chart images in the print/PDF
-  export (currently text + tables only).
-- **Broader annualization integration** — extend the selectable convention
-  beyond single-asset Backtest and Strategy Comparison into portfolio, CSV,
-  pairs, and research-tool endpoints where the architecture supports it.
-- **Real data-provider integrations** beyond yfinance, with data-quality
-  warnings (gaps, splits, anomalies) and a dividend-adjusted toggle.
+Backtest engine · five single-asset strategies + pairs · Strategy Comparison
+with shared simulation settings · cost model · position sizing · risk
+management · annualization convention · data provider abstraction + data
+quality diagnostics · benchmark & active analytics + visualization · research
+tools (sweep / train-test / walk-forward) · Portfolio Lab (optimization,
+frontier, risk, stress, factors) · CSV upload · custom strategy builder +
+template gallery · saved backtests · report export (MD/PDF/templates/gallery)
+· settings · neon theme + chart system · Command Center / palette / global
+search · toasts, error boundary, loading/offline states.
 
-### Execution realism
+### Near-term next phases (planned)
 
-- **Slippage and market-impact modelling** (size-dependent fills) on top of the
-  current flat-bps turnover cost.
-- Optional non-zero risk-free rate in Sharpe/Sortino.
+1. ~~Benchmark visualization~~ — **built** (12.6.1)
+2. **Reproducible Backtest Permalinks / Config Hash** — deterministic config
+   hashing so any result can be reproduced and shared locally
+3. **Robustness Lab v1** — bootstrap Monte Carlo resampling, deflated Sharpe
+   ratio, sensitivity heatmaps; PBO (probability of backtest overfitting) if
+   feasible
+4. **Strategy Library v1 pages** — intuition, math, parameters, strengths /
+   failure modes for each built strategy
+5. **Paper Replication Series v1** — classic papers (e.g. momentum, low-vol)
+   replicated with honest deviation notes
+6. **Options Pricing Engine v1** — Black–Scholes, Greeks, simple IV surface
+   (educational; no options data feed)
+7. **Volatility Lab v1** — realized vol estimators, vol targeting deep-dive,
+   term-structure visuals
+8. **Event-Driven & Arbitrage Module** (research)
+9. **Rates / FX / Credit Module** (research)
+10. **Real Estate Module** (research)
+11. **Microstructure & HFT Lab** — *educational simulations* (order-book toys,
+    queue models) on synthetic data; **not** real HFT execution (research)
+12. **Portfolio Studio + Strategy Ensemble Builder** (research)
+13. **ML & AI Lab** — feature pipelines, walk-forward ML guards (research)
+14. **AI Explainer Copilot** — explains a result, never recommends trades
+    (future)
+15. **3D Visualization Engine** — surfaces (vol, parameter sweeps) (future)
+16. **Dashboard & Content Engine** — Quant Disasters series, educational
+    content (future)
+17. **Platform & Launch** — hosted demo, hardening, optional accounts (future)
 
-### Visualisation
+### Long-term model catalog (12 categories)
 
-- Monthly-return heatmap, rolling Sharpe/beta, trade-distribution histogram,
-  underwater (time-in-drawdown) plot.
+Target of ~100 educational models over time — **currently a small fraction is
+built**; everything else is planned/research/future:
 
-### Advanced models (long-term)
-
-- Kalman-filter / rolling-beta pairs v2, HMM regime detection, options pricing
-  (Black–Scholes / Heston + volatility surface).
-
-### Optional, far-future
-
-- **User authentication & multi-user** — only if a shared/hosted deployment is
-  pursued (today is intentionally single-user, local SQLite).
-- **Broker / live-trading integration** — **far-future only** and arguably a
-  non-goal for a research tool (see below).
+| # | Category | Status today |
+|---|----------|--------------|
+| 1 | Equities | **built (core)** — SMA, RSI, Bollinger, Momentum, Vol Breakout, Pairs |
+| 2 | Options & Volatility | planned (Options Engine v1, Vol Lab v1) |
+| 3 | Event-Driven & Arbitrage | research |
+| 4 | Futures & Commodities | research |
+| 5 | FX | research |
+| 6 | Fixed Income & Rates | research |
+| 7 | Credit | research |
+| 8 | Crypto | **built (partial)** — crypto tickers, 365-day annualization; exchange-native data future |
+| 9 | Real Estate | research |
+| 10 | Market Microstructure & HFT | future (educational simulations only) |
+| 11 | Portfolio & Risk | **built (core)** — optimization, frontier, risk dashboard, stress, factors; ensemble builder planned |
+| 12 | Machine Learning & AI | future |
 
 ---
 
@@ -769,9 +805,11 @@ candidate next steps; order and scope may change, and none are commitments.
 
 These items will not be built in the foreseeable future:
 
-- Real-money order execution / brokerage API integration
-- Intraday data or tick-level backtesting
-- High-frequency or market-making strategies
+- Real-money order execution / brokerage API integration / live trading
+- Real high-frequency trading execution or live tick-data feeds (the future
+  Microstructure & HFT Lab is *educational simulation on synthetic data* only)
 - Tax modelling
 - Options order management
-- Proprietary data subscriptions
+- Proprietary / paid data subscriptions and API-key management
+- Anything that positions QuantLab as a production trading system or
+  investment advice — it is a local-first, educational research platform

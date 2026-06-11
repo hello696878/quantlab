@@ -306,3 +306,62 @@ def test_api_comparison_invalid_custom_benchmark_warns(client):
     assert any("could not be fetched" in w for w in b["warnings"])
     assert all(s["active_metrics"] is None for s in body["strategies"])
     assert len(body["strategies"]) == 5  # strategies still ran
+
+
+# ---------------------------------------------------------------------------
+# Visualization data (Phase 12.6.1) — curves the frontend charts consume
+# ---------------------------------------------------------------------------
+
+
+def test_api_buy_and_hold_curve_on_response_aligns_with_strategy(client):
+    """The legacy equity_curve carries the same-asset benchmark, date-aligned."""
+    body = client.post("/backtest/sma-crossover", json={}).json()
+    curve = body["equity_curve"]
+    assert len(curve) == len(_DATES)
+    for p in curve:
+        assert "strategy" in p and "benchmark" in p and "date" in p
+    # Both series start at initial capital (same normalization).
+    assert curve[0]["strategy"] == pytest.approx(100_000.0, rel=1e-6)
+    assert curve[0]["benchmark"] == pytest.approx(100_000.0, rel=1e-6)
+
+
+def test_api_custom_benchmark_curve_dates_subset_of_strategy_dates(client):
+    body = client.post(
+        "/backtest/sma-crossover",
+        json={"benchmark": {"mode": "custom_ticker", "ticker": "QQQ"}},
+    ).json()
+    strat_dates = {p["date"] for p in body["equity_curve"]}
+    bench_curve = body["benchmark_analytics"]["equity_curve"]
+    assert len(bench_curve) >= 2
+    assert all(p["date"] in strat_dates for p in bench_curve)
+    # Dates ascend (chartable without re-sorting).
+    dates = [p["date"] for p in bench_curve]
+    assert dates == sorted(dates)
+
+
+def test_api_benchmark_drawdown_computable_from_curve(client):
+    """Drawdown derived from the returned benchmark curve is finite, <= 0, and
+    its minimum matches the reported benchmark max drawdown."""
+    body = client.post(
+        "/backtest/sma-crossover",
+        json={"benchmark": {"mode": "custom_ticker", "ticker": "QQQ"}},
+    ).json()
+    b = body["benchmark_analytics"]
+    values = [p["equity"] for p in b["equity_curve"]]
+    peak = values[0]
+    dds = []
+    for v in values:
+        peak = max(peak, v)
+        dds.append(v / peak - 1.0)
+    assert all(math.isfinite(d) and d <= 1e-12 for d in dds)
+    assert min(dds) == pytest.approx(b["metrics"]["max_drawdown"], abs=1e-3)
+
+
+def test_api_mode_none_has_no_benchmark_chart_payload(client):
+    body = client.post(
+        "/backtest/sma-crossover", json={"benchmark": {"mode": "none"}}
+    ).json()
+    assert body["benchmark_analytics"] is None  # nothing for the charts
+    # Legacy response shape still serializes safely (old-frontend compatible).
+    assert len(body["equity_curve"]) == len(_DATES)
+    assert "benchmark_metrics" in body

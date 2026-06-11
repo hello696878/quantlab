@@ -24,6 +24,10 @@ import {
 
 interface Props {
   data: EquityPoint[];
+  /** Legend label for the benchmark drawdown (e.g. "Buy & Hold SPY DD"). */
+  benchmarkLabel?: string;
+  /** Hide the benchmark drawdown (benchmark mode "none" / unavailable). */
+  showBenchmark?: boolean;
 }
 
 interface DrawdownPoint {
@@ -58,7 +62,11 @@ function buildYearTicks(data: DrawdownPoint[]): string[] {
   return ticks;
 }
 
-export default function DrawdownChart({ data }: Props) {
+export default function DrawdownChart({
+  data,
+  benchmarkLabel = "Benchmark",
+  showBenchmark = true,
+}: Props) {
   const uid = useId().replace(/:/g, "");
   const strokeId = `ddStrategy-${uid}`;
   const benchId = `ddBenchmark-${uid}`;
@@ -85,8 +93,13 @@ export default function DrawdownChart({ data }: Props) {
 
   const yearTicks = buildYearTicks(drawdown);
 
-  // Y-axis domain: slightly below the minimum drawdown for padding
-  const minDD = Math.min(...drawdown.map((d) => Math.min(d.strategy, d.benchmark)));
+  // Y-axis domain: slightly below the minimum drawdown for padding (only the
+  // visible series count toward the scale).
+  const minDD = Math.min(
+    ...drawdown.map((d) =>
+      showBenchmark ? Math.min(d.strategy, d.benchmark) : d.strategy,
+    ),
+  );
   const yMin = Math.min(minDD * 1.1, -0.01); // at least -1% for scale
 
   return (
@@ -144,29 +157,35 @@ export default function DrawdownChart({ data }: Props) {
               color: DANGER,
               payload: { strokeDasharray: "0" },
             },
-            {
-              value: "Benchmark DD",
-              type: "plainline",
-              id: "benchmark",
-              color: DANGER_SOFT,
-              payload: { strokeDasharray: "4 3" },
-            },
+            ...(showBenchmark
+              ? [
+                  {
+                    value: `${benchmarkLabel} DD`,
+                    type: "plainline" as const,
+                    id: "benchmark",
+                    color: DANGER_SOFT,
+                    payload: { strokeDasharray: "4 3" },
+                  },
+                ]
+              : []),
           ]}
         />
 
         {/* Benchmark drawdown — drawn first (behind) */}
-        <Area
-          type="monotone"
-          dataKey="benchmark"
-          name="Benchmark DD"
-          stroke={DANGER_SOFT}
-          strokeWidth={1.5}
-          strokeDasharray="4 3"
-          strokeOpacity={0.7}
-          fill={`url(#${benchId})`}
-          dot={false}
-          isAnimationActive={false}
-        />
+        {showBenchmark && (
+          <Area
+            type="monotone"
+            dataKey="benchmark"
+            name={`${benchmarkLabel} DD`}
+            stroke={DANGER_SOFT}
+            strokeWidth={1.5}
+            strokeDasharray="4 3"
+            strokeOpacity={0.7}
+            fill={`url(#${benchId})`}
+            dot={false}
+            isAnimationActive={false}
+          />
+        )}
 
         {/* Subtle red glow underlay behind the strategy drawdown line */}
         <Line
