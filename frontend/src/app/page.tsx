@@ -34,6 +34,8 @@ import {
   type PaperEntry,
   type PaperRunPreset,
 } from "@/lib/paperRegistry";
+import QuantDisastersPanel from "@/components/QuantDisastersPanel";
+import { LIVE_DISASTERS } from "@/lib/disasterRegistry";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -330,6 +332,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "Classic quant papers explained, with honest simplified demos — not full academic replications.",
   },
+  disasters: {
+    title: "Quant Disasters",
+    subtitle:
+      "How quant strategies fail — simplified risk-education case studies, not forensic investigations.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -423,6 +430,9 @@ export default function HomePage() {
   // Paper Replications: same pattern.
   const [paperSlug, setPaperSlug] = useState<string | null>(null);
   const [paperKey, setPaperKey] = useState(0);
+  // Quant Disasters: same pattern.
+  const [disasterSlug, setDisasterSlug] = useState<string | null>(null);
+  const [disasterKey, setDisasterKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -526,6 +536,8 @@ export default function HomePage() {
     setLibraryKey((k) => k + 1);
     setPaperSlug(null);
     setPaperKey((k) => k + 1);
+    setDisasterSlug(null);
+    setDisasterKey((k) => k + 1);
   }
 
   /** Open the Strategy Library on a specific model page (command palette). */
@@ -544,6 +556,15 @@ export default function HomePage() {
     setPaperSlug(slug);
     setPaperKey((k) => k + 1);
     setView("replications");
+  }
+
+  /** Open Quant Disasters on a specific case study. */
+  function openDisasterPage(slug: string | null) {
+    setSavedDetailId(null);
+    setSavedReportDetailId(null);
+    setDisasterSlug(slug);
+    setDisasterKey((k) => k + 1);
+    setView("disasters");
   }
 
   /**
@@ -713,6 +734,7 @@ export default function HomePage() {
     { view: "backtest", title: "Go to Backtest", keywords: "single asset run strategy" },
     { view: "library", title: "Open Strategy Library", keywords: "models catalog docs education strategy pages" },
     { view: "replications", title: "Open Paper Replications", keywords: "papers research academic momentum pairs replication" },
+    { view: "disasters", title: "Open Quant Disasters", keywords: "risk education failures ltcm crash blowup lessons" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -796,6 +818,13 @@ export default function HomePage() {
       keywords: `paper replication demo run ${p.slug}`,
       hint: "prefill",
       run: () => handleRunPaperPreset(p.runPreset!, p),
+    })),
+    ...LIVE_DISASTERS.map((d) => ({
+      id: `disaster-${d.slug}`,
+      group: "Quant Disasters",
+      title: `Open ${d.title} (${d.year}) case study`,
+      keywords: `disaster risk lesson ${d.title} ${d.category} ${d.slug}`,
+      run: () => openDisasterPage(d.slug),
     })),
     // Report actions are only offered when they actually work (a result exists).
     ...(result
@@ -1194,6 +1223,7 @@ export default function HomePage() {
             onRunStrategy={handleRunFromLibrary}
             onOpenComparison={() => handleNav("comparison")}
             onOpenPaper={openPaperPage}
+            onOpenDisaster={openDisasterPage}
           />
         )}
 
@@ -1204,6 +1234,17 @@ export default function HomePage() {
             initialSlug={paperSlug}
             onRunPreset={handleRunPaperPreset}
             onOpenStrategy={openLibraryPage}
+            onOpenDisaster={openDisasterPage}
+          />
+        )}
+
+        {/* ── Quant Disasters ──────────────────────────────────────────── */}
+        {view === "disasters" && (
+          <QuantDisastersPanel
+            key={disasterKey}
+            initialSlug={disasterSlug}
+            onOpenStrategy={openLibraryPage}
+            onOpenPaper={openPaperPage}
           />
         )}
 

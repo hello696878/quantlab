@@ -11,12 +11,15 @@ import {
   type ReplicationLevel,
 } from "@/lib/paperRegistry";
 import { MODEL_REGISTRY } from "@/lib/modelRegistry";
+import { disastersForPaper } from "@/lib/disasterRegistry";
 
 interface Props {
   /** Launch a paper-inspired preset in Backtest Studio (never auto-runs). */
   onRunPreset: (preset: PaperRunPreset, paper: PaperEntry) => void;
   /** Open a related Strategy Library model page. */
   onOpenStrategy: (slug: string) => void;
+  /** Open a related Quant Disasters case study. */
+  onOpenDisaster?: (slug: string) => void;
   /** Initial detail slug (e.g. from the command palette); null = index. */
   initialSlug?: string | null;
 }
@@ -84,6 +87,7 @@ function Bullets({ items }: { items: string[] }) {
 export default function PaperReplicationsPanel({
   onRunPreset,
   onOpenStrategy,
+  onOpenDisaster,
   initialSlug = null,
 }: Props) {
   const [slug, setSlug] = useState<string | null>(initialSlug);
@@ -110,6 +114,7 @@ export default function PaperReplicationsPanel({
         onBack={() => setSlug(null)}
         onRunPreset={onRunPreset}
         onOpenStrategy={onOpenStrategy}
+        onOpenDisaster={onOpenDisaster}
       />
     );
   }
@@ -213,15 +218,18 @@ function PaperDetail({
   onBack,
   onRunPreset,
   onOpenStrategy,
+  onOpenDisaster,
 }: {
   paper: PaperEntry;
   onBack: () => void;
   onRunPreset: (preset: PaperRunPreset, paper: PaperEntry) => void;
   onOpenStrategy: (slug: string) => void;
+  onOpenDisaster?: (slug: string) => void;
 }) {
   const relatedModels = MODEL_REGISTRY.filter((m) =>
     paper.relatedStrategyIds.includes(m.id),
   );
+  const relatedDisasters = disastersForPaper(paper.slug);
   const statusLine =
     paper.replicationLevel === "inspired_demo"
       ? "Inspired demo available — a single-asset approximation of the research idea, not the paper's design."
@@ -298,6 +306,27 @@ function PaperDetail({
           <li>Export the report — the config hash fingerprints the assumptions.</li>
         </ol>
       </Section>
+
+      {relatedDisasters.length > 0 && onOpenDisaster && (
+        <Section title="Related Disasters">
+          <div className="flex flex-wrap gap-2">
+            {relatedDisasters.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => onOpenDisaster(d.slug)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-amber-400 hover:text-amber-700"
+              >
+                ⚠ {d.title} ({d.year}) →
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">
+            Cautionary cases showing how this style of strategy can fail in
+            practice.
+          </p>
+        </Section>
+      )}
 
       {relatedModels.length > 0 && (
         <Section title="Related Strategy Pages">

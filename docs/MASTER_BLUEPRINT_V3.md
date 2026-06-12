@@ -52,7 +52,7 @@ reproducible and every limitation explicit.
 | Honest caveats in every report (costs, overfitting, short selling, data) | **built** |
 | Reproducible Backtest Permalinks / config hash | **built** (v1: canonical config hash + CSV content fingerprint; replay-by-hash routing + dataset version hashes future) |
 | Robustness Lab (bootstrap Monte Carlo, deflated Sharpe, sensitivity heatmaps, PBO if feasible) | **built** (v1: block bootstrap + heuristic grade; 12.9 added the SMA parameter-sensitivity heatmap / Stability Lab. Deflated Sharpe / PBO / multi-strategy sweeps remain v2 — not implemented) |
-| Quant Disasters Series (what blew up and why — LTCM, Aug 2007, vol short 2018, …) | future |
+| Quant Disasters Series (what blew up and why — LTCM, Aug 2007, vol short 2018, …) | **built** (v1: 6 case studies — LTCM, 1987, Flash Crash, Volmageddon, Archegos, FTX — educational summaries with honest "cannot model yet" lists; scenario stress simulations remain future) |
 | Paper Replication Series (classic papers, honest deviations) | **built** (v1: 8 paper pages + 3 inspired demos clearly labelled as simplified; full replications future — need universe data) |
 | AI Explainer Copilot (explains results; never recommends trades) | future |
 | 3D Visualization Engine (vol surfaces, sweep landscapes) | future |
@@ -101,7 +101,8 @@ reproducible and every limitation explicit.
 13. ML & AI Lab
 14. AI Explainer Copilot
 15. 3D Visualization Engine
-16. Dashboard & Content Engine (incl. Quant Disasters)
+16. Dashboard & Content Engine — Quant Disasters **built** (13.2); broader
+    content engine future
 17. Platform & Launch
 
 ## 6. Hard constraints (apply to every phase)

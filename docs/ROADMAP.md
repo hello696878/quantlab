@@ -761,6 +761,19 @@ single-asset Backtest + Strategy Comparison:
 - Registry (`frontend/src/lib/paperRegistry.ts`) cross-links Strategy Library
   pages (Related Papers) and powers command-palette commands
 
+### Phase 13.2 — Quant Disasters Series v1 ✅
+
+- New **Quant Disasters** workspace: six risk-education case studies (LTCM,
+  1987 portfolio insurance, 2010 Flash Crash, Volmageddon, Archegos,
+  FTX/Alameda) with simplified mechanism, "what a naive backtest might miss",
+  an honest Trust-Layer checklist (available vs not-yet tools), explicit
+  "what QuantLab cannot model yet" lists, and lessons
+- Registry (`frontend/src/lib/disasterRegistry.ts`) cross-links Strategy
+  Library (Related Disasters) and Paper Replications pages; command-palette
+  commands per case
+- Educational pages only — neutral phrasing for legally sensitive cases, no
+  runnable scenario simulations (scenario stress tests remain future work)
+
 ---
 
 ## Future Phases — aligned with Master Blueprint v3
@@ -814,8 +827,8 @@ search · toasts, error boundary, loading/offline states.
 14. **AI Explainer Copilot** — explains a result, never recommends trades
     (future)
 15. **3D Visualization Engine** — surfaces (vol, parameter sweeps) (future)
-16. **Dashboard & Content Engine** — Quant Disasters series, educational
-    content (future)
+16. **Dashboard & Content Engine** — ~~Quant Disasters series~~ **built**
+    (13.2, six case studies); broader educational content engine (future)
 17. **Platform & Launch** — hosted demo, hardening, optional accounts (future)
 
 ### Long-term model catalog (12 categories)

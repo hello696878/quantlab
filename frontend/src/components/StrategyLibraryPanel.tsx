@@ -10,6 +10,7 @@ import {
 } from "@/lib/modelRegistry";
 import type { StrategyType } from "@/lib/types";
 import { papersForStrategy } from "@/lib/paperRegistry";
+import { disastersForStrategy } from "@/lib/disasterRegistry";
 
 interface Props {
   /** Navigate to Backtest Studio with the strategy preselected + defaults. */
@@ -18,6 +19,8 @@ interface Props {
   onOpenComparison: () => void;
   /** Open a Paper Replications page (related-papers links). */
   onOpenPaper?: (slug: string) => void;
+  /** Open a Quant Disasters case study (related-disasters links). */
+  onOpenDisaster?: (slug: string) => void;
   /** Initial detail slug (e.g. from the command palette); null = index. */
   initialSlug?: string | null;
 }
@@ -90,6 +93,7 @@ export default function StrategyLibraryPanel({
   onRunStrategy,
   onOpenComparison,
   onOpenPaper,
+  onOpenDisaster,
   initialSlug = null,
 }: Props) {
   const [slug, setSlug] = useState<string | null>(initialSlug);
@@ -119,6 +123,7 @@ export default function StrategyLibraryPanel({
         onRunStrategy={onRunStrategy}
         onOpenComparison={onOpenComparison}
         onOpenPaper={onOpenPaper}
+        onOpenDisaster={onOpenDisaster}
       />
     );
   }
@@ -203,14 +208,17 @@ function ModelDetail({
   onRunStrategy,
   onOpenComparison,
   onOpenPaper,
+  onOpenDisaster,
 }: {
   model: ModelEntry;
   onBack: () => void;
   onRunStrategy: (strategy: StrategyType) => void;
   onOpenComparison: () => void;
   onOpenPaper?: (slug: string) => void;
+  onOpenDisaster?: (slug: string) => void;
 }) {
   const relatedPapers = papersForStrategy(model.id);
+  const relatedDisasters = disastersForStrategy(model.id);
   return (
     <div className="space-y-5">
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -334,6 +342,27 @@ function ModelDetail({
           <p className="mt-2 text-[11px] text-slate-400">
             Paper pages explain the original research and what QuantLab can
             honestly approximate today.
+          </p>
+        </Section>
+      )}
+
+      {relatedDisasters.length > 0 && onOpenDisaster && (
+        <Section title="Related Disasters">
+          <div className="flex flex-wrap gap-2">
+            {relatedDisasters.map((d) => (
+              <button
+                key={d.id}
+                type="button"
+                onClick={() => onOpenDisaster(d.slug)}
+                className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-amber-400 hover:text-amber-700"
+              >
+                ⚠ {d.title} ({d.year}) →
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-[11px] text-slate-400">
+            Cautionary case studies of how this style of strategy has failed in
+            practice — risk education, not predictions.
           </p>
         </Section>
       )}

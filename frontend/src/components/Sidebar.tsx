@@ -25,6 +25,7 @@ const ICONS: Record<string, string> = {
   portfolio: "M3 3v18h18M7 14l3-3 3 2 5-6",
   library: "M4 19.5V5a2 2 0 0 1 2-2h14v17H6a2 2 0 0 0-2 2Zm0 0A2.5 2.5 0 0 0 6.5 22H20M9 7h7M9 11h7",
   papers: "M8 3h8l4 4v14H8V3Zm8 0v4h4M4 7v14h12M11 11h6M11 15h6",
+  warning: "M12 3 2.5 19.5h19L12 3Zm0 6v5m0 3.5v.5",
 };
 
 function Icon({ name, size = 17 }: { name: string; size?: number }) {
@@ -99,6 +100,7 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "backtest", label: "Backtest", icon: "backtest" },
   { id: "library", label: "Strategy Library", icon: "library" },
   { id: "replications", label: "Paper Replications", icon: "papers" },
+  { id: "disasters", label: "Quant Disasters", icon: "warning" },
   { id: "csv", label: "CSV Backtest", icon: "upload" },
   { id: "builder", label: "Strategy Builder", icon: "builder" },
   { id: "portfolio", label: "Portfolio Backtest", icon: "portfolio" },

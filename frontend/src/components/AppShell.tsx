@@ -10,6 +10,7 @@ export type View =
   | "backtest"
   | "library"
   | "replications"
+  | "disasters"
   | "csv"
   | "builder"
   | "portfolio"
