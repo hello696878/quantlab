@@ -101,8 +101,10 @@ reproducible and every limitation explicit.
 13. ML & AI Lab
 14. AI Explainer Copilot
 15. 3D Visualization Engine
-16. Dashboard & Content Engine — Quant Disasters **built** (13.2); broader
-    content engine future
+16. Dashboard & Content Engine — Quant Disasters **built** (13.2); dashboard
+    content hub **built** (13.3: hero workflows, Trust Layer grid, Content
+    Engine cards, featured items, direction panel); broader content engine
+    future
 17. Platform & Launch
 
 ## 6. Hard constraints (apply to every phase)

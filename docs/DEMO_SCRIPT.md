@@ -103,6 +103,16 @@ Close on the stack.
 ---
 
 ## Optional add-ons (if you have extra time)
+- **Content Hub tour** — from the Command Center hero, click through the four
+  workflows: Run Backtest → back → Open Strategy Library (open SMA Crossover,
+  show hypothesis/failure modes) → Open Paper Replications (Jegadeesh–Titman,
+  point out the "inspired demo, not full replication" labelling) → Open Quant
+  Disasters (LTCM, show "what a naive backtest might miss"). Then scroll the
+  dashboard's Trust Layer grid and the Built/Planned/Future direction panel —
+  emphasize nothing planned is claimed as live.
+- **Trust Layer on one result** — run SPY SMA with benchmark + robustness +
+  stability enabled; walk the result page top to bottom (data quality, config
+  hash, robustness grade, stability heatmap) and export the report.
 - **Strategy Comparison** — five strategies on SPY, side by side, ranked.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.

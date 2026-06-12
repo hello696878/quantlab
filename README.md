@@ -30,7 +30,7 @@ A tour of the running app — every chart and metric below is a **real backend r
 
 ### Command Center
 
-**Command Center** — the local-first home dashboard, with quick actions, guided demos, a quick-start checklist, recent saved work, and live system status.
+**Command Center** — the local-first research hub: hero CTAs into the four core workflows (run research, learn strategies, study papers, study failures), quick actions, guided demos, a quick-start checklist, recent saved work, live system status, a **Trust Layer** explainer grid, **Content Engine** cards (Strategy Library · Paper Replications · Quant Disasters, with live registry counts), registry-driven **Featured** items, and an honest **Platform Direction** panel (Built / Planned / Future). Static sections render even with the backend offline.
 
 ![QuantLab Command Center](docs/screenshots/command-center.png)
 

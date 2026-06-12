@@ -24,6 +24,9 @@ import {
   type ChecklistState,
   type ChecklistStep,
 } from "@/lib/onboarding";
+import { LIVE_MODELS, findModelBySlug } from "@/lib/modelRegistry";
+import { LIVE_PAPERS, findPaperBySlug } from "@/lib/paperRegistry";
+import { LIVE_DISASTERS, findDisasterBySlug } from "@/lib/disasterRegistry";
 
 // ---------------------------------------------------------------------------
 // Labels
@@ -67,6 +70,56 @@ function metricColor(v: number | null | undefined, positiveGood = true): string 
   if (v < 0) return positiveGood ? "text-red-600" : "text-green-700";
   return "text-slate-500";
 }
+
+/** Trust Layer explainer cards — static, render fine with the backend offline. */
+const TRUST_LAYER_CARDS: { title: string; description: string; view: View }[] = [
+  {
+    title: "Data Quality",
+    description: "Shows provider, actual date range, missing values, and warnings.",
+    view: "backtest",
+  },
+  {
+    title: "Benchmark Comparison",
+    description: "Compares the strategy against buy-and-hold or a custom benchmark.",
+    view: "backtest",
+  },
+  {
+    title: "Config Hash",
+    description: "Creates a deterministic fingerprint of backtest assumptions.",
+    view: "backtest",
+  },
+  {
+    title: "Robustness Lab",
+    description: "Resamples returns to estimate outcome uncertainty.",
+    view: "backtest",
+  },
+  {
+    title: "Stability Lab",
+    description: "Checks whether nearby parameters produce similar results.",
+    view: "backtest",
+  },
+  {
+    title: "Report Export",
+    description: "Exports structured research reports with assumptions and caveats.",
+    view: "reports",
+  },
+];
+
+/** Blueprint v3 direction chips — only "Built" items exist today. */
+const ROADMAP_STATUS: { label: string; status: "Built" | "Planned" | "Future" }[] = [
+  { label: "Backtest Studio", status: "Built" },
+  { label: "Trust Layer", status: "Built" },
+  { label: "Strategy Library", status: "Built" },
+  { label: "Paper Replications", status: "Built" },
+  { label: "Quant Disasters", status: "Built" },
+  { label: "Options & Volatility Lab", status: "Planned" },
+  { label: "Event-Driven / Arbitrage Module", status: "Planned" },
+  { label: "Portfolio Ensemble Builder", status: "Planned" },
+  { label: "Microstructure & HFT Lab", status: "Future" },
+  { label: "AI Explainer Copilot", status: "Future" },
+  { label: "3D Visualization Engine", status: "Future" },
+  { label: "Platform / Launch Layer", status: "Future" },
+];
 
 /** Quick-start checklist rows. Order = suggested first-run path. */
 const CHECKLIST_ITEMS: { step: ChecklistStep; label: string }[] = [
@@ -301,6 +354,10 @@ interface HomeDashboardProps {
   onOpenReport: (id: number) => void;
   /** Load a guided-demo preset: navigates + prefills, never auto-runs. */
   onDemo: (id: DemoPresetId) => void;
+  /** Deep-open content pages by slug (featured cards reference registries). */
+  onOpenLibraryPage?: (slug: string | null) => void;
+  onOpenPaperPage?: (slug: string | null) => void;
+  onOpenDisasterPage?: (slug: string | null) => void;
 }
 
 export default function HomeDashboard({
@@ -308,6 +365,9 @@ export default function HomeDashboard({
   onOpenBacktest,
   onOpenReport,
   onDemo,
+  onOpenLibraryPage,
+  onOpenPaperPage,
+  onOpenDisasterPage,
 }: HomeDashboardProps) {
   const [backtests, setBacktests] = useState<SavedBacktestSummary[]>([]);
   const [reports, setReports] = useState<SavedReportSummary[]>([]);
@@ -383,12 +443,75 @@ export default function HomeDashboard({
 
   const doneCount = CHECKLIST_ITEMS.filter((i) => checklist[i.step]).length;
 
+  // Featured content — names/descriptions come from the registries (single
+  // source of truth, no metadata drift); only existing destinations are linked.
+  const featuredSma = findModelBySlug("sma-crossover");
+  const featuredPaper = findPaperBySlug("jegadeesh-titman-1993-momentum");
+  const featuredDisaster = findDisasterBySlug("ltcm-1998");
+  const featuredItems: {
+    title: string;
+    type: "Strategy" | "Paper" | "Disaster" | "Workflow";
+    description: string;
+    cta: string;
+    onClick: () => void;
+  }[] = [
+    ...(featuredSma && onOpenLibraryPage
+      ? [{
+          title: featuredSma.name,
+          type: "Strategy" as const,
+          description: featuredSma.description,
+          cta: "Open strategy page",
+          onClick: () => onOpenLibraryPage(featuredSma.slug),
+        }]
+      : []),
+    ...(featuredPaper && onOpenPaperPage
+      ? [{
+          title: `${featuredPaper.authors} (${featuredPaper.year})`,
+          type: "Paper" as const,
+          description: featuredPaper.summary,
+          cta: "Open replication page",
+          onClick: () => onOpenPaperPage(featuredPaper.slug),
+        }]
+      : []),
+    ...(featuredDisaster && onOpenDisasterPage
+      ? [{
+          title: `${featuredDisaster.title} (${featuredDisaster.year})`,
+          type: "Disaster" as const,
+          description: featuredDisaster.shortDescription,
+          cta: "Open case study",
+          onClick: () => onOpenDisasterPage(featuredDisaster.slug),
+        }]
+      : []),
+    {
+      title: "Robustness Lab workflow",
+      type: "Workflow",
+      description:
+        "Bootstrap-resample a backtest's returns to see how fragile the result is.",
+      cta: "Run a backtest with robustness",
+      onClick: () => onNav("backtest"),
+    },
+    {
+      title: "Stability Lab workflow",
+      type: "Workflow",
+      description:
+        "Sweep nearby SMA parameters to check for stable regions vs isolated spikes.",
+      cta: "Run a backtest with stability",
+      onClick: () => onNav("backtest"),
+    },
+  ];
+
   const quickActions: QuickAction[] = [
     {
       label: "Run Single-Asset Backtest",
       description: "SMA, RSI, Bollinger, Momentum, Breakout, or Pairs",
       icon: "M4 4v16h16M8 16l3-4 3 2 4-6",
       onClick: () => onNav("backtest"),
+    },
+    {
+      label: "Compare Strategies",
+      description: "All five strategies under shared simulation settings",
+      icon: "M4 20V10m5 10V4m5 16v-7m5 7V8",
+      onClick: () => onNav("comparison"),
     },
     {
       label: "Upload CSV Data",
@@ -456,11 +579,12 @@ export default function HomeDashboard({
               className="text-2xl font-extrabold tracking-[-0.01em] sm:text-3xl"
               style={{ color: "var(--text-hi)" }}
             >
-              QuantLab Command Center
+              QuantLab Research Terminal
             </h1>
             <p className="mt-1.5 max-w-2xl text-sm text-slate-400">
-              Research, backtest, optimize, and report trading strategies from
-              one local dashboard.
+              Local-first quant research platform for backtesting,
+              benchmarking, robustness, and strategy education — research only,
+              not investment advice.
             </p>
           </div>
         </div>
@@ -470,6 +594,21 @@ export default function HomeDashboard({
           <Badge>Next.js frontend</Badge>
           <Badge>SQLite persistence</Badge>
           <Badge>Research-only</Badge>
+        </div>
+        <div className="mt-4 flex flex-wrap gap-2">
+          <PrimaryButton label="Run Backtest" onClick={() => onNav("backtest")} />
+          <PrimaryButton
+            label="Open Strategy Library"
+            onClick={() => onNav("library")}
+          />
+          <PrimaryButton
+            label="Open Paper Replications"
+            onClick={() => onNav("replications")}
+          />
+          <PrimaryButton
+            label="Open Quant Disasters"
+            onClick={() => onNav("disasters")}
+          />
         </div>
       </div>
 
@@ -796,6 +935,153 @@ export default function HomeDashboard({
             items={["Markdown Export", "PDF Print", "Saved Reports", "Templates"]}
             onClick={() => onNav("reports")}
           />
+        </div>
+      </section>
+
+      {/* ── Trust Layer ──────────────────────────────────────────────────── */}
+      <section>
+        <p className="section-title mb-1">Trust Layer</p>
+        <p className="mb-3 text-xs text-slate-400">
+          Every backtest result carries diagnostics for auditing assumptions —
+          research tools, not guarantees.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {TRUST_LAYER_CARDS.map((c) => (
+            <button
+              key={c.title}
+              type="button"
+              onClick={() => onNav(c.view)}
+              className="card flex flex-col gap-1 p-4 text-left"
+            >
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                {c.title}
+              </span>
+              <span className="text-xs text-slate-400">{c.description}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Content Engine ───────────────────────────────────────────────── */}
+      <section>
+        <p className="section-title mb-1">Content Engine</p>
+        <p className="mb-3 text-xs text-slate-400">
+          Learn how strategies work, where the ideas came from, and how they
+          fail.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <button
+            type="button"
+            onClick={() => onNav("library")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+              Strategy Library
+            </span>
+            <span className="text-xs text-slate-400">
+              {LIVE_MODELS.length} live strategy models with hypothesis, signal
+              logic, failure modes, and trust checklist.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Browse Strategies →
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNav("replications")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+              Paper Replications
+            </span>
+            <span className="text-xs text-slate-400">
+              Classic quant papers with {LIVE_PAPERS.length} simplified inspired
+              demos — honest about what full replication needs.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Study Papers →
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNav("disasters")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+              Quant Disasters
+            </span>
+            <span className="text-xs text-slate-400">
+              {LIVE_DISASTERS.length} risk-education case studies on how quant
+              strategies and risk systems fail.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Study Disasters →
+            </span>
+          </button>
+        </div>
+      </section>
+
+      {/* ── Featured ─────────────────────────────────────────────────────── */}
+      <section>
+        <p className="section-title mb-3">Featured</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {featuredItems.map((f) => (
+            <button
+              key={f.title}
+              type="button"
+              onClick={f.onClick}
+              className="card flex flex-col gap-1.5 p-4 text-left"
+            >
+              <span className="flex items-center justify-between gap-2">
+                <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                  {f.title}
+                </span>
+                <span
+                  className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                  style={{
+                    background: "var(--accent-softer)",
+                    border: "1px solid var(--accent-line)",
+                    color: "var(--accent-text)",
+                  }}
+                >
+                  {f.type}
+                </span>
+              </span>
+              <span className="text-xs text-slate-400">{f.description}</span>
+              <span className="mt-0.5 text-xs font-medium text-blue-600">{f.cta} →</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* ── Platform Direction (Blueprint v3) ────────────────────────────── */}
+      <section>
+        <p className="section-title mb-1">Platform Direction</p>
+        <p className="mb-3 text-xs text-slate-400">
+          Development follows Master Blueprint v3 — only items marked Built
+          exist today; nothing here is a feature promise.
+        </p>
+        <div className="card p-4">
+          <div className="flex flex-wrap gap-1.5">
+            {ROADMAP_STATUS.map((r) => (
+              <span
+                key={r.label}
+                className={
+                  "inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[11px] font-medium " +
+                  (r.status === "Built"
+                    ? "bg-emerald-100 text-emerald-700"
+                    : r.status === "Planned"
+                      ? "bg-amber-100 text-amber-700"
+                      : "bg-slate-100 text-slate-500")
+                }
+              >
+                <span className="font-semibold uppercase text-[9px] tracking-wide opacity-70">
+                  {r.status}
+                </span>
+                {r.label}
+              </span>
+            ))}
+          </div>
         </div>
       </section>
     </div>

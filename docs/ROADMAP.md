@@ -774,6 +774,18 @@ single-asset Backtest + Strategy Comparison:
 - Educational pages only — neutral phrasing for legally sensitive cases, no
   runnable scenario simulations (scenario stress tests remain future work)
 
+### Phase 13.3 — Dashboard Content Hub ✅
+
+- Command Center upgraded into a unified research hub: hero CTAs (Run
+  Backtest / Strategy Library / Paper Replications / Quant Disasters),
+  **Trust Layer** explainer grid (Data Quality, Benchmark, Config Hash,
+  Robustness, Stability, Report Export), **Content Engine** cards with live
+  registry counts, registry-driven **Featured** items (no metadata drift),
+  and a **Platform Direction** status panel (Built / Planned / Future —
+  honest Blueprint v3 chips)
+- Strategy Comparison added to Quick Actions; Trust-Layer workflow commands in
+  the palette; all static sections render with the backend offline
+
 ---
 
 ## Future Phases — aligned with Master Blueprint v3

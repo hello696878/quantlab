@@ -826,6 +826,22 @@ export default function HomePage() {
       keywords: `disaster risk lesson ${d.title} ${d.category} ${d.slug}`,
       run: () => openDisasterPage(d.slug),
     })),
+    {
+      id: "workflow-robustness",
+      group: "Trust Layer",
+      title: "Open Robustness Lab workflow",
+      keywords: "robustness bootstrap monte carlo resample uncertainty trust",
+      hint: "backtest",
+      run: () => handleNav("backtest"),
+    },
+    {
+      id: "workflow-stability",
+      group: "Trust Layer",
+      title: "Open Stability Lab workflow",
+      keywords: "stability sensitivity heatmap parameters sweep trust",
+      hint: "backtest",
+      run: () => handleNav("backtest"),
+    },
     // Report actions are only offered when they actually work (a result exists).
     ...(result
       ? [
@@ -885,6 +901,9 @@ export default function HomePage() {
             onDemo={handleDemo}
             onOpenBacktest={openSavedBacktest}
             onOpenReport={openSavedReport}
+            onOpenLibraryPage={openLibraryPage}
+            onOpenPaperPage={openPaperPage}
+            onOpenDisasterPage={openDisasterPage}
           />
         )}
 
