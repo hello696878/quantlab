@@ -786,6 +786,21 @@ single-asset Backtest + Strategy Comparison:
 - Strategy Comparison added to Quick Actions; Trust-Layer workflow commands in
   the palette; all static sections render with the backend offline
 
+### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
+
+- README: Trust Layer + Content Engine feature rows; honest "screenshots
+  pending capture pass" note for the post-v4.0 features
+- `DEMO_SCRIPT.md` rewritten as a 7-demo showcase flow (Command Center →
+  Backtest Studio → Trust Layer → Report → Comparison → Content Engine →
+  Portfolio → roadmap close)
+- `SCREENSHOT_PLAN.md` refreshed: 16-shot checklist with per-shot setup,
+  must-show/avoid lists, and captured/recapture/pending status
+- `RELEASE_CHECKLIST.md`: current test counts, Trust-Layer + Content-Engine QA
+  blocks, report no-raw-JSON checks, sign-off items (disclaimer, clean git,
+  tag); `KNOWN_ISSUES.md` gained Trust Layer + Content Engine sections
+- App copy audited for overclaims — none found (all "full replication"
+  mentions are honest status framing)
+
 ---
 
 ## Future Phases — aligned with Master Blueprint v3

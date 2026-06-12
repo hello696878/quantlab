@@ -1,9 +1,10 @@
-# QuantLab — Demo Script (5–8 minutes)
+# QuantLab — Demo Script (8–12 minutes)
 
 A polished walkthrough for a portfolio showcase or screen recording. It moves
-from the landing dashboard → a real backtest → reporting → portfolio analytics →
-the command palette, and closes on the architecture. Every number shown is a
-**real backend run** — nothing is faked.
+from the Command Center → a real backtest with the Trust Layer → reporting →
+strategy comparison → the Content Engine, and closes on the roadmap. Every
+number shown is a **real backend run** — nothing is faked, and nothing planned
+is presented as built.
 
 **Before you start**
 - Run the stack (`docker compose up --build`, or `uvicorn` + `npm run dev`).
@@ -28,92 +29,86 @@ the command palette, and closes on the architecture. Every number shown is a
 
 ## The flow
 
-### 1 · Open the Command Center (~30s)
-Load <http://localhost:3000>. Point out the **Command Center**: quick actions,
-**recent saved backtests/reports** (real, from local SQLite), **system status**
-(API **ONLINE**, local mode, live counts), and the **feature map**.
-> "QuantLab opens on a command center — everything here is local-first; the
-> recents and counts come straight from a local SQLite database."
+### Demo 1 · Command Center (~60s)
+Load <http://localhost:3000>. Point out the four pillars on the hub: **research
+workflows** (hero CTAs + quick actions), the **Trust Layer** grid, the
+**Content Engine** cards (Strategy Library · Paper Replications · Quant
+Disasters, with live counts), and **saved research** (recents + system status
+from local SQLite). Scroll to the **Platform Direction** panel.
+> "QuantLab opens on a research hub. Everything is local-first, and the
+> direction panel is honest — only items marked Built exist."
 
-### 2 · Show guided demo mode (~30s)
-Point to the **Welcome / guided demos**. Hover a preset and note it **prefills,
-never auto-runs**.
-> "First-time users get guided demos. They load real parameters into the form —
-> but nothing runs until you click Run, so there's no fake data."
+### Demo 2 · Backtest Studio (~90s)
+Go to **Backtest**. Set: **SMA Crossover · SPY · 2016-01-01 → present · cost
+model Simple 10 bps · position sizing Full Allocation · risk management None ·
+annualization trading_days_252 · benchmark Buy & Hold Same Asset**. Click
+**Run**.
+Walk the result top-down: **metrics grid**, the **neon equity curve vs the
+labelled benchmark**, the **drawdown overlay**, the **cumulative excess return**
+chart, the **Benchmark Comparison** card (alpha/beta/correlation/tracking
+error/information ratio), the **Data Source** card, and the **Reproducibility**
+card.
+> "Real yfinance data, one-day signal shift — no lookahead. Every result
+> carries its data quality and a SHA-256 config hash: same normalized config,
+> same hash."
 
-### 3 · Run an SPY SMA backtest (~60s)
-Go to **Backtest**. Enter the backtest parameters above and click **Run**.
-> "Real historical data via yfinance, one-day signal shift so there's no
-> lookahead bias."
+### Demo 3 · Trust Layer (~90s)
+Re-run the same backtest with **Run robustness analysis** and **Run Stability
+Lab** enabled (defaults: 1,000 sims · block 5 · seed 42).
+Show the **Robustness Lab** card — probability of loss, percentile ranges, the
+final-return histogram, and the **heuristic grade** — then the **Stability
+Lab** heatmap with the selected 20/100 cell ring-highlighted.
+> "Robustness resamples *returns*; stability varies *parameters*. Broad stable
+> regions beat isolated spikes — and both cards say plainly they're
+> diagnostics, not guarantees."
 
-### 4 · Show the neon equity curve (~45s)
-Walk through the results: **metrics grid** (CAGR, Sharpe, Sortino, max drawdown),
-the **neon equity curve** (glowing strategy line vs dashed buy-&-hold benchmark),
-the **drawdown** chart, and the **trade log**.
-> "The whole UI is a neon quant-terminal theme; the charts pick up the accent
-> color, while semantic colors — green/red — stay fixed for readability."
+### Demo 4 · Report Export (~45s)
+**Save** the backtest (toast confirms), then **Export Report** → PDF
+print-preview. Scroll the structured sections: Metadata, Simulation Settings,
+Data Quality, Benchmark Comparison, Robustness Lab, Stability Lab,
+Reproducibility, Risk/Caveats.
+> "The report carries the assumptions and the caveats — including the config
+> hash — so the research is auditable. No raw JSON anywhere."
 
-### 5 · Save the backtest (~20s)
-Click **Save backtest**, give it a name → a **toast** confirms it's stored. Note
-it now appears under Saved Backtests and on the Command Center recents.
+### Demo 5 · Strategy Comparison (~60s)
+Open **Strategy Comparison**. Point at the **Simulation Settings** (cost,
+sizing, risk, annualization, benchmark applied to all five strategies), run on
+SPY, and show the ranked table plus the **"vs Benchmark"** toggle
+(excess/alpha/beta/IR columns).
+> "Five strategies under identical assumptions — and mean-reversion strategies
+> that can't short are labelled, not silently skipped."
 
-### 6 · Export a Markdown / PDF report (~45s)
-On the result, pick a **report template** (e.g. *Quant Tear Sheet*), click
-**Export Report** (Markdown downloads), then **Export PDF** → the print-preview
-opens (browser **Print → Save as PDF**). Optionally **Save Report**.
-> "Reports are generated locally in the browser from the result on screen —
-> four branded templates, Markdown or print-to-PDF, nothing uploaded."
+### Demo 6 · Content Engine (~90s)
+Open **Strategy Library** → SMA Crossover (hypothesis, parameters, failure
+modes, trust checklist, related papers/disasters). Open **Paper Replications**
+→ Jegadeesh–Titman (point at the **Inspired Demo** badge and the "not a full
+replication" caveats). Open **Quant Disasters** → LTCM (the "what a naive
+backtest might miss" section and the honest "cannot model yet" list).
+> "The platform teaches how strategies work, where the ideas came from, and how
+> they fail — with the same honesty rules as the engine."
 
-### 7 · Open the Portfolio Lab (~30s)
-Go to **Portfolio Backtest**. Enter the portfolio basket and run the
-**Equal-Weight Backtest** (monthly rebalance).
-> "Same engine, multi-asset: equal-weight with turnover-based rebalancing costs."
+### Demo 7 · Portfolio Studio (~60s, optional)
+Open **Portfolio Lab**: run the **Efficient Frontier** (SPY/QQQ/GLD/TLT · rf
+0.02 · 2,000 portfolios) and glance at the **Risk Dashboard** heatmap.
+> "Multi-asset analytics with the same in-sample honesty caveats."
 
-### 8 · Run the Efficient Frontier (~45s)
-Switch to the **Efficient Frontier** tab; run with rf **0.02**, **2000**
-portfolios. Show the scatter with **min-vol / max-Sharpe / equal-weight**
-highlighted and the weight cards.
-> "Random long-only portfolios plus the efficient frontier — and we're explicit
-> that this is in-sample, historical, not a forecast."
-
-### 9 · Show the Risk Dashboard (~40s)
-Switch to the **Risk Dashboard** tab. Highlight the **correlation heatmap**, the
-**diversification ratio**, and the **risk-contribution** table.
-> "This shows when one volatile, correlated asset dominates portfolio risk even
-> at equal dollar weight."
-
-### 10 · Open the Command Palette (Ctrl/Cmd + K) (~30s)
-Press **Ctrl/Cmd + K**. Show how it navigates anywhere and runs demos.
-> "A command palette wires up every workspace — the same handlers as the
-> sidebar, no separate router."
-
-### 11 · Search a saved report (~30s)
-In the palette, type a term from your saved report (e.g. `SPY` or `momentum`).
-Show it surfaces the **saved report** (and saved backtests, templates, gallery);
-press Enter to open it.
-> "It's also a global search across your real local resources."
-
-### 12 · Mention the architecture (~30s)
-Close on the stack.
-> "Under the hood: a **FastAPI** backend computes every backtest and risk metric;
-> a **Next.js / React / TypeScript** frontend; **local SQLite** persistence — no
-> account, no cloud, no telemetry. It's a research tool: no live trading, and
-> it's honest about its limitations."
+### Demo Close · Roadmap (~30s)
+Return to the Command Center's **Platform Direction** panel (or open
+`docs/ROADMAP.md`).
+> "Next up per the blueprint: an Options & Volatility Lab, event-driven and
+> arbitrage modules, an ensemble builder, a microstructure/HFT teaching lab,
+> an explainer copilot, and 3D visualization — all clearly marked planned or
+> future, none claimed as built. Under the hood it's FastAPI + Next.js +
+> local SQLite: research software, not a trading system."
 
 ---
 
 ## Optional add-ons (if you have extra time)
-- **Content Hub tour** — from the Command Center hero, click through the four
-  workflows: Run Backtest → back → Open Strategy Library (open SMA Crossover,
-  show hypothesis/failure modes) → Open Paper Replications (Jegadeesh–Titman,
-  point out the "inspired demo, not full replication" labelling) → Open Quant
-  Disasters (LTCM, show "what a naive backtest might miss"). Then scroll the
-  dashboard's Trust Layer grid and the Built/Planned/Future direction panel —
-  emphasize nothing planned is claimed as live.
-- **Trust Layer on one result** — run SPY SMA with benchmark + robustness +
-  stability enabled; walk the result page top to bottom (data quality, config
-  hash, robustness grade, stability heatmap) and export the report.
-- **Strategy Comparison** — five strategies on SPY, side by side, ranked.
+- **Guided demos / onboarding** — show a preset chip prefilling the form
+  (never auto-runs); run the BTC-USD crypto momentum demo with **auto**
+  annualization resolving to crypto 365.
+- **Command palette** — Ctrl/Cmd+K, search `LTCM`, `robustness`, or a saved
+  report name; everything is reachable from the keyboard.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

@@ -14,7 +14,10 @@ QuantLab is a full-stack quantitative research platform you run on your own mach
 
 | Area | Capabilities |
 |---|---|
-| **Strategy Research** | Single-asset backtesting · SMA / RSI / Bollinger / Momentum / Volatility Breakout / Pairs · long / short / long-short modes · strategy comparison · parameter sweep · train/test validation · walk-forward validation |
+| **Strategy Research** | Single-asset backtesting · SMA / RSI / Bollinger / Momentum / Volatility Breakout / Pairs · long / short / long-short modes · strategy comparison with shared simulation settings · parameter sweep · train/test validation · walk-forward validation |
+| **Backtest Studio engines** | Transaction cost model · position sizing (no leverage) · risk-management exits · annualization convention (252/365/auto) · benchmark analytics + charts (alpha/beta/TE/IR, equity/drawdown/excess overlays) |
+| **Trust Layer** | Data-quality diagnostics · reproducible SHA-256 config hash · Robustness Lab (block-bootstrap Monte Carlo) · Stability Lab (parameter-sensitivity heatmap) · honest caveats in every report |
+| **Content Engine** | Strategy Library (live model pages) · Paper Replication Series (classic papers + inspired demos) · Quant Disasters Series (risk-education case studies) |
 | **Custom Strategy Lab** | No-code rule builder (whitelisted indicators, **no `eval`**) · saved templates · JSON import / export · built-in template gallery |
 | **Portfolio Lab** | Equal-weight backtesting · optimization (min-vol / max-Sharpe) · walk-forward optimization · efficient frontier · risk dashboard · stress testing · factor analysis |
 | **Reporting** | Markdown export · PDF / print export · four branded report templates · saved reports gallery |
@@ -27,6 +30,8 @@ Each capability is described in detail under [Features](#features) below.
 ## Screenshots
 
 A tour of the running app — every chart and metric below is a **real backend run** on real historical data (no mock data). Full capture parameters are in [`docs/screenshots/README.md`](docs/screenshots/README.md).
+
+> The captures below predate the Trust Layer + Content Engine phases. Screenshots of the **Simulation Settings, benchmark visualization, Robustness Lab, Stability heatmap, Strategy Library, Paper Replications, and Quant Disasters** will be added after the next showcase capture pass — the exact checklist is in [`docs/SCREENSHOT_PLAN.md`](docs/SCREENSHOT_PLAN.md). Nothing shown or listed is mocked.
 
 ### Command Center
 

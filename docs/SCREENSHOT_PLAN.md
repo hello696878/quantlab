@@ -1,33 +1,44 @@
-# QuantLab — Screenshot Plan (v4.0 RC)
+# QuantLab — Screenshot Plan (showcase refresh)
 
-The capture list for release/portfolio screenshots. Capture as **PNG** on the
-dark neon theme at **~1440 × 900**, using the parameters below so each shot is
-representative and reproducible. Save into `docs/screenshots/`.
+The capture checklist for release/portfolio screenshots. Capture as **PNG** on
+the dark neon theme at **~1440 × 900**, save into `docs/screenshots/`, and
+reference from the README Screenshots section.
 
-> Every chart/metric shown must come from a **real backend run** — no fabricated
-> data. The existing committed captures are listed in
-> [`screenshots/README.md`](screenshots/README.md); this plan is the target set
-> for the release.
+> **Honesty rule:** every chart/metric shown must come from a **real backend
+> run** — no fabricated data, no mocked screenshots. If a capture is not done
+> yet its status below says **pending**; the README says so too.
 
-**Setup:** run the stack and pre-create a few saved backtests/reports/templates
-so the Command Center, Saved Reports, and Command Palette have real content.
+**Global setup:** run the stack, pre-create ≥2 saved backtests and ≥1 saved
+report so recents/search have content. For every shot, avoid: loading
+spinners, error toasts, personal local paths, raw JSON, and empty states
+(unless the shot is *about* an empty/offline state).
 
 ---
 
-| # | Page / view | Parameters | What should be visible | Filename |
-|---|---|---|---|---|
-| 1 | **Command Center** (Home) | — (have ≥2 saved backtests + ≥1 saved report) | Quick actions, recent saved backtests/reports, system status (API **ONLINE**), feature map | `command-center.png` |
-| 2 | **Backtest** results | SPY · SMA Crossover 20/100 · 2015-01-01 → 2023-12-31 · 100,000 · 10 bps · long_only | Metrics grid + neon equity curve (glow line vs dashed benchmark) + drawdown chart | `backtest-neon-chart.png` |
-| 3 | **Strategy Comparison** | SPY · 2015-01-01 → 2023-12-31 · long-only | All five strategies side by side with the ranking summary; mode badge | `strategy-comparison.png` |
-| 4 | **CSV Backtest** | Upload a `date,close` CSV · SMA Crossover | Upload dropzone with a parsed file + a real result (metrics + equity curve); "CSV backtest complete" toast if timed | `csv-upload.png` |
-| 5 | **Custom Strategy Builder** | Load gallery template *Momentum + Trend*, then Run | Entry/exit rule rows, ALL/ANY logic, and a result below | `custom-strategy-builder.png` |
-| 6 | **Portfolio Lab → Efficient Frontier** | SPY, QQQ, GLD, TLT · 2015-01-01 → 2023-12-31 · rf 0.02 · 2,000 portfolios | Scatter (x=vol, y=return) with min-vol / max-Sharpe / equal-weight highlighted + weight cards | `portfolio-efficient-frontier.png` |
-| 7 | **Portfolio Lab → Risk Dashboard** | SPY, QQQ, GLD, TLT · 2015-01-01 → 2023-12-31 | Correlation heatmap (neon tiles), diversification ratio, risk-contribution table | `portfolio-risk-dashboard.png` |
-| 8 | **Portfolio Lab → Stress Test** | Basket + COVID Crash + 2022 Rate-Hike scenarios | Scenario-comparison table, selected scenario equity vs benchmark, per-scenario correlation heatmap | `portfolio-stress-test.png` |
-| 9 | **Portfolio Lab → Factor Analysis** | Basket vs Core ETF Factors (SPY/QQQ/IWM/TLT/GLD) | R²/alpha/residual-vol/largest-exposure cards, beta table, actual-vs-fitted curve | `factor-analysis.png` |
-| 10 | **Saved Reports** gallery | — (have ≥2 saved reports) | The saved-reports list; optionally a report opened in the reader | `saved-reports.png` |
-| 11 | **Command Palette** (Ctrl/Cmd + K) | Query `momentum` or `risk` | Palette open showing commands + grouped saved resources (backtests/reports/templates) | `command-palette.png` |
-| 12 | **Settings → Appearance** | Select an accent (e.g. **Risk** red or **violet**) | Theme controls with the whole app re-skinned to the chosen accent | `settings-theme.png` |
+## Capture checklist
+
+| # | Filename | View | Setup | Must show | Avoid | Status |
+|---|---|---|---|---|---|---|
+| 1 | `command-center.png` | Command Center | ≥2 saved backtests, ≥1 report | Hero CTAs, Trust Layer grid, Content Engine cards, Platform Direction chips, recents, API **ONLINE** | stale counts | **recapture** (pre-13.3 version committed) |
+| 2 | `backtest-simulation-settings.png` | Backtest form | SMA · SPY · scroll to controls | Cost Model, Position Sizing, Risk Management, Annualization, Benchmark, Robustness + Stability toggles | validation errors | pending |
+| 3 | `backtest-neon-chart.png` | Backtest result | SPY · SMA 20/100 · 2015→2023 · 10 bps · long_only | Metrics grid + neon equity vs labelled benchmark + drawdown | — | captured (v4.0) |
+| 4 | `benchmark-visualization.png` | Backtest result | Same run, benchmark Buy & Hold; scroll to benchmark cards | Benchmark Comparison card (alpha/beta/TE/IR) + cumulative excess return chart | — | pending |
+| 5 | `robustness-lab.png` | Backtest result | Same run + robustness ON (1,000 sims · seed 42) | P(loss), percentile stats, final-return histogram, heuristic grade chip | — | pending |
+| 6 | `stability-heatmap.png` | Backtest result | Same run + Stability Lab ON (Sharpe metric) | Heatmap with 20/100 ring-highlighted, ★ best cell, stability score, fragility/stable note | — | pending |
+| 7 | `strategy-comparison.png` | Strategy Comparison | SPY · 2015→2023 · simulation settings visible | Ranked table + applied-assumptions summary + "vs Benchmark" toggle | — | **recapture** (pre-12.3.1 version committed) |
+| 8 | `strategy-library.png` | Strategy Library | Open SMA Crossover detail | Hypothesis/Signal Logic/Failure Modes sections + Live badge + related papers/disasters | — | pending |
+| 9 | `paper-replications.png` | Paper Replications | Index or Jegadeesh–Titman detail | Status + **Inspired Demo** badges, "not a full replication" caveat | implying full replication | pending |
+| 10 | `quant-disasters.png` | Quant Disasters | Open LTCM detail | "What a naive backtest might miss" + Trust-Layer checklist with **Not yet** badges | sensational framing | pending |
+| 11 | `report-pdf.png` | Report print preview | Saved SPY run with benchmark+robustness+stability · Export PDF | Structured sections (Simulation Settings, Data Quality, Benchmark, Robustness, Stability, Reproducibility) | raw JSON, letter-wrapped labels | pending |
+| 12 | `saved-backtests.png` | Saved Backtests detail | Open the saved SPY run | Config-hash pill, benchmark charts, robustness/stability cards persisted | — | pending |
+| 13 | `portfolio-efficient-frontier.png` | Portfolio Lab | SPY/QQQ/GLD/TLT · rf 0.02 · 2,000 portfolios | Frontier scatter + highlighted portfolios + weight cards | — | captured (v4.0) |
+| 14 | `portfolio-risk-dashboard.png` | Portfolio Lab | Same basket | Correlation heatmap, diversification ratio, risk contributions | — | captured (v4.0) |
+| 15 | `command-palette.png` | Palette (Ctrl/Cmd+K) | Query `ltcm` or `robustness` | Content-engine + trust-layer commands grouped with saved resources | — | **recapture** (new command groups) |
+| 16 | `settings-theme.png` | Settings | Pick an accent | Theme re-skin | — | captured (v4.0) |
+
+Legacy v4.0 captures not listed above (CSV upload, builder, stress test, factor
+analysis, sweep/validation, FastAPI docs, saved reports) remain valid and
+committed.
 
 ---
 
@@ -36,14 +47,14 @@ so the Command Center, Saved Reports, and Command Palette have real content.
 1. Start the stack: `docker compose up --build` (or `uvicorn` + `npm run dev`).
 2. Set the browser/device toolbar to 1440×900.
 3. Run each view with the parameters above, wait for the real result, capture.
-4. Save into `docs/screenshots/` with the suggested filename and reference it in
-   the README Screenshots section, e.g.:
+4. Save into `docs/screenshots/`, update `docs/screenshots/README.md` with the
+   capture parameters, and reference the file from the README:
 
 ```markdown
-### Command Center
-![Command Center](docs/screenshots/command-center.png)
+### Robustness Lab
+![Robustness Lab](docs/screenshots/robustness-lab.png)
 ```
 
-**Optional extras:** a guided-demo/onboarding card shot and an **offline UX**
-shot (stop the backend, open Saved Reports to show the friendly *Backend offline*
-panel) make good "honest engineering" additions.
+**Optional extras:** an offline-UX shot (backend stopped → friendly offline
+panel) and a fragility-warning Stability shot make good "honest engineering"
+additions.

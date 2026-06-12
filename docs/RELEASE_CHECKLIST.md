@@ -31,7 +31,7 @@ cd backend
 python -m pytest -q
 ```
 
-- [ ] **All tests pass** — 980+ tests across 48 files, all on synthetic data (no network calls at test time).
+- [ ] **All tests pass** — 1,060+ tests across 53 files, all on synthetic data (no network calls at test time).
 - [ ] **No real database polluted by tests** — persistence tests redirect to a temporary SQLite file via the `fresh_db` / `monkeypatch` fixture; the guard test `test_tests_use_temp_database_not_real_database` asserts the active DB path is **never** the real `backend/data/quantlab.db`. After a test run, confirm your real DB's row counts are unchanged.
 - [ ] **Health endpoint works** — `curl http://localhost:8000/health` returns a healthy JSON payload; `GET /api/health` works through the frontend proxy.
 - [ ] **Swagger loads** — <http://localhost:8000/docs> lists endpoints grouped by tag (`backtest`, `research`, `portfolio`, persistence, `ops`).
@@ -136,10 +136,20 @@ For each item: **what to test → expected result → suggested parameters**.
 - **Expected:** R²/alpha/residual-vol/largest-exposure cards, beta table, factor correlation heatmap, actual-vs-fitted curve; multicollinearity warning when proxies overlap.
 - **Params:** basket vs market SPY / tech_growth QQQ / small_cap IWM / bonds TLT / gold GLD.
 
+### Trust Layer (single backtest)
+- **Test:** run the baseline with benchmark Buy & Hold, robustness ON (1,000 sims · block 5 · seed 42), and Stability Lab ON; re-run with a different seed.
+- **Expected:** Benchmark Comparison card (alpha/beta/correlation/TE/IR) + equity/drawdown/excess overlays; Data Source card with provider + actual range; Reproducibility card (same config → same hash; copy buttons toast); Robustness card (P(loss), histogram, heuristic grade; same seed → same summary); Stability heatmap (20/100 ring-highlighted, invalid cells blank, score labelled heuristic). **No runtime errors on seed re-runs.**
+- **Params:** baseline SPY SMA.
+
+### Content Engine
+- **Test:** open Strategy Library → SMA detail; Paper Replications → Jegadeesh–Titman; Quant Disasters → LTCM; click each "Run in Backtest Studio"/"Run inspired demo" CTA.
+- **Expected:** detail sections render; status/replication badges honest (planned items have **no run buttons**); CTAs preload Backtest Studio (never auto-run); related papers/disasters cross-links navigate correctly.
+- **Params:** n/a (static pages).
+
 ### Report Export
 - **Test:** from a result, switch templates and export Markdown + PDF; Save Report.
-- **Expected:** four templates (Standard / Executive Summary / Quant Tear Sheet / Risk Report); Markdown downloads; PDF opens a print preview; Save stores Markdown only. Toasts confirm each. Templates that can't be filled aren't offered.
-- **Params:** baseline backtest / any portfolio result.
+- **Expected:** four templates (Standard / Executive Summary / Quant Tear Sheet / Risk Report); Markdown downloads; PDF opens a print preview; Save stores Markdown only. Toasts confirm each. Templates that can't be filled aren't offered. **No raw JSON anywhere in the PDF; the Parameters table shows strategy parameters only; no letter-by-letter wrapped labels; no white broken inputs anywhere in the demo flow.**
+- **Params:** baseline backtest with benchmark + robustness + stability enabled (worst-case report length).
 
 ### Settings
 - **Test:** change accent theme, defaults, and report template; reload.
@@ -155,8 +165,9 @@ For each item: **what to test → expected result → suggested parameters**.
 
 ## 5. Release sign-off
 
-- [ ] README, `ROADMAP.md`, `LIMITATIONS.md`, and `KNOWN_ISSUES.md` reflect the current build.
-- [ ] Screenshots captured per [`SCREENSHOT_PLAN.md`](SCREENSHOT_PLAN.md) (or TODO noted).
-- [ ] Demo rehearsed against [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) end-to-end.
+- [ ] README, `ROADMAP.md`, `LIMITATIONS.md`, and `KNOWN_ISSUES.md` reflect the current build (Trust Layer + Content Engine included; nothing planned claimed as built).
+- [ ] Educational disclaimer present in README and app copy (research-only, not investment advice, no live trading claims).
+- [ ] Screenshots captured per [`SCREENSHOT_PLAN.md`](SCREENSHOT_PLAN.md) (or the README's "pending capture pass" note retained).
+- [ ] Demo rehearsed against [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) end-to-end with no runtime errors.
 - [ ] `backend/data/*.db` is git-ignored; no local DB or secrets committed.
-- [ ] Tag the release candidate (e.g. `v4.0-rc1`) once all boxes are checked.
+- [ ] `git status` clean; release notes / changelog updated; tag the release (e.g. `v4.1-rc1`) once all boxes are checked.

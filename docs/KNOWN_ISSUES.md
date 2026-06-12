@@ -68,6 +68,31 @@ of a **research tool**.
 - **Settings are browser-local** (`localStorage`); they never change backend
   computation.
 
+## Trust Layer
+
+- **Robustness Lab is a bootstrap, not a tail-risk model.** It resamples the
+  observed return history; regime shifts, liquidity shocks, and structural
+  breaks absent from the sample cannot appear in the simulation. The A–F grade
+  is a labelled heuristic.
+- **Sensitivity heatmaps can still overfit.** Choosing the best-performing cell
+  after viewing the heatmap is selection bias; the best cell is context, not a
+  recommended setting. Stability Lab v1 covers SMA Crossover only.
+- **Config hashes fingerprint inputs, not outputs.** External data revisions
+  (yfinance) can change results under the same hash; exact reproducibility
+  needs dataset version hashing (future). The "permalink" is local-first — no
+  public URLs, no replay-by-hash route yet.
+- **Daily-bar risk exits are approximations.** Stops/takes execute at daily
+  closes in simulation; intraday gaps and stop cascades are not modelled.
+
+## Content Engine
+
+- **Paper replications are simplified unless labelled otherwise.** All v1
+  entries are *inspired demos* (single-asset approximations); no page claims
+  full replication, and planned papers have no run buttons.
+- **Quant Disasters are educational summaries, not forensic reports.** Cases
+  use neutral phrasing, simplified mechanisms, and explicit "cannot model yet"
+  lists; they are risk education, not historical verdicts.
+
 ## Reporting
 
 - **PDF export uses the browser print dialog (v1).** Reports are generated as
