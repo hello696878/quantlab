@@ -802,7 +802,8 @@ single-asset Backtest + Strategy Comparison:
 - Integrated into the dashboard Content Engine, command palette (4 commands),
   and cross-linked from the Black–Scholes paper page + Volmageddon disaster page
 - Educational only — no live chains, no American exercise, no vol surface;
-  27 backend tests (textbook known values + put-call parity + payoff bounds)
+  expanded backend tests cover textbook values, put-call parity, IV bounds, and
+  payoff boundedness
 
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
@@ -884,7 +885,7 @@ built**; everything else is planned/research/future:
 | # | Category | Status today |
 |---|----------|--------------|
 | 1 | Equities | **built (core)** — SMA, RSI, Bollinger, Momentum, Vol Breakout, Pairs |
-| 2 | Options & Volatility | planned (Options Engine v1, Vol Lab v1) |
+| 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder; vol surface / deeper Vol Lab planned |
 | 3 | Event-Driven & Arbitrage | research |
 | 4 | Futures & Commodities | research |
 | 5 | FX | research |

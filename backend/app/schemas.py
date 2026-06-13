@@ -3540,9 +3540,11 @@ OptionSide = Literal["long", "short"]
 class BlackScholesRequest(BaseModel):
     """Inputs for European Black–Scholes pricing + Greeks."""
 
+    model_config = ConfigDict(allow_inf_nan=False)
+
     option_type: OptionType = "call"
-    underlying_price: float = Field(gt=0.0, description="Spot price S (> 0).")
-    strike: float = Field(gt=0.0, description="Strike K (> 0).")
+    underlying_price: float = Field(gt=0.0, le=1e12, description="Spot price S (> 0).")
+    strike: float = Field(gt=0.0, le=1e12, description="Strike K (> 0).")
     time_to_expiry: float = Field(gt=0.0, le=100.0, description="Years to expiry T (> 0).")
     risk_free_rate: float = Field(ge=-1.0, le=1.0, description="Continuous risk-free rate r.")
     volatility: float = Field(gt=0.0, le=10.0, description="Annualized volatility sigma (> 0).")
@@ -3567,10 +3569,12 @@ class BlackScholesResponse(BaseModel):
 class ImpliedVolRequest(BaseModel):
     """Inputs for the implied-volatility solver."""
 
+    model_config = ConfigDict(allow_inf_nan=False)
+
     option_type: OptionType = "call"
-    market_price: float = Field(gt=0.0, description="Observed option price (> 0).")
-    underlying_price: float = Field(gt=0.0)
-    strike: float = Field(gt=0.0)
+    market_price: float = Field(gt=0.0, le=1e12, description="Observed option price (> 0).")
+    underlying_price: float = Field(gt=0.0, le=1e12)
+    strike: float = Field(gt=0.0, le=1e12)
     time_to_expiry: float = Field(gt=0.0, le=100.0)
     risk_free_rate: float = Field(ge=-1.0, le=1.0)
     dividend_yield: float = Field(default=0.0, ge=0.0, le=1.0)
@@ -3590,12 +3594,14 @@ class ImpliedVolResponse(BaseModel):
 class PayoffLeg(BaseModel):
     """One leg of a payoff strategy (option or stock)."""
 
+    model_config = ConfigDict(allow_inf_nan=False)
+
     instrument: Literal["option", "stock"] = "option"
     option_type: Optional[OptionType] = Field(default=None, description="Required for option legs.")
     side: OptionSide = "long"
-    strike: Optional[float] = Field(default=None, gt=0.0, description="Required for option legs.")
-    premium: float = Field(default=0.0, ge=0.0, description="Manual premium input (option legs).")
-    entry_price: Optional[float] = Field(default=None, gt=0.0, description="Required for stock legs.")
+    strike: Optional[float] = Field(default=None, gt=0.0, le=1e12, description="Required for option legs.")
+    premium: float = Field(default=0.0, ge=0.0, le=1e12, description="Manual premium input (option legs).")
+    entry_price: Optional[float] = Field(default=None, gt=0.0, le=1e12, description="Required for stock legs.")
     quantity: float = Field(default=1.0, gt=0.0, le=1000.0)
 
     @model_validator(mode="after")
@@ -3614,9 +3620,11 @@ class PayoffLeg(BaseModel):
 class PayoffRequest(BaseModel):
     """A multi-leg payoff request (manual legs — no live option chains)."""
 
+    model_config = ConfigDict(allow_inf_nan=False)
+
     legs: List[PayoffLeg] = Field(min_length=1, max_length=8)
-    price_min: float = Field(gt=0.0)
-    price_max: float = Field(gt=0.0)
+    price_min: float = Field(gt=0.0, le=1e12)
+    price_max: float = Field(gt=0.0, le=1e12)
     points: int = Field(default=101, ge=20, le=1000)
 
     @model_validator(mode="after")

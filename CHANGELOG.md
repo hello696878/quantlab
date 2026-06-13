@@ -9,6 +9,28 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## Unreleased — Options & Volatility Lab v1
+
+### Added
+
+- **Options Lab** workspace with European Black–Scholes pricing, Greeks,
+  bisection implied-volatility solving, and single/multi-leg expiration payoff
+  diagrams.
+- Deterministic backend endpoints: `POST /options/black-scholes`,
+  `POST /options/implied-volatility`, and `POST /options/payoff`.
+- Strategy payoff presets for long call/put, covered call, protective put,
+  bull/bear spreads, straddles, and strangles.
+- Dashboard, sidebar, command-palette/search, Black–Scholes paper, and
+  Volmageddon cross-links.
+
+### Limitations
+
+- Educational calculator only: no live option chains, broker integration,
+  American exercise, assignment, transaction-cost/liquidity modelling, or full
+  volatility surface.
+
+---
+
 ## v4.7.0 — Showcase Candidate — 2026-06-13
 
 This candidate packages QuantLab as a portfolio-ready local research showcase:

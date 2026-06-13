@@ -95,11 +95,12 @@ Open **Portfolio Lab**: run the **Efficient Frontier** (SPY/QQQ/GLD/TLT · rf
 ### Demo Close · Roadmap (~30s)
 Return to the Command Center's **Platform Direction** panel (or open
 `docs/ROADMAP.md`).
-> "Next up per the blueprint: an Options & Volatility Lab, event-driven and
-> arbitrage modules, an ensemble builder, a microstructure/HFT teaching lab,
-> an explainer copilot, and 3D visualization — all clearly marked planned or
-> future, none claimed as built. Under the hood it's FastAPI + Next.js +
-> local SQLite: research software, not a trading system."
+> "Options Lab v1 is now built as an educational calculator. Next up per the
+> blueprint: deeper volatility tooling, event-driven and arbitrage modules, an
+> ensemble builder, a microstructure/HFT teaching lab, an explainer copilot,
+> and 3D visualization — all clearly marked planned or future, none claimed as
+> built. Under the hood it's FastAPI + Next.js + local SQLite: research
+> software, not a trading system."
 
 ---
 
@@ -110,6 +111,9 @@ Return to the Command Center's **Platform Direction** panel (or open
 - **Command palette** — Ctrl/Cmd+K, search `LTCM`, `Flash Crash`,
   `Fama French`, `robustness`, or a saved report name; everything is reachable
   from the keyboard.
+- **Options Lab** — show the Black–Scholes reference case (S=100, K=100, T=1,
+  r=0.05, sigma=0.20), the IV warning for an impossible price, and a short-call
+  payoff with unbounded max loss.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

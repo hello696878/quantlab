@@ -197,29 +197,44 @@ def strategy_payoff(
     legs: List[dict], price_min: float, price_max: float, points: int
 ) -> dict:
     """Total expiration payoff curve + bounded max/min + approximate breakevens."""
-    prices = [
-        price_min + (price_max - price_min) * i / (points - 1) for i in range(points)
-    ]
-    payoffs: List[float] = []
-    for S_T in prices:
+    def total_payoff_at(S_T: float) -> float:
         total = 0.0
         for leg in legs:
             total += _leg_payoff(leg, S_T) * float(leg.get("quantity", 1))
-        payoffs.append(total)
+        return total
+
+    prices = [
+        price_min + (price_max - price_min) * i / (points - 1) for i in range(points)
+    ]
+    payoffs: List[float] = [total_payoff_at(S_T) for S_T in prices]
 
     curve = [
         {"underlying_price": _clean(p), "payoff": _clean(v)}
         for p, v in zip(prices, payoffs)
     ]
 
-    # Bounded-ness from the slope at each edge (payoff is piecewise-linear).
+    # Underlyings are bounded below by zero, so the left edge is never
+    # unbounded.  The only unbounded direction is S_T -> infinity, determined by
+    # the asymptotic slope after all option strikes.
     eps = 1e-9
-    slope_left = payoffs[1] - payoffs[0]
-    slope_right = payoffs[-1] - payoffs[-2]
-    profit_unbounded = slope_right > eps or slope_left < -eps
-    loss_unbounded = slope_right < -eps or slope_left > eps
-    max_profit = None if profit_unbounded else _clean(max(payoffs))
-    max_loss = None if loss_unbounded else _clean(min(payoffs))
+    right_slope = 0.0
+    summary_points = {0.0, price_min, price_max}
+    for leg in legs:
+        quantity = float(leg.get("quantity", 1))
+        sign = 1.0 if leg["side"] == "long" else -1.0
+        if leg["instrument"] == "stock":
+            right_slope += sign * quantity
+        elif leg["option_type"] == "call":
+            right_slope += sign * quantity
+            summary_points.add(float(leg["strike"]))
+        else:
+            summary_points.add(float(leg["strike"]))
+
+    profit_unbounded = right_slope > eps
+    loss_unbounded = right_slope < -eps
+    summary_payoffs = payoffs + [total_payoff_at(p) for p in summary_points]
+    max_profit = None if profit_unbounded else _clean(max(summary_payoffs))
+    max_loss = None if loss_unbounded else _clean(min(summary_payoffs))
 
     # Approximate breakevens: linear-interpolate sign changes of the payoff.
     breakevens: List[float] = []

@@ -747,7 +747,7 @@ export default function HomePage() {
     { view: "library", title: "Open Strategy Library", keywords: "models catalog docs education strategy pages" },
     { view: "replications", title: "Open Paper Replications", keywords: "papers research academic momentum pairs replication" },
     { view: "disasters", title: "Open Quant Disasters", keywords: "risk education failures ltcm crash blowup lessons" },
-    { view: "options", title: "Open Options Lab", keywords: "options black-scholes greeks implied volatility payoff straddle strangle covered call" },
+    { view: "options", title: "Open Options Lab", keywords: "options black-scholes greeks implied volatility payoff straddle strangle covered call protective put" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -859,7 +859,7 @@ export default function HomePage() {
       [
         ["pricing", "Open Black-Scholes Calculator", "options pricing greeks delta gamma vega theta rho"],
         ["implied_vol", "Open Implied Volatility Solver", "options implied volatility iv solver"],
-        ["payoff", "Open Payoff Builder", "options payoff straddle strangle covered call spread"],
+        ["payoff", "Open Payoff Builder", "options payoff straddle strangle covered call protective put bull call bear put spread"],
       ] as const
     ).map(([t, title, keywords]) => ({
       id: `options-${t}`,

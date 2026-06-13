@@ -51,6 +51,18 @@ of a **research tool**.
 - Risk-dashboard, stress-test, and factor-exposure figures are likewise
   **historical estimates** that may not persist out-of-sample.
 
+## Options Lab
+
+- **Options Lab v1 is an educational calculator.** It covers European
+  Black–Scholes pricing, Greeks, bisection implied volatility, and terminal
+  payoff diagrams. It does **not** fetch live option chains, model American
+  exercise / assignment, simulate transaction costs or liquidity, produce a
+  volatility surface, or backtest option strategies through time.
+- **Payoff diagrams are expiration-only.** They ignore mark-to-market path,
+  financing, early assignment, and margin. Unbounded short-option risk is
+  labelled where applicable; finite payoff summaries assume the underlying
+  cannot go below zero.
+
 ## Metrics
 
 - **Annualization is selectable in the main single-asset UI flows.** Backtest

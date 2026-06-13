@@ -32,7 +32,7 @@ Each capability is described in detail under [Features](#features) below.
 
 A tour of the running app — every chart and metric below is a **real backend run** on real historical data (no mock data). Full capture parameters are in [`docs/screenshots/README.md`](docs/screenshots/README.md).
 
-> The captures below predate the Trust Layer + Content Engine phases. Screenshots of the **Simulation Settings, benchmark visualization, Robustness Lab, Stability heatmap, Strategy Library, Paper Replications, and Quant Disasters** will be added after the next showcase capture pass — the exact checklist is in [`docs/SCREENSHOT_PLAN.md`](docs/SCREENSHOT_PLAN.md). Nothing shown or listed is mocked.
+> The captures below predate the Trust Layer + Content Engine + Options Lab phases. Screenshots of the **Simulation Settings, benchmark visualization, Robustness Lab, Stability heatmap, Strategy Library, Paper Replications, Quant Disasters, and Options Lab** will be added after the next showcase capture pass — the exact checklist is in [`docs/SCREENSHOT_PLAN.md`](docs/SCREENSHOT_PLAN.md). Nothing shown or listed is mocked.
 
 ### Command Center
 
@@ -139,9 +139,10 @@ Press **Ctrl + K** (Windows/Linux) or **⌘ + K** (macOS) anywhere to open a sea
 
 It searches **both commands and your real local resources**:
 
-- **Navigation** — Go to Home / Backtest / CSV Upload / Custom Strategy Builder / Portfolio Lab / Research Tools / Parameter Sweep / Train/Test / Walk-Forward / Strategy Comparison / Saved Backtests / Saved Reports / Settings.
+- **Navigation** — Go to Home / Backtest / Options Lab / CSV Upload / Custom Strategy Builder / Portfolio Lab / Research Tools / Parameter Sweep / Train/Test / Walk-Forward / Strategy Comparison / Saved Backtests / Saved Reports / Settings.
 - **Guided demos** — Load Demo Backtest, Demo Crypto Momentum, Demo Portfolio Risk, Demo Efficient Frontier, Demo Strategy Builder (reusing the onboarding presets — they prefill, they never auto-run).
 - **Content Engine pages** — Strategy Library, Paper Replications, and Quant Disasters entries, including planned/read-only educational pages such as Fama–French and live case studies such as LTCM / Flash Crash. Run/prefill commands are only shown for implemented strategies and inspired demos.
+- **Options Lab** — open the Black–Scholes calculator, implied-volatility solver, or payoff builder directly.
 - **Portfolio tools** — jump straight to Portfolio Backtest, Optimization, Walk-Forward, Efficient Frontier, Risk Dashboard, Stress Test, or Factor Analysis.
 - **Report** — *Export current backtest report (Markdown)*, shown only when a backtest result is on screen (broken/no-op commands are never listed).
 - **Saved Backtests** — search by name, ticker, or strategy (shows ticker · strategy · Sharpe/CAGR · date); opens the saved backtest detail.
@@ -653,6 +654,7 @@ QuantLab is deliberately honest about what it does and does not model. See [`doc
 - **Short selling is simplified.** Long/short modes (and pairs trading) earn `−1 × asset_return` on shorts with **no borrow fees, margin requirements, liquidation, or funding costs modelled** — short results are highly sensitive to timing and transaction costs.
 - **Backtests can overfit.** Default parameters are demo-friendly, not tuned; parameter sweeps and in-sample optimization look good by construction. Always validate with Train/Test and Walk-Forward.
 - **Portfolio optimization v1** estimates expected returns and covariance from the selected historical window (252-day annualisation) — descriptive, in-sample, and not a forecast.
+- **Options Lab v1 is a calculator, not an options risk engine.** It supports European Black–Scholes, Greeks, bisection IV, and terminal payoff diagrams only — no live chains, American exercise, assignment, liquidity, transaction costs, or volatility surface.
 - **Data limitations.** yfinance daily data may have gaps/anomalies and is not survivorship-bias-free; there is no intraday/tick data.
 - **Annualisation conventions are scoped.** Single-asset backtests and Strategy Comparison expose 252, crypto 365, or auto in the UI; portfolio tools, pairs, CSV upload's simple UI path, and SMA research tools remain on the existing 252-day convention.
 - **Local & single-user.** Data lives in a local SQLite file with **no authentication, no multi-user support, and no cloud sync**.
@@ -661,9 +663,9 @@ QuantLab is deliberately honest about what it does and does not model. See [`doc
 
 ## Roadmap
 
-Most of the platform described above is complete; see [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full per-phase history (Phases 0–13.x: backend MVP → strategies → research tools → portfolio lab → reporting → settings/theme → long/short → Command Center / palette / search → UX resilience → the simulation-realism engines → Trust Layer v1 → Content Engine v1 → showcase docs).
+Most of the platform described above is complete; see [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full per-phase history (Phases 0–14.x: backend MVP → strategies → research tools → portfolio lab → reporting → settings/theme → long/short → Command Center / palette / search → UX resilience → the simulation-realism engines → Trust Layer v1 → Content Engine v1 → showcase docs → Options Lab v1).
 
-**Direction.** Future development follows [Master Blueprint v3](docs/MASTER_BLUEPRINT_V3.md): a long-term catalog of ~100 *educational* quant models across 12 categories (equities, options & volatility, event-driven, futures, FX, rates, credit, crypto, real estate, microstructure simulations, portfolio & risk, ML) plus platform trust features. Trust Layer v1 and Content Engine v1 are now built; next candidate phases include Options & Volatility, event-driven/arbitrage, portfolio ensembles, microstructure teaching simulations, an explainer copilot, and 3D visualization. **Only items labelled built exist today** — the blueprint is a direction, not a feature list. Broker / live-trading integration remains a **non-goal** for this research tool.
+**Direction.** Future development follows [Master Blueprint v3](docs/MASTER_BLUEPRINT_V3.md): a long-term catalog of ~100 *educational* quant models across 12 categories (equities, options & volatility, event-driven, futures, FX, rates, credit, crypto, real estate, microstructure simulations, portfolio & risk, ML) plus platform trust features. Trust Layer v1, Content Engine v1, and Options Lab v1 are now built; next candidate phases include a deeper Volatility Lab / IV surface, event-driven/arbitrage, portfolio ensembles, microstructure teaching simulations, an explainer copilot, and 3D visualization. **Only items labelled built exist today** — the blueprint is a direction, not a feature list. Broker / live-trading integration remains a **non-goal** for this research tool.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the phased plan with honest status labels (built / planned / research / future — none are commitments).
 

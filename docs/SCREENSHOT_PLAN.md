@@ -29,12 +29,13 @@ spinners, error toasts, personal local paths, raw JSON, and empty states
 | 8 | `strategy-library.png` | Strategy Library | Open SMA Crossover detail | Hypothesis/Signal Logic/Failure Modes sections + Live badge + related papers/disasters | — | pending |
 | 9 | `paper-replications.png` | Paper Replications | Index or Jegadeesh–Titman detail | Status + **Inspired Demo** badges, "not a full replication" caveat | implying full replication | pending |
 | 10 | `quant-disasters.png` | Quant Disasters | Open LTCM detail | "What a naive backtest might miss" + Trust-Layer checklist with **Not yet** badges | sensational framing | pending |
-| 11 | `report-pdf.png` | Report print preview | Saved SPY run with benchmark+robustness+stability · Export PDF | Structured sections (Simulation Settings, Data Quality, Benchmark, Robustness, Stability, Reproducibility) | raw JSON, letter-wrapped labels | pending |
-| 12 | `saved-backtests.png` | Saved Backtests detail | Open the saved SPY run | Config-hash pill, benchmark charts, robustness/stability cards persisted | — | pending |
-| 13 | `portfolio-efficient-frontier.png` | Portfolio Lab | SPY/QQQ/GLD/TLT · rf 0.02 · 2,000 portfolios | Frontier scatter + highlighted portfolios + weight cards | — | captured (v4.0) |
-| 14 | `portfolio-risk-dashboard.png` | Portfolio Lab | Same basket | Correlation heatmap, diversification ratio, risk contributions | — | captured (v4.0) |
-| 15 | `command-palette.png` | Palette (Ctrl/Cmd+K) | Query `ltcm` or `robustness` | Content-engine + trust-layer commands grouped with saved resources | — | **recapture** (new command groups) |
-| 16 | `settings-theme.png` | Settings | Pick an accent | Theme re-skin | — | captured (v4.0) |
+| 11 | `options-lab.png` | Options Lab | Pricing tab or Payoff Builder | Black–Scholes reference inputs/results or payoff chart with zero line + unbounded risk label | live-chain implication, recommendations | pending |
+| 12 | `report-pdf.png` | Report print preview | Saved SPY run with benchmark+robustness+stability · Export PDF | Structured sections (Simulation Settings, Data Quality, Benchmark, Robustness, Stability, Reproducibility) | raw JSON, letter-wrapped labels | pending |
+| 13 | `saved-backtests.png` | Saved Backtests detail | Open the saved SPY run | Config-hash pill, benchmark charts, robustness/stability cards persisted | — | pending |
+| 14 | `portfolio-efficient-frontier.png` | Portfolio Lab | SPY/QQQ/GLD/TLT · rf 0.02 · 2,000 portfolios | Frontier scatter + highlighted portfolios + weight cards | — | captured (v4.0) |
+| 15 | `portfolio-risk-dashboard.png` | Portfolio Lab | Same basket | Correlation heatmap, diversification ratio, risk contributions | — | captured (v4.0) |
+| 16 | `command-palette.png` | Palette (Ctrl/Cmd+K) | Query `ltcm`, `options`, or `robustness` | Content-engine + options + trust-layer commands grouped with saved resources | — | **recapture** (new command groups) |
+| 17 | `settings-theme.png` | Settings | Pick an accent | Theme re-skin | — | captured (v4.0) |
 
 Legacy v4.0 captures not listed above (CSV upload, builder, stress test, factor
 analysis, sweep/validation, FastAPI docs, saved reports) remain valid and

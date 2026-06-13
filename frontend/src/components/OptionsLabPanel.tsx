@@ -41,7 +41,11 @@ const inputCls = "ql-input px-2.5 py-1.5";
 const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400";
 
 function num(s: string): number {
-  return parseFloat(s);
+  return s.trim() === "" ? NaN : Number(s);
+}
+
+function finite(s: string): boolean {
+  return Number.isFinite(num(s));
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
@@ -154,12 +158,18 @@ function PricingTab() {
   const [loading, setLoading] = useState(false);
 
   const valid =
-    num(S) > 0 && num(K) > 0 && num(T) > 0 && num(sigma) > 0 && !isNaN(num(r)) && !isNaN(num(q));
+    num(S) > 0 &&
+    num(K) > 0 &&
+    num(T) > 0 &&
+    num(sigma) > 0 &&
+    finite(r) &&
+    finite(q);
 
   async function run() {
     if (!valid) return;
     setLoading(true);
     setError(null);
+    setResult(null);
     try {
       const res = await priceBlackScholes({
         option_type: optionType,
@@ -239,12 +249,19 @@ function ImpliedVolTab() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const valid = num(mktPrice) > 0 && num(S) > 0 && num(K) > 0 && num(T) > 0;
+  const valid =
+    num(mktPrice) > 0 &&
+    num(S) > 0 &&
+    num(K) > 0 &&
+    num(T) > 0 &&
+    finite(r) &&
+    finite(q);
 
   async function run() {
     if (!valid) return;
     setLoading(true);
     setError(null);
+    setResult(null);
     try {
       setResult(
         await solveImpliedVolatility({
@@ -355,6 +372,15 @@ function PayoffTab() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const valid =
+    num(priceMin) > 0 &&
+    num(priceMax) > num(priceMin) &&
+    legs.every((l) =>
+      l.instrument === "stock"
+        ? num(l.entry_price) > 0 && num(l.quantity) > 0
+        : num(l.strike) > 0 && num(l.premium) >= 0 && num(l.quantity) > 0,
+    );
+
   function applyPreset(id: string) {
     setPreset(id);
     const p = PRESETS.find((x) => x.id === id);
@@ -367,8 +393,10 @@ function PayoffTab() {
   }
 
   async function run() {
+    if (!valid) return;
     setLoading(true);
     setError(null);
+    setResult(null);
     try {
       const apiLegs: PayoffLeg[] = legs.map((l) =>
         l.instrument === "stock"
@@ -469,8 +497,11 @@ function PayoffTab() {
         <button
           type="button"
           onClick={run}
-          disabled={loading}
-          className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700 disabled:opacity-50"
+          disabled={!valid || loading}
+          className={
+            "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+            (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+          }
         >
           {loading ? "Computing…" : "Plot payoff"}
         </button>

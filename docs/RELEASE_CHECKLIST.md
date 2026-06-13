@@ -76,6 +76,11 @@ For each item: **what to test → expected result → suggested parameters**.
 - **Expected:** results mix commands + real saved resources (backtests, reports, templates, gallery) + Content Engine pages, grouped; planned educational pages open as read-only/detail content with no run button. Selecting a saved item opens its detail/builder. Empty query → all; no match → "No results found".
 - **Params:** must have a few saved items to see resource rows.
 
+### Options Lab
+- **Test:** open Options Lab from the sidebar/dashboard/palette; price the Black–Scholes reference case; solve IV; plot Long Call, Bull Call Spread, Short Call, and Long Straddle.
+- **Expected:** call ≈10.45, put ≈5.57, Greeks finite and unit-labelled; IV ≈20% for the generated price; impossible price shows a friendly warning; payoff charts have a visible zero line/breakevens; short call/short straddle max loss is **Unbounded**; no raw JSON or fake option-chain data.
+- **Params:** S=100, K=100, T=1, r=0.05, sigma=0.20, q=0; IV market price 10.45 then 200.
+
 ### Backtest (single-asset)
 - **Test:** run the baseline; check metrics, neon equity curve, drawdown, trade log; try a short mode on SMA.
 - **Expected:** metrics + benchmark; neon glow line vs dashed benchmark; trade events; short modes show the short-selling warning + direction diagnostics. Long-only output unchanged.

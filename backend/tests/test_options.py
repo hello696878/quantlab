@@ -76,6 +76,13 @@ def test_gamma_and_vega_positive_and_match_spec():
     assert g["rho"] == pytest.approx(53.232, abs=1e-2)
 
 
+def test_put_rho_negative_and_theta_finite():
+    g = black_scholes_greeks("put", _S, _K, _T, _R, _SIG, _Q)
+    assert g["rho"] < 0
+    assert math.isfinite(g["theta_annual"])
+    assert math.isfinite(g["theta_daily"])
+
+
 def test_call_put_gamma_vega_equal():
     cg = black_scholes_greeks("call", _S, _K, _T, _R, _SIG, _Q)
     pg = black_scholes_greeks("put", _S, _K, _T, _R, _SIG, _Q)
@@ -109,6 +116,13 @@ def test_iv_price_above_bounds_warns_no_crash():
     assert warning and "no-arbitrage" in warning
 
 
+def test_iv_price_below_bounds_warns_no_crash():
+    lb, _ub = no_arbitrage_bounds("put", 80.0, 100.0, _T, _R, _Q)
+    iv, converged, iters, warning = implied_volatility("put", lb - 0.01, 80.0, 100.0, _T, _R, _Q)
+    assert iv is None and converged is False and iters == 0
+    assert warning and "no-arbitrage" in warning
+
+
 def test_iv_near_intrinsic_is_low_vol():
     # A deep-ITM call priced just above intrinsic implies a low volatility.
     lb, _ub = no_arbitrage_bounds("call", 120.0, 100.0, _T, _R, _Q)
@@ -133,6 +147,7 @@ def test_long_call_payoff():
         50, 150, 101,
     )
     assert _curve_at(r, 90) == pytest.approx(-5.0)   # below strike → lose premium
+    assert _curve_at(r, 105) == pytest.approx(0.0)   # breakeven = strike + premium
     assert _curve_at(r, 120) == pytest.approx(15.0)  # 20 intrinsic − 5 premium
     assert r["max_loss"] == pytest.approx(-5.0)      # bounded loss
     assert r["max_profit"] is None                   # unbounded upside
@@ -160,6 +175,18 @@ def test_long_put_payoff():
     )
     assert _curve_at(r, 80) == pytest.approx(16.0)   # 20 intrinsic − 4 premium
     assert _curve_at(r, 120) == pytest.approx(-4.0)  # above strike → lose premium
+    assert r["max_profit"] == pytest.approx(96.0)    # underlying is bounded below by zero
+    assert r["max_loss"] == pytest.approx(-4.0)
+    assert r["breakevens"] == [pytest.approx(96.0)]
+
+
+def test_short_put_loss_is_bounded_by_zero_underlying():
+    r = strategy_payoff(
+        [{"instrument": "option", "option_type": "put", "side": "short", "strike": 100, "premium": 4}],
+        50, 150, 101,
+    )
+    assert r["max_profit"] == pytest.approx(4.0)
+    assert r["max_loss"] == pytest.approx(-96.0)
     assert r["breakevens"] == [pytest.approx(96.0)]
 
 
@@ -173,6 +200,19 @@ def test_bull_call_spread_bounded_both_sides():
     )
     assert r["max_loss"] == pytest.approx(-3.0)   # net debit
     assert r["max_profit"] == pytest.approx(7.0)  # spread width 10 − debit 3
+    assert all(math.isfinite(p["payoff"]) for p in r["payoff_curve"])
+
+
+def test_bear_put_spread_bounded_both_sides():
+    r = strategy_payoff(
+        [
+            {"instrument": "option", "option_type": "put", "side": "long", "strike": 110, "premium": 6},
+            {"instrument": "option", "option_type": "put", "side": "short", "strike": 100, "premium": 2},
+        ],
+        50, 160, 111,
+    )
+    assert r["max_loss"] == pytest.approx(-4.0)   # net debit
+    assert r["max_profit"] == pytest.approx(6.0)  # spread width 10 − debit 4
     assert all(math.isfinite(p["payoff"]) for p in r["payoff_curve"])
 
 
@@ -190,6 +230,20 @@ def test_long_straddle_v_shape_no_nan():
     assert len(r["breakevens"]) == 2
 
 
+def test_short_straddle_profit_bounded_loss_unbounded():
+    r = strategy_payoff(
+        [
+            {"instrument": "option", "option_type": "call", "side": "short", "strike": 100, "premium": 6},
+            {"instrument": "option", "option_type": "put", "side": "short", "strike": 100, "premium": 6},
+        ],
+        50, 150, 101,
+    )
+    assert _curve_at(r, 100) == pytest.approx(12.0)
+    assert r["max_profit"] == pytest.approx(12.0)
+    assert r["max_loss"] is None
+    assert all(math.isfinite(p["payoff"]) for p in r["payoff_curve"])
+
+
 def test_covered_call_uses_stock_leg():
     r = strategy_payoff(
         [
@@ -200,6 +254,7 @@ def test_covered_call_uses_stock_leg():
     )
     # Capped upside above the short strike: (110-100) stock gain + 3 premium = 13.
     assert r["max_profit"] == pytest.approx(13.0)
+    assert r["max_loss"] == pytest.approx(-97.0)
     assert all(math.isfinite(p["payoff"]) for p in r["payoff_curve"])
 
 
