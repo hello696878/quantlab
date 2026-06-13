@@ -685,11 +685,11 @@ All research tools reuse `run_backtest` and `compute_metrics` — no separate en
 
 ### Phase 11.1 — Release Candidate QA Checklist ✅
 
-- Documentation-only pass to prepare a **v4.0 release candidate**. **No code,
+- Documentation-only pass to prepare the initial release-candidate package. **No code,
   quant logic, API, or feature changes.**
 - New release/QA docs: **`RELEASE_CHECKLIST.md`** (environment / backend /
   frontend / per-feature QA with expected results + demo parameters),
-  **`DEMO_SCRIPT.md`** (5–8 min showcase flow with exact parameters),
+  **`DEMO_SCRIPT.md`** (showcase flow with exact parameters),
   **`KNOWN_ISSUES.md`** (honest, release-facing limitations), and
   **`SCREENSHOT_PLAN.md`** (12 recommended captures with page/params/visible/
   filename).

@@ -41,20 +41,20 @@ All strategies use daily closing prices only. Intraday patterns, opening gaps, a
 
 ## Backtest Engine
 
-### Simplified transaction cost model
+### Static transaction cost model
 
-Transaction costs are modelled as a flat percentage of portfolio value (`transaction_cost_bps / 10000`) charged on each position change. This is a rough approximation. In practice, costs depend on:
+Transaction costs are modelled as a static percentage of portfolio value charged on each position change. The single-asset Backtest form and Strategy Comparison support either backward-compatible simple bps or a commission + slippage + spread/conservative preset; CSV upload and SMA research tools use the simple `transaction_cost_bps` path. This is still a rough approximation. In practice, costs depend on:
 
 - Trade size (market impact)
 - Bid-ask spread (varies by asset, time, liquidity)
 - Broker commissions
 - Short-selling borrowing fees (relevant for pairs trading)
 
-The model does not simulate partial fills, slippage, or order book dynamics.
+The model does not simulate dynamic spreads, size-dependent impact, partial fills, or order book dynamics.
 
-### No slippage model
+### No execution simulator
 
-Trades are executed at the closing price of the signal bar (i.e., the open of the next bar conceptually). In reality, large orders move the market. For illiquid assets or large position sizes, actual fill prices will be worse.
+Signals are generated from the close and shifted one bar before returns are earned, but the daily-bar simulation still approximates fills from closing-price data. Static slippage bps can be included in the cost model, but QuantLab does not model intraday execution paths, gap fills, market orders walking the book, or adverse selection. For illiquid assets or large position sizes, actual fill prices can be materially worse.
 
 ### No tax model
 
@@ -82,7 +82,7 @@ This is still a simplified convention:
 - CAGR uses `periods_per_year` (not exact calendar days) for v1.
 - `auto` detection is a simple ticker heuristic (`-USD` suffix / a known-crypto list); uncertain tickers default to 252 with a warning.
 - Mixed-asset portfolios may need more nuanced calendar handling in future.
-- **Pairs trading, CSV-upload backtests, the SMA research tools (sweep / train-test / walk-forward), and all portfolio analytics still annualise with 252** regardless of asset — only the single-asset Backtest and Strategy Comparison flows honour the selected mode.
+- **Pairs trading, the CSV Upload UI's simple workflow, the SMA research tools (sweep / train-test / walk-forward), and all portfolio analytics still annualise with 252** regardless of asset — only the single-asset Backtest and Strategy Comparison flows expose the selected mode in the UI.
 
 Using 252 for crypto assets will understate annual returns and overstate risk metrics compared to a 365-day calculation, which is why `crypto_365` / `auto` exist.
 

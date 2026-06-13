@@ -107,8 +107,9 @@ Return to the Command Center's **Platform Direction** panel (or open
 - **Guided demos / onboarding** — show a preset chip prefilling the form
   (never auto-runs); run the BTC-USD crypto momentum demo with **auto**
   annualization resolving to crypto 365.
-- **Command palette** — Ctrl/Cmd+K, search `LTCM`, `robustness`, or a saved
-  report name; everything is reachable from the keyboard.
+- **Command palette** — Ctrl/Cmd+K, search `LTCM`, `Flash Crash`,
+  `Fama French`, `robustness`, or a saved report name; everything is reachable
+  from the keyboard.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

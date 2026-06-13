@@ -78,11 +78,11 @@ Each function takes a `pd.Series` of closing prices and returns a `pd.Series` of
 
 | Function | Position values | Logic |
 |---|---|---|
-| `sma_crossover_signals` | 0 or 1 | Long when fast SMA > slow SMA |
+| `sma_crossover_signals` | 0 / 1 (or -1 / 0 / 1 with direction modes) | Long when fast SMA > slow SMA |
 | `rsi_mean_reversion_signals` | 0 or 1 | Enter when RSI < oversold; exit when RSI > exit threshold |
 | `bollinger_band_signals` | 0 or 1 | Enter when close < lower band; exit at middle or upper band |
-| `momentum_signals` | 0 or 1 | Enter when trailing N-day return > entry threshold |
-| `volatility_breakout_signals` | 0 or 1 | Enter when close > rolling high + multiplier × range |
+| `momentum_signals` | 0 / 1 (or -1 / 0 / 1 with direction modes) | Enter when trailing N-day return > entry threshold |
+| `volatility_breakout_signals` | 0 / 1 (or -1 / 0 / 1 with direction modes) | Enter when close > rolling high + multiplier × range |
 | `pairs_signals` | −1, 0, or +1 | Long/short spread based on z-score of log-price spread |
 
 ---
@@ -93,7 +93,7 @@ Each function takes a `pd.Series` of closing prices and returns a `pd.Series` of
 
 - **Strategy equity curve** — daily portfolio value after applying position and transaction costs
 - **Benchmark equity curve** — buy-and-hold with no transaction costs
-- **Trade log** — list of BUY/SELL records with date, price, shares, and dollar cost
+- **Trade log** — list of position-change records (BUY / SELL / SHORT / COVER / FLIP_TO_LONG / FLIP_TO_SHORT, plus spread actions for pairs) with date, price context, shares/exposure, and dollar transaction cost
 
 Transaction cost model:
 
@@ -111,20 +111,20 @@ For a long-only strategy (`position ∈ {0, 1}`), this charges `cost_rate` of NA
 
 ### `metrics.py` — Performance Statistics
 
-`compute_metrics(equity_curve)` returns:
+`compute_metrics(equity_curve, periods_per_year=252)` returns:
 
 | Metric | Formula notes |
 |---|---|
 | Total return | `(final / initial) − 1` |
-| CAGR | `(final / initial)^(1/years) − 1`, using 252 trading days/year |
-| Annualised volatility | `std(daily_returns) × √252` |
-| Sharpe ratio | `mean(excess) / std(excess) × √252`, risk-free = 0 |
-| Sortino ratio | `mean(excess) / downside_std × √252` |
+| CAGR | `(final / initial)^(1/years) − 1`, using the selected/default periods-per-year convention |
+| Annualised volatility | `std(daily_returns) × √periods_per_year` |
+| Sharpe ratio | `mean(excess) / std(excess) × √periods_per_year`, risk-free = 0 |
+| Sortino ratio | `mean(excess) / downside_std × √periods_per_year` |
 | Max drawdown | Peak-to-trough on the equity curve (`≤ 0`) |
 | Calmar ratio | `CAGR / |max_drawdown|` |
 | Win rate | Fraction of positive-return days |
 
-All annualisation uses **252 trading days/year** (US equity convention).
+The default convention is **252 trading days/year** (US equity convention). Single-asset Backtest and Strategy Comparison can request 252 / crypto 365 / auto; portfolio analytics, pairs trading, and SMA research tools retain the 252 convention.
 
 ---
 

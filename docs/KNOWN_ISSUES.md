@@ -28,11 +28,12 @@ of a **research tool**.
 
 ## Backtest & execution realism
 
-- **No slippage or market-impact model (yet).** Trades are assumed to fill at the
-  signal bar's close; large orders moving the market are not simulated.
-- **Simplified transaction costs.** A flat bps charge on turnover (`|Δposition|`
-  for single-asset, portfolio rebalancing turnover for baskets) — no spreads,
-  commissions tiers, or partial fills.
+- **No market-impact or execution simulator.** Daily-bar fills are approximations;
+  large orders moving the market, intraday gaps, order-book depth, and partial
+  fills are not simulated.
+- **Static transaction costs.** Simple bps and commission + slippage + spread
+  presets are supported in the main single-asset flows, but costs do not vary by
+  size, liquidity, time, broker tier, or stress regime.
 - **Short-selling is simplified.** Long/short modes (SMA / Momentum / Volatility
   Breakout) and pairs trading earn `−1 × asset_return` on shorts with **no borrow
   fees, margin requirements, liquidation, or funding costs modelled**, and
@@ -52,10 +53,11 @@ of a **research tool**.
 
 ## Metrics
 
-- **Annualization is selectable for single-asset backtests and Strategy
-  Comparison only.** Use `trading_days_252`, `crypto_365`, or `auto` depending
-  on the asset. Portfolio analytics, CSV upload, pairs trading, and SMA research
-  tools still use the existing 252 trading-day convention in this version.
+- **Annualization is selectable in the main single-asset UI flows.** Backtest
+  Studio and Strategy Comparison expose `trading_days_252`, `crypto_365`, or
+  `auto`. Portfolio analytics, pairs trading, the CSV Upload UI's simple
+  workflow, and SMA research tools still use the existing 252 trading-day
+  convention in this version.
 - **Risk-free rate is 0** in Sharpe/Sortino (a portfolio-level `risk_free_rate`
   is used in the efficient frontier / optimization Sharpe objective).
 

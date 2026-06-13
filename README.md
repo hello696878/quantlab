@@ -6,7 +6,7 @@ QuantLab is a full-stack quantitative research platform you run on your own mach
 
 > **Research only.** QuantLab is an educational/research tool. It does **not** place trades, connect to a broker, or provide investment advice. See [Limitations & Disclaimers](#limitations--disclaimers).
 
-📦 **Latest release: v4.0.0** — [release notes](docs/RELEASE_NOTES_v4.0.0.md) · [changelog](CHANGELOG.md)
+📦 **Showcase candidate: v4.7.0** — [changelog](CHANGELOG.md) · foundational [v4.0.0 release notes](docs/RELEASE_NOTES_v4.0.0.md)
 
 ---
 
@@ -102,7 +102,7 @@ A tour of the running app — every chart and metric below is a **real backend r
 | Styling | Tailwind CSS · CSS-variable neon theme |
 | Charts | Recharts |
 | Local persistence | SQLite (saved backtests, reports & strategy templates) |
-| Testing | pytest (980+ tests across 48 files, synthetic data) |
+| Testing | pytest (1,060+ tests across 53 files, synthetic data) |
 | CI | GitHub Actions |
 | Containerisation | Docker · Docker Compose |
 
@@ -140,13 +140,14 @@ It searches **both commands and your real local resources**:
 
 - **Navigation** — Go to Home / Backtest / CSV Upload / Custom Strategy Builder / Portfolio Lab / Research Tools / Parameter Sweep / Train/Test / Walk-Forward / Strategy Comparison / Saved Backtests / Saved Reports / Settings.
 - **Guided demos** — Load Demo Backtest, Demo Crypto Momentum, Demo Portfolio Risk, Demo Efficient Frontier, Demo Strategy Builder (reusing the onboarding presets — they prefill, they never auto-run).
+- **Content Engine pages** — Strategy Library, Paper Replications, and Quant Disasters entries, including planned/read-only educational pages such as Fama–French and live case studies such as LTCM / Flash Crash. Run/prefill commands are only shown for implemented strategies and inspired demos.
 - **Portfolio tools** — jump straight to Portfolio Backtest, Optimization, Walk-Forward, Efficient Frontier, Risk Dashboard, Stress Test, or Factor Analysis.
 - **Report** — *Export current backtest report (Markdown)*, shown only when a backtest result is on screen (broken/no-op commands are never listed).
 - **Saved Backtests** — search by name, ticker, or strategy (shows ticker · strategy · Sharpe/CAGR · date); opens the saved backtest detail.
 - **Saved Reports** — search by title, ticker, source, or strategy; opens the saved report detail.
 - **Strategy Templates** — your saved *My Templates* **and** the built-in **gallery** templates (matched on name, description, and tags); opens the Custom Strategy Builder with that template loaded.
 
-Saved resources are fetched live from the backend (`/saved-backtests`, `/saved-reports`, `/custom-strategies`, `/custom-strategy-gallery`) each time you open the palette — never fabricated. Try `BTC` (your BTC-USD backtests/reports), `momentum` (the Momentum command, momentum templates, the *Momentum + Trend* gallery template, momentum reports), or `risk` (Risk Dashboard, Risk Report template, saved risk reports, stress test). Each list is fetched independently, so one failing endpoint never breaks the others.
+Saved resources are fetched live from the backend (`/saved-backtests`, `/saved-reports`, `/custom-strategies`, `/custom-strategy-gallery`) each time you open the palette — never fabricated. Try `BTC` (your BTC-USD backtests/reports), `momentum` (Momentum commands/templates/reports), `Fama French` (planned paper/model pages with no run button), `LTCM`, `Flash Crash`, or `risk`. Each list is fetched independently, so one failing endpoint never breaks the others.
 
 **Offline behaviour.** If the FastAPI backend is offline, navigation and demo commands still work; saved resources are **omitted** (never shown stale) and the palette shows a *"Saved resources unavailable while backend is offline"* note. Opening a saved backtest or report while the backend is down shows a friendly **Backend offline** panel (amber info card) — explaining the data is safe in local SQLite, the exact `uvicorn` command to start the backend, and **Retry** / **Go to Command Center** actions — instead of a raw HTTP 500. The frontend API layer classifies errors (`classifyApiError`: offline / server / not-found / validation / unknown) so real errors are still surfaced, just presented better.
 
@@ -426,7 +427,7 @@ The local database lives at `backend/data/quantlab.db` (both `saved_backtests` a
 - Transaction cost model: bps charged on turnover (`|Δposition|` / portfolio rebalancing), with a v1 `cost_model` on single-asset backtests (Backtest form → **Cost model** selector) — **simple BPS** (default, backward-compatible), **commission + slippage (+ optional spread)**, or a **conservative** preset (10 + 10 + 5 = 25 bps/side). The response reports `effective_cost_bps`, `total_transaction_cost`, and `cost_drag_return`. Still a static per-side assumption — no size-dependent market-impact model. *(Available on the single-asset **Backtest** form and **Strategy Comparison** (applied globally to all five strategies); CSV upload and the SMA research tools use the simple `transaction_cost_bps` field.)*
 - Position sizing: a v1 `position_sizing` on single-asset backtests (Backtest form → **Position sizing** selector) — **Full Allocation** (`type: "full_allocation"`, default/backward-compatible), **Fixed Fraction**, **Volatility Target** (`lookback_days`, no-lookahead rolling realized vol, capped at `max_exposure` — de-levers only), or **Exposure Cap** (cash reserve). Sizing scales exposure magnitude only — signal timing/direction are unchanged and **no leverage** (`|exposure| ≤ 1`). The response reports `average_exposure` and echoes the resolved sizing. *(Available on the single-asset **Backtest** form and **Strategy Comparison**; pairs, CSV, and the SMA research tools use full allocation.)*
 - Risk management: a v1 `risk_management` on single-asset backtests (Backtest form → **Risk management** selector) — **None** (default/backward-compatible), **Stop / Take Profit** (`fixed_stop_take_profit`), **Trailing Stop**, **Max Holding** days, or **Combined**. Rules run *after* the signal+mode produce a desired position and *before* sizing; they **close positions to cash only (never reverse)**, a later new signal can re-enter, and they are **daily-close based & lookahead-free** (decision for bar `t` uses prices through `close[t-1]`). The response echoes the resolved rules + `risk_diagnostics` (stop/take/trailing/max-holding exit counts), and trades carry a `reason` (signal_entry / signal_exit / signal_flip / stop_loss / take_profit / trailing_stop / max_holding_days). Intraday breaches, gaps, and liquidity are not modelled, and rules are **not investment recommendations**. *(Available on the single-asset **Backtest** form and **Strategy Comparison** (applied globally, with daily-bar approximation); pairs, CSV, and the SMA research tools use signal-based exits.)* **Strategy Comparison** applies these controls — cost model, position sizing, risk management, and direction mode — globally to all five strategies, while each strategy keeps its default strategy-specific parameters; mean-reversion strategies (RSI, Bollinger) run long-only under short modes and are labelled accordingly.
-- Annualization convention: a v1 `annualization_mode` on single-asset backtests and Strategy Comparison (Backtest form / Simulation Settings → **Annualization** selector) — **Trading days · 252** (default/backward-compatible, equities/ETFs), **Crypto · 365** (24/7 crypto daily data), or **Auto** (infer from the ticker: recognized crypto → 365, else 252 with a caveat). It rescales **CAGR / Calmar / Sharpe / Sortino / volatility** only — it **does not change trades, the equity curve, or total return**. The response echoes `annualization_mode`, `annualization_mode_used`, `periods_per_year`, and an `annualization_warning` when auto can't confirm the asset class. *(Pairs, CSV, the SMA research tools, and portfolio analytics remain 252 for now.)*
+- Annualization convention: a v1 `annualization_mode` on single-asset backtests and Strategy Comparison (Backtest form / Simulation Settings → **Annualization** selector) — **Trading days · 252** (default/backward-compatible, equities/ETFs), **Crypto · 365** (24/7 crypto daily data), or **Auto** (infer from the ticker: recognized crypto → 365, else 252 with a caveat). It rescales **CAGR / Calmar / Sharpe / Sortino / volatility** only — it **does not change trades, the equity curve, or total return**. The response echoes `annualization_mode`, `annualization_mode_used`, `periods_per_year`, and an `annualization_warning` when auto can't confirm the asset class. *(Pairs, the CSV Upload UI's simple workflow, the SMA research tools, and portfolio analytics remain 252 for now.)*
 - Data provider abstraction + quality diagnostics: **Yahoo Finance (yfinance)** is the default provider (`Close` is auto-adjusted for splits/dividends); **CSV upload** has its own workspace (`provider: "csv_upload"`). Single-asset backtests, CSV backtests, custom strategies, and Strategy Comparison responses include `data_provider` + `data_quality` (actual date range, row count, missing values, duplicate dates, inferred frequency, calendar gaps, price column, warnings) — purely informational, computed from the exact series fed to the engine, never altering results. Results pages show a compact **Data Source** card. The layer is structured so future providers (local parquet, Polygon, Tiingo, Alpaca, Binance) can slot in behind the same seam — **no paid/professional data feed is integrated yet**, and yfinance data may contain gaps or revisions.
 - Benchmark & active analytics: a v1 `benchmark` config on single-asset backtests and Strategy Comparison — **Buy & Hold Same Asset** (default; the engine's costless built-in benchmark), **Custom Benchmark** ticker (e.g. SPY/QQQ/BTC-USD, fetched via the same provider seam with its own data-quality diagnostics, **inner-joined by date**), or **None**. Responses add a `benchmark_analytics` block: benchmark total return / CAGR / volatility / Sharpe / max drawdown plus active metrics — **excess return, alpha, beta, correlation, tracking error, information ratio** (risk-free rate 0, annualized with the selected convention). Non-computable metrics (zero variance, zero tracking error, limited overlap) are **null with a warning**, never NaN. Benchmark choice **never changes strategy trades or results**, and the legacy same-asset benchmark fields/chart stay unchanged. Results visualize the comparison with labelled **strategy-vs-benchmark equity and drawdown overlays** plus a **cumulative excess return** chart (difference of cumulative returns from the first aligned date), all hidden when benchmark mode is None. *(Single-asset Backtest + Strategy Comparison; the per-strategy comparison table gains a "vs Benchmark" toggle. Pairs/CSV custom benchmarks and portfolio tools are future work.)*
 - Reproducible config hashes: every single-asset backtest and Strategy Comparison response includes a `reproducibility` block — a **SHA-256 config hash** (12-char display + full hex) over the **canonical, normalized, result-changing inputs** (strategy + params, ticker, dates, capital, effective cost, position sizing, risk rules, resolved annualization, benchmark, direction, data provider; CSV backtests also fingerprint the uploaded file content). Defaults are normalized before hashing, so a legacy request and its explicit-default equivalent hash identically; outputs (metrics, curves, trades) never affect the hash. Results show a **Reproducibility card** (copy hash / copy canonical config JSON), saved backtests persist the hash, and reports include it. **Local-first fingerprint, not a public URL** — and since providers can revise history, exact output reproducibility also needs the data-quality metadata (dataset version hashing is future work).
@@ -436,7 +437,7 @@ The local database lives at `backend/data/quantlab.db` (both `saved_backtests` a
 - Paper Replication Series v1: a **Paper Replications** workspace covering classic quant papers (Jegadeesh–Titman 1993 momentum, Gatev et al. 2006 pairs, Moskowitz–Ooi–Pedersen 2012 TSMOM, Fama–French 1993, Frazzini–Pedersen 2014 BAB, Avellaneda–Stoikov 2008, Black–Scholes 1973, Black–Litterman 1992) — each page explains the research question, core idea, original method, **honest QuantLab implementation status**, data requirements for full replication, limitations, and the Trust Layer workflow. Live papers ship **inspired demos** (clearly labelled single-asset approximations that preload Backtest Studio — never auto-run, never presented as full replications); planned papers have **no run buttons**. No original performance figures are reproduced; pages cite the papers and are educational, not investment advice. Strategy Library pages cross-link their related papers.
 - Quant Disasters Series v1: a **risk-education workspace** with six case studies (LTCM 1998, Portfolio Insurance 1987, the 2010 Flash Crash, Volmageddon 2018, Archegos 2021, FTX/Alameda 2022) connecting famous failures to QuantLab concepts — leverage, liquidity, crowding, correlation breakdown, short-vol tail risk, forced liquidation, custody/counterparty risk. Each page covers the simplified mechanism, **what a naive backtest might miss**, a Trust-Layer checklist that honestly marks which diagnostics help and **what QuantLab cannot model yet** (margin calls, order-book liquidity, venue failure…), and research lessons. Cross-linked from Strategy Library and Paper Replication pages. Neutral, educational summaries — *not* forensic investigations, legal accusations, or investment advice; no runnable scenario simulations in v1.
 - Pydantic v2 request/response schemas with full validation
-- 1,060+ pytest tests (52 files) using synthetic data — no network calls at test time
+- 1,060+ pytest tests (53 files) using synthetic data — no network calls at test time
 - Typed frontend (`tsc --noEmit` clean), shared loading/empty/offline/error UI primitives, toast system, and an app-level error boundary
 - GitHub Actions CI: backend tests + frontend build on every push/PR
 - Docker Compose: one command to start the full stack
@@ -554,7 +555,7 @@ Frontend: http://localhost:3000
 
 ## Testing
 
-**Backend** — 980+ tests across 48 files, all on synthetic price data (no network calls, no yfinance dependency at test time):
+**Backend** — 1,060+ tests across 53 files, all on synthetic price data (no network calls, no yfinance dependency at test time):
 
 ```powershell
 cd backend
@@ -597,7 +598,7 @@ quantlab/
 │   │   ├── schemas.py       Pydantic v2 request / response models
 │   │   ├── data.py          yfinance OHLCV download layer
 │   │   └── utils.py         Shared helpers (date validation, etc.)
-│   ├── tests/               pytest suite (980+ tests, synthetic data)
+│   ├── tests/               pytest suite (1,060+ tests, synthetic data)
 │   ├── Dockerfile
 │   ├── .dockerignore
 │   └── requirements.txt
@@ -616,7 +617,7 @@ quantlab/
 │   ├── LIMITATIONS.md       Known constraints and caveats
 │   ├── KNOWN_ISSUES.md      Release-facing honest limitations
 │   ├── RELEASE_CHECKLIST.md Pre-release QA checklist
-│   ├── DEMO_SCRIPT.md       5–8 min showcase walkthrough
+│   ├── DEMO_SCRIPT.md       8–12 min showcase walkthrough
 │   ├── SCREENSHOT_PLAN.md   Release screenshot capture plan
 │   └── screenshots/         UI screenshots + capture guide
 ├── .github/
@@ -637,7 +638,7 @@ quantlab/
 | [`docs/LIMITATIONS.md`](docs/LIMITATIONS.md) | Full, categorized constraints and caveats |
 | [`docs/KNOWN_ISSUES.md`](docs/KNOWN_ISSUES.md) | Release-facing honest summary of what is / isn't modelled |
 | [`docs/RELEASE_CHECKLIST.md`](docs/RELEASE_CHECKLIST.md) | Manual QA checklist for cutting a release candidate |
-| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | 5–8 minute demo flow with exact parameters |
+| [`docs/DEMO_SCRIPT.md`](docs/DEMO_SCRIPT.md) | 8–12 minute demo flow with exact parameters |
 | [`docs/SCREENSHOT_PLAN.md`](docs/SCREENSHOT_PLAN.md) | Recommended release screenshots with capture settings |
 
 ---
@@ -652,16 +653,16 @@ QuantLab is deliberately honest about what it does and does not model. See [`doc
 - **Backtests can overfit.** Default parameters are demo-friendly, not tuned; parameter sweeps and in-sample optimization look good by construction. Always validate with Train/Test and Walk-Forward.
 - **Portfolio optimization v1** estimates expected returns and covariance from the selected historical window (252-day annualisation) — descriptive, in-sample, and not a forecast.
 - **Data limitations.** yfinance daily data may have gaps/anomalies and is not survivorship-bias-free; there is no intraday/tick data.
-- **Annualisation conventions are scoped.** Single-asset backtests and Strategy Comparison support 252, crypto 365, or auto; portfolio tools, pairs, CSV upload, and SMA research tools remain on the existing 252-day convention.
+- **Annualisation conventions are scoped.** Single-asset backtests and Strategy Comparison expose 252, crypto 365, or auto in the UI; portfolio tools, pairs, CSV upload's simple UI path, and SMA research tools remain on the existing 252-day convention.
 - **Local & single-user.** Data lives in a local SQLite file with **no authentication, no multi-user support, and no cloud sync**.
 
 ---
 
 ## Roadmap
 
-Most of the platform described above is complete; see [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full per-phase history (Phases 0–12.x: backend MVP → strategies → research tools → portfolio lab → reporting → settings/theme → long/short → Command Center / palette / search → UX resilience → the simulation-realism engines: cost model, position sizing, risk management, annualization, data quality, benchmark analytics + visualization).
+Most of the platform described above is complete; see [`docs/ROADMAP.md`](docs/ROADMAP.md) for the full per-phase history (Phases 0–13.x: backend MVP → strategies → research tools → portfolio lab → reporting → settings/theme → long/short → Command Center / palette / search → UX resilience → the simulation-realism engines → Trust Layer v1 → Content Engine v1 → showcase docs).
 
-**Direction.** Future development follows [Master Blueprint v3](docs/MASTER_BLUEPRINT_V3.md): a long-term catalog of ~100 *educational* quant models across 12 categories (equities, options & volatility, event-driven, futures, FX, rates, credit, crypto, real estate, microstructure simulations, portfolio & risk, ML) plus platform trust features (reproducible backtest permalinks, a Robustness Lab, paper replications, an explainer copilot). **Only a small fraction is built today** — the blueprint is a direction, not a feature list; near-term phases are reproducible permalinks, Robustness Lab v1, Strategy Library pages, and an Options/Volatility engine v1. Broker / live-trading integration remains a **non-goal** for this research tool.
+**Direction.** Future development follows [Master Blueprint v3](docs/MASTER_BLUEPRINT_V3.md): a long-term catalog of ~100 *educational* quant models across 12 categories (equities, options & volatility, event-driven, futures, FX, rates, credit, crypto, real estate, microstructure simulations, portfolio & risk, ML) plus platform trust features. Trust Layer v1 and Content Engine v1 are now built; next candidate phases include Options & Volatility, event-driven/arbitrage, portfolio ensembles, microstructure teaching simulations, an explainer copilot, and 3D visualization. **Only items labelled built exist today** — the blueprint is a direction, not a feature list. Broker / live-trading integration remains a **non-goal** for this research tool.
 
 See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the phased plan with honest status labels (built / planned / research / future — none are commitments).
 

@@ -9,6 +9,56 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## v4.7.0 — Showcase Candidate — 2026-06-13
+
+This candidate packages QuantLab as a portfolio-ready local research showcase:
+the core backtesting/research stack is stable, the Trust Layer is visible in
+results and reports, and the Content Engine explains strategies, papers, and
+failure modes without pretending planned work is already built.
+
+### Added
+
+**Trust Layer v1**
+- Data-quality diagnostics, benchmark analytics/visualization, reproducible
+  SHA-256 config hashes, Robustness Lab bootstrap diagnostics, and Stability
+  Lab SMA parameter-sensitivity heatmaps.
+- Report/export integration for trust diagnostics and caveats, so saved and
+  downloaded research remains auditable.
+
+**Content Engine v1**
+- Strategy Library pages for live strategies plus honest planned/research
+  catalog entries with no run buttons until the backend exists.
+- Paper Replications pages with clearly labelled inspired demos, not full
+  academic replications.
+- Quant Disasters case studies that connect backtest limitations to real risk
+  mechanisms and explicit "cannot model yet" lists.
+- Command Center content hub, global-search access, and release screenshot/demo
+  plans for the showcase flow.
+
+### Changed
+
+- README, release checklist, demo script, screenshot plan, limitations, and
+  known-issues docs refreshed for v4.7 showcase readiness.
+- Command Palette search now opens all existing educational registry pages
+  (including planned Strategy Library / Paper Replication entries) while keeping
+  runnable commands limited to implemented strategies and safe demo presets.
+- Test-count references updated to the current 1,060+ backend tests across 53
+  files.
+
+### Limitations
+
+- Still **research only**: no live trading, broker connection, account system,
+  cloud sync, billing, or AI copilot.
+- yfinance/CSV daily data only; no survivorship-bias-free institutional data,
+  intraday/tick data, or live feeds.
+- Cost modelling is static bps/commission/slippage/spread; there is no
+  size-dependent market-impact, partial-fill, order-book, borrow, margin, or tax
+  simulator.
+- Browser print-to-PDF remains the PDF export path; embedded chart images in
+  reports are future work.
+
+---
+
 ## v4.0.0 — Local-First Quant Research Terminal — 2026-06-08
 
 The first public, portfolio-ready release: a full local-first quantitative

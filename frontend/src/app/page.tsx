@@ -27,15 +27,16 @@ import ReproducibilityCard from "@/components/ReproducibilityCard";
 import RobustnessLabCard from "@/components/RobustnessLabCard";
 import StabilityLabCard from "@/components/StabilityLabCard";
 import StrategyLibraryPanel from "@/components/StrategyLibraryPanel";
-import { LIVE_MODELS } from "@/lib/modelRegistry";
+import { LIVE_MODELS, MODEL_REGISTRY } from "@/lib/modelRegistry";
 import PaperReplicationsPanel from "@/components/PaperReplicationsPanel";
 import {
   LIVE_PAPERS,
+  PAPER_REGISTRY,
   type PaperEntry,
   type PaperRunPreset,
 } from "@/lib/paperRegistry";
 import QuantDisastersPanel from "@/components/QuantDisastersPanel";
-import { LIVE_DISASTERS } from "@/lib/disasterRegistry";
+import { DISASTER_REGISTRY, LIVE_DISASTERS } from "@/lib/disasterRegistry";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -789,11 +790,11 @@ export default function HomePage() {
       keywords: c.keywords,
       run: () => goToPortfolioTab(c.tab),
     })),
-    ...LIVE_MODELS.map((m) => ({
+    ...MODEL_REGISTRY.map((m) => ({
       id: `library-${m.slug}`,
       group: "Strategy Library",
       title: `Open ${m.name} page`,
-      keywords: `strategy library docs ${m.category} ${m.slug}`,
+      keywords: `strategy library docs ${m.category} ${m.status} ${m.slug}`,
       run: () => openLibraryPage(m.slug),
     })),
     ...LIVE_MODELS.filter((m) => m.strategyId).map((m) => ({
@@ -804,11 +805,11 @@ export default function HomePage() {
       hint: "prefill",
       run: () => handleRunFromLibrary(m.strategyId!),
     })),
-    ...LIVE_PAPERS.map((p) => ({
+    ...PAPER_REGISTRY.map((p) => ({
       id: `paper-${p.slug}`,
       group: "Paper Replications",
       title: `Open ${p.authors} (${p.year}) replication page`,
-      keywords: `paper replication ${p.title} ${p.category} ${p.slug}`,
+      keywords: `paper replication ${p.title} ${p.category} ${p.status} ${p.replicationLevel} ${p.slug}`,
       run: () => openPaperPage(p.slug),
     })),
     ...LIVE_PAPERS.filter((p) => p.runPreset).map((p) => ({
@@ -819,11 +820,11 @@ export default function HomePage() {
       hint: "prefill",
       run: () => handleRunPaperPreset(p.runPreset!, p),
     })),
-    ...LIVE_DISASTERS.map((d) => ({
+    ...DISASTER_REGISTRY.map((d) => ({
       id: `disaster-${d.slug}`,
       group: "Quant Disasters",
       title: `Open ${d.title} (${d.year}) case study`,
-      keywords: `disaster risk lesson ${d.title} ${d.category} ${d.slug}`,
+      keywords: `disaster risk lesson ${d.title} ${d.category} ${d.severity} ${d.slug}`,
       run: () => openDisasterPage(d.slug),
     })),
     {

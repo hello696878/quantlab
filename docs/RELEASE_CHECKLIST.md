@@ -1,7 +1,7 @@
-# QuantLab — Release Candidate QA Checklist
+# QuantLab — v4.7 Showcase Candidate QA Checklist
 
-A manual pre-release checklist for cutting a **v4.0 release candidate**. Work top
-to bottom; everything is local and reproducible. Companion docs:
+A manual pre-release checklist for cutting a **v4.7 showcase candidate**. Work
+top to bottom; everything is local and reproducible. Companion docs:
 [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) · [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) ·
 [`SCREENSHOT_PLAN.md`](SCREENSHOT_PLAN.md).
 
@@ -72,8 +72,8 @@ For each item: **what to test → expected result → suggested parameters**.
 - **Params:** n/a.
 
 ### Global search
-- **Test:** in the palette, search `momentum`, `risk`, `BTC`.
-- **Expected:** results mix commands + real saved resources (backtests, reports, templates, gallery), grouped; selecting a saved item opens its detail/builder. Empty query → all; no match → "No results found".
+- **Test:** in the palette, search `SMA Crossover`, `Fama French`, `LTCM`, `Flash Crash`, `momentum`, `risk`, and a saved report name.
+- **Expected:** results mix commands + real saved resources (backtests, reports, templates, gallery) + Content Engine pages, grouped; planned educational pages open as read-only/detail content with no run button. Selecting a saved item opens its detail/builder. Empty query → all; no match → "No results found".
 - **Params:** must have a few saved items to see resource rows.
 
 ### Backtest (single-asset)
@@ -170,4 +170,4 @@ For each item: **what to test → expected result → suggested parameters**.
 - [ ] Screenshots captured per [`SCREENSHOT_PLAN.md`](SCREENSHOT_PLAN.md) (or the README's "pending capture pass" note retained).
 - [ ] Demo rehearsed against [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) end-to-end with no runtime errors.
 - [ ] `backend/data/*.db` is git-ignored; no local DB or secrets committed.
-- [ ] `git status` clean; release notes / changelog updated; tag the release (e.g. `v4.1-rc1`) once all boxes are checked.
+- [ ] `git status` clean; changelog updated; tag the release (e.g. `v4.7.0-rc1`) once all boxes are checked.
