@@ -1387,3 +1387,79 @@ export interface CustomStrategyTemplateExport {
   exit_rules: CustomRule[];
   tags: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Options & Volatility Lab (research v1)
+// ---------------------------------------------------------------------------
+
+export type OptionType = "call" | "put";
+export type OptionSide = "long" | "short";
+
+export interface BlackScholesRequest {
+  option_type: OptionType;
+  underlying_price: number;
+  strike: number;
+  time_to_expiry: number;
+  risk_free_rate: number;
+  volatility: number;
+  dividend_yield?: number;
+}
+
+export interface BlackScholesResponse {
+  option_type: OptionType;
+  price: number;
+  delta: number;
+  gamma: number;
+  vega: number;
+  theta_annual: number;
+  theta_daily: number;
+  rho: number;
+  d1: number;
+  d2: number;
+}
+
+export interface ImpliedVolRequest {
+  option_type: OptionType;
+  market_price: number;
+  underlying_price: number;
+  strike: number;
+  time_to_expiry: number;
+  risk_free_rate: number;
+  dividend_yield?: number;
+}
+
+export interface ImpliedVolResponse {
+  implied_volatility: number | null;
+  converged: boolean;
+  iterations: number;
+  warning: string | null;
+}
+
+export interface PayoffLeg {
+  instrument: "option" | "stock";
+  option_type?: OptionType;
+  side: OptionSide;
+  strike?: number;
+  premium?: number;
+  entry_price?: number;
+  quantity?: number;
+}
+
+export interface PayoffRequest {
+  legs: PayoffLeg[];
+  price_min: number;
+  price_max: number;
+  points: number;
+}
+
+export interface PayoffPoint {
+  underlying_price: number;
+  payoff: number;
+}
+
+export interface PayoffResponse {
+  payoff_curve: PayoffPoint[];
+  max_profit: number | null;
+  max_loss: number | null;
+  breakevens: number[];
+}

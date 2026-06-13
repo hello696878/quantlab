@@ -14,6 +14,8 @@ interface Props {
   onOpenStrategy: (slug: string) => void;
   /** Open a related Paper Replications page. */
   onOpenPaper: (slug: string) => void;
+  /** Open the Options Lab (volatility-case cross-link). */
+  onOpenOptions?: () => void;
   /** Initial detail slug (e.g. from the command palette); null = index. */
   initialSlug?: string | null;
 }
@@ -64,6 +66,7 @@ const CAVEAT =
 export default function QuantDisastersPanel({
   onOpenStrategy,
   onOpenPaper,
+  onOpenOptions,
   initialSlug = null,
 }: Props) {
   const [slug, setSlug] = useState<string | null>(initialSlug);
@@ -90,6 +93,7 @@ export default function QuantDisastersPanel({
         onBack={() => setSlug(null)}
         onOpenStrategy={onOpenStrategy}
         onOpenPaper={onOpenPaper}
+        onOpenOptions={onOpenOptions}
       />
     );
   }
@@ -150,15 +154,18 @@ function DisasterDetail({
   onBack,
   onOpenStrategy,
   onOpenPaper,
+  onOpenOptions,
 }: {
   entry: DisasterEntry;
   onBack: () => void;
   onOpenStrategy: (slug: string) => void;
   onOpenPaper: (slug: string) => void;
+  onOpenOptions?: () => void;
 }) {
   const relatedModels = MODEL_REGISTRY.filter((m) =>
     entry.relatedStrategyIds.includes(m.id),
   );
+  const showOptionsLink = entry.slug === "volmageddon-2018" && onOpenOptions;
   const relatedPapers = entry.relatedPaperSlugs
     .map((s) => findPaperBySlug(s))
     .filter((p): p is NonNullable<typeof p> => Boolean(p));
@@ -243,6 +250,24 @@ function DisasterDetail({
       <Section title="Lessons">
         <Bullets items={entry.lessons} />
       </Section>
+
+      {showOptionsLink && (
+        <Section title="Related QuantLab Tool">
+          <button
+            type="button"
+            onClick={onOpenOptions}
+            className="rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition-colors hover:border-blue-400 hover:text-blue-600"
+          >
+            Options Lab — short-vol payoff asymmetry →
+          </button>
+          <p className="mt-2 text-[11px] text-slate-400">
+            Use the payoff builder (short straddle/strangle) to see the bounded
+            premium vs unbounded loss profile this case is about — and remember
+            payoff diagrams ignore the path-dependent mark-to-market swings that
+            destroyed the product.
+          </p>
+        </Section>
+      )}
 
       {(relatedModels.length > 0 || relatedPapers.length > 0) && (
         <Section title="Related Pages">

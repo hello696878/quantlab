@@ -11,6 +11,7 @@ export type View =
   | "library"
   | "replications"
   | "disasters"
+  | "options"
   | "csv"
   | "builder"
   | "portfolio"

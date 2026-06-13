@@ -3527,3 +3527,116 @@ class FactorAnalysisResponse(BaseModel):
         ),
         description="Historical / collinearity caveat.",
     )
+
+
+# ===========================================================================
+# Options & Volatility Lab (research v1)
+# ===========================================================================
+
+OptionType = Literal["call", "put"]
+OptionSide = Literal["long", "short"]
+
+
+class BlackScholesRequest(BaseModel):
+    """Inputs for European Black–Scholes pricing + Greeks."""
+
+    option_type: OptionType = "call"
+    underlying_price: float = Field(gt=0.0, description="Spot price S (> 0).")
+    strike: float = Field(gt=0.0, description="Strike K (> 0).")
+    time_to_expiry: float = Field(gt=0.0, le=100.0, description="Years to expiry T (> 0).")
+    risk_free_rate: float = Field(ge=-1.0, le=1.0, description="Continuous risk-free rate r.")
+    volatility: float = Field(gt=0.0, le=10.0, description="Annualized volatility sigma (> 0).")
+    dividend_yield: float = Field(default=0.0, ge=0.0, le=1.0, description="Continuous dividend yield q.")
+
+
+class BlackScholesResponse(BaseModel):
+    """European Black–Scholes price + Greeks. Educational; see caveats."""
+
+    option_type: OptionType
+    price: float
+    delta: float = Field(description="Per 1.0 change in the underlying.")
+    gamma: float = Field(description="Per 1.0 change in the underlying.")
+    vega: float = Field(description="Raw, per 1.0 (100%) change in volatility.")
+    theta_annual: float = Field(description="Per year (negative for long options).")
+    theta_daily: float = Field(description="theta_annual / 365.")
+    rho: float = Field(description="Raw, per 1.0 (100%) change in the rate.")
+    d1: float
+    d2: float
+
+
+class ImpliedVolRequest(BaseModel):
+    """Inputs for the implied-volatility solver."""
+
+    option_type: OptionType = "call"
+    market_price: float = Field(gt=0.0, description="Observed option price (> 0).")
+    underlying_price: float = Field(gt=0.0)
+    strike: float = Field(gt=0.0)
+    time_to_expiry: float = Field(gt=0.0, le=100.0)
+    risk_free_rate: float = Field(ge=-1.0, le=1.0)
+    dividend_yield: float = Field(default=0.0, ge=0.0, le=1.0)
+
+
+class ImpliedVolResponse(BaseModel):
+    """Implied volatility + solver status (bisection)."""
+
+    implied_volatility: Optional[float] = Field(
+        default=None, description="Null when the price is outside no-arbitrage bounds."
+    )
+    converged: bool
+    iterations: int
+    warning: Optional[str] = None
+
+
+class PayoffLeg(BaseModel):
+    """One leg of a payoff strategy (option or stock)."""
+
+    instrument: Literal["option", "stock"] = "option"
+    option_type: Optional[OptionType] = Field(default=None, description="Required for option legs.")
+    side: OptionSide = "long"
+    strike: Optional[float] = Field(default=None, gt=0.0, description="Required for option legs.")
+    premium: float = Field(default=0.0, ge=0.0, description="Manual premium input (option legs).")
+    entry_price: Optional[float] = Field(default=None, gt=0.0, description="Required for stock legs.")
+    quantity: float = Field(default=1.0, gt=0.0, le=1000.0)
+
+    @model_validator(mode="after")
+    def check_leg(self) -> "PayoffLeg":
+        if self.instrument == "option":
+            if self.option_type is None:
+                raise ValueError("option legs require option_type (call/put).")
+            if self.strike is None:
+                raise ValueError("option legs require a strike.")
+        else:  # stock
+            if self.entry_price is None:
+                raise ValueError("stock legs require entry_price.")
+        return self
+
+
+class PayoffRequest(BaseModel):
+    """A multi-leg payoff request (manual legs — no live option chains)."""
+
+    legs: List[PayoffLeg] = Field(min_length=1, max_length=8)
+    price_min: float = Field(gt=0.0)
+    price_max: float = Field(gt=0.0)
+    points: int = Field(default=101, ge=20, le=1000)
+
+    @model_validator(mode="after")
+    def check_range(self) -> "PayoffRequest":
+        if self.price_min >= self.price_max:
+            raise ValueError("price_min must be less than price_max.")
+        return self
+
+
+class PayoffPoint(BaseModel):
+    underlying_price: float
+    payoff: float
+
+
+class PayoffResponse(BaseModel):
+    """Expiration payoff curve + bounded extremes + approximate breakevens."""
+
+    payoff_curve: List[PayoffPoint]
+    max_profit: Optional[float] = Field(default=None, description="Null when unbounded.")
+    max_loss: Optional[float] = Field(default=None, description="Null when unbounded.")
+    breakevens: List[float] = Field(
+        default_factory=list, description="Approximate — interpolated from the sampled curve."
+    )

@@ -786,6 +786,24 @@ single-asset Backtest + Strategy Comparison:
 - Strategy Comparison added to Quick Actions; Trust-Layer workflow commands in
   the palette; all static sections render with the backend offline
 
+### Phase 14.0 — Options & Volatility Lab v1 ✅
+
+- New backend `app/options.py` (zero-dependency `math.erf` Black–Scholes):
+  European pricing + Greeks (delta/gamma/vega/theta annual+daily/rho/d1/d2),
+  a robust **bisection** implied-vol solver with no-arbitrage bounds, and an
+  expiration **payoff engine** (option + stock legs, bounded max/min detection,
+  approximate breakevens)
+- Three deterministic routes: `POST /options/black-scholes`,
+  `/options/implied-volatility`, `/options/payoff` (validated; never NaN/inf)
+- Frontend **Options Lab** workspace: Pricing / Implied Vol / Payoff Builder /
+  Education tabs; 10 strategy presets (long call/put, covered call, protective
+  put, bull/bear spreads, straddles, strangles); neon payoff chart with
+  breakeven markers
+- Integrated into the dashboard Content Engine, command palette (4 commands),
+  and cross-linked from the Black–Scholes paper page + Volmageddon disaster page
+- Educational only — no live chains, no American exercise, no vol surface;
+  27 backend tests (textbook known values + put-call parity + payoff bounds)
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -840,8 +858,8 @@ search · toasts, error boundary, loading/offline states.
    live strategies + honest planned-model catalog)
 5. ~~Paper Replication Series v1~~ — **built** (13.1: 8 paper pages, 3 honest
    inspired demos; full replications remain future work pending universe data)
-6. **Options Pricing Engine v1** — Black–Scholes, Greeks, simple IV surface
-   (educational; no options data feed)
+6. ~~Options Pricing Engine v1~~ — **built** (14.0: Black–Scholes pricing +
+   Greeks + IV solver + payoff builder; a vol *surface* remains future)
 7. **Volatility Lab v1** — realized vol estimators, vol targeting deep-dive,
    term-structure visuals
 8. **Event-Driven & Arbitrage Module** (research)

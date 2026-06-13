@@ -75,6 +75,11 @@ from app.reproducibility import (
 )
 from app.robustness import build_robustness_report
 from app.sensitivity import run_sensitivity_grid, unsupported_sensitivity
+from app.options import (
+    black_scholes_greeks,
+    implied_volatility,
+    strategy_payoff,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -123,6 +128,12 @@ from app.schemas import (
     BbBacktestRequest,
     BenchmarkAnalytics,
     BenchmarkConfig,
+    BlackScholesRequest,
+    BlackScholesResponse,
+    ImpliedVolRequest,
+    ImpliedVolResponse,
+    PayoffRequest,
+    PayoffResponse,
     CostModel,
     PositionSizing,
     RiskManagement,
@@ -3419,3 +3430,84 @@ def get_strategy_gallery_template(template_id: str) -> GalleryTemplate:
             status_code=404, detail=f"Gallery template '{template_id}' not found."
         )
     return template
+
+
+# ---------------------------------------------------------------------------
+# Options & Volatility Lab endpoints (research v1 — deterministic, no chains)
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/options/black-scholes",
+    response_model=BlackScholesResponse,
+    tags=["options"],
+    summary="Price a European option (Black–Scholes) + Greeks",
+    description=(
+        "Educational European Black–Scholes pricing with continuous dividend "
+        "yield. Returns price, delta, gamma, vega, annual + daily theta, rho, "
+        "d1, d2. Simplified model — no American exercise, discrete dividends, "
+        "smile/term-structure, costs, or liquidity."
+    ),
+)
+def options_black_scholes(request: BlackScholesRequest) -> BlackScholesResponse:
+    g = black_scholes_greeks(
+        request.option_type,
+        request.underlying_price,
+        request.strike,
+        request.time_to_expiry,
+        request.risk_free_rate,
+        request.volatility,
+        request.dividend_yield,
+    )
+    return BlackScholesResponse(option_type=request.option_type, **g)
+
+
+@app.post(
+    "/options/implied-volatility",
+    response_model=ImpliedVolResponse,
+    tags=["options"],
+    summary="Solve implied volatility (bisection)",
+    description=(
+        "Robust bisection solver for the Black–Scholes implied volatility. "
+        "Prices outside the no-arbitrage bounds return a warning and "
+        "converged=false rather than crashing."
+    ),
+)
+def options_implied_volatility(request: ImpliedVolRequest) -> ImpliedVolResponse:
+    iv, converged, iterations, warning = implied_volatility(
+        request.option_type,
+        request.market_price,
+        request.underlying_price,
+        request.strike,
+        request.time_to_expiry,
+        request.risk_free_rate,
+        request.dividend_yield,
+    )
+    return ImpliedVolResponse(
+        implied_volatility=iv,
+        converged=converged,
+        iterations=iterations,
+        warning=warning,
+    )
+
+
+@app.post(
+    "/options/payoff",
+    response_model=PayoffResponse,
+    tags=["options"],
+    summary="Expiration payoff for a multi-leg options strategy",
+    description=(
+        "Expiration payoff curve for manually-entered legs (no live option "
+        "chains). Returns bounded max profit / max loss (null when unbounded) "
+        "and approximate breakevens interpolated from the sampled curve. "
+        "Expiration payoff only — not path-dependent mark-to-market PnL."
+    ),
+)
+def options_payoff(request: PayoffRequest) -> PayoffResponse:
+    result = strategy_payoff(
+        [leg.model_dump() for leg in request.legs],
+        request.price_min,
+        request.price_max,
+        request.points,
+    )
+    return PayoffResponse(**result)

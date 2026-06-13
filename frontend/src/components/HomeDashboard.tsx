@@ -112,7 +112,7 @@ const ROADMAP_STATUS: { label: string; status: "Built" | "Planned" | "Future" }[
   { label: "Strategy Library", status: "Built" },
   { label: "Paper Replications", status: "Built" },
   { label: "Quant Disasters", status: "Built" },
-  { label: "Options & Volatility Lab", status: "Planned" },
+  { label: "Options & Volatility Lab", status: "Built" },
   { label: "Event-Driven / Arbitrage Module", status: "Planned" },
   { label: "Portfolio Ensemble Builder", status: "Planned" },
   { label: "Microstructure & HFT Lab", status: "Future" },
@@ -969,7 +969,7 @@ export default function HomeDashboard({
           Learn how strategies work, where the ideas came from, and how they
           fail.
         </p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <button
             type="button"
             onClick={() => onNav("library")}
@@ -1016,6 +1016,22 @@ export default function HomeDashboard({
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Study Disasters →
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNav("options")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+              Options Lab
+            </span>
+            <span className="text-xs text-slate-400">
+              European Black–Scholes pricing, Greeks, implied volatility, and
+              payoff diagrams — a deterministic educational calculator.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Options Lab →
             </span>
           </button>
         </div>

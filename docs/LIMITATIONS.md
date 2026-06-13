@@ -100,6 +100,18 @@ Robustness Lab v1 block-bootstraps the realized daily strategy returns (blocks p
 - **Deflated Sharpe is null in v1**: it requires the number of tried configurations and distributional assumptions, which the app cannot know. Full deflated Sharpe and PBO (probability of backtest overfitting) are planned for Robustness/Stability v2 — they are **not implemented yet**. The SMA parameter-sensitivity heatmap exists as Stability Lab v1 below.
 - Robustness quality inherits data quality: warnings from the data layer are surfaced because the bootstrap assumes the input return series is valid.
 
+### Options Lab is an educational calculator, not an options risk engine
+
+The Options & Volatility Lab v1 prices **European** options with Black–Scholes (continuous dividend yield), computes Greeks, solves implied volatility by bisection, and draws expiration payoff diagrams. It is deterministic and educational. It explicitly does **not** model:
+
+- American / early exercise, or discrete dividends.
+- Volatility smile or term structure (a single flat σ per calculation — no surface).
+- Transaction costs, bid/ask spreads, liquidity, or assignment risk.
+- Path-dependent mark-to-market PnL — payoff diagrams are **terminal** payoff at expiration only (a short option can show a small bounded payoff yet carry large interim losses; see Volmageddon in Quant Disasters).
+- Real-time Greeks or **any live option-chain data** — all inputs (including premiums in the payoff builder) are manual.
+
+Greeks conventions are labelled: delta/gamma per 1.0 of the underlying; vega/rho raw per 1.0 (100%) move; theta shown per-day and per-year. Breakevens are approximate (interpolated from the sampled payoff curve). It is not a fair value, a recommendation, or a production options risk system.
+
 ### Stability Lab explores parameters; it cannot bless them
 
 Stability Lab v1 sweeps an SMA fast × slow grid with the same simulation settings and summarizes whether the selected parameters sit in a stable neighborhood. Honest limits:

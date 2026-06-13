@@ -20,6 +20,8 @@ interface Props {
   onOpenStrategy: (slug: string) => void;
   /** Open a related Quant Disasters case study. */
   onOpenDisaster?: (slug: string) => void;
+  /** Open the Options Lab (Black–Scholes paper cross-link). */
+  onOpenOptions?: () => void;
   /** Initial detail slug (e.g. from the command palette); null = index. */
   initialSlug?: string | null;
 }
@@ -88,6 +90,7 @@ export default function PaperReplicationsPanel({
   onRunPreset,
   onOpenStrategy,
   onOpenDisaster,
+  onOpenOptions,
   initialSlug = null,
 }: Props) {
   const [slug, setSlug] = useState<string | null>(initialSlug);
@@ -115,6 +118,7 @@ export default function PaperReplicationsPanel({
         onRunPreset={onRunPreset}
         onOpenStrategy={onOpenStrategy}
         onOpenDisaster={onOpenDisaster}
+        onOpenOptions={onOpenOptions}
       />
     );
   }
@@ -219,17 +223,20 @@ function PaperDetail({
   onRunPreset,
   onOpenStrategy,
   onOpenDisaster,
+  onOpenOptions,
 }: {
   paper: PaperEntry;
   onBack: () => void;
   onRunPreset: (preset: PaperRunPreset, paper: PaperEntry) => void;
   onOpenStrategy: (slug: string) => void;
   onOpenDisaster?: (slug: string) => void;
+  onOpenOptions?: () => void;
 }) {
   const relatedModels = MODEL_REGISTRY.filter((m) =>
     paper.relatedStrategyIds.includes(m.id),
   );
   const relatedDisasters = disastersForPaper(paper.slug);
+  const showOptionsLink = paper.slug === "black-scholes-1973-options" && onOpenOptions;
   const statusLine =
     paper.replicationLevel === "inspired_demo"
       ? "Inspired demo available — a single-asset approximation of the research idea, not the paper's design."
@@ -342,6 +349,22 @@ function PaperDetail({
               </button>
             ))}
           </div>
+        </Section>
+      )}
+
+      {showOptionsLink && (
+        <Section title="Related QuantLab Tool">
+          <button
+            type="button"
+            onClick={onOpenOptions}
+            className="rounded-lg bg-blue-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-blue-700"
+          >
+            Open the Options Lab (Black–Scholes calculator) →
+          </button>
+          <p className="mt-2 text-[11px] text-slate-400">
+            The Options Lab implements this paper&apos;s European pricing model
+            with Greeks, an implied-vol solver, and payoff diagrams.
+          </p>
         </Section>
       )}
 

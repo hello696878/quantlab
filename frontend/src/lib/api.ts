@@ -9,6 +9,12 @@ import type {
   BacktestRequest,
   BacktestResponse,
   BbBacktestRequest,
+  BlackScholesRequest,
+  BlackScholesResponse,
+  ImpliedVolRequest,
+  ImpliedVolResponse,
+  PayoffRequest,
+  PayoffResponse,
   CustomStrategyRequest,
   CustomStrategyTemplateCreate,
   CustomStrategyTemplateExport,
@@ -853,4 +859,50 @@ export async function getStrategyGalleryTemplate(
     `/api/custom-strategy-gallery/${encodeURIComponent(templateId)}`,
     { method: "GET" },
   );
+}
+
+// ---------------------------------------------------------------------------
+// Options & Volatility Lab (research v1)
+// ---------------------------------------------------------------------------
+
+/** Shared POST helper for the deterministic Options Lab endpoints. */
+async function postOptions<T>(path: string, body: unknown): Promise<T> {
+  let res: Response;
+  try {
+    res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+  if (!res.ok) {
+    let message =
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`;
+    try {
+      const errBody = await res.json();
+      message = formatBackendDetail(errBody?.detail) ?? message;
+    } catch {
+      // keep the HTTP status message
+    }
+    throw new BacktestApiError(res.status, message);
+  }
+  return res.json() as Promise<T>;
+}
+
+export function priceBlackScholes(
+  req: BlackScholesRequest,
+): Promise<BlackScholesResponse> {
+  return postOptions<BlackScholesResponse>("/api/options/black-scholes", req);
+}
+
+export function solveImpliedVolatility(
+  req: ImpliedVolRequest,
+): Promise<ImpliedVolResponse> {
+  return postOptions<ImpliedVolResponse>("/api/options/implied-volatility", req);
+}
+
+export function computeOptionPayoff(req: PayoffRequest): Promise<PayoffResponse> {
+  return postOptions<PayoffResponse>("/api/options/payoff", req);
 }

@@ -37,6 +37,7 @@ import {
 } from "@/lib/paperRegistry";
 import QuantDisastersPanel from "@/components/QuantDisastersPanel";
 import { DISASTER_REGISTRY, LIVE_DISASTERS } from "@/lib/disasterRegistry";
+import OptionsLabPanel from "@/components/OptionsLabPanel";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -338,6 +339,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "How quant strategies fail — simplified risk-education case studies, not forensic investigations.",
   },
+  options: {
+    title: "Options Lab",
+    subtitle:
+      "European Black–Scholes pricing, Greeks, implied vol, and payoff diagrams — a deterministic educational calculator.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -434,6 +440,11 @@ export default function HomePage() {
   // Quant Disasters: same pattern.
   const [disasterSlug, setDisasterSlug] = useState<string | null>(null);
   const [disasterKey, setDisasterKey] = useState(0);
+  // Options Lab: which tab to open on (deep-linked from the palette).
+  const [optionsTab, setOptionsTab] = useState<
+    "pricing" | "implied_vol" | "payoff" | "education"
+  >("pricing");
+  const [optionsKey, setOptionsKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -736,6 +747,7 @@ export default function HomePage() {
     { view: "library", title: "Open Strategy Library", keywords: "models catalog docs education strategy pages" },
     { view: "replications", title: "Open Paper Replications", keywords: "papers research academic momentum pairs replication" },
     { view: "disasters", title: "Open Quant Disasters", keywords: "risk education failures ltcm crash blowup lessons" },
+    { view: "options", title: "Open Options Lab", keywords: "options black-scholes greeks implied volatility payoff straddle strangle covered call" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -843,6 +855,23 @@ export default function HomePage() {
       hint: "backtest",
       run: () => handleNav("backtest"),
     },
+    ...(
+      [
+        ["pricing", "Open Black-Scholes Calculator", "options pricing greeks delta gamma vega theta rho"],
+        ["implied_vol", "Open Implied Volatility Solver", "options implied volatility iv solver"],
+        ["payoff", "Open Payoff Builder", "options payoff straddle strangle covered call spread"],
+      ] as const
+    ).map(([t, title, keywords]) => ({
+      id: `options-${t}`,
+      group: "Options Lab",
+      title,
+      keywords,
+      run: () => {
+        setOptionsTab(t);
+        setOptionsKey((k) => k + 1);
+        handleNav("options");
+      },
+    })),
     // Report actions are only offered when they actually work (a result exists).
     ...(result
       ? [
@@ -1255,6 +1284,7 @@ export default function HomePage() {
             onRunPreset={handleRunPaperPreset}
             onOpenStrategy={openLibraryPage}
             onOpenDisaster={openDisasterPage}
+            onOpenOptions={() => handleNav("options")}
           />
         )}
 
@@ -1265,7 +1295,13 @@ export default function HomePage() {
             initialSlug={disasterSlug}
             onOpenStrategy={openLibraryPage}
             onOpenPaper={openPaperPage}
+            onOpenOptions={() => handleNav("options")}
           />
+        )}
+
+        {/* ── Options Lab ──────────────────────────────────────────────── */}
+        {view === "options" && (
+          <OptionsLabPanel key={optionsKey} initialTab={optionsTab} />
         )}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
