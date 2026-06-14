@@ -116,7 +116,11 @@ Return to the Command Center's **Platform Direction** panel (or open
   payoff with unbounded max loss. Then open **Tree Pricing**: price the same
   case on a CRR binomial tree (European call ≈ 10.45, converging to BS), switch
   to an **American put** (price ≥ the European put, early exercise detected),
-  and drop steps to 5 to show the small lattice diagram.
+  and drop steps to 5 to show the small lattice diagram. Finally open **Monte
+  Carlo**: price the European call (10,000 sims · seed 42 → ≈ 10.45 with a
+  standard error and 95% CI that brackets Black–Scholes), show the path-preview
+  chart, then switch to an **Asian Call** and an **Up-and-Out Call** (barrier
+  120) to show path-dependent payoffs with the discrete-monitoring warning.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

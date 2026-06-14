@@ -18,6 +18,7 @@ import {
   computeTreeConvergence,
   priceBinomialTree,
   priceBlackScholes,
+  priceMonteCarlo,
   solveImpliedVolatility,
 } from "@/lib/api";
 import type {
@@ -25,6 +26,8 @@ import type {
   BlackScholesResponse,
   ExerciseStyle,
   ImpliedVolResponse,
+  MonteCarloPayoffType,
+  MonteCarloResponse,
   OptionType,
   PayoffLeg,
   PayoffResponse,
@@ -40,7 +43,7 @@ import {
   DANGER,
 } from "@/components/charts/chartTheme";
 
-type Tab = "pricing" | "implied_vol" | "payoff" | "tree" | "education";
+type Tab = "pricing" | "implied_vol" | "payoff" | "tree" | "monte_carlo" | "education";
 
 const inputCls = "ql-input px-2.5 py-1.5";
 const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400";
@@ -99,10 +102,12 @@ function OptionTypeToggle({
 
 const CAVEAT =
   "Black–Scholes is a simplified European model; Tree Pricing adds a simplified " +
-  "CRR lattice for American exercise. The lab does not model discrete dividends, " +
-  "assignment, transaction costs, liquidity, volatility smile, term structure, " +
-  "or live option chains. Educational only — not a fair value, a recommendation, " +
-  "or a trading system.";
+  "CRR lattice for American exercise; Monte Carlo simulates GBM paths (with " +
+  "sampling error) for European, Asian, and simple barrier options. The lab does " +
+  "not model discrete dividends, assignment, transaction costs, liquidity, " +
+  "volatility smile, term structure, stochastic volatility, or live option " +
+  "chains. Educational only — not a fair value, a recommendation, or a trading " +
+  "system.";
 
 export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -111,9 +116,10 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
     <div className="space-y-5">
       <div className="card p-5">
         <p className="text-sm text-slate-600">
-          The Options Lab prices simple European options, inspects Greeks, solves
-          implied volatility, and visualizes expiration payoff diagrams — a
-          deterministic, educational calculator.
+          The Options Lab prices options with Black–Scholes, binomial trees, and
+          Monte Carlo simulation, inspects Greeks, solves implied volatility, and
+          visualizes expiration payoff diagrams — a reproducible, educational
+          calculator.
         </p>
         <p className="mt-2 text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
@@ -125,6 +131,7 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
             ["implied_vol", "Implied Vol"],
             ["payoff", "Payoff Builder"],
             ["tree", "Tree Pricing"],
+            ["monte_carlo", "Monte Carlo"],
             ["education", "Education"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -146,6 +153,7 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
       {tab === "implied_vol" && <ImpliedVolTab />}
       {tab === "payoff" && <PayoffTab />}
       {tab === "tree" && <TreePricingTab />}
+      {tab === "monte_carlo" && <MonteCarloTab />}
       {tab === "education" && <EducationTab />}
     </div>
   );
@@ -908,6 +916,324 @@ function TreePricingTab() {
         Tree models are numerical approximations: results depend on the step count, the
         volatility input, the (continuous) dividend assumption, and the exercise style. No live
         option chains, no volatility surface, no production risk engine.
+      </p>
+    </div>
+  );
+}
+
+// ── Monte Carlo ──────────────────────────────────────────────────────────────
+
+const MC_PAYOFFS: { value: MonteCarloPayoffType; label: string; barrier: boolean }[] = [
+  { value: "european_call", label: "European Call", barrier: false },
+  { value: "european_put", label: "European Put", barrier: false },
+  { value: "asian_call", label: "Asian Call (avg)", barrier: false },
+  { value: "asian_put", label: "Asian Put (avg)", barrier: false },
+  { value: "up_and_out_call", label: "Up-and-Out Call", barrier: true },
+  { value: "down_and_out_put", label: "Down-and-Out Put", barrier: true },
+];
+
+const MC_CONVERGENCE_SIMS = [1000, 5000, 10000, 25000];
+
+interface ConvRow {
+  simulations: number;
+  price: number;
+  standard_error: number;
+}
+
+function MonteCarloTab() {
+  const colors = useAccentColors();
+  const [payoffType, setPayoffType] = useState<MonteCarloPayoffType>("european_call");
+  const [S, setS] = useState("100");
+  const [K, setK] = useState("100");
+  const [T, setT] = useState("1");
+  const [r, setR] = useState("0.05");
+  const [sigma, setSigma] = useState("0.20");
+  const [q, setQ] = useState("0");
+  const [steps, setSteps] = useState("252");
+  const [simulations, setSimulations] = useState("10000");
+  const [seed, setSeed] = useState("42");
+  const [antithetic, setAntithetic] = useState(false);
+  const [barrier, setBarrier] = useState("120");
+  const [result, setResult] = useState<MonteCarloResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [convRows, setConvRows] = useState<ConvRow[] | null>(null);
+  const [convLoading, setConvLoading] = useState(false);
+
+  const isBarrier = MC_PAYOFFS.find((p) => p.value === payoffType)?.barrier ?? false;
+  const stepsInt = Math.trunc(num(steps));
+  const simsInt = Math.trunc(num(simulations));
+  const seedInt = Math.trunc(num(seed));
+  const valid =
+    num(S) > 0 &&
+    num(K) > 0 &&
+    num(T) > 0 &&
+    num(sigma) > 0 &&
+    finite(r) &&
+    finite(q) &&
+    Number.isInteger(stepsInt) &&
+    stepsInt >= 1 &&
+    stepsInt <= 2000 &&
+    Number.isInteger(simsInt) &&
+    simsInt >= 100 &&
+    simsInt <= 200000 &&
+    Number.isInteger(seedInt) &&
+    seedInt >= 0 &&
+    (!isBarrier || num(barrier) > 0);
+
+  function baseRequest(sims: number) {
+    return {
+      payoff_type: payoffType,
+      underlying_price: num(S),
+      strike: num(K),
+      time_to_expiry: num(T),
+      risk_free_rate: num(r),
+      volatility: num(sigma),
+      dividend_yield: num(q),
+      steps: stepsInt,
+      simulations: sims,
+      seed: seedInt,
+      antithetic,
+      ...(isBarrier ? { barrier_price: num(barrier) } : {}),
+    };
+  }
+
+  async function run() {
+    if (!valid) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setConvRows(null);
+    try {
+      setResult(await priceMonteCarlo(baseRequest(simsInt)));
+    } catch (e) {
+      setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function runConvergence() {
+    if (!valid) return;
+    setConvLoading(true);
+    try {
+      const rows: ConvRow[] = [];
+      for (const sims of MC_CONVERGENCE_SIMS) {
+        const res = await priceMonteCarlo(baseRequest(sims));
+        rows.push({ simulations: sims, price: res.price, standard_error: res.standard_error });
+      }
+      setConvRows(rows);
+    } catch (e) {
+      setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setConvLoading(false);
+    }
+  }
+
+  const hasBsRef = result?.black_scholes_reference != null;
+  const preview = result?.path_preview ?? [];
+  const pathChartData = preview.length
+    ? preview[0].points.map((pt, i) => {
+        const row: Record<string, number> = { time: pt.time };
+        for (const p of preview) row[`p${p.path_id}`] = p.points[i]?.price ?? NaN;
+        return row;
+      })
+    : [];
+
+  return (
+    <div className="card space-y-4 p-5">
+      <p className="section-title">Monte Carlo Pricing — GBM Simulation</p>
+      <p className="text-xs text-slate-500">
+        Prices options by simulating many risk-neutral price paths under Geometric Brownian
+        Motion and averaging the discounted payoff. More simulations shrink the standard error
+        roughly like 1/√N; more steps refine path discretization for path-dependent payoffs.
+        Educational stochastic simulation with sampling error — not a fair value.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Field label="Payoff type">
+          <select
+            className={inputCls}
+            value={payoffType}
+            onChange={(e) => {
+              setPayoffType(e.target.value as MonteCarloPayoffType);
+              setResult(null);
+              setConvRows(null);
+            }}
+          >
+            {MC_PAYOFFS.map((p) => (
+              <option key={p.value} value={p.value}>
+                {p.label}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Underlying S"><input type="number" className={inputCls} value={S} onChange={(e) => setS(e.target.value)} /></Field>
+        <Field label="Strike K"><input type="number" className={inputCls} value={K} onChange={(e) => setK(e.target.value)} /></Field>
+        {isBarrier && (
+          <Field label="Barrier"><input type="number" className={inputCls} value={barrier} onChange={(e) => setBarrier(e.target.value)} /></Field>
+        )}
+        <Field label="Expiry T (years)"><input type="number" className={inputCls} value={T} onChange={(e) => setT(e.target.value)} /></Field>
+        <Field label="Rate r"><input type="number" className={inputCls} value={r} step={0.01} onChange={(e) => setR(e.target.value)} /></Field>
+        <Field label="Volatility σ"><input type="number" className={inputCls} value={sigma} step={0.01} onChange={(e) => setSigma(e.target.value)} /></Field>
+        <Field label="Dividend q"><input type="number" className={inputCls} value={q} step={0.01} onChange={(e) => setQ(e.target.value)} /></Field>
+        <Field label="Steps (1–2000)"><input type="number" className={inputCls} value={steps} min={1} max={2000} step={1} onChange={(e) => setSteps(e.target.value)} /></Field>
+        <Field label="Simulations (100–200k)"><input type="number" className={inputCls} value={simulations} min={100} max={200000} step={1000} onChange={(e) => setSimulations(e.target.value)} /></Field>
+        <Field label="Seed"><input type="number" className={inputCls} value={seed} min={0} step={1} onChange={(e) => setSeed(e.target.value)} /></Field>
+        <Field label="Variance reduction">
+          <label className="flex items-center gap-2 py-1.5 text-xs text-slate-600">
+            <input type="checkbox" checked={antithetic} onChange={(e) => setAntithetic(e.target.checked)} />
+            Antithetic variates
+          </label>
+        </Field>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          type="button"
+          onClick={run}
+          disabled={!valid || loading}
+          className={
+            "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+            (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+          }
+        >
+          {loading ? "Simulating…" : "Run Monte Carlo"}
+        </button>
+        <button
+          type="button"
+          onClick={runConvergence}
+          disabled={!valid || convLoading}
+          className={
+            "rounded-lg border px-3 py-2 text-xs font-medium transition-colors " +
+            (valid && !convLoading ? "border-slate-300 bg-white text-slate-600 hover:border-blue-400" : "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400")
+          }
+        >
+          {convLoading ? "Running…" : "Run convergence (1k–25k)"}
+        </button>
+      </div>
+      {!valid && (
+        <p className="text-[11px] text-slate-400">
+          Steps 1–2000 and simulations 100–200,000 must be whole numbers; S, K, T, σ positive;
+          barrier required for barrier payoffs.
+        </p>
+      )}
+      {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+
+      {result && (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label="Monte Carlo price" value={result.price.toFixed(4)} />
+            <Stat label="Standard error" value={result.standard_error.toFixed(4)} />
+            <Stat
+              label="95% CI"
+              value={`${result.confidence_interval_95.lower.toFixed(3)} – ${result.confidence_interval_95.upper.toFixed(3)}`}
+            />
+            {hasBsRef ? (
+              <Stat label="Black–Scholes ref." value={result.black_scholes_reference!.toFixed(4)} />
+            ) : (
+              <Stat label="Average type" value={result.average_type ?? "—"} />
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {hasBsRef && (
+              <Stat label="Diff vs BS" value={result.difference_vs_black_scholes!.toFixed(4)} />
+            )}
+            <Stat label="Simulations" value={result.simulations.toLocaleString()} />
+            <Stat label="Steps" value={String(result.steps)} />
+            <Stat label="Seed" value={`${result.seed}${result.antithetic ? " · antithetic" : ""}`} />
+          </div>
+
+          {result.warnings.length > 0 && (
+            <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700">
+              {result.warnings.map((w, i) => (
+                <p key={i}>{w}</p>
+              ))}
+            </div>
+          )}
+
+          {/* Path preview */}
+          {pathChartData.length > 0 && (
+            <div>
+              <p className="section-title mb-1">Path preview</p>
+              <p className="mb-2 text-[11px] text-slate-400">
+                A small sample of simulated paths (the engine never returns all paths). x = time
+                (years), y = simulated underlying price.
+              </p>
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={pathChartData} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                  <XAxis
+                    dataKey="time"
+                    type="number"
+                    domain={["dataMin", "dataMax"]}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
+                    axisLine={{ stroke: CHART_AXIS_LINE }}
+                    tickLine={false}
+                    tickFormatter={(v: number) => v.toFixed(2)}
+                  />
+                  <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={52} />
+                  <ReferenceLine y={num(K)} stroke={CHART_REF_LINE} strokeDasharray="5 4" />
+                  {preview.map((p) => (
+                    <Line
+                      key={p.path_id}
+                      type="monotone"
+                      dataKey={`p${p.path_id}`}
+                      stroke={colors.accent}
+                      strokeWidth={1}
+                      strokeOpacity={0.45}
+                      dot={false}
+                      isAnimationActive={false}
+                    />
+                  ))}
+                </ComposedChart>
+              </ResponsiveContainer>
+              <p className="text-[11px] text-slate-400">
+                Dashed line = strike {num(K)}. Paths are a representative, reproducible sample for
+                the chosen seed.
+              </p>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Convergence table */}
+      {convRows && (
+        <div>
+          <p className="section-title mb-1">Convergence (standard error shrinks with N)</p>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-slate-400">
+                  <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Simulations</th>
+                  <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Price</th>
+                  <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Std error</th>
+                  <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">95% CI half-width</th>
+                </tr>
+              </thead>
+              <tbody>
+                {convRows.map((row) => (
+                  <tr key={row.simulations} className="border-t border-slate-100">
+                    <td className="px-2 py-1 mono">{row.simulations.toLocaleString()}</td>
+                    <td className="px-2 py-1 mono">{row.price.toFixed(4)}</td>
+                    <td className="px-2 py-1 mono">{row.standard_error.toFixed(4)}</td>
+                    <td className="px-2 py-1 mono">±{(1.96 * row.standard_error).toFixed(4)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-1 text-[11px] text-slate-400">
+            Standard error falls roughly like 1/√N — quartering it takes ~4× the simulations.
+          </p>
+        </div>
+      )}
+
+      <p className="text-[11px] text-slate-400">
+        Monte Carlo carries sampling error and assumes GBM with constant volatility. Barrier
+        monitoring is discrete over the simulated steps; Asian averaging is arithmetic. No
+        stochastic volatility, no volatility surface, no live option chains, no production exotic
+        pricing.
       </p>
     </div>
   );

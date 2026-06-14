@@ -829,6 +829,31 @@ single-asset Backtest + Strategy Comparison:
 - Numerical approximation only — no trinomial tree yet, no discrete dividends /
   corporate actions, no vol surface, no live chains, no production risk engine
 
+### Phase 14.2 — Monte Carlo Options Engine v1 ✅
+
+- New backend `app/options_monte_carlo.py` — risk-neutral **Geometric Brownian
+  Motion** path simulation (`S_{t+dt} = S_t·exp((r−q−½σ²)dt + σ√dt·Z)`) with a
+  reproducible seed, optional **antithetic-variate** variance reduction, and
+  memory-bounded **batched** simulation; reuses `black_scholes_price` for the
+  European reference
+- Payoffs: **European** call/put, arithmetic-average **Asian** call/put, and
+  discretely-monitored **barrier** options (up-and-out / down-and-out, plus
+  up-and-in / down-and-in — in + out = vanilla, a tested parity)
+- Reports the **standard error** and a **95% confidence interval**
+  (`price ± 1.96·SE`), the Black-Scholes difference for European payoffs, and a
+  **capped path preview** (≤ 12 paths, ≤ 150 points — never all paths)
+- One route `POST /options/monte-carlo` (validated; simulations 100–200,000,
+  steps 1–2000; missing barrier → 422; never NaN/inf); barrier breach at t=0 is
+  warned, not crashed
+- Frontend **Monte Carlo** tab: payoff/S/K/T/r/σ/q/steps/simulations/seed form
+  (+ antithetic toggle, conditional barrier), price / SE / CI / BS-reference
+  cards, a neon path-preview chart, and an on-demand convergence table
+  (1k → 25k showing SE shrink ~ 1/√N); palette commands + dashboard card updated
+- 32 new backend tests (seed reproducibility, MC↔BS agreement + CI containment,
+  SE behaviour, Asian/barrier, parity, validation, finiteness)
+- Educational simulation with sampling error — **no** stochastic / local
+  volatility, no surface, no live chains, no production exotic pricing
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -885,8 +910,9 @@ search · toasts, error boundary, loading/offline states.
    inspired demos; full replications remain future work pending universe data)
 6. ~~Options Pricing Engine v1~~ — **built** (14.0: Black–Scholes pricing +
    Greeks + IV solver + payoff builder; 14.1: CRR **binomial tree** + American
-   exercise + early-exercise diagnostic. Trinomial tree and a vol *surface*
-   remain future)
+   exercise + early-exercise diagnostic; 14.2: **Monte Carlo** GBM engine with
+   Asian + barrier options, standard error / CI, path preview. Trinomial tree,
+   stochastic volatility, and a vol *surface* remain future)
 7. **Volatility Lab v1** — realized vol estimators, vol targeting deep-dive,
    term-structure visuals
 8. **Event-Driven & Arbitrage Module** (research)
@@ -911,7 +937,7 @@ built**; everything else is planned/research/future:
 | # | Category | Status today |
 |---|----------|--------------|
 | 1 | Equities | **built (core)** — SMA, RSI, Bollinger, Momentum, Vol Breakout, Pairs |
-| 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder, CRR **binomial tree** + American exercise; trinomial / vol surface / deeper Vol Lab planned |
+| 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder, CRR **binomial tree** + American exercise, **Monte Carlo** GBM (Asian + barrier, SE/CI); trinomial / stochastic vol / vol surface / deeper Vol Lab planned |
 | 3 | Event-Driven & Arbitrage | research |
 | 4 | Futures & Commodities | research |
 | 5 | FX | research |

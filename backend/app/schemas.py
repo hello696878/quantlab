@@ -3807,3 +3807,101 @@ class TreeConvergenceResponse(BaseModel):
     points: List[TreeConvergencePoint]
     black_scholes_price: float
     is_european_reference: bool
+
+
+# ===========================================================================
+# Monte Carlo option pricing (GBM; European / Asian / barrier) — research v1
+# ===========================================================================
+
+MonteCarloPayoffType = Literal[
+    "european_call",
+    "european_put",
+    "asian_call",
+    "asian_put",
+    "up_and_out_call",
+    "down_and_out_put",
+    "up_and_in_call",
+    "down_and_in_put",
+]
+
+_MC_BARRIER_PAYOFFS = {
+    "up_and_out_call",
+    "down_and_out_put",
+    "up_and_in_call",
+    "down_and_in_put",
+}
+
+
+class MonteCarloRequest(BaseModel):
+    """Inputs for risk-neutral GBM Monte Carlo option pricing."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    payoff_type: MonteCarloPayoffType = "european_call"
+    underlying_price: float = Field(gt=0.0, le=1e12, description="Spot price S (> 0).")
+    strike: float = Field(gt=0.0, le=1e12, description="Strike K (> 0).")
+    time_to_expiry: float = Field(gt=0.0, le=100.0, description="Years to expiry T (> 0).")
+    risk_free_rate: float = Field(ge=-1.0, le=1.0, description="Continuous risk-free rate r.")
+    volatility: float = Field(gt=0.0, le=10.0, description="Annualized volatility sigma (> 0).")
+    dividend_yield: float = Field(default=0.0, ge=0.0, le=1.0, description="Continuous dividend yield q.")
+    steps: int = Field(default=252, ge=1, le=2000, description="Time steps per path (1–2000).")
+    simulations: int = Field(
+        default=10000, ge=100, le=200000, description="Number of simulated paths (100–200,000)."
+    )
+    seed: int = Field(default=42, ge=0, le=2**32 - 1, description="RNG seed for reproducibility.")
+    antithetic: bool = Field(
+        default=False, description="Use antithetic variates (variance reduction)."
+    )
+    barrier_price: Optional[float] = Field(
+        default=None, gt=0.0, le=1e12, description="Required for barrier payoff types."
+    )
+
+    @model_validator(mode="after")
+    def check_barrier(self) -> "MonteCarloRequest":
+        if self.payoff_type in _MC_BARRIER_PAYOFFS and self.barrier_price is None:
+            raise ValueError("barrier_price is required for barrier payoff types.")
+        return self
+
+
+class MonteCarloConfidenceInterval(BaseModel):
+    lower: float
+    upper: float
+
+
+class MonteCarloPathPoint(BaseModel):
+    time: float
+    price: float
+
+
+class MonteCarloPath(BaseModel):
+    path_id: int
+    points: List[MonteCarloPathPoint]
+
+
+class MonteCarloResponse(BaseModel):
+    """Monte Carlo price + sampling diagnostics. Educational; not a fair value."""
+
+    model: Literal["gbm_monte_carlo"] = "gbm_monte_carlo"
+    payoff_type: MonteCarloPayoffType
+    price: float
+    standard_error: float = Field(description="payoff_std / sqrt(simulations).")
+    confidence_interval_95: MonteCarloConfidenceInterval = Field(
+        description="price ± 1.96 · standard_error."
+    )
+    simulations: int
+    steps: int
+    seed: int
+    antithetic: bool
+    average_type: Optional[str] = Field(
+        default=None, description="'arithmetic' for Asian options; null otherwise."
+    )
+    barrier_price: Optional[float] = Field(default=None, description="Echoed for barrier payoffs.")
+    black_scholes_reference: Optional[float] = Field(
+        default=None, description="European reference only (null for Asian/barrier)."
+    )
+    difference_vs_black_scholes: Optional[float] = None
+    relative_difference_vs_black_scholes: Optional[float] = None
+    path_preview: List[MonteCarloPath] = Field(
+        default_factory=list, description="A small, capped sample of paths — never all paths."
+    )
+    warnings: List[str] = Field(default_factory=list)

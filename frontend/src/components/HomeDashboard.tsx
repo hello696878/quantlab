@@ -1027,9 +1027,9 @@ export default function HomeDashboard({
               Options Lab
             </span>
             <span className="text-xs text-slate-400">
-              Black–Scholes pricing, Greeks, implied volatility, payoff
-              diagrams, and binomial-tree / American-exercise pricing — a
-              deterministic educational calculator.
+              Black–Scholes, Greeks, implied volatility, payoff diagrams,
+              binomial-tree / American-exercise pricing, and Monte Carlo
+              (Asian &amp; barrier) path simulation — an educational calculator.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Options Lab →

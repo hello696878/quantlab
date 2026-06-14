@@ -15,6 +15,8 @@ import type {
   BinomialTreeResponse,
   ImpliedVolRequest,
   ImpliedVolResponse,
+  MonteCarloRequest,
+  MonteCarloResponse,
   PayoffRequest,
   PayoffResponse,
   TreeConvergenceRequest,
@@ -924,4 +926,10 @@ export function computeTreeConvergence(
     "/api/options/tree-convergence",
     req,
   );
+}
+
+export function priceMonteCarlo(
+  req: MonteCarloRequest,
+): Promise<MonteCarloResponse> {
+  return postOptions<MonteCarloResponse>("/api/options/monte-carlo", req);
 }

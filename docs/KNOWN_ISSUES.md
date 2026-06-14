@@ -67,6 +67,15 @@ of a **research tool**.
   step count, volatility input, and exercise style. The early-exercise
   diagnostic and boundary are teaching aids; the full lattice renders only for
   small trees (≤ 6 steps). No trinomial tree yet (planned), no Heston/SABR.
+- **Monte Carlo pricing is an educational simulation with sampling error.** The
+  Monte Carlo tab simulates risk-neutral **GBM** paths (constant volatility) to
+  price European, arithmetic-average **Asian**, and simple **barrier** options.
+  Each price carries Monte Carlo error (reported as standard error + 95% CI) and
+  depends on the **seed**, simulation count, and step count. **Barrier
+  monitoring is discrete** over the simulated steps (it can differ from
+  continuous monitoring). The path preview is a small capped sample (≤ 12 paths)
+  — never all paths. No stochastic / local volatility, no surface, no jumps, no
+  live chains, no production exotic pricing.
 - **Payoff diagrams are expiration-only.** They ignore mark-to-market path,
   financing, early assignment, and margin. Unbounded short-option risk is
   labelled where applicable; finite payoff summaries assume the underlying

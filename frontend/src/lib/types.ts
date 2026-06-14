@@ -1572,3 +1572,66 @@ export interface TreeConvergenceResponse {
   black_scholes_price: number;
   is_european_reference: boolean;
 }
+
+// ---------------------------------------------------------------------------
+// Monte Carlo option pricing (GBM; European / Asian / barrier) — research v1
+// ---------------------------------------------------------------------------
+
+export type MonteCarloPayoffType =
+  | "european_call"
+  | "european_put"
+  | "asian_call"
+  | "asian_put"
+  | "up_and_out_call"
+  | "down_and_out_put"
+  | "up_and_in_call"
+  | "down_and_in_put";
+
+export interface MonteCarloRequest {
+  payoff_type: MonteCarloPayoffType;
+  underlying_price: number;
+  strike: number;
+  time_to_expiry: number;
+  risk_free_rate: number;
+  volatility: number;
+  dividend_yield?: number;
+  steps: number;
+  simulations: number;
+  seed: number;
+  antithetic?: boolean;
+  barrier_price?: number | null;
+}
+
+export interface MonteCarloConfidenceInterval {
+  lower: number;
+  upper: number;
+}
+
+export interface MonteCarloPathPoint {
+  time: number;
+  price: number;
+}
+
+export interface MonteCarloPath {
+  path_id: number;
+  points: MonteCarloPathPoint[];
+}
+
+export interface MonteCarloResponse {
+  model: "gbm_monte_carlo";
+  payoff_type: MonteCarloPayoffType;
+  price: number;
+  standard_error: number;
+  confidence_interval_95: MonteCarloConfidenceInterval;
+  simulations: number;
+  steps: number;
+  seed: number;
+  antithetic: boolean;
+  average_type: string | null;
+  barrier_price: number | null;
+  black_scholes_reference: number | null;
+  difference_vs_black_scholes: number | null;
+  relative_difference_vs_black_scholes: number | null;
+  path_preview: MonteCarloPath[];
+  warnings: string[];
+}

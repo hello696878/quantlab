@@ -85,6 +85,10 @@ from app.options_tree import (
     binomial_tree_price,
     compare_tree_to_black_scholes,
 )
+from app.options_monte_carlo import (
+    MonteCarloInputError,
+    price_monte_carlo,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -139,6 +143,8 @@ from app.schemas import (
     BinomialTreeResponse,
     ImpliedVolRequest,
     ImpliedVolResponse,
+    MonteCarloRequest,
+    MonteCarloResponse,
     PayoffRequest,
     PayoffResponse,
     TreeConvergenceRequest,
@@ -3586,3 +3592,39 @@ def options_tree_convergence(
     except TreeInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return TreeConvergenceResponse(**result)
+
+
+@app.post(
+    "/options/monte-carlo",
+    response_model=MonteCarloResponse,
+    tags=["options"],
+    summary="Monte Carlo option pricing (GBM; European / Asian / barrier)",
+    description=(
+        "Risk-neutral Geometric Brownian Motion Monte Carlo pricing for European, "
+        "arithmetic-average Asian, and simple (discretely-monitored) barrier "
+        "options. Reproducible via the seed; returns the price, standard error, a "
+        "95% confidence interval, a European Black-Scholes reference where "
+        "applicable, and a small capped path preview. Educational simulation with "
+        "sampling error — not a fair value, not a production exotic-pricing engine. "
+        "Constant-volatility GBM only; barrier monitoring is discrete."
+    ),
+)
+def options_monte_carlo(request: MonteCarloRequest) -> MonteCarloResponse:
+    try:
+        result = price_monte_carlo(
+            request.payoff_type,
+            request.underlying_price,
+            request.strike,
+            request.time_to_expiry,
+            request.risk_free_rate,
+            request.volatility,
+            request.dividend_yield,
+            request.steps,
+            request.simulations,
+            request.seed,
+            request.antithetic,
+            request.barrier_price,
+        )
+    except MonteCarloInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return MonteCarloResponse(**result)

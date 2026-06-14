@@ -48,6 +48,7 @@ FastAPI Backend
   ├── sensitivity.py                Stability Lab v1: SMA parameter-sensitivity sweep + stability score
   ├── options.py                    Options Lab v1: Black–Scholes pricing, Greeks, IV solver, payoff engine
   ├── options_tree.py               Tree pricing v1: CRR binomial lattice, American exercise, early-exercise diagnostic, BS convergence
+  ├── options_monte_carlo.py        Monte Carlo v1: GBM path simulation, European/Asian/barrier payoffs, standard error + 95% CI, path preview
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD
