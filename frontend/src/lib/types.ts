@@ -1768,3 +1768,85 @@ export interface SurfaceData {
 export interface SurfaceResponse {
   surface: SurfaceData;
 }
+
+// ---------------------------------------------------------------------------
+// Heston stochastic volatility (Monte Carlo) — research v1
+// ---------------------------------------------------------------------------
+
+export interface HestonRequest {
+  option_type: OptionType;
+  underlying_price: number;
+  strike: number;
+  time_to_expiry: number;
+  risk_free_rate: number;
+  dividend_yield?: number;
+  initial_variance: number;
+  long_run_variance: number;
+  kappa: number;
+  vol_of_vol: number;
+  rho: number;
+  steps: number;
+  simulations: number;
+  seed: number;
+}
+
+export interface HestonConfidenceInterval {
+  lower: number;
+  upper: number;
+}
+
+export interface HestonBlackScholesReference {
+  volatility_source: string;
+  volatility_used: number;
+  price: number;
+  difference: number;
+  relative_difference: number | null;
+}
+
+export interface HestonParameters {
+  initial_variance: number;
+  long_run_variance: number;
+  initial_volatility: number;
+  long_run_volatility: number;
+  kappa: number;
+  vol_of_vol: number;
+  rho: number;
+}
+
+export interface HestonFeller {
+  satisfied: boolean;
+  two_kappa_theta: number;
+  xi_squared: number;
+}
+
+export interface HestonPath {
+  path_id: number;
+  underlying: number[];
+  variance: number[];
+  volatility: number[];
+}
+
+export interface HestonSummary {
+  mean_terminal_price: number;
+  mean_terminal_volatility: number;
+  min_variance_observed: number;
+  max_variance_observed: number;
+}
+
+export interface HestonResponse {
+  model: "heston_mc_full_truncation_euler";
+  option_type: OptionType;
+  price: number;
+  standard_error: number;
+  confidence_interval_95: HestonConfidenceInterval;
+  black_scholes_reference: HestonBlackScholesReference;
+  parameters: HestonParameters;
+  feller: HestonFeller;
+  simulations: number;
+  steps: number;
+  seed: number;
+  preview_times: number[];
+  path_preview: HestonPath[];
+  summary: HestonSummary;
+  warnings: string[];
+}

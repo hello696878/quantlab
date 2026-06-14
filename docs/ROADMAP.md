@@ -878,6 +878,30 @@ single-asset Backtest + Strategy Comparison:
 - Research tool only — **no** live chains, **not** an arbitrage-free calibration,
   no stochastic volatility, no production vol calibration
 
+### Phase 14.4 — Heston Stochastic Volatility v1 ✅
+
+- New backend `app/options_heston.py` — risk-neutral **Heston** model
+  (`dS = (r−q)S dt + √v·S dW₁`, `dv = κ(θ−v) dt + ξ√v dW₂`, `corr = ρ`) priced by
+  **full-truncation Euler** Monte Carlo (correlated shocks `Z₂ = ρZ₁ +
+  √(1−ρ²)Z⊥`); O(simulations) memory (only current S/v vectors kept)
+- European call/put price with **standard error** + **95% CI**, a
+  constant-volatility **Black-Scholes reference** (√long-run-variance, flagged as
+  orientation only — not a correctness benchmark under stochastic vol), and a
+  **Feller-condition** diagnostic (`2κθ ≥ ξ²`) that **warns rather than rejects**
+- **Variance is never reported negative** (truncated for output); capped path
+  preview returns underlying + variance + volatility for ≤ 12 paths
+- One route `POST /options/heston` (validated; rho ∈ [−0.999, 0.999], positive
+  variances/κ, sims 100–200k, steps 1–2000; never NaN/inf). When ξ = 0 and
+  v₀ = θ it reduces to Black-Scholes with √θ (tested)
+- Frontend **Heston** tab: full parameter form (volatility inputs squared to
+  variance), result cards (price / SE / CI / BS ref / mean terminal price + vol /
+  Feller status), **underlying & volatility path charts** with a deterministic
+  multi-colour palette (first path highlighted), an education panel, and the
+  Euler/Feller/Monte-Carlo caveats; palette commands + dashboard card updated;
+  35 new backend tests
+- Educational model — Euler is **biased**, results carry Monte Carlo error, and
+  the model is **not calibrated** to any market surface (calibration is planned)
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -936,8 +960,10 @@ search · toasts, error boundary, loading/offline states.
    Greeks + IV solver + payoff builder; 14.1: CRR **binomial tree** + American
    exercise + early-exercise diagnostic; 14.2: **Monte Carlo** GBM engine with
    Asian + barrier options, standard error / CI, path preview; 14.3: **IV
-   surface** + smile / term structure / skew + **SVI** research fit. Trinomial
-   tree, stochastic volatility, and an arbitrage-free surface remain future)
+   surface** + smile / term structure / skew + **SVI** research fit; 14.4:
+   **Heston** stochastic-volatility Monte Carlo. Heston **calibration** to a
+   market IV surface, trinomial tree, SABR / local / rough vol, and an
+   arbitrage-free surface remain future)
 7. **Volatility Lab v1** — realized vol estimators, vol targeting deep-dive,
    term-structure visuals
 8. **Event-Driven & Arbitrage Module** (research)
@@ -962,7 +988,7 @@ built**; everything else is planned/research/future:
 | # | Category | Status today |
 |---|----------|--------------|
 | 1 | Equities | **built (core)** — SMA, RSI, Bollinger, Momentum, Vol Breakout, Pairs |
-| 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder, CRR **binomial tree** + American exercise, **Monte Carlo** GBM (Asian + barrier, SE/CI), **IV surface** + **SVI** research fit; trinomial / stochastic vol / arbitrage-free surface / deeper Vol Lab planned |
+| 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder, CRR **binomial tree** + American exercise, **Monte Carlo** GBM (Asian + barrier, SE/CI), **IV surface** + **SVI** research fit, **Heston** stochastic-vol MC; trinomial / Heston calibration / SABR / local vol / arbitrage-free surface planned |
 | 3 | Event-Driven & Arbitrage | research |
 | 4 | Futures & Commodities | research |
 | 5 | FX | research |

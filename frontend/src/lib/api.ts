@@ -15,6 +15,8 @@ import type {
   BinomialTreeResponse,
   ImpliedVolRequest,
   ImpliedVolResponse,
+  HestonRequest,
+  HestonResponse,
   MonteCarloRequest,
   MonteCarloResponse,
   PayoffRequest,
@@ -945,4 +947,8 @@ export function buildSampleVolSurface(
   req: SampleSurfaceRequest,
 ): Promise<SurfaceResponse> {
   return postOptions<SurfaceResponse>("/api/options/surface/sample", req);
+}
+
+export function priceHeston(req: HestonRequest): Promise<HestonResponse> {
+  return postOptions<HestonResponse>("/api/options/heston", req);
 }

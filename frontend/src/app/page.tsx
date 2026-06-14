@@ -442,7 +442,14 @@ export default function HomePage() {
   const [disasterKey, setDisasterKey] = useState(0);
   // Options Lab: which tab to open on (deep-linked from the palette).
   const [optionsTab, setOptionsTab] = useState<
-    "pricing" | "implied_vol" | "payoff" | "tree" | "monte_carlo" | "surface" | "education"
+    | "pricing"
+    | "implied_vol"
+    | "payoff"
+    | "tree"
+    | "monte_carlo"
+    | "surface"
+    | "heston"
+    | "education"
   >("pricing");
   const [optionsKey, setOptionsKey] = useState(0);
 
@@ -871,6 +878,9 @@ export default function HomePage() {
         ["surface", "surface-svi", "Open SVI Fit", "options svi volatility smile fit calibration research surface"],
         ["surface", "surface-vol", "Open Options Vol Surface", "options vol surface implied volatility iv heatmap moneyness expiry"],
         ["surface", "surface-smile", "Open IV Smile", "options iv smile volatility skew moneyness term structure surface"],
+        ["heston", "heston", "Open Heston Model", "options heston stochastic volatility vol of vol kappa rho leverage effect variance process"],
+        ["heston", "heston-stochvol", "Open Stochastic Volatility Lab", "options stochastic volatility heston vol of vol variance mean reversion leverage effect"],
+        ["heston", "heston-pricing", "Open Heston Options Pricing", "options heston monte carlo stochastic volatility european call put pricing"],
       ] as const
     ).map(([t, id, title, keywords]) => ({
       id: `options-${id}`,

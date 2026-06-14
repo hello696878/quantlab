@@ -94,6 +94,10 @@ from app.options_surface import (
     build_sample_surface,
     build_surface,
 )
+from app.options_heston import (
+    HestonInputError,
+    price_heston_european_mc,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -148,6 +152,8 @@ from app.schemas import (
     BinomialTreeResponse,
     ImpliedVolRequest,
     ImpliedVolResponse,
+    HestonRequest,
+    HestonResponse,
     MonteCarloRequest,
     MonteCarloResponse,
     PayoffRequest,
@@ -3693,3 +3699,41 @@ def options_surface_sample(request: SampleSurfaceRequest) -> SurfaceResponse:
     except SurfaceInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return SurfaceResponse(**result)
+
+
+@app.post(
+    "/options/heston",
+    response_model=HestonResponse,
+    tags=["options"],
+    summary="Heston stochastic-volatility Monte Carlo pricing (European)",
+    description=(
+        "Prices European options under the Heston stochastic-volatility model via "
+        "a full-truncation Euler Monte Carlo simulation. Returns the price, "
+        "standard error, 95% confidence interval, a constant-volatility "
+        "Black-Scholes reference (sqrt of long-run variance), variance/volatility "
+        "path previews, and a Feller-condition diagnostic. Educational research "
+        "model — Euler discretization is biased, results carry Monte Carlo error, "
+        "and the model is not calibrated to any market surface."
+    ),
+)
+def options_heston(request: HestonRequest) -> HestonResponse:
+    try:
+        result = price_heston_european_mc(
+            request.option_type,
+            request.underlying_price,
+            request.strike,
+            request.time_to_expiry,
+            request.risk_free_rate,
+            request.dividend_yield,
+            request.initial_variance,
+            request.long_run_variance,
+            request.kappa,
+            request.vol_of_vol,
+            request.rho,
+            request.steps,
+            request.simulations,
+            request.seed,
+        )
+    except HestonInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return HestonResponse(**result)

@@ -83,8 +83,17 @@ of a **research tool**.
   expiry coverage, dividends, rates, and solver stability (deep-OTM / short-dated
   IVs are unreliable due to tiny vega). The **SVI fit enforces b ≥ 0, |ρ| < 1,
   σ > 0 but is not guaranteed arbitrage-free**; sparse slices are left unfitted.
-  Failed rows are kept with null IV + a warning. No stochastic volatility, no
-  Heston/SABR, no production calibration.
+  Failed rows are kept with null IV + a warning. The surface is **not** a
+  stochastic-vol calibration (the Heston tab is a separate simulator). No SABR,
+  no local volatility, no production calibration.
+- **Heston is an educational stochastic-volatility simulator, not a calibrated
+  model.** The Heston tab prices European options via a **full-truncation Euler**
+  Monte Carlo (variance mean reversion, vol-of-vol, price/variance correlation).
+  Euler is **biased** (finer steps help), prices carry Monte Carlo error (SE +
+  95% CI), and the **Feller condition** (2κθ ≥ ξ²) is **warned, not rejected**.
+  The Black–Scholes reference (√long-run-variance) is orientation only, not a
+  correctness benchmark under stochastic vol. **Not calibrated to any market
+  surface** (calibration planned); no SABR / local / rough vol.
 - **Payoff diagrams are expiration-only.** They ignore mark-to-market path,
   financing, early assignment, and margin. Unbounded short-option risk is
   labelled where applicable; finite payoff summaries assume the underlying

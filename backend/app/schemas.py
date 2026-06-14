@@ -4055,3 +4055,94 @@ class SurfaceResponse(BaseModel):
     """Implied-volatility surface + SVI research fit. Educational; not live data."""
 
     surface: SurfaceData
+
+
+# ===========================================================================
+# Heston stochastic volatility (Monte Carlo) — research v1
+# ===========================================================================
+
+
+class HestonRequest(BaseModel):
+    """Inputs for Heston Monte Carlo pricing (variance form for v0 / theta)."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    option_type: OptionType = "call"
+    underlying_price: float = Field(gt=0.0, le=1e12)
+    strike: float = Field(gt=0.0, le=1e12)
+    time_to_expiry: float = Field(gt=0.0, le=100.0)
+    risk_free_rate: float = Field(ge=-1.0, le=1.0)
+    dividend_yield: float = Field(default=0.0, ge=0.0, le=1.0)
+    initial_variance: float = Field(gt=0.0, le=100.0, description="v0 (variance, not volatility).")
+    long_run_variance: float = Field(gt=0.0, le=100.0, description="theta (variance).")
+    kappa: float = Field(gt=0.0, le=100.0, description="Mean-reversion speed.")
+    vol_of_vol: float = Field(ge=0.0, le=100.0, description="xi (volatility of variance).")
+    rho: float = Field(ge=-0.999, le=0.999, description="Correlation of price/variance shocks.")
+    steps: int = Field(default=252, ge=1, le=2000)
+    simulations: int = Field(default=10000, ge=100, le=200000)
+    seed: int = Field(default=42, ge=0, le=2**32 - 1)
+
+
+class HestonConfidenceInterval(BaseModel):
+    lower: float
+    upper: float
+
+
+class HestonBlackScholesReference(BaseModel):
+    volatility_source: str
+    volatility_used: float
+    price: float
+    difference: float = Field(description="heston_price - black_scholes_price.")
+    relative_difference: Optional[float] = None
+
+
+class HestonParameters(BaseModel):
+    initial_variance: float
+    long_run_variance: float
+    initial_volatility: float
+    long_run_volatility: float
+    kappa: float
+    vol_of_vol: float
+    rho: float
+
+
+class HestonFeller(BaseModel):
+    satisfied: bool
+    two_kappa_theta: float = Field(description="2 · kappa · theta.")
+    xi_squared: float = Field(description="vol_of_vol squared.")
+
+
+class HestonPath(BaseModel):
+    path_id: int
+    underlying: List[float]
+    variance: List[float]
+    volatility: List[float]
+
+
+class HestonSummary(BaseModel):
+    mean_terminal_price: float
+    mean_terminal_volatility: float
+    min_variance_observed: float
+    max_variance_observed: float
+
+
+class HestonResponse(BaseModel):
+    """Heston Monte Carlo price + diagnostics. Educational; not calibrated."""
+
+    model: Literal["heston_mc_full_truncation_euler"] = "heston_mc_full_truncation_euler"
+    option_type: OptionType
+    price: float
+    standard_error: float
+    confidence_interval_95: HestonConfidenceInterval
+    black_scholes_reference: HestonBlackScholesReference
+    parameters: HestonParameters
+    feller: HestonFeller
+    simulations: int
+    steps: int
+    seed: int
+    preview_times: List[float] = Field(default_factory=list)
+    path_preview: List[HestonPath] = Field(
+        default_factory=list, description="A small, capped sample of paths — never all paths."
+    )
+    summary: HestonSummary
+    warnings: List[str] = Field(default_factory=list)

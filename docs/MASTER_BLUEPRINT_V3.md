@@ -68,9 +68,9 @@ reproducible and every limitation explicit.
    + **American exercise** + early-exercise diagnostic + BS convergence (14.1);
    **Monte Carlo** GBM engine — European / Asian / barrier, standard error + CI,
    path preview (14.2); **IV surface** + smile / term structure / skew + **SVI**
-   research fit (14.3). Planned: trinomial tree, arbitrage-free surface, vol
-   targeting / term structure; later
-   Heston, SABR — research
+   research fit (14.3); **Heston** stochastic-vol Monte Carlo (14.4). Planned:
+   Heston calibration to an IV surface, trinomial tree, arbitrage-free surface,
+   vol targeting / term structure; later SABR, local / rough vol — research
 3. **Event-Driven & Arbitrage** — research (merger-arb toy, index add/remove,
    earnings drift)
 4. **Futures & Commodities** — research (carry, term-structure, trend)
@@ -99,7 +99,7 @@ reproducible and every limitation explicit.
 5. ~~Paper Replication Series v1~~ — **built** (13.1)
 6. ~~Options Pricing Engine v1~~ — **built** (14.0 Black–Scholes; 14.1 CRR
    binomial tree + American exercise; 14.2 Monte Carlo GBM + Asian/barrier;
-   14.3 IV surface + SVI research fit)
+   14.3 IV surface + SVI research fit; 14.4 Heston stochastic volatility)
 7. Volatility Lab v1
 8. Event-Driven & Arbitrage Module
 9. Rates / FX / Credit Module

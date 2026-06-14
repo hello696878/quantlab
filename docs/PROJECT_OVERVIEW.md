@@ -50,6 +50,7 @@ FastAPI Backend
   ├── options_tree.py               Tree pricing v1: CRR binomial lattice, American exercise, early-exercise diagnostic, BS convergence
   ├── options_monte_carlo.py        Monte Carlo v1: GBM path simulation, European/Asian/barrier payoffs, standard error + 95% CI, path preview
   ├── options_surface.py            Vol surface v1: chain IV extraction, moneyness×expiry grid, smile/term/skew, SVI research fit (scipy)
+  ├── options_heston.py             Heston v1: stochastic-vol full-truncation Euler MC, European pricing, BS reference, Feller diagnostic, path preview
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD

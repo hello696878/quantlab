@@ -21,6 +21,7 @@ import {
   computeTreeConvergence,
   priceBinomialTree,
   priceBlackScholes,
+  priceHeston,
   priceMonteCarlo,
   solveImpliedVolatility,
 } from "@/lib/api";
@@ -29,6 +30,7 @@ import type {
   BlackScholesResponse,
   ExerciseStyle,
   ImpliedVolResponse,
+  HestonResponse,
   MonteCarloPayoffType,
   MonteCarloResponse,
   OptionType,
@@ -55,6 +57,7 @@ type Tab =
   | "tree"
   | "monte_carlo"
   | "surface"
+  | "heston"
   | "education";
 
 const inputCls = "ql-input px-2.5 py-1.5";
@@ -117,9 +120,10 @@ const CAVEAT =
   "CRR lattice for American exercise; Monte Carlo simulates GBM paths (with " +
   "sampling error) for European, Asian, and simple barrier options; Vol Surface " +
   "builds an implied-vol surface from a manual/synthetic chain with an SVI " +
-  "research fit. The lab does not model assignment, transaction costs, " +
-  "liquidity, stochastic volatility, or live option chains, and does not produce " +
-  "an arbitrage-free surface. Educational only — not a fair value, a " +
+  "research fit; Heston adds a stochastic-volatility Monte Carlo (Euler, biased). " +
+  "The lab does not model assignment, transaction costs, liquidity, or live " +
+  "option chains, does not produce an arbitrage-free surface, and is not " +
+  "calibrated to any market. Educational only — not a fair value, a " +
   "recommendation, or a trading system.";
 
 export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab?: Tab }) {
@@ -131,8 +135,9 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
         <p className="text-sm text-slate-600">
           The Options Lab prices options with Black–Scholes, binomial trees, and
           Monte Carlo simulation, inspects Greeks, solves implied volatility,
-          visualizes payoff diagrams, and builds an implied-volatility surface
-          with an SVI research fit — a reproducible, educational calculator.
+          visualizes payoff diagrams, builds an implied-volatility surface with
+          an SVI research fit, and simulates Heston stochastic volatility — a
+          reproducible, educational calculator.
         </p>
         <p className="mt-2 text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
@@ -146,6 +151,7 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
             ["tree", "Tree Pricing"],
             ["monte_carlo", "Monte Carlo"],
             ["surface", "Vol Surface"],
+            ["heston", "Heston"],
             ["education", "Education"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -169,6 +175,7 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
       {tab === "tree" && <TreePricingTab />}
       {tab === "monte_carlo" && <MonteCarloTab />}
       {tab === "surface" && <SurfaceTab />}
+      {tab === "heston" && <HestonTab />}
       {tab === "education" && <EducationTab />}
     </div>
   );
@@ -1764,6 +1771,261 @@ function SurfaceTab() {
         guaranteed arbitrage-free surface. No live option chains, no stochastic volatility, no
         production calibration.
       </p>
+    </div>
+  );
+}
+
+// ── Heston ───────────────────────────────────────────────────────────────────
+
+function HestonPathChart({
+  times,
+  paths,
+  field,
+  yLabel,
+  yPercent,
+}: {
+  times: number[];
+  paths: HestonResponse["path_preview"];
+  field: "underlying" | "volatility";
+  yLabel: string;
+  yPercent?: boolean;
+}) {
+  const data = times.map((t, i) => {
+    const row: Record<string, number> = { time: t };
+    for (const p of paths) row[`p${p.path_id}`] = p[field][i];
+    return row;
+  });
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <ComposedChart data={data} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+        <XAxis
+          dataKey="time"
+          type="number"
+          domain={["dataMin", "dataMax"]}
+          tick={{ fontSize: 11, fill: CHART_AXIS }}
+          axisLine={{ stroke: CHART_AXIS_LINE }}
+          tickLine={false}
+          tickFormatter={(v: number) => v.toFixed(2)}
+        />
+        <YAxis
+          tick={{ fontSize: 11, fill: CHART_AXIS }}
+          axisLine={false}
+          tickLine={false}
+          width={52}
+          tickFormatter={(v: number) => (yPercent ? `${(v * 100).toFixed(0)}%` : v.toFixed(0))}
+        />
+        <Tooltip
+          content={
+            <NeonTooltip
+              formatValue={(v: number) => (yPercent ? `${(v * 100).toFixed(1)}%` : v.toFixed(2))}
+              formatLabel={(l) => (typeof l === "number" ? `t = ${l.toFixed(2)} yr` : "")}
+            />
+          }
+        />
+        {paths.map((p) => (
+          <Line
+            key={p.path_id}
+            type="monotone"
+            dataKey={`p${p.path_id}`}
+            stroke={SURFACE_PALETTE[p.path_id % SURFACE_PALETTE.length]}
+            strokeWidth={p.path_id === 0 ? 2.5 : 1}
+            strokeOpacity={p.path_id === 0 ? 1 : 0.5}
+            dot={false}
+            isAnimationActive={false}
+          />
+        ))}
+      </ComposedChart>
+    </ResponsiveContainer>
+  );
+}
+
+function HestonTab() {
+  const [optionType, setOptionType] = useState<OptionType>("call");
+  const [S, setS] = useState("100");
+  const [K, setK] = useState("100");
+  const [T, setT] = useState("1");
+  const [r, setR] = useState("0.05");
+  const [q, setQ] = useState("0");
+  const [initVol, setInitVol] = useState("0.20");
+  const [lrVol, setLrVol] = useState("0.20");
+  const [kappa, setKappa] = useState("2.0");
+  const [volOfVol, setVolOfVol] = useState("0.5");
+  const [rho, setRho] = useState("-0.7");
+  const [steps, setSteps] = useState("252");
+  const [simulations, setSimulations] = useState("10000");
+  const [seed, setSeed] = useState("42");
+  const [result, setResult] = useState<HestonResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const stepsInt = Math.trunc(num(steps));
+  const simsInt = Math.trunc(num(simulations));
+  const seedInt = Math.trunc(num(seed));
+  const valid =
+    num(S) > 0 &&
+    num(K) > 0 &&
+    num(T) > 0 &&
+    finite(r) &&
+    finite(q) &&
+    num(initVol) > 0 &&
+    num(lrVol) > 0 &&
+    num(kappa) > 0 &&
+    num(volOfVol) >= 0 &&
+    num(rho) >= -0.999 &&
+    num(rho) <= 0.999 &&
+    Number.isInteger(stepsInt) &&
+    stepsInt >= 1 &&
+    stepsInt <= 2000 &&
+    Number.isInteger(simsInt) &&
+    simsInt >= 100 &&
+    simsInt <= 200000 &&
+    Number.isInteger(seedInt) &&
+    seedInt >= 0;
+
+  async function run() {
+    if (!valid) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      setResult(
+        await priceHeston({
+          option_type: optionType,
+          underlying_price: num(S),
+          strike: num(K),
+          time_to_expiry: num(T),
+          risk_free_rate: num(r),
+          dividend_yield: num(q),
+          // UI takes volatility; Heston uses variance internally.
+          initial_variance: num(initVol) ** 2,
+          long_run_variance: num(lrVol) ** 2,
+          kappa: num(kappa),
+          vol_of_vol: num(volOfVol),
+          rho: num(rho),
+          steps: stepsInt,
+          simulations: simsInt,
+          seed: seedInt,
+        }),
+      );
+    } catch (e) {
+      setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const bs = result?.black_scholes_reference;
+
+  return (
+    <div className="card space-y-4 p-5">
+      <p className="section-title">Heston Stochastic Volatility</p>
+      <p className="text-xs text-slate-500">
+        Heston lets volatility itself vary randomly and be correlated with price moves, capturing
+        skew that constant-volatility Black–Scholes cannot. This prices European options with a
+        full-truncation Euler Monte Carlo simulation. Results depend on the parameters,
+        discretization, simulation count, seed, and variance handling — Euler is biased and the
+        model is not calibrated to any market surface.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Field label="Option type">
+          <OptionTypeToggle value={optionType} onChange={setOptionType} />
+        </Field>
+        <Field label="Underlying S"><input type="number" className={inputCls} value={S} onChange={(e) => setS(e.target.value)} /></Field>
+        <Field label="Strike K"><input type="number" className={inputCls} value={K} onChange={(e) => setK(e.target.value)} /></Field>
+        <Field label="Expiry T (years)"><input type="number" className={inputCls} value={T} onChange={(e) => setT(e.target.value)} /></Field>
+        <Field label="Rate r"><input type="number" className={inputCls} value={r} step={0.01} onChange={(e) => setR(e.target.value)} /></Field>
+        <Field label="Dividend q"><input type="number" className={inputCls} value={q} step={0.01} onChange={(e) => setQ(e.target.value)} /></Field>
+        <Field label="Initial vol σ₀"><input type="number" className={inputCls} value={initVol} step={0.01} onChange={(e) => setInitVol(e.target.value)} /></Field>
+        <Field label="Long-run vol √θ"><input type="number" className={inputCls} value={lrVol} step={0.01} onChange={(e) => setLrVol(e.target.value)} /></Field>
+        <Field label="κ mean-reversion"><input type="number" className={inputCls} value={kappa} step={0.1} onChange={(e) => setKappa(e.target.value)} /></Field>
+        <Field label="Vol of vol ξ"><input type="number" className={inputCls} value={volOfVol} step={0.05} onChange={(e) => setVolOfVol(e.target.value)} /></Field>
+        <Field label="ρ correlation"><input type="number" className={inputCls} value={rho} step={0.05} onChange={(e) => setRho(e.target.value)} /></Field>
+        <Field label="Steps (1–2000)"><input type="number" className={inputCls} value={steps} min={1} max={2000} step={1} onChange={(e) => setSteps(e.target.value)} /></Field>
+        <Field label="Simulations"><input type="number" className={inputCls} value={simulations} min={100} max={200000} step={1000} onChange={(e) => setSimulations(e.target.value)} /></Field>
+        <Field label="Seed"><input type="number" className={inputCls} value={seed} min={0} step={1} onChange={(e) => setSeed(e.target.value)} /></Field>
+      </div>
+
+      <button
+        type="button"
+        onClick={run}
+        disabled={!valid || loading}
+        className={
+          "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+        }
+      >
+        {loading ? "Simulating…" : "Run Heston"}
+      </button>
+      {!valid && (
+        <p className="text-[11px] text-slate-400">
+          σ₀, √θ, κ positive; ξ ≥ 0; ρ between −0.999 and 0.999; steps 1–2000 and simulations
+          100–200,000 whole numbers.
+        </p>
+      )}
+      {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+
+      {result && (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label="Heston MC price" value={result.price.toFixed(4)} />
+            <Stat label="Standard error" value={result.standard_error.toFixed(4)} />
+            <Stat
+              label="95% CI"
+              value={`${result.confidence_interval_95.lower.toFixed(3)} – ${result.confidence_interval_95.upper.toFixed(3)}`}
+            />
+            <Stat label="Feller condition" value={result.feller.satisfied ? "Satisfied" : "Violated"} />
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label={`BS ref (σ=${bs ? bs.volatility_used.toFixed(2) : "—"})`} value={bs ? bs.price.toFixed(4) : "—"} />
+            <Stat label="Diff vs BS" value={bs ? bs.difference.toFixed(4) : "—"} />
+            <Stat label="Mean terminal price" value={result.summary.mean_terminal_price.toFixed(2)} />
+            <Stat label="Mean terminal vol" value={`${(result.summary.mean_terminal_volatility * 100).toFixed(1)}%`} />
+          </div>
+
+          {result.warnings.length > 0 && (
+            <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700">
+              {result.warnings.map((w, i) => (
+                <p key={i}>{w}</p>
+              ))}
+            </div>
+          )}
+
+          {result.path_preview.length > 0 && (
+            <>
+              <div>
+                <p className="section-title mb-1">Underlying paths</p>
+                <HestonPathChart times={result.preview_times} paths={result.path_preview} field="underlying" yLabel="price" />
+              </div>
+              <div>
+                <p className="section-title mb-1">Volatility paths (√variance)</p>
+                <HestonPathChart times={result.preview_times} paths={result.path_preview} field="volatility" yLabel="vol" yPercent />
+                <p className="text-[11px] text-slate-400">
+                  Variance mean-reverts toward √θ = {bs ? bs.volatility_used.toFixed(2) : ""}; the
+                  bold path is the first simulation. Observed variance ranged{" "}
+                  {(result.summary.min_variance_observed * 100).toFixed(1)}% –{" "}
+                  {(result.summary.max_variance_observed * 100).toFixed(1)}% (as variance).
+                </p>
+              </div>
+            </>
+          )}
+
+          <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+            The Black–Scholes reference assumes constant volatility and is{" "}
+            <span className="font-medium">not</span> a benchmark for correctness when volatility is
+            stochastic — it is shown only for orientation.
+          </p>
+        </>
+      )}
+
+      <div className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+        <span className="font-medium text-slate-600">How to read the parameters:</span> κ is the
+        speed variance reverts to its long-run level; θ (here √θ) is that long-run variance/vol; ξ
+        (vol of vol) is how randomly volatility itself moves; ρ is the price/variance correlation
+        (negative ρ produces the equity leverage effect and skew); v₀ (σ₀) is the starting
+        variance/vol. Calibration to a market IV surface is planned, not implemented.
+      </div>
     </div>
   );
 }

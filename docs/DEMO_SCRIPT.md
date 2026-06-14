@@ -124,7 +124,11 @@ Return to the Command Center's **Platform Direction** panel (or open
   Last, open **Vol Surface** → *Generate Sample Surface*: the summary cards, the
   smile chart (raw IV scatter + SVI curve in distinct colours), the ATM
   term-structure chart, and the moneyness × expiry heatmap all populate from a
-  synthetic chain — emphasise it is research, not live market data.
+  synthetic chain — emphasise it is research, not live market data. Then open
+  **Heston** → *Run Heston* on the defaults: the price / SE / CI / Black–Scholes
+  reference / Feller-status cards plus the underlying and volatility path charts
+  (multi-colour, first path highlighted); set vol of vol = 0 to show it collapse
+  toward the Black–Scholes reference, and note the Euler/Feller/MC caveats.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).
