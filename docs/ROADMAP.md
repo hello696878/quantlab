@@ -801,7 +801,8 @@ single-asset Backtest + Strategy Comparison:
   breakeven markers
 - Integrated into the dashboard Content Engine, command palette (4 commands),
   and cross-linked from the Black–Scholes paper page + Volmageddon disaster page
-- Educational only — no live chains, no American exercise, no vol surface;
+- Educational only — no live chains, no American exercise in the Phase 14.0
+  Black-Scholes/payoff tools (CRR American exercise added in Phase 14.1), no vol surface;
   expanded backend tests cover textbook values, put-call parity, IV bounds, and
   payoff boundedness
 

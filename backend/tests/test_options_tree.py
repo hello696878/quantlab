@@ -15,6 +15,7 @@ import pytest
 from app.options import black_scholes_price
 from app.options_tree import (
     LATTICE_MAX_STEPS,
+    MAX_TREE_STEPS,
     TreeInputError,
     binomial_tree_price,
     build_binomial_lattice,
@@ -96,7 +97,9 @@ def test_american_put_deep_itm_detects_early_exercise():
     assert ee["detected"] is True
     assert ee["first_step"] is not None and 0 <= ee["first_step"] <= 100
     assert ee["first_time"] is not None and math.isfinite(ee["first_time"])
+    assert [pt["step"] for pt in ee["boundary"]] == sorted(pt["step"] for pt in ee["boundary"])
     for pt in ee["boundary"]:
+        assert 0 <= pt["step"] < 100  # terminal expiry nodes are not "early" exercise
         assert math.isfinite(pt["boundary_price"]) and pt["boundary_price"] > 0
         assert math.isfinite(pt["time"])
 
@@ -123,6 +126,28 @@ def test_american_call_with_dividend_can_exercise_early():
 def test_validate_rejects_zero_steps():
     with pytest.raises(TreeInputError):
         validate_tree_inputs(_S, _K, _T, _R, _SIG, _Q, 0)
+
+
+def test_validate_rejects_steps_above_cap():
+    with pytest.raises(TreeInputError):
+        validate_tree_inputs(_S, _K, _T, _R, _SIG, _Q, MAX_TREE_STEPS + 1)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        (0.0, _K, _T, _R, _SIG, _Q, 100),
+        (_S, 0.0, _T, _R, _SIG, _Q, 100),
+        (_S, _K, 0.0, _R, _SIG, _Q, 100),
+        (_S, _K, _T, _R, 0.0, _Q, 100),
+        (_S, _K, _T, _R, _SIG, -0.01, 100),
+        (math.inf, _K, _T, _R, _SIG, _Q, 100),
+        (_S, _K, _T, math.nan, _SIG, _Q, 100),
+    ],
+)
+def test_validate_rejects_invalid_direct_inputs(args):
+    with pytest.raises(TreeInputError):
+        validate_tree_inputs(*args)
 
 
 def test_validate_rejects_p_outside_unit_interval():
@@ -220,6 +245,16 @@ def test_convergence_sweep_shape():
         assert math.isfinite(p["price"]) and math.isfinite(p["difference_vs_black_scholes"])
 
 
+def test_american_convergence_uses_black_scholes_as_reference_only():
+    conv = compare_tree_to_black_scholes(
+        "put", "american", _S, _K, _T, _R, _SIG, _Q, [25, 50, 100]
+    )
+    assert conv["is_european_reference"] is True
+    assert conv["black_scholes_price"] == pytest.approx(
+        black_scholes_price("put", _S, _K, _T, _R, _SIG, _Q), abs=1e-4
+    )
+
+
 # ---------------------------------------------------------------------------
 # API
 # ---------------------------------------------------------------------------
@@ -297,6 +332,8 @@ def test_api_tree_convergence(client):
         {"option_type": "call", "exercise_style": "european", "underlying_price": 100, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 0},
         # steps above the cap
         {"option_type": "call", "exercise_style": "european", "underlying_price": 100, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 1001},
+        # fractional steps are not silently truncated
+        {"option_type": "call", "exercise_style": "european", "underlying_price": 100, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 1.5},
         # negative underlying
         {"option_type": "call", "exercise_style": "european", "underlying_price": -1, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 100},
         # zero volatility

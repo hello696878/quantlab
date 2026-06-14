@@ -98,10 +98,11 @@ function OptionTypeToggle({
 }
 
 const CAVEAT =
-  "Black–Scholes is a simplified European model: it does not model early " +
-  "exercise (American options), discrete dividends, transaction costs, " +
-  "liquidity, volatility smile, or term structure. Educational only — not a " +
-  "fair value, a recommendation, or a trading system. No live option chains.";
+  "Black–Scholes is a simplified European model; Tree Pricing adds a simplified " +
+  "CRR lattice for American exercise. The lab does not model discrete dividends, " +
+  "assignment, transaction costs, liquidity, volatility smile, term structure, " +
+  "or live option chains. Educational only — not a fair value, a recommendation, " +
+  "or a trading system.";
 
 export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -682,9 +683,11 @@ function TreePricingTab() {
   const [result, setResult] = useState<BinomialTreeResponse | null>(null);
   const [convergence, setConvergence] = useState<TreeConvergenceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [convergenceError, setConvergenceError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const stepsInt = Math.trunc(num(steps));
+  const stepsNum = num(steps);
+  const stepsInt = Number.isInteger(stepsNum) ? stepsNum : NaN;
   const valid =
     num(S) > 0 &&
     num(K) > 0 &&
@@ -692,7 +695,7 @@ function TreePricingTab() {
     num(sigma) > 0 &&
     finite(r) &&
     finite(q) &&
-    Number.isInteger(stepsInt) &&
+    Number.isInteger(stepsNum) &&
     stepsInt >= 1 &&
     stepsInt <= 1000;
 
@@ -700,6 +703,7 @@ function TreePricingTab() {
     if (!valid) return;
     setLoading(true);
     setError(null);
+    setConvergenceError(null);
     setResult(null);
     setConvergence(null);
     const base = {
@@ -712,16 +716,20 @@ function TreePricingTab() {
       dividend_yield: num(q),
     };
     try {
-      const [priced, conv] = await Promise.all([
-        priceBinomialTree({ ...base, exercise_style: exerciseStyle, steps: stepsInt }),
-        computeTreeConvergence({
+      const priced = await priceBinomialTree({ ...base, exercise_style: exerciseStyle, steps: stepsInt });
+      setResult(priced);
+      try {
+        const conv = await computeTreeConvergence({
           ...base,
           exercise_style: exerciseStyle,
           step_values: CONVERGENCE_STEPS,
-        }),
-      ]);
-      setResult(priced);
-      setConvergence(conv);
+        });
+        setConvergence(conv);
+      } catch (e) {
+        setConvergence(null);
+        const message = e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.";
+        setConvergenceError(`Price calculated, but the convergence sweep was unavailable: ${message}`);
+      }
     } catch (e) {
       setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
     } finally {
@@ -829,6 +837,12 @@ function TreePricingTab() {
               {result.warnings.map((w, i) => (
                 <p key={i}>{w}</p>
               ))}
+            </div>
+          )}
+
+          {convergenceError && (
+            <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700">
+              {convergenceError}
             </div>
           )}
 

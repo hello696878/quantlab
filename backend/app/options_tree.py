@@ -35,6 +35,8 @@ from app.options import black_scholes_price
 # Only build the full node lattice for small trees — a readable diagram, not a
 # giant payload.  Larger trees return the price only (see ``lattice_note``).
 LATTICE_MAX_STEPS = 6
+# Keep direct Python callers bounded the same way the API schema is bounded.
+MAX_TREE_STEPS = 1000
 # Cap how many exercise-boundary points the response carries (downsampled, the
 # exact first-exercise step/time are computed before downsampling).
 BOUNDARY_MAX_POINTS = 60
@@ -65,6 +67,11 @@ def _risk_neutral_prob(
     """Return ``(p, u, d)`` for the CRR lattice."""
     u = math.exp(sigma * math.sqrt(dt))
     d = 1.0 / u
+    if abs(u - d) < 1e-15:
+        raise TreeInputError(
+            "Volatility and step size make the CRR up/down factors indistinguishable; "
+            "increase volatility, time to expiry, or use fewer steps."
+        )
     p = (math.exp((r - q) * dt) - d) / (u - d)
     return p, u, d
 
@@ -81,8 +88,25 @@ def validate_tree_inputs(
     range the lattice is arbitrageable, so we raise rather than return a
     misleading price.  Returns an optional informational warning otherwise.
     """
+    numeric_inputs = {
+        "underlying_price": S,
+        "strike": K,
+        "time_to_expiry": T,
+        "risk_free_rate": r,
+        "volatility": sigma,
+        "dividend_yield": q,
+    }
+    for name, value in numeric_inputs.items():
+        if not math.isfinite(float(value)):
+            raise TreeInputError(f"{name} must be finite.")
+    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
+        raise TreeInputError("underlying_price, strike, time_to_expiry, and volatility must be positive.")
+    if q < 0:
+        raise TreeInputError("dividend_yield must be non-negative.")
     if steps < 1:
         raise TreeInputError("steps must be a positive integer.")
+    if steps > MAX_TREE_STEPS:
+        raise TreeInputError(f"steps must be at most {MAX_TREE_STEPS}.")
     dt = T / steps
     p, _u, _d = _risk_neutral_prob(r, q, sigma, dt)
     if p < -_P_TOL or p > 1.0 + _P_TOL:

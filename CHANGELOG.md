@@ -18,6 +18,9 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   diagrams.
 - Deterministic backend endpoints: `POST /options/black-scholes`,
   `POST /options/implied-volatility`, and `POST /options/payoff`.
+- CRR binomial tree endpoints for European/American exercise:
+  `POST /options/binomial` and `POST /options/tree-convergence`, with small
+  lattice visualization capped for readability.
 - Strategy payoff presets for long call/put, covered call, protective put,
   bull/bear spreads, straddles, and strangles.
 - Dashboard, sidebar, command-palette/search, Black–Scholes paper, and
@@ -25,9 +28,10 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Limitations
 
-- Educational calculator only: no live option chains, broker integration,
-  American exercise, assignment, transaction-cost/liquidity modelling, or full
-  volatility surface.
+- Educational calculator only: American exercise is limited to the simplified
+  CRR tree model; no live option chains, broker integration, assignment,
+  discrete-dividend/corporate-action modelling, transaction-cost/liquidity
+  modelling, or full volatility surface.
 
 ---
 

@@ -3,9 +3,11 @@ Options & Volatility Lab v1 — European Black–Scholes pricing, Greeks, an
 implied-volatility solver, and expiration-payoff math.
 
 Educational / deterministic only.  This is **not** an options trading system:
-no live chains, no American exercise, no discrete dividends, no transaction
-costs / liquidity / smile / term structure.  Black–Scholes assumes lognormal
-prices with constant volatility and continuous dividend yield ``q``.
+no live chains, no discrete dividends, no transaction costs / liquidity / smile
+/ term structure.  This module is European closed-form/payoff math; American
+exercise is handled separately by ``app.options_tree`` using a simplified CRR
+lattice.  Black–Scholes assumes lognormal prices with constant volatility and
+continuous dividend yield ``q``.
 
 Greeks conventions (labelled in the schema/UI):
 * delta, gamma — per 1.0 change in the underlying.
