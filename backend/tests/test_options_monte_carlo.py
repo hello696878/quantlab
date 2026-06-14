@@ -52,6 +52,12 @@ def test_same_seed_identical_price():
     assert a["confidence_interval_95"] == b["confidence_interval_95"]
 
 
+def test_same_seed_identical_path_preview():
+    a = price_monte_carlo("european_call", _S, _K, _T, _R, _SIG, _Q, 100, 10000, 123)
+    b = price_monte_carlo("european_call", _S, _K, _T, _R, _SIG, _Q, 100, 10000, 123)
+    assert a["path_preview"] == b["path_preview"]
+
+
 def test_different_seed_differs_but_finite():
     a = price_monte_carlo("european_call", _S, _K, _T, _R, _SIG, _Q, 100, 10000, 1)
     b = price_monte_carlo("european_call", _S, _K, _T, _R, _SIG, _Q, 100, 10000, 2)
@@ -140,6 +146,7 @@ def test_asian_call_price_finite():
     assert math.isfinite(mc["price"]) and mc["price"] >= 0
     assert mc["average_type"] == "arithmetic"
     assert mc["black_scholes_reference"] is None
+    assert any("arithmetic average" in w for w in mc["warnings"])
 
 
 def test_asian_put_price_finite():
@@ -182,6 +189,13 @@ def test_barrier_already_breached_returns_zero_and_warns():
     assert any("breached" in w for w in mc["warnings"])
 
 
+def test_down_barrier_already_breached_returns_zero_and_warns():
+    # Down barrier above spot → every path starts breached → down-and-out payoff is 0.
+    mc = price_monte_carlo("down_and_out_put", _S, _K, _T, _R, _SIG, _Q, 252, 5000, 42, False, 120.0)
+    assert mc["price"] == 0.0
+    assert any("breached" in w for w in mc["warnings"])
+
+
 def test_barrier_in_out_parity():
     # in + out == vanilla (same seed, same paths).
     out = price_monte_carlo("up_and_out_call", _S, _K, _T, _R, _SIG, _Q, 252, 20000, 9, False, 130.0)
@@ -210,6 +224,34 @@ def test_validate_rejects_unknown_payoff():
         )
 
 
+@pytest.mark.parametrize("seed", [-1, 2**32, 1.5, "42"])
+def test_price_rejects_invalid_direct_seed(seed):
+    with pytest.raises(MonteCarloInputError):
+        price_monte_carlo("european_call", _S, _K, _T, _R, _SIG, _Q, 100, 5000, seed)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        ("european_call", 0.0, _K, _T, _R, _SIG, _Q, 100, 5000, None),
+        ("european_call", _S, 0.0, _T, _R, _SIG, _Q, 100, 5000, None),
+        ("european_call", _S, _K, 0.0, _R, _SIG, _Q, 100, 5000, None),
+        ("european_call", _S, _K, _T, _R, 0.0, _Q, 100, 5000, None),
+        ("european_call", _S, _K, _T, _R, _SIG, -0.01, 100, 5000, None),
+        ("european_call", math.inf, _K, _T, _R, _SIG, _Q, 100, 5000, None),
+        ("european_call", _S, _K, _T, math.nan, _SIG, _Q, 100, 5000, None),
+        ("european_call", _S, _K, _T, _R, _SIG, _Q, 1.5, 5000, None),
+        ("european_call", _S, _K, _T, _R, _SIG, _Q, 100, 10.5, None),
+        ("european_call", _S, _K, _T, _R, _SIG, _Q, 0, 5000, None),
+        ("european_call", _S, _K, _T, _R, _SIG, _Q, 100, 10, None),
+        ("up_and_out_call", _S, _K, _T, _R, _SIG, _Q, 100, 5000, math.inf),
+    ],
+)
+def test_validate_rejects_invalid_direct_inputs(args):
+    with pytest.raises(MonteCarloInputError):
+        validate_monte_carlo_inputs(*args)
+
+
 # ---------------------------------------------------------------------------
 # Path preview / finiteness
 # ---------------------------------------------------------------------------
@@ -222,6 +264,7 @@ def test_path_preview_is_capped():
         assert len(path["points"]) <= 150
         assert path["points"][0]["time"] == 0.0
         assert path["points"][0]["price"] == pytest.approx(_S)
+        assert all(pt["price"] > 0 for pt in path["points"])
 
 
 def test_no_nan_inf_in_response():
@@ -282,8 +325,14 @@ def test_api_monte_carlo_barrier(client):
         {"payoff_type": "european_call", "underlying_price": 100, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 100, "simulations": 500000, "seed": 1},
         # steps = 0
         {"payoff_type": "european_call", "underlying_price": 100, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 0, "simulations": 5000, "seed": 1},
+        # fractional steps are not silently truncated
+        {"payoff_type": "european_call", "underlying_price": 100, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 1.5, "simulations": 5000, "seed": 1},
         # steps above cap
         {"payoff_type": "european_call", "underlying_price": 100, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 5000, "simulations": 5000, "seed": 1},
+        # fractional simulations are not silently truncated
+        {"payoff_type": "european_call", "underlying_price": 100, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 100, "simulations": 5000.5, "seed": 1},
+        # seed above cap
+        {"payoff_type": "european_call", "underlying_price": 100, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 100, "simulations": 5000, "seed": 2**32},
         # negative underlying
         {"payoff_type": "european_call", "underlying_price": -1, "strike": 100, "time_to_expiry": 1, "risk_free_rate": 0.05, "volatility": 0.20, "steps": 100, "simulations": 5000, "seed": 1},
         # zero volatility

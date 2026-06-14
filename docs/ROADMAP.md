@@ -849,7 +849,7 @@ single-asset Backtest + Strategy Comparison:
   (+ antithetic toggle, conditional barrier), price / SE / CI / BS-reference
   cards, a neon path-preview chart, and an on-demand convergence table
   (1k → 25k showing SE shrink ~ 1/√N); palette commands + dashboard card updated
-- 32 new backend tests (seed reproducibility, MC↔BS agreement + CI containment,
+- 53 backend tests (seed reproducibility, MC↔BS agreement + CI containment,
   SE behaviour, Asian/barrier, parity, validation, finiteness)
 - Educational simulation with sampling error — **no** stochastic / local
   volatility, no surface, no live chains, no production exotic pricing

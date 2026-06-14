@@ -933,6 +933,24 @@ const MC_PAYOFFS: { value: MonteCarloPayoffType; label: string; barrier: boolean
 ];
 
 const MC_CONVERGENCE_SIMS = [1000, 5000, 10000, 25000];
+const MC_PATH_COLORS = [
+  "#22d3ee", // cyan
+  "#60a5fa", // blue
+  "#8b5cf6", // violet
+  "#a78bfa", // purple
+  "#f59e0b", // amber
+  "#34d399", // green
+  "#f472b6", // pink
+  "#2dd4bf", // teal
+  "#fb7185", // rose
+  "#38bdf8", // sky
+  "#c084fc", // orchid
+  "#bef264", // lime
+];
+
+function monteCarloPathColor(pathId: number): string {
+  return MC_PATH_COLORS[pathId % MC_PATH_COLORS.length];
+}
 
 interface ConvRow {
   simulations: number;
@@ -941,7 +959,6 @@ interface ConvRow {
 }
 
 function MonteCarloTab() {
-  const colors = useAccentColors();
   const [payoffType, setPayoffType] = useState<MonteCarloPayoffType>("european_call");
   const [S, setS] = useState("100");
   const [K, setK] = useState("100");
@@ -961,9 +978,12 @@ function MonteCarloTab() {
   const [convLoading, setConvLoading] = useState(false);
 
   const isBarrier = MC_PAYOFFS.find((p) => p.value === payoffType)?.barrier ?? false;
-  const stepsInt = Math.trunc(num(steps));
-  const simsInt = Math.trunc(num(simulations));
-  const seedInt = Math.trunc(num(seed));
+  const stepsNum = num(steps);
+  const simsNum = num(simulations);
+  const seedNum = num(seed);
+  const stepsInt = Number.isInteger(stepsNum) ? stepsNum : NaN;
+  const simsInt = Number.isInteger(simsNum) ? simsNum : NaN;
+  const seedInt = Number.isInteger(seedNum) ? seedNum : NaN;
   const valid =
     num(S) > 0 &&
     num(K) > 0 &&
@@ -971,14 +991,15 @@ function MonteCarloTab() {
     num(sigma) > 0 &&
     finite(r) &&
     finite(q) &&
-    Number.isInteger(stepsInt) &&
+    Number.isInteger(stepsNum) &&
     stepsInt >= 1 &&
     stepsInt <= 2000 &&
-    Number.isInteger(simsInt) &&
+    Number.isInteger(simsNum) &&
     simsInt >= 100 &&
     simsInt <= 200000 &&
-    Number.isInteger(seedInt) &&
+    Number.isInteger(seedNum) &&
     seedInt >= 0 &&
+    seedInt <= 4294967295 &&
     (!isBarrier || num(barrier) > 0);
 
   function baseRequest(sims: number) {
@@ -1016,6 +1037,8 @@ function MonteCarloTab() {
   async function runConvergence() {
     if (!valid) return;
     setConvLoading(true);
+    setError(null);
+    setConvRows(null);
     try {
       const rows: ConvRow[] = [];
       for (const sims of MC_CONVERGENCE_SIMS) {
@@ -1115,7 +1138,7 @@ function MonteCarloTab() {
       {!valid && (
         <p className="text-[11px] text-slate-400">
           Steps 1–2000 and simulations 100–200,000 must be whole numbers; S, K, T, σ positive;
-          barrier required for barrier payoffs.
+          seed must be a non-negative integer; barrier required for barrier payoffs.
         </p>
       )}
       {error && <p className="text-xs text-red-600">⚠ {error}</p>}
@@ -1174,18 +1197,30 @@ function MonteCarloTab() {
                   />
                   <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={52} />
                   <ReferenceLine y={num(K)} stroke={CHART_REF_LINE} strokeDasharray="5 4" />
-                  {preview.map((p) => (
-                    <Line
-                      key={p.path_id}
-                      type="monotone"
-                      dataKey={`p${p.path_id}`}
-                      stroke={colors.accent}
-                      strokeWidth={1}
-                      strokeOpacity={0.45}
-                      dot={false}
-                      isAnimationActive={false}
-                    />
-                  ))}
+                  <Tooltip
+                    content={
+                      <NeonTooltip
+                        formatValue={(v: number) => v.toFixed(2)}
+                        formatLabel={(l) => (typeof l === "number" ? `t=${l.toFixed(2)} yr` : "")}
+                      />
+                    }
+                  />
+                  {preview.map((p, idx) => {
+                    const highlighted = idx < 2;
+                    return (
+                      <Line
+                        key={p.path_id}
+                        type="monotone"
+                        dataKey={`p${p.path_id}`}
+                        name={`Path ${p.path_id + 1}`}
+                        stroke={monteCarloPathColor(p.path_id)}
+                        strokeWidth={highlighted ? 2 : 1.15}
+                        strokeOpacity={highlighted ? 0.88 : 0.46}
+                        dot={false}
+                        isAnimationActive={false}
+                      />
+                    );
+                  })}
                 </ComposedChart>
               </ResponsiveContainer>
               <p className="text-[11px] text-slate-400">

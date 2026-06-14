@@ -21,6 +21,10 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - CRR binomial tree endpoints for European/American exercise:
   `POST /options/binomial` and `POST /options/tree-convergence`, with small
   lattice visualization capped for readability.
+- Monte Carlo GBM endpoint `POST /options/monte-carlo` for European,
+  arithmetic-average Asian, and simple discretely monitored barrier payoffs,
+  with seed reproducibility, standard error, 95% confidence interval, and capped
+  path preview.
 - Strategy payoff presets for long call/put, covered call, protective put,
   bull/bear spreads, straddles, and strangles.
 - Dashboard, sidebar, command-palette/search, Black–Scholes paper, and
@@ -29,9 +33,10 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Limitations
 
 - Educational calculator only: American exercise is limited to the simplified
-  CRR tree model; no live option chains, broker integration, assignment,
-  discrete-dividend/corporate-action modelling, transaction-cost/liquidity
-  modelling, or full volatility surface.
+  CRR tree model, and Monte Carlo is constant-volatility GBM with sampling
+  error; no live option chains, broker integration, assignment,
+  discrete-dividend/corporate-action modelling, stochastic volatility,
+  transaction-cost/liquidity modelling, or full volatility surface.
 
 ---
 

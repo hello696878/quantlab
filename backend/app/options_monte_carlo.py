@@ -33,6 +33,12 @@ from app.options import black_scholes_price
 
 # Per-batch element cap keeps peak memory bounded for large simulations × steps.
 _MAX_BATCH_ELEMENTS = 4_000_000
+# Keep direct Python callers bounded the same way the API schema is bounded.
+_MIN_STEPS = 1
+_MAX_STEPS = 2000
+_MIN_SIMULATIONS = 100
+_MAX_SIMULATIONS = 200_000
+_MAX_SEED = 2**32 - 1
 # Path-preview caps — never stream all paths to the frontend.
 _PREVIEW_PATHS = 12
 _PREVIEW_POINTS = 150
@@ -82,12 +88,46 @@ def validate_monte_carlo_inputs(
     if payoff_type not in _ALL_PAYOFFS:
         raise MonteCarloInputError(f"Unknown payoff_type '{payoff_type}'.")
 
+    numeric_inputs = {
+        "underlying_price": S,
+        "strike": K,
+        "time_to_expiry": T,
+        "risk_free_rate": r,
+        "volatility": sigma,
+        "dividend_yield": q,
+    }
+    for name, value in numeric_inputs.items():
+        if not math.isfinite(float(value)):
+            raise MonteCarloInputError(f"{name} must be finite.")
+    if S <= 0 or K <= 0 or T <= 0 or sigma <= 0:
+        raise MonteCarloInputError(
+            "underlying_price, strike, time_to_expiry, and volatility must be positive."
+        )
+    if q < 0:
+        raise MonteCarloInputError("dividend_yield must be non-negative.")
+    if not isinstance(steps, (int, np.integer)):
+        raise MonteCarloInputError("steps must be an integer.")
+    if not isinstance(simulations, (int, np.integer)):
+        raise MonteCarloInputError("simulations must be an integer.")
+    if steps < _MIN_STEPS or steps > _MAX_STEPS:
+        raise MonteCarloInputError(f"steps must be between {_MIN_STEPS} and {_MAX_STEPS}.")
+    if simulations < _MIN_SIMULATIONS or simulations > _MAX_SIMULATIONS:
+        raise MonteCarloInputError(
+            f"simulations must be between {_MIN_SIMULATIONS} and {_MAX_SIMULATIONS}."
+        )
+
     warnings: List[str] = []
+    if payoff_type in _ASIAN_TYPES:
+        warnings.append(
+            "Asian payoff uses the arithmetic average of the initial spot and simulated time steps."
+        )
     if _is_barrier(payoff_type):
         if barrier is None:
             raise MonteCarloInputError(
                 "barrier_price is required for barrier payoff types."
             )
+        if not math.isfinite(float(barrier)):
+            raise MonteCarloInputError("barrier_price must be finite.")
         if barrier <= 0:
             raise MonteCarloInputError("barrier_price must be positive.")
         warnings.append(
@@ -148,6 +188,10 @@ def simulate_gbm_paths(
     paths = np.empty((n_paths, steps + 1), dtype=float)
     paths[:, 0] = S
     paths[:, 1:] = S * np.exp(cumulative)
+    if not np.all(np.isfinite(paths)):
+        raise MonteCarloInputError(
+            "Simulated paths became non-finite; reduce volatility, time to expiry, or rate magnitude."
+        )
     return paths
 
 
@@ -220,6 +264,10 @@ def _run_simulation(
 
     if preview is None:  # pragma: no cover — simulations >= 100 by schema
         preview = np.empty((0, cols))
+    if not np.all(np.isfinite(discounted)):
+        raise MonteCarloInputError(
+            "Discounted payoffs became non-finite; reduce volatility, time to expiry, or rate magnitude."
+        )
     return discounted, preview
 
 
@@ -306,6 +354,13 @@ def price_monte_carlo(
     barrier: Optional[float] = None,
 ) -> dict:
     """Monte Carlo price + diagnostics as a JSON-ready dict (``MonteCarloResponse``)."""
+    if seed is not None:
+        if not isinstance(seed, (int, np.integer)):
+            raise MonteCarloInputError("seed must be an integer.")
+        seed = int(seed)
+        if seed < 0 or seed > _MAX_SEED:
+            raise MonteCarloInputError(f"seed must be between 0 and {_MAX_SEED}.")
+
     warnings = validate_monte_carlo_inputs(
         payoff_type, S, K, T, r, sigma, q, steps, simulations, barrier
     )
