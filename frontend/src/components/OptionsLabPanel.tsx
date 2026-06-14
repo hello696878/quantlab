@@ -15,15 +15,20 @@ import {
 import {
   BacktestApiError,
   computeOptionPayoff,
+  computeTreeConvergence,
+  priceBinomialTree,
   priceBlackScholes,
   solveImpliedVolatility,
 } from "@/lib/api";
 import type {
+  BinomialTreeResponse,
   BlackScholesResponse,
+  ExerciseStyle,
   ImpliedVolResponse,
   OptionType,
   PayoffLeg,
   PayoffResponse,
+  TreeConvergenceResponse,
 } from "@/lib/types";
 import { useAccentColors } from "@/lib/useAccentColors";
 import NeonTooltip from "@/components/charts/NeonTooltip";
@@ -35,7 +40,7 @@ import {
   DANGER,
 } from "@/components/charts/chartTheme";
 
-type Tab = "pricing" | "implied_vol" | "payoff" | "education";
+type Tab = "pricing" | "implied_vol" | "payoff" | "tree" | "education";
 
 const inputCls = "ql-input px-2.5 py-1.5";
 const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400";
@@ -118,6 +123,7 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
             ["pricing", "Pricing"],
             ["implied_vol", "Implied Vol"],
             ["payoff", "Payoff Builder"],
+            ["tree", "Tree Pricing"],
             ["education", "Education"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -138,6 +144,7 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
       {tab === "pricing" && <PricingTab />}
       {tab === "implied_vol" && <ImpliedVolTab />}
       {tab === "payoff" && <PayoffTab />}
+      {tab === "tree" && <TreePricingTab />}
       {tab === "education" && <EducationTab />}
     </div>
   );
@@ -550,6 +557,344 @@ function PayoffTab() {
           </p>
         </>
       )}
+    </div>
+  );
+}
+
+// ── Tree Pricing ─────────────────────────────────────────────────────────────
+
+function ExerciseStyleToggle({
+  value,
+  onChange,
+}: {
+  value: ExerciseStyle;
+  onChange: (v: ExerciseStyle) => void;
+}) {
+  return (
+    <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+      {(["european", "american"] as ExerciseStyle[]).map((s) => (
+        <button
+          key={s}
+          type="button"
+          onClick={() => onChange(s)}
+          className={
+            "px-3 py-1.5 text-xs font-medium capitalize transition-colors " +
+            (value === s ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")
+          }
+        >
+          {s}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+// Fixed, safe step list for the convergence sweep (independent of the chosen N).
+const CONVERGENCE_STEPS = [5, 10, 25, 50, 100, 200];
+
+function TreeLatticeView({ result }: { result: BinomialTreeResponse }) {
+  const colors = useAccentColors();
+  if (!result.lattice) {
+    return (
+      <p className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-500">
+        {result.lattice_note ??
+          "Tree visualization is limited to small step counts for readability."}
+      </p>
+    );
+  }
+
+  // Group nodes into columns by step; within a column, highest underlying on top.
+  const columns = new Map<number, typeof result.lattice.nodes>();
+  for (const node of result.lattice.nodes) {
+    const col = columns.get(node.step) ?? [];
+    col.push(node);
+    columns.set(node.step, col);
+  }
+  const steps = Array.from(columns.keys()).sort((a, b) => a - b);
+  const dt = result.tree_params.dt;
+
+  return (
+    <div>
+      <div className="flex gap-3 overflow-x-auto pb-2">
+        {steps.map((step) => {
+          const nodes = (columns.get(step) ?? []).slice().sort((a, b) => b.index - a.index);
+          return (
+            <div key={step} className="flex min-w-[88px] flex-col items-stretch gap-1.5">
+              <div className="text-center text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                Step {step}
+                <span className="block text-[9px] normal-case text-slate-300">
+                  t={(step * dt).toFixed(3)}
+                </span>
+              </div>
+              <div className="flex flex-1 flex-col justify-center gap-1.5">
+                {nodes.map((n) => (
+                  <div
+                    key={n.index}
+                    className={
+                      "rounded-md border px-1.5 py-1 text-center " +
+                      (n.early_exercise
+                        ? "border-amber-400 bg-amber-50"
+                        : "border-slate-200 bg-white")
+                    }
+                    title={
+                      `Underlying ${n.underlying_price.toFixed(2)} · option ${n.option_value.toFixed(2)}` +
+                      ` · intrinsic ${n.intrinsic_value.toFixed(2)}` +
+                      (n.early_exercise ? " · early exercise optimal" : "")
+                    }
+                  >
+                    <div className="mono text-[11px] font-semibold text-slate-700">
+                      {n.underlying_price.toFixed(2)}
+                    </div>
+                    <div className="mono text-[10px]" style={{ color: colors.accent }}>
+                      {n.option_value.toFixed(2)}
+                    </div>
+                    {n.early_exercise && (
+                      <div className="text-[8px] font-bold uppercase text-amber-600">EX</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+      <p className="mt-1 text-[11px] text-slate-400">
+        Each node shows the <span className="font-medium text-slate-600">underlying price</span>{" "}
+        (top) and <span style={{ color: colors.accent }}>option value</span> (bottom). Amber{" "}
+        <span className="font-bold text-amber-600">EX</span> nodes are where early exercise is
+        optimal (American only).
+      </p>
+    </div>
+  );
+}
+
+function TreePricingTab() {
+  const colors = useAccentColors();
+  const [optionType, setOptionType] = useState<OptionType>("call");
+  const [exerciseStyle, setExerciseStyle] = useState<ExerciseStyle>("european");
+  const [S, setS] = useState("100");
+  const [K, setK] = useState("100");
+  const [T, setT] = useState("1");
+  const [r, setR] = useState("0.05");
+  const [sigma, setSigma] = useState("0.20");
+  const [q, setQ] = useState("0");
+  const [steps, setSteps] = useState("100");
+  const [result, setResult] = useState<BinomialTreeResponse | null>(null);
+  const [convergence, setConvergence] = useState<TreeConvergenceResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const stepsInt = Math.trunc(num(steps));
+  const valid =
+    num(S) > 0 &&
+    num(K) > 0 &&
+    num(T) > 0 &&
+    num(sigma) > 0 &&
+    finite(r) &&
+    finite(q) &&
+    Number.isInteger(stepsInt) &&
+    stepsInt >= 1 &&
+    stepsInt <= 1000;
+
+  async function run() {
+    if (!valid) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    setConvergence(null);
+    const base = {
+      option_type: optionType,
+      underlying_price: num(S),
+      strike: num(K),
+      time_to_expiry: num(T),
+      risk_free_rate: num(r),
+      volatility: num(sigma),
+      dividend_yield: num(q),
+    };
+    try {
+      const [priced, conv] = await Promise.all([
+        priceBinomialTree({ ...base, exercise_style: exerciseStyle, steps: stepsInt }),
+        computeTreeConvergence({
+          ...base,
+          exercise_style: exerciseStyle,
+          step_values: CONVERGENCE_STEPS,
+        }),
+      ]);
+      setResult(priced);
+      setConvergence(conv);
+    } catch (e) {
+      setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const isAmerican = exerciseStyle === "american";
+  const refLabel = isAmerican ? "European reference (BS)" : "Black–Scholes";
+  const convChartData =
+    convergence?.points.map((p) => ({ steps: p.steps, price: p.price })) ?? [];
+
+  return (
+    <div className="card space-y-4 p-5">
+      <p className="section-title">Tree Pricing — Binomial Lattice</p>
+      <p className="text-xs text-slate-500">
+        Binomial trees approximate option values by stepping through possible up/down price
+        paths. American exercise is handled by checking, at each node, whether exercising early
+        is better than continuing. European tree prices converge to Black–Scholes as the step
+        count grows. Educational lattice model — a numerical approximation, not a fair value.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Field label="Model">
+          <div className="rounded-lg border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-600">
+            Binomial (CRR)
+            <span className="ml-1 text-[10px] text-slate-400">· Trinomial planned</span>
+          </div>
+        </Field>
+        <Field label="Option type">
+          <OptionTypeToggle value={optionType} onChange={setOptionType} />
+        </Field>
+        <Field label="Exercise style">
+          <ExerciseStyleToggle value={exerciseStyle} onChange={setExerciseStyle} />
+        </Field>
+        <Field label="Steps N (1–1000)">
+          <input type="number" className={inputCls} value={steps} min={1} max={1000} step={1} onChange={(e) => setSteps(e.target.value)} />
+        </Field>
+        <Field label="Underlying S"><input type="number" className={inputCls} value={S} onChange={(e) => setS(e.target.value)} /></Field>
+        <Field label="Strike K"><input type="number" className={inputCls} value={K} onChange={(e) => setK(e.target.value)} /></Field>
+        <Field label="Expiry T (years)"><input type="number" className={inputCls} value={T} onChange={(e) => setT(e.target.value)} /></Field>
+        <Field label="Rate r"><input type="number" className={inputCls} value={r} step={0.01} onChange={(e) => setR(e.target.value)} /></Field>
+        <Field label="Volatility σ"><input type="number" className={inputCls} value={sigma} step={0.01} onChange={(e) => setSigma(e.target.value)} /></Field>
+        <Field label="Dividend q"><input type="number" className={inputCls} value={q} step={0.01} onChange={(e) => setQ(e.target.value)} /></Field>
+      </div>
+
+      <button
+        type="button"
+        onClick={run}
+        disabled={!valid || loading}
+        className={
+          "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+        }
+      >
+        {loading ? "Pricing…" : "Price on tree"}
+      </button>
+      {!valid && (
+        <p className="text-[11px] text-slate-400">
+          Steps must be a whole number between 1 and 1000; S, K, T, σ must be positive.
+        </p>
+      )}
+      {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+
+      {result && (
+        <>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label={`Tree price (${result.exercise_style})`} value={result.price.toFixed(4)} />
+            <Stat label={refLabel} value={result.convergence.black_scholes_price.toFixed(4)} />
+            <Stat label="Difference" value={result.convergence.difference.toFixed(4)} />
+            <Stat
+              label="Early exercise"
+              value={result.early_exercise.detected ? "Detected" : "None"}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label="Up factor u" value={result.tree_params.up_factor.toFixed(4)} />
+            <Stat label="Down factor d" value={result.tree_params.down_factor.toFixed(4)} />
+            <Stat label="Risk-neutral p" value={result.tree_params.risk_neutral_prob.toFixed(4)} />
+            <Stat label="dt" value={result.tree_params.dt.toFixed(4)} />
+          </div>
+
+          {isAmerican && (
+            <div className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
+              {result.early_exercise.detected ? (
+                <>
+                  Early exercise first becomes optimal at step{" "}
+                  <span className="font-semibold">{result.early_exercise.first_step}</span>{" "}
+                  (t ≈ {result.early_exercise.first_time?.toFixed(3)} yr).{" "}
+                  {optionType === "put"
+                    ? "Early exercise can be optimal when the put is sufficiently deep in the money."
+                    : "Dividends can make early call exercise optimal."}
+                </>
+              ) : optionType === "call" && num(q) === 0 ? (
+                "Early exercise is usually not optimal for non-dividend-paying American calls in this simplified model."
+              ) : (
+                "No early-exercise node was optimal for these parameters."
+              )}
+            </div>
+          )}
+
+          {result.warnings.length > 0 && (
+            <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700">
+              {result.warnings.map((w, i) => (
+                <p key={i}>{w}</p>
+              ))}
+            </div>
+          )}
+
+          {/* Convergence panel */}
+          {convergence && (
+            <div>
+              <p className="section-title mb-1">Convergence vs steps</p>
+              <p className="mb-2 text-[11px] text-slate-400">
+                {isAmerican
+                  ? "American tree price across step counts; the dashed line is the Black–Scholes European reference (no early-exercise value)."
+                  : "Tree price converges toward the dashed Black–Scholes line as the step count grows."}
+              </p>
+              <ResponsiveContainer width="100%" height={220}>
+                <ComposedChart data={convChartData} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                  <XAxis
+                    dataKey="steps"
+                    type="number"
+                    domain={["dataMin", "dataMax"]}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
+                    axisLine={{ stroke: CHART_AXIS_LINE }}
+                    tickLine={false}
+                    label={{ value: "steps", position: "insideBottom", offset: -2, fontSize: 10, fill: CHART_AXIS }}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={56}
+                    domain={["auto", "auto"]}
+                  />
+                  <Tooltip
+                    content={
+                      <NeonTooltip
+                        formatValue={(v: number) => v.toFixed(4)}
+                        formatLabel={(l) => (typeof l === "number" ? `${l} steps` : "")}
+                      />
+                    }
+                  />
+                  <ReferenceLine
+                    y={convergence.black_scholes_price}
+                    stroke={CHART_REF_LINE}
+                    strokeDasharray="5 4"
+                  />
+                  <Line type="monotone" dataKey="price" name="Tree price" stroke={colors.accent} strokeWidth={2} dot={{ r: 2 }} isAnimationActive={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+              <p className="text-[11px] text-slate-400">
+                {refLabel}: {convergence.black_scholes_price.toFixed(4)}
+              </p>
+            </div>
+          )}
+
+          {/* Tree visualization */}
+          <div>
+            <p className="section-title mb-1">Lattice</p>
+            <TreeLatticeView result={result} />
+          </div>
+        </>
+      )}
+
+      <p className="text-[11px] text-slate-400">
+        Tree models are numerical approximations: results depend on the step count, the
+        volatility input, the (continuous) dividend assumption, and the exercise style. No live
+        option chains, no volatility surface, no production risk engine.
+      </p>
     </div>
   );
 }

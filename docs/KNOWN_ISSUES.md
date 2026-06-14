@@ -53,11 +53,20 @@ of a **research tool**.
 
 ## Options Lab
 
-- **Options Lab v1 is an educational calculator.** It covers European
-  Black–Scholes pricing, Greeks, bisection implied volatility, and terminal
-  payoff diagrams. It does **not** fetch live option chains, model American
-  exercise / assignment, simulate transaction costs or liquidity, produce a
-  volatility surface, or backtest option strategies through time.
+- **Options Lab is an educational calculator.** It covers European
+  Black–Scholes pricing, Greeks, bisection implied volatility, terminal
+  payoff diagrams, and (Phase 14.1) **Cox-Ross-Rubinstein binomial tree**
+  pricing with **European/American exercise**. It does **not** fetch live
+  option chains, simulate transaction costs or liquidity, produce a volatility
+  surface, or backtest option strategies through time.
+- **Tree pricing is a numerical approximation, not a production risk engine.**
+  The binomial lattice converges to Black–Scholes for European options as the
+  step count grows; American exercise is handled by `max(intrinsic,
+  continuation)` at each node. It models only a **continuous** dividend yield —
+  not discrete dividends or corporate actions — and the price depends on the
+  step count, volatility input, and exercise style. The early-exercise
+  diagnostic and boundary are teaching aids; the full lattice renders only for
+  small trees (≤ 6 steps). No trinomial tree yet (planned), no Heston/SABR.
 - **Payoff diagrams are expiration-only.** They ignore mark-to-market path,
   financing, early assignment, and margin. Unbounded short-option risk is
   labelled where applicable; finite payoff summaries assume the underlying

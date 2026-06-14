@@ -805,6 +805,29 @@ single-asset Backtest + Strategy Comparison:
   expanded backend tests cover textbook values, put-call parity, IV bounds, and
   payoff boundedness
 
+### Phase 14.1 — Binomial Tree & American Options v1 ✅
+
+- New backend `app/options_tree.py` — **Cox-Ross-Rubinstein binomial lattice**
+  (`u = e^{σ√dt}`, `d = 1/u`, `p = (e^{(r−q)dt} − d)/(u − d)`) with **European
+  and American** exercise via `max(intrinsic, continuation)` backward induction;
+  reuses `black_scholes_price` (no duplicated closed-form code)
+- **Early-exercise diagnostic**: detected flag, first step / first time, and a
+  downsampled exercise boundary; American **call with q = 0 never exercises
+  early** (verified by test); deep-ITM American **put** does
+- **Convergence** comparison: European tree → Black–Scholes as steps grow;
+  for American options BS is shown only as a **European reference** (flagged)
+- Two deterministic routes: `POST /options/binomial` and
+  `/options/tree-convergence` (validated; `p ∉ [0,1]` → 422; never NaN/inf;
+  full node lattice only for small trees ≤ 6 steps to bound payloads)
+- Frontend **Tree Pricing** tab: model (Binomial CRR; Trinomial labelled
+  planned) / type / exercise style / S / K / T / r / σ / q / steps form, price
+  vs BS reference, early-exercise readout, a convergence chart, and a small-tree
+  lattice diagram (large trees show a "limited to small step counts" message)
+- Palette commands (Tree Pricing / American Option / Binomial), dashboard card
+  copy, and the Black–Scholes paper cross-link updated; 33 new backend tests
+- Numerical approximation only — no trinomial tree yet, no discrete dividends /
+  corporate actions, no vol surface, no live chains, no production risk engine
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -860,7 +883,9 @@ search · toasts, error boundary, loading/offline states.
 5. ~~Paper Replication Series v1~~ — **built** (13.1: 8 paper pages, 3 honest
    inspired demos; full replications remain future work pending universe data)
 6. ~~Options Pricing Engine v1~~ — **built** (14.0: Black–Scholes pricing +
-   Greeks + IV solver + payoff builder; a vol *surface* remains future)
+   Greeks + IV solver + payoff builder; 14.1: CRR **binomial tree** + American
+   exercise + early-exercise diagnostic. Trinomial tree and a vol *surface*
+   remain future)
 7. **Volatility Lab v1** — realized vol estimators, vol targeting deep-dive,
    term-structure visuals
 8. **Event-Driven & Arbitrage Module** (research)
@@ -885,7 +910,7 @@ built**; everything else is planned/research/future:
 | # | Category | Status today |
 |---|----------|--------------|
 | 1 | Equities | **built (core)** — SMA, RSI, Bollinger, Momentum, Vol Breakout, Pairs |
-| 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder; vol surface / deeper Vol Lab planned |
+| 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder, CRR **binomial tree** + American exercise; trinomial / vol surface / deeper Vol Lab planned |
 | 3 | Event-Driven & Arbitrage | research |
 | 4 | Futures & Commodities | research |
 | 5 | FX | research |

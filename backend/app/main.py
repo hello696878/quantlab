@@ -80,6 +80,11 @@ from app.options import (
     implied_volatility,
     strategy_payoff,
 )
+from app.options_tree import (
+    TreeInputError,
+    binomial_tree_price,
+    compare_tree_to_black_scholes,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -130,10 +135,14 @@ from app.schemas import (
     BenchmarkConfig,
     BlackScholesRequest,
     BlackScholesResponse,
+    BinomialTreeRequest,
+    BinomialTreeResponse,
     ImpliedVolRequest,
     ImpliedVolResponse,
     PayoffRequest,
     PayoffResponse,
+    TreeConvergenceRequest,
+    TreeConvergenceResponse,
     CostModel,
     PositionSizing,
     RiskManagement,
@@ -3511,3 +3520,69 @@ def options_payoff(request: PayoffRequest) -> PayoffResponse:
         request.points,
     )
     return PayoffResponse(**result)
+
+
+@app.post(
+    "/options/binomial",
+    response_model=BinomialTreeResponse,
+    tags=["options"],
+    summary="Price a European/American option on a CRR binomial tree",
+    description=(
+        "Cox-Ross-Rubinstein binomial lattice pricing for European and American "
+        "options, with early-exercise diagnostics and Black-Scholes convergence. "
+        "Educational numerical approximation — not a production options risk "
+        "engine. European prices converge to Black-Scholes as steps grow; "
+        "American exercise is handled by max(intrinsic, continuation) at each "
+        "node. No discrete dividends, corporate actions, costs, or liquidity. "
+        "The full node lattice is returned only for small trees (steps <= 6)."
+    ),
+)
+def options_binomial(request: BinomialTreeRequest) -> BinomialTreeResponse:
+    try:
+        result = binomial_tree_price(
+            request.option_type,
+            request.exercise_style,
+            request.underlying_price,
+            request.strike,
+            request.time_to_expiry,
+            request.risk_free_rate,
+            request.volatility,
+            request.dividend_yield,
+            request.steps,
+            include_lattice=request.include_lattice,
+        )
+    except TreeInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return BinomialTreeResponse(**result)
+
+
+@app.post(
+    "/options/tree-convergence",
+    response_model=TreeConvergenceResponse,
+    tags=["options"],
+    summary="Tree price vs Black-Scholes across step counts (convergence)",
+    description=(
+        "Prices the option on CRR binomial trees of several step counts and "
+        "reports each price and its difference from Black-Scholes. For European "
+        "options this shows convergence to Black-Scholes; for American options "
+        "Black-Scholes is only a European reference (no early-exercise value)."
+    ),
+)
+def options_tree_convergence(
+    request: TreeConvergenceRequest,
+) -> TreeConvergenceResponse:
+    try:
+        result = compare_tree_to_black_scholes(
+            request.option_type,
+            request.exercise_style,
+            request.underlying_price,
+            request.strike,
+            request.time_to_expiry,
+            request.risk_free_rate,
+            request.volatility,
+            request.dividend_yield,
+            request.step_values,
+        )
+    except TreeInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return TreeConvergenceResponse(**result)

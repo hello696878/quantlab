@@ -11,10 +11,14 @@ import type {
   BbBacktestRequest,
   BlackScholesRequest,
   BlackScholesResponse,
+  BinomialTreeRequest,
+  BinomialTreeResponse,
   ImpliedVolRequest,
   ImpliedVolResponse,
   PayoffRequest,
   PayoffResponse,
+  TreeConvergenceRequest,
+  TreeConvergenceResponse,
   CustomStrategyRequest,
   CustomStrategyTemplateCreate,
   CustomStrategyTemplateExport,
@@ -905,4 +909,19 @@ export function solveImpliedVolatility(
 
 export function computeOptionPayoff(req: PayoffRequest): Promise<PayoffResponse> {
   return postOptions<PayoffResponse>("/api/options/payoff", req);
+}
+
+export function priceBinomialTree(
+  req: BinomialTreeRequest,
+): Promise<BinomialTreeResponse> {
+  return postOptions<BinomialTreeResponse>("/api/options/binomial", req);
+}
+
+export function computeTreeConvergence(
+  req: TreeConvergenceRequest,
+): Promise<TreeConvergenceResponse> {
+  return postOptions<TreeConvergenceResponse>(
+    "/api/options/tree-convergence",
+    req,
+  );
 }

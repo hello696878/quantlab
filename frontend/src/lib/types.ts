@@ -1463,3 +1463,112 @@ export interface PayoffResponse {
   max_loss: number | null;
   breakevens: number[];
 }
+
+// ---------------------------------------------------------------------------
+// Tree-based option pricing (CRR binomial, European + American) — research v1
+// ---------------------------------------------------------------------------
+
+export type ExerciseStyle = "european" | "american";
+
+export interface BinomialTreeRequest {
+  option_type: OptionType;
+  exercise_style: ExerciseStyle;
+  underlying_price: number;
+  strike: number;
+  time_to_expiry: number;
+  risk_free_rate: number;
+  volatility: number;
+  dividend_yield?: number;
+  steps: number;
+  include_lattice?: boolean;
+}
+
+export interface TreeParams {
+  dt: number;
+  up_factor: number;
+  down_factor: number;
+  risk_neutral_prob: number;
+  discount_per_step: number;
+}
+
+export interface EarlyExerciseBoundaryPoint {
+  step: number;
+  time: number;
+  boundary_price: number;
+}
+
+export interface EarlyExerciseInfo {
+  detected: boolean;
+  first_step: number | null;
+  first_time: number | null;
+  boundary: EarlyExerciseBoundaryPoint[];
+}
+
+export interface TreeConvergence {
+  black_scholes_price: number;
+  difference: number;
+  relative_difference: number | null;
+  is_european_reference: boolean;
+}
+
+export interface TreeLatticeNode {
+  step: number;
+  index: number;
+  underlying_price: number;
+  option_value: number;
+  intrinsic_value: number;
+  early_exercise: boolean;
+}
+
+export interface TreeLattice {
+  steps: number;
+  nodes: TreeLatticeNode[];
+}
+
+export interface BinomialTreeParameters {
+  underlying_price: number;
+  strike: number;
+  time_to_expiry: number;
+  risk_free_rate: number;
+  volatility: number;
+  dividend_yield: number;
+}
+
+export interface BinomialTreeResponse {
+  model: "crr_binomial";
+  option_type: OptionType;
+  exercise_style: ExerciseStyle;
+  price: number;
+  steps: number;
+  parameters: BinomialTreeParameters;
+  tree_params: TreeParams;
+  early_exercise: EarlyExerciseInfo;
+  convergence: TreeConvergence;
+  lattice: TreeLattice | null;
+  lattice_note: string | null;
+  warnings: string[];
+}
+
+export interface TreeConvergenceRequest {
+  option_type: OptionType;
+  exercise_style: ExerciseStyle;
+  underlying_price: number;
+  strike: number;
+  time_to_expiry: number;
+  risk_free_rate: number;
+  volatility: number;
+  dividend_yield?: number;
+  step_values: number[];
+}
+
+export interface TreeConvergencePoint {
+  steps: number;
+  price: number;
+  difference_vs_black_scholes: number;
+}
+
+export interface TreeConvergenceResponse {
+  points: TreeConvergencePoint[];
+  black_scholes_price: number;
+  is_european_reference: boolean;
+}

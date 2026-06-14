@@ -102,15 +102,16 @@ Robustness Lab v1 block-bootstraps the realized daily strategy returns (blocks p
 
 ### Options Lab is an educational calculator, not an options risk engine
 
-The Options & Volatility Lab v1 prices **European** options with Black–Scholes (continuous dividend yield), computes Greeks, solves implied volatility by bisection, and draws expiration payoff diagrams. It is deterministic and educational. It explicitly does **not** model:
+The Options & Volatility Lab prices **European** options with Black–Scholes (continuous dividend yield), computes Greeks, solves implied volatility by bisection, and draws expiration payoff diagrams. A **Tree Pricing** tab adds a Cox-Ross-Rubinstein **binomial lattice** with **European and American** exercise (v1, Phase 14.1). It is deterministic and educational. It explicitly does **not** model:
 
-- American / early exercise, or discrete dividends.
 - Volatility smile or term structure (a single flat σ per calculation — no surface).
 - Transaction costs, bid/ask spreads, liquidity, or assignment risk.
 - Path-dependent mark-to-market PnL — payoff diagrams are **terminal** payoff at expiration only (a short option can show a small bounded payoff yet carry large interim losses; see Volmageddon in Quant Disasters).
 - Real-time Greeks or **any live option-chain data** — all inputs (including premiums in the payoff builder) are manual.
 
 Greeks conventions are labelled: delta/gamma per 1.0 of the underlying; vega/rho raw per 1.0 (100%) move; theta shown per-day and per-year. Breakevens are approximate (interpolated from the sampled payoff curve). It is not a fair value, a recommendation, or a production options risk system.
+
+**Tree pricing is a numerical approximation, not a production American-pricing engine.** The CRR binomial model converges to Black–Scholes for European options as the step count grows, and handles American exercise by taking `max(intrinsic, continuation)` at each node. It models only a **continuous** dividend yield — **not** discrete dividends, corporate actions, or other exotic features — and its price depends on the chosen step count, the volatility input, and the exercise style. The early-exercise diagnostic (detected / first step / approximate boundary) is a teaching aid, not a guaranteed optimal-exercise policy. The full node lattice is rendered only for small trees (≤ 6 steps) for readability; larger trees return the price and diagnostics only. No trinomial tree yet (planned), no volatility surface, no Heston/SABR.
 
 ### Stability Lab explores parameters; it cannot bless them
 

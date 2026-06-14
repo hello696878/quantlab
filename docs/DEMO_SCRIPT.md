@@ -113,7 +113,10 @@ Return to the Command Center's **Platform Direction** panel (or open
   from the keyboard.
 - **Options Lab** — show the Black–Scholes reference case (S=100, K=100, T=1,
   r=0.05, sigma=0.20), the IV warning for an impossible price, and a short-call
-  payoff with unbounded max loss.
+  payoff with unbounded max loss. Then open **Tree Pricing**: price the same
+  case on a CRR binomial tree (European call ≈ 10.45, converging to BS), switch
+  to an **American put** (price ≥ the European put, early exercise detected),
+  and drop steps to 5 to show the small lattice diagram.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

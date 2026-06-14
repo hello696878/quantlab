@@ -64,8 +64,10 @@ reproducible and every limitation explicit.
 
 1. **Equities** — built (core 6); more planned (low-vol, quality, seasonal…)
 2. **Options & Volatility** — **built (v1)**: Black–Scholes pricing + Greeks +
-   bisection IV solver + multi-leg payoff builder (14.0). Planned: IV surface,
-   vol targeting / term structure; later Heston, SABR — research
+   bisection IV solver + multi-leg payoff builder (14.0); CRR **binomial tree**
+   + **American exercise** + early-exercise diagnostic + BS convergence (14.1).
+   Planned: trinomial tree, IV surface, vol targeting / term structure; later
+   Heston, SABR — research
 3. **Event-Driven & Arbitrage** — research (merger-arb toy, index add/remove,
    earnings drift)
 4. **Futures & Commodities** — research (carry, term-structure, trend)
@@ -92,7 +94,8 @@ reproducible and every limitation explicit.
 4. ~~Strategy Library v1 pages~~ — **built** (13.0: six live strategy pages +
    honest planned catalog; registry in `frontend/src/lib/modelRegistry.ts`)
 5. ~~Paper Replication Series v1~~ — **built** (13.1)
-6. ~~Options Pricing Engine v1~~ — **built** (14.0)
+6. ~~Options Pricing Engine v1~~ — **built** (14.0 Black–Scholes; 14.1 CRR
+   binomial tree + American exercise)
 7. Volatility Lab v1
 8. Event-Driven & Arbitrage Module
 9. Rates / FX / Credit Module

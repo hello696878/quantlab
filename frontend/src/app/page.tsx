@@ -442,7 +442,7 @@ export default function HomePage() {
   const [disasterKey, setDisasterKey] = useState(0);
   // Options Lab: which tab to open on (deep-linked from the palette).
   const [optionsTab, setOptionsTab] = useState<
-    "pricing" | "implied_vol" | "payoff" | "education"
+    "pricing" | "implied_vol" | "payoff" | "tree" | "education"
   >("pricing");
   const [optionsKey, setOptionsKey] = useState(0);
 
@@ -857,12 +857,15 @@ export default function HomePage() {
     },
     ...(
       [
-        ["pricing", "Open Black-Scholes Calculator", "options pricing greeks delta gamma vega theta rho"],
-        ["implied_vol", "Open Implied Volatility Solver", "options implied volatility iv solver"],
-        ["payoff", "Open Payoff Builder", "options payoff straddle strangle covered call protective put bull call bear put spread"],
+        ["pricing", "pricing", "Open Black-Scholes Calculator", "options pricing greeks delta gamma vega theta rho"],
+        ["implied_vol", "implied_vol", "Open Implied Volatility Solver", "options implied volatility iv solver"],
+        ["payoff", "payoff", "Open Payoff Builder", "options payoff straddle strangle covered call protective put bull call bear put spread"],
+        ["tree", "tree", "Open Options Tree Pricing", "options tree pricing binomial crr lattice american early exercise convergence"],
+        ["tree", "tree-american", "Open American Option Calculator", "options american option early exercise put call binomial tree lattice"],
+        ["tree", "tree-binomial", "Open Binomial Tree Pricing", "options binomial crr tree lattice convergence steps black-scholes"],
       ] as const
-    ).map(([t, title, keywords]) => ({
-      id: `options-${t}`,
+    ).map(([t, id, title, keywords]) => ({
+      id: `options-${id}`,
       group: "Options Lab",
       title,
       keywords,

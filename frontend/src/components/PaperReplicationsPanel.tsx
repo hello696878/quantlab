@@ -363,7 +363,10 @@ function PaperDetail({
           </button>
           <p className="mt-2 text-[11px] text-slate-400">
             The Options Lab implements this paper&apos;s European pricing model
-            with Greeks, an implied-vol solver, and payoff diagrams.
+            with Greeks, an implied-vol solver, and payoff diagrams — and
+            extends it numerically with a Cox-Ross-Rubinstein binomial tree that
+            adds American early-exercise pricing and converges to Black–Scholes
+            for European options.
           </p>
         </Section>
       )}

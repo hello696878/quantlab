@@ -3648,3 +3648,162 @@ class PayoffResponse(BaseModel):
     breakevens: List[float] = Field(
         default_factory=list, description="Approximate — interpolated from the sampled curve."
     )
+
+
+# ===========================================================================
+# Tree-based option pricing (CRR binomial, European + American) — research v1
+# ===========================================================================
+
+ExerciseStyle = Literal["european", "american"]
+
+
+class BinomialTreeRequest(BaseModel):
+    """Inputs for Cox-Ross-Rubinstein binomial tree pricing."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    option_type: OptionType = "call"
+    exercise_style: ExerciseStyle = "european"
+    underlying_price: float = Field(gt=0.0, le=1e12, description="Spot price S (> 0).")
+    strike: float = Field(gt=0.0, le=1e12, description="Strike K (> 0).")
+    time_to_expiry: float = Field(gt=0.0, le=100.0, description="Years to expiry T (> 0).")
+    risk_free_rate: float = Field(ge=-1.0, le=1.0, description="Continuous risk-free rate r.")
+    volatility: float = Field(gt=0.0, le=10.0, description="Annualized volatility sigma (> 0).")
+    dividend_yield: float = Field(default=0.0, ge=0.0, le=1.0, description="Continuous dividend yield q.")
+    steps: int = Field(default=100, ge=1, le=1000, description="Number of tree steps N (1–1000).")
+    include_lattice: bool = Field(
+        default=True,
+        description="Return the full node lattice for small trees (steps <= 6); ignored for larger trees.",
+    )
+
+
+class TreeParams(BaseModel):
+    """CRR lattice construction parameters (educational)."""
+
+    dt: float = Field(description="Time per step, T / N.")
+    up_factor: float = Field(description="u = exp(sigma * sqrt(dt)).")
+    down_factor: float = Field(description="d = 1 / u.")
+    risk_neutral_prob: float = Field(description="p = (exp((r-q)dt) - d) / (u - d), in [0, 1].")
+    discount_per_step: float = Field(description="exp(-r * dt).")
+
+
+class EarlyExerciseBoundaryPoint(BaseModel):
+    step: int
+    time: float
+    boundary_price: float = Field(
+        description="Underlying price at the edge of the early-exercise region at this step."
+    )
+
+
+class EarlyExerciseInfo(BaseModel):
+    """American early-exercise diagnostic (empty/False for European)."""
+
+    detected: bool
+    first_step: Optional[int] = Field(default=None, description="Earliest step with an early exercise.")
+    first_time: Optional[float] = Field(default=None, description="first_step * dt, in years.")
+    boundary: List[EarlyExerciseBoundaryPoint] = Field(
+        default_factory=list, description="Approximate exercise boundary (downsampled)."
+    )
+
+
+class TreeConvergence(BaseModel):
+    """Tree price vs Black-Scholes. For American options BS is a European reference."""
+
+    black_scholes_price: float
+    difference: float = Field(description="tree_price - black_scholes_price.")
+    relative_difference: Optional[float] = Field(
+        default=None, description="difference / black_scholes_price (null if BS ≈ 0)."
+    )
+    is_european_reference: bool = Field(
+        description="True for American options: BS has no early-exercise value, so it is only a reference."
+    )
+
+
+class TreeLatticeNode(BaseModel):
+    step: int
+    index: int = Field(description="Number of up-moves at this node (0..step).")
+    underlying_price: float
+    option_value: float
+    intrinsic_value: float
+    early_exercise: bool = Field(description="American only: exercising was optimal at this node.")
+
+
+class TreeLattice(BaseModel):
+    """Full node grid — only populated for small trees (steps <= 6)."""
+
+    steps: int
+    nodes: List[TreeLatticeNode] = Field(default_factory=list)
+
+
+class BinomialTreeParameters(BaseModel):
+    """Echo of the pricing inputs."""
+
+    underlying_price: float
+    strike: float
+    time_to_expiry: float
+    risk_free_rate: float
+    volatility: float
+    dividend_yield: float
+
+
+class BinomialTreeResponse(BaseModel):
+    """CRR binomial tree pricing result. Educational; numerical approximation."""
+
+    model: Literal["crr_binomial"] = "crr_binomial"
+    option_type: OptionType
+    exercise_style: ExerciseStyle
+    price: float
+    steps: int
+    parameters: BinomialTreeParameters
+    tree_params: TreeParams
+    early_exercise: EarlyExerciseInfo
+    convergence: TreeConvergence
+    lattice: Optional[TreeLattice] = Field(
+        default=None, description="Full lattice for small trees; null otherwise."
+    )
+    lattice_note: Optional[str] = Field(
+        default=None, description="Why the lattice is omitted (large step counts)."
+    )
+    warnings: List[str] = Field(default_factory=list)
+
+
+class TreeConvergenceRequest(BaseModel):
+    """Inputs for a tree-vs-Black-Scholes convergence sweep over step counts."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    option_type: OptionType = "call"
+    exercise_style: ExerciseStyle = "european"
+    underlying_price: float = Field(gt=0.0, le=1e12)
+    strike: float = Field(gt=0.0, le=1e12)
+    time_to_expiry: float = Field(gt=0.0, le=100.0)
+    risk_free_rate: float = Field(ge=-1.0, le=1.0)
+    volatility: float = Field(gt=0.0, le=10.0)
+    dividend_yield: float = Field(default=0.0, ge=0.0, le=1.0)
+    step_values: List[int] = Field(
+        default_factory=lambda: [5, 10, 25, 50, 100, 200],
+        min_length=1,
+        max_length=12,
+        description="Step counts to evaluate (each 1–1000).",
+    )
+
+    @field_validator("step_values")
+    @classmethod
+    def check_steps(cls, v: List[int]) -> List[int]:
+        for n in v:
+            if n < 1 or n > 1000:
+                raise ValueError("each step value must be between 1 and 1000.")
+        # de-duplicate and sort ascending for a clean convergence curve
+        return sorted(set(v))
+
+
+class TreeConvergencePoint(BaseModel):
+    steps: int
+    price: float
+    difference_vs_black_scholes: float
+
+
+class TreeConvergenceResponse(BaseModel):
+    points: List[TreeConvergencePoint]
+    black_scholes_price: float
+    is_european_reference: bool
