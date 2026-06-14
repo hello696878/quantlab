@@ -25,6 +25,10 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   arithmetic-average Asian, and simple discretely monitored barrier payoffs,
   with seed reproducibility, standard error, 95% confidence interval, and capped
   path preview.
+- Volatility surface endpoints `POST /options/surface` and
+  `POST /options/surface/sample` for manual/synthetic option chains, per-row IV
+  extraction, smile/skew/ATM term structure, moneyness × expiry heatmap, and SVI
+  research fit.
 - Strategy payoff presets for long call/put, covered call, protective put,
   bull/bear spreads, straddles, and strangles.
 - Dashboard, sidebar, command-palette/search, Black–Scholes paper, and
@@ -36,7 +40,8 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   CRR tree model, and Monte Carlo is constant-volatility GBM with sampling
   error; no live option chains, broker integration, assignment,
   discrete-dividend/corporate-action modelling, stochastic volatility,
-  transaction-cost/liquidity modelling, or full volatility surface.
+  transaction-cost/liquidity modelling, or arbitrage-free production volatility
+  calibration.
 
 ---
 

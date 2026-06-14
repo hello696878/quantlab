@@ -29,7 +29,7 @@ from app.options import black_scholes_price, implied_volatility
 
 MAX_SURFACE_ROWS = 1000
 MIN_SVI_POINTS = 5
-_ATM_MONEYNESS_TOL = 0.02  # |K/S − 1| under which a strike is treated as ATM
+_ATM_LOG_MONEYNESS_TOL = math.log(1.02)  # nearest-forward-ATM warning threshold
 
 # Defaults for the synthetic sample chain.
 DEFAULT_EXPIRY_DAYS = [30, 60, 90, 180, 365]
@@ -83,6 +83,28 @@ def generate_sample_chain(
     Out-of-the-money options (puts below the forward, calls above) give the most
     stable IV recovery.  Returns rows shaped like the manual-input rows.
     """
+    for name, value in (
+        ("underlying_price", underlying_price),
+        ("risk_free_rate", risk_free_rate),
+        ("dividend_yield", dividend_yield),
+        ("base_vol", base_vol),
+        ("skew", skew),
+        ("smile", smile),
+        ("term", term),
+    ):
+        if not math.isfinite(float(value)):
+            raise SurfaceInputError(f"{name} must be finite.")
+    if underlying_price <= 0 or base_vol <= 0:
+        raise SurfaceInputError("underlying_price and base_vol must be positive.")
+    if dividend_yield < 0:
+        raise SurfaceInputError("dividend_yield must be non-negative.")
+    for days in expiry_days:
+        if not math.isfinite(float(days)) or days <= 0:
+            raise SurfaceInputError("expiry_days must contain positive finite values.")
+    for strike in strikes:
+        if not math.isfinite(float(strike)) or strike <= 0:
+            raise SurfaceInputError("strikes must contain positive finite values.")
+
     rows: List[dict] = []
     for days in expiry_days:
         T = days / 365.0
@@ -308,6 +330,13 @@ def _nearest_valid(rows: Sequence[dict], target_moneyness: float) -> Optional[di
     return min(valid, key=lambda r: abs(r["moneyness"] - target_moneyness))
 
 
+def _nearest_forward_atm(rows: Sequence[dict]) -> Optional[dict]:
+    valid = [r for r in rows if r["implied_volatility"] is not None]
+    if not valid:
+        return None
+    return min(valid, key=lambda r: abs(r["log_moneyness"]))
+
+
 def build_smiles(rows: Sequence[dict], svi_fits_by_expiry: dict) -> List[dict]:
     smiles = []
     for expiry, slice_rows in _rows_by_expiry(rows):
@@ -337,7 +366,7 @@ def build_smiles(rows: Sequence[dict], svi_fits_by_expiry: dict) -> List[dict]:
 def build_term_structure(rows: Sequence[dict]) -> List[dict]:
     term = []
     for expiry, slice_rows in _rows_by_expiry(rows):
-        atm = _nearest_valid(slice_rows, 1.0)
+        atm = _nearest_forward_atm(slice_rows)
         warning = None
         if atm is None:
             atm_iv = None
@@ -345,7 +374,7 @@ def build_term_structure(rows: Sequence[dict]) -> List[dict]:
         else:
             atm_iv = atm["implied_volatility"]
             nearest_strike = atm["strike"]
-            if abs(atm["moneyness"] - 1.0) > _ATM_MONEYNESS_TOL:
+            if abs(atm["log_moneyness"]) > _ATM_LOG_MONEYNESS_TOL:
                 warning = "ATM IV is approximated from the nearest available strike to the forward."
         term.append(
             {
@@ -402,17 +431,31 @@ def validate_surface_inputs(
             raise SurfaceInputError(f"{name} must be finite.")
     if underlying_price <= 0:
         raise SurfaceInputError("underlying_price must be positive.")
+    if dividend_yield < 0:
+        raise SurfaceInputError("dividend_yield must be non-negative.")
     if not rows:
         raise SurfaceInputError("At least one option row is required.")
     if len(rows) > MAX_SURFACE_ROWS:
         raise SurfaceInputError(f"Too many rows ({len(rows)}); the cap is {MAX_SURFACE_ROWS}.")
+    for idx, row in enumerate(rows):
+        if row.get("option_type") not in {"call", "put"}:
+            raise SurfaceInputError(f"row {idx}: option_type must be 'call' or 'put'.")
+        for name in ("strike", "time_to_expiry", "market_price"):
+            if name not in row:
+                raise SurfaceInputError(f"row {idx}: {name} is required.")
+            try:
+                value = float(row[name])
+            except (TypeError, ValueError):
+                raise SurfaceInputError(f"row {idx}: {name} must be numeric.") from None
+            if not math.isfinite(value) or value <= 0:
+                raise SurfaceInputError(f"row {idx}: {name} must be positive and finite.")
 
 
 def summarize_surface(rows: Sequence[dict], grid: dict, svi_fitted_count: int) -> dict:
     valid = [r for r in rows if r["implied_volatility"] is not None]
     failed = [r for r in rows if r["implied_volatility"] is None]
     ivs = [r["implied_volatility"] for r in valid]
-    atm = _nearest_valid(rows, 1.0)
+    atm = _nearest_forward_atm(rows)
     return {
         "valid_row_count": len(valid),
         "failed_row_count": len(failed),

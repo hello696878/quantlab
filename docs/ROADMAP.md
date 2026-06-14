@@ -874,7 +874,7 @@ single-asset Backtest + Strategy Comparison:
   smile/term, fit-SVI toggle, summary cards, a **smile chart** (raw IV scatter +
   SVI curve in distinct colours), an **ATM term-structure** chart, a colour
   **surface heatmap** (deterministic blue→red scale), and row diagnostics;
-  palette commands + dashboard card updated; 23 new backend tests
+  palette commands + dashboard card updated; 32 backend tests
 - Research tool only — **no** live chains, **not** an arbitrage-free calibration,
   no stochastic volatility, no production vol calibration
 

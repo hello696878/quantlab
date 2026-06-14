@@ -930,7 +930,7 @@ function TreePricingTab() {
       <p className="text-[11px] text-slate-400">
         Tree models are numerical approximations: results depend on the step count, the
         volatility input, the (continuous) dividend assumption, and the exercise style. No live
-        option chains, no volatility surface, no production risk engine.
+        option chains, no calibrated surface input, no production risk engine.
       </p>
     </div>
   );
@@ -1282,8 +1282,8 @@ function MonteCarloTab() {
       <p className="text-[11px] text-slate-400">
         Monte Carlo carries sampling error and assumes GBM with constant volatility. Barrier
         monitoring is discrete over the simulated steps; Asian averaging is arithmetic. No
-        stochastic volatility, no volatility surface, no live option chains, no production exotic
-        pricing.
+        stochastic volatility or calibrated surface input, no live option chains, no production
+        exotic pricing.
       </p>
     </div>
   );
@@ -1312,8 +1312,7 @@ function _hexToRgb(hex: string): [number, number, number] {
   const h = hex.replace("#", "");
   return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
 }
-function heatColor(value: number | null, min: number, max: number): string {
-  if (value == null || !Number.isFinite(value)) return "rgba(148,163,184,0.12)";
+function heatRgb(value: number, min: number, max: number): [number, number, number] {
   const t = max > min ? Math.min(1, Math.max(0, (value - min) / (max - min))) : 0.5;
   const x = Math.min(0.9999, t) * (HEAT_STOPS.length - 1);
   const i = Math.floor(x);
@@ -1321,7 +1320,18 @@ function heatColor(value: number | null, min: number, max: number): string {
   const [r0, g0, b0] = _hexToRgb(HEAT_STOPS[i]);
   const [r1, g1, b1] = _hexToRgb(HEAT_STOPS[i + 1]);
   const mix = (a: number, b: number) => Math.round(a + (b - a) * f);
-  return `rgb(${mix(r0, r1)}, ${mix(g0, g1)}, ${mix(b0, b1)})`;
+  return [mix(r0, r1), mix(g0, g1), mix(b0, b1)];
+}
+function heatColor(value: number | null, min: number, max: number): string {
+  if (value == null || !Number.isFinite(value)) return "rgba(148,163,184,0.12)";
+  const [r, g, b] = heatRgb(value, min, max);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+function heatTextColor(value: number | null, min: number, max: number): string {
+  if (value == null || !Number.isFinite(value)) return "#64748b";
+  const [r, g, b] = heatRgb(value, min, max);
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 145 ? "#0b1220" : "#f8fafc";
 }
 
 interface UiSurfaceRow {
@@ -1339,7 +1349,7 @@ const DEFAULT_MANUAL_ROWS: UiSurfaceRow[] = [
   { option_type: "call", strike: "110", time_to_expiry: "0.25", market_price: "1.30" },
 ];
 
-function SurfaceHeatmap({ surface }: { surface: SurfaceResponse["surface"] }) {
+function SurfaceHeatmap({ surface, spot }: { surface: SurfaceResponse["surface"]; spot: number }) {
   const { grid, summary } = surface;
   const min = summary.min_iv ?? 0;
   const max = summary.max_iv ?? 1;
@@ -1370,10 +1380,11 @@ function SurfaceHeatmap({ surface }: { surface: SurfaceResponse["surface"] }) {
                   className="h-8 w-12 rounded text-center text-[9px] font-semibold"
                   style={{
                     backgroundColor: heatColor(cell, min, max),
-                    color: cell == null ? "#64748b" : "#0b1220",
+                    color: heatTextColor(cell, min, max),
                   }}
                   title={
                     `Expiry ${grid.expiry_days[i].toFixed(0)}d · moneyness ${grid.moneyness_values[j].toFixed(2)}` +
+                    ` · approx strike ${(grid.moneyness_values[j] * spot).toFixed(2)}` +
                     (cell == null ? " · no IV" : ` · IV ${(cell * 100).toFixed(1)}%`)
                   }
                 >
@@ -1411,17 +1422,30 @@ function SurfaceTab() {
   const manualValid = rows.every(
     (l) => num(l.strike) > 0 && num(l.time_to_expiry) > 0 && num(l.market_price) > 0,
   );
+  const sampleValid =
+    num(baseVol) > 0 &&
+    num(baseVol) <= 5 &&
+    finite(skew) &&
+    finite(smile) &&
+    finite(term) &&
+    Math.abs(num(skew)) <= 5 &&
+    Math.abs(num(smile)) <= 5 &&
+    Math.abs(num(term)) <= 5;
   const valid =
     num(S) > 0 &&
     finite(r) &&
     finite(q) &&
-    (source === "sample" ? num(baseVol) > 0 : rows.length >= 1 && manualValid);
+    (source === "sample" ? sampleValid : rows.length >= 1 && rows.length <= 1000 && manualValid);
 
   function setRow(i: number, patch: Partial<UiSurfaceRow>) {
     setRows((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }
   function addRow() {
-    setRows((ls) => [...ls, { option_type: "call", strike: "100", time_to_expiry: "0.25", market_price: "4.00" }]);
+    setRows((ls) =>
+      ls.length >= 1000
+        ? ls
+        : [...ls, { option_type: "call", strike: "100", time_to_expiry: "0.25", market_price: "4.00" }],
+    );
   }
   function removeRow(i: number) {
     setRows((ls) => (ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls));
@@ -1587,6 +1611,13 @@ function SurfaceTab() {
         {loading ? "Building…" : source === "sample" ? "Generate Sample Surface" : "Build Surface"}
       </button>
       {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+      {!valid && (
+        <p className="text-[11px] text-slate-400">
+          Use positive S and finite rates. Sample surfaces require positive base vol and finite
+          skew/smile/term inputs within ±5; manual rows require positive strike, expiry, and price
+          with at most 1,000 rows.
+        </p>
+      )}
 
       {surface && (
         <>
@@ -1708,7 +1739,7 @@ function SurfaceTab() {
           {/* Heatmap */}
           <div>
             <p className="section-title mb-1">Surface heatmap</p>
-            <SurfaceHeatmap surface={surface} />
+            <SurfaceHeatmap surface={surface} spot={num(S)} />
           </div>
 
           {/* Diagnostics */}

@@ -80,6 +80,15 @@ def test_rows_include_moneyness_and_log_moneyness():
         assert r["moneyness"] == pytest.approx(r["strike"] / 100.0, abs=1e-6)
 
 
+def test_log_moneyness_uses_forward_price():
+    S, r, q = 100.0, 0.07, 0.02
+    rows = generate_sample_chain(S, r, q)
+    res = build_surface(S, r, q, rows, fit_svi=False)
+    for row in res["surface"]["rows"]:
+        forward = S * math.exp((r - q) * row["time_to_expiry"])
+        assert row["log_moneyness"] == pytest.approx(math.log(row["strike"] / forward), abs=1e-6)
+
+
 # ---------------------------------------------------------------------------
 # Grid
 # ---------------------------------------------------------------------------
@@ -100,6 +109,20 @@ def test_grid_cells_are_iv_or_null():
     for row in res["surface"]["grid"]["surface_matrix"]:
         for cell in row:
             assert cell is None or (math.isfinite(cell) and cell > 0)
+
+
+def test_grid_matrix_orientation_matches_expiry_then_moneyness_axes():
+    res = build_sample_surface(fit_svi=False)
+    surface = res["surface"]
+    grid = surface["grid"]
+    exp_index = {round(e, 6): i for i, e in enumerate(grid["expiries"])}
+    mon_index = {round(m, 4): j for j, m in enumerate(grid["moneyness_values"])}
+    for row in surface["rows"]:
+        if row["implied_volatility"] is None:
+            continue
+        i = exp_index[round(row["time_to_expiry"], 6)]
+        j = mon_index[round(row["moneyness"], 4)]
+        assert grid["surface_matrix"][i][j] == pytest.approx(row["implied_volatility"], abs=1e-6)
 
 
 # ---------------------------------------------------------------------------
@@ -138,6 +161,22 @@ def test_failed_row_has_null_iv_and_warning():
     assert row["warning"]
 
 
+@pytest.mark.parametrize(
+    "bad_row",
+    [
+        {"option_type": "straddle", "strike": 100.0, "time_to_expiry": 0.25, "market_price": 5.0},
+        {"option_type": "call", "strike": 0.0, "time_to_expiry": 0.25, "market_price": 5.0},
+        {"option_type": "call", "strike": 100.0, "time_to_expiry": 0.0, "market_price": 5.0},
+        {"option_type": "call", "strike": 100.0, "time_to_expiry": 0.25, "market_price": math.inf},
+        {"option_type": "call", "strike": 100.0, "time_to_expiry": 0.25, "market_price": None},
+        {"option_type": "call", "strike": 100.0, "time_to_expiry": 0.25},
+    ],
+)
+def test_invalid_structural_row_rejected_directly(bad_row):
+    with pytest.raises(SurfaceInputError):
+        build_surface(100.0, 0.05, 0.0, [bad_row])
+
+
 # ---------------------------------------------------------------------------
 # Smile / term structure / skew
 # ---------------------------------------------------------------------------
@@ -149,6 +188,20 @@ def test_term_structure_atm_iv_finite():
     assert len(term) == 5
     for t in term:
         assert t["atm_iv"] is not None and math.isfinite(t["atm_iv"]) and t["atm_iv"] > 0
+
+
+def test_term_structure_uses_nearest_forward_atm_strike():
+    S, r, q = 100.0, 0.10, 0.0
+    res = build_sample_surface(S, r, q, fit_svi=False)
+    surface = res["surface"]
+    rows_by_expiry = {}
+    for row in surface["rows"]:
+        if row["implied_volatility"] is not None:
+            rows_by_expiry.setdefault(round(row["time_to_expiry"], 6), []).append(row)
+    for point in surface["term_structure"]:
+        candidates = rows_by_expiry[round(point["time_to_expiry"], 6)]
+        expected = min(candidates, key=lambda row: abs(row["log_moneyness"]))
+        assert point["nearest_atm_strike"] == pytest.approx(expected["strike"], abs=1e-6)
 
 
 def test_smile_points_sorted_by_moneyness():
@@ -180,6 +233,8 @@ def test_svi_fits_clean_synthetic_smile():
         assert fit["rmse"] is not None and fit["rmse"] < 0.02  # < 2 vol points
         p = fit["params"]
         assert p["b"] >= 0 and -1 < p["rho"] < 1 and p["sigma"] > 0
+        for point in fit["points"]:
+            assert point["iv_svi"] is not None and math.isfinite(point["iv_svi"]) and point["iv_svi"] > 0
 
 
 def test_svi_fails_gracefully_on_insufficient_points():
@@ -216,6 +271,15 @@ def test_rows_above_cap_rejected():
 def test_invalid_underlying_rejected():
     with pytest.raises(SurfaceInputError):
         build_surface(0.0, 0.05, 0.0, [{"option_type": "call", "strike": 100.0, "time_to_expiry": 0.25, "market_price": 5.0}])
+
+
+def test_sample_chain_rejects_invalid_direct_inputs():
+    with pytest.raises(SurfaceInputError):
+        generate_sample_chain(0.0, 0.05, 0.0)
+    with pytest.raises(SurfaceInputError):
+        generate_sample_chain(100.0, 0.05, 0.0, base_vol=0.0)
+    with pytest.raises(SurfaceInputError):
+        generate_sample_chain(100.0, 0.05, 0.0, strikes=[100.0, -1.0])
 
 
 # ---------------------------------------------------------------------------

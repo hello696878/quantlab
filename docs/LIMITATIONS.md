@@ -102,9 +102,10 @@ Robustness Lab v1 block-bootstraps the realized daily strategy returns (blocks p
 
 ### Options Lab is an educational calculator, not an options risk engine
 
-The Options & Volatility Lab prices **European** options with Black–Scholes (continuous dividend yield), computes Greeks, solves implied volatility by bisection, and draws expiration payoff diagrams. A **Tree Pricing** tab adds a Cox-Ross-Rubinstein **binomial lattice** with **European and American** exercise (v1, Phase 14.1). It is deterministic and educational. It explicitly does **not** model:
+The Options & Volatility Lab prices **European** options with Black–Scholes (continuous dividend yield), computes Greeks, solves implied volatility by bisection, draws expiration payoff diagrams, runs CRR tree / Monte Carlo calculators, and builds a manual/synthetic IV surface with an SVI research fit. It is deterministic and educational. It explicitly does **not** model:
 
-- Volatility smile or term structure (a single flat σ per calculation — no surface).
+- Live option chains or calibrated market feeds; the Vol Surface tab uses manual or synthetic rows only.
+- A guaranteed arbitrage-free surface; the SVI fit is a constrained least-squares research approximation.
 - Transaction costs, bid/ask spreads, liquidity, or assignment risk.
 - Path-dependent mark-to-market PnL — payoff diagrams are **terminal** payoff at expiration only (a short option can show a small bounded payoff yet carry large interim losses; see Volmageddon in Quant Disasters).
 - Real-time Greeks or **any live option-chain data** — all inputs (including premiums in the payoff builder) are manual.
