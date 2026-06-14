@@ -67,8 +67,9 @@ reproducible and every limitation explicit.
    bisection IV solver + multi-leg payoff builder (14.0); CRR **binomial tree**
    + **American exercise** + early-exercise diagnostic + BS convergence (14.1);
    **Monte Carlo** GBM engine — European / Asian / barrier, standard error + CI,
-   path preview (14.2). Planned: trinomial tree, IV surface, vol targeting /
-   term structure; later
+   path preview (14.2); **IV surface** + smile / term structure / skew + **SVI**
+   research fit (14.3). Planned: trinomial tree, arbitrage-free surface, vol
+   targeting / term structure; later
    Heston, SABR — research
 3. **Event-Driven & Arbitrage** — research (merger-arb toy, index add/remove,
    earnings drift)
@@ -97,7 +98,8 @@ reproducible and every limitation explicit.
    honest planned catalog; registry in `frontend/src/lib/modelRegistry.ts`)
 5. ~~Paper Replication Series v1~~ — **built** (13.1)
 6. ~~Options Pricing Engine v1~~ — **built** (14.0 Black–Scholes; 14.1 CRR
-   binomial tree + American exercise; 14.2 Monte Carlo GBM + Asian/barrier)
+   binomial tree + American exercise; 14.2 Monte Carlo GBM + Asian/barrier;
+   14.3 IV surface + SVI research fit)
 7. Volatility Lab v1
 8. Event-Driven & Arbitrage Module
 9. Rates / FX / Credit Module

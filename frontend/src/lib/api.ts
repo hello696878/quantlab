@@ -19,6 +19,9 @@ import type {
   MonteCarloResponse,
   PayoffRequest,
   PayoffResponse,
+  SampleSurfaceRequest,
+  SurfaceRequest,
+  SurfaceResponse,
   TreeConvergenceRequest,
   TreeConvergenceResponse,
   CustomStrategyRequest,
@@ -932,4 +935,14 @@ export function priceMonteCarlo(
   req: MonteCarloRequest,
 ): Promise<MonteCarloResponse> {
   return postOptions<MonteCarloResponse>("/api/options/monte-carlo", req);
+}
+
+export function buildVolSurface(req: SurfaceRequest): Promise<SurfaceResponse> {
+  return postOptions<SurfaceResponse>("/api/options/surface", req);
+}
+
+export function buildSampleVolSurface(
+  req: SampleSurfaceRequest,
+): Promise<SurfaceResponse> {
+  return postOptions<SurfaceResponse>("/api/options/surface/sample", req);
 }

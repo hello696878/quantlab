@@ -442,7 +442,7 @@ export default function HomePage() {
   const [disasterKey, setDisasterKey] = useState(0);
   // Options Lab: which tab to open on (deep-linked from the palette).
   const [optionsTab, setOptionsTab] = useState<
-    "pricing" | "implied_vol" | "payoff" | "tree" | "monte_carlo" | "education"
+    "pricing" | "implied_vol" | "payoff" | "tree" | "monte_carlo" | "surface" | "education"
   >("pricing");
   const [optionsKey, setOptionsKey] = useState(0);
 
@@ -867,6 +867,10 @@ export default function HomePage() {
         ["monte_carlo", "monte-carlo-lab", "Open Options Monte Carlo Lab", "options monte carlo mc simulation stochastic paths variance reduction antithetic"],
         ["monte_carlo", "monte-carlo-asian", "Open Asian Option Pricing", "options asian option average price monte carlo path dependent exotic"],
         ["monte_carlo", "monte-carlo-barrier", "Open Barrier Option Pricing", "options barrier option knock out up and out down and out monte carlo exotic"],
+        ["surface", "surface", "Open Volatility Surface", "options volatility surface vol surface implied volatility smile skew term structure moneyness svi"],
+        ["surface", "surface-svi", "Open SVI Fit", "options svi volatility smile fit calibration research surface"],
+        ["surface", "surface-vol", "Open Options Vol Surface", "options vol surface implied volatility iv heatmap moneyness expiry"],
+        ["surface", "surface-smile", "Open IV Smile", "options iv smile volatility skew moneyness term structure surface"],
       ] as const
     ).map(([t, id, title, keywords]) => ({
       id: `options-${id}`,

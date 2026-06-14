@@ -74,8 +74,17 @@ of a **research tool**.
   depends on the **seed**, simulation count, and step count. **Barrier
   monitoring is discrete** over the simulated steps (it can differ from
   continuous monitoring). The path preview is a small capped sample (≤ 12 paths)
-  — never all paths. No stochastic / local volatility, no surface, no jumps, no
+  — never all paths. No stochastic / local volatility, no jumps, no
   live chains, no production exotic pricing.
+- **The volatility surface is a research tool, not a live vol terminal.** The
+  Vol Surface tab extracts IV from a **manual or synthetic** chain (no live
+  chains), then shows the smile, ATM term structure, skew, and a per-expiry
+  **SVI** research fit. Surface quality depends on the input prices, strike/
+  expiry coverage, dividends, rates, and solver stability (deep-OTM / short-dated
+  IVs are unreliable due to tiny vega). The **SVI fit enforces b ≥ 0, |ρ| < 1,
+  σ > 0 but is not guaranteed arbitrage-free**; sparse slices are left unfitted.
+  Failed rows are kept with null IV + a warning. No stochastic volatility, no
+  Heston/SABR, no production calibration.
 - **Payoff diagrams are expiration-only.** They ignore mark-to-market path,
   financing, early assignment, and margin. Unbounded short-option risk is
   labelled where applicable; finite payoff summaries assume the underlying

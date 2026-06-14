@@ -3905,3 +3905,153 @@ class MonteCarloResponse(BaseModel):
         default_factory=list, description="A small, capped sample of paths — never all paths."
     )
     warnings: List[str] = Field(default_factory=list)
+
+
+# ===========================================================================
+# Volatility surface + SVI (manual / sample chain) — research v1
+# ===========================================================================
+
+
+class SurfaceRowInput(BaseModel):
+    """One option quote in a manual chain."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    option_type: OptionType = "call"
+    strike: float = Field(gt=0.0, le=1e12)
+    time_to_expiry: float = Field(gt=0.0, le=100.0)
+    market_price: float = Field(gt=0.0, le=1e12)
+
+
+class SurfaceRequest(BaseModel):
+    """Build an IV surface from a manual option chain."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    underlying_price: float = Field(gt=0.0, le=1e12)
+    risk_free_rate: float = Field(ge=-1.0, le=1.0)
+    dividend_yield: float = Field(default=0.0, ge=0.0, le=1.0)
+    rows: List[SurfaceRowInput] = Field(min_length=1, max_length=1000)
+    fit_svi: bool = True
+
+
+class SampleSurfaceRequest(BaseModel):
+    """Generate a synthetic chain (Black-Scholes + parametric smile) and build its surface."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    underlying_price: float = Field(default=100.0, gt=0.0, le=1e12)
+    risk_free_rate: float = Field(default=0.05, ge=-1.0, le=1.0)
+    dividend_yield: float = Field(default=0.0, ge=0.0, le=1.0)
+    base_vol: float = Field(default=0.20, gt=0.0, le=5.0, description="ATM base volatility.")
+    skew: float = Field(default=0.15, ge=-5.0, le=5.0, description="Skew coefficient (positive = put skew).")
+    smile: float = Field(default=0.30, ge=-5.0, le=5.0, description="Smile curvature coefficient.")
+    term: float = Field(default=0.02, ge=-5.0, le=5.0, description="Term-structure slope coefficient.")
+    fit_svi: bool = True
+
+
+class SurfaceRow(BaseModel):
+    option_type: OptionType
+    strike: float
+    expiry_days: float
+    time_to_expiry: float
+    market_price: float
+    implied_volatility: Optional[float] = Field(default=None, description="Null when the solver fails.")
+    moneyness: float = Field(description="strike / underlying.")
+    log_moneyness: float = Field(description="ln(strike / forward).")
+    solver_converged: bool
+    warning: Optional[str] = None
+
+
+class SurfaceGrid(BaseModel):
+    """Surface matrix indexed [expiry_index][moneyness_index]; null cells are missing."""
+
+    expiries: List[float]
+    expiry_days: List[float]
+    moneyness_values: List[float] = Field(description="Shared x-axis = strike / underlying.")
+    log_moneyness_values: List[float] = Field(description="ln(moneyness) (forward-unadjusted, grid convenience).")
+    surface_matrix: List[List[Optional[float]]]
+
+
+class SurfaceSmilePoint(BaseModel):
+    strike: float
+    moneyness: float
+    log_moneyness: float
+    implied_volatility: Optional[float] = None
+    option_type: OptionType
+    fitted_svi_iv: Optional[float] = None
+
+
+class SurfaceSmileSlice(BaseModel):
+    time_to_expiry: float
+    expiry_days: float
+    points: List[SurfaceSmilePoint]
+
+
+class SurfaceTermPoint(BaseModel):
+    expiry_days: float
+    time_to_expiry: float
+    atm_iv: Optional[float] = None
+    nearest_atm_strike: Optional[float] = None
+    warning: Optional[str] = None
+
+
+class SurfaceSkewPoint(BaseModel):
+    expiry_days: float
+    time_to_expiry: float
+    low_moneyness_iv: Optional[float] = None
+    atm_iv: Optional[float] = None
+    high_moneyness_iv: Optional[float] = None
+    skew: Optional[float] = Field(default=None, description="low_moneyness_iv − high_moneyness_iv (positive = put skew).")
+
+
+class SviParams(BaseModel):
+    a: float
+    b: float
+    rho: float
+    m: float
+    sigma: float
+
+
+class SviFittedPoint(BaseModel):
+    log_moneyness: float
+    iv_observed: Optional[float] = None
+    iv_svi: Optional[float] = None
+
+
+class SviFit(BaseModel):
+    time_to_expiry: float
+    expiry_days: float
+    fitted: bool
+    params: Optional[SviParams] = None
+    rmse: Optional[float] = None
+    points: List[SviFittedPoint] = Field(default_factory=list)
+    warning: Optional[str] = None
+
+
+class SurfaceSummary(BaseModel):
+    valid_row_count: int
+    failed_row_count: int
+    min_iv: Optional[float] = None
+    max_iv: Optional[float] = None
+    atm_iv_nearest: Optional[float] = None
+    expiries_count: int
+    strikes_count: int
+    svi_fitted_count: int
+
+
+class SurfaceData(BaseModel):
+    rows: List[SurfaceRow]
+    grid: SurfaceGrid
+    smiles: List[SurfaceSmileSlice]
+    term_structure: List[SurfaceTermPoint]
+    skew: List[SurfaceSkewPoint]
+    svi_fits: List[SviFit]
+    summary: SurfaceSummary
+    warnings: List[str] = Field(default_factory=list)
+
+
+class SurfaceResponse(BaseModel):
+    """Implied-volatility surface + SVI research fit. Educational; not live data."""
+
+    surface: SurfaceData

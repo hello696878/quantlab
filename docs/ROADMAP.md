@@ -854,6 +854,30 @@ single-asset Backtest + Strategy Comparison:
 - Educational simulation with sampling error — **no** stochastic / local
   volatility, no surface, no live chains, no production exotic pricing
 
+### Phase 14.3 — Volatility Surface & SVI v1 ✅
+
+- New backend `app/options_surface.py` — builds an **implied-volatility surface**
+  from a **manual or synthetic** option chain (no live data): per-row IV via the
+  existing bisection solver (a failed row is kept with null IV + a warning, never
+  crashes the surface), a moneyness × expiry **surface grid**, **smile** by
+  expiry, **ATM term structure**, and a **skew** summary
+- Per-expiry **SVI** research fit (`w(k) = a + b[ρ(k−m) + √((k−m)² + σ²)]`) via
+  scipy `least_squares` with the basic constraints (b ≥ 0, |ρ| < 1, σ > 0) and an
+  RMSE; **graceful fallback** when scipy is missing or a slice has too few points
+  (fits the synthetic smile to < 1 vol-pt RMSE)
+- Synthetic **sample chain** = Black-Scholes prices + a parametric skew/smile, so
+  the IV solver recovers the input vols approximately
+- Two routes: `POST /options/surface` and `/options/surface/sample` (validated;
+  row cap 1000; missing/invalid quotes → null IV or 422; never NaN/inf — null for
+  invalid cells)
+- Frontend **Vol Surface** tab: sample/manual source, adjustable base-vol/skew/
+  smile/term, fit-SVI toggle, summary cards, a **smile chart** (raw IV scatter +
+  SVI curve in distinct colours), an **ATM term-structure** chart, a colour
+  **surface heatmap** (deterministic blue→red scale), and row diagnostics;
+  palette commands + dashboard card updated; 23 new backend tests
+- Research tool only — **no** live chains, **not** an arbitrage-free calibration,
+  no stochastic volatility, no production vol calibration
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -911,8 +935,9 @@ search · toasts, error boundary, loading/offline states.
 6. ~~Options Pricing Engine v1~~ — **built** (14.0: Black–Scholes pricing +
    Greeks + IV solver + payoff builder; 14.1: CRR **binomial tree** + American
    exercise + early-exercise diagnostic; 14.2: **Monte Carlo** GBM engine with
-   Asian + barrier options, standard error / CI, path preview. Trinomial tree,
-   stochastic volatility, and a vol *surface* remain future)
+   Asian + barrier options, standard error / CI, path preview; 14.3: **IV
+   surface** + smile / term structure / skew + **SVI** research fit. Trinomial
+   tree, stochastic volatility, and an arbitrage-free surface remain future)
 7. **Volatility Lab v1** — realized vol estimators, vol targeting deep-dive,
    term-structure visuals
 8. **Event-Driven & Arbitrage Module** (research)
@@ -937,7 +962,7 @@ built**; everything else is planned/research/future:
 | # | Category | Status today |
 |---|----------|--------------|
 | 1 | Equities | **built (core)** — SMA, RSI, Bollinger, Momentum, Vol Breakout, Pairs |
-| 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder, CRR **binomial tree** + American exercise, **Monte Carlo** GBM (Asian + barrier, SE/CI); trinomial / stochastic vol / vol surface / deeper Vol Lab planned |
+| 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder, CRR **binomial tree** + American exercise, **Monte Carlo** GBM (Asian + barrier, SE/CI), **IV surface** + **SVI** research fit; trinomial / stochastic vol / arbitrage-free surface / deeper Vol Lab planned |
 | 3 | Event-Driven & Arbitrage | research |
 | 4 | Futures & Commodities | research |
 | 5 | FX | research |

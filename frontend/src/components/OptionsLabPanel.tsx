@@ -6,6 +6,7 @@ import {
   ComposedChart,
   Area,
   Line,
+  Scatter,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -14,6 +15,8 @@ import {
 } from "recharts";
 import {
   BacktestApiError,
+  buildSampleVolSurface,
+  buildVolSurface,
   computeOptionPayoff,
   computeTreeConvergence,
   priceBinomialTree,
@@ -31,6 +34,8 @@ import type {
   OptionType,
   PayoffLeg,
   PayoffResponse,
+  SurfaceResponse,
+  SurfaceRowInput,
   TreeConvergenceResponse,
 } from "@/lib/types";
 import { useAccentColors } from "@/lib/useAccentColors";
@@ -43,7 +48,14 @@ import {
   DANGER,
 } from "@/components/charts/chartTheme";
 
-type Tab = "pricing" | "implied_vol" | "payoff" | "tree" | "monte_carlo" | "education";
+type Tab =
+  | "pricing"
+  | "implied_vol"
+  | "payoff"
+  | "tree"
+  | "monte_carlo"
+  | "surface"
+  | "education";
 
 const inputCls = "ql-input px-2.5 py-1.5";
 const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400";
@@ -103,11 +115,12 @@ function OptionTypeToggle({
 const CAVEAT =
   "Black–Scholes is a simplified European model; Tree Pricing adds a simplified " +
   "CRR lattice for American exercise; Monte Carlo simulates GBM paths (with " +
-  "sampling error) for European, Asian, and simple barrier options. The lab does " +
-  "not model discrete dividends, assignment, transaction costs, liquidity, " +
-  "volatility smile, term structure, stochastic volatility, or live option " +
-  "chains. Educational only — not a fair value, a recommendation, or a trading " +
-  "system.";
+  "sampling error) for European, Asian, and simple barrier options; Vol Surface " +
+  "builds an implied-vol surface from a manual/synthetic chain with an SVI " +
+  "research fit. The lab does not model assignment, transaction costs, " +
+  "liquidity, stochastic volatility, or live option chains, and does not produce " +
+  "an arbitrage-free surface. Educational only — not a fair value, a " +
+  "recommendation, or a trading system.";
 
 export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
@@ -117,9 +130,9 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
       <div className="card p-5">
         <p className="text-sm text-slate-600">
           The Options Lab prices options with Black–Scholes, binomial trees, and
-          Monte Carlo simulation, inspects Greeks, solves implied volatility, and
-          visualizes expiration payoff diagrams — a reproducible, educational
-          calculator.
+          Monte Carlo simulation, inspects Greeks, solves implied volatility,
+          visualizes payoff diagrams, and builds an implied-volatility surface
+          with an SVI research fit — a reproducible, educational calculator.
         </p>
         <p className="mt-2 text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
@@ -132,6 +145,7 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
             ["payoff", "Payoff Builder"],
             ["tree", "Tree Pricing"],
             ["monte_carlo", "Monte Carlo"],
+            ["surface", "Vol Surface"],
             ["education", "Education"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -154,6 +168,7 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
       {tab === "payoff" && <PayoffTab />}
       {tab === "tree" && <TreePricingTab />}
       {tab === "monte_carlo" && <MonteCarloTab />}
+      {tab === "surface" && <SurfaceTab />}
       {tab === "education" && <EducationTab />}
     </div>
   );
@@ -1269,6 +1284,454 @@ function MonteCarloTab() {
         monitoring is discrete over the simulated steps; Asian averaging is arithmetic. No
         stochastic volatility, no volatility surface, no live option chains, no production exotic
         pricing.
+      </p>
+    </div>
+  );
+}
+
+// ── Vol Surface ──────────────────────────────────────────────────────────────
+
+// Deterministic, distinct palette for per-expiry colors (no random per render).
+const SURFACE_PALETTE = [
+  "#22d3ee", // cyan
+  "#a78bfa", // violet
+  "#f472b6", // pink
+  "#fbbf24", // amber
+  "#34d399", // green
+  "#60a5fa", // blue
+  "#fb923c", // orange
+  "#e879f9", // fuchsia
+];
+const SMILE_RAW_COLOR = "#22d3ee"; // raw IV points
+const SMILE_SVI_COLOR = "#fbbf24"; // SVI fitted curve (distinct from raw)
+const TERM_COLOR = "#a78bfa";
+// Sequential heat scale for the surface (professional, dark-theme friendly).
+const HEAT_STOPS = ["#3b82f6", "#22d3ee", "#34d399", "#fbbf24", "#f87171"];
+
+function _hexToRgb(hex: string): [number, number, number] {
+  const h = hex.replace("#", "");
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+function heatColor(value: number | null, min: number, max: number): string {
+  if (value == null || !Number.isFinite(value)) return "rgba(148,163,184,0.12)";
+  const t = max > min ? Math.min(1, Math.max(0, (value - min) / (max - min))) : 0.5;
+  const x = Math.min(0.9999, t) * (HEAT_STOPS.length - 1);
+  const i = Math.floor(x);
+  const f = x - i;
+  const [r0, g0, b0] = _hexToRgb(HEAT_STOPS[i]);
+  const [r1, g1, b1] = _hexToRgb(HEAT_STOPS[i + 1]);
+  const mix = (a: number, b: number) => Math.round(a + (b - a) * f);
+  return `rgb(${mix(r0, r1)}, ${mix(g0, g1)}, ${mix(b0, b1)})`;
+}
+
+interface UiSurfaceRow {
+  option_type: OptionType;
+  strike: string;
+  time_to_expiry: string;
+  market_price: string;
+}
+
+const DEFAULT_MANUAL_ROWS: UiSurfaceRow[] = [
+  { option_type: "put", strike: "90", time_to_expiry: "0.25", market_price: "1.20" },
+  { option_type: "put", strike: "95", time_to_expiry: "0.25", market_price: "2.30" },
+  { option_type: "call", strike: "100", time_to_expiry: "0.25", market_price: "4.60" },
+  { option_type: "call", strike: "105", time_to_expiry: "0.25", market_price: "2.60" },
+  { option_type: "call", strike: "110", time_to_expiry: "0.25", market_price: "1.30" },
+];
+
+function SurfaceHeatmap({ surface }: { surface: SurfaceResponse["surface"] }) {
+  const { grid, summary } = surface;
+  const min = summary.min_iv ?? 0;
+  const max = summary.max_iv ?? 1;
+  return (
+    <div className="overflow-x-auto">
+      <table className="border-separate" style={{ borderSpacing: 2 }}>
+        <thead>
+          <tr>
+            <th className="px-1 py-0.5 text-[10px] font-medium uppercase tracking-wide text-slate-400">
+              Exp \ M
+            </th>
+            {grid.moneyness_values.map((m) => (
+              <th key={m} className="px-1 py-0.5 text-[10px] font-medium text-slate-400">
+                {m.toFixed(2)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {grid.surface_matrix.map((row, i) => (
+            <tr key={grid.expiries[i]}>
+              <td className="px-1 py-0.5 text-right text-[10px] font-medium text-slate-400">
+                {grid.expiry_days[i].toFixed(0)}d
+              </td>
+              {row.map((cell, j) => (
+                <td
+                  key={j}
+                  className="h-8 w-12 rounded text-center text-[9px] font-semibold"
+                  style={{
+                    backgroundColor: heatColor(cell, min, max),
+                    color: cell == null ? "#64748b" : "#0b1220",
+                  }}
+                  title={
+                    `Expiry ${grid.expiry_days[i].toFixed(0)}d · moneyness ${grid.moneyness_values[j].toFixed(2)}` +
+                    (cell == null ? " · no IV" : ` · IV ${(cell * 100).toFixed(1)}%`)
+                  }
+                >
+                  {cell == null ? "—" : (cell * 100).toFixed(0)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1 text-[11px] text-slate-400">
+        Cells show implied volatility (%) by expiry (rows) × moneyness K/S (columns); colour scales
+        from low (blue) to high (red). Grey = no valid IV.
+      </p>
+    </div>
+  );
+}
+
+function SurfaceTab() {
+  const [source, setSource] = useState<"sample" | "manual">("sample");
+  const [S, setS] = useState("100");
+  const [r, setR] = useState("0.05");
+  const [q, setQ] = useState("0");
+  const [baseVol, setBaseVol] = useState("0.20");
+  const [skew, setSkew] = useState("0.15");
+  const [smile, setSmile] = useState("0.30");
+  const [term, setTerm] = useState("0.02");
+  const [fitSvi, setFitSvi] = useState(true);
+  const [rows, setRows] = useState<UiSurfaceRow[]>(DEFAULT_MANUAL_ROWS);
+  const [result, setResult] = useState<SurfaceResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [expiryIdx, setExpiryIdx] = useState(0);
+
+  const manualValid = rows.every(
+    (l) => num(l.strike) > 0 && num(l.time_to_expiry) > 0 && num(l.market_price) > 0,
+  );
+  const valid =
+    num(S) > 0 &&
+    finite(r) &&
+    finite(q) &&
+    (source === "sample" ? num(baseVol) > 0 : rows.length >= 1 && manualValid);
+
+  function setRow(i: number, patch: Partial<UiSurfaceRow>) {
+    setRows((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
+  }
+  function addRow() {
+    setRows((ls) => [...ls, { option_type: "call", strike: "100", time_to_expiry: "0.25", market_price: "4.00" }]);
+  }
+  function removeRow(i: number) {
+    setRows((ls) => (ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls));
+  }
+
+  async function run() {
+    if (!valid) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      let res: SurfaceResponse;
+      if (source === "sample") {
+        res = await buildSampleVolSurface({
+          underlying_price: num(S),
+          risk_free_rate: num(r),
+          dividend_yield: num(q),
+          base_vol: num(baseVol),
+          skew: num(skew),
+          smile: num(smile),
+          term: num(term),
+          fit_svi: fitSvi,
+        });
+      } else {
+        const apiRows: SurfaceRowInput[] = rows.map((l) => ({
+          option_type: l.option_type,
+          strike: num(l.strike),
+          time_to_expiry: num(l.time_to_expiry),
+          market_price: num(l.market_price),
+        }));
+        res = await buildVolSurface({
+          underlying_price: num(S),
+          risk_free_rate: num(r),
+          dividend_yield: num(q),
+          rows: apiRows,
+          fit_svi: fitSvi,
+        });
+      }
+      setResult(res);
+      setExpiryIdx(0);
+    } catch (e) {
+      setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  const surface = result?.surface;
+  const smiles = surface?.smiles ?? [];
+  const selected = smiles[Math.min(expiryIdx, smiles.length - 1)];
+  const smileData =
+    selected?.points.map((p) => ({
+      moneyness: p.moneyness,
+      iv: p.implied_volatility,
+      svi: p.fitted_svi_iv,
+    })) ?? [];
+  const termData =
+    surface?.term_structure.map((t) => ({ expiry_days: t.expiry_days, atm_iv: t.atm_iv })) ?? [];
+  const failedRows = surface?.rows.filter((r) => r.implied_volatility == null) ?? [];
+
+  return (
+    <div className="card space-y-4 p-5">
+      <p className="section-title">Volatility Surface &amp; SVI</p>
+      <p className="text-xs text-slate-500">
+        Extracts implied volatility from a sample or manual option chain, then visualizes the
+        smile, skew, ATM term structure, and a per-expiry SVI research fit. Surface quality depends
+        on the option prices, strike/expiry coverage, dividends, rates, and solver stability.
+        Educational research tool — no live chains, not an arbitrage-free calibration.
+      </p>
+
+      {/* Setup */}
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={labelCls + " mb-0"}>Source</span>
+        <div className="inline-flex overflow-hidden rounded-lg border border-slate-300">
+          {(
+            [
+              ["sample", "Sample Chain"],
+              ["manual", "Manual Rows"],
+            ] as [typeof source, string][]
+          ).map(([id, label]) => (
+            <button
+              key={id}
+              type="button"
+              onClick={() => {
+                setSource(id);
+                setResult(null);
+              }}
+              className={
+                "px-3 py-1.5 text-xs font-medium transition-colors " +
+                (source === id ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")
+              }
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        <label className="ml-2 flex items-center gap-2 text-xs text-slate-600">
+          <input type="checkbox" checked={fitSvi} onChange={(e) => setFitSvi(e.target.checked)} />
+          Fit SVI
+        </label>
+      </div>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Field label="Underlying S"><input type="number" className={inputCls} value={S} onChange={(e) => setS(e.target.value)} /></Field>
+        <Field label="Rate r"><input type="number" className={inputCls} value={r} step={0.01} onChange={(e) => setR(e.target.value)} /></Field>
+        <Field label="Dividend q"><input type="number" className={inputCls} value={q} step={0.01} onChange={(e) => setQ(e.target.value)} /></Field>
+        {source === "sample" && (
+          <>
+            <Field label="Base vol"><input type="number" className={inputCls} value={baseVol} step={0.01} onChange={(e) => setBaseVol(e.target.value)} /></Field>
+            <Field label="Skew"><input type="number" className={inputCls} value={skew} step={0.01} onChange={(e) => setSkew(e.target.value)} /></Field>
+            <Field label="Smile"><input type="number" className={inputCls} value={smile} step={0.05} onChange={(e) => setSmile(e.target.value)} /></Field>
+            <Field label="Term slope"><input type="number" className={inputCls} value={term} step={0.01} onChange={(e) => setTerm(e.target.value)} /></Field>
+          </>
+        )}
+      </div>
+
+      {source === "manual" && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-slate-400">
+                <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Type</th>
+                <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Strike</th>
+                <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">T (yrs)</th>
+                <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Market price</th>
+                <th className="px-2 py-1"></th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((l, i) => (
+                <tr key={i} className="border-t border-slate-100">
+                  <td className="px-2 py-1">
+                    <select className={inputCls} value={l.option_type} onChange={(e) => setRow(i, { option_type: e.target.value as OptionType })}>
+                      <option value="call">call</option>
+                      <option value="put">put</option>
+                    </select>
+                  </td>
+                  <td className="px-2 py-1"><input type="number" className={inputCls + " w-20"} value={l.strike} onChange={(e) => setRow(i, { strike: e.target.value })} /></td>
+                  <td className="px-2 py-1"><input type="number" className={inputCls + " w-20"} value={l.time_to_expiry} step={0.05} onChange={(e) => setRow(i, { time_to_expiry: e.target.value })} /></td>
+                  <td className="px-2 py-1"><input type="number" className={inputCls + " w-24"} value={l.market_price} step={0.1} onChange={(e) => setRow(i, { market_price: e.target.value })} /></td>
+                  <td className="px-2 py-1">
+                    <button type="button" onClick={() => removeRow(i)} className="text-slate-400 hover:text-red-600" title="Remove row">✕</button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <button type="button" onClick={addRow} className="mt-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-blue-400">
+            + Add row
+          </button>
+        </div>
+      )}
+
+      <button
+        type="button"
+        onClick={run}
+        disabled={!valid || loading}
+        className={
+          "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+        }
+      >
+        {loading ? "Building…" : source === "sample" ? "Generate Sample Surface" : "Build Surface"}
+      </button>
+      {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+
+      {surface && (
+        <>
+          {/* Summary */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <Stat label="Valid IV rows" value={String(surface.summary.valid_row_count)} />
+            <Stat label="Failed rows" value={String(surface.summary.failed_row_count)} />
+            <Stat label="Min IV" value={surface.summary.min_iv != null ? `${(surface.summary.min_iv * 100).toFixed(1)}%` : "—"} />
+            <Stat label="Max IV" value={surface.summary.max_iv != null ? `${(surface.summary.max_iv * 100).toFixed(1)}%` : "—"} />
+            <Stat label="ATM IV" value={surface.summary.atm_iv_nearest != null ? `${(surface.summary.atm_iv_nearest * 100).toFixed(1)}%` : "—"} />
+            <Stat label="Expiries" value={String(surface.summary.expiries_count)} />
+            <Stat label="Strikes" value={String(surface.summary.strikes_count)} />
+            <Stat label="SVI fitted" value={`${surface.summary.svi_fitted_count} / ${surface.svi_fits.length}`} />
+          </div>
+
+          {/* Smile */}
+          {smiles.length > 0 && (
+            <div>
+              <p className="section-title mb-1">Smile by expiry</p>
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {smiles.map((sm, i) => (
+                  <button
+                    key={sm.expiry_days}
+                    type="button"
+                    onClick={() => setExpiryIdx(i)}
+                    className={
+                      "rounded-lg border px-2.5 py-1 text-xs font-medium transition-colors " +
+                      (i === expiryIdx ? "text-white" : "bg-white text-slate-600 hover:border-blue-400")
+                    }
+                    style={
+                      i === expiryIdx
+                        ? { backgroundColor: SURFACE_PALETTE[i % SURFACE_PALETTE.length], borderColor: SURFACE_PALETTE[i % SURFACE_PALETTE.length] }
+                        : { borderColor: SURFACE_PALETTE[i % SURFACE_PALETTE.length] }
+                    }
+                  >
+                    {sm.expiry_days.toFixed(0)}d
+                  </button>
+                ))}
+              </div>
+              <ResponsiveContainer width="100%" height={240}>
+                <ComposedChart data={smileData} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                  <XAxis
+                    dataKey="moneyness"
+                    type="number"
+                    domain={["dataMin", "dataMax"]}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
+                    axisLine={{ stroke: CHART_AXIS_LINE }}
+                    tickLine={false}
+                    tickFormatter={(v: number) => v.toFixed(2)}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={52}
+                    tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
+                  />
+                  <ReferenceLine x={1.0} stroke={CHART_REF_LINE} strokeDasharray="5 4" />
+                  <Tooltip
+                    content={
+                      <NeonTooltip
+                        formatValue={(v: number) => `${(v * 100).toFixed(2)}%`}
+                        formatLabel={(l) => (typeof l === "number" ? `Moneyness ${l.toFixed(2)}` : "")}
+                      />
+                    }
+                  />
+                  <Scatter dataKey="iv" name="Implied vol" fill={SMILE_RAW_COLOR} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="svi" name="SVI fit" stroke={SMILE_SVI_COLOR} strokeWidth={2} dot={false} connectNulls isAnimationActive={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+              <p className="text-[11px] text-slate-400">
+                <span style={{ color: SMILE_RAW_COLOR }}>● Raw IV</span>{"   "}
+                <span style={{ color: SMILE_SVI_COLOR }}>— SVI fit (research approximation)</span>. Dashed line = ATM (moneyness 1.0).
+                {selected && surface.svi_fits[expiryIdx]?.rmse != null && (
+                  <> SVI RMSE: {(surface.svi_fits[expiryIdx].rmse! * 100).toFixed(2)} vol pts.</>
+                )}
+              </p>
+            </div>
+          )}
+
+          {/* Term structure */}
+          {termData.length > 0 && (
+            <div>
+              <p className="section-title mb-1">ATM term structure</p>
+              <ResponsiveContainer width="100%" height={200}>
+                <ComposedChart data={termData} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                  <XAxis
+                    dataKey="expiry_days"
+                    type="number"
+                    domain={["dataMin", "dataMax"]}
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
+                    axisLine={{ stroke: CHART_AXIS_LINE }}
+                    tickLine={false}
+                    tickFormatter={(v: number) => `${v.toFixed(0)}d`}
+                  />
+                  <YAxis
+                    tick={{ fontSize: 11, fill: CHART_AXIS }}
+                    axisLine={false}
+                    tickLine={false}
+                    width={52}
+                    tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`}
+                  />
+                  <Tooltip
+                    content={
+                      <NeonTooltip
+                        formatValue={(v: number) => `${(v * 100).toFixed(2)}%`}
+                        formatLabel={(l) => (typeof l === "number" ? `${l.toFixed(0)} days` : "")}
+                      />
+                    }
+                  />
+                  <Line type="monotone" dataKey="atm_iv" name="ATM IV" stroke={TERM_COLOR} strokeWidth={2} dot={{ r: 3 }} connectNulls isAnimationActive={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            </div>
+          )}
+
+          {/* Heatmap */}
+          <div>
+            <p className="section-title mb-1">Surface heatmap</p>
+            <SurfaceHeatmap surface={surface} />
+          </div>
+
+          {/* Diagnostics */}
+          {(failedRows.length > 0 || surface.warnings.length > 0) && (
+            <div className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              {surface.warnings.map((w, i) => (
+                <p key={`w${i}`}>{w}</p>
+              ))}
+              {failedRows.slice(0, 8).map((r, i) => (
+                <p key={`f${i}`}>
+                  {r.option_type} K={r.strike} ({r.expiry_days.toFixed(0)}d): {r.warning}
+                </p>
+              ))}
+              {failedRows.length > 8 && <p>…and {failedRows.length - 8} more failed rows.</p>}
+            </div>
+          )}
+        </>
+      )}
+
+      <p className="text-[11px] text-slate-400">
+        SVI is a least-squares research fit (enforces b ≥ 0, |ρ| &lt; 1, σ &gt; 0) — it is not a
+        guaranteed arbitrage-free surface. No live option chains, no stochastic volatility, no
+        production calibration.
       </p>
     </div>
   );

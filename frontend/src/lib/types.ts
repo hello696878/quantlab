@@ -1635,3 +1635,136 @@ export interface MonteCarloResponse {
   path_preview: MonteCarloPath[];
   warnings: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Volatility surface + SVI (manual / sample chain) — research v1
+// ---------------------------------------------------------------------------
+
+export interface SurfaceRowInput {
+  option_type: OptionType;
+  strike: number;
+  time_to_expiry: number;
+  market_price: number;
+}
+
+export interface SurfaceRequest {
+  underlying_price: number;
+  risk_free_rate: number;
+  dividend_yield?: number;
+  rows: SurfaceRowInput[];
+  fit_svi?: boolean;
+}
+
+export interface SampleSurfaceRequest {
+  underlying_price: number;
+  risk_free_rate: number;
+  dividend_yield?: number;
+  base_vol?: number;
+  skew?: number;
+  smile?: number;
+  term?: number;
+  fit_svi?: boolean;
+}
+
+export interface SurfaceRow {
+  option_type: OptionType;
+  strike: number;
+  expiry_days: number;
+  time_to_expiry: number;
+  market_price: number;
+  implied_volatility: number | null;
+  moneyness: number;
+  log_moneyness: number;
+  solver_converged: boolean;
+  warning: string | null;
+}
+
+export interface SurfaceGrid {
+  expiries: number[];
+  expiry_days: number[];
+  moneyness_values: number[];
+  log_moneyness_values: number[];
+  surface_matrix: (number | null)[][];
+}
+
+export interface SurfaceSmilePoint {
+  strike: number;
+  moneyness: number;
+  log_moneyness: number;
+  implied_volatility: number | null;
+  option_type: OptionType;
+  fitted_svi_iv: number | null;
+}
+
+export interface SurfaceSmileSlice {
+  time_to_expiry: number;
+  expiry_days: number;
+  points: SurfaceSmilePoint[];
+}
+
+export interface SurfaceTermPoint {
+  expiry_days: number;
+  time_to_expiry: number;
+  atm_iv: number | null;
+  nearest_atm_strike: number | null;
+  warning: string | null;
+}
+
+export interface SurfaceSkewPoint {
+  expiry_days: number;
+  time_to_expiry: number;
+  low_moneyness_iv: number | null;
+  atm_iv: number | null;
+  high_moneyness_iv: number | null;
+  skew: number | null;
+}
+
+export interface SviParams {
+  a: number;
+  b: number;
+  rho: number;
+  m: number;
+  sigma: number;
+}
+
+export interface SviFittedPoint {
+  log_moneyness: number;
+  iv_observed: number | null;
+  iv_svi: number | null;
+}
+
+export interface SviFit {
+  time_to_expiry: number;
+  expiry_days: number;
+  fitted: boolean;
+  params: SviParams | null;
+  rmse: number | null;
+  points: SviFittedPoint[];
+  warning: string | null;
+}
+
+export interface SurfaceSummary {
+  valid_row_count: number;
+  failed_row_count: number;
+  min_iv: number | null;
+  max_iv: number | null;
+  atm_iv_nearest: number | null;
+  expiries_count: number;
+  strikes_count: number;
+  svi_fitted_count: number;
+}
+
+export interface SurfaceData {
+  rows: SurfaceRow[];
+  grid: SurfaceGrid;
+  smiles: SurfaceSmileSlice[];
+  term_structure: SurfaceTermPoint[];
+  skew: SurfaceSkewPoint[];
+  svi_fits: SviFit[];
+  summary: SurfaceSummary;
+  warnings: string[];
+}
+
+export interface SurfaceResponse {
+  surface: SurfaceData;
+}

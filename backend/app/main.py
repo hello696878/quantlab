@@ -89,6 +89,11 @@ from app.options_monte_carlo import (
     MonteCarloInputError,
     price_monte_carlo,
 )
+from app.options_surface import (
+    SurfaceInputError,
+    build_sample_surface,
+    build_surface,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -147,6 +152,9 @@ from app.schemas import (
     MonteCarloResponse,
     PayoffRequest,
     PayoffResponse,
+    SampleSurfaceRequest,
+    SurfaceRequest,
+    SurfaceResponse,
     TreeConvergenceRequest,
     TreeConvergenceResponse,
     CostModel,
@@ -3628,3 +3636,60 @@ def options_monte_carlo(request: MonteCarloRequest) -> MonteCarloResponse:
     except MonteCarloInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return MonteCarloResponse(**result)
+
+
+@app.post(
+    "/options/surface",
+    response_model=SurfaceResponse,
+    tags=["options"],
+    summary="Build an implied-volatility surface from a manual option chain",
+    description=(
+        "Extracts implied volatility per option row (reusing the bisection "
+        "solver), builds a moneyness × expiry surface grid, smile / ATM term "
+        "structure / skew summaries, and an optional per-expiry SVI research "
+        "fit. Educational research tool — no live chains, not an arbitrage-free "
+        "calibration. A row that fails to solve is kept with null IV and a "
+        "warning rather than crashing the surface."
+    ),
+)
+def options_surface(request: SurfaceRequest) -> SurfaceResponse:
+    try:
+        result = build_surface(
+            request.underlying_price,
+            request.risk_free_rate,
+            request.dividend_yield,
+            [row.model_dump() for row in request.rows],
+            request.fit_svi,
+        )
+    except SurfaceInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return SurfaceResponse(**result)
+
+
+@app.post(
+    "/options/surface/sample",
+    response_model=SurfaceResponse,
+    tags=["options"],
+    summary="Generate a synthetic option chain and build its IV surface",
+    description=(
+        "Generates a synthetic option chain from Black-Scholes plus a parametric "
+        "skew/smile (no live data), then runs the same surface pipeline. Useful "
+        "for exploring the smile, term structure, and SVI fit without supplying "
+        "a chain."
+    ),
+)
+def options_surface_sample(request: SampleSurfaceRequest) -> SurfaceResponse:
+    try:
+        result = build_sample_surface(
+            request.underlying_price,
+            request.risk_free_rate,
+            request.dividend_yield,
+            request.base_vol,
+            request.skew,
+            request.smile,
+            request.term,
+            request.fit_svi,
+        )
+    except SurfaceInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return SurfaceResponse(**result)

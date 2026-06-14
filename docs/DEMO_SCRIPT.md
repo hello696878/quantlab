@@ -121,6 +121,10 @@ Return to the Command Center's **Platform Direction** panel (or open
   standard error and 95% CI that brackets Black–Scholes), show the path-preview
   chart, then switch to an **Asian Call** and an **Up-and-Out Call** (barrier
   120) to show path-dependent payoffs with the discrete-monitoring warning.
+  Last, open **Vol Surface** → *Generate Sample Surface*: the summary cards, the
+  smile chart (raw IV scatter + SVI curve in distinct colours), the ATM
+  term-structure chart, and the moneyness × expiry heatmap all populate from a
+  synthetic chain — emphasise it is research, not live market data.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

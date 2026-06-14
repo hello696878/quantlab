@@ -1028,8 +1028,9 @@ export default function HomeDashboard({
             </span>
             <span className="text-xs text-slate-400">
               Black–Scholes, Greeks, implied volatility, payoff diagrams,
-              binomial-tree / American-exercise pricing, and Monte Carlo
-              (Asian &amp; barrier) path simulation — an educational calculator.
+              binomial-tree / American-exercise pricing, Monte Carlo (Asian &amp;
+              barrier), and an implied-volatility surface with SVI research fit —
+              an educational calculator.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Options Lab →
