@@ -876,7 +876,7 @@ single-asset Backtest + Strategy Comparison:
   **surface heatmap** (deterministic blue→red scale), and row diagnostics;
   palette commands + dashboard card updated; 32 backend tests
 - Research tool only — **no** live chains, **not** an arbitrage-free calibration,
-  no stochastic volatility, no production vol calibration
+  no stochastic-volatility calibration, no production vol calibration
 
 ### Phase 14.4 — Heston Stochastic Volatility v1 ✅
 

@@ -29,6 +29,10 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `POST /options/surface/sample` for manual/synthetic option chains, per-row IV
   extraction, smile/skew/ATM term structure, moneyness × expiry heatmap, and SVI
   research fit.
+- Heston stochastic-volatility endpoint `POST /options/heston` for educational
+  full-truncation Euler Monte Carlo European pricing with standard error, 95%
+  confidence interval, Feller-condition warning, Black-Scholes reference, and
+  capped price/volatility path preview.
 - Strategy payoff presets for long call/put, covered call, protective put,
   bull/bear spreads, straddles, and strangles.
 - Dashboard, sidebar, command-palette/search, Black–Scholes paper, and
@@ -37,9 +41,9 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 ### Limitations
 
 - Educational calculator only: American exercise is limited to the simplified
-  CRR tree model, and Monte Carlo is constant-volatility GBM with sampling
-  error; no live option chains, broker integration, assignment,
-  discrete-dividend/corporate-action modelling, stochastic volatility,
+  CRR tree model, GBM Monte Carlo is constant-volatility with sampling error,
+  and Heston is an uncalibrated Euler simulator; no live option chains, broker
+  integration, assignment, discrete-dividend/corporate-action modelling,
   transaction-cost/liquidity modelling, or arbitrage-free production volatility
   calibration.
 

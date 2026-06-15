@@ -108,10 +108,11 @@ def test_confidence_interval_brackets_price():
     assert ci["upper"] - ci["lower"] == pytest.approx(2 * 1.96 * res["standard_error"], abs=1e-5)
 
 
-def test_zero_vol_of_vol_reduces_to_black_scholes():
-    # xi = 0 and v0 = theta → variance is constant at theta → GBM with sqrt(theta).
-    res = _price(xi=0.0, v0=0.04, theta=0.04, simulations=50000, seed=42)
-    bs = black_scholes_price("call", 100.0, 100.0, 1.0, 0.05, math.sqrt(0.04), 0.0)
+@pytest.mark.parametrize("option_type", ["call", "put"])
+def test_zero_vol_of_vol_reduces_to_black_scholes(option_type):
+    # xi = 0 and v0 = theta -> variance is constant at theta -> GBM with sqrt(theta).
+    res = _price(option_type, xi=0.0, v0=0.04, theta=0.04, simulations=50000, seed=42)
+    bs = black_scholes_price(option_type, 100.0, 100.0, 1.0, 0.05, math.sqrt(0.04), 0.0)
     assert res["price"] == pytest.approx(bs, abs=0.2)
     assert res["black_scholes_reference"]["volatility_used"] == pytest.approx(0.20, abs=1e-6)
 
@@ -172,6 +173,18 @@ def test_feller_condition_helper():
 def test_invalid_inputs_rejected(overrides):
     with pytest.raises(HestonInputError):
         _price(**overrides)
+
+
+@pytest.mark.parametrize("option_type", ["", "straddle"])
+def test_invalid_option_type_rejected(option_type):
+    with pytest.raises(HestonInputError):
+        _price(option_type)
+
+
+@pytest.mark.parametrize("seed", [-1, 2**32, 1.5])
+def test_invalid_seed_rejected(seed):
+    with pytest.raises(HestonInputError):
+        _price(seed=seed)
 
 
 def test_validate_returns_warnings_list():

@@ -69,6 +69,7 @@ def validate_heston_inputs(
     rho: float,
     steps: int,
     simulations: int,
+    seed: Optional[int] = None,
 ) -> List[str]:
     """Field/combination validation. Returns warnings; raises on fatal problems."""
     numeric = {
@@ -88,14 +89,28 @@ def validate_heston_inputs(
             raise HestonInputError(f"{name} must be finite.")
     if S <= 0 or K <= 0 or T <= 0:
         raise HestonInputError("underlying_price, strike, and time_to_expiry must be positive.")
+    if S > 1e12 or K > 1e12:
+        raise HestonInputError("underlying_price and strike must be no greater than 1e12.")
+    if T > 100:
+        raise HestonInputError("time_to_expiry must be no greater than 100 years.")
+    if r < -1.0 or r > 1.0:
+        raise HestonInputError("risk_free_rate must be between -1.0 and 1.0.")
     if v0 <= 0 or theta <= 0:
         raise HestonInputError("initial_variance and long_run_variance must be positive.")
+    if v0 > 100 or theta > 100:
+        raise HestonInputError("initial_variance and long_run_variance must be no greater than 100.")
     if kappa <= 0:
         raise HestonInputError("kappa (mean-reversion speed) must be positive.")
+    if kappa > 100:
+        raise HestonInputError("kappa (mean-reversion speed) must be no greater than 100.")
     if xi < 0:
         raise HestonInputError("vol_of_vol must be non-negative.")
+    if xi > 100:
+        raise HestonInputError("vol_of_vol must be no greater than 100.")
     if q < 0:
         raise HestonInputError("dividend_yield must be non-negative.")
+    if q > 1.0:
+        raise HestonInputError("dividend_yield must be no greater than 1.0.")
     if rho < -0.999 or rho > 0.999:
         raise HestonInputError("rho must be between -0.999 and 0.999.")
     if not isinstance(steps, (int, np.integer)) or steps < _MIN_STEPS or steps > _MAX_STEPS:
@@ -108,6 +123,9 @@ def validate_heston_inputs(
         raise HestonInputError(
             f"simulations must be an integer between {_MIN_SIMULATIONS} and {_MAX_SIMULATIONS}."
         )
+    if seed is not None:
+        if not isinstance(seed, (int, np.integer)) or seed < 0 or seed > _MAX_SEED:
+            raise HestonInputError(f"seed must be an integer between 0 and {_MAX_SEED}.")
 
     warnings: List[str] = []
     satisfied, _lhs, _rhs = feller_condition(kappa, theta, xi)
@@ -177,7 +195,7 @@ def simulate_heston_paths(
         prev_S[:, t] = S[:n_prev]
         prev_v[:, t] = v_trunc[:n_prev]
 
-    if not np.all(np.isfinite(S)):
+    if not np.all(np.isfinite(S)) or not np.all(np.isfinite(v)):
         raise HestonInputError(
             "Simulated paths became non-finite; reduce vol_of_vol, variance, or time to expiry, "
             "or increase the step count."
@@ -262,11 +280,14 @@ def price_heston_european_mc(
     seed: Optional[int] = 42,
 ) -> dict:
     """Heston Monte Carlo European price + diagnostics as a JSON-ready dict."""
+    if option_type not in {"call", "put"}:
+        raise HestonInputError("option_type must be 'call' or 'put'.")
+
     warnings = validate_heston_inputs(
-        S, K, T, r, q, v0, theta, kappa, xi, rho, steps, simulations
+        S, K, T, r, q, v0, theta, kappa, xi, rho, steps, simulations, seed
     )
 
-    rng = np.random.default_rng(seed)
+    rng = np.random.default_rng(None if seed is None else int(seed))
     sim = simulate_heston_paths(S, T, r, q, v0, theta, kappa, xi, rho, steps, simulations, rng)
 
     S_T = sim["terminal_price"]
@@ -275,6 +296,10 @@ def price_heston_european_mc(
     else:
         payoff = np.maximum(K - S_T, 0.0)
     discounted = math.exp(-r * T) * payoff
+    if not np.all(np.isfinite(discounted)):
+        raise HestonInputError(
+            "Discounted payoffs became non-finite; reduce extreme inputs or increase the step count."
+        )
 
     n = int(discounted.shape[0])
     price = float(np.mean(discounted))

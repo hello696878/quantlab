@@ -1312,6 +1312,26 @@ const SURFACE_PALETTE = [
 const SMILE_RAW_COLOR = "#22d3ee"; // raw IV points
 const SMILE_SVI_COLOR = "#fbbf24"; // SVI fitted curve (distinct from raw)
 const TERM_COLOR = "#a78bfa";
+const HESTON_UNDERLYING_PALETTE = [
+  "#22d3ee", // cyan highlight
+  "#a78bfa",
+  "#34d399",
+  "#f472b6",
+  "#60a5fa",
+  "#fbbf24",
+  "#fb923c",
+  "#e879f9",
+];
+const HESTON_VOLATILITY_PALETTE = [
+  "#fbbf24", // amber highlight, intentionally distinct from price chart
+  "#22d3ee",
+  "#f472b6",
+  "#34d399",
+  "#818cf8",
+  "#fb923c",
+  "#bef264",
+  "#60a5fa",
+];
 // Sequential heat scale for the surface (professional, dark-theme friendly).
 const HEAT_STOPS = ["#3b82f6", "#22d3ee", "#34d399", "#fbbf24", "#f87171"];
 
@@ -1795,6 +1815,8 @@ function HestonPathChart({
     for (const p of paths) row[`p${p.path_id}`] = p[field][i];
     return row;
   });
+  const palette = field === "volatility" ? HESTON_VOLATILITY_PALETTE : HESTON_UNDERLYING_PALETTE;
+  const tooltipLabel = `${yLabel} path`;
   return (
     <ResponsiveContainer width="100%" height={220}>
       <ComposedChart data={data} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
@@ -1828,7 +1850,8 @@ function HestonPathChart({
             key={p.path_id}
             type="monotone"
             dataKey={`p${p.path_id}`}
-            stroke={SURFACE_PALETTE[p.path_id % SURFACE_PALETTE.length]}
+            name={`${tooltipLabel} ${p.path_id + 1}`}
+            stroke={palette[p.path_id % palette.length]}
             strokeWidth={p.path_id === 0 ? 2.5 : 1}
             strokeOpacity={p.path_id === 0 ? 1 : 0.5}
             dot={false}
@@ -1859,15 +1882,18 @@ function HestonTab() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const stepsInt = Math.trunc(num(steps));
-  const simsInt = Math.trunc(num(simulations));
-  const seedInt = Math.trunc(num(seed));
+  const stepsNum = num(steps);
+  const simsNum = num(simulations);
+  const seedNum = num(seed);
+  const stepsInt = Number.isInteger(stepsNum) ? stepsNum : NaN;
+  const simsInt = Number.isInteger(simsNum) ? simsNum : NaN;
+  const seedInt = Number.isInteger(seedNum) ? seedNum : NaN;
   const valid =
     num(S) > 0 &&
     num(K) > 0 &&
     num(T) > 0 &&
     finite(r) &&
-    finite(q) &&
+    num(q) >= 0 &&
     num(initVol) > 0 &&
     num(lrVol) > 0 &&
     num(kappa) > 0 &&
@@ -1881,7 +1907,8 @@ function HestonTab() {
     simsInt >= 100 &&
     simsInt <= 200000 &&
     Number.isInteger(seedInt) &&
-    seedInt >= 0;
+    seedInt >= 0 &&
+    seedInt <= 4294967295;
 
   async function run() {
     if (!valid) return;
@@ -1953,7 +1980,7 @@ function HestonTab() {
         disabled={!valid || loading}
         className={
           "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-800 text-slate-500")
         }
       >
         {loading ? "Simulating…" : "Run Heston"}
@@ -1964,7 +1991,7 @@ function HestonTab() {
           100–200,000 whole numbers.
         </p>
       )}
-      {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+      {error && <p className="text-xs text-red-400">⚠ {error}</p>}
 
       {result && (
         <>
@@ -1985,7 +2012,7 @@ function HestonTab() {
           </div>
 
           {result.warnings.length > 0 && (
-            <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700">
+            <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200">
               {result.warnings.map((w, i) => (
                 <p key={i}>{w}</p>
               ))}
@@ -2011,7 +2038,7 @@ function HestonTab() {
             </>
           )}
 
-          <p className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
+          <p className="glass px-3 py-2 text-[11px]" style={{ color: "var(--text-mut)" }}>
             The Black–Scholes reference assumes constant volatility and is{" "}
             <span className="font-medium">not</span> a benchmark for correctness when volatility is
             stochastic — it is shown only for orientation.
@@ -2019,8 +2046,8 @@ function HestonTab() {
         </>
       )}
 
-      <div className="rounded-lg bg-slate-50 px-3 py-2 text-[11px] text-slate-500">
-        <span className="font-medium text-slate-600">How to read the parameters:</span> κ is the
+      <div className="glass px-3 py-2 text-[11px]" style={{ color: "var(--text-mut)" }}>
+        <span className="font-medium" style={{ color: "var(--text-hi)" }}>How to read the parameters:</span> κ is the
         speed variance reverts to its long-run level; θ (here √θ) is that long-run variance/vol; ξ
         (vol of vol) is how randomly volatility itself moves; ρ is the price/variance correlation
         (negative ρ produces the equity leverage effect and skew); v₀ (σ₀) is the starting
