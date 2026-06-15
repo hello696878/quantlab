@@ -926,6 +926,30 @@ single-asset Backtest + Strategy Comparison:
 - Frontend-only polish phase — **no** new pricing models, no backend change; the
   full prior backend suite still passes and `tsc --noEmit` is clean
 
+### Phase 15.0 — Event-Driven / Arbitrage Module v1 ✅
+
+- New backend `app/event_study.py` — **pure** event-study engine (operates on
+  price series; the route fetches via the app's data seam, so it is fully
+  testable offline). Abnormal-return models: **market-adjusted**,
+  **mean-adjusted**, and a **market model** (OLS α/β over an estimation window),
+  with graceful fallback when a benchmark is missing
+- Cumulative abnormal return (**CAR**), pre/post/event-day segments, and a
+  **multi-event** aggregation (average abnormal return + **CAAR** by relative
+  day). Non-trading event dates map to the next session with a warning;
+  insufficient pre/post data warns instead of crashing; never NaN/inf
+- Simplified **merger-arbitrage** calculator: spread, gross upside, expected
+  exit/return, annualized return, downside, and breakeven probability — with an
+  explicit "ignores borrow/financing/regulatory/tax/liquidity" caveat
+- Four routes: `POST /events/study`, `/events/multi-study`, `/events/merger-arb`,
+  `GET /events/sample` (synthetic demo events, clearly labelled). 27 new backend
+  tests (synthetic data, no live yfinance)
+- New top-level **Event Lab** workspace (Event Study / Multi-Event / Merger Arb /
+  Education) with deterministic-palette charts (abnormal-return bars coloured by
+  sign, CAR line, asset-vs-benchmark cumulative, CAAR), sidebar nav, dashboard
+  card, command-palette commands, and honest caveats
+- Research/education only — **no** live SEC filings, no complete deal database,
+  no full merger-arb engine; not investment advice
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -990,7 +1014,9 @@ search · toasts, error boundary, loading/offline states.
    arbitrage-free surface remain future)
 7. **Volatility Lab v1** — realized vol estimators, vol targeting deep-dive,
    term-structure visuals
-8. **Event-Driven & Arbitrage Module** (research)
+8. ~~Event-Driven & Arbitrage Module~~ — **built (v1)** (15.0: event study with
+   abnormal returns + CAR/CAAR + simplified merger-arb calculator; full merger-arb
+   / convertible-arb / index-rebalance engines remain future)
 9. **Rates / FX / Credit Module** (research)
 10. **Real Estate Module** (research)
 11. **Microstructure & HFT Lab** — *educational simulations* (order-book toys,
@@ -1013,7 +1039,7 @@ built**; everything else is planned/research/future:
 |---|----------|--------------|
 | 1 | Equities | **built (core)** — SMA, RSI, Bollinger, Momentum, Vol Breakout, Pairs |
 | 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder, CRR **binomial tree** + American exercise, **Monte Carlo** GBM (Asian + barrier, SE/CI), **IV surface** + **SVI** research fit, **Heston** stochastic-vol MC; trinomial / Heston calibration / SABR / local vol / arbitrage-free surface planned |
-| 3 | Event-Driven & Arbitrage | research |
+| 3 | Event-Driven & Arbitrage | **built (v1)** — event study (abnormal returns, CAR/CAAR) + simplified merger-arb calculator; full deal/convertible/index engines planned |
 | 4 | Futures & Commodities | research |
 | 5 | FX | research |
 | 6 | Fixed Income & Rates | research |

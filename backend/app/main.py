@@ -37,6 +37,7 @@ POST /research/strategy-comparison     — compare five single-asset strategies
 import hashlib
 import json
 from contextlib import asynccontextmanager
+from datetime import date, timedelta
 from typing import Optional
 
 from fastapi import FastAPI, File, Form, HTTPException, UploadFile
@@ -98,6 +99,13 @@ from app.options_heston import (
     HestonInputError,
     price_heston_european_mc,
 )
+from app.event_study import (
+    SAMPLE_EVENTS,
+    EventInputError,
+    compute_merger_arb_metrics,
+    run_multi_event_study,
+    run_single_event_study,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -152,10 +160,17 @@ from app.schemas import (
     BinomialTreeResponse,
     ImpliedVolRequest,
     ImpliedVolResponse,
+    EventStudyRequest,
+    EventStudyResponse,
     HestonRequest,
     HestonResponse,
+    MergerArbRequest,
+    MergerArbResponse,
     MonteCarloRequest,
     MonteCarloResponse,
+    MultiEventStudyRequest,
+    MultiEventStudyResponse,
+    SampleEventsResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -3737,3 +3752,191 @@ def options_heston(request: HestonRequest) -> HestonResponse:
     except HestonInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return HestonResponse(**result)
+
+
+# ---------------------------------------------------------------------------
+# Event-Driven / Arbitrage Lab endpoints (research v1)
+# ---------------------------------------------------------------------------
+
+
+def _event_close_series(
+    ticker: str,
+    event_date: str,
+    estimation_window_days: int,
+    pre_event_days: int,
+    post_event_days: int,
+):
+    """Fetch a close-price series wide enough for the estimation + event window.
+
+    Trading days are ~0.69 of calendar days, so we over-fetch with a buffer.
+    """
+    ev = date.fromisoformat(event_date)
+    before_days = int((estimation_window_days + pre_event_days) * 1.7) + 45
+    after_days = int(post_event_days * 1.7) + 15
+    start = (ev - timedelta(days=before_days)).isoformat()
+    end = (ev + timedelta(days=after_days + 1)).isoformat()  # yfinance end is exclusive
+    return _fetch(ticker, start, end)["Close"].rename(ticker.upper())
+
+
+@app.post(
+    "/events/study",
+    response_model=EventStudyResponse,
+    tags=["events"],
+    summary="Event study — benchmark-adjusted abnormal returns and CAR",
+    description=(
+        "Computes abnormal returns and the cumulative abnormal return (CAR) "
+        "around an event date, using market-adjusted, mean-adjusted, or "
+        "market-model baselines. Educational research diagnostic — results depend "
+        "on the event date, benchmark choice, window size, leakage, confounding "
+        "events, liquidity, and costs. Not a live event scanner or investment advice."
+    ),
+)
+def events_study(request: EventStudyRequest) -> EventStudyResponse:
+    asset_close = _event_close_series(
+        request.ticker,
+        request.event_date,
+        request.estimation_window_days,
+        request.pre_event_days,
+        request.post_event_days,
+    )
+    benchmark_close = None
+    bench_warning: Optional[str] = None
+    try:
+        benchmark_close = _event_close_series(
+            request.benchmark_ticker,
+            request.event_date,
+            request.estimation_window_days,
+            request.pre_event_days,
+            request.post_event_days,
+        )
+    except HTTPException as exc:
+        bench_warning = (
+            f"Benchmark '{request.benchmark_ticker}' could not be fetched: {exc.detail}"
+        )
+
+    try:
+        result = run_single_event_study(
+            asset_close,
+            benchmark_close,
+            request.event_date,
+            request.estimation_window_days,
+            request.pre_event_days,
+            request.post_event_days,
+            request.model,
+            request.event_name,
+        )
+    except EventInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+
+    if bench_warning:
+        result["warnings"].insert(0, bench_warning)
+        result["summary"]["warnings"].insert(0, bench_warning)
+    result["benchmark_ticker"] = request.benchmark_ticker.upper()
+    return EventStudyResponse(**result)
+
+
+@app.post(
+    "/events/multi-study",
+    response_model=MultiEventStudyResponse,
+    tags=["events"],
+    summary="Multi-event study — average abnormal return (AAR) and CAAR",
+    description=(
+        "Runs an event study for each event and averages abnormal returns by "
+        "relative day (AAR / CAAR). A single failing event is recorded rather than "
+        "aborting the batch. Educational research diagnostic."
+    ),
+)
+def events_multi_study(request: MultiEventStudyRequest) -> MultiEventStudyResponse:
+    results = []
+    errors = []
+    for ev in request.events:
+        bench_ticker = ev.benchmark_ticker or request.benchmark_ticker
+        try:
+            asset_close = _event_close_series(
+                ev.ticker, ev.event_date, request.estimation_window_days,
+                request.pre_event_days, request.post_event_days,
+            )
+            try:
+                bench_close = _event_close_series(
+                    bench_ticker, ev.event_date, request.estimation_window_days,
+                    request.pre_event_days, request.post_event_days,
+                )
+            except HTTPException:
+                bench_close = None
+            results.append(
+                run_single_event_study(
+                    asset_close, bench_close, ev.event_date,
+                    request.estimation_window_days, request.pre_event_days,
+                    request.post_event_days, request.model,
+                    ev.event_name or ev.ticker,
+                )
+            )
+        except (EventInputError, HTTPException) as exc:
+            detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+            errors.append(
+                {
+                    "event_name": ev.event_name or ev.ticker,
+                    "ticker": ev.ticker.upper(),
+                    "actual_event_date": None,
+                    "total_car": None,
+                    "error": str(detail),
+                }
+            )
+
+    if not results:
+        raise HTTPException(
+            status_code=422,
+            detail="No events could be processed; check the tickers and dates.",
+        )
+
+    agg = run_multi_event_study(results)
+    return MultiEventStudyResponse(
+        event_count=len(request.events),
+        per_event=agg["per_event"] + errors,
+        aar_curve=agg["aar_curve"],
+        average_total_car=agg["average_total_car"],
+        warnings=(
+            [f"{len(errors)} event(s) could not be processed; see per-event errors."]
+            if errors
+            else []
+        ),
+    )
+
+
+@app.post(
+    "/events/merger-arb",
+    response_model=MergerArbResponse,
+    tags=["events"],
+    summary="Simplified merger-arbitrage calculator",
+    description=(
+        "Simplified expected-value merger-arb economics (spread, expected/annualized "
+        "return, breakeven probability). Ignores borrow/financing costs, regulatory "
+        "timing, competing bids, taxes, liquidity, and detailed deal terms — not a "
+        "full merger-arbitrage model and not investment advice."
+    ),
+)
+def events_merger_arb(request: MergerArbRequest) -> MergerArbResponse:
+    try:
+        result = compute_merger_arb_metrics(
+            request.current_price,
+            request.offer_price,
+            request.downside_price,
+            request.probability_close,
+            request.expected_days_to_close,
+        )
+    except EventInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return MergerArbResponse(**result)
+
+
+@app.get(
+    "/events/sample",
+    response_model=SampleEventsResponse,
+    tags=["events"],
+    summary="Sample (demo) events for the Event Lab",
+)
+def events_sample() -> SampleEventsResponse:
+    return SampleEventsResponse(
+        events=list(SAMPLE_EVENTS),
+        note="Sample events are for demo workflow only. Verify event dates before research use.",
+    )

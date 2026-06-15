@@ -71,8 +71,9 @@ reproducible and every limitation explicit.
    research fit (14.3); **Heston** stochastic-vol Monte Carlo (14.4). Planned:
    Heston calibration to an IV surface, trinomial tree, arbitrage-free surface,
    vol targeting / term structure; later SABR, local / rough vol — research
-3. **Event-Driven & Arbitrage** — research (merger-arb toy, index add/remove,
-   earnings drift)
+3. **Event-Driven & Arbitrage** — **built (v1)**: event study (abnormal returns,
+   CAR/CAAR) + simplified merger-arb calculator (15.0). Planned: full merger-arb,
+   convertible-arb, index add/remove engines
 4. **Futures & Commodities** — research (carry, term-structure, trend)
 5. **FX** — research (carry, momentum, PPP toys)
 6. **Fixed Income & Rates** — research (duration, curve steepeners, rolldown)
@@ -101,7 +102,7 @@ reproducible and every limitation explicit.
    binomial tree + American exercise; 14.2 Monte Carlo GBM + Asian/barrier;
    14.3 IV surface + SVI research fit; 14.4 Heston stochastic volatility)
 7. Volatility Lab v1
-8. Event-Driven & Arbitrage Module
+8. ~~Event-Driven & Arbitrage Module~~ — **built (v1)** (15.0: event study + merger-arb calculator)
 9. Rates / FX / Credit Module
 10. Real Estate Module
 11. Microstructure & HFT Lab (educational simulations)

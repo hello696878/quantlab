@@ -1850,3 +1850,125 @@ export interface HestonResponse {
   summary: HestonSummary;
   warnings: string[];
 }
+
+// ---------------------------------------------------------------------------
+// Event-Driven / Arbitrage Lab — research v1
+// ---------------------------------------------------------------------------
+
+export type AbnormalReturnModel = "market_adjusted" | "mean_adjusted" | "market_model";
+
+export interface EventStudyRequest {
+  ticker: string;
+  benchmark_ticker: string;
+  event_date: string;
+  event_name?: string;
+  estimation_window_days?: number;
+  pre_event_days?: number;
+  post_event_days?: number;
+  model: AbnormalReturnModel;
+}
+
+export interface EventStudyRow {
+  relative_day: number;
+  date: string;
+  asset_return: number | null;
+  benchmark_return: number | null;
+  abnormal_return: number | null;
+  cumulative_abnormal_return: number | null;
+}
+
+export interface EventStudySummary {
+  event_day_abnormal_return: number | null;
+  pre_event_car: number | null;
+  post_event_car: number | null;
+  total_car: number | null;
+  window_start: string | null;
+  window_end: string | null;
+  actual_event_date: string | null;
+  warnings: string[];
+}
+
+export interface EventStudyResponse {
+  event_name: string;
+  ticker: string;
+  benchmark_ticker: string;
+  model: AbnormalReturnModel;
+  model_used: string;
+  alpha: number | null;
+  beta: number | null;
+  estimation_obs: number;
+  rows: EventStudyRow[];
+  summary: EventStudySummary;
+  warnings: string[];
+}
+
+export interface EventItem {
+  event_name?: string;
+  ticker: string;
+  event_date: string;
+  benchmark_ticker?: string | null;
+}
+
+export interface MultiEventStudyRequest {
+  events: EventItem[];
+  benchmark_ticker: string;
+  estimation_window_days?: number;
+  pre_event_days?: number;
+  post_event_days?: number;
+  model: AbnormalReturnModel;
+}
+
+export interface MultiEventPerEvent {
+  event_name: string;
+  ticker: string;
+  actual_event_date: string | null;
+  total_car: number | null;
+  error: string | null;
+}
+
+export interface CaarPoint {
+  relative_day: number;
+  average_abnormal_return: number | null;
+  average_cumulative_abnormal_return: number | null;
+  event_count: number;
+}
+
+export interface MultiEventStudyResponse {
+  event_count: number;
+  per_event: MultiEventPerEvent[];
+  aar_curve: CaarPoint[];
+  average_total_car: number | null;
+  warnings: string[];
+}
+
+export interface MergerArbRequest {
+  current_price: number;
+  offer_price: number;
+  downside_price: number;
+  probability_close: number;
+  expected_days_to_close: number;
+}
+
+export interface MergerArbResponse {
+  spread: number;
+  gross_upside_pct: number;
+  downside_pct: number;
+  expected_exit_price: number;
+  expected_return: number;
+  annualized_expected_return: number | null;
+  downside_loss_pct: number;
+  breakeven_probability: number | null;
+  warnings: string[];
+}
+
+export interface SampleEvent {
+  event_name: string;
+  ticker: string;
+  benchmark_ticker: string;
+  event_date: string;
+}
+
+export interface SampleEventsResponse {
+  events: SampleEvent[];
+  note: string;
+}

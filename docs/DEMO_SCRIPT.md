@@ -137,6 +137,13 @@ Return to the Command Center's **Platform Direction** panel (or open
   paths → **Model Compare** → *Run Comparison* prices the scenario across every
   model in one table. Emphasise: presets are educational scenarios, and models
   differ because their assumptions differ — none is automatically "correct".
+- **Event Lab** — *Event Study*: AAPL vs SPY, market-adjusted, a sample event
+  date → show the summary cards, the sign-coloured abnormal-return bars, the CAR
+  line, and the asset-vs-benchmark cumulative chart (note the "next trading day"
+  warning when the date is a weekend). Switch to *Merger Arb* (current 90, offer
+  100, downside 70, P(close) 0.8, 180 days) → spread, expected return, and
+  breakeven probability. Emphasise: research diagnostic, no live filings, not
+  investment advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

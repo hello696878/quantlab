@@ -15,10 +15,17 @@ import type {
   BinomialTreeResponse,
   ImpliedVolRequest,
   ImpliedVolResponse,
+  EventStudyRequest,
+  EventStudyResponse,
   HestonRequest,
   HestonResponse,
+  MergerArbRequest,
+  MergerArbResponse,
   MonteCarloRequest,
   MonteCarloResponse,
+  MultiEventStudyRequest,
+  MultiEventStudyResponse,
+  SampleEventsResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -951,4 +958,38 @@ export function buildSampleVolSurface(
 
 export function priceHeston(req: HestonRequest): Promise<HestonResponse> {
   return postOptions<HestonResponse>("/api/options/heston", req);
+}
+
+// ---------------------------------------------------------------------------
+// Event-Driven / Arbitrage Lab (research v1)
+// ---------------------------------------------------------------------------
+
+export function runEventStudy(req: EventStudyRequest): Promise<EventStudyResponse> {
+  return postOptions<EventStudyResponse>("/api/events/study", req);
+}
+
+export function runMultiEventStudy(
+  req: MultiEventStudyRequest,
+): Promise<MultiEventStudyResponse> {
+  return postOptions<MultiEventStudyResponse>("/api/events/multi-study", req);
+}
+
+export function computeMergerArb(req: MergerArbRequest): Promise<MergerArbResponse> {
+  return postOptions<MergerArbResponse>("/api/events/merger-arb", req);
+}
+
+export async function fetchSampleEvents(): Promise<SampleEventsResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/events/sample");
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+  if (!res.ok) {
+    throw new BacktestApiError(
+      res.status,
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`,
+    );
+  }
+  return res.json() as Promise<SampleEventsResponse>;
 }

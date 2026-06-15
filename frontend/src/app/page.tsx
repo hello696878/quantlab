@@ -38,6 +38,7 @@ import {
 import QuantDisastersPanel from "@/components/QuantDisastersPanel";
 import { DISASTER_REGISTRY, LIVE_DISASTERS } from "@/lib/disasterRegistry";
 import OptionsLabPanel from "@/components/OptionsLabPanel";
+import EventLabPanel from "@/components/EventLabPanel";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -344,6 +345,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "European Black–Scholes pricing, Greeks, implied vol, and payoff diagrams — a deterministic educational calculator.",
   },
+  events: {
+    title: "Event Lab",
+    subtitle:
+      "Event-study abnormal returns (CAR/CAAR) and a simplified merger-arbitrage calculator — research diagnostic, no live filings.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -455,6 +461,11 @@ export default function HomePage() {
   const [optionsKey, setOptionsKey] = useState(0);
   // Scenario preset to seed the Options Lab with on (re)mount (palette deep-link).
   const [optionsPreset, setOptionsPreset] = useState<string | null>(null);
+  // Event Lab: which tab to open on (deep-linked from the palette).
+  const [eventsTab, setEventsTab] = useState<"study" | "multi" | "merger" | "education">(
+    "study",
+  );
+  const [eventsKey, setEventsKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -758,6 +769,7 @@ export default function HomePage() {
     { view: "replications", title: "Open Paper Replications", keywords: "papers research academic momentum pairs replication" },
     { view: "disasters", title: "Open Quant Disasters", keywords: "risk education failures ltcm crash blowup lessons" },
     { view: "options", title: "Open Options Lab", keywords: "options black-scholes greeks implied volatility payoff straddle strangle covered call protective put" },
+    { view: "events", title: "Open Event Lab", keywords: "event study abnormal return car caar merger arbitrage deal spread event-driven earnings event" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -916,6 +928,23 @@ export default function HomePage() {
         setOptionsPreset(presetId);
         setOptionsKey((k) => k + 1);
         handleNav("options");
+      },
+    })),
+    ...(
+      [
+        ["study", "Open Event Study", "event study abnormal return car benchmark adjusted earnings"],
+        ["multi", "Open Multi-Event Study", "multi event study caar average abnormal return aar"],
+        ["merger", "Open Merger Arb Calculator", "merger arbitrage deal spread breakeven probability annualized return"],
+      ] as const
+    ).map(([t, title, keywords]) => ({
+      id: `events-${t}`,
+      group: "Event Lab",
+      title,
+      keywords,
+      run: () => {
+        setEventsTab(t);
+        setEventsKey((k) => k + 1);
+        handleNav("events");
       },
     })),
     // Report actions are only offered when they actually work (a result exists).
@@ -1349,6 +1378,9 @@ export default function HomePage() {
         {view === "options" && (
           <OptionsLabPanel key={optionsKey} initialTab={optionsTab} initialPresetId={optionsPreset} />
         )}
+
+        {/* ── Event Lab ────────────────────────────────────────────────── */}
+        {view === "events" && <EventLabPanel key={eventsKey} initialTab={eventsTab} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

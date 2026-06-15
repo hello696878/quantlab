@@ -4146,3 +4146,160 @@ class HestonResponse(BaseModel):
     )
     summary: HestonSummary
     warnings: List[str] = Field(default_factory=list)
+
+
+# ===========================================================================
+# Event-Driven / Arbitrage Lab — research v1
+# ===========================================================================
+
+AbnormalReturnModel = Literal["market_adjusted", "mean_adjusted", "market_model"]
+
+
+def _check_iso_date(value: str) -> str:
+    try:
+        date.fromisoformat(value)
+    except (ValueError, TypeError):
+        raise ValueError("date must be in YYYY-MM-DD format.")
+    return value
+
+
+class EventStudyRequest(BaseModel):
+    """Single-event event-study request."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    ticker: str = Field(min_length=1, max_length=20)
+    benchmark_ticker: str = Field(default="SPY", min_length=1, max_length=20)
+    event_date: str = Field(description="YYYY-MM-DD.")
+    event_name: str = Field(default="", max_length=120)
+    estimation_window_days: int = Field(default=120, ge=10, le=500)
+    pre_event_days: int = Field(default=10, ge=1, le=120)
+    post_event_days: int = Field(default=10, ge=1, le=120)
+    model: AbnormalReturnModel = "market_adjusted"
+    data_provider: str = Field(default="yfinance", max_length=40)
+
+    @field_validator("event_date")
+    @classmethod
+    def _validate_event_date(cls, v: str) -> str:
+        return _check_iso_date(v)
+
+
+class EventStudyRow(BaseModel):
+    relative_day: int
+    date: str
+    asset_return: Optional[float] = None
+    benchmark_return: Optional[float] = None
+    abnormal_return: Optional[float] = None
+    cumulative_abnormal_return: Optional[float] = None
+
+
+class EventStudySummary(BaseModel):
+    event_day_abnormal_return: Optional[float] = None
+    pre_event_car: Optional[float] = None
+    post_event_car: Optional[float] = None
+    total_car: Optional[float] = None
+    window_start: Optional[str] = None
+    window_end: Optional[str] = None
+    actual_event_date: Optional[str] = None
+    warnings: List[str] = Field(default_factory=list)
+
+
+class EventStudyResponse(BaseModel):
+    """Event-study abnormal returns + CAR. Educational research diagnostic."""
+
+    event_name: str = ""
+    ticker: str = ""
+    benchmark_ticker: str = ""
+    model: AbnormalReturnModel
+    model_used: str
+    alpha: Optional[float] = None
+    beta: Optional[float] = None
+    estimation_obs: int = 0
+    rows: List[EventStudyRow] = Field(default_factory=list)
+    summary: EventStudySummary
+    warnings: List[str] = Field(default_factory=list)
+
+
+class EventItem(BaseModel):
+    event_name: str = Field(default="", max_length=120)
+    ticker: str = Field(min_length=1, max_length=20)
+    event_date: str
+    benchmark_ticker: Optional[str] = Field(default=None, max_length=20)
+
+    @field_validator("event_date")
+    @classmethod
+    def _validate_event_date(cls, v: str) -> str:
+        return _check_iso_date(v)
+
+
+class MultiEventStudyRequest(BaseModel):
+    """Multi-event study request (shared windows/model; per-event ticker/date)."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    events: List[EventItem] = Field(min_length=1, max_length=20)
+    benchmark_ticker: str = Field(default="SPY", min_length=1, max_length=20)
+    estimation_window_days: int = Field(default=120, ge=10, le=500)
+    pre_event_days: int = Field(default=10, ge=1, le=120)
+    post_event_days: int = Field(default=10, ge=1, le=120)
+    model: AbnormalReturnModel = "market_adjusted"
+    data_provider: str = Field(default="yfinance", max_length=40)
+
+
+class MultiEventPerEvent(BaseModel):
+    event_name: str
+    ticker: str
+    actual_event_date: Optional[str] = None
+    total_car: Optional[float] = None
+    error: Optional[str] = None
+
+
+class CaarPoint(BaseModel):
+    relative_day: int
+    average_abnormal_return: Optional[float] = None
+    average_cumulative_abnormal_return: Optional[float] = None
+    event_count: int
+
+
+class MultiEventStudyResponse(BaseModel):
+    event_count: int
+    per_event: List[MultiEventPerEvent] = Field(default_factory=list)
+    aar_curve: List[CaarPoint] = Field(default_factory=list)
+    average_total_car: Optional[float] = None
+    warnings: List[str] = Field(default_factory=list)
+
+
+class MergerArbRequest(BaseModel):
+    """Simplified merger-arbitrage calculator inputs."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    current_price: float = Field(gt=0.0, le=1e12)
+    offer_price: float = Field(gt=0.0, le=1e12)
+    downside_price: float = Field(ge=0.0, le=1e12)
+    probability_close: float = Field(ge=0.0, le=1.0)
+    expected_days_to_close: float = Field(gt=0.0, le=3650.0)
+
+
+class MergerArbResponse(BaseModel):
+    spread: float
+    gross_upside_pct: float
+    downside_pct: float
+    expected_exit_price: float
+    expected_return: float
+    annualized_expected_return: Optional[float] = None
+    downside_loss_pct: float
+    breakeven_probability: Optional[float] = None
+    warnings: List[str] = Field(default_factory=list)
+
+
+class SampleEvent(BaseModel):
+    event_name: str
+    ticker: str
+    benchmark_ticker: str
+    event_date: str
+
+
+class SampleEventsResponse(BaseModel):
+    events: List[SampleEvent] = Field(default_factory=list)
+    note: str
