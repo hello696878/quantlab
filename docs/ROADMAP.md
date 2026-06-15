@@ -951,6 +951,29 @@ single-asset Backtest + Strategy Comparison:
 - Research/education only — **no** live SEC filings, no complete deal database,
   no full merger-arb engine; not investment advice
 
+### Phase 16.0 — Yield Curve Lab v1 ✅
+
+- New backend `app/yield_curve.py` — **pure**, deterministic rates math: zero
+  rate ↔ **discount factor** under annual / semiannual / **continuous**
+  compounding, **forward rates** (continuously compounded from the DFs), linear
+  interpolation on zero rates or discount factors, and a synthetic sample curve
+- **Curve shocks**: parallel, steepener, flattener, and butterfly (educational,
+  pivoting on a normalized maturity position) with an original-vs-shocked diff
+- **Bond pricing**: fixed-rate bond from a **YTM** or by **curve discounting**,
+  with Macaulay / modified **duration**, **DV01**, and **convexity** (closed-form
+  in YTM mode; finite-difference +1 bp reprice in curve mode), plus a cash-flow
+  table — par bond prices to exactly face, zero-coupon matches the closed form
+- Four routes: `POST /rates/curve`, `/rates/shock`, `/rates/bond`,
+  `GET /rates/sample` (validated; bad maturity / frequency / duplicate maturities
+  → 422; never NaN/inf). 34 new backend tests
+- New top-level **Yield Curve Lab** workspace (Curve Builder / Curve Shocks /
+  Bond Pricing / Education) with a shared editable curve, deterministic-palette
+  charts (spot, discount-factor, forward, original-vs-shocked, cash-flow PV bars),
+  sidebar nav, dashboard card, and command-palette commands
+- Research/education only — **no** live rates feed, no swap-curve bootstrapping,
+  no short-rate models (Vasicek / CIR / Hull-White), no credit curve; results are
+  assumption-sensitive (compounding / interpolation / day count). Not advice
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -1018,7 +1041,9 @@ search · toasts, error boundary, loading/offline states.
 8. ~~Event-Driven & Arbitrage Module~~ — **built (v1)** (15.0: event study with
    abnormal returns + CAR/CAAR + simplified merger-arb calculator; full merger-arb
    / convertible-arb / index-rebalance engines remain future)
-9. **Rates / FX / Credit Module** (research)
+9. **Rates / FX / Credit Module** — **started** (16.0: Yield Curve Lab v1 —
+   zero rates, discount factors, forwards, curve shocks, bond duration/convexity;
+   short-rate models, swap curve, FX, and credit curve remain research)
 10. **Real Estate Module** (research)
 11. **Microstructure & HFT Lab** — *educational simulations* (order-book toys,
     queue models) on synthetic data; **not** real HFT execution (research)
@@ -1043,7 +1068,7 @@ built**; everything else is planned/research/future:
 | 3 | Event-Driven & Arbitrage | **built (v1)** — event study (abnormal returns, CAR/CAAR) + simplified merger-arb calculator; full deal/convertible/index engines planned |
 | 4 | Futures & Commodities | research |
 | 5 | FX | research |
-| 6 | Fixed Income & Rates | research |
+| 6 | Fixed Income & Rates | **built (v1)** — Yield Curve Lab: zero rates, discount factors, forwards, curve shocks, bond duration / convexity / DV01; Vasicek / CIR / Hull-White, swap-curve bootstrapping planned |
 | 7 | Credit | research |
 | 8 | Crypto | **built (partial)** — crypto tickers, 365-day annualization; exchange-native data future |
 | 9 | Real Estate | research |

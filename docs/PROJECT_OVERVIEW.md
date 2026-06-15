@@ -52,6 +52,7 @@ FastAPI Backend
   ├── options_surface.py            Vol surface v1: chain IV extraction, moneyness×expiry grid, smile/term/skew, SVI research fit (scipy)
   ├── options_heston.py             Heston v1: stochastic-vol full-truncation Euler MC, European pricing, BS reference, Feller diagnostic, path preview
   ├── event_study.py                Event Lab v1: abnormal returns (market/mean/market-model), CAR/CAAR, merger-arb calculator (pure; route fetches prices)
+  ├── yield_curve.py                Yield Curve Lab v1: discount factors, forwards, interpolation, curve shocks, bond pricing + duration/convexity/DV01 (pure)
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD

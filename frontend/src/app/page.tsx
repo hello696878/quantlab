@@ -39,6 +39,7 @@ import QuantDisastersPanel from "@/components/QuantDisastersPanel";
 import { DISASTER_REGISTRY, LIVE_DISASTERS } from "@/lib/disasterRegistry";
 import OptionsLabPanel from "@/components/OptionsLabPanel";
 import EventLabPanel from "@/components/EventLabPanel";
+import YieldCurveLabPanel from "@/components/YieldCurveLabPanel";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -350,6 +351,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "Event-study abnormal returns (CAR/CAAR) and a simplified merger-arbitrage calculator — research diagnostic, no live filings.",
   },
+  rates: {
+    title: "Yield Curve Lab",
+    subtitle:
+      "Zero rates, discount factors, forward rates, curve shocks, and basic bond duration / convexity — synthetic curves, no live rates feed.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -466,6 +472,11 @@ export default function HomePage() {
     "study",
   );
   const [eventsKey, setEventsKey] = useState(0);
+  // Yield Curve Lab: which tab to open on (deep-linked from the palette).
+  const [ratesTab, setRatesTab] = useState<"builder" | "shocks" | "bond" | "education">(
+    "builder",
+  );
+  const [ratesKey, setRatesKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -770,6 +781,7 @@ export default function HomePage() {
     { view: "disasters", title: "Open Quant Disasters", keywords: "risk education failures ltcm crash blowup lessons" },
     { view: "options", title: "Open Options Lab", keywords: "options black-scholes greeks implied volatility payoff straddle strangle covered call protective put" },
     { view: "events", title: "Open Event Lab", keywords: "event study abnormal return car caar merger arbitrage deal spread event-driven earnings event" },
+    { view: "rates", title: "Open Yield Curve Lab", keywords: "yield curve rates zero rate discount factor forward rate duration convexity dv01 bond pricing fixed income" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -945,6 +957,23 @@ export default function HomePage() {
         setEventsTab(t);
         setEventsKey((k) => k + 1);
         handleNav("events");
+      },
+    })),
+    ...(
+      [
+        ["builder", "Open Rates Lab", "yield curve rates zero rate discount factor forward rate curve builder"],
+        ["bond", "Open Bond Pricing", "bond pricing duration convexity dv01 yield to maturity coupon fixed income"],
+        ["shocks", "Open Curve Shocks", "yield curve shocks parallel steepener flattener butterfly rates"],
+      ] as const
+    ).map(([t, title, keywords]) => ({
+      id: `rates-${t}`,
+      group: "Yield Curve Lab",
+      title,
+      keywords,
+      run: () => {
+        setRatesTab(t);
+        setRatesKey((k) => k + 1);
+        handleNav("rates");
       },
     })),
     // Report actions are only offered when they actually work (a result exists).
@@ -1381,6 +1410,9 @@ export default function HomePage() {
 
         {/* ── Event Lab ────────────────────────────────────────────────── */}
         {view === "events" && <EventLabPanel key={eventsKey} initialTab={eventsTab} />}
+
+        {/* ── Yield Curve Lab ──────────────────────────────────────────── */}
+        {view === "rates" && <YieldCurveLabPanel key={ratesKey} initialTab={ratesTab} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

@@ -4303,3 +4303,123 @@ class SampleEvent(BaseModel):
 class SampleEventsResponse(BaseModel):
     events: List[SampleEvent] = Field(default_factory=list)
     note: str
+
+
+# ===========================================================================
+# Yield Curve Lab — research v1
+# ===========================================================================
+
+CompoundingConvention = Literal["annual", "semiannual", "continuous"]
+InterpolationMethod = Literal["linear_zero", "linear_discount"]
+ShockType = Literal["parallel", "steepener", "flattener", "butterfly"]
+PricingMode = Literal["ytm", "curve"]
+
+
+class CurvePoint(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    maturity_years: float = Field(gt=0.0, le=100.0)
+    zero_rate: float = Field(ge=-1.0, le=1.0)
+
+
+class CurveRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    curve_points: List[CurvePoint] = Field(min_length=2, max_length=100)
+    compounding: CompoundingConvention = "continuous"
+    interpolation: InterpolationMethod = "linear_zero"
+
+
+class DiscountCurvePoint(BaseModel):
+    maturity_years: float
+    zero_rate: float
+    discount_factor: float
+
+
+class ForwardSegment(BaseModel):
+    start_year: float
+    end_year: float
+    forward_rate: float
+
+
+class CurveResponse(BaseModel):
+    compounding: CompoundingConvention
+    interpolation: InterpolationMethod
+    curve: List[DiscountCurvePoint]
+    forward_rates: List[ForwardSegment]
+    warnings: List[str] = Field(default_factory=list)
+
+
+class ShockRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    curve_points: List[CurvePoint] = Field(min_length=2, max_length=100)
+    shock_type: ShockType = "parallel"
+    shock_bps: float = Field(ge=-10000.0, le=10000.0)
+    compounding: CompoundingConvention = "continuous"
+
+
+class CurveChange(BaseModel):
+    maturity_years: float
+    original_rate: float
+    shocked_rate: float
+    change_bps: float
+
+
+class ShockResponse(BaseModel):
+    shock_type: ShockType
+    shock_bps: float
+    compounding: CompoundingConvention
+    original_curve: List[DiscountCurvePoint]
+    shocked_curve: List[DiscountCurvePoint]
+    changes: List[CurveChange]
+    warnings: List[str] = Field(default_factory=list)
+
+
+class BondRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    face_value: float = Field(gt=0.0, le=1e12)
+    coupon_rate: float = Field(ge=0.0, le=1.0)
+    maturity_years: float = Field(gt=0.0, le=100.0)
+    coupon_frequency: int = Field(default=2, description="Payments per year (1, 2, 4, or 12).")
+    pricing_mode: PricingMode = "ytm"
+    yield_to_maturity: Optional[float] = Field(default=None, ge=-1.0, le=1.0)
+    curve_points: Optional[List[CurvePoint]] = Field(default=None, max_length=100)
+    compounding: CompoundingConvention = "annual"
+    interpolation: InterpolationMethod = "linear_zero"
+
+    @field_validator("coupon_frequency")
+    @classmethod
+    def _check_freq(cls, v: int) -> int:
+        if v not in (1, 2, 4, 12):
+            raise ValueError("coupon_frequency must be 1, 2, 4, or 12.")
+        return v
+
+
+class BondCashFlow(BaseModel):
+    time_years: float
+    cash_flow: float
+    discount_factor: float
+    present_value: float
+
+
+class BondResponse(BaseModel):
+    pricing_mode: PricingMode
+    price: float
+    face_value: float
+    coupon_rate: float
+    maturity_years: float
+    coupon_frequency: int
+    yield_to_maturity: Optional[float] = None
+    macaulay_duration: Optional[float] = None
+    modified_duration: Optional[float] = None
+    dv01: Optional[float] = None
+    convexity: Optional[float] = None
+    cash_flows: List[BondCashFlow] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class SampleCurveResponse(BaseModel):
+    curve_points: List[CurvePoint] = Field(default_factory=list)
+    note: str

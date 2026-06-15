@@ -106,6 +106,13 @@ from app.event_study import (
     run_multi_event_study,
     run_single_event_study,
 )
+from app.yield_curve import (
+    CurveInputError,
+    bond_analytics,
+    build_curve_analytics,
+    generate_sample_yield_curve,
+    shock_analytics,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -171,6 +178,13 @@ from app.schemas import (
     MultiEventStudyRequest,
     MultiEventStudyResponse,
     SampleEventsResponse,
+    BondRequest,
+    BondResponse,
+    CurveRequest,
+    CurveResponse,
+    SampleCurveResponse,
+    ShockRequest,
+    ShockResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -3939,4 +3953,100 @@ def events_sample() -> SampleEventsResponse:
     return SampleEventsResponse(
         events=list(SAMPLE_EVENTS),
         note="Sample events are for demo workflow only. Verify event dates before research use.",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Yield Curve Lab endpoints (research v1)
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/rates/curve",
+    response_model=CurveResponse,
+    tags=["rates"],
+    summary="Yield curve analytics — discount factors and forward rates",
+    description=(
+        "Builds discount factors and (continuously-compounded) forward rates from "
+        "a manual/synthetic zero curve under the chosen compounding convention. "
+        "Educational fixed-income research — no live rates feed, no swap-curve "
+        "bootstrapping. Results depend on curve construction, compounding, "
+        "interpolation, and data quality."
+    ),
+)
+def rates_curve(request: CurveRequest) -> CurveResponse:
+    try:
+        result = build_curve_analytics(
+            [p.model_dump() for p in request.curve_points],
+            request.compounding,
+            request.interpolation,
+        )
+    except CurveInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return CurveResponse(**result)
+
+
+@app.post(
+    "/rates/shock",
+    response_model=ShockResponse,
+    tags=["rates"],
+    summary="Educational yield-curve shocks (parallel / steepener / flattener / butterfly)",
+    description=(
+        "Applies a simple educational curve shock and returns the original vs "
+        "shocked curve. Not a realistic scenario-generation model."
+    ),
+)
+def rates_shock(request: ShockRequest) -> ShockResponse:
+    try:
+        result = shock_analytics(
+            [p.model_dump() for p in request.curve_points],
+            request.shock_type,
+            request.shock_bps,
+            request.compounding,
+        )
+    except CurveInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return ShockResponse(**result)
+
+
+@app.post(
+    "/rates/bond",
+    response_model=BondResponse,
+    tags=["rates"],
+    summary="Simplified fixed-rate bond pricing + duration / convexity / DV01",
+    description=(
+        "Prices a fixed-rate bond from a yield to maturity or by discounting cash "
+        "flows on a zero curve, with Macaulay/modified duration, DV01, and "
+        "convexity. Simplified clean-price approximation — no accrued interest, "
+        "day-count, or settlement conventions. Educational only, not a quote."
+    ),
+)
+def rates_bond(request: BondRequest) -> BondResponse:
+    try:
+        result = bond_analytics(
+            request.face_value,
+            request.coupon_rate,
+            request.maturity_years,
+            request.coupon_frequency,
+            request.pricing_mode,
+            request.yield_to_maturity,
+            [p.model_dump() for p in request.curve_points] if request.curve_points else None,
+            request.compounding,
+            request.interpolation,
+        )
+    except CurveInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return BondResponse(**result)
+
+
+@app.get(
+    "/rates/sample",
+    response_model=SampleCurveResponse,
+    tags=["rates"],
+    summary="Synthetic sample yield curve for the Yield Curve Lab",
+)
+def rates_sample() -> SampleCurveResponse:
+    return SampleCurveResponse(
+        curve_points=generate_sample_yield_curve(),
+        note="Synthetic sample curve for education — not current market data.",
     )

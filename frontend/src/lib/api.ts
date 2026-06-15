@@ -26,6 +26,13 @@ import type {
   MultiEventStudyRequest,
   MultiEventStudyResponse,
   SampleEventsResponse,
+  BondRequest,
+  BondResponse,
+  CurveRequest,
+  CurveResponse,
+  SampleCurveResponse,
+  ShockRequest,
+  ShockResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -992,4 +999,36 @@ export async function fetchSampleEvents(): Promise<SampleEventsResponse> {
     );
   }
   return res.json() as Promise<SampleEventsResponse>;
+}
+
+// ---------------------------------------------------------------------------
+// Yield Curve Lab (research v1)
+// ---------------------------------------------------------------------------
+
+export function buildCurve(req: CurveRequest): Promise<CurveResponse> {
+  return postOptions<CurveResponse>("/api/rates/curve", req);
+}
+
+export function shockCurve(req: ShockRequest): Promise<ShockResponse> {
+  return postOptions<ShockResponse>("/api/rates/shock", req);
+}
+
+export function priceBond(req: BondRequest): Promise<BondResponse> {
+  return postOptions<BondResponse>("/api/rates/bond", req);
+}
+
+export async function fetchSampleCurve(): Promise<SampleCurveResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/rates/sample");
+  } catch {
+    throw new BacktestApiError(0, backendUnavailableMessage(0));
+  }
+  if (!res.ok) {
+    throw new BacktestApiError(
+      res.status,
+      res.status >= 500 ? backendUnavailableMessage(res.status) : `HTTP ${res.status}`,
+    );
+  }
+  return res.json() as Promise<SampleCurveResponse>;
 }

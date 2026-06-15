@@ -1972,3 +1972,107 @@ export interface SampleEventsResponse {
   events: SampleEvent[];
   note: string;
 }
+
+// ---------------------------------------------------------------------------
+// Yield Curve Lab — research v1
+// ---------------------------------------------------------------------------
+
+export type CompoundingConvention = "annual" | "semiannual" | "continuous";
+export type InterpolationMethod = "linear_zero" | "linear_discount";
+export type ShockType = "parallel" | "steepener" | "flattener" | "butterfly";
+export type PricingMode = "ytm" | "curve";
+
+export interface CurvePoint {
+  maturity_years: number;
+  zero_rate: number;
+}
+
+export interface CurveRequest {
+  curve_points: CurvePoint[];
+  compounding: CompoundingConvention;
+  interpolation: InterpolationMethod;
+}
+
+export interface DiscountCurvePoint {
+  maturity_years: number;
+  zero_rate: number;
+  discount_factor: number;
+}
+
+export interface ForwardSegment {
+  start_year: number;
+  end_year: number;
+  forward_rate: number;
+}
+
+export interface CurveResponse {
+  compounding: CompoundingConvention;
+  interpolation: InterpolationMethod;
+  curve: DiscountCurvePoint[];
+  forward_rates: ForwardSegment[];
+  warnings: string[];
+}
+
+export interface ShockRequest {
+  curve_points: CurvePoint[];
+  shock_type: ShockType;
+  shock_bps: number;
+  compounding: CompoundingConvention;
+}
+
+export interface CurveChange {
+  maturity_years: number;
+  original_rate: number;
+  shocked_rate: number;
+  change_bps: number;
+}
+
+export interface ShockResponse {
+  shock_type: ShockType;
+  shock_bps: number;
+  compounding: CompoundingConvention;
+  original_curve: DiscountCurvePoint[];
+  shocked_curve: DiscountCurvePoint[];
+  changes: CurveChange[];
+  warnings: string[];
+}
+
+export interface BondRequest {
+  face_value: number;
+  coupon_rate: number;
+  maturity_years: number;
+  coupon_frequency: number;
+  pricing_mode: PricingMode;
+  yield_to_maturity?: number | null;
+  curve_points?: CurvePoint[] | null;
+  compounding: CompoundingConvention;
+  interpolation: InterpolationMethod;
+}
+
+export interface BondCashFlow {
+  time_years: number;
+  cash_flow: number;
+  discount_factor: number;
+  present_value: number;
+}
+
+export interface BondResponse {
+  pricing_mode: PricingMode;
+  price: number;
+  face_value: number;
+  coupon_rate: number;
+  maturity_years: number;
+  coupon_frequency: number;
+  yield_to_maturity: number | null;
+  macaulay_duration: number | null;
+  modified_duration: number | null;
+  dv01: number | null;
+  convexity: number | null;
+  cash_flows: BondCashFlow[];
+  warnings: string[];
+}
+
+export interface SampleCurveResponse {
+  curve_points: CurvePoint[];
+  note: string;
+}

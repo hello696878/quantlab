@@ -13,6 +13,7 @@ export type View =
   | "disasters"
   | "options"
   | "events"
+  | "rates"
   | "csv"
   | "builder"
   | "portfolio"

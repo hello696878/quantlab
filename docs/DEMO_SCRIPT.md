@@ -146,6 +146,12 @@ Return to the Command Center's **Platform Direction** panel (or open
   100, downside 70, P(close) 0.8, 180 days) → spread, expected return, and
   breakeven probability. Emphasise: research diagnostic, no live filings, not
   investment advice.
+- **Yield Curve Lab** — *Curve Builder*: Load sample curve → Build curve → show
+  the spot, discount-factor, and forward-rate charts; flip compounding from
+  continuous to annual to show discount factors change. *Curve Shocks*: parallel
+  +100 bps, then steepener (long end rises vs short). *Bond Pricing*: face 1000,
+  coupon 5%, 5y, semiannual, YTM 4.5% → price, duration, DV01, convexity.
+  Emphasise: synthetic curves, no live rates feed, assumption-sensitive.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

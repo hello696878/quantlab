@@ -1053,6 +1053,23 @@ export default function HomeDashboard({
               Open Event Lab →
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => onNav("rates")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+              Yield Curve Lab
+            </span>
+            <span className="text-xs text-slate-400">
+              Explore zero rates, discount factors, forward rates, curve shocks,
+              and basic bond duration / convexity — synthetic curves, no live
+              rates feed.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Yield Curve Lab →
+            </span>
+          </button>
         </div>
       </section>
 
