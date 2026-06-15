@@ -449,9 +449,12 @@ export default function HomePage() {
     | "monte_carlo"
     | "surface"
     | "heston"
+    | "compare"
     | "education"
   >("pricing");
   const [optionsKey, setOptionsKey] = useState(0);
+  // Scenario preset to seed the Options Lab with on (re)mount (palette deep-link).
+  const [optionsPreset, setOptionsPreset] = useState<string | null>(null);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -881,6 +884,7 @@ export default function HomePage() {
         ["heston", "heston", "Open Heston Model", "options heston stochastic volatility vol of vol kappa rho leverage effect variance process"],
         ["heston", "heston-stochvol", "Open Stochastic Volatility Lab", "options stochastic volatility heston vol of vol variance mean reversion leverage effect"],
         ["heston", "heston-pricing", "Open Heston Options Pricing", "options heston monte carlo stochastic volatility european call put pricing"],
+        ["compare", "compare", "Open Model Comparison", "options compare models cross model black-scholes binomial monte carlo heston"],
       ] as const
     ).map(([t, id, title, keywords]) => ({
       id: `options-${id}`,
@@ -888,7 +892,28 @@ export default function HomePage() {
       title,
       keywords,
       run: () => {
+        setOptionsPreset(null);
         setOptionsTab(t);
+        setOptionsKey((k) => k + 1);
+        handleNav("options");
+      },
+    })),
+    ...(
+      [
+        ["atm-equity-call", "Open Options Lab — ATM Equity Call preset"],
+        ["american-put-early-exercise", "Open Options Lab — American Put preset"],
+        ["asian-option-demo", "Open Options Lab — Asian Option preset"],
+        ["negative-skew-heston", "Open Options Lab — Heston Leverage preset"],
+        ["synthetic-vol-surface-demo", "Open Options Lab — Vol Surface preset"],
+      ] as const
+    ).map(([presetId, title]) => ({
+      id: `options-preset-${presetId}`,
+      group: "Options Lab",
+      title,
+      keywords: `options scenario preset demo ${presetId.replace(/-/g, " ")}`,
+      hint: "prefill" as const,
+      run: () => {
+        setOptionsPreset(presetId);
         setOptionsKey((k) => k + 1);
         handleNav("options");
       },
@@ -1322,7 +1347,7 @@ export default function HomePage() {
 
         {/* ── Options Lab ──────────────────────────────────────────────── */}
         {view === "options" && (
-          <OptionsLabPanel key={optionsKey} initialTab={optionsTab} />
+          <OptionsLabPanel key={optionsKey} initialTab={optionsTab} initialPresetId={optionsPreset} />
         )}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}

@@ -49,6 +49,27 @@ import {
   CHART_REF_LINE,
   DANGER,
 } from "@/components/charts/chartTheme";
+import {
+  OPTIONS_CHART_PALETTE,
+  SMILE_FIT_COLOR,
+  TERM_STRUCTURE_COLOR,
+  seriesColor,
+} from "@/lib/chartPalette";
+import {
+  OPTIONS_SCENARIOS,
+  getOptionsScenario,
+  type OptionsScenarioPreset,
+} from "@/lib/optionsScenarioRegistry";
+
+/** Props every model tab accepts so an applied scenario preset can seed it. */
+interface TabProps {
+  scenario?: OptionsScenarioPreset | null;
+}
+
+/** Preset value → input string, falling back to the tab's own default. */
+function pstr(value: number | undefined, fallback: string): string {
+  return value == null ? fallback : String(value);
+}
 
 type Tab =
   | "pricing"
@@ -58,7 +79,36 @@ type Tab =
   | "monte_carlo"
   | "surface"
   | "heston"
+  | "compare"
   | "education";
+
+// Grouped tab layout so the (now many) tools read as a coherent product.
+const TAB_GROUPS: { label: string; tabs: [Tab, string][] }[] = [
+  {
+    label: "Core Pricing",
+    tabs: [
+      ["pricing", "Black–Scholes"],
+      ["implied_vol", "Implied Vol"],
+      ["tree", "Tree Pricing"],
+    ],
+  },
+  {
+    label: "Payoffs & Simulation",
+    tabs: [
+      ["payoff", "Payoff Builder"],
+      ["monte_carlo", "Monte Carlo"],
+      ["heston", "Heston"],
+    ],
+  },
+  {
+    label: "Volatility & Compare",
+    tabs: [
+      ["surface", "Vol Surface"],
+      ["compare", "Model Compare"],
+    ],
+  },
+  { label: "Learn", tabs: [["education", "Education"]] },
+];
 
 const inputCls = "ql-input px-2.5 py-1.5";
 const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400";
@@ -126,8 +176,38 @@ const CAVEAT =
   "calibrated to any market. Educational only — not a fair value, a " +
   "recommendation, or a trading system.";
 
-export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab?: Tab }) {
-  const [tab, setTab] = useState<Tab>(initialTab);
+export default function OptionsLabPanel({
+  initialTab = "pricing",
+  initialPresetId = null,
+}: {
+  initialTab?: Tab;
+  initialPresetId?: string | null;
+}) {
+  const [tab, setTab] = useState<Tab>(() => {
+    if (initialPresetId) {
+      const p = getOptionsScenario(initialPresetId);
+      if (p) return p.primaryTab;
+    }
+    return initialTab;
+  });
+  // Applied scenario preset (seeds the tabs). `presetNonce` keys the tab content
+  // so re-applying a preset always re-seeds, even if the tab is already open.
+  const [scenario, setScenario] = useState<OptionsScenarioPreset | null>(() =>
+    initialPresetId ? getOptionsScenario(initialPresetId) ?? null : null,
+  );
+  const [presetNonce, setPresetNonce] = useState(0);
+  const [notice, setNotice] = useState<string | null>(
+    initialPresetId && getOptionsScenario(initialPresetId)
+      ? `Scenario applied: ${getOptionsScenario(initialPresetId)!.name}`
+      : null,
+  );
+
+  function applyScenario(preset: OptionsScenarioPreset) {
+    setScenario(preset);
+    setPresetNonce((n) => n + 1);
+    setNotice(`Scenario applied: ${preset.name}`);
+    setTab(preset.primaryTab);
+  }
 
   return (
     <div className="space-y-5">
@@ -142,55 +222,97 @@ export default function OptionsLabPanel({ initialTab = "pricing" }: { initialTab
         <p className="mt-2 text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
 
-      <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
-        {(
-          [
-            ["pricing", "Pricing"],
-            ["implied_vol", "Implied Vol"],
-            ["payoff", "Payoff Builder"],
-            ["tree", "Tree Pricing"],
-            ["monte_carlo", "Monte Carlo"],
-            ["surface", "Vol Surface"],
-            ["heston", "Heston"],
-            ["education", "Education"],
-          ] as [Tab, string][]
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={
-              "px-3.5 py-1.5 text-xs font-medium transition-colors " +
-              (tab === id ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")
-            }
+      {/* Unified scenario presets — apply once, every tab seeds from it. */}
+      <div className="card space-y-2 p-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className={labelCls + " mb-0"}>Scenario preset</span>
+          <select
+            className={inputCls}
+            value={scenario?.id ?? ""}
+            onChange={(e) => {
+              if (!e.target.value) {
+                setScenario(null);
+                setNotice(null);
+                setPresetNonce((n) => n + 1);
+                return;
+              }
+              const preset = getOptionsScenario(e.target.value);
+              if (preset) applyScenario(preset);
+            }}
           >
-            {label}
-          </button>
+            <option value="">Custom (no preset)</option>
+            {OPTIONS_SCENARIOS.map((s) => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+          {notice && (
+            <span className="rounded-md bg-emerald-50 px-2 py-1 text-[11px] font-medium text-emerald-700">
+              ✓ {notice}
+            </span>
+          )}
+        </div>
+        <p className="text-[11px] text-slate-400">
+          {scenario?.description ??
+            "Educational scenarios and model demonstrations — not trading recommendations. Applying one seeds S / K / T / r / q / σ (and relevant model defaults) across the tabs."}
+        </p>
+      </div>
+
+      {/* Grouped tab navigation */}
+      <div className="flex flex-wrap items-stretch gap-x-4 gap-y-2">
+        {TAB_GROUPS.map((group) => (
+          <div key={group.label} className="flex flex-col gap-1">
+            <span className="px-1 text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+              {group.label}
+            </span>
+            <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
+              {group.tabs.map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  onClick={() => setTab(id)}
+                  className={
+                    "px-3 py-1.5 text-xs font-medium transition-colors " +
+                    (tab === id
+                      ? "bg-blue-600 text-white"
+                      : "bg-white text-slate-600 hover:bg-slate-50")
+                  }
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
         ))}
       </div>
 
-      {tab === "pricing" && <PricingTab />}
-      {tab === "implied_vol" && <ImpliedVolTab />}
-      {tab === "payoff" && <PayoffTab />}
-      {tab === "tree" && <TreePricingTab />}
-      {tab === "monte_carlo" && <MonteCarloTab />}
-      {tab === "surface" && <SurfaceTab />}
-      {tab === "heston" && <HestonTab />}
-      {tab === "education" && <EducationTab />}
+      <div key={presetNonce}>
+        {tab === "pricing" && <PricingTab scenario={scenario} />}
+        {tab === "implied_vol" && <ImpliedVolTab scenario={scenario} />}
+        {tab === "payoff" && <PayoffTab scenario={scenario} />}
+        {tab === "tree" && <TreePricingTab scenario={scenario} />}
+        {tab === "monte_carlo" && <MonteCarloTab scenario={scenario} />}
+        {tab === "surface" && <SurfaceTab scenario={scenario} />}
+        {tab === "heston" && <HestonTab scenario={scenario} />}
+        {tab === "compare" && <CompareTab scenario={scenario} />}
+        {tab === "education" && <EducationTab />}
+      </div>
     </div>
   );
 }
 
 // ── Pricing ──────────────────────────────────────────────────────────────────
 
-function PricingTab() {
-  const [optionType, setOptionType] = useState<OptionType>("call");
-  const [S, setS] = useState("100");
-  const [K, setK] = useState("100");
-  const [T, setT] = useState("1");
-  const [r, setR] = useState("0.05");
-  const [sigma, setSigma] = useState("0.20");
-  const [q, setQ] = useState("0");
+function PricingTab({ scenario }: TabProps) {
+  const b = scenario?.baseInputs;
+  const [optionType, setOptionType] = useState<OptionType>(b?.option_type ?? "call");
+  const [S, setS] = useState(pstr(b?.underlying_price, "100"));
+  const [K, setK] = useState(pstr(b?.strike, "100"));
+  const [T, setT] = useState(pstr(b?.time_to_expiry, "1"));
+  const [r, setR] = useState(pstr(b?.risk_free_rate, "0.05"));
+  const [sigma, setSigma] = useState(pstr(b?.volatility, "0.20"));
+  const [q, setQ] = useState(pstr(b?.dividend_yield, "0"));
   const [result, setResult] = useState<BlackScholesResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -275,14 +397,15 @@ function PricingTab() {
 
 // ── Implied Vol ──────────────────────────────────────────────────────────────
 
-function ImpliedVolTab() {
-  const [optionType, setOptionType] = useState<OptionType>("call");
+function ImpliedVolTab({ scenario }: TabProps) {
+  const b = scenario?.baseInputs;
+  const [optionType, setOptionType] = useState<OptionType>(b?.option_type ?? "call");
   const [mktPrice, setMktPrice] = useState("10.45");
-  const [S, setS] = useState("100");
-  const [K, setK] = useState("100");
-  const [T, setT] = useState("1");
-  const [r, setR] = useState("0.05");
-  const [q, setQ] = useState("0");
+  const [S, setS] = useState(pstr(b?.underlying_price, "100"));
+  const [K, setK] = useState(pstr(b?.strike, "100"));
+  const [T, setT] = useState(pstr(b?.time_to_expiry, "1"));
+  const [r, setR] = useState(pstr(b?.risk_free_rate, "0.05"));
+  const [q, setQ] = useState(pstr(b?.dividend_yield, "0"));
   const [result, setResult] = useState<ImpliedVolResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -400,10 +523,16 @@ const PRESETS: { id: string; label: string; legs: () => UiLeg[] }[] = [
   { id: "short_strangle", label: "Short Strangle", legs: () => [optLeg("call", "short", 110, 3), optLeg("put", "short", 90, 3)] },
 ];
 
-function PayoffTab() {
+function PayoffTab({ scenario }: TabProps) {
   const colors = useAccentColors();
-  const [preset, setPreset] = useState("long_call");
-  const [legs, setLegs] = useState<UiLeg[]>(PRESETS[0].legs());
+  const initialPresetId =
+    (scenario?.payoffPresetId && PRESETS.some((p) => p.id === scenario.payoffPresetId)
+      ? scenario.payoffPresetId
+      : null) ?? "long_call";
+  const [preset, setPreset] = useState(initialPresetId);
+  const [legs, setLegs] = useState<UiLeg[]>(
+    (PRESETS.find((p) => p.id === initialPresetId) ?? PRESETS[0]).legs(),
+  );
   const [priceMin, setPriceMin] = useState("50");
   const [priceMax, setPriceMax] = useState("150");
   const [result, setResult] = useState<PayoffResponse | null>(null);
@@ -699,17 +828,20 @@ function TreeLatticeView({ result }: { result: BinomialTreeResponse }) {
   );
 }
 
-function TreePricingTab() {
+function TreePricingTab({ scenario }: TabProps) {
   const colors = useAccentColors();
-  const [optionType, setOptionType] = useState<OptionType>("call");
-  const [exerciseStyle, setExerciseStyle] = useState<ExerciseStyle>("european");
-  const [S, setS] = useState("100");
-  const [K, setK] = useState("100");
-  const [T, setT] = useState("1");
-  const [r, setR] = useState("0.05");
-  const [sigma, setSigma] = useState("0.20");
-  const [q, setQ] = useState("0");
-  const [steps, setSteps] = useState("100");
+  const b = scenario?.baseInputs;
+  const [optionType, setOptionType] = useState<OptionType>(b?.option_type ?? "call");
+  const [exerciseStyle, setExerciseStyle] = useState<ExerciseStyle>(
+    scenario?.treeInputs?.exercise_style ?? "european",
+  );
+  const [S, setS] = useState(pstr(b?.underlying_price, "100"));
+  const [K, setK] = useState(pstr(b?.strike, "100"));
+  const [T, setT] = useState(pstr(b?.time_to_expiry, "1"));
+  const [r, setR] = useState(pstr(b?.risk_free_rate, "0.05"));
+  const [sigma, setSigma] = useState(pstr(b?.volatility, "0.20"));
+  const [q, setQ] = useState(pstr(b?.dividend_yield, "0"));
+  const [steps, setSteps] = useState(pstr(scenario?.treeInputs?.steps, "100"));
   const [result, setResult] = useState<BinomialTreeResponse | null>(null);
   const [convergence, setConvergence] = useState<TreeConvergenceResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -955,23 +1087,9 @@ const MC_PAYOFFS: { value: MonteCarloPayoffType; label: string; barrier: boolean
 ];
 
 const MC_CONVERGENCE_SIMS = [1000, 5000, 10000, 25000];
-const MC_PATH_COLORS = [
-  "#22d3ee", // cyan
-  "#60a5fa", // blue
-  "#8b5cf6", // violet
-  "#a78bfa", // purple
-  "#f59e0b", // amber
-  "#34d399", // green
-  "#f472b6", // pink
-  "#2dd4bf", // teal
-  "#fb7185", // rose
-  "#38bdf8", // sky
-  "#c084fc", // orchid
-  "#bef264", // lime
-];
 
 function monteCarloPathColor(pathId: number): string {
-  return MC_PATH_COLORS[pathId % MC_PATH_COLORS.length];
+  return seriesColor(pathId);
 }
 
 interface ConvRow {
@@ -980,19 +1098,23 @@ interface ConvRow {
   standard_error: number;
 }
 
-function MonteCarloTab() {
-  const [payoffType, setPayoffType] = useState<MonteCarloPayoffType>("european_call");
-  const [S, setS] = useState("100");
-  const [K, setK] = useState("100");
-  const [T, setT] = useState("1");
-  const [r, setR] = useState("0.05");
-  const [sigma, setSigma] = useState("0.20");
-  const [q, setQ] = useState("0");
-  const [steps, setSteps] = useState("252");
-  const [simulations, setSimulations] = useState("10000");
-  const [seed, setSeed] = useState("42");
+function MonteCarloTab({ scenario }: TabProps) {
+  const b = scenario?.baseInputs;
+  const mc = scenario?.monteCarloInputs;
+  const [payoffType, setPayoffType] = useState<MonteCarloPayoffType>(
+    mc?.payoff_type ?? "european_call",
+  );
+  const [S, setS] = useState(pstr(b?.underlying_price, "100"));
+  const [K, setK] = useState(pstr(b?.strike, "100"));
+  const [T, setT] = useState(pstr(b?.time_to_expiry, "1"));
+  const [r, setR] = useState(pstr(b?.risk_free_rate, "0.05"));
+  const [sigma, setSigma] = useState(pstr(b?.volatility, "0.20"));
+  const [q, setQ] = useState(pstr(b?.dividend_yield, "0"));
+  const [steps, setSteps] = useState(pstr(mc?.steps, "252"));
+  const [simulations, setSimulations] = useState(pstr(mc?.simulations, "10000"));
+  const [seed, setSeed] = useState(pstr(mc?.seed, "42"));
   const [antithetic, setAntithetic] = useState(false);
-  const [barrier, setBarrier] = useState("120");
+  const [barrier, setBarrier] = useState(pstr(mc?.barrier_price, "120"));
   const [result, setResult] = useState<MonteCarloResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -1298,30 +1420,13 @@ function MonteCarloTab() {
 
 // ── Vol Surface ──────────────────────────────────────────────────────────────
 
-// Deterministic, distinct palette for per-expiry colors (no random per render).
-const SURFACE_PALETTE = [
-  "#22d3ee", // cyan
-  "#a78bfa", // violet
-  "#f472b6", // pink
-  "#fbbf24", // amber
-  "#34d399", // green
-  "#60a5fa", // blue
-  "#fb923c", // orange
-  "#e879f9", // fuchsia
-];
+// Per-expiry / per-path colours come from the centralized Options Lab palette
+// (see lib/chartPalette.ts) so every chart in the lab is deterministic + distinct.
+const SURFACE_PALETTE = OPTIONS_CHART_PALETTE;
 const SMILE_RAW_COLOR = "#22d3ee"; // raw IV points
-const SMILE_SVI_COLOR = "#fbbf24"; // SVI fitted curve (distinct from raw)
-const TERM_COLOR = "#a78bfa";
-const HESTON_UNDERLYING_PALETTE = [
-  "#22d3ee", // cyan highlight
-  "#a78bfa",
-  "#34d399",
-  "#f472b6",
-  "#60a5fa",
-  "#fbbf24",
-  "#fb923c",
-  "#e879f9",
-];
+const SMILE_SVI_COLOR = SMILE_FIT_COLOR; // SVI fitted curve (distinct from raw)
+const TERM_COLOR = TERM_STRUCTURE_COLOR;
+const HESTON_UNDERLYING_PALETTE = OPTIONS_CHART_PALETTE;
 const HESTON_VOLATILITY_PALETTE = [
   "#fbbf24", // amber highlight, intentionally distinct from price chart
   "#22d3ee",
@@ -1430,15 +1535,17 @@ function SurfaceHeatmap({ surface, spot }: { surface: SurfaceResponse["surface"]
   );
 }
 
-function SurfaceTab() {
+function SurfaceTab({ scenario }: TabProps) {
+  const b = scenario?.baseInputs;
+  const sf = scenario?.surfaceInputs;
   const [source, setSource] = useState<"sample" | "manual">("sample");
-  const [S, setS] = useState("100");
-  const [r, setR] = useState("0.05");
-  const [q, setQ] = useState("0");
-  const [baseVol, setBaseVol] = useState("0.20");
-  const [skew, setSkew] = useState("0.15");
-  const [smile, setSmile] = useState("0.30");
-  const [term, setTerm] = useState("0.02");
+  const [S, setS] = useState(pstr(b?.underlying_price, "100"));
+  const [r, setR] = useState(pstr(b?.risk_free_rate, "0.05"));
+  const [q, setQ] = useState(pstr(b?.dividend_yield, "0"));
+  const [baseVol, setBaseVol] = useState(pstr(sf?.base_vol, "0.20"));
+  const [skew, setSkew] = useState(pstr(sf?.skew, "0.15"));
+  const [smile, setSmile] = useState(pstr(sf?.smile, "0.30"));
+  const [term, setTerm] = useState(pstr(sf?.term, "0.02"));
   const [fitSvi, setFitSvi] = useState(true);
   const [rows, setRows] = useState<UiSurfaceRow[]>(DEFAULT_MANUAL_ROWS);
   const [result, setResult] = useState<SurfaceResponse | null>(null);
@@ -1863,21 +1970,23 @@ function HestonPathChart({
   );
 }
 
-function HestonTab() {
-  const [optionType, setOptionType] = useState<OptionType>("call");
-  const [S, setS] = useState("100");
-  const [K, setK] = useState("100");
-  const [T, setT] = useState("1");
-  const [r, setR] = useState("0.05");
-  const [q, setQ] = useState("0");
-  const [initVol, setInitVol] = useState("0.20");
-  const [lrVol, setLrVol] = useState("0.20");
-  const [kappa, setKappa] = useState("2.0");
-  const [volOfVol, setVolOfVol] = useState("0.5");
-  const [rho, setRho] = useState("-0.7");
-  const [steps, setSteps] = useState("252");
-  const [simulations, setSimulations] = useState("10000");
-  const [seed, setSeed] = useState("42");
+function HestonTab({ scenario }: TabProps) {
+  const b = scenario?.baseInputs;
+  const h = scenario?.hestonInputs;
+  const [optionType, setOptionType] = useState<OptionType>(b?.option_type ?? "call");
+  const [S, setS] = useState(pstr(b?.underlying_price, "100"));
+  const [K, setK] = useState(pstr(b?.strike, "100"));
+  const [T, setT] = useState(pstr(b?.time_to_expiry, "1"));
+  const [r, setR] = useState(pstr(b?.risk_free_rate, "0.05"));
+  const [q, setQ] = useState(pstr(b?.dividend_yield, "0"));
+  const [initVol, setInitVol] = useState(pstr(h?.initial_volatility, "0.20"));
+  const [lrVol, setLrVol] = useState(pstr(h?.long_run_volatility, "0.20"));
+  const [kappa, setKappa] = useState(pstr(h?.kappa, "2.0"));
+  const [volOfVol, setVolOfVol] = useState(pstr(h?.vol_of_vol, "0.5"));
+  const [rho, setRho] = useState(pstr(h?.rho, "-0.7"));
+  const [steps, setSteps] = useState(pstr(h?.steps, "252"));
+  const [simulations, setSimulations] = useState(pstr(h?.simulations, "10000"));
+  const [seed, setSeed] = useState(pstr(h?.seed, "42"));
   const [result, setResult] = useState<HestonResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -2053,6 +2162,195 @@ function HestonTab() {
         (negative ρ produces the equity leverage effect and skew); v₀ (σ₀) is the starting
         variance/vol. Calibration to a market IV surface is planned, not implemented.
       </div>
+    </div>
+  );
+}
+
+// ── Model Comparison ─────────────────────────────────────────────────────────
+
+interface CompareRow {
+  model: string;
+  price: number | null;
+  diff: number | null;
+  notes: string;
+}
+
+function CompareTab({ scenario }: TabProps) {
+  const b = scenario?.baseInputs;
+  const h = scenario?.hestonInputs;
+  const [optionType, setOptionType] = useState<OptionType>(b?.option_type ?? "call");
+  const [S, setS] = useState(pstr(b?.underlying_price, "100"));
+  const [K, setK] = useState(pstr(b?.strike, "100"));
+  const [T, setT] = useState(pstr(b?.time_to_expiry, "1"));
+  const [r, setR] = useState(pstr(b?.risk_free_rate, "0.05"));
+  const [sigma, setSigma] = useState(pstr(b?.volatility, "0.20"));
+  const [q, setQ] = useState(pstr(b?.dividend_yield, "0"));
+  const [rows, setRows] = useState<CompareRow[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  const valid =
+    num(S) > 0 && num(K) > 0 && num(T) > 0 && num(sigma) > 0 && finite(r) && finite(q);
+
+  async function run() {
+    if (!valid || loading) return; // guard against duplicate clicks
+    setLoading(true);
+    setError(null);
+    setRows(null);
+    const base = {
+      underlying_price: num(S),
+      strike: num(K),
+      time_to_expiry: num(T),
+      risk_free_rate: num(r),
+      dividend_yield: num(q),
+    };
+    try {
+      const bs = await priceBlackScholes({ option_type: optionType, ...base, volatility: num(sigma) });
+      const bsPrice = bs.price;
+      const out: CompareRow[] = [
+        { model: "Black–Scholes (European)", price: bsPrice, diff: 0, notes: "Constant vol, closed form" },
+      ];
+
+      const treeEur = await priceBinomialTree({
+        option_type: optionType,
+        exercise_style: "european",
+        ...base,
+        volatility: num(sigma),
+        steps: 200,
+        include_lattice: false,
+      });
+      out.push({
+        model: "Binomial CRR · European (200)",
+        price: treeEur.price,
+        diff: treeEur.price - bsPrice,
+        notes: "Lattice; converges to BS",
+      });
+
+      const treeAmer = await priceBinomialTree({
+        option_type: optionType,
+        exercise_style: "american",
+        ...base,
+        volatility: num(sigma),
+        steps: 200,
+        include_lattice: false,
+      });
+      out.push({
+        model: "Binomial CRR · American (200)",
+        price: treeAmer.price,
+        diff: treeAmer.price - bsPrice,
+        notes:
+          treeAmer.early_exercise.detected
+            ? "Early exercise optimal (≥ European)"
+            : "No early exercise (= European)",
+      });
+
+      const mc = await priceMonteCarlo({
+        payoff_type: optionType === "call" ? "european_call" : "european_put",
+        ...base,
+        volatility: num(sigma),
+        steps: 252,
+        simulations: 20000,
+        seed: 42,
+      });
+      out.push({
+        model: "Monte Carlo GBM (20k)",
+        price: mc.price,
+        diff: mc.price - bsPrice,
+        notes: `±${mc.standard_error.toFixed(3)} SE — sampling error`,
+      });
+
+      const hInit = h?.initial_volatility ?? num(sigma);
+      const hLong = h?.long_run_volatility ?? num(sigma);
+      const heston = await priceHeston({
+        option_type: optionType,
+        ...base,
+        initial_variance: hInit * hInit,
+        long_run_variance: hLong * hLong,
+        kappa: h?.kappa ?? 2.0,
+        vol_of_vol: h?.vol_of_vol ?? 0.5,
+        rho: h?.rho ?? -0.7,
+        steps: 252,
+        simulations: h?.simulations ?? 12000,
+        seed: 42,
+      });
+      out.push({
+        model: "Heston MC (stochastic vol)",
+        price: heston.price,
+        diff: heston.price - bsPrice,
+        notes: `ξ=${(h?.vol_of_vol ?? 0.5)}, ρ=${(h?.rho ?? -0.7)}; ±${heston.standard_error.toFixed(3)} SE`,
+      });
+
+      setRows(out);
+    } catch (e) {
+      setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="card space-y-4 p-5">
+      <p className="section-title">Model Comparison</p>
+      <p className="text-xs text-slate-500">
+        Prices the same European option across every model on demand. Model outputs differ because
+        their <span className="font-medium">assumptions differ</span> — none is automatically
+        “correct”. Monte Carlo and Heston are simulations and carry sampling error. Runs only when
+        you click; it does not recompute on every keystroke.
+      </p>
+
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <Field label="Option type"><OptionTypeToggle value={optionType} onChange={setOptionType} /></Field>
+        <Field label="Underlying S"><input type="number" className={inputCls} value={S} onChange={(e) => setS(e.target.value)} /></Field>
+        <Field label="Strike K"><input type="number" className={inputCls} value={K} onChange={(e) => setK(e.target.value)} /></Field>
+        <Field label="Expiry T (years)"><input type="number" className={inputCls} value={T} onChange={(e) => setT(e.target.value)} /></Field>
+        <Field label="Rate r"><input type="number" className={inputCls} value={r} step={0.01} onChange={(e) => setR(e.target.value)} /></Field>
+        <Field label="Volatility σ"><input type="number" className={inputCls} value={sigma} step={0.01} onChange={(e) => setSigma(e.target.value)} /></Field>
+        <Field label="Dividend q"><input type="number" className={inputCls} value={q} step={0.01} onChange={(e) => setQ(e.target.value)} /></Field>
+      </div>
+
+      <button
+        type="button"
+        onClick={run}
+        disabled={!valid || loading}
+        className={
+          "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+        }
+      >
+        {loading ? "Running models…" : "Run Comparison"}
+      </button>
+      {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+
+      {rows && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="text-slate-400">
+                <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Model</th>
+                <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Price</th>
+                <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Δ vs BS</th>
+                <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr key={row.model} className="border-t border-slate-100">
+                  <td className="px-2 py-1 font-medium text-slate-700">{row.model}</td>
+                  <td className="px-2 py-1 text-right mono">{row.price == null ? "—" : row.price.toFixed(4)}</td>
+                  <td className="px-2 py-1 text-right mono">{row.diff == null ? "—" : (row.diff >= 0 ? "+" : "") + row.diff.toFixed(4)}</td>
+                  <td className="px-2 py-1 text-slate-500">{row.notes}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      <p className="text-[11px] text-slate-400">
+        Model outputs differ because assumptions differ. Differences vs Black–Scholes are expected,
+        not errors. Simulation models (Monte Carlo, Heston) are reproducible by seed and carry the
+        reported standard error.
+      </p>
     </div>
   );
 }

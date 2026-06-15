@@ -902,6 +902,29 @@ single-asset Backtest + Strategy Comparison:
 - Educational model — Euler is **biased**, results carry Monte Carlo error, and
   the model is **not calibrated** to any market surface (calibration is planned)
 
+### Phase 14.5 — Options Lab UI Polish & Unified Scenario Presets ✅
+
+- **Unified scenario presets** (`frontend/src/lib/optionsScenarioRegistry.ts`):
+  10 educational scenarios (ATM/OTM/ITM vanillas, high/low-vol regimes, Heston
+  leverage effect, American early exercise, Asian, barrier, synthetic surface).
+  Applying one seeds the shared base inputs (S/K/T/r/q/σ/type) **and** per-model
+  defaults across the tabs; tab-specific fields stay local otherwise. Neutral
+  wording ("educational scenario" / "model demonstration", never a recommendation)
+- **Centralized chart palette** (`frontend/src/lib/chartPalette.ts`): one
+  deterministic, dark-theme multi-colour palette (`seriesColor`, heat scale) used
+  by Monte Carlo / Heston paths, the smile, SVI, term structure, and the surface
+  heatmap — fixes the recurring "too-uniform / all-cyan" feedback
+- **Model Comparison** tab: on a **Run Comparison** button (never auto-run), prices
+  the same European option with Black–Scholes, binomial European + American, Monte
+  Carlo, and Heston, in one table with Δ-vs-BS and notes — framed as "model outputs
+  differ because assumptions differ", none automatically correct
+- **Grouped tab navigation** (Core Pricing / Payoffs & Simulation / Volatility &
+  Compare / Learn) so the eight-plus tools read as one product; a **scenario bar**
+  with an "Scenario applied" notice; palette deep-links open the lab on a preset;
+  consistent empty/loading/error/validation states and concise per-tab caveats
+- Frontend-only polish phase — **no** new pricing models, no backend change; the
+  full prior backend suite still passes and `tsc --noEmit` is clean
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

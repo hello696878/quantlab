@@ -129,6 +129,14 @@ Return to the Command Center's **Platform Direction** panel (or open
   reference / Feller-status cards plus the underlying and volatility path charts
   (multi-colour, first path highlighted); set vol of vol = 0 to show it collapse
   toward the Black–Scholes reference, and note the Euler/Feller/MC caveats.
+- **Options Lab scenario flow (short):** at the top of the Options Lab pick the
+  **ATM Equity Call** scenario preset (a "Scenario applied" notice appears) →
+  **Black–Scholes** shows the price and Greeks → **Tree Pricing** compares
+  European vs American → **Monte Carlo** shows the price with its 95% CI →
+  **Vol Surface** → *Generate Sample Surface* → **Heston** shows the volatility
+  paths → **Model Compare** → *Run Comparison* prices the scenario across every
+  model in one table. Emphasise: presets are educational scenarios, and models
+  differ because their assumptions differ — none is automatically "correct".
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

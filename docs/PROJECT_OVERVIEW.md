@@ -174,6 +174,16 @@ TypeScript interfaces mirroring the Pydantic response models: `BacktestResponse`
 
 Display formatters: percentages, dollar amounts, ratios, dates.
 
+### `src/lib/optionsScenarioRegistry.ts` + `src/lib/chartPalette.ts`
+
+Options Lab UX layer (Phase 14.5): `optionsScenarioRegistry.ts` holds the 10
+unified **scenario presets** (educational scenarios / model demonstrations) that
+seed the shared base inputs and per-model defaults across the Options Lab tabs;
+`chartPalette.ts` is the single **deterministic, dark-theme chart palette**
+(`seriesColor`, heat scale) used by every Options Lab chart so colours are stable
+and distinct. The Options Lab also has a button-driven **Model Comparison** tab
+(Black–Scholes vs binomial vs Monte Carlo vs Heston) — educational, none "correct".
+
 ### `src/app/page.tsx`
 
 Root page component. Owns all strategy and research parameter state. Renders `BacktestForm` on the left and the appropriate result panels on the right. Tabs switch between Backtest and each research tool.
