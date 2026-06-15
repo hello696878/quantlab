@@ -51,8 +51,10 @@ import {
 } from "@/components/charts/chartTheme";
 import {
   OPTIONS_CHART_PALETTE,
+  SMILE_RAW_COLOR as CHART_SMILE_RAW_COLOR,
   SMILE_FIT_COLOR,
   TERM_STRUCTURE_COLOR,
+  heatColor as paletteHeatColor,
   seriesColor,
 } from "@/lib/chartPalette";
 import {
@@ -233,7 +235,6 @@ export default function OptionsLabPanel({
               if (!e.target.value) {
                 setScenario(null);
                 setNotice(null);
-                setPresetNonce((n) => n + 1);
                 return;
               }
               const preset = getOptionsScenario(e.target.value);
@@ -257,6 +258,16 @@ export default function OptionsLabPanel({
           {scenario?.description ??
             "Educational scenarios and model demonstrations — not trading recommendations. Applying one seeds S / K / T / r / q / σ (and relevant model defaults) across the tabs."}
         </p>
+        {scenario?.educationalNotes && (
+          <p className="text-[11px] text-slate-400">{scenario.educationalNotes}</p>
+        )}
+        {scenario?.warnings && scenario.warnings.length > 0 && (
+          <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-[11px] font-medium text-amber-200">
+            {scenario.warnings.map((w) => (
+              <p key={w}>{w}</p>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Grouped tab navigation */}
@@ -288,15 +299,33 @@ export default function OptionsLabPanel({
       </div>
 
       <div key={presetNonce}>
-        {tab === "pricing" && <PricingTab scenario={scenario} />}
-        {tab === "implied_vol" && <ImpliedVolTab scenario={scenario} />}
-        {tab === "payoff" && <PayoffTab scenario={scenario} />}
-        {tab === "tree" && <TreePricingTab scenario={scenario} />}
-        {tab === "monte_carlo" && <MonteCarloTab scenario={scenario} />}
-        {tab === "surface" && <SurfaceTab scenario={scenario} />}
-        {tab === "heston" && <HestonTab scenario={scenario} />}
-        {tab === "compare" && <CompareTab scenario={scenario} />}
-        {tab === "education" && <EducationTab />}
+        <div hidden={tab !== "pricing"} aria-hidden={tab !== "pricing"}>
+          <PricingTab scenario={scenario} />
+        </div>
+        <div hidden={tab !== "implied_vol"} aria-hidden={tab !== "implied_vol"}>
+          <ImpliedVolTab scenario={scenario} />
+        </div>
+        <div hidden={tab !== "payoff"} aria-hidden={tab !== "payoff"}>
+          <PayoffTab scenario={scenario} />
+        </div>
+        <div hidden={tab !== "tree"} aria-hidden={tab !== "tree"}>
+          <TreePricingTab scenario={scenario} />
+        </div>
+        <div hidden={tab !== "monte_carlo"} aria-hidden={tab !== "monte_carlo"}>
+          <MonteCarloTab scenario={scenario} />
+        </div>
+        <div hidden={tab !== "surface"} aria-hidden={tab !== "surface"}>
+          <SurfaceTab scenario={scenario} />
+        </div>
+        <div hidden={tab !== "heston"} aria-hidden={tab !== "heston"}>
+          <HestonTab scenario={scenario} />
+        </div>
+        <div hidden={tab !== "compare"} aria-hidden={tab !== "compare"}>
+          <CompareTab scenario={scenario} />
+        </div>
+        <div hidden={tab !== "education"} aria-hidden={tab !== "education"}>
+          <EducationTab />
+        </div>
       </div>
     </div>
   );
@@ -1423,7 +1452,7 @@ function MonteCarloTab({ scenario }: TabProps) {
 // Per-expiry / per-path colours come from the centralized Options Lab palette
 // (see lib/chartPalette.ts) so every chart in the lab is deterministic + distinct.
 const SURFACE_PALETTE = OPTIONS_CHART_PALETTE;
-const SMILE_RAW_COLOR = "#22d3ee"; // raw IV points
+const SMILE_RAW_COLOR = CHART_SMILE_RAW_COLOR; // raw IV points
 const SMILE_SVI_COLOR = SMILE_FIT_COLOR; // SVI fitted curve (distinct from raw)
 const TERM_COLOR = TERM_STRUCTURE_COLOR;
 const HESTON_UNDERLYING_PALETTE = OPTIONS_CHART_PALETTE;
@@ -1437,33 +1466,10 @@ const HESTON_VOLATILITY_PALETTE = [
   "#bef264",
   "#60a5fa",
 ];
-// Sequential heat scale for the surface (professional, dark-theme friendly).
-const HEAT_STOPS = ["#3b82f6", "#22d3ee", "#34d399", "#fbbf24", "#f87171"];
-
-function _hexToRgb(hex: string): [number, number, number] {
-  const h = hex.replace("#", "");
-  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
-}
-function heatRgb(value: number, min: number, max: number): [number, number, number] {
-  const t = max > min ? Math.min(1, Math.max(0, (value - min) / (max - min))) : 0.5;
-  const x = Math.min(0.9999, t) * (HEAT_STOPS.length - 1);
-  const i = Math.floor(x);
-  const f = x - i;
-  const [r0, g0, b0] = _hexToRgb(HEAT_STOPS[i]);
-  const [r1, g1, b1] = _hexToRgb(HEAT_STOPS[i + 1]);
-  const mix = (a: number, b: number) => Math.round(a + (b - a) * f);
-  return [mix(r0, r1), mix(g0, g1), mix(b0, b1)];
-}
-function heatColor(value: number | null, min: number, max: number): string {
-  if (value == null || !Number.isFinite(value)) return "rgba(148,163,184,0.12)";
-  const [r, g, b] = heatRgb(value, min, max);
-  return `rgb(${r}, ${g}, ${b})`;
-}
-function heatTextColor(value: number | null, min: number, max: number): string {
+function _heatTextColor(value: number | null, min: number, max: number): string {
   if (value == null || !Number.isFinite(value)) return "#64748b";
-  const [r, g, b] = heatRgb(value, min, max);
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  return luminance > 145 ? "#0b1220" : "#f8fafc";
+  const t = max > min ? Math.min(1, Math.max(0, (value - min) / (max - min))) : 0.5;
+  return t >= 0.38 && t <= 0.82 ? "#0b1220" : "#f8fafc";
 }
 
 interface UiSurfaceRow {
@@ -1511,8 +1517,8 @@ function SurfaceHeatmap({ surface, spot }: { surface: SurfaceResponse["surface"]
                   key={j}
                   className="h-8 w-12 rounded text-center text-[9px] font-semibold"
                   style={{
-                    backgroundColor: heatColor(cell, min, max),
-                    color: heatTextColor(cell, min, max),
+                    backgroundColor: paletteHeatColor(cell, min, max),
+                    color: _heatTextColor(cell, min, max),
                   }}
                   title={
                     `Expiry ${grid.expiry_days[i].toFixed(0)}d · moneyness ${grid.moneyness_values[j].toFixed(2)}` +
@@ -2172,6 +2178,7 @@ interface CompareRow {
   model: string;
   price: number | null;
   diff: number | null;
+  settings: string;
   notes: string;
 }
 
@@ -2188,6 +2195,9 @@ function CompareTab({ scenario }: TabProps) {
   const [rows, setRows] = useState<CompareRow[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const scenarioPayoffType = scenario?.monteCarloInputs?.payoff_type;
+  const isPathDependentScenario =
+    scenarioPayoffType != null && !scenarioPayoffType.startsWith("european_");
 
   const valid =
     num(S) > 0 && num(K) > 0 && num(T) > 0 && num(sigma) > 0 && finite(r) && finite(q);
@@ -2208,21 +2218,29 @@ function CompareTab({ scenario }: TabProps) {
       const bs = await priceBlackScholes({ option_type: optionType, ...base, volatility: num(sigma) });
       const bsPrice = bs.price;
       const out: CompareRow[] = [
-        { model: "Black–Scholes (European)", price: bsPrice, diff: 0, notes: "Constant vol, closed form" },
+        {
+          model: "Black–Scholes (European)",
+          price: bsPrice,
+          diff: 0,
+          settings: "closed form",
+          notes: "Constant-vol European reference",
+        },
       ];
 
+      const treeSteps = scenario?.treeInputs?.steps ?? 200;
       const treeEur = await priceBinomialTree({
         option_type: optionType,
         exercise_style: "european",
         ...base,
         volatility: num(sigma),
-        steps: 200,
+        steps: treeSteps,
         include_lattice: false,
       });
       out.push({
-        model: "Binomial CRR · European (200)",
+        model: `Binomial CRR · European`,
         price: treeEur.price,
         diff: treeEur.price - bsPrice,
+        settings: `${treeSteps} steps`,
         notes: "Lattice; converges to BS",
       });
 
@@ -2231,36 +2249,44 @@ function CompareTab({ scenario }: TabProps) {
         exercise_style: "american",
         ...base,
         volatility: num(sigma),
-        steps: 200,
+        steps: treeSteps,
         include_lattice: false,
       });
       out.push({
-        model: "Binomial CRR · American (200)",
+        model: "Binomial CRR · American",
         price: treeAmer.price,
         diff: treeAmer.price - bsPrice,
+        settings: `${treeSteps} steps`,
         notes:
           treeAmer.early_exercise.detected
             ? "Early exercise optimal (≥ European)"
             : "No early exercise (= European)",
       });
 
+      const mcSteps = scenario?.monteCarloInputs?.steps ?? 252;
+      const mcSims = scenario?.monteCarloInputs?.simulations ?? 20000;
+      const mcSeed = scenario?.monteCarloInputs?.seed ?? 42;
       const mc = await priceMonteCarlo({
         payoff_type: optionType === "call" ? "european_call" : "european_put",
         ...base,
         volatility: num(sigma),
-        steps: 252,
-        simulations: 20000,
-        seed: 42,
+        steps: mcSteps,
+        simulations: mcSims,
+        seed: mcSeed,
       });
       out.push({
-        model: "Monte Carlo GBM (20k)",
+        model: "Monte Carlo GBM",
         price: mc.price,
         diff: mc.price - bsPrice,
+        settings: `${mcSims.toLocaleString()} sims · ${mcSteps} steps · seed ${mcSeed}`,
         notes: `±${mc.standard_error.toFixed(3)} SE — sampling error`,
       });
 
       const hInit = h?.initial_volatility ?? num(sigma);
       const hLong = h?.long_run_volatility ?? num(sigma);
+      const hestonSteps = h?.steps ?? 252;
+      const hestonSims = h?.simulations ?? 12000;
+      const hestonSeed = h?.seed ?? 42;
       const heston = await priceHeston({
         option_type: optionType,
         ...base,
@@ -2269,14 +2295,15 @@ function CompareTab({ scenario }: TabProps) {
         kappa: h?.kappa ?? 2.0,
         vol_of_vol: h?.vol_of_vol ?? 0.5,
         rho: h?.rho ?? -0.7,
-        steps: 252,
-        simulations: h?.simulations ?? 12000,
-        seed: 42,
+        steps: hestonSteps,
+        simulations: hestonSims,
+        seed: hestonSeed,
       });
       out.push({
         model: "Heston MC (stochastic vol)",
         price: heston.price,
         diff: heston.price - bsPrice,
+        settings: `${hestonSims.toLocaleString()} sims · ${hestonSteps} steps · seed ${hestonSeed}`,
         notes: `ξ=${(h?.vol_of_vol ?? 0.5)}, ρ=${(h?.rho ?? -0.7)}; ±${heston.standard_error.toFixed(3)} SE`,
       });
 
@@ -2297,6 +2324,13 @@ function CompareTab({ scenario }: TabProps) {
         “correct”. Monte Carlo and Heston are simulations and carry sampling error. Runs only when
         you click; it does not recompute on every keystroke.
       </p>
+      {isPathDependentScenario && (
+        <div className="rounded-lg border border-amber-400/40 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-200">
+          The active scenario is path-dependent ({scenarioPayoffType?.replace(/_/g, " ")}), while
+          Model Compare prices the matching European vanilla {optionType}. Use the Monte Carlo tab
+          for the path-dependent payoff itself.
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Field label="Option type"><OptionTypeToggle value={optionType} onChange={setOptionType} /></Field>
@@ -2329,6 +2363,7 @@ function CompareTab({ scenario }: TabProps) {
                 <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Model</th>
                 <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Price</th>
                 <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Δ vs BS</th>
+                <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Settings</th>
                 <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Notes</th>
               </tr>
             </thead>
@@ -2338,6 +2373,7 @@ function CompareTab({ scenario }: TabProps) {
                   <td className="px-2 py-1 font-medium text-slate-700">{row.model}</td>
                   <td className="px-2 py-1 text-right mono">{row.price == null ? "—" : row.price.toFixed(4)}</td>
                   <td className="px-2 py-1 text-right mono">{row.diff == null ? "—" : (row.diff >= 0 ? "+" : "") + row.diff.toFixed(4)}</td>
+                  <td className="px-2 py-1 text-slate-500">{row.settings}</td>
                   <td className="px-2 py-1 text-slate-500">{row.notes}</td>
                 </tr>
               ))}

@@ -178,7 +178,7 @@ Display formatters: percentages, dollar amounts, ratios, dates.
 
 Options Lab UX layer (Phase 14.5): `optionsScenarioRegistry.ts` holds the 10
 unified **scenario presets** (educational scenarios / model demonstrations) that
-seed the shared base inputs and per-model defaults across the Options Lab tabs;
+seed the common base inputs and per-model defaults across the Options Lab tabs;
 `chartPalette.ts` is the single **deterministic, dark-theme chart palette**
 (`seriesColor`, heat scale) used by every Options Lab chart so colours are stable
 and distinct. The Options Lab also has a button-driven **Model Comparison** tab

@@ -907,7 +907,7 @@ single-asset Backtest + Strategy Comparison:
 - **Unified scenario presets** (`frontend/src/lib/optionsScenarioRegistry.ts`):
   10 educational scenarios (ATM/OTM/ITM vanillas, high/low-vol regimes, Heston
   leverage effect, American early exercise, Asian, barrier, synthetic surface).
-  Applying one seeds the shared base inputs (S/K/T/r/q/σ/type) **and** per-model
+  Applying one seeds the common base inputs (S/K/T/r/q/σ/type) **and** per-model
   defaults across the tabs; tab-specific fields stay local otherwise. Neutral
   wording ("educational scenario" / "model demonstration", never a recommendation)
 - **Centralized chart palette** (`frontend/src/lib/chartPalette.ts`): one
@@ -920,8 +920,9 @@ single-asset Backtest + Strategy Comparison:
   differ because assumptions differ", none automatically correct
 - **Grouped tab navigation** (Core Pricing / Payoffs & Simulation / Volatility &
   Compare / Learn) so the eight-plus tools read as one product; a **scenario bar**
-  with an "Scenario applied" notice; palette deep-links open the lab on a preset;
-  consistent empty/loading/error/validation states and concise per-tab caveats
+  with a "Scenario applied" notice; command-palette preset entries open the lab
+  on a preset; consistent empty/loading/error/validation states and concise
+  per-tab caveats
 - Frontend-only polish phase — **no** new pricing models, no backend change; the
   full prior backend suite still passes and `tsc --noEmit` is clean
 

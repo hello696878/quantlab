@@ -1,7 +1,7 @@
 /**
  * Unified Options Lab scenario presets.
  *
- * A preset seeds the shared base inputs (S/K/T/r/q/σ/type) plus optional
+ * A preset seeds the common base inputs (S/K/T/r/q/σ/type) plus optional
  * per-model defaults (tree steps, Monte Carlo sims/seed, Heston params, payoff
  * preset, surface settings). Applying a preset re-seeds the tabs — tab-specific
  * fields stay local otherwise.
@@ -274,7 +274,7 @@ export const OPTIONS_SCENARIOS: OptionsScenarioPreset[] = [
     category: "Path-dependent",
     description:
       "Model demonstration: an arithmetic-average Asian call. Averaging lowers effective volatility, so the Asian price sits below the vanilla call.",
-    appliesTo: ["monte_carlo", "compare"],
+    appliesTo: ["monte_carlo"],
     primaryTab: "monte_carlo",
     baseInputs: {
       option_type: "call",
@@ -294,7 +294,7 @@ export const OPTIONS_SCENARIOS: OptionsScenarioPreset[] = [
     category: "Path-dependent",
     description:
       "Model demonstration: an up-and-out call with a knock-out barrier at 120. Barrier monitoring is discrete over the simulated steps.",
-    appliesTo: ["monte_carlo", "compare"],
+    appliesTo: ["monte_carlo"],
     primaryTab: "monte_carlo",
     baseInputs: {
       option_type: "call",
