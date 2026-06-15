@@ -933,7 +933,8 @@ single-asset Backtest + Strategy Comparison:
   testable offline). Abnormal-return models: **market-adjusted**,
   **mean-adjusted**, and a **market model** (OLS α/β over an estimation window),
   with graceful fallback when a benchmark is missing
-- Cumulative abnormal return (**CAR**), pre/post/event-day segments, and a
+- Cumulative abnormal return (**CAR**), pre/post/event-day segments (post-event
+  CAR excludes day 0; event-day abnormal return is reported separately), and a
   **multi-event** aggregation (average abnormal return + **CAAR** by relative
   day). Non-trading event dates map to the next session with a warning;
   insufficient pre/post data warns instead of crashing; never NaN/inf
@@ -941,8 +942,8 @@ single-asset Backtest + Strategy Comparison:
   exit/return, annualized return, downside, and breakeven probability — with an
   explicit "ignores borrow/financing/regulatory/tax/liquidity" caveat
 - Four routes: `POST /events/study`, `/events/multi-study`, `/events/merger-arb`,
-  `GET /events/sample` (synthetic demo events, clearly labelled). 27 new backend
-  tests (synthetic data, no live yfinance)
+  `GET /events/sample` (synthetic demo events, clearly labelled). Backend tests
+  use synthetic data only, with no live yfinance dependency
 - New top-level **Event Lab** workspace (Event Study / Multi-Event / Merger Arb /
   Education) with deterministic-palette charts (abnormal-return bars coloured by
   sign, CAR line, asset-vs-benchmark cumulative, CAAR), sidebar nav, dashboard

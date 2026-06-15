@@ -55,8 +55,29 @@ def _clean(value: Optional[float], digits: int = 6) -> Optional[float]:
 
 
 def compute_returns(close: pd.Series) -> pd.Series:
-    """Simple daily returns from a close-price series (first NaN dropped)."""
-    returns = close.astype(float).pct_change().dropna()
+    """Simple daily returns from a clean close-price series.
+
+    Event studies are sensitive to even small alignment mistakes, so this helper
+    normalizes the index order, keeps the latest duplicate timestamp, and rejects
+    non-positive / non-finite prices before computing:
+
+    ``return_t = price_t / price_{t-1} - 1``.
+    """
+    prices = pd.to_numeric(close, errors="coerce").sort_index()
+    prices = prices[~prices.index.duplicated(keep="last")].dropna()
+    if len(prices) < 2:
+        raise EventInputError("At least two valid close prices are required.")
+    values = prices.to_numpy(dtype=float)
+    if not np.all(np.isfinite(values)):
+        raise EventInputError("Close prices must be finite.")
+    if (prices <= 0).any():
+        raise EventInputError("Close prices must be positive.")
+
+    returns = prices.pct_change().dropna()
+    ret_values = returns.to_numpy(dtype=float)
+    if len(returns) == 0 or not np.all(np.isfinite(ret_values)):
+        raise EventInputError("Returns could not be computed from the close prices.")
+    returns.name = close.name
     return returns
 
 
@@ -73,7 +94,10 @@ def align_event_window(
     """
     warnings: List[str] = []
     idx = asset_returns.index
-    target = pd.Timestamp(event_date)
+    try:
+        target = pd.Timestamp(event_date)
+    except (TypeError, ValueError) as exc:
+        raise EventInputError("event_date must be a valid YYYY-MM-DD date.") from exc
 
     # First trading day on or after the requested date.
     on_or_after = idx[idx >= target]
@@ -82,7 +106,12 @@ def align_event_window(
             "The event date is after the available price history; no post-event data."
         )
     actual = on_or_after[0]
-    if actual != target:
+    if target < idx[0]:
+        warnings.append(
+            f"Event date {target.date()} is before the available return history; using the first "
+            f"available trading day {actual.date()}."
+        )
+    elif actual != target:
         warnings.append(
             f"Event date {target.date()} is not a trading day in the data; using the next "
             f"available trading day {actual.date()}."
@@ -203,12 +232,12 @@ def validate_event_inputs(
 ) -> None:
     if model not in ABNORMAL_RETURN_MODELS:
         raise EventInputError(f"model must be one of {ABNORMAL_RETURN_MODELS}.")
-    if estimation_window_days < 10 or estimation_window_days > 500:
-        raise EventInputError("estimation_window_days must be between 10 and 500.")
-    if pre_event_days < 1 or pre_event_days > 120:
-        raise EventInputError("pre_event_days must be between 1 and 120.")
-    if post_event_days < 1 or post_event_days > 120:
-        raise EventInputError("post_event_days must be between 1 and 120.")
+    if estimation_window_days < 1 or estimation_window_days > 500:
+        raise EventInputError("estimation_window_days must be between 1 and 500.")
+    if pre_event_days < 0 or pre_event_days > 120:
+        raise EventInputError("pre_event_days must be between 0 and 120.")
+    if post_event_days < 0 or post_event_days > 120:
+        raise EventInputError("post_event_days must be between 0 and 120.")
 
 
 def run_single_event_study(
@@ -233,10 +262,13 @@ def run_single_event_study(
     if benchmark_close is not None:
         benchmark_returns = compute_returns(benchmark_close)
         # Align asset & benchmark on common trading days.
-        asset_returns, benchmark_returns = asset_returns.align(benchmark_returns, join="inner")
-        if len(asset_returns) < 2:
+        aligned_asset_returns, aligned_benchmark_returns = asset_returns.align(benchmark_returns, join="inner")
+        if len(aligned_asset_returns) < 2:
             benchmark_returns = None
             warnings.append("Asset and benchmark share too few common dates; benchmark ignored.")
+        else:
+            asset_returns = aligned_asset_returns
+            benchmark_returns = aligned_benchmark_returns
 
     event_pos, actual_event, win_warnings = align_event_window(
         asset_returns, event_date, pre_event_days, post_event_days
@@ -317,30 +349,36 @@ def run_single_event_study(
 
 
 def run_multi_event_study(events_results: Sequence[dict]) -> dict:
-    """Aggregate single-event results into average AR (AAR) and CAAR by relative day."""
-    # Collect abnormal returns aligned by relative day across events.
-    by_rel: dict = {}
+    """Aggregate single-event results into AAR and average CAR by relative day."""
+    # Collect event-window rows aligned by relative day across events.  CAAR is
+    # computed as the average of each event's CAR at the relative day; for fully
+    # balanced windows this equals the cumulative sum of AAR, while truncated
+    # windows keep each point's sample explicit.
+    ar_by_rel: dict = {}
+    car_by_rel: dict = {}
     for res in events_results:
         for row in res["rows"]:
             rel = row["relative_day"]
             ar = row["abnormal_return"]
-            if ar is None:
-                continue
-            by_rel.setdefault(rel, []).append(ar)
+            car = row["cumulative_abnormal_return"]
+            if ar is not None:
+                ar_by_rel.setdefault(rel, []).append(ar)
+            if car is not None:
+                car_by_rel.setdefault(rel, []).append(car)
 
-    rel_days = sorted(by_rel.keys())
+    rel_days = sorted(set(ar_by_rel.keys()) | set(car_by_rel.keys()))
     aar_points: List[dict] = []
-    running = 0.0
     for rel in rel_days:
-        values = by_rel[rel]
-        aar = sum(values) / len(values)
-        running += aar
+        ar_values = ar_by_rel.get(rel, [])
+        car_values = car_by_rel.get(rel, [])
+        aar = sum(ar_values) / len(ar_values) if ar_values else None
+        caar = sum(car_values) / len(car_values) if car_values else None
         aar_points.append(
             {
                 "relative_day": rel,
                 "average_abnormal_return": _clean(aar),
-                "average_cumulative_abnormal_return": _clean(running),
-                "event_count": len(values),
+                "average_cumulative_abnormal_return": _clean(caar),
+                "event_count": max(len(ar_values), len(car_values)),
             }
         )
 
@@ -389,6 +427,11 @@ def compute_merger_arb_metrics(
     if expected_days_to_close <= 0:
         raise EventInputError("expected_days_to_close must be positive.")
 
+    warnings = [
+        "Simplified expected-value model — ignores borrow/financing costs, regulatory "
+        "timing, competing bids, taxes, liquidity, and detailed deal terms.",
+    ]
+
     spread = offer_price - current_price
     gross_upside_pct = spread / current_price
     downside_pct = (downside_price - current_price) / current_price
@@ -400,6 +443,15 @@ def compute_merger_arb_metrics(
     breakeven = None
     if abs(offer_price - downside_price) > 1e-12:
         breakeven = (current_price - downside_price) / (offer_price - downside_price)
+        if breakeven < 0.0 or breakeven > 1.0:
+            warnings.append(
+                "Breakeven close probability is outside 0–1 for these prices; "
+                "the current price is outside the offer/downside payoff range."
+            )
+    else:
+        warnings.append(
+            "Offer price equals downside price; breakeven close probability is undefined."
+        )
 
     return {
         "spread": _clean(spread),
@@ -410,8 +462,5 @@ def compute_merger_arb_metrics(
         "annualized_expected_return": _clean(annualized) if annualized is not None else None,
         "downside_loss_pct": _clean(downside_pct),
         "breakeven_probability": _clean(breakeven) if breakeven is not None else None,
-        "warnings": [
-            "Simplified expected-value model — ignores borrow/financing costs, regulatory "
-            "timing, competing bids, taxes, liquidity, and detailed deal terms.",
-        ],
+        "warnings": warnings,
     }

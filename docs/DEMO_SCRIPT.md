@@ -139,8 +139,10 @@ Return to the Command Center's **Platform Direction** panel (or open
   differ because their assumptions differ — none is automatically "correct".
 - **Event Lab** — *Event Study*: AAPL vs SPY, market-adjusted, a sample event
   date → show the summary cards, the sign-coloured abnormal-return bars, the CAR
-  line, and the asset-vs-benchmark cumulative chart (note the "next trading day"
-  warning when the date is a weekend). Switch to *Merger Arb* (current 90, offer
+  line, and the asset-vs-benchmark cumulative chart. Mention that windows are
+  trading observations and post-event CAR excludes day 0 (shown separately as
+  event-day AR). Note the "next trading day" warning when the date is a weekend.
+  Switch to *Merger Arb* (current 90, offer
   100, downside 70, P(close) 0.8, 180 days) → spread, expected return, and
   breakeven probability. Emphasise: research diagnostic, no live filings, not
   investment advice.

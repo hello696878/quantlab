@@ -4172,9 +4172,9 @@ class EventStudyRequest(BaseModel):
     benchmark_ticker: str = Field(default="SPY", min_length=1, max_length=20)
     event_date: str = Field(description="YYYY-MM-DD.")
     event_name: str = Field(default="", max_length=120)
-    estimation_window_days: int = Field(default=120, ge=10, le=500)
-    pre_event_days: int = Field(default=10, ge=1, le=120)
-    post_event_days: int = Field(default=10, ge=1, le=120)
+    estimation_window_days: int = Field(default=120, ge=1, le=500)
+    pre_event_days: int = Field(default=10, ge=0, le=120)
+    post_event_days: int = Field(default=10, ge=0, le=120)
     model: AbnormalReturnModel = "market_adjusted"
     data_provider: str = Field(default="yfinance", max_length=40)
 
@@ -4239,9 +4239,9 @@ class MultiEventStudyRequest(BaseModel):
 
     events: List[EventItem] = Field(min_length=1, max_length=20)
     benchmark_ticker: str = Field(default="SPY", min_length=1, max_length=20)
-    estimation_window_days: int = Field(default=120, ge=10, le=500)
-    pre_event_days: int = Field(default=10, ge=1, le=120)
-    post_event_days: int = Field(default=10, ge=1, le=120)
+    estimation_window_days: int = Field(default=120, ge=1, le=500)
+    pre_event_days: int = Field(default=10, ge=0, le=120)
+    post_event_days: int = Field(default=10, ge=0, le=120)
     model: AbnormalReturnModel = "market_adjusted"
     data_provider: str = Field(default="yfinance", max_length=40)
 

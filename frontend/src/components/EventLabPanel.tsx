@@ -49,6 +49,10 @@ const AR_NEG = "#f87171"; // red
 function num(s: string): number {
   return s.trim() === "" ? NaN : Number(s);
 }
+function intNum(s: string): number {
+  const value = num(s);
+  return Number.isInteger(value) ? value : NaN;
+}
 function finite(s: string): boolean {
   return Number.isFinite(num(s));
 }
@@ -66,9 +70,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2 text-center">
+    <div className="glass px-3 py-2 text-center">
       <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mono mt-0.5 text-sm font-semibold text-slate-800">{value}</p>
+      <p className="mono mt-0.5 text-sm font-semibold text-slate-100">{value}</p>
     </div>
   );
 }
@@ -97,7 +101,7 @@ export default function EventLabPanel({ initialTab = "study" }: { initialTab?: T
         <p className="mt-2 text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
 
-      <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
+      <div className="ql-segmented">
         {(
           [
             ["study", "Event Study"],
@@ -110,10 +114,7 @@ export default function EventLabPanel({ initialTab = "study" }: { initialTab?: T
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={
-              "px-3.5 py-1.5 text-xs font-medium transition-colors " +
-              (tab === id ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")
-            }
+            className={"ql-segmented-option " + (tab === id ? "active" : "")}
           >
             {label}
           </button>
@@ -142,14 +143,20 @@ function EventStudyTab() {
   const [result, setResult] = useState<EventStudyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const estDaysNum = intNum(estWindow);
+  const preDaysNum = intNum(preDays);
+  const postDaysNum = intNum(postDays);
 
   const valid =
     ticker.trim() !== "" &&
     benchmark.trim() !== "" &&
     /^\d{4}-\d{2}-\d{2}$/.test(eventDate) &&
-    num(estWindow) >= 10 &&
-    num(preDays) >= 1 &&
-    num(postDays) >= 1;
+    estDaysNum >= 1 &&
+    estDaysNum <= 500 &&
+    preDaysNum >= 0 &&
+    preDaysNum <= 120 &&
+    postDaysNum >= 0 &&
+    postDaysNum <= 120;
 
   async function run() {
     if (!valid || loading) return;
@@ -164,9 +171,9 @@ function EventStudyTab() {
           event_date: eventDate,
           event_name: eventName,
           model,
-          estimation_window_days: Math.trunc(num(estWindow)),
-          pre_event_days: Math.trunc(num(preDays)),
-          post_event_days: Math.trunc(num(postDays)),
+          estimation_window_days: estDaysNum,
+          pre_event_days: preDaysNum,
+          post_event_days: postDaysNum,
         }),
       );
     } catch (e) {
@@ -194,6 +201,7 @@ function EventStudyTab() {
       <p className="text-xs text-slate-500">
         Abnormal return = asset return minus the model baseline (benchmark / estimation mean / market
         model). Cumulative abnormal return (CAR) sums abnormal returns across the window.
+        Event windows are measured in trading observations around the event date.
       </p>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -208,9 +216,9 @@ function EventStudyTab() {
             ))}
           </select>
         </Field>
-        <Field label="Estimation days"><input type="number" className={inputCls} value={estWindow} min={10} max={500} onChange={(e) => setEstWindow(e.target.value)} /></Field>
-        <Field label="Pre-event days"><input type="number" className={inputCls} value={preDays} min={1} max={120} onChange={(e) => setPreDays(e.target.value)} /></Field>
-        <Field label="Post-event days"><input type="number" className={inputCls} value={postDays} min={1} max={120} onChange={(e) => setPostDays(e.target.value)} /></Field>
+        <Field label="Estimation days"><input type="number" className={inputCls} value={estWindow} min={1} max={500} step={1} onChange={(e) => setEstWindow(e.target.value)} /></Field>
+        <Field label="Pre-event days"><input type="number" className={inputCls} value={preDays} min={0} max={120} step={1} onChange={(e) => setPreDays(e.target.value)} /></Field>
+        <Field label="Post-event days"><input type="number" className={inputCls} value={postDays} min={0} max={120} step={1} onChange={(e) => setPostDays(e.target.value)} /></Field>
       </div>
 
       <button
@@ -219,13 +227,16 @@ function EventStudyTab() {
         disabled={!valid || loading}
         className={
           "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+          (valid && !loading
+            ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
+            : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
         }
       >
         {loading ? "Running…" : "Run event study"}
       </button>
       <p className="text-[11px] text-slate-400">
         Sample events are for demo workflow only. Verify event dates before research use.
+        Post-event CAR excludes day 0; event-day abnormal return is shown separately.
       </p>
       {error && <p className="text-xs text-red-600">⚠ {error}</p>}
 
@@ -234,7 +245,7 @@ function EventStudyTab() {
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <Stat label="Event-day AR" value={pct(result.summary.event_day_abnormal_return)} />
             <Stat label="Pre-event CAR" value={pct(result.summary.pre_event_car)} />
-            <Stat label="Post-event CAR" value={pct(result.summary.post_event_car)} />
+            <Stat label="Post-event CAR (excl. day 0)" value={pct(result.summary.post_event_car)} />
             <Stat label="Total CAR" value={pct(result.summary.total_car)} />
             <Stat label="Model used" value={result.model_used.replace(/_/g, " ")} />
             <Stat label="Actual event date" value={result.summary.actual_event_date ?? "—"} />
@@ -243,7 +254,7 @@ function EventStudyTab() {
           </div>
 
           {result.warnings.length > 0 && (
-            <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700">
+            <div className="rounded-lg border border-[color-mix(in_oklch,var(--warn)_35%,transparent)] bg-[var(--warn-soft)] px-3 py-2 text-xs font-medium text-[var(--warn)]">
               {result.warnings.map((w, i) => (
                 <p key={i}>{w}</p>
               ))}
@@ -322,7 +333,7 @@ function EventStudyTab() {
               </thead>
               <tbody>
                 {rows.map((r) => (
-                  <tr key={r.relative_day} className={"border-t border-slate-100" + (r.relative_day === 0 ? " bg-blue-50" : "")}>
+                  <tr key={r.relative_day} className={"border-t border-[var(--line)]" + (r.relative_day === 0 ? " bg-[var(--accent-softer)]" : "")}>
                     <td className="px-2 py-1 text-right mono">{r.relative_day}</td>
                     <td className="px-2 py-1">{r.date}</td>
                     <td className="px-2 py-1 text-right mono">{pct(r.asset_return, 2)}</td>
@@ -357,23 +368,39 @@ function MultiEventTab() {
   const [rows, setRows] = useState<UiEventRow[]>(DEFAULT_MULTI_ROWS);
   const [benchmark, setBenchmark] = useState("SPY");
   const [model, setModel] = useState<AbnormalReturnModel>("market_adjusted");
+  const [estWindow, setEstWindow] = useState("120");
   const [preDays, setPreDays] = useState("10");
   const [postDays, setPostDays] = useState("10");
   const [result, setResult] = useState<MultiEventStudyResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sampleNote, setSampleNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sampleLoading, setSampleLoading] = useState(false);
+  const estDaysNum = intNum(estWindow);
+  const preDaysNum = intNum(preDays);
+  const postDaysNum = intNum(postDays);
 
   const valid =
     rows.length >= 1 &&
+    rows.length <= 20 &&
     rows.every((r) => r.ticker.trim() !== "" && /^\d{4}-\d{2}-\d{2}$/.test(r.event_date)) &&
-    benchmark.trim() !== "";
+    benchmark.trim() !== "" &&
+    estDaysNum >= 1 &&
+    estDaysNum <= 500 &&
+    preDaysNum >= 0 &&
+    preDaysNum <= 120 &&
+    postDaysNum >= 0 &&
+    postDaysNum <= 120;
 
   function setRow(i: number, patch: Partial<UiEventRow>) {
     setRows((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }
   function addRow() {
-    setRows((ls) => [...ls, { event_name: `Event ${ls.length + 1}`, ticker: "AAPL", event_date: "2024-05-02" }]);
+    setRows((ls) =>
+      ls.length >= 20
+        ? ls
+        : [...ls, { event_name: `Event ${ls.length + 1}`, ticker: "AAPL", event_date: "2024-05-02" }],
+    );
   }
   function removeRow(i: number) {
     setRows((ls) => (ls.length > 1 ? ls.filter((_, idx) => idx !== i) : ls));
@@ -386,6 +413,7 @@ function MultiEventTab() {
       const s = await fetchSampleEvents();
       setRows(s.events.map((e) => ({ event_name: e.event_name, ticker: e.ticker, event_date: e.event_date })));
       if (s.events[0]) setBenchmark(s.events[0].benchmark_ticker);
+      setSampleNote(s.note);
     } catch (e) {
       setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
     } finally {
@@ -404,8 +432,9 @@ function MultiEventTab() {
           events: rows.map((r) => ({ event_name: r.event_name, ticker: r.ticker.trim(), event_date: r.event_date })),
           benchmark_ticker: benchmark.trim(),
           model,
-          pre_event_days: Math.trunc(num(preDays)),
-          post_event_days: Math.trunc(num(postDays)),
+          estimation_window_days: estDaysNum,
+          pre_event_days: preDaysNum,
+          post_event_days: postDaysNum,
         }),
       );
     } catch (e) {
@@ -427,7 +456,8 @@ function MultiEventTab() {
       <p className="section-title">Multi-Event Study (CAAR)</p>
       <p className="text-xs text-slate-500">
         Aligns several events by relative day and averages the abnormal returns — average abnormal
-        return (AAR) and cumulative average abnormal return (CAAR).
+        return (AAR) and cumulative average abnormal return (CAAR). Event windows are measured in
+        trading observations around each event date.
       </p>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -445,9 +475,11 @@ function MultiEventTab() {
             {MODEL_OPTIONS.map((m) => (<option key={m.value} value={m.value}>{m.label}</option>))}
           </select>
         </Field>
-        <Field label="Pre days"><input type="number" className={inputCls + " w-20"} value={preDays} onChange={(e) => setPreDays(e.target.value)} /></Field>
-        <Field label="Post days"><input type="number" className={inputCls + " w-20"} value={postDays} onChange={(e) => setPostDays(e.target.value)} /></Field>
+        <Field label="Estimation days"><input type="number" className={inputCls + " w-24"} value={estWindow} min={1} max={500} step={1} onChange={(e) => setEstWindow(e.target.value)} /></Field>
+        <Field label="Pre days"><input type="number" className={inputCls + " w-20"} value={preDays} min={0} max={120} step={1} onChange={(e) => setPreDays(e.target.value)} /></Field>
+        <Field label="Post days"><input type="number" className={inputCls + " w-20"} value={postDays} min={0} max={120} step={1} onChange={(e) => setPostDays(e.target.value)} /></Field>
       </div>
+      {sampleNote && <p className="text-[11px] text-slate-400">{sampleNote}</p>}
 
       <div className="overflow-x-auto">
         <table className="w-full text-xs">
@@ -461,7 +493,7 @@ function MultiEventTab() {
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} className="border-t border-slate-100">
+              <tr key={i} className="border-t border-[var(--line)]">
                 <td className="px-2 py-1"><input className={inputCls} value={r.event_name} onChange={(e) => setRow(i, { event_name: e.target.value })} /></td>
                 <td className="px-2 py-1"><input className={inputCls + " w-24"} value={r.ticker} onChange={(e) => setRow(i, { ticker: e.target.value })} /></td>
                 <td className="px-2 py-1"><input type="date" className={inputCls} value={r.event_date} onChange={(e) => setRow(i, { event_date: e.target.value })} /></td>
@@ -470,7 +502,17 @@ function MultiEventTab() {
             ))}
           </tbody>
         </table>
-        <button type="button" onClick={addRow} className="mt-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-blue-400">+ Add event</button>
+        <button
+          type="button"
+          onClick={addRow}
+          disabled={rows.length >= 20}
+          className={
+            "mt-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium " +
+            (rows.length >= 20 ? "cursor-not-allowed text-slate-400" : "text-slate-600 hover:border-blue-400")
+          }
+        >
+          + Add event
+        </button>
       </div>
 
       <button
@@ -479,7 +521,9 @@ function MultiEventTab() {
         disabled={!valid || loading}
         className={
           "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+            (valid && !loading
+              ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
+              : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
         }
       >
         {loading ? "Running…" : "Run multi-event study"}
@@ -494,7 +538,7 @@ function MultiEventTab() {
             <Stat label="Window points" value={String(result.aar_curve.length)} />
           </div>
           {result.warnings.length > 0 && (
-            <div className="rounded-lg bg-amber-100 px-3 py-2 text-xs font-medium text-amber-700">
+            <div className="rounded-lg border border-[color-mix(in_oklch,var(--warn)_35%,transparent)] bg-[var(--warn-soft)] px-3 py-2 text-xs font-medium text-[var(--warn)]">
               {result.warnings.map((w, i) => (<p key={i}>{w}</p>))}
             </div>
           )}
@@ -526,7 +570,7 @@ function MultiEventTab() {
                 </thead>
                 <tbody>
                   {result.per_event.map((e, i) => (
-                    <tr key={i} className="border-t border-slate-100">
+                    <tr key={i} className="border-t border-[var(--line)]">
                       <td className="px-2 py-1">{e.event_name}</td>
                       <td className="px-2 py-1">{e.ticker}</td>
                       <td className="px-2 py-1">{e.actual_event_date ?? "—"}</td>
@@ -609,7 +653,9 @@ function MergerArbTab() {
         disabled={!valid || loading}
         className={
           "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+          (valid && !loading
+            ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
+            : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
         }
       >
         {loading ? "Computing…" : "Compute"}
@@ -632,7 +678,7 @@ function MergerArbTab() {
             <Stat label="Downside loss" value={pct(result.downside_loss_pct)} />
             <Stat label="Breakeven P(close)" value={pct(result.breakeven_probability)} />
           </div>
-          <div className="rounded-lg bg-amber-50 px-3 py-2 text-[11px] text-amber-700">
+          <div className="rounded-lg border border-[color-mix(in_oklch,var(--warn)_35%,transparent)] bg-[var(--warn-soft)] px-3 py-2 text-[11px] text-[var(--warn)]">
             {result.warnings.map((w, i) => (<p key={i}>{w}</p>))}
           </div>
         </>
