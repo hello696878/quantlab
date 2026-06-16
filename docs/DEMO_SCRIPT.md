@@ -150,8 +150,9 @@ Return to the Command Center's **Platform Direction** panel (or open
   the spot, discount-factor, and forward-rate charts; flip compounding from
   continuous to annual to show discount factors change. *Curve Shocks*: parallel
   +100 bps, then steepener (long end rises vs short). *Bond Pricing*: face 1000,
-  coupon 5%, 5y, semiannual, YTM 4.5% → price, duration, DV01, convexity.
-  Emphasise: synthetic curves, no live rates feed, assumption-sensitive.
+  coupon 5%, 5y, semiannual, YTM 4.5% → price, duration, DV01 magnitude,
+  convexity. Emphasise: forward rates are implied, not guaranteed forecasts;
+  synthetic curves, no live rates feed, assumption-sensitive.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

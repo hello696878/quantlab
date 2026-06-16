@@ -89,20 +89,30 @@ def validate_curve_points(points: Sequence[dict]) -> List[dict]:
 
 
 def zero_rate_to_discount_factor(rate: float, t: float, compounding: Compounding) -> float:
+    if not (math.isfinite(float(rate)) and math.isfinite(float(t))):
+        raise CurveInputError("rate and maturity must be finite.")
     if t <= 0:
-        return 1.0
+        raise CurveInputError("maturity must be positive.")
     if compounding == "continuous":
         return math.exp(-rate * t)
     if compounding == "annual":
+        if 1.0 + rate <= 0:
+            raise CurveInputError("annual compounding requires 1 + rate > 0.")
         return 1.0 / (1.0 + rate) ** t
     if compounding == "semiannual":
+        if 1.0 + rate / 2.0 <= 0:
+            raise CurveInputError("semiannual compounding requires 1 + rate / 2 > 0.")
         return 1.0 / (1.0 + rate / 2.0) ** (2.0 * t)
     raise CurveInputError(f"Unknown compounding '{compounding}'.")
 
 
 def discount_factor_to_zero_rate(df: float, t: float, compounding: Compounding) -> float:
-    if t <= 0 or df <= 0:
-        return 0.0
+    if not (math.isfinite(float(df)) and math.isfinite(float(t))):
+        raise CurveInputError("discount factor and maturity must be finite.")
+    if t <= 0:
+        raise CurveInputError("maturity must be positive.")
+    if df <= 0:
+        raise CurveInputError("discount factor must be positive.")
     if compounding == "continuous":
         return -math.log(df) / t
     if compounding == "annual":
@@ -143,11 +153,12 @@ def interpolate_discount_factor(
 ) -> Tuple[float, bool]:
     """Linear interpolation on discount factors → effective zero rate."""
     mats = [p["maturity_years"] for p in points]
+    rates = [p["zero_rate"] for p in points]
     dfs = [zero_rate_to_discount_factor(p["zero_rate"], p["maturity_years"], compounding) for p in points]
     if t <= mats[0]:
-        return discount_factor_to_zero_rate(dfs[0], mats[0], compounding) if t == mats[0] else _df_rate(dfs[0], t, compounding), t < mats[0]
+        return rates[0], t < mats[0]
     if t >= mats[-1]:
-        return _df_rate(dfs[-1], t, compounding), t > mats[-1]
+        return rates[-1], t > mats[-1]
     for i in range(1, len(mats)):
         if t <= mats[i]:
             t0, t1 = mats[i - 1], mats[i]
@@ -243,7 +254,12 @@ def apply_curve_shock(points: Sequence[dict], shock_type: str, shock_bps: float)
 def _bond_cashflows(
     face_value: float, coupon_rate: float, maturity_years: float, freq: int
 ) -> List[Tuple[float, float]]:
-    n = int(round(maturity_years * freq))
+    periods = maturity_years * freq
+    n = int(round(periods))
+    if not math.isclose(periods, n, rel_tol=0.0, abs_tol=1e-9):
+        raise CurveInputError(
+            "maturity_years × coupon_frequency must be an integer number of coupon periods."
+        )
     if n < 1:
         raise CurveInputError("maturity_years × coupon_frequency must be at least 1 period.")
     coupon = face_value * coupon_rate / freq
@@ -258,6 +274,8 @@ def _bond_cashflows(
 def price_bond_from_ytm(
     face_value: float, coupon_rate: float, maturity_years: float, freq: int, ytm: float
 ) -> Tuple[float, List[dict]]:
+    if 1.0 + ytm / freq <= 0:
+        raise CurveInputError("yield_to_maturity is too negative for the coupon frequency.")
     flows = _bond_cashflows(face_value, coupon_rate, maturity_years, freq)
     rows = []
     price = 0.0
@@ -343,7 +361,7 @@ def build_curve_analytics(
         "forward_rates": compute_forward_rates(pts, compounding),
         "warnings": [
             "Synthetic / manually-entered curve — not live market data. Forward rates are "
-            "continuously compounded, implied by the discount factors.",
+            "continuously compounded, implied by the discount factors, and not guaranteed forecasts.",
         ],
     }
 
@@ -393,9 +411,9 @@ def bond_analytics(
     compounding: Compounding,
     interpolation: Interpolation,
 ) -> dict:
-    if face_value <= 0:
+    if not math.isfinite(face_value) or face_value <= 0:
         raise CurveInputError("face_value must be positive.")
-    if maturity_years <= 0:
+    if not math.isfinite(maturity_years) or maturity_years <= 0:
         raise CurveInputError("maturity_years must be positive.")
     if coupon_frequency not in COUPON_FREQUENCIES:
         raise CurveInputError(f"coupon_frequency must be one of {COUPON_FREQUENCIES}.")

@@ -955,17 +955,18 @@ single-asset Backtest + Strategy Comparison:
 
 - New backend `app/yield_curve.py` — **pure**, deterministic rates math: zero
   rate ↔ **discount factor** under annual / semiannual / **continuous**
-  compounding, **forward rates** (continuously compounded from the DFs), linear
-  interpolation on zero rates or discount factors, and a synthetic sample curve
+  compounding, **forward rates** (continuously compounded from the DFs, implied
+  by the curve rather than guaranteed forecasts), linear interpolation on zero
+  rates or discount factors, and a synthetic sample curve
 - **Curve shocks**: parallel, steepener, flattener, and butterfly (educational,
   pivoting on a normalized maturity position) with an original-vs-shocked diff
 - **Bond pricing**: fixed-rate bond from a **YTM** or by **curve discounting**,
-  with Macaulay / modified **duration**, **DV01**, and **convexity** (closed-form
-  in YTM mode; finite-difference +1 bp reprice in curve mode), plus a cash-flow
+  with Macaulay / modified **duration**, **DV01 magnitude**, and **convexity** (closed-form
+  in YTM mode; finite-difference +/-1 bp reprice in curve mode), plus a cash-flow
   table — par bond prices to exactly face, zero-coupon matches the closed form
 - Four routes: `POST /rates/curve`, `/rates/shock`, `/rates/bond`,
   `GET /rates/sample` (validated; bad maturity / frequency / duplicate maturities
-  → 422; never NaN/inf). 34 new backend tests
+  → 422; never NaN/inf). Backend tests use deterministic synthetic inputs
 - New top-level **Yield Curve Lab** workspace (Curve Builder / Curve Shocks /
   Bond Pricing / Education) with a shared editable curve, deterministic-palette
   charts (spot, discount-factor, forward, original-vs-shocked, cash-flow PV bars),

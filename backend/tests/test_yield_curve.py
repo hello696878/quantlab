@@ -19,6 +19,7 @@ from app.yield_curve import (
     compute_forward_rates,
     discount_factor_to_zero_rate,
     generate_sample_yield_curve,
+    interpolate_discount_factor,
     interpolate_zero_rate,
     shock_analytics,
     validate_curve_points,
@@ -56,6 +57,12 @@ def test_continuous_discount_factor():
     assert zero_rate_to_discount_factor(0.05, 2, "continuous") == pytest.approx(math.exp(-0.10))
 
 
+def test_discount_factor_reference_values_at_one_year():
+    assert zero_rate_to_discount_factor(0.05, 1, "continuous") == pytest.approx(0.9512294245)
+    assert zero_rate_to_discount_factor(0.05, 1, "annual") == pytest.approx(0.9523809524)
+    assert zero_rate_to_discount_factor(0.05, 1, "semiannual") == pytest.approx(0.9518143962)
+
+
 def test_annual_discount_factor():
     assert zero_rate_to_discount_factor(0.05, 2, "annual") == pytest.approx(1 / 1.05**2)
 
@@ -68,6 +75,24 @@ def test_semiannual_discount_factor():
 def test_discount_factor_roundtrip(comp):
     df = zero_rate_to_discount_factor(0.045, 3, comp)
     assert discount_factor_to_zero_rate(df, 3, comp) == pytest.approx(0.045, abs=1e-9)
+
+
+@pytest.mark.parametrize(
+    "df,t",
+    [
+        (0.0, 1.0),
+        (-0.5, 1.0),
+        (0.95, 0.0),
+    ],
+)
+def test_discount_to_zero_rate_rejects_invalid_inputs(df, t):
+    with pytest.raises(CurveInputError):
+        discount_factor_to_zero_rate(df, t, "continuous")
+
+
+def test_annual_compounding_rejects_minus_100_percent_rate():
+    with pytest.raises(CurveInputError):
+        zero_rate_to_discount_factor(-1.0, 1.0, "annual")
 
 
 def test_discount_factors_decline_with_maturity():
@@ -113,6 +138,13 @@ def test_interpolation_out_of_range_clamps_and_flags():
     assert rate == pytest.approx(0.06) and oor is True
 
 
+def test_linear_discount_out_of_range_clamps_endpoint_rate():
+    pts = [{"maturity_years": 1, "zero_rate": 0.04}, {"maturity_years": 3, "zero_rate": 0.06}]
+    rate, oor = interpolate_discount_factor(pts, 5, "annual")
+    assert rate == pytest.approx(0.06)
+    assert oor is True
+
+
 # ---------------------------------------------------------------------------
 # Validation / sorting
 # ---------------------------------------------------------------------------
@@ -149,6 +181,13 @@ def test_parallel_shock_adds_bps():
         assert s["zero_rate"] - o["zero_rate"] == pytest.approx(0.01)
 
 
+def test_curve_shock_does_not_mutate_original_curve():
+    pts = generate_sample_yield_curve()
+    before = [dict(p) for p in pts]
+    apply_curve_shock(pts, "parallel", 100)
+    assert pts == before
+
+
 def test_steepener_shifts_short_down_long_up():
     pts = generate_sample_yield_curve()
     shocked = apply_curve_shock(pts, "steepener", 100)
@@ -180,6 +219,15 @@ def test_fixed_coupon_bond_price_from_ytm():
     assert b["price"] == pytest.approx(1000.0, abs=1e-6)
 
 
+def test_fixed_coupon_bond_cash_flows():
+    b = bond_analytics(1000, 0.05, 5, 2, "ytm", 0.05, None, "annual", "linear_zero")
+    assert len(b["cash_flows"]) == 10
+    assert b["cash_flows"][0]["time_years"] == pytest.approx(0.5)
+    assert b["cash_flows"][0]["cash_flow"] == pytest.approx(25.0)
+    assert b["cash_flows"][-1]["time_years"] == pytest.approx(5.0)
+    assert b["cash_flows"][-1]["cash_flow"] == pytest.approx(1025.0)
+
+
 def test_premium_bond_when_coupon_above_ytm():
     b = bond_analytics(1000, 0.05, 5, 2, "ytm", 0.045, None, "annual", "linear_zero")
     assert b["price"] > 1000.0
@@ -188,6 +236,16 @@ def test_premium_bond_when_coupon_above_ytm():
 def test_zero_coupon_bond_price():
     b = bond_analytics(1000, 0.0, 5, 1, "ytm", 0.04, None, "annual", "linear_zero")
     assert b["price"] == pytest.approx(1000.0 / 1.04**5, abs=1e-6)
+
+
+def test_non_integer_coupon_schedule_rejected():
+    with pytest.raises(CurveInputError):
+        bond_analytics(1000, 0.05, 5.25, 2, "ytm", 0.045, None, "annual", "linear_zero")
+
+
+def test_too_negative_ytm_rejected():
+    with pytest.raises(CurveInputError):
+        bond_analytics(1000, 0.05, 5, 1, "ytm", -1.0, None, "annual", "linear_zero")
 
 
 def test_duration_convexity_finite_positive():
@@ -207,6 +265,12 @@ def test_curve_discounted_bond_finite():
     assert b["modified_duration"] is not None and b["modified_duration"] > 0
     assert b["dv01"] is not None and b["dv01"] > 0
     assert b["convexity"] is not None and b["convexity"] > 0
+
+
+def test_curve_discounting_beyond_curve_range_warns():
+    b = bond_analytics(1000, 0.05, 10, 1, "curve", None, _CURVE, "annual", "linear_zero")
+    assert b["price"] > 0
+    assert any("outside the curve" in w for w in b["warnings"])
 
 
 def test_invalid_negative_maturity_rejected():
@@ -282,3 +346,15 @@ def test_api_bond_validation_422(client, payload):
 
 def test_api_curve_validation_422(client):
     assert client.post("/rates/curve", json={"curve_points": [{"maturity_years": 1, "zero_rate": 0.04}]}).status_code == 422
+
+
+def test_api_curve_duplicate_maturities_422(client):
+    assert client.post(
+        "/rates/curve",
+        json={
+            "curve_points": [
+                {"maturity_years": 1, "zero_rate": 0.04},
+                {"maturity_years": 1, "zero_rate": 0.05},
+            ]
+        },
+    ).status_code == 422

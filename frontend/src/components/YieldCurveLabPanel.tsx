@@ -46,6 +46,9 @@ const PV_COLOR = seriesColor(0);
 function num(s: string): number {
   return s.trim() === "" ? NaN : Number(s);
 }
+function finite(s: string): boolean {
+  return Number.isFinite(num(s));
+}
 function pct(v: number | null | undefined, d = 3): string {
   return v == null ? "—" : `${(v * 100).toFixed(d)}%`;
 }
@@ -60,9 +63,9 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
 }
 function Stat({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-50 px-3 py-2 text-center">
+    <div className="glass px-3 py-2 text-center">
       <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mono mt-0.5 text-sm font-semibold text-slate-800">{value}</p>
+      <p className="mono mt-0.5 text-sm font-semibold text-slate-100">{value}</p>
     </div>
   );
 }
@@ -86,6 +89,34 @@ const CAVEAT =
   "method, and day-count assumptions. Synthetic/manual curves only — no live rates feed, no " +
   "swap-curve bootstrapping. Educational, not investment advice.";
 
+function parseCurveRows(rows: UiCurveRow[]): { points: CurvePoint[]; valid: boolean; message: string } {
+  if (rows.length < 2) {
+    return { points: [], valid: false, message: "At least two curve points are required." };
+  }
+  if (rows.length > 100) {
+    return { points: [], valid: false, message: "Curve input is capped at 100 points." };
+  }
+  const seen = new Set<string>();
+  const points: CurvePoint[] = [];
+  for (const row of rows) {
+    const maturity = num(row.maturity);
+    const ratePct = num(row.rate);
+    if (!Number.isFinite(maturity) || maturity <= 0 || !Number.isFinite(ratePct)) {
+      return { points: [], valid: false, message: "Every row needs a finite maturity > 0 and zero rate." };
+    }
+    if (ratePct <= -100 || ratePct > 100) {
+      return { points: [], valid: false, message: "Zero rates are entered as percent values between -100% and 100%." };
+    }
+    const key = maturity.toFixed(9);
+    if (seen.has(key)) {
+      return { points: [], valid: false, message: "Maturities must be unique." };
+    }
+    seen.add(key);
+    points.push({ maturity_years: maturity, zero_rate: ratePct / 100 });
+  }
+  return { points, valid: true, message: "" };
+}
+
 export default function YieldCurveLabPanel({ initialTab = "builder" }: { initialTab?: Tab }) {
   const [tab, setTab] = useState<Tab>(initialTab);
   // Shared curve across Builder / Shocks / Bond (curve mode).
@@ -93,24 +124,21 @@ export default function YieldCurveLabPanel({ initialTab = "builder" }: { initial
   const [compounding, setCompounding] = useState<CompoundingConvention>("continuous");
   const [interpolation, setInterpolation] = useState<InterpolationMethod>("linear_zero");
 
-  const apiPoints = (): CurvePoint[] =>
-    rows
-      .filter((r) => num(r.maturity) > 0 && Number.isFinite(num(r.rate)))
-      .map((r) => ({ maturity_years: num(r.maturity), zero_rate: num(r.rate) / 100 }));
-
-  const curveValid = apiPoints().length >= 2;
+  const curveParse = parseCurveRows(rows);
+  const apiPoints = (): CurvePoint[] => curveParse.points;
+  const curveValid = curveParse.valid;
 
   return (
     <div className="space-y-5">
       <div className="card p-5">
-        <p className="text-sm text-slate-600">
+        <p className="text-sm text-slate-300">
           The Yield Curve Lab explores interest-rate curves — zero rates, discount factors, forward
           rates, curve shocks, and basic bond duration / convexity.
         </p>
         <p className="mt-2 text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
 
-      <div className="inline-flex flex-wrap overflow-hidden rounded-lg border border-slate-300">
+      <div className="ql-segmented">
         {(
           [
             ["builder", "Curve Builder"],
@@ -123,10 +151,7 @@ export default function YieldCurveLabPanel({ initialTab = "builder" }: { initial
             key={id}
             type="button"
             onClick={() => setTab(id)}
-            className={
-              "px-3.5 py-1.5 text-xs font-medium transition-colors " +
-              (tab === id ? "bg-blue-600 text-white" : "bg-white text-slate-600 hover:bg-slate-50")
-            }
+            className={"ql-segmented-option " + (tab === id ? "active" : "")}
           >
             {label}
           </button>
@@ -143,6 +168,7 @@ export default function YieldCurveLabPanel({ initialTab = "builder" }: { initial
           setInterpolation={setInterpolation}
           apiPoints={apiPoints}
           curveValid={curveValid}
+          curveMessage={curveParse.message}
         />
       )}
       {tab === "shocks" && (
@@ -167,6 +193,7 @@ function CurveBuilderTab({
   setInterpolation,
   apiPoints,
   curveValid,
+  curveMessage,
 }: {
   rows: UiCurveRow[];
   setRows: (f: (r: UiCurveRow[]) => UiCurveRow[]) => void;
@@ -176,9 +203,11 @@ function CurveBuilderTab({
   setInterpolation: (m: InterpolationMethod) => void;
   apiPoints: () => CurvePoint[];
   curveValid: boolean;
+  curveMessage: string;
 }) {
   const [result, setResult] = useState<CurveResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [sampleNote, setSampleNote] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [sampleLoading, setSampleLoading] = useState(false);
 
@@ -186,7 +215,7 @@ function CurveBuilderTab({
     setRows((ls) => ls.map((l, idx) => (idx === i ? { ...l, ...patch } : l)));
   }
   function addRow() {
-    setRows((ls) => [...ls, { maturity: "20", rate: "4.10" }]);
+    setRows((ls) => (ls.length >= 100 ? ls : [...ls, { maturity: "20", rate: "4.10" }]));
   }
   function removeRow(i: number) {
     setRows((ls) => (ls.length > 2 ? ls.filter((_, idx) => idx !== i) : ls));
@@ -198,6 +227,7 @@ function CurveBuilderTab({
     try {
       const s = await fetchSampleCurve();
       setRows(() => s.curve_points.map((p) => ({ maturity: String(p.maturity_years), rate: (p.zero_rate * 100).toFixed(2) })));
+      setSampleNote(s.note);
     } catch (e) {
       setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
     } finally {
@@ -227,7 +257,7 @@ function CurveBuilderTab({
     <div className="card space-y-4 p-5">
       <p className="section-title">Curve Builder</p>
       <div className="flex flex-wrap items-end gap-3">
-        <button type="button" onClick={loadSample} disabled={sampleLoading} className="rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs font-medium text-slate-600 hover:border-blue-400">
+        <button type="button" onClick={loadSample} disabled={sampleLoading} className="rounded-lg border border-[var(--line-strong)] px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-[var(--accent-border)] disabled:cursor-not-allowed disabled:text-slate-500">
           {sampleLoading ? "Loading…" : "Load sample curve"}
         </button>
         <Field label="Compounding">
@@ -242,6 +272,7 @@ function CurveBuilderTab({
           </select>
         </Field>
       </div>
+      {sampleNote && <p className="text-[11px] text-slate-400">{sampleNote}</p>}
 
       <div className="overflow-x-auto">
         <table className="w-full max-w-md text-xs">
@@ -254,7 +285,7 @@ function CurveBuilderTab({
           </thead>
           <tbody>
             {rows.map((r, i) => (
-              <tr key={i} className="border-t border-slate-100">
+              <tr key={i} className="border-t border-[var(--line)]">
                 <td className="px-2 py-1"><input type="number" className={inputCls + " w-24"} value={r.maturity} onChange={(e) => setRow(i, { maturity: e.target.value })} /></td>
                 <td className="px-2 py-1"><input type="number" className={inputCls + " w-24"} value={r.rate} step={0.05} onChange={(e) => setRow(i, { rate: e.target.value })} /></td>
                 <td className="px-2 py-1"><button type="button" onClick={() => removeRow(i)} className="text-slate-400 hover:text-red-600" title="Remove">✕</button></td>
@@ -262,7 +293,14 @@ function CurveBuilderTab({
             ))}
           </tbody>
         </table>
-        <button type="button" onClick={addRow} className="mt-1 rounded-lg border border-slate-300 px-2.5 py-1 text-xs font-medium text-slate-600 hover:border-blue-400">+ Add point</button>
+        <button
+          type="button"
+          onClick={addRow}
+          disabled={rows.length >= 100}
+          className="mt-1 rounded-lg border border-[var(--line-strong)] px-2.5 py-1 text-xs font-medium text-slate-300 hover:border-[var(--accent-border)] disabled:cursor-not-allowed disabled:text-slate-500"
+        >
+          + Add point
+        </button>
       </div>
 
       <button
@@ -271,12 +309,14 @@ function CurveBuilderTab({
         disabled={!curveValid || loading}
         className={
           "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-          (curveValid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+          (curveValid && !loading
+            ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
+            : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
         }
       >
         {loading ? "Building…" : "Build curve"}
       </button>
-      {!curveValid && <p className="text-[11px] text-slate-400">At least two valid curve points (maturity &gt; 0) are required.</p>}
+      {!curveValid && <p className="text-[11px] text-slate-400">{curveMessage}</p>}
       {error && <p className="text-xs text-red-600">⚠ {error}</p>}
 
       {result && (
@@ -328,7 +368,7 @@ function CurveBuilderTab({
               </thead>
               <tbody>
                 {result.curve.map((c) => (
-                  <tr key={c.maturity_years} className="border-t border-slate-100">
+                  <tr key={c.maturity_years} className="border-t border-[var(--line)]">
                     <td className="px-2 py-1 text-right mono">{c.maturity_years}y</td>
                     <td className="px-2 py-1 text-right mono">{pct(c.zero_rate)}</td>
                     <td className="px-2 py-1 text-right mono">{c.discount_factor.toFixed(5)}</td>
@@ -393,7 +433,8 @@ function CurveShocksTab({
       <p className="section-title">Curve Shocks</p>
       <p className="text-xs text-slate-500">
         Educational curve shocks applied to the curve from the Builder tab — not a realistic
-        scenario-generation model.
+        scenario-generation model. Steepener shifts the short end down and long end up;
+        flattener does the opposite. Shock size is in basis points.
       </p>
       <div className="flex flex-wrap items-end gap-3">
         <Field label="Shock type">
@@ -407,8 +448,10 @@ function CurveShocksTab({
           onClick={run}
           disabled={!valid || loading}
           className={
-            "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-            (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+          "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+            (valid && !loading
+              ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
+              : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
           }
         >
           {loading ? "Shocking…" : "Run shock"}
@@ -448,7 +491,7 @@ function CurveShocksTab({
               </thead>
               <tbody>
                 {result.changes.map((c) => (
-                  <tr key={c.maturity_years} className="border-t border-slate-100">
+                  <tr key={c.maturity_years} className="border-t border-[var(--line)]">
                     <td className="px-2 py-1 text-right mono">{c.maturity_years}y</td>
                     <td className="px-2 py-1 text-right mono">{pct(c.original_rate)}</td>
                     <td className="px-2 py-1 text-right mono">{pct(c.shocked_rate)}</td>
@@ -487,13 +530,21 @@ function BondPricingTab({
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const freqValid = [1, 2, 4, 12].includes(num(freq));
+  const freqNum = num(freq);
+  const maturityNum = num(maturity);
+  const freqValid = Number.isInteger(freqNum) && [1, 2, 4, 12].includes(freqNum);
+  const couponScheduleValid =
+    freqValid &&
+    Number.isFinite(maturityNum) &&
+    maturityNum > 0 &&
+    Number.isInteger(Math.round(maturityNum * freqNum * 1e9) / 1e9);
   const valid =
     num(face) > 0 &&
-    Number.isFinite(num(coupon)) &&
+    finite(coupon) &&
     num(coupon) >= 0 &&
-    num(maturity) > 0 &&
+    maturityNum > 0 &&
     freqValid &&
+    couponScheduleValid &&
     (mode === "curve" ? curveValid : Number.isFinite(num(ytm)));
 
   async function run() {
@@ -506,8 +557,8 @@ function BondPricingTab({
         await priceBond({
           face_value: num(face),
           coupon_rate: num(coupon) / 100,
-          maturity_years: num(maturity),
-          coupon_frequency: num(freq),
+          maturity_years: maturityNum,
+          coupon_frequency: freqNum,
           pricing_mode: mode,
           yield_to_maturity: mode === "ytm" ? num(ytm) / 100 : null,
           curve_points: mode === "curve" ? apiPoints() : null,
@@ -556,7 +607,9 @@ function BondPricingTab({
         disabled={!valid || loading}
         className={
           "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-          (valid && !loading ? "bg-blue-600 text-white hover:bg-blue-700" : "cursor-not-allowed bg-slate-100 text-slate-400")
+          (valid && !loading
+            ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
+            : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
         }
       >
         {loading ? "Pricing…" : "Price bond"}
@@ -564,6 +617,7 @@ function BondPricingTab({
       {!valid && (
         <p className="text-[11px] text-slate-400">
           Face/maturity positive, frequency 1/2/4/12, and either a YTM or a valid Builder curve.
+          Maturity × frequency must be a whole number of coupon periods.
         </p>
       )}
       {error && <p className="text-xs text-red-600">⚠ {error}</p>}
@@ -574,7 +628,7 @@ function BondPricingTab({
             <Stat label="Price" value={result.price.toFixed(2)} />
             <Stat label="Macaulay duration" value={result.macaulay_duration != null ? `${result.macaulay_duration.toFixed(3)} y` : "—"} />
             <Stat label="Modified duration" value={result.modified_duration != null ? result.modified_duration.toFixed(3) : "—"} />
-            <Stat label="DV01" value={result.dv01 != null ? result.dv01.toFixed(4) : "—"} />
+            <Stat label="DV01 magnitude" value={result.dv01 != null ? result.dv01.toFixed(4) : "—"} />
             <Stat label="Convexity" value={result.convexity != null ? result.convexity.toFixed(3) : "—"} />
           </div>
           <div>
@@ -601,7 +655,7 @@ function BondPricingTab({
               </thead>
               <tbody>
                 {result.cash_flows.map((c) => (
-                  <tr key={c.time_years} className="border-t border-slate-100">
+                  <tr key={c.time_years} className="border-t border-[var(--line)]">
                     <td className="px-2 py-1 text-right mono">{c.time_years}y</td>
                     <td className="px-2 py-1 text-right mono">{c.cash_flow.toFixed(2)}</td>
                     <td className="px-2 py-1 text-right mono">{c.discount_factor.toFixed(5)}</td>
@@ -626,20 +680,20 @@ function EducationTab() {
   const items: [string, string][] = [
     ["Spot vs par yields", "A zero (spot) rate discounts a single cash flow at one maturity; a par yield is the coupon that prices a bond at par. They differ whenever the curve is not flat."],
     ["Discount factors", "DF(T) is the present value of $1 paid at T. For positive rates DFs fall with maturity; they encode the whole curve."],
-    ["Forward rates", "Forwards are the future rates implied by today's curve between two maturities — here continuously compounded from the discount factors."],
+    ["Forward rates", "Forwards are rates implied by today's curve between two maturities — here continuously compounded from the discount factors. They are not guaranteed forecasts."],
     ["Duration", "Macaulay duration is the PV-weighted average time to cash flows; modified duration ≈ the % price change per 1% yield move."],
     ["Convexity", "Convexity captures the curvature of the price/yield relationship — duration alone underestimates price for large moves."],
-    ["DV01", "Dollar value of a 1 bp yield move (≈ modified duration × price × 0.0001)."],
+    ["DV01", "Dollar value magnitude of a 1 bp yield move (≈ modified duration × price × 0.0001); the price change for a +1 bp move is usually negative."],
     ["Interpolation", "Rates between curve points are interpolated; the method (zero rates vs discount factors) changes intermediate values."],
     ["Assumption sensitivity", "Compounding, day count, interpolation, and curve construction all shift the numbers — fixed-income analytics are assumption-driven."],
   ];
   return (
-    <div className="card space-y-3 p-5 text-sm text-slate-600">
+    <div className="card space-y-3 p-5 text-sm text-slate-400">
       <p className="section-title">How to read the Yield Curve Lab</p>
       <ul className="space-y-2">
         {items.map(([title, body]) => (
           <li key={title}>
-            <span className="font-semibold text-slate-700">{title}:</span> {body}
+            <span className="font-semibold text-slate-200">{title}:</span> {body}
           </li>
         ))}
       </ul>
