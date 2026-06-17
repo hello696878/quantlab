@@ -75,7 +75,9 @@ reproducible and every limitation explicit.
    CAR/CAAR) + simplified merger-arb calculator (15.0). Planned: full merger-arb,
    convertible-arb, index add/remove engines
 4. **Futures & Commodities** — research (carry, term-structure, trend)
-5. **FX** — research (carry, momentum, PPP toys)
+5. **FX** — **built (v1)**: FX Lab — interest rate parity forward, FX carry, PPP
+   deviation, currency exposure + stress, Garman-Kohlhagen FX options (16.2).
+   Planned: FX vol surface, momentum/carry strategy backtests, live rates
 6. **Fixed Income & Rates** — **built (v1)**: Yield Curve Lab — zero rates,
    discount factors, forwards, curve shocks, bond duration/convexity/DV01 (16.0);
    Short Rate Models Lab — Vasicek / CIR simulation + analytic zero-coupon pricing
@@ -107,7 +109,8 @@ reproducible and every limitation explicit.
 7. Volatility Lab v1
 8. ~~Event-Driven & Arbitrage Module~~ — **built (v1)** (15.0: event study + merger-arb calculator)
 9. Rates / FX / Credit Module — **started** (16.0: Yield Curve Lab v1;
-   16.1: Short Rate Models v1 — Vasicek / CIR)
+   16.1: Short Rate Models v1 — Vasicek / CIR; 16.2: FX Lab v1 — IRP / carry /
+   PPP / exposure / Garman-Kohlhagen)
 10. Real Estate Module
 11. Microstructure & HFT Lab (educational simulations)
 12. Portfolio Studio + Ensemble Builder

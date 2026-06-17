@@ -1002,6 +1002,33 @@ single-asset Backtest + Strategy Comparison:
   rates feed, **no Hull-White**, no swap-curve bootstrapping, no production curve
   engine. Outputs depend on parameters, discretization, and seed. Not advice
 
+### Phase 16.2 — FX Lab v1 ✅
+
+- New backend `app/fx.py` — **pure**, deterministic FX analytics: **covered
+  interest rate parity** forward (`F = S·e^((r_d−r_f)T)` / annual), **FX carry**
+  decomposition (interest differential + expected spot move, both directions),
+  **PPP deviation** (`S_ppp = S_base·(dom index / for index)`), **currency
+  exposure** translation + symmetric stress, and **Garman-Kohlhagen** FX option
+  pricing (Black-Scholes with the foreign rate as a dividend yield → price, d1/d2,
+  delta, gamma, vega, theta, domestic/foreign rho)
+- Five routes: `POST /fx/forward`, `/fx/carry`, `/fx/ppp`, `/fx/exposure`,
+  `/fx/option` (validated; bad spot / vol / time / option type / index → 422;
+  never NaN/inf). 38 deterministic tests incl. parity-forward values, put-call
+  parity, exposure stress, and a GK-vs-Black-Scholes cross-check
+- New top-level **FX Lab** workspace (Forward / IRP · Carry · PPP · Exposure ·
+  FX Options · Education) with the shared **MetricCard** (readable values),
+  deterministic-palette charts (spot-vs-forward, carry breakdown, current-vs-PPP,
+  exposure-by-currency, FX option payoff), sidebar nav, dashboard card, and
+  command-palette commands (FX Lab + forward / carry / PPP / exposure / options)
+- **UI hotfix**: Rates / Yield Curve **metric-card value contrast** fixed
+  *globally* via a shared `MetricCard` driven by explicit CSS tokens
+  (`var(--text-hi)` / accent / emerald / warn / risk) instead of the inverted
+  Tailwind slate ramp — values were rendering as near-invisible dark navy
+- Research/education only — **no** live FX rates, no broker integration, no FX
+  arbitrage, no FX volatility surface, no production currency-risk system. Quote
+  convention is domestic per 1 foreign; results ignore bid/ask, funding/costs,
+  liquidity, and capital controls. Not advice
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -1072,8 +1099,9 @@ search · toasts, error boundary, loading/offline states.
 9. **Rates / FX / Credit Module** — **started** (16.0: Yield Curve Lab v1 —
    zero rates, discount factors, forwards, curve shocks, bond duration/convexity;
    16.1: Short Rate Models v1 — Vasicek / CIR simulation + analytic zero-coupon
-   pricing; Hull-White, swap-curve bootstrapping, FX, and credit curve remain
-   planned / research)
+   pricing; 16.2: FX Lab v1 — interest rate parity, carry, PPP, currency exposure,
+   Garman-Kohlhagen FX options; Hull-White, swap-curve bootstrapping, FX vol
+   surface, and credit curve remain planned / research)
 10. **Real Estate Module** (research)
 11. **Microstructure & HFT Lab** — *educational simulations* (order-book toys,
     queue models) on synthetic data; **not** real HFT execution (research)
@@ -1097,7 +1125,7 @@ built**; everything else is planned/research/future:
 | 2 | Options & Volatility | **built (v1)** — Black–Scholes, Greeks, IV solver, payoff builder, CRR **binomial tree** + American exercise, **Monte Carlo** GBM (Asian + barrier, SE/CI), **IV surface** + **SVI** research fit, **Heston** stochastic-vol MC; trinomial / Heston calibration / SABR / local vol / arbitrage-free surface planned |
 | 3 | Event-Driven & Arbitrage | **built (v1)** — event study (abnormal returns, CAR/CAAR) + simplified merger-arb calculator; full deal/convertible/index engines planned |
 | 4 | Futures & Commodities | research |
-| 5 | FX | research |
+| 5 | FX | **built (v1)** — FX Lab: interest rate parity forward, FX carry, PPP deviation, currency exposure + stress, Garman-Kohlhagen FX options; FX vol surface, live rates planned |
 | 6 | Fixed Income & Rates | **built (v1)** — Yield Curve Lab (zero rates, discount factors, forwards, curve shocks, bond duration / convexity / DV01) + Short Rate Models Lab (Vasicek / CIR simulation + analytic zero-coupon pricing); Hull-White, swap-curve bootstrapping planned |
 | 7 | Credit | research |
 | 8 | Crypto | **built (partial)** — crypto tickers, 365-day annualization; exchange-native data future |

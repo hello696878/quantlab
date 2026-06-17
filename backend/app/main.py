@@ -117,6 +117,14 @@ from app.short_rates import (
     ShortRateInputError,
     run_short_rate_model,
 )
+from app.fx import (
+    FxInputError,
+    compute_currency_exposure,
+    compute_fx_carry,
+    compute_fx_forward,
+    compute_ppp_deviation,
+    price_garman_kohlhagen,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -191,6 +199,16 @@ from app.schemas import (
     ShockResponse,
     ShortRateRequest,
     ShortRateResponse,
+    FxForwardRequest,
+    FxForwardResponse,
+    FxCarryRequest,
+    FxCarryResponse,
+    FxPppRequest,
+    FxPppResponse,
+    FxExposureRequest,
+    FxExposureResponse,
+    FxOptionRequest,
+    FxOptionResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -4088,3 +4106,136 @@ def rates_short_rate(request: ShortRateRequest) -> ShortRateResponse:
     except ShortRateInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return ShortRateResponse(**result)
+
+
+# ---------------------------------------------------------------------------
+# FX Lab endpoints (research v1)
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/fx/forward",
+    response_model=FxForwardResponse,
+    tags=["fx"],
+    summary="FX forward via covered interest rate parity",
+    description=(
+        "Theoretical forward rate from spot and the domestic/foreign interest "
+        "differential (continuous or annual compounding). Quote convention: "
+        "domestic currency per 1 unit of foreign. Educational — no live FX rates, "
+        "ignores bid/ask, funding/transaction costs, and capital controls."
+    ),
+)
+def fx_forward(request: FxForwardRequest) -> FxForwardResponse:
+    try:
+        result = compute_fx_forward(
+            request.spot_rate,
+            request.domestic_rate,
+            request.foreign_rate,
+            request.time_to_maturity,
+            request.compounding,
+        )
+    except FxInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return FxForwardResponse(**result)
+
+
+@app.post(
+    "/fx/carry",
+    response_model=FxCarryResponse,
+    tags=["fx"],
+    summary="Simplified FX carry decomposition",
+    description=(
+        "Decomposes an FX carry position into the interest differential and the "
+        "expected spot move. Educational — carry is not free money; ignores "
+        "funding/transaction costs and uses an assumed expected spot, not a forecast."
+    ),
+)
+def fx_carry(request: FxCarryRequest) -> FxCarryResponse:
+    try:
+        result = compute_fx_carry(
+            request.spot_rate,
+            request.domestic_rate,
+            request.foreign_rate,
+            request.expected_spot,
+            request.horizon_years,
+            request.notional,
+            request.direction,
+        )
+    except FxInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return FxCarryResponse(**result)
+
+
+@app.post(
+    "/fx/ppp",
+    response_model=FxPppResponse,
+    tags=["fx"],
+    summary="Purchasing-power-parity (PPP) deviation",
+    description=(
+        "Relative PPP-implied spot and the deviation of the current spot from it. "
+        "Educational — suggests relative valuation under simplified inputs, not a "
+        "timing signal; sensitive to base period, basket, and data quality."
+    ),
+)
+def fx_ppp(request: FxPppRequest) -> FxPppResponse:
+    try:
+        result = compute_ppp_deviation(
+            request.current_spot,
+            request.base_spot,
+            request.domestic_price_index,
+            request.foreign_price_index,
+        )
+    except FxInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return FxPppResponse(**result)
+
+
+@app.post(
+    "/fx/exposure",
+    response_model=FxExposureResponse,
+    tags=["fx"],
+    summary="Currency exposure translation + symmetric stress",
+    description=(
+        "Translates currency exposures into a base currency and applies a uniform "
+        "symmetric FX shock. Educational translation, not a covariance-based risk "
+        "model; no live FX rates."
+    ),
+)
+def fx_exposure(request: FxExposureRequest) -> FxExposureResponse:
+    try:
+        result = compute_currency_exposure(
+            [e.model_dump() for e in request.exposures],
+            request.base_currency,
+            request.shock_pct,
+        )
+    except FxInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return FxExposureResponse(**result)
+
+
+@app.post(
+    "/fx/option",
+    response_model=FxOptionResponse,
+    tags=["fx"],
+    summary="Garman-Kohlhagen FX option pricing + Greeks",
+    description=(
+        "Prices a European FX option with the Garman-Kohlhagen model "
+        "(Black-Scholes with a foreign risk-free rate as the dividend yield), "
+        "returning d1/d2, delta, gamma, vega, theta, and domestic/foreign rho. "
+        "Constant volatility — no FX volatility surface. Educational only."
+    ),
+)
+def fx_option(request: FxOptionRequest) -> FxOptionResponse:
+    try:
+        result = price_garman_kohlhagen(
+            request.option_type,
+            request.spot_rate,
+            request.strike,
+            request.domestic_rate,
+            request.foreign_rate,
+            request.volatility,
+            request.time_to_expiry,
+        )
+    except FxInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return FxOptionResponse(**result)

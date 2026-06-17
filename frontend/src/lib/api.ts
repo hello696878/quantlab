@@ -35,6 +35,16 @@ import type {
   ShockResponse,
   ShortRateRequest,
   ShortRateResponse,
+  FxForwardRequest,
+  FxForwardResponse,
+  FxCarryRequest,
+  FxCarryResponse,
+  FxPppRequest,
+  FxPppResponse,
+  FxExposureRequest,
+  FxExposureResponse,
+  FxOptionRequest,
+  FxOptionResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -1021,6 +1031,28 @@ export function priceBond(req: BondRequest): Promise<BondResponse> {
 
 export function simulateShortRate(req: ShortRateRequest): Promise<ShortRateResponse> {
   return postOptions<ShortRateResponse>("/api/rates/short-rate", req);
+}
+
+// ── FX Lab ───────────────────────────────────────────────────────────────────
+
+export function computeFxForward(req: FxForwardRequest): Promise<FxForwardResponse> {
+  return postOptions<FxForwardResponse>("/api/fx/forward", req);
+}
+
+export function computeFxCarry(req: FxCarryRequest): Promise<FxCarryResponse> {
+  return postOptions<FxCarryResponse>("/api/fx/carry", req);
+}
+
+export function computeFxPpp(req: FxPppRequest): Promise<FxPppResponse> {
+  return postOptions<FxPppResponse>("/api/fx/ppp", req);
+}
+
+export function computeFxExposure(req: FxExposureRequest): Promise<FxExposureResponse> {
+  return postOptions<FxExposureResponse>("/api/fx/exposure", req);
+}
+
+export function priceFxOption(req: FxOptionRequest): Promise<FxOptionResponse> {
+  return postOptions<FxOptionResponse>("/api/fx/option", req);
 }
 
 export async function fetchSampleCurve(): Promise<SampleCurveResponse> {

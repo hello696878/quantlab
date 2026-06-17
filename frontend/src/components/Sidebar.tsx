@@ -29,6 +29,7 @@ const ICONS: Record<string, string> = {
   options: "M3 12h4l3 7 4-14 3 7h4",
   events: "M4 5h16v15H4zM4 9h16M8 3v4M16 3v4",
   rates: "M3 17c3 0 4-9 7-9s4 6 7 6 3-7 4-7M3 21h18",
+  fx: "M4 7h11l-3-3m3 3-3 3M20 17H9l3-3m-3 3 3 3",
 };
 
 function Icon({ name, size = 17 }: { name: string; size?: number }) {
@@ -107,6 +108,7 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "options", label: "Options Lab", icon: "options" },
   { id: "events", label: "Event Lab", icon: "events" },
   { id: "rates", label: "Yield Curve Lab", icon: "rates" },
+  { id: "fx", label: "FX Lab", icon: "fx" },
   { id: "csv", label: "CSV Backtest", icon: "upload" },
   { id: "builder", label: "Strategy Builder", icon: "builder" },
   { id: "portfolio", label: "Portfolio Backtest", icon: "portfolio" },

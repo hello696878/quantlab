@@ -34,6 +34,7 @@ import type {
   ShortRateResponse,
 } from "@/lib/types";
 import NeonTooltip from "@/components/charts/NeonTooltip";
+import MetricCard from "@/components/MetricCard";
 import {
   CHART_AXIS,
   CHART_AXIS_LINE,
@@ -72,20 +73,10 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   );
 }
-function Stat({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "accent" | "warn" }) {
-  const valueColor =
-    tone === "accent"
-      ? "text-[var(--accent-text)]"
-      : tone === "warn"
-        ? "text-[var(--warn)]"
-        : "text-slate-100";
-  return (
-    <div className="glass px-3 py-2 text-center">
-      <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <p className={"mono mt-0.5 text-sm font-semibold " + valueColor}>{value}</p>
-    </div>
-  );
-}
+// Result cards use the shared MetricCard (explicit CSS tokens → always readable
+// on the dark theme; the Tailwind slate ramp is inverted, so numeric classes are
+// avoided here). Aliased as `Stat` to keep existing call sites unchanged.
+const Stat = MetricCard;
 
 interface UiCurveRow {
   maturity: string;
@@ -885,7 +876,7 @@ function ShortRateModelsTab() {
             <Stat label="Terminal rate vol" value={pct(result.summary.final_rate_std)} />
             <Stat label="Negative rate prob." value={pct(negProb, 1)} tone={negProb > 0 ? "warn" : "default"} />
             {isCir && (
-              <Stat label="Feller condition" value={result.feller.satisfied ? "Satisfied" : "Violated"} tone={result.feller.satisfied ? "default" : "warn"} />
+              <Stat label="Feller condition" value={result.feller.satisfied ? "Satisfied" : "Violated"} tone={result.feller.satisfied ? "positive" : "warn"} />
             )}
           </div>
 

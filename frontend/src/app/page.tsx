@@ -40,6 +40,7 @@ import { DISASTER_REGISTRY, LIVE_DISASTERS } from "@/lib/disasterRegistry";
 import OptionsLabPanel from "@/components/OptionsLabPanel";
 import EventLabPanel from "@/components/EventLabPanel";
 import YieldCurveLabPanel from "@/components/YieldCurveLabPanel";
+import FxLabPanel from "@/components/FxLabPanel";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -356,6 +357,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "Zero rates, discount factors, forward rates, curve shocks, and basic bond duration / convexity — synthetic curves, no live rates feed.",
   },
+  fx: {
+    title: "FX Lab",
+    subtitle:
+      "Spot/forward via interest rate parity, FX carry, PPP deviation, currency exposure, and Garman-Kohlhagen FX options — no live FX rates, not investment advice.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -477,6 +483,12 @@ export default function HomePage() {
     "builder",
   );
   const [ratesKey, setRatesKey] = useState(0);
+
+  // FX Lab: which tab to open on (deep-linked from the palette).
+  const [fxTab, setFxTab] = useState<"forward" | "carry" | "ppp" | "exposure" | "options" | "education">(
+    "forward",
+  );
+  const [fxKey, setFxKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -782,6 +794,7 @@ export default function HomePage() {
     { view: "options", title: "Open Options Lab", keywords: "options black-scholes greeks implied volatility payoff straddle strangle covered call protective put" },
     { view: "events", title: "Open Event Lab", keywords: "event study abnormal return car caar merger arbitrage deal spread event-driven earnings event" },
     { view: "rates", title: "Open Yield Curve Lab", keywords: "yield curve rates zero rate discount factor forward rate duration convexity dv01 bond pricing fixed income short rate vasicek cir mean reversion" },
+    { view: "fx", title: "Open FX Lab", keywords: "fx foreign exchange currency forward rate interest rate parity carry ppp purchasing power parity exposure garman kohlhagen fx option" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -977,6 +990,25 @@ export default function HomePage() {
         setRatesTab(t);
         setRatesKey((k) => k + 1);
         handleNav("rates");
+      },
+    })),
+    ...(
+      [
+        ["forward", "Open FX Forward Calculator", "fx forward interest rate parity irp spot currency foreign exchange"],
+        ["carry", "Open FX Carry Calculator", "fx carry interest differential currency foreign exchange"],
+        ["ppp", "Open PPP Calculator", "ppp purchasing power parity fx valuation deviation currency"],
+        ["exposure", "Open Currency Exposure", "currency exposure fx stress base currency foreign exchange"],
+        ["options", "Open FX Options", "fx option garman kohlhagen call put delta gamma vega currency"],
+      ] as const
+    ).map(([t, title, keywords], i) => ({
+      id: `fx-${t}-${i}`,
+      group: "FX Lab",
+      title,
+      keywords,
+      run: () => {
+        setFxTab(t);
+        setFxKey((k) => k + 1);
+        handleNav("fx");
       },
     })),
     // Report actions are only offered when they actually work (a result exists).
@@ -1416,6 +1448,9 @@ export default function HomePage() {
 
         {/* ── Yield Curve Lab ──────────────────────────────────────────── */}
         {view === "rates" && <YieldCurveLabPanel key={ratesKey} initialTab={ratesTab} />}
+
+        {/* ── FX Lab ───────────────────────────────────────────────────── */}
+        {view === "fx" && <FxLabPanel key={fxKey} initialTab={fxTab} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

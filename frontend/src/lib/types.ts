@@ -2157,3 +2157,123 @@ export interface ShortRateResponse {
   distribution: ShortRateDistributionBucket[];
   warnings: string[];
 }
+
+// ── FX Lab (forward/IRP, carry, PPP, exposure, Garman-Kohlhagen) ─────────────
+
+export type FxCompounding = "continuous" | "annual";
+export type CarryDirection = "long_foreign" | "long_domestic";
+
+export interface FxForwardRequest {
+  spot_rate: number;
+  domestic_rate: number;
+  foreign_rate: number;
+  time_to_maturity: number;
+  compounding: FxCompounding;
+}
+
+export interface FxForwardResponse {
+  spot_rate: number;
+  forward_rate: number;
+  forward_points: number;
+  rate_differential: number;
+  compounding: FxCompounding;
+  convention: string;
+  warnings: string[];
+}
+
+export interface FxCarryRequest {
+  spot_rate: number;
+  domestic_rate: number;
+  foreign_rate: number;
+  expected_spot: number;
+  horizon_years: number;
+  notional: number;
+  direction: CarryDirection;
+}
+
+export interface FxCarryResponse {
+  direction: CarryDirection;
+  interest_differential: number;
+  carry_return: number;
+  expected_fx_return: number;
+  total_expected_return: number;
+  pnl_estimate: number;
+  notional: number;
+  horizon_years: number;
+  convention: string;
+  warnings: string[];
+}
+
+export interface FxPppRequest {
+  current_spot: number;
+  base_spot: number;
+  domestic_price_index: number;
+  foreign_price_index: number;
+}
+
+export interface FxPppResponse {
+  current_spot: number;
+  ppp_implied_spot: number;
+  deviation: number;
+  valuation: string;
+  convention: string;
+  warnings: string[];
+}
+
+export interface FxExposureItem {
+  currency: string;
+  amount: number;
+  spot_to_base: number;
+}
+
+export interface FxExposureRequest {
+  exposures: FxExposureItem[];
+  base_currency: string;
+  shock_pct: number;
+}
+
+export interface FxExposureRow {
+  currency: string;
+  amount: number;
+  spot_to_base: number;
+  base_value: number;
+  weight_pct: number;
+  stress_pnl_up: number;
+  stress_pnl_down: number;
+}
+
+export interface FxExposureResponse {
+  base_currency: string;
+  shock_pct: number;
+  total_exposure: number;
+  rows: FxExposureRow[];
+  stress_pnl_up: number;
+  stress_pnl_down: number;
+  warnings: string[];
+}
+
+export interface FxOptionRequest {
+  option_type: "call" | "put";
+  spot_rate: number;
+  strike: number;
+  domestic_rate: number;
+  foreign_rate: number;
+  volatility: number;
+  time_to_expiry: number;
+}
+
+export interface FxOptionResponse {
+  option_type: "call" | "put";
+  price: number;
+  d1: number;
+  d2: number;
+  delta: number;
+  gamma: number;
+  vega: number;
+  theta_annual: number;
+  theta_daily: number;
+  rho_domestic: number;
+  rho_foreign: number;
+  convention: string;
+  warnings: string[];
+}

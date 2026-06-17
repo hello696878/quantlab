@@ -4521,3 +4521,138 @@ class ShortRateResponse(BaseModel):
     )
     distribution: List[ShortRateDistributionBucket] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
+
+
+# ===========================================================================
+# FX Lab — research v1 (forward / IRP, carry, PPP, exposure, Garman-Kohlhagen)
+# ===========================================================================
+
+FxCompounding = Literal["continuous", "annual"]
+CarryDirection = Literal["long_foreign", "long_domestic"]
+
+
+class FxForwardRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    spot_rate: float = Field(gt=0.0, le=1e12, description="Domestic currency per 1 unit of foreign.")
+    domestic_rate: float = Field(ge=-10.0, le=10.0)
+    foreign_rate: float = Field(ge=-10.0, le=10.0)
+    time_to_maturity: float = Field(gt=0.0, le=100.0)
+    compounding: FxCompounding = "continuous"
+
+
+class FxForwardResponse(BaseModel):
+    spot_rate: float
+    forward_rate: float
+    forward_points: float
+    rate_differential: float
+    compounding: FxCompounding
+    convention: str
+    warnings: List[str] = Field(default_factory=list)
+
+
+class FxCarryRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    spot_rate: float = Field(gt=0.0, le=1e12)
+    domestic_rate: float = Field(ge=-10.0, le=10.0)
+    foreign_rate: float = Field(ge=-10.0, le=10.0)
+    expected_spot: float = Field(gt=0.0, le=1e12)
+    horizon_years: float = Field(gt=0.0, le=100.0)
+    notional: float = Field(ge=-1e15, le=1e15)
+    direction: CarryDirection = "long_foreign"
+
+
+class FxCarryResponse(BaseModel):
+    direction: CarryDirection
+    interest_differential: float
+    carry_return: float
+    expected_fx_return: float
+    total_expected_return: float
+    pnl_estimate: float
+    notional: float
+    horizon_years: float
+    convention: str
+    warnings: List[str] = Field(default_factory=list)
+
+
+class FxPppRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    current_spot: float = Field(gt=0.0, le=1e12)
+    base_spot: float = Field(gt=0.0, le=1e12)
+    domestic_price_index: float = Field(gt=0.0, le=1e9)
+    foreign_price_index: float = Field(gt=0.0, le=1e9)
+
+
+class FxPppResponse(BaseModel):
+    current_spot: float
+    ppp_implied_spot: float
+    deviation: float
+    valuation: str
+    convention: str
+    warnings: List[str] = Field(default_factory=list)
+
+
+class FxExposureItem(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    currency: str = Field(min_length=1, max_length=12)
+    amount: float = Field(ge=-1e15, le=1e15)
+    spot_to_base: float = Field(gt=0.0, le=1e12, description="Base currency per 1 unit of this currency.")
+
+
+class FxExposureRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    exposures: List[FxExposureItem] = Field(min_length=1, max_length=100)
+    base_currency: str = Field(min_length=1, max_length=12)
+    shock_pct: float = Field(default=0.1, ge=0.0, le=1.0)
+
+
+class FxExposureRow(BaseModel):
+    currency: str
+    amount: float
+    spot_to_base: float
+    base_value: float
+    weight_pct: float
+    stress_pnl_up: float
+    stress_pnl_down: float
+
+
+class FxExposureResponse(BaseModel):
+    base_currency: str
+    shock_pct: float
+    total_exposure: float
+    rows: List[FxExposureRow] = Field(default_factory=list)
+    stress_pnl_up: float
+    stress_pnl_down: float
+    warnings: List[str] = Field(default_factory=list)
+
+
+class FxOptionRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    option_type: OptionType = "call"
+    spot_rate: float = Field(gt=0.0, le=1e12)
+    strike: float = Field(gt=0.0, le=1e12)
+    domestic_rate: float = Field(ge=-10.0, le=10.0)
+    foreign_rate: float = Field(ge=-10.0, le=10.0)
+    volatility: float = Field(gt=0.0, le=100.0)
+    time_to_expiry: float = Field(gt=0.0, le=100.0)
+
+
+class FxOptionResponse(BaseModel):
+    option_type: OptionType
+    price: float
+    d1: float
+    d2: float
+    delta: float
+    gamma: float
+    vega: float
+    theta_annual: float
+    theta_daily: float
+    rho_domestic: float
+    rho_foreign: float
+    convention: str
+    warnings: List[str] = Field(default_factory=list)

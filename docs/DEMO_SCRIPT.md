@@ -162,6 +162,19 @@ Return to the Command Center's **Platform Direction** panel (or open
   Emphasise: forward rates are implied, not guaranteed forecasts; short-rate
   paths are model scenarios, not forecasts; synthetic curves, no live rates
   feed, no market calibration, no Hull-White, assumption-sensitive.
+- **FX Lab** — *Forward / IRP*: spot 150, domestic 1%, foreign 5%, T 1,
+  continuous → forward ≈ 144.12 (below spot — foreign trades at a forward
+  discount). *Carry*: spot 150, dom 1%, for 5%, expected 152, 1y, notional
+  1,000,000, long foreign → interest differential, carry return, expected FX
+  return, total, and P&L (note "carry is not free money"). *PPP*: current 150,
+  base 120, dom index 110, for index 105 → PPP-implied ≈ 125.71 and the
+  deviation / valuation label. *Exposure*: USD / JPY / EUR sample rows, base USD,
+  10% shock → total exposure, per-currency bars, and ± stress P&L (the base
+  currency carries no FX risk). *FX Options*: call, S 1.10, K 1.10, dom 4%,
+  for 2%, vol 12%, T 1 → price, d1/d2, delta, gamma, vega and the intrinsic
+  payoff chart. Emphasise: domestic-per-foreign convention; all result-card
+  values are readable on the dark theme; no live FX rates, no FX vol surface,
+  not investment advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

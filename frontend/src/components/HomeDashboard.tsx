@@ -1070,6 +1070,22 @@ export default function HomeDashboard({
               Open Yield Curve Lab →
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => onNav("fx")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+              FX Lab
+            </span>
+            <span className="text-xs text-slate-400">
+              Explore spot/forward relationships, interest rate parity, FX carry, PPP
+              deviation, currency exposure, and FX option pricing — no live FX rates.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open FX Lab →
+            </span>
+          </button>
         </div>
       </section>
 
