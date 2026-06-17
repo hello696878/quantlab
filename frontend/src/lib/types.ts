@@ -2076,3 +2076,84 @@ export interface SampleCurveResponse {
   curve_points: CurvePoint[];
   note: string;
 }
+
+// ── Short Rate Models Lab (Vasicek / CIR) ────────────────────────────────────
+
+export type ShortRateModel = "vasicek" | "cir";
+
+export interface ShortRateRequest {
+  model: ShortRateModel;
+  initial_rate: number;
+  long_run_rate: number;
+  kappa: number;
+  sigma: number;
+  horizon_years: number;
+  steps: number;
+  simulations: number;
+  seed: number | null;
+}
+
+export interface ShortRateSummary {
+  mean_terminal_rate: number;
+  median_terminal_rate: number;
+  min_terminal_rate: number;
+  max_terminal_rate: number;
+  negative_rate_probability: number;
+  mean_path_rate: number;
+  final_rate_std: number;
+}
+
+export interface ShortRateZeroCoupon {
+  maturity_years: number;
+  price: number | null;
+  implied_zero_rate: number | null;
+  formula: string;
+}
+
+export interface ShortRateFeller {
+  satisfied: boolean;
+  two_kappa_theta: number;
+  sigma_squared: number;
+}
+
+export interface ShortRateParameters {
+  initial_rate: number;
+  long_run_rate: number;
+  kappa: number;
+  sigma: number;
+}
+
+export interface ShortRatePoint {
+  time: number;
+  rate: number;
+}
+
+export interface ShortRatePath {
+  path_id: number;
+  points: ShortRatePoint[];
+}
+
+export interface ShortRateDistributionBucket {
+  lower: number;
+  upper: number;
+  mid: number;
+  count: number;
+  probability: number;
+}
+
+export interface ShortRateResponse {
+  model: ShortRateModel;
+  summary: ShortRateSummary;
+  zero_coupon: ShortRateZeroCoupon;
+  feller: ShortRateFeller;
+  parameters: ShortRateParameters;
+  horizon_years: number;
+  steps: number;
+  simulations: number;
+  seed: number | null;
+  long_run_rate: number;
+  mean_path: ShortRatePoint[];
+  path_preview: ShortRatePath[];
+  distribution: ShortRateDistributionBucket[];
+  warnings: string[];
+}

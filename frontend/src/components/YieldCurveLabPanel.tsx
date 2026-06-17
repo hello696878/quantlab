@@ -5,7 +5,9 @@ import {
   ResponsiveContainer,
   ComposedChart,
   Bar,
+  Cell,
   Line,
+  ReferenceLine,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -17,6 +19,7 @@ import {
   fetchSampleCurve,
   priceBond,
   shockCurve,
+  simulateShortRate,
 } from "@/lib/api";
 import type {
   BondResponse,
@@ -27,12 +30,20 @@ import type {
   PricingMode,
   ShockResponse,
   ShockType,
+  ShortRateModel,
+  ShortRateResponse,
 } from "@/lib/types";
 import NeonTooltip from "@/components/charts/NeonTooltip";
-import { CHART_AXIS, CHART_AXIS_LINE, CHART_GRID } from "@/components/charts/chartTheme";
+import {
+  CHART_AXIS,
+  CHART_AXIS_LINE,
+  CHART_GRID,
+  CHART_REF_LINE,
+  DANGER,
+} from "@/components/charts/chartTheme";
 import { seriesColor } from "@/lib/chartPalette";
 
-type Tab = "builder" | "shocks" | "bond" | "education";
+type Tab = "builder" | "shocks" | "bond" | "shortrate" | "education";
 
 const inputCls = "ql-input px-2.5 py-1.5";
 const labelCls = "mb-1 block text-[11px] font-medium uppercase tracking-wide text-slate-400";
@@ -61,11 +72,18 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
     </label>
   );
 }
-function Stat({ label, value }: { label: string; value: string }) {
+function Stat({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "accent" | "warn" }) {
+  // slate ramp is inverted for the dark theme: 400 = muted label, 900 = bright value.
+  const valueColor =
+    tone === "accent"
+      ? "text-blue-700"
+      : tone === "warn"
+        ? "text-amber-700"
+        : "text-slate-900";
   return (
     <div className="glass px-3 py-2 text-center">
       <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="mono mt-0.5 text-sm font-semibold text-slate-100">{value}</p>
+      <p className={"mono mt-0.5 text-sm font-semibold " + valueColor}>{value}</p>
     </div>
   );
 }
@@ -133,7 +151,8 @@ export default function YieldCurveLabPanel({ initialTab = "builder" }: { initial
       <div className="card p-5">
         <p className="text-sm text-slate-300">
           The Yield Curve Lab explores interest-rate curves — zero rates, discount factors, forward
-          rates, curve shocks, and basic bond duration / convexity.
+          rates, curve shocks, basic bond duration / convexity, and educational short-rate models
+          (Vasicek / CIR).
         </p>
         <p className="mt-2 text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
@@ -144,6 +163,7 @@ export default function YieldCurveLabPanel({ initialTab = "builder" }: { initial
             ["builder", "Curve Builder"],
             ["shocks", "Curve Shocks"],
             ["bond", "Bond Pricing"],
+            ["shortrate", "Short Rate Models"],
             ["education", "Education"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -177,6 +197,7 @@ export default function YieldCurveLabPanel({ initialTab = "builder" }: { initial
       {tab === "bond" && (
         <BondPricingTab compounding={compounding} interpolation={interpolation} apiPoints={apiPoints} curveValid={curveValid} />
       )}
+      {tab === "shortrate" && <ShortRateModelsTab />}
       {tab === "education" && <EducationTab />}
     </div>
   );
@@ -625,7 +646,7 @@ function BondPricingTab({
       {result && (
         <>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <Stat label="Price" value={result.price.toFixed(2)} />
+            <Stat label="Price" value={result.price.toFixed(2)} tone="accent" />
             <Stat label="Macaulay duration" value={result.macaulay_duration != null ? `${result.macaulay_duration.toFixed(3)} y` : "—"} />
             <Stat label="Modified duration" value={result.modified_duration != null ? result.modified_duration.toFixed(3) : "—"} />
             <Stat label="DV01 magnitude" value={result.dv01 != null ? result.dv01.toFixed(4) : "—"} />
@@ -674,6 +695,264 @@ function BondPricingTab({
   );
 }
 
+// ── Short Rate Models (Vasicek / CIR) ────────────────────────────────────────
+
+const SHORT_RATE_MODELS: [ShortRateModel, string][] = [
+  ["vasicek", "Vasicek"],
+  ["cir", "CIR (Cox–Ingersoll–Ross)"],
+];
+
+// Distinct from the curve colours; deterministic per path index.
+const SR_MEAN_COLOR = "#e8ecf6"; // bright mean-path line
+const SR_THETA_COLOR = seriesColor(4); // amber — long-run mean reference
+const SR_BAR_COLOR = seriesColor(0); // cyan — distribution bars
+
+interface ShortRateUiInputs {
+  model: ShortRateModel;
+  initialRatePct: string;
+  longRunRatePct: string;
+  kappa: string;
+  sigmaPct: string;
+  horizon: string;
+  steps: string;
+  simulations: string;
+  seed: string;
+}
+
+const SR_VASICEK_DEMO: ShortRateUiInputs = {
+  model: "vasicek",
+  initialRatePct: "4.0",
+  longRunRatePct: "3.5",
+  kappa: "0.8",
+  sigmaPct: "1.5",
+  horizon: "5",
+  steps: "252",
+  simulations: "5000",
+  seed: "42",
+};
+const SR_CIR_DEMO: ShortRateUiInputs = { ...SR_VASICEK_DEMO, model: "cir" };
+
+function ShortRateModelsTab() {
+  const [inp, setInp] = useState<ShortRateUiInputs>(SR_VASICEK_DEMO);
+  const [result, setResult] = useState<ShortRateResponse | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  function set<K extends keyof ShortRateUiInputs>(key: K, value: ShortRateUiInputs[K]) {
+    setInp((s) => ({ ...s, [key]: value }));
+  }
+
+  const kappaNum = num(inp.kappa);
+  const sigmaNum = num(inp.sigmaPct);
+  const horizonNum = num(inp.horizon);
+  const stepsNum = num(inp.steps);
+  const simsNum = num(inp.simulations);
+  const seedNum = inp.seed.trim() === "" ? NaN : num(inp.seed);
+  const initialNum = num(inp.initialRatePct);
+  const longRunNum = num(inp.longRunRatePct);
+
+  const valid =
+    finite(inp.initialRatePct) &&
+    finite(inp.longRunRatePct) &&
+    kappaNum > 0 &&
+    sigmaNum >= 0 &&
+    horizonNum > 0 &&
+    horizonNum <= 100 &&
+    Number.isInteger(stepsNum) &&
+    stepsNum >= 1 &&
+    stepsNum <= 2000 &&
+    Number.isInteger(simsNum) &&
+    simsNum >= 100 &&
+    simsNum <= 200000 &&
+    Number.isInteger(seedNum) &&
+    seedNum >= 0 &&
+    // CIR is defined on non-negative rates.
+    (inp.model === "vasicek" || (initialNum >= 0 && longRunNum >= 0));
+
+  async function run() {
+    if (!valid || loading) return;
+    setLoading(true);
+    setError(null);
+    setResult(null);
+    try {
+      setResult(
+        await simulateShortRate({
+          model: inp.model,
+          initial_rate: initialNum / 100,
+          long_run_rate: longRunNum / 100,
+          kappa: kappaNum,
+          sigma: sigmaNum / 100,
+          horizon_years: horizonNum,
+          steps: stepsNum,
+          simulations: simsNum,
+          seed: seedNum,
+        }),
+      );
+    } catch (e) {
+      setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // Merge the (shared time grid) preview paths + mean path into rows for Recharts.
+  const pathRows = (() => {
+    if (!result || result.path_preview.length === 0) return [];
+    const paths = result.path_preview;
+    const len = paths[0].points.length;
+    const rows: Record<string, number | undefined>[] = [];
+    for (let k = 0; k < len; k++) {
+      const row: Record<string, number | undefined> = { t: paths[0].points[k].time };
+      paths.forEach((p, i) => {
+        row[`p${i}`] = p.points[k]?.rate;
+      });
+      if (result.mean_path[k]) row.mean = result.mean_path[k].rate;
+      rows.push(row);
+    }
+    return rows;
+  })();
+
+  const distData = result?.distribution.map((b) => ({ mid: b.mid, probability: b.probability })) ?? [];
+  const isCir = result?.model === "cir";
+  const negProb = result?.summary.negative_rate_probability ?? 0;
+
+  return (
+    <div className="card space-y-4 p-5">
+      <p className="section-title">Short Rate Models</p>
+      <p className="text-xs text-slate-500">
+        One-factor <span className="font-medium">Vasicek</span> and{" "}
+        <span className="font-medium">CIR</span> short-rate models simulated under risk-neutral
+        dynamics (Euler scheme; CIR uses full truncation). Short-rate paths are model scenarios
+        under the chosen parameters and seed — not forecasts. Educational only: simplified models,
+        no live rates feed, no market calibration, no Hull-White.
+      </p>
+
+      {/* Model setup */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Field label="Model">
+          <select className={inputCls} value={inp.model} onChange={(e) => set("model", e.target.value as ShortRateModel)}>
+            {SHORT_RATE_MODELS.map(([id, label]) => (<option key={id} value={id}>{label}</option>))}
+          </select>
+        </Field>
+        <Field label="Initial rate (%)"><input type="number" className={inputCls} value={inp.initialRatePct} step={0.25} onChange={(e) => set("initialRatePct", e.target.value)} /></Field>
+        <Field label="Long-run rate (%)"><input type="number" className={inputCls} value={inp.longRunRatePct} step={0.25} onChange={(e) => set("longRunRatePct", e.target.value)} /></Field>
+        <Field label="Kappa (speed)"><input type="number" className={inputCls} value={inp.kappa} step={0.1} onChange={(e) => set("kappa", e.target.value)} /></Field>
+        <Field label="Sigma (vol, %)"><input type="number" className={inputCls} value={inp.sigmaPct} step={0.25} onChange={(e) => set("sigmaPct", e.target.value)} /></Field>
+        <Field label="Horizon (yrs)"><input type="number" className={inputCls} value={inp.horizon} step={1} onChange={(e) => set("horizon", e.target.value)} /></Field>
+        <Field label="Steps"><input type="number" className={inputCls} value={inp.steps} step={1} onChange={(e) => set("steps", e.target.value)} /></Field>
+        <Field label="Simulations"><input type="number" className={inputCls} value={inp.simulations} step={1000} onChange={(e) => set("simulations", e.target.value)} /></Field>
+        <Field label="Seed"><input type="number" className={inputCls} value={inp.seed} step={1} onChange={(e) => set("seed", e.target.value)} /></Field>
+      </div>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={run}
+          disabled={!valid || loading}
+          className={
+            "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+            (valid && !loading
+              ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
+              : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
+          }
+        >
+          {loading ? "Simulating…" : "Run simulation"}
+        </button>
+        <button type="button" onClick={() => { setInp(SR_VASICEK_DEMO); setResult(null); setError(null); }} className="rounded-lg border border-[var(--line-strong)] px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-[var(--accent-border)]">
+          Load Vasicek demo
+        </button>
+        <button type="button" onClick={() => { setInp(SR_CIR_DEMO); setResult(null); setError(null); }} className="rounded-lg border border-[var(--line-strong)] px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-[var(--accent-border)]">
+          Load CIR demo
+        </button>
+      </div>
+      {!valid && (
+        <p className="text-[11px] text-slate-400">
+          Kappa &gt; 0, sigma ≥ 0, horizon 0–100y, steps 1–2000, simulations 100–200,000, integer
+          seed ≥ 0. CIR also requires non-negative initial and long-run rates.
+        </p>
+      )}
+      {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+
+      {result && (
+        <>
+          {/* Result cards */}
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+            <Stat label="Zero-coupon price" value={result.zero_coupon.price != null ? result.zero_coupon.price.toFixed(4) : "—"} tone="accent" />
+            <Stat label="Implied zero rate" value={pct(result.zero_coupon.implied_zero_rate)} />
+            <Stat label="Mean terminal rate" value={pct(result.summary.mean_terminal_rate)} />
+            <Stat label="Terminal rate vol" value={pct(result.summary.final_rate_std)} />
+            <Stat label="Negative rate prob." value={pct(negProb, 1)} tone={negProb > 0 ? "warn" : "default"} />
+            {isCir && (
+              <Stat label="Feller condition" value={result.feller.satisfied ? "Satisfied" : "Violated"} tone={result.feller.satisfied ? "default" : "warn"} />
+            )}
+          </div>
+
+          {/* Path preview */}
+          <div>
+            <p className="section-title mb-1">Short-rate path preview</p>
+            <ResponsiveContainer width="100%" height={240}>
+              <ComposedChart data={pathRows} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={{ stroke: CHART_AXIS_LINE }} tickLine={false} tickFormatter={(v: number) => `${v.toFixed(1)}y`} />
+                <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => `${(v * 100).toFixed(1)}%`} />
+                <Tooltip content={<NeonTooltip formatValue={(v: number) => `${(v * 100).toFixed(3)}%`} formatLabel={(l) => (typeof l === "number" ? `${l.toFixed(2)}y` : "")} />} />
+                <ReferenceLine y={0} stroke={CHART_REF_LINE} strokeDasharray="2 2" />
+                <ReferenceLine y={result.long_run_rate} stroke={SR_THETA_COLOR} strokeDasharray="6 4" />
+                {result.path_preview.map((p, i) => (
+                  <Line key={p.path_id} type="monotone" dataKey={`p${i}`} stroke={seriesColor(i)} strokeWidth={1.2} strokeOpacity={0.75} dot={false} isAnimationActive={false} />
+                ))}
+                <Line type="monotone" dataKey="mean" name="Mean path" stroke={SR_MEAN_COLOR} strokeWidth={2.4} dot={false} isAnimationActive={false} />
+              </ComposedChart>
+            </ResponsiveContainer>
+            <p className="text-[11px] text-slate-400">
+              Thin coloured lines are sample paths (capped preview).{" "}
+              <span style={{ color: SR_MEAN_COLOR }}>— Mean path</span>{"  "}
+              <span style={{ color: SR_THETA_COLOR }}>– – Long-run mean (θ = {pct(result.long_run_rate)})</span>.
+            </p>
+          </div>
+
+          {/* Terminal distribution */}
+          <div>
+            <p className="section-title mb-1">Terminal rate distribution</p>
+            <ResponsiveContainer width="100%" height={200}>
+              <ComposedChart data={distData} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                <XAxis dataKey="mid" type="number" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={{ stroke: CHART_AXIS_LINE }} tickLine={false} tickFormatter={(v: number) => `${(v * 100).toFixed(1)}%`} />
+                <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={52} tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`} />
+                <Tooltip content={<NeonTooltip formatValue={(v: number) => `${(v * 100).toFixed(2)}%`} formatLabel={(l) => (typeof l === "number" ? `${(l * 100).toFixed(2)}%` : "")} />} />
+                <ReferenceLine x={0} stroke={DANGER} strokeDasharray="3 3" />
+                <Bar dataKey="probability" name="Probability" isAnimationActive={false}>
+                  {distData.map((d, i) => (
+                    <Cell key={i} fill={d.mid < 0 ? DANGER : SR_BAR_COLOR} />
+                  ))}
+                </Bar>
+              </ComposedChart>
+            </ResponsiveContainer>
+            <p className="text-[11px] text-slate-400">
+              Distribution of the terminal short rate across simulations.{" "}
+              {isCir
+                ? "CIR rates stay non-negative after full truncation."
+                : "Bars left of 0 (red) are negative-rate outcomes — a known Vasicek feature."}
+            </p>
+          </div>
+
+          {/* Education / parameter recap */}
+          <div className="glass px-3 py-2 text-[11px]" style={{ color: "var(--text-mut)" }}>
+            <span className="font-medium" style={{ color: "var(--text-hi)" }}>How to read the parameters:</span>{" "}
+            κ (kappa) controls the speed of mean reversion; θ (long-run rate) is the level rates
+            revert to; σ (sigma) is the rate volatility. Zero-coupon price uses the closed-form
+            affine solution ({result.zero_coupon.formula.replace(/_/g, " ")}).
+          </div>
+
+          {result.warnings.map((w, i) => (
+            <p key={i} className="text-[11px] text-slate-400">⚠ {w}</p>
+          ))}
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Education ──────────────────────────────────────────────────────────────
 
 function EducationTab() {
@@ -685,7 +964,10 @@ function EducationTab() {
     ["Convexity", "Convexity captures the curvature of the price/yield relationship — duration alone underestimates price for large moves."],
     ["DV01", "Dollar value magnitude of a 1 bp yield move (≈ modified duration × price × 0.0001); the price change for a +1 bp move is usually negative."],
     ["Interpolation", "Rates between curve points are interpolated; the method (zero rates vs discount factors) changes intermediate values."],
-    ["Assumption sensitivity", "Compounding, day count, interpolation, and curve construction all shift the numbers — fixed-income analytics are assumption-driven."],
+    ["Vasicek model", "A mean-reverting Gaussian short-rate model dr = κ(θ−r)dt + σ dW — simple and analytically tractable, but it can generate negative rates (a known feature, not a bug)."],
+    ["CIR model", "A mean-reverting square-root model dr = κ(θ−r)dt + σ√r dW, designed for non-negative rates. The Feller condition 2κθ ≥ σ² governs how often rates approach zero."],
+    ["Mean reversion (κ, θ, σ)", "κ controls how fast the short rate is pulled toward the long-run level θ; σ controls rate volatility. Simulated paths are model scenarios under your parameters and seed — not forecasts."],
+    ["Assumption sensitivity", "Compounding, day count, interpolation, curve construction, and short-rate parameters all shift the numbers — fixed-income analytics are assumption-driven, and short-rate models here are not calibrated to any market curve."],
   ];
   return (
     <div className="card space-y-3 p-5 text-sm text-slate-400">

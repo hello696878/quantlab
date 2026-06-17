@@ -77,8 +77,9 @@ reproducible and every limitation explicit.
 4. **Futures & Commodities** — research (carry, term-structure, trend)
 5. **FX** — research (carry, momentum, PPP toys)
 6. **Fixed Income & Rates** — **built (v1)**: Yield Curve Lab — zero rates,
-   discount factors, forwards, curve shocks, bond duration/convexity/DV01 (16.0).
-   Planned: Vasicek/CIR/Hull-White, swap-curve bootstrapping, rolldown
+   discount factors, forwards, curve shocks, bond duration/convexity/DV01 (16.0);
+   Short Rate Models Lab — Vasicek / CIR simulation + analytic zero-coupon pricing
+   (16.1). Planned: Hull-White, swap-curve bootstrapping, rolldown
 7. **Credit** — research (spread momentum, quality)
 8. **Crypto** — built (partial: tickers + 365-day convention); funding-rate /
    basis models research; exchange-native data future
@@ -105,7 +106,8 @@ reproducible and every limitation explicit.
    14.3 IV surface + SVI research fit; 14.4 Heston stochastic volatility)
 7. Volatility Lab v1
 8. ~~Event-Driven & Arbitrage Module~~ — **built (v1)** (15.0: event study + merger-arb calculator)
-9. Rates / FX / Credit Module — **started** (16.0: Yield Curve Lab v1)
+9. Rates / FX / Credit Module — **started** (16.0: Yield Curve Lab v1;
+   16.1: Short Rate Models v1 — Vasicek / CIR)
 10. Real Estate Module
 11. Microstructure & HFT Lab (educational simulations)
 12. Portfolio Studio + Ensemble Builder

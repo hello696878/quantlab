@@ -1062,9 +1062,9 @@ export default function HomeDashboard({
               Yield Curve Lab
             </span>
             <span className="text-xs text-slate-400">
-              Explore zero rates, discount factors, forward rates, curve shocks,
-              and basic bond duration / convexity — synthetic curves, no live
-              rates feed.
+              Explore yield curves, discount factors, forward rates, curve shocks,
+              bond duration / convexity, and short-rate models like Vasicek and
+              CIR — synthetic curves, no live rates feed.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Yield Curve Lab →

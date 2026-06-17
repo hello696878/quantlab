@@ -33,6 +33,8 @@ import type {
   SampleCurveResponse,
   ShockRequest,
   ShockResponse,
+  ShortRateRequest,
+  ShortRateResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -1015,6 +1017,10 @@ export function shockCurve(req: ShockRequest): Promise<ShockResponse> {
 
 export function priceBond(req: BondRequest): Promise<BondResponse> {
   return postOptions<BondResponse>("/api/rates/bond", req);
+}
+
+export function simulateShortRate(req: ShortRateRequest): Promise<ShortRateResponse> {
+  return postOptions<ShortRateResponse>("/api/rates/short-rate", req);
 }
 
 export async function fetchSampleCurve(): Promise<SampleCurveResponse> {

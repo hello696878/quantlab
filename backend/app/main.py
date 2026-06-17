@@ -113,6 +113,10 @@ from app.yield_curve import (
     generate_sample_yield_curve,
     shock_analytics,
 )
+from app.short_rates import (
+    ShortRateInputError,
+    run_short_rate_model,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -185,6 +189,8 @@ from app.schemas import (
     SampleCurveResponse,
     ShockRequest,
     ShockResponse,
+    ShortRateRequest,
+    ShortRateResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -4050,3 +4056,35 @@ def rates_sample() -> SampleCurveResponse:
         curve_points=generate_sample_yield_curve(),
         note="Synthetic sample curve for education — not current market data.",
     )
+
+
+@app.post(
+    "/rates/short-rate",
+    response_model=ShortRateResponse,
+    tags=["rates"],
+    summary="Short-rate model simulation (Vasicek / CIR) + analytic zero-coupon price",
+    description=(
+        "Simulates a one-factor Vasicek or CIR short-rate model (risk-neutral, "
+        "Euler scheme; CIR uses full truncation), returning summary diagnostics, a "
+        "capped path preview, a terminal-rate distribution, and the closed-form "
+        "zero-coupon bond price. Educational research only — simplified models, "
+        "no live rates feed, no market calibration, no Hull-White. Results depend "
+        "on the parameters, discretization, simulation count, and random seed."
+    ),
+)
+def rates_short_rate(request: ShortRateRequest) -> ShortRateResponse:
+    try:
+        result = run_short_rate_model(
+            request.model,
+            request.initial_rate,
+            request.long_run_rate,
+            request.kappa,
+            request.sigma,
+            request.horizon_years,
+            request.steps,
+            request.simulations,
+            request.seed,
+        )
+    except ShortRateInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return ShortRateResponse(**result)

@@ -473,7 +473,7 @@ export default function HomePage() {
   );
   const [eventsKey, setEventsKey] = useState(0);
   // Yield Curve Lab: which tab to open on (deep-linked from the palette).
-  const [ratesTab, setRatesTab] = useState<"builder" | "shocks" | "bond" | "education">(
+  const [ratesTab, setRatesTab] = useState<"builder" | "shocks" | "bond" | "shortrate" | "education">(
     "builder",
   );
   const [ratesKey, setRatesKey] = useState(0);
@@ -781,7 +781,7 @@ export default function HomePage() {
     { view: "disasters", title: "Open Quant Disasters", keywords: "risk education failures ltcm crash blowup lessons" },
     { view: "options", title: "Open Options Lab", keywords: "options black-scholes greeks implied volatility payoff straddle strangle covered call protective put" },
     { view: "events", title: "Open Event Lab", keywords: "event study abnormal return car caar merger arbitrage deal spread event-driven earnings event" },
-    { view: "rates", title: "Open Yield Curve Lab", keywords: "yield curve rates zero rate discount factor forward rate duration convexity dv01 bond pricing fixed income" },
+    { view: "rates", title: "Open Yield Curve Lab", keywords: "yield curve rates zero rate discount factor forward rate duration convexity dv01 bond pricing fixed income short rate vasicek cir mean reversion" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -964,9 +964,12 @@ export default function HomePage() {
         ["builder", "Open Rates Lab", "yield curve rates zero rate discount factor forward rate curve builder"],
         ["bond", "Open Bond Pricing", "bond pricing duration convexity dv01 yield to maturity coupon fixed income"],
         ["shocks", "Open Curve Shocks", "yield curve shocks parallel steepener flattener butterfly rates"],
+        ["shortrate", "Open Short Rate Models", "short rate vasicek cir cox ingersoll ross mean reversion interest rate model zero coupon feller condition"],
+        ["shortrate", "Open Vasicek Model", "vasicek short rate gaussian mean reversion interest rate model"],
+        ["shortrate", "Open CIR Model", "cir cox ingersoll ross short rate square root mean reversion feller condition"],
       ] as const
-    ).map(([t, title, keywords]) => ({
-      id: `rates-${t}`,
+    ).map(([t, title, keywords], i) => ({
+      id: `rates-${t}-${i}`,
       group: "Yield Curve Lab",
       title,
       keywords,

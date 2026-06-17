@@ -151,8 +151,17 @@ Return to the Command Center's **Platform Direction** panel (or open
   continuous to annual to show discount factors change. *Curve Shocks*: parallel
   +100 bps, then steepener (long end rises vs short). *Bond Pricing*: face 1000,
   coupon 5%, 5y, semiannual, YTM 4.5% → price, duration, DV01 magnitude,
-  convexity. Emphasise: forward rates are implied, not guaranteed forecasts;
-  synthetic curves, no live rates feed, assumption-sensitive.
+  convexity (result-card values are bright/readable on the dark theme).
+  *Short Rate Models*: **Load Vasicek demo** → **Run simulation** → show the
+  zero-coupon price / implied zero rate / mean terminal rate cards, the
+  multi-colour path preview (mean path + dashed long-run mean θ), and the
+  terminal-rate distribution; bump σ to ~20% to make negative-rate bars (red,
+  left of 0) and the Vasicek negative-rate warning appear. **Load CIR demo** →
+  **Run** → rates stay non-negative and the Feller-condition card shows; set
+  σ high enough to violate Feller (2κθ < σ²) to surface that warning.
+  Emphasise: forward rates are implied, not guaranteed forecasts; short-rate
+  paths are model scenarios, not forecasts; synthetic curves, no live rates
+  feed, no market calibration, no Hull-White, assumption-sensitive.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

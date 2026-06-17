@@ -972,8 +972,35 @@ single-asset Backtest + Strategy Comparison:
   charts (spot, discount-factor, forward, original-vs-shocked, cash-flow PV bars),
   sidebar nav, dashboard card, and command-palette commands
 - Research/education only — **no** live rates feed, no swap-curve bootstrapping,
-  no short-rate models (Vasicek / CIR / Hull-White), no credit curve; results are
+  no short-rate models (added in 16.1), no credit curve; results are
   assumption-sensitive (compounding / interpolation / day count). Not advice
+
+### Phase 16.1 — Short Rate Models Lab v1 ✅
+
+- New backend `app/short_rates.py` — **pure**, deterministic short-rate math:
+  **Vasicek** (`dr = κ(θ−r)dt + σ dW`, Gaussian, mean-reverting, can go negative)
+  and **CIR** (`dr = κ(θ−r)dt + σ√r dW`, full-truncation Euler so simulated rates
+  stay non-negative) risk-neutral Monte Carlo; capped path preview, cross-sectional
+  mean path, and a terminal-rate distribution
+- **Analytic zero-coupon pricing**: closed-form affine `P = A·exp(−B·r0)` for both
+  models (CIR rewritten with `h = e^{−γT}` for numerical stability; `σ = 0` falls
+  back to the deterministic limit), plus the implied zero rate
+- **Feller condition** `2κθ ≥ σ²` reported for CIR (warns when violated, never
+  rejects); Vasicek warns when any path goes negative — a known model feature
+- One route `POST /rates/short-rate` (validated; bad model / horizon / steps /
+  simulations / negative CIR rate → 422; never NaN/inf; full paths never returned).
+  36 deterministic tests (reproducibility, capped preview, negativity, Feller,
+  ZCB finiteness, σ=0, validation)
+- New **Short Rate Models** tab inside the Yield Curve Lab (model setup, Vasicek /
+  CIR demos, readable result cards, multi-colour path preview with mean + long-run
+  reference lines, terminal-distribution bars, Education) + command-palette
+  commands (Short Rate / Vasicek / CIR)
+- **UI hotfix**: Yield Curve Lab **Bond Pricing result-card value text contrast**
+  fixed (the inverted dark-theme slate ramp made values nearly invisible — values
+  now use bright slate / accent)
+- Research/education only — simplified models, **no** market calibration, no live
+  rates feed, **no Hull-White**, no swap-curve bootstrapping, no production curve
+  engine. Outputs depend on parameters, discretization, and seed. Not advice
 
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
@@ -1044,7 +1071,9 @@ search · toasts, error boundary, loading/offline states.
    / convertible-arb / index-rebalance engines remain future)
 9. **Rates / FX / Credit Module** — **started** (16.0: Yield Curve Lab v1 —
    zero rates, discount factors, forwards, curve shocks, bond duration/convexity;
-   short-rate models, swap curve, FX, and credit curve remain research)
+   16.1: Short Rate Models v1 — Vasicek / CIR simulation + analytic zero-coupon
+   pricing; Hull-White, swap-curve bootstrapping, FX, and credit curve remain
+   planned / research)
 10. **Real Estate Module** (research)
 11. **Microstructure & HFT Lab** — *educational simulations* (order-book toys,
     queue models) on synthetic data; **not** real HFT execution (research)
@@ -1069,7 +1098,7 @@ built**; everything else is planned/research/future:
 | 3 | Event-Driven & Arbitrage | **built (v1)** — event study (abnormal returns, CAR/CAAR) + simplified merger-arb calculator; full deal/convertible/index engines planned |
 | 4 | Futures & Commodities | research |
 | 5 | FX | research |
-| 6 | Fixed Income & Rates | **built (v1)** — Yield Curve Lab: zero rates, discount factors, forwards, curve shocks, bond duration / convexity / DV01; Vasicek / CIR / Hull-White, swap-curve bootstrapping planned |
+| 6 | Fixed Income & Rates | **built (v1)** — Yield Curve Lab (zero rates, discount factors, forwards, curve shocks, bond duration / convexity / DV01) + Short Rate Models Lab (Vasicek / CIR simulation + analytic zero-coupon pricing); Hull-White, swap-curve bootstrapping planned |
 | 7 | Credit | research |
 | 8 | Crypto | **built (partial)** — crypto tickers, 365-day annualization; exchange-native data future |
 | 9 | Real Estate | research |

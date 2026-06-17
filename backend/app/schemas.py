@@ -4423,3 +4423,101 @@ class BondResponse(BaseModel):
 class SampleCurveResponse(BaseModel):
     curve_points: List[CurvePoint] = Field(default_factory=list)
     note: str
+
+
+# ===========================================================================
+# Short Rate Models Lab — research v1 (Vasicek / CIR)
+# ===========================================================================
+
+ShortRateModel = Literal["vasicek", "cir"]
+
+
+class ShortRateRequest(BaseModel):
+    """Inputs for a Vasicek / CIR short-rate Monte Carlo simulation."""
+
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    model: ShortRateModel = "vasicek"
+    initial_rate: float = Field(default=0.04, ge=-10.0, le=10.0, description="r0.")
+    long_run_rate: float = Field(default=0.035, ge=-10.0, le=10.0, description="theta.")
+    kappa: float = Field(default=0.8, gt=0.0, le=100.0, description="Mean-reversion speed.")
+    sigma: float = Field(default=0.015, ge=0.0, le=10.0, description="Short-rate volatility.")
+    horizon_years: float = Field(default=5.0, gt=0.0, le=100.0)
+    steps: int = Field(default=252, ge=1, le=2000)
+    simulations: int = Field(default=5000, ge=100, le=200000)
+    seed: Optional[int] = Field(default=42, ge=0, le=2**32 - 1)
+
+
+class ShortRateSummary(BaseModel):
+    mean_terminal_rate: float
+    median_terminal_rate: float
+    min_terminal_rate: float
+    max_terminal_rate: float
+    negative_rate_probability: float = Field(
+        description="Fraction of simulated paths that went negative at any monitored step."
+    )
+    mean_path_rate: float
+    final_rate_std: float
+
+
+class ShortRateZeroCoupon(BaseModel):
+    maturity_years: float
+    price: Optional[float] = None
+    implied_zero_rate: Optional[float] = None
+    formula: str
+
+
+class ShortRateFeller(BaseModel):
+    satisfied: bool
+    two_kappa_theta: float = Field(description="2 · kappa · theta.")
+    sigma_squared: float = Field(description="sigma squared.")
+
+
+class ShortRateParameters(BaseModel):
+    initial_rate: float
+    long_run_rate: float
+    kappa: float
+    sigma: float
+
+
+class ShortRatePoint(BaseModel):
+    time: float
+    rate: float
+
+
+class ShortRatePath(BaseModel):
+    path_id: int
+    points: List[ShortRatePoint]
+
+
+class ShortRateDistributionBucket(BaseModel):
+    lower: float
+    upper: float
+    mid: float
+    count: int
+    probability: float
+
+
+class ShortRateResponse(BaseModel):
+    """Vasicek / CIR short-rate simulation + analytic zero-coupon price.
+
+    Educational research only — simplified models, not calibrated to any market
+    curve. Full paths are never returned (capped preview).
+    """
+
+    model: ShortRateModel
+    summary: ShortRateSummary
+    zero_coupon: ShortRateZeroCoupon
+    feller: ShortRateFeller
+    parameters: ShortRateParameters
+    horizon_years: float
+    steps: int
+    simulations: int
+    seed: Optional[int] = None
+    long_run_rate: float
+    mean_path: List[ShortRatePoint] = Field(default_factory=list)
+    path_preview: List[ShortRatePath] = Field(
+        default_factory=list, description="A small, capped sample of paths — never all paths."
+    )
+    distribution: List[ShortRateDistributionBucket] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
