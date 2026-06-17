@@ -73,13 +73,12 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 function Stat({ label, value, tone = "default" }: { label: string; value: string; tone?: "default" | "accent" | "warn" }) {
-  // slate ramp is inverted for the dark theme: 400 = muted label, 900 = bright value.
   const valueColor =
     tone === "accent"
-      ? "text-blue-700"
+      ? "text-[var(--accent-text)]"
       : tone === "warn"
-        ? "text-amber-700"
-        : "text-slate-900";
+        ? "text-[var(--warn)]"
+        : "text-slate-100";
   return (
     <div className="glass px-3 py-2 text-center">
       <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
@@ -747,9 +746,13 @@ function ShortRateModelsTab() {
   const horizonNum = num(inp.horizon);
   const stepsNum = num(inp.steps);
   const simsNum = num(inp.simulations);
-  const seedNum = inp.seed.trim() === "" ? NaN : num(inp.seed);
+  const seedIsBlank = inp.seed.trim() === "";
+  const seedNum = seedIsBlank ? null : num(inp.seed);
   const initialNum = num(inp.initialRatePct);
   const longRunNum = num(inp.longRunRatePct);
+  const seedValid =
+    seedIsBlank ||
+    (typeof seedNum === "number" && Number.isInteger(seedNum) && seedNum >= 0);
 
   const valid =
     finite(inp.initialRatePct) &&
@@ -764,8 +767,7 @@ function ShortRateModelsTab() {
     Number.isInteger(simsNum) &&
     simsNum >= 100 &&
     simsNum <= 200000 &&
-    Number.isInteger(seedNum) &&
-    seedNum >= 0 &&
+    seedValid &&
     // CIR is defined on non-negative rates.
     (inp.model === "vasicek" || (initialNum >= 0 && longRunNum >= 0));
 
@@ -785,7 +787,7 @@ function ShortRateModelsTab() {
           horizon_years: horizonNum,
           steps: stepsNum,
           simulations: simsNum,
-          seed: seedNum,
+          seed: seedIsBlank ? null : seedNum,
         }),
       );
     } catch (e) {
@@ -868,7 +870,7 @@ function ShortRateModelsTab() {
       {!valid && (
         <p className="text-[11px] text-slate-400">
           Kappa &gt; 0, sigma ≥ 0, horizon 0–100y, steps 1–2000, simulations 100–200,000, integer
-          seed ≥ 0. CIR also requires non-negative initial and long-run rates.
+          optional integer seed ≥ 0. CIR also requires non-negative initial and long-run rates.
         </p>
       )}
       {error && <p className="text-xs text-red-600">⚠ {error}</p>}

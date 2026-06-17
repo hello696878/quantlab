@@ -989,10 +989,10 @@ single-asset Backtest + Strategy Comparison:
   rejects); Vasicek warns when any path goes negative — a known model feature
 - One route `POST /rates/short-rate` (validated; bad model / horizon / steps /
   simulations / negative CIR rate → 422; never NaN/inf; full paths never returned).
-  36 deterministic tests (reproducibility, capped preview, negativity, Feller,
-  ZCB finiteness, σ=0, validation)
+  Deterministic tests cover reproducibility, capped previews, negativity, Feller,
+  ZCB finiteness, σ=0, validation, and volatility / mean-reversion sanity checks
 - New **Short Rate Models** tab inside the Yield Curve Lab (model setup, Vasicek /
-  CIR demos, readable result cards, multi-colour path preview with mean + long-run
+  CIR demos, readable dark-theme result cards, multi-colour path preview with mean + long-run
   reference lines, terminal-distribution bars, Education) + command-palette
   commands (Short Rate / Vasicek / CIR)
 - **UI hotfix**: Yield Curve Lab **Bond Pricing result-card value text contrast**

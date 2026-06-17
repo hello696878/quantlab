@@ -367,10 +367,34 @@ def _deterministic_zero_coupon(r0: float, kappa: float, theta: float, T: float) 
     return math.exp(-integral)
 
 
+def _validate_zero_coupon_inputs(
+    r0: float, kappa: float, theta: float, sigma: float, T: float, model: str
+) -> None:
+    values = {
+        "initial_rate": r0,
+        "kappa": kappa,
+        "long_run_rate": theta,
+        "sigma": sigma,
+        "maturity": T,
+    }
+    for name, value in values.items():
+        if not math.isfinite(float(value)):
+            raise ShortRateInputError(f"{name} must be finite.")
+    if kappa <= 0:
+        raise ShortRateInputError("kappa must be positive for zero-coupon pricing.")
+    if sigma < 0:
+        raise ShortRateInputError("sigma must be non-negative for zero-coupon pricing.")
+    if T <= 0:
+        raise ShortRateInputError("maturity must be positive for zero-coupon pricing.")
+    if model == "cir" and (r0 < 0 or theta < 0):
+        raise ShortRateInputError("CIR zero-coupon pricing requires non-negative rates.")
+
+
 def price_vasicek_zero_coupon(
     r0: float, kappa: float, theta: float, sigma: float, T: float
 ) -> dict:
     """Closed-form Vasicek zero-coupon bond price ``P(0,T) = A·exp(−B·r0)``."""
+    _validate_zero_coupon_inputs(r0, kappa, theta, sigma, T, "vasicek")
     warnings: List[str] = []
     b = (1.0 - math.exp(-kappa * T)) / kappa
     if sigma <= 1e-12:
@@ -401,6 +425,7 @@ def price_cir_zero_coupon(r0: float, kappa: float, theta: float, sigma: float, T
     quantities stay bounded (no ``e^{γT}`` overflow).  ``sigma = 0`` uses the
     deterministic limit (the usual formula divides by ``sigma²``).
     """
+    _validate_zero_coupon_inputs(r0, kappa, theta, sigma, T, "cir")
     warnings: List[str] = []
     if sigma <= 1e-12:
         price = _deterministic_zero_coupon(r0, kappa, theta, T)

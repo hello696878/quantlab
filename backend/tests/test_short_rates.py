@@ -172,6 +172,18 @@ def test_zero_coupon_matches_deterministic_when_sigma_zero():
     assert v == pytest.approx(c, abs=1e-9)
 
 
+def test_constant_rate_case_matches_exp_discount():
+    for model, pricer in (
+        ("vasicek", price_vasicek_zero_coupon),
+        ("cir", price_cir_zero_coupon),
+    ):
+        zc = pricer(0.04, 0.8, 0.04, 0.0, 5)
+        sim = _run(model, initial_rate=0.04, long_run_rate=0.04, sigma=0.0)
+        assert zc["price"] == pytest.approx(math.exp(-0.04 * 5), abs=1e-8)
+        assert sim["summary"]["mean_terminal_rate"] == pytest.approx(0.04, abs=1e-9)
+        assert sim["summary"]["final_rate_std"] == pytest.approx(0.0, abs=1e-9)
+
+
 def test_cir_zero_coupon_long_horizon_stable():
     # Large gamma*T must not overflow.
     zc = price_cir_zero_coupon(0.04, 0.8, 0.035, 0.015, 100)
@@ -190,6 +202,20 @@ def test_sigma_zero_handled():
         assert r["zero_coupon"]["price"] is not None
         # Deterministic: terminal rate has (near) zero dispersion.
         assert r["summary"]["final_rate_std"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_higher_sigma_increases_terminal_distribution_spread():
+    low = _run("vasicek", sigma=0.005, seed=123)
+    high = _run("vasicek", sigma=0.08, seed=123)
+    assert high["summary"]["final_rate_std"] > low["summary"]["final_rate_std"]
+
+
+def test_higher_kappa_mean_reverts_faster_when_sigma_zero():
+    slow = _run("vasicek", initial_rate=0.08, long_run_rate=0.03, kappa=0.2, sigma=0.0)
+    fast = _run("vasicek", initial_rate=0.08, long_run_rate=0.03, kappa=2.0, sigma=0.0)
+    assert abs(fast["summary"]["mean_terminal_rate"] - 0.03) < abs(
+        slow["summary"]["mean_terminal_rate"] - 0.03
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -234,6 +260,24 @@ def test_negative_sigma_rejected():
 def test_cir_negative_initial_rate_rejected():
     with pytest.raises(ShortRateInputError):
         _run("cir", initial_rate=-0.01)
+
+
+@pytest.mark.parametrize(
+    "args",
+    [
+        (0.04, 0.0, 0.035, 0.015, 5.0),   # kappa <= 0
+        (0.04, 0.8, 0.035, -0.01, 5.0),   # sigma < 0
+        (0.04, 0.8, 0.035, 0.015, 0.0),   # maturity <= 0
+    ],
+)
+def test_vasicek_zero_coupon_invalid_inputs_rejected(args):
+    with pytest.raises(ShortRateInputError):
+        price_vasicek_zero_coupon(*args)
+
+
+def test_cir_zero_coupon_rejects_negative_rates():
+    with pytest.raises(ShortRateInputError):
+        price_cir_zero_coupon(-0.01, 0.8, 0.035, 0.015, 5.0)
 
 
 def test_vasicek_allows_negative_inputs():
