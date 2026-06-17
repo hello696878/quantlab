@@ -127,6 +127,7 @@ _EXPOSURES = [
 def test_exposure_total_base_value():
     r = compute_currency_exposure(_EXPOSURES, "USD", 0.1)
     assert r["total_exposure"] == pytest.approx(100_000 + 6_700 + 54_000, abs=1e-3)
+    assert r["gross_exposure"] == pytest.approx(100_000 + 6_700 + 54_000, abs=1e-3)
 
 
 def test_exposure_stress_pnl():
@@ -142,6 +143,23 @@ def test_exposure_stress_pnl():
 def test_exposure_weights_sum_to_one():
     r = compute_currency_exposure(_EXPOSURES, "USD", 0.1)
     assert sum(row["weight_pct"] for row in r["rows"]) == pytest.approx(1.0, abs=1e-6)
+    assert sum(row["gross_weight_pct"] for row in r["rows"]) == pytest.approx(1.0, abs=1e-6)
+
+
+def test_exposure_near_zero_net_suppresses_net_weights():
+    r = compute_currency_exposure(
+        [
+            {"currency": "EUR", "amount": 100.0, "spot_to_base": 1.2},
+            {"currency": "JPY", "amount": -120.0, "spot_to_base": 1.0},
+        ],
+        "USD",
+        0.1,
+    )
+    assert r["total_exposure"] == pytest.approx(0.0, abs=1e-9)
+    assert r["gross_exposure"] == pytest.approx(240.0, abs=1e-9)
+    assert [row["weight_pct"] for row in r["rows"]] == [0.0, 0.0]
+    assert sum(row["gross_weight_pct"] for row in r["rows"]) == pytest.approx(1.0, abs=1e-9)
+    assert any("Net exposure is near zero" in w for w in r["warnings"])
 
 
 # ---------------------------------------------------------------------------
@@ -236,6 +254,16 @@ def test_exposure_invalid_spot_rejected():
         compute_currency_exposure([{"currency": "USD", "amount": 100, "spot_to_base": -1}], "USD", 0.1)
 
 
+def test_carry_non_finite_output_rejected():
+    with pytest.raises(FxInputError):
+        compute_fx_carry(1e-300, 0.01, 0.05, 1e12, 1, 1_000_000, "long_foreign")
+
+
+def test_ppp_non_finite_deviation_rejected():
+    with pytest.raises(FxInputError):
+        compute_ppp_deviation(1e12, 1e-300, 100, 100)
+
+
 # ---------------------------------------------------------------------------
 # No NaN / Infinity (20)
 # ---------------------------------------------------------------------------
@@ -291,6 +319,7 @@ def test_api_fx_exposure(client):
         json={"exposures": _EXPOSURES, "base_currency": "USD", "shock_pct": 0.1},
     ).json()
     assert body["stress_pnl_up"] == pytest.approx(6_070.0, abs=1e-3)
+    assert body["gross_exposure"] == pytest.approx(160_700.0, abs=1e-3)
 
 
 def test_api_fx_option(client):

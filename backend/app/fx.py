@@ -179,6 +179,15 @@ def compute_fx_carry(
     total_expected_return = carry_return + expected_fx_return
     pnl_estimate = notional * total_expected_return
 
+    for name, val in (
+        ("expected_fx_return", expected_fx_return),
+        ("carry_return", carry_return),
+        ("total_expected_return", total_expected_return),
+        ("pnl_estimate", pnl_estimate),
+    ):
+        if not math.isfinite(val):
+            raise FxInputError(f"{name} is not finite for these inputs.")
+
     warnings = [
         "Carry is not free money: currency moves can offset or exceed the interest differential "
         "(this is the carry-trade risk).",
@@ -227,6 +236,8 @@ def compute_ppp_deviation(
     if ppp_implied <= 0 or not math.isfinite(ppp_implied):
         raise FxInputError("PPP-implied spot is not finite for these inputs.")
     deviation = (current_spot - ppp_implied) / ppp_implied
+    if not math.isfinite(deviation):
+        raise FxInputError("PPP deviation is not finite for these inputs.")
 
     # Wording is from the foreign currency's perspective (the base of the quote).
     if deviation > 0.01:
@@ -282,6 +293,7 @@ def compute_currency_exposure(
     base = base_currency.strip().upper()
     rows: List[dict] = []
     total = 0.0
+    gross = 0.0
     for i, e in enumerate(exposures):
         currency = str(e.get("currency", "")).strip().upper()
         if not currency:
@@ -293,18 +305,29 @@ def compute_currency_exposure(
         if abs(amount) > _MAX_NOTIONAL:
             raise FxInputError(f"exposure row {i} amount is out of a sensible range.")
         base_value = amount * spot_to_base
+        if not math.isfinite(base_value):
+            raise FxInputError(f"exposure row {i} base_value is not finite.")
         total += base_value
+        gross += abs(base_value)
         rows.append({"currency": currency, "amount": amount, "spot_to_base": spot_to_base, "base_value": base_value})
+
+    if not math.isfinite(total) or not math.isfinite(gross):
+        raise FxInputError("Exposure totals are not finite for these inputs.")
+
+    near_zero_net = gross > 0 and abs(total) <= gross * 1e-6
 
     out_rows: List[dict] = []
     stress_up = 0.0
     stress_down = 0.0
     for r in rows:
         is_base = r["currency"] == base
-        weight = (r["base_value"] / total) if total != 0 else 0.0
+        weight = 0.0 if near_zero_net else ((r["base_value"] / total) if total != 0 else 0.0)
+        gross_weight = (abs(r["base_value"]) / gross) if gross > 0 else 0.0
         # Base currency has no FX risk under a foreign-vs-base shock.
         pnl_up = 0.0 if is_base else r["base_value"] * shock_pct
         pnl_down = 0.0 if is_base else -r["base_value"] * shock_pct
+        if not math.isfinite(pnl_up) or not math.isfinite(pnl_down):
+            raise FxInputError("Exposure stress P&L is not finite for these inputs.")
         stress_up += pnl_up
         stress_down += pnl_down
         out_rows.append(
@@ -314,20 +337,30 @@ def compute_currency_exposure(
                 "spot_to_base": _clean(r["spot_to_base"]),
                 "base_value": _clean(r["base_value"]),
                 "weight_pct": _clean(weight),
+                "gross_weight_pct": _clean(gross_weight),
                 "stress_pnl_up": _clean(pnl_up),
                 "stress_pnl_down": _clean(pnl_down),
             }
         )
 
+    if not math.isfinite(stress_up) or not math.isfinite(stress_down):
+        raise FxInputError("Aggregate exposure stress P&L is not finite for these inputs.")
+
     warnings = [
         "Educational translation + a uniform symmetric shock (all non-base currencies move "
         "together) — not a covariance-based risk model. No live FX rates.",
     ]
+    if near_zero_net:
+        warnings.append(
+            "Net exposure is near zero relative to gross exposure; net percentage weights are "
+            "suppressed to avoid misleading large ratios. Use gross exposure for scale."
+        )
 
     return {
         "base_currency": base,
         "shock_pct": _clean(shock_pct),
         "total_exposure": _clean(total),
+        "gross_exposure": _clean(gross),
         "rows": out_rows,
         "stress_pnl_up": _clean(stress_up),
         "stress_pnl_down": _clean(stress_down),
@@ -403,7 +436,21 @@ def price_garman_kohlhagen(
     gamma = disc_f * pdf_d1 / (spot_rate * vol_sqrt_t)
     vega = spot_rate * disc_f * pdf_d1 * sqrt_t  # per 1.00 (100%) vol change
 
-    for name, val in (("price", price), ("delta", delta), ("gamma", gamma), ("vega", vega)):
+    if price < -1e-12:
+        raise FxInputError("Garman-Kohlhagen price is negative for these inputs.")
+    price = max(price, 0.0)
+
+    for name, val in (
+        ("price", price),
+        ("d1", d1),
+        ("d2", d2),
+        ("delta", delta),
+        ("gamma", gamma),
+        ("vega", vega),
+        ("theta", theta),
+        ("rho_domestic", rho_domestic),
+        ("rho_foreign", rho_foreign),
+    ):
         if not math.isfinite(val):
             raise FxInputError(f"Garman-Kohlhagen {name} is not finite for these inputs.")
 

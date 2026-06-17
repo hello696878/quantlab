@@ -1013,8 +1013,9 @@ single-asset Backtest + Strategy Comparison:
   delta, gamma, vega, theta, domestic/foreign rho)
 - Five routes: `POST /fx/forward`, `/fx/carry`, `/fx/ppp`, `/fx/exposure`,
   `/fx/option` (validated; bad spot / vol / time / option type / index → 422;
-  never NaN/inf). 38 deterministic tests incl. parity-forward values, put-call
-  parity, exposure stress, and a GK-vs-Black-Scholes cross-check
+  never NaN/inf). Deterministic tests cover parity-forward values, put-call
+  parity, exposure stress / net-vs-gross exposure, finite-output guards, and a
+  GK-vs-Black-Scholes cross-check
 - New top-level **FX Lab** workspace (Forward / IRP · Carry · PPP · Exposure ·
   FX Options · Education) with the shared **MetricCard** (readable values),
   deterministic-palette charts (spot-vs-forward, carry breakdown, current-vs-PPP,

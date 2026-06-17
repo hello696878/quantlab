@@ -4615,7 +4615,8 @@ class FxExposureRow(BaseModel):
     amount: float
     spot_to_base: float
     base_value: float
-    weight_pct: float
+    weight_pct: float = Field(description="Net-exposure weight; suppressed to 0 when net exposure is near zero.")
+    gross_weight_pct: float = Field(description="Share of gross absolute exposure.")
     stress_pnl_up: float
     stress_pnl_down: float
 
@@ -4624,6 +4625,7 @@ class FxExposureResponse(BaseModel):
     base_currency: str
     shock_pct: float
     total_exposure: float
+    gross_exposure: float
     rows: List[FxExposureRow] = Field(default_factory=list)
     stress_pnl_up: float
     stress_pnl_down: float

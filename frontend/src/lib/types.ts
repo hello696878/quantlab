@@ -2238,6 +2238,7 @@ export interface FxExposureRow {
   spot_to_base: number;
   base_value: number;
   weight_pct: number;
+  gross_weight_pct: number;
   stress_pnl_up: number;
   stress_pnl_down: number;
 }
@@ -2246,6 +2247,7 @@ export interface FxExposureResponse {
   base_currency: string;
   shock_pct: number;
   total_exposure: number;
+  gross_exposure: number;
   rows: FxExposureRow[];
   stress_pnl_up: number;
   stress_pnl_down: number;

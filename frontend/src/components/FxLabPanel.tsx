@@ -543,8 +543,9 @@ function ExposureTab() {
 
       {result && (
         <>
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <MetricCard label={`Total exposure (${result.base_currency})`} value={money(result.total_exposure)} tone="accent" />
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+            <MetricCard label={`Net exposure (${result.base_currency})`} value={money(result.total_exposure)} tone="accent" />
+            <MetricCard label={`Gross exposure (${result.base_currency})`} value={money(result.gross_exposure)} />
             <MetricCard label={`Stress +${pct(result.shock_pct, 0)} P&L`} value={money(result.stress_pnl_up)} tone={result.stress_pnl_up >= 0 ? "positive" : "danger"} />
             <MetricCard label={`Stress −${pct(result.shock_pct, 0)} P&L`} value={money(result.stress_pnl_down)} tone={result.stress_pnl_down >= 0 ? "positive" : "danger"} />
           </div>
@@ -569,7 +570,8 @@ function ExposureTab() {
                 <tr className="text-slate-400">
                   <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Currency</th>
                   <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Base value</th>
-                  <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Weight</th>
+                  <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Net weight</th>
+                  <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Gross weight</th>
                   <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Stress + P&L</th>
                   <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Stress − P&L</th>
                 </tr>
@@ -580,6 +582,7 @@ function ExposureTab() {
                     <td className="px-2 py-1 text-left mono">{r.currency}</td>
                     <td className="px-2 py-1 text-right mono">{money(r.base_value)}</td>
                     <td className="px-2 py-1 text-right mono">{pct(r.weight_pct, 1)}</td>
+                    <td className="px-2 py-1 text-right mono">{pct(r.gross_weight_pct, 1)}</td>
                     <td className="px-2 py-1 text-right mono">{money(r.stress_pnl_up)}</td>
                     <td className="px-2 py-1 text-right mono">{money(r.stress_pnl_down)}</td>
                   </tr>
@@ -700,7 +703,10 @@ function FxOptionsTab() {
                 <Line type="monotone" dataKey="payoff" name="Payoff" stroke={seriesColor(5)} strokeWidth={2} dot={false} isAnimationActive={false} />
               </ComposedChart>
             </ResponsiveContainer>
-            <p className="text-[11px] text-slate-400">Intrinsic payoff at expiry vs spot; dashed line = strike. Theta/rho available via the API.</p>
+            <p className="text-[11px] text-slate-400">
+              Intrinsic payoff at expiry vs spot; dashed line = strike. Vega is raw per 1.00
+              volatility change (100 percentage points). Theta/rho available via the API.
+            </p>
           </div>
           {result.warnings.map((w, i) => (<p key={i} className="text-[11px] text-slate-400">⚠ {w}</p>))}
         </>
