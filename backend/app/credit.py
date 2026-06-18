@@ -49,6 +49,19 @@ def _require_finite(name: str, value: float) -> float:
     return float(value)
 
 
+def _safe_exp(exponent: float, name: str) -> float:
+    """Finite exponential with a domain-specific validation error."""
+    if not math.isfinite(exponent):
+        raise CreditInputError(f"{name} exponent must be finite.")
+    try:
+        value = math.exp(exponent)
+    except OverflowError as exc:
+        raise CreditInputError(f"{name} is not finite for these inputs.") from exc
+    if not math.isfinite(value):
+        raise CreditInputError(f"{name} is not finite for these inputs.")
+    return value
+
+
 def _check_recovery(recovery_rate: float) -> float:
     _require_finite("recovery_rate", recovery_rate)
     if recovery_rate < 0.0 or recovery_rate > 1.0:
@@ -76,10 +89,23 @@ def _check_maturity(name: str, t: float) -> float:
 
 def _check_frequency(freq: int) -> int:
     if not isinstance(freq, (int,)) or isinstance(freq, bool):
-        raise CreditInputError("payment_frequency must be a positive integer.")
+        raise CreditInputError("frequency must be a positive integer.")
     if freq < 1 or freq > _MAX_FREQ:
-        raise CreditInputError(f"payment_frequency must be an integer between 1 and {_MAX_FREQ}.")
+        raise CreditInputError(f"frequency must be an integer between 1 and {_MAX_FREQ}.")
     return int(freq)
+
+
+def _period_count(maturity_years: float, frequency: int) -> int:
+    """Return the number of full payment periods, rejecting rounded schedules."""
+    raw = maturity_years * frequency
+    periods = round(raw)
+    if not math.isclose(raw, periods, rel_tol=0.0, abs_tol=1e-9):
+        raise CreditInputError(
+            "maturity_years * frequency must be a whole number of payment periods."
+        )
+    if periods < 1:
+        raise CreditInputError("At least one payment period is required.")
+    return int(periods)
 
 
 # ---------------------------------------------------------------------------
@@ -158,13 +184,22 @@ def price_merton_credit(
             raise CreditInputError("expected_asset_return is out of a sensible range.")
 
     vol_sqrt_t = sigma * math.sqrt(T)
-    d1 = (math.log(V / D) + (r + 0.5 * sigma * sigma) * T) / vol_sqrt_t
+    ratio = V / D
+    if ratio <= 0 or not math.isfinite(ratio):
+        raise CreditInputError("asset_value / debt_face_value is not finite for these inputs.")
+    d1 = (math.log(ratio) + (r + 0.5 * sigma * sigma) * T) / vol_sqrt_t
     d2 = d1 - vol_sqrt_t
+    if not math.isfinite(d1) or not math.isfinite(d2):
+        raise CreditInputError("Merton d1/d2 are not finite for these inputs.")
 
-    disc = math.exp(-r * T)
+    disc = _safe_exp(-r * T, "risk-free discount factor")
     equity = V * normal_cdf(d1) - D * disc * normal_cdf(d2)
     equity = max(0.0, equity)
     debt = V - equity
+    if not math.isfinite(equity) or not math.isfinite(debt):
+        raise CreditInputError("Merton equity/debt values are not finite for these inputs.")
+    if debt <= 0:
+        raise CreditInputError("Merton debt value is not positive for these inputs.")
     pd_q = normal_cdf(-d2)
 
     # Distance to default — uses the supplied expected asset return if given,
@@ -175,11 +210,21 @@ def price_merton_credit(
 
     # Risky debt yield + credit spread (continuously compounded).
     if debt > 0:
-        risky_yield = -math.log(debt / D) / T
-    else:
-        risky_yield = float("inf")
+        debt_ratio = debt / D
+        if debt_ratio <= 0 or not math.isfinite(debt_ratio):
+            raise CreditInputError("Merton debt / face value is not finite for these inputs.")
+        risky_yield = -math.log(debt_ratio) / T
     credit_spread = risky_yield - r
     expected_loss = pd_q * (1.0 - R) * D
+    for name, val in (
+        ("risk_neutral_default_probability", pd_q),
+        ("risky_debt_yield", risky_yield),
+        ("credit_spread", credit_spread),
+        ("expected_loss", expected_loss),
+        ("distance_to_default", dd),
+    ):
+        if not math.isfinite(val):
+            raise CreditInputError(f"{name} is not finite for these inputs.")
 
     warnings: List[str] = [
         "Merton is a stylized single-debt structural model: one zero-coupon debt maturity, constant "
@@ -190,6 +235,11 @@ def price_merton_credit(
         warnings.append(
             "Assets are at or below the debt face value (V ≤ D): the firm is deeply distressed in "
             "this model and the default probability is high."
+        )
+    if credit_spread < -1e-8:
+        warnings.append(
+            "The implied credit spread is negative under these inputs; treat this as a model/numerical "
+            "edge case rather than a tradable signal."
         )
 
     return {
@@ -240,10 +290,10 @@ def compute_hazard_survival_curve(
     curve: List[dict] = []
     for i in range(n + 1):
         t = T * i / n
-        survival = math.exp(-lam * t)
+        survival = _safe_exp(-lam * t, "survival probability")
         default = 1.0 - survival
         el = lgd * default
-        risky_df = math.exp(-(r + lam * lgd) * t)
+        risky_df = _safe_exp(-(r + lam * lgd) * t, "risky discount factor")
         curve.append(
             {
                 "time": _clean(t),
@@ -254,7 +304,7 @@ def compute_hazard_survival_curve(
             }
         )
 
-    survival_T = math.exp(-lam * T)
+    survival_T = _safe_exp(-lam * T, "survival probability at maturity")
     return {
         "hazard_rate": _clean(lam),
         "recovery_rate": _clean(R),
@@ -313,22 +363,28 @@ def compute_cds_spread(
 
     lgd = 1.0 - R
     dt = 1.0 / freq
-    n = max(1, int(round(T * freq)))
+    n = _period_count(T, freq)
     protection_pv = 0.0
     risky_pv01 = 0.0
     prev_survival = 1.0
     for i in range(1, n + 1):
         t = i * dt
-        survival = math.exp(-lam * t)
-        df = math.exp(-r * t)
+        survival = _safe_exp(-lam * t, "CDS survival probability")
+        df = _safe_exp(-r * t, "CDS discount factor")
         marginal_default = prev_survival - survival
         protection_pv += df * marginal_default * lgd * notional
         risky_pv01 += df * survival * dt * notional
         prev_survival = survival
 
-    fair_spread = protection_pv / risky_pv01 if risky_pv01 > 0 else 0.0
-    survival_T = math.exp(-lam * T)
+    if risky_pv01 <= 0 or not math.isfinite(risky_pv01):
+        raise CreditInputError("CDS risky PV01 is not positive for these inputs.")
+    if protection_pv < 0 or not math.isfinite(protection_pv):
+        raise CreditInputError("CDS protection leg PV is not finite for these inputs.")
+    fair_spread = protection_pv / risky_pv01
+    survival_T = _safe_exp(-lam * T, "CDS survival probability at maturity")
     expected_loss = lgd * (1.0 - survival_T) * notional
+    if not math.isfinite(fair_spread) or not math.isfinite(expected_loss):
+        raise CreditInputError("CDS spread output is not finite for these inputs.")
 
     return {
         "hazard_rate": _clean(lam),
@@ -410,7 +466,7 @@ def price_risky_bond(
     R = _check_recovery(recovery_rate)
 
     dt = 1.0 / freq
-    n = max(1, int(round(T * freq)))
+    n = _period_count(T, freq)
     coupon = face * coupon_rate / freq
 
     pv_coupons = 0.0
@@ -423,8 +479,8 @@ def price_risky_bond(
 
     for i in range(1, n + 1):
         t = i * dt
-        survival = math.exp(-lam * t)
-        df = math.exp(-r * t)
+        survival = _safe_exp(-lam * t, "bond survival probability")
+        df = _safe_exp(-r * t, "bond discount factor")
         marginal_default = prev_survival - survival
         is_last = i == n
         cash_flow = coupon + (face if is_last else 0.0)
@@ -451,8 +507,20 @@ def price_risky_bond(
         prev_survival = survival
 
     risky_price = pv_coupons + pv_principal + pv_recovery
-    survival_T = math.exp(-lam * T)
+    survival_T = _safe_exp(-lam * T, "bond survival probability at maturity")
     expected_loss = (1.0 - R) * (1.0 - survival_T) * face
+    for name, val in (
+        ("risky_bond_price", risky_price),
+        ("risk_free_bond_price", rf_price),
+        ("pv_coupons", pv_coupons),
+        ("pv_principal", pv_principal),
+        ("pv_recovery", pv_recovery),
+        ("expected_loss", expected_loss),
+    ):
+        if not math.isfinite(val):
+            raise CreditInputError(f"{name} is not finite for these inputs.")
+    if risky_price <= 0 or rf_price <= 0:
+        raise CreditInputError("Bond prices must be positive for these inputs.")
 
     # Credit spread from a flat yield that reprices the promised flows to the risky price.
     y = _solve_flat_yield(promised_cf, risky_price)
@@ -466,6 +534,11 @@ def price_risky_bond(
         risky_yield = y
         credit_spread = y - r
         warnings_spread = []
+        if credit_spread < -1e-8:
+            warnings_spread.append(
+                "The solved credit spread is negative under these inputs; this can happen in the "
+                "simplified model with high recovery or unusual rates and is not a trading signal."
+            )
 
     return {
         "risky_bond_price": _clean(risky_price),

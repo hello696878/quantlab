@@ -1042,9 +1042,11 @@ single-asset Backtest + Strategy Comparison:
   promised flows + recovery leg, risk-free price, and a flat-yield credit spread)
 - Four routes: `POST /credit/merton`, `/credit/hazard`, `/credit/cds`,
   `/credit/risky-bond` (validated; bad recovery / negative hazard / maturity /
-  volatility / asset value → 422; never NaN/inf). 36 deterministic tests incl.
-  the accounting identity (E+Debt=V), leverage monotonicity, survival = `e^{−λt}`,
-  CDS ≈ `λ·LGD`, risky ≤ risk-free, and a cash-flow reconciliation
+  volatility / asset value / non-whole CDS or coupon schedule → 422; never
+  NaN/inf). Deterministic tests cover the accounting identity (E+Debt=V),
+  leverage/volatility monotonicity, distance-to-default behavior, survival =
+  `e^{−λt}`, CDS ≈ `λ·LGD`, risky ≤ risk-free, hazard/recovery bond-price
+  monotonicity, finite-output guards, and a cash-flow reconciliation
 - New top-level **Credit Risk Lab** workspace (Merton Model · Hazard / Survival ·
   CDS Spread · Risky Bond · Education) with the shared **MetricCard** (readable
   values), deterministic-palette charts (capital-structure breakdown,

@@ -67,6 +67,12 @@ def test_merton_higher_leverage_higher_default_probability():
     assert high_lev > low_lev
 
 
+def test_merton_higher_volatility_higher_default_probability():
+    low_vol = price_merton_credit(120, 100, 0.15, 0.04, 1, 0.4)["risk_neutral_default_probability"]
+    high_vol = price_merton_credit(120, 100, 0.35, 0.04, 1, 0.4)["risk_neutral_default_probability"]
+    assert high_vol > low_vol
+
+
 def test_merton_credit_spread_finite():
     r = price_merton_credit(120, 100, 0.25, 0.04, 1, 0.4)
     assert math.isfinite(r["credit_spread"])
@@ -85,6 +91,16 @@ def test_distance_to_default_uses_expected_return_when_supplied():
     assert r["dd_drift_used"] == "expected_asset_return"
     dd = compute_distance_to_default(120, 100, 0.25, 0.10, 1)
     assert r["distance_to_default"] == pytest.approx(dd, abs=1e-6)
+
+
+def test_distance_to_default_monotonic_inputs():
+    base = compute_distance_to_default(120, 100, 0.25, 0.04, 1)
+    lower_assets = compute_distance_to_default(100, 100, 0.25, 0.04, 1)
+    higher_debt = compute_distance_to_default(120, 120, 0.25, 0.04, 1)
+    higher_vol = compute_distance_to_default(120, 100, 0.35, 0.04, 1)
+    assert lower_assets < base
+    assert higher_debt < base
+    assert higher_vol < base
 
 
 def test_merton_pd_helper_matches():
@@ -167,6 +183,18 @@ def test_risky_bond_zero_hazard_matches_risk_free():
     assert r["credit_spread_bps"] == pytest.approx(0.0, abs=1e-2)
 
 
+def test_higher_hazard_lowers_risky_bond_price():
+    low = price_risky_bond(1000, 0.05, 5, 2, 0.04, 0.01, 0.4)["risky_bond_price"]
+    high = price_risky_bond(1000, 0.05, 5, 2, 0.04, 0.04, 0.4)["risky_bond_price"]
+    assert high < low
+
+
+def test_higher_recovery_raises_risky_bond_price():
+    low = price_risky_bond(1000, 0.05, 5, 2, 0.04, 0.02, 0.2)["risky_bond_price"]
+    high = price_risky_bond(1000, 0.05, 5, 2, 0.04, 0.02, 0.7)["risky_bond_price"]
+    assert high > low
+
+
 def test_risky_bond_cashflow_table_reconciles():
     r = price_risky_bond(1000, 0.05, 5, 2, 0.04, 0.02, 0.4)
     total = sum(c["present_value"] for c in r["cash_flows"]) + sum(c["recovery_pv"] for c in r["cash_flows"])
@@ -216,6 +244,18 @@ def test_invalid_volatility_rejected():
 def test_invalid_asset_value_rejected():
     with pytest.raises(CreditInputError):
         price_merton_credit(-1, 100, 0.25, 0.04, 1, 0.4)
+
+
+def test_non_whole_payment_schedule_rejected():
+    with pytest.raises(CreditInputError):
+        compute_cds_spread(0.02, 0.4, 5.3, 0.04, 4, 1_000_000)
+    with pytest.raises(CreditInputError):
+        price_risky_bond(1000, 0.05, 5.25, 2, 0.04, 0.02, 0.4)
+
+
+def test_non_finite_discounting_rejected():
+    with pytest.raises(CreditInputError):
+        compute_hazard_survival_curve(0.02, 0.4, 100, -10.0)
 
 
 # ---------------------------------------------------------------------------

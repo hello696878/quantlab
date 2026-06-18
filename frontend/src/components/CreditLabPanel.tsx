@@ -56,6 +56,10 @@ function num(s: string): number {
 function finite(s: string): boolean {
   return Number.isFinite(num(s));
 }
+function wholePeriods(maturity: string, frequency: string): boolean {
+  const raw = num(maturity) * num(frequency);
+  return Number.isFinite(raw) && Math.abs(raw - Math.round(raw)) < 1e-9;
+}
 function fmt(v: number | null | undefined, d = 2): string {
   return v == null || !Number.isFinite(v) ? "—" : v.toFixed(d);
 }
@@ -343,7 +347,15 @@ function CdsTab() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  const valid = num(hazard) >= 0 && num(recovery) >= 0 && num(recovery) <= 100 && num(maturity) > 0 && finite(rfRate) && num(notional) > 0;
+  const scheduleValid = wholePeriods(maturity, freq);
+  const valid =
+    num(hazard) >= 0 &&
+    num(recovery) >= 0 &&
+    num(recovery) <= 100 &&
+    num(maturity) > 0 &&
+    finite(rfRate) &&
+    num(notional) > 0 &&
+    scheduleValid;
 
   async function run() {
     if (!valid || loading) return;
@@ -397,7 +409,12 @@ function CdsTab() {
       <button type="button" onClick={run} disabled={!valid || loading} className={runBtnCls(valid, loading)}>
         {loading ? "Computing…" : "Compute CDS spread"}
       </button>
-      {!valid && <p className="text-[11px] text-slate-400">λ ≥ 0, recovery 0–100%, maturity &gt; 0, notional &gt; 0.</p>}
+      {!valid && (
+        <p className="text-[11px] text-slate-400">
+          λ ≥ 0, recovery 0–100%, maturity &gt; 0, notional &gt; 0, and maturity ×
+          frequency must be a whole number of payment periods.
+        </p>
+      )}
       {error && <p className="text-xs text-red-600">⚠ {error}</p>}
 
       {result && (
@@ -449,8 +466,16 @@ function RiskyBondTab() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
+  const scheduleValid = wholePeriods(maturity, freq);
   const valid =
-    num(face) > 0 && num(coupon) >= 0 && num(maturity) > 0 && finite(rfRate) && num(hazard) >= 0 && num(recovery) >= 0 && num(recovery) <= 100;
+    num(face) > 0 &&
+    num(coupon) >= 0 &&
+    num(maturity) > 0 &&
+    finite(rfRate) &&
+    num(hazard) >= 0 &&
+    num(recovery) >= 0 &&
+    num(recovery) <= 100 &&
+    scheduleValid;
 
   async function run() {
     if (!valid || loading) return;
@@ -507,7 +532,12 @@ function RiskyBondTab() {
       <button type="button" onClick={run} disabled={!valid || loading} className={runBtnCls(valid, loading)}>
         {loading ? "Pricing…" : "Price risky bond"}
       </button>
-      {!valid && <p className="text-[11px] text-slate-400">Face/maturity &gt; 0, coupon ≥ 0, λ ≥ 0, recovery 0–100%.</p>}
+      {!valid && (
+        <p className="text-[11px] text-slate-400">
+          Face/maturity &gt; 0, coupon ≥ 0, λ ≥ 0, recovery 0–100%, and maturity ×
+          frequency must be a whole number of coupon periods.
+        </p>
+      )}
       {error && <p className="text-xs text-red-600">⚠ {error}</p>}
 
       {result && (
