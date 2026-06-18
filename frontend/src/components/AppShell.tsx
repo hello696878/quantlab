@@ -15,6 +15,7 @@ export type View =
   | "events"
   | "rates"
   | "fx"
+  | "credit"
   | "csv"
   | "builder"
   | "portfolio"

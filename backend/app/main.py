@@ -125,6 +125,13 @@ from app.fx import (
     compute_ppp_deviation,
     price_garman_kohlhagen,
 )
+from app.credit import (
+    CreditInputError,
+    compute_cds_spread,
+    compute_hazard_survival_curve,
+    price_merton_credit,
+    price_risky_bond,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -209,6 +216,14 @@ from app.schemas import (
     FxExposureResponse,
     FxOptionRequest,
     FxOptionResponse,
+    MertonRequest,
+    MertonResponse,
+    HazardRequest,
+    HazardResponse,
+    CdsRequest,
+    CdsResponse,
+    RiskyBondRequest,
+    RiskyBondResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -4239,3 +4254,114 @@ def fx_option(request: FxOptionRequest) -> FxOptionResponse:
     except FxInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return FxOptionResponse(**result)
+
+
+# ---------------------------------------------------------------------------
+# Credit Risk Lab endpoints (research v1)
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/credit/merton",
+    response_model=MertonResponse,
+    tags=["credit"],
+    summary="Merton structural credit model (equity as a call on assets)",
+    description=(
+        "Merton structural model: equity as a call on firm assets, implied debt "
+        "value, distance to default, risk-neutral default probability, and credit "
+        "spread. Educational — stylized single-debt structure, constant asset "
+        "volatility, no live data, not investment advice."
+    ),
+)
+def credit_merton(request: MertonRequest) -> MertonResponse:
+    try:
+        result = price_merton_credit(
+            request.asset_value,
+            request.debt_face_value,
+            request.asset_volatility,
+            request.risk_free_rate,
+            request.time_to_maturity,
+            request.recovery_rate,
+            request.expected_asset_return,
+        )
+    except CreditInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return MertonResponse(**result)
+
+
+@app.post(
+    "/credit/hazard",
+    response_model=HazardResponse,
+    tags=["credit"],
+    summary="Reduced-form constant-hazard survival / default curve",
+    description=(
+        "Constant-hazard reduced-form model: survival, cumulative default, "
+        "expected loss, and risky discount factor over time, plus the credit-"
+        "triangle CDS approximation. Educational — flat hazard, not calibrated."
+    ),
+)
+def credit_hazard(request: HazardRequest) -> HazardResponse:
+    try:
+        result = compute_hazard_survival_curve(
+            request.hazard_rate,
+            request.recovery_rate,
+            request.maturity_years,
+            request.risk_free_rate,
+        )
+    except CreditInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return HazardResponse(**result)
+
+
+@app.post(
+    "/credit/cds",
+    response_model=CdsResponse,
+    tags=["credit"],
+    summary="Simplified CDS par-spread calculator",
+    description=(
+        "Discrete protection-leg / premium-leg fair CDS par spread under a flat "
+        "hazard rate. Educational approximation — no ISDA conventions, no "
+        "accrual-on-default, no calibrated hazard term structure. Not a quote."
+    ),
+)
+def credit_cds(request: CdsRequest) -> CdsResponse:
+    try:
+        result = compute_cds_spread(
+            request.hazard_rate,
+            request.recovery_rate,
+            request.maturity_years,
+            request.risk_free_rate,
+            request.payment_frequency,
+            request.notional,
+        )
+    except CreditInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return CdsResponse(**result)
+
+
+@app.post(
+    "/credit/risky-bond",
+    response_model=RiskyBondResponse,
+    tags=["credit"],
+    summary="Reduced-form risky (defaultable) bond pricing + credit spread",
+    description=(
+        "Prices a fixed-coupon risky bond as survival-weighted promised cash "
+        "flows plus a recovery leg under a flat hazard rate, with the risk-free "
+        "price and a flat-yield credit spread. Educational — no liquidity/tax/"
+        "optionality, not an OAS or a market quote."
+    ),
+)
+def credit_risky_bond(request: RiskyBondRequest) -> RiskyBondResponse:
+    try:
+        result = price_risky_bond(
+            request.face_value,
+            request.coupon_rate,
+            request.maturity_years,
+            request.coupon_frequency,
+            request.risk_free_rate,
+            request.hazard_rate,
+            request.recovery_rate,
+        )
+    except CreditInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return RiskyBondResponse(**result)

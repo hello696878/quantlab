@@ -41,6 +41,7 @@ import OptionsLabPanel from "@/components/OptionsLabPanel";
 import EventLabPanel from "@/components/EventLabPanel";
 import YieldCurveLabPanel from "@/components/YieldCurveLabPanel";
 import FxLabPanel from "@/components/FxLabPanel";
+import CreditLabPanel from "@/components/CreditLabPanel";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -362,6 +363,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "Spot/forward via interest rate parity, FX carry, PPP deviation, currency exposure, and Garman-Kohlhagen FX options — no live FX rates, not investment advice.",
   },
+  credit: {
+    title: "Credit Risk Lab",
+    subtitle:
+      "Merton structural credit, distance to default, hazard rates and survival curves, CDS spread approximation, and risky bond pricing — no live CDS data, not investment advice.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -489,6 +495,12 @@ export default function HomePage() {
     "forward",
   );
   const [fxKey, setFxKey] = useState(0);
+
+  // Credit Risk Lab: which tab to open on (deep-linked from the palette).
+  const [creditTab, setCreditTab] = useState<"merton" | "hazard" | "cds" | "bond" | "education">(
+    "merton",
+  );
+  const [creditKey, setCreditKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -795,6 +807,7 @@ export default function HomePage() {
     { view: "events", title: "Open Event Lab", keywords: "event study abnormal return car caar merger arbitrage deal spread event-driven earnings event" },
     { view: "rates", title: "Open Yield Curve Lab", keywords: "yield curve rates zero rate discount factor forward rate duration convexity dv01 bond pricing fixed income short rate vasicek cir mean reversion" },
     { view: "fx", title: "Open FX Lab", keywords: "fx foreign exchange currency forward rate interest rate parity carry ppp purchasing power parity exposure garman kohlhagen fx option" },
+    { view: "credit", title: "Open Credit Risk Lab", keywords: "credit credit risk merton structural model distance to default default probability hazard rate survival curve cds credit spread risky bond recovery rate" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1009,6 +1022,24 @@ export default function HomePage() {
         setFxTab(t);
         setFxKey((k) => k + 1);
         handleNav("fx");
+      },
+    })),
+    ...(
+      [
+        ["merton", "Open Merton Model", "merton structural credit model distance to default default probability equity call"],
+        ["hazard", "Open Hazard Rate Model", "hazard rate survival curve default probability reduced form credit intensity"],
+        ["cds", "Open CDS Spread Calculator", "cds credit default swap spread protection leg premium leg credit"],
+        ["bond", "Open Risky Bond Pricing", "risky bond defaultable bond credit spread recovery hazard pricing"],
+      ] as const
+    ).map(([t, title, keywords], i) => ({
+      id: `credit-${t}-${i}`,
+      group: "Credit Risk Lab",
+      title,
+      keywords,
+      run: () => {
+        setCreditTab(t);
+        setCreditKey((k) => k + 1);
+        handleNav("credit");
       },
     })),
     // Report actions are only offered when they actually work (a result exists).
@@ -1451,6 +1482,9 @@ export default function HomePage() {
 
         {/* ── FX Lab ───────────────────────────────────────────────────── */}
         {view === "fx" && <FxLabPanel key={fxKey} initialTab={fxTab} />}
+
+        {/* ── Credit Risk Lab ──────────────────────────────────────────── */}
+        {view === "credit" && <CreditLabPanel key={creditKey} initialTab={creditTab} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

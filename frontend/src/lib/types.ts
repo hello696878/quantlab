@@ -2279,3 +2279,124 @@ export interface FxOptionResponse {
   convention: string;
   warnings: string[];
 }
+
+// ── Credit Risk Lab (Merton / hazard / CDS / risky bond) ─────────────────────
+
+export interface MertonRequest {
+  asset_value: number;
+  debt_face_value: number;
+  asset_volatility: number;
+  risk_free_rate: number;
+  time_to_maturity: number;
+  recovery_rate: number;
+  expected_asset_return?: number | null;
+}
+
+export interface MertonResponse {
+  equity_value: number;
+  debt_value: number;
+  asset_value: number;
+  debt_face_value: number;
+  d1: number;
+  d2: number;
+  distance_to_default: number;
+  dd_drift_used: string;
+  risk_neutral_default_probability: number;
+  risky_debt_yield: number | null;
+  credit_spread: number | null;
+  credit_spread_bps: number | null;
+  expected_loss: number;
+  recovery_rate: number;
+  warnings: string[];
+}
+
+export interface HazardRequest {
+  hazard_rate: number;
+  recovery_rate: number;
+  maturity_years: number;
+  risk_free_rate: number;
+}
+
+export interface HazardCurvePoint {
+  time: number;
+  survival_probability: number;
+  default_probability: number;
+  expected_loss: number;
+  risky_discount_factor: number;
+}
+
+export interface HazardResponse {
+  hazard_rate: number;
+  recovery_rate: number;
+  maturity_years: number;
+  survival_probability_at_maturity: number;
+  default_probability_at_maturity: number;
+  expected_loss_at_maturity: number;
+  simple_cds_spread: number;
+  simple_cds_spread_bps: number;
+  curve: HazardCurvePoint[];
+  warnings: string[];
+}
+
+export interface CdsRequest {
+  hazard_rate: number;
+  recovery_rate: number;
+  maturity_years: number;
+  risk_free_rate: number;
+  payment_frequency: number;
+  notional: number;
+}
+
+export interface CdsResponse {
+  hazard_rate: number;
+  recovery_rate: number;
+  maturity_years: number;
+  payment_frequency: number;
+  notional: number;
+  fair_spread: number;
+  fair_spread_bps: number;
+  simple_spread_bps: number;
+  protection_leg_pv: number;
+  risky_pv01: number;
+  expected_loss: number;
+  survival_probability_at_maturity: number;
+  warnings: string[];
+}
+
+export interface RiskyBondRequest {
+  face_value: number;
+  coupon_rate: number;
+  maturity_years: number;
+  coupon_frequency: number;
+  risk_free_rate: number;
+  hazard_rate: number;
+  recovery_rate: number;
+}
+
+export interface RiskyBondCashFlow {
+  time: number;
+  cash_flow: number;
+  survival_probability: number;
+  discount_factor: number;
+  present_value: number;
+  recovery_pv: number;
+}
+
+export interface RiskyBondResponse {
+  risky_bond_price: number;
+  risk_free_bond_price: number;
+  pv_coupons: number;
+  pv_principal: number;
+  pv_recovery: number;
+  risky_yield: number | null;
+  credit_spread: number | null;
+  credit_spread_bps: number | null;
+  expected_loss: number;
+  survival_probability_at_maturity: number;
+  face_value: number;
+  coupon_rate: number;
+  maturity_years: number;
+  coupon_frequency: number;
+  cash_flows: RiskyBondCashFlow[];
+  warnings: string[];
+}

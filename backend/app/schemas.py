@@ -4658,3 +4658,135 @@ class FxOptionResponse(BaseModel):
     rho_foreign: float
     convention: str
     warnings: List[str] = Field(default_factory=list)
+
+
+# ===========================================================================
+# Credit Risk Lab — research v1 (Merton / hazard / CDS / risky bond)
+# ===========================================================================
+
+
+class MertonRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    asset_value: float = Field(gt=0.0, le=1e15)
+    debt_face_value: float = Field(gt=0.0, le=1e15)
+    asset_volatility: float = Field(gt=0.0, le=100.0)
+    risk_free_rate: float = Field(ge=-10.0, le=10.0)
+    time_to_maturity: float = Field(gt=0.0, le=100.0)
+    recovery_rate: float = Field(default=0.4, ge=0.0, le=1.0)
+    expected_asset_return: Optional[float] = Field(default=None, ge=-10.0, le=10.0)
+
+
+class MertonResponse(BaseModel):
+    equity_value: float
+    debt_value: float
+    asset_value: float
+    debt_face_value: float
+    d1: float
+    d2: float
+    distance_to_default: float
+    dd_drift_used: str
+    risk_neutral_default_probability: float
+    risky_debt_yield: Optional[float] = None
+    credit_spread: Optional[float] = None
+    credit_spread_bps: Optional[float] = None
+    expected_loss: float
+    recovery_rate: float
+    warnings: List[str] = Field(default_factory=list)
+
+
+class HazardRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    hazard_rate: float = Field(ge=0.0, le=10.0)
+    recovery_rate: float = Field(default=0.4, ge=0.0, le=1.0)
+    maturity_years: float = Field(gt=0.0, le=100.0)
+    risk_free_rate: float = Field(default=0.04, ge=-10.0, le=10.0)
+
+
+class HazardCurvePoint(BaseModel):
+    time: float
+    survival_probability: float
+    default_probability: float
+    expected_loss: float
+    risky_discount_factor: float
+
+
+class HazardResponse(BaseModel):
+    hazard_rate: float
+    recovery_rate: float
+    maturity_years: float
+    survival_probability_at_maturity: float
+    default_probability_at_maturity: float
+    expected_loss_at_maturity: float
+    simple_cds_spread: float
+    simple_cds_spread_bps: float
+    curve: List[HazardCurvePoint] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
+
+
+class CdsRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    hazard_rate: float = Field(ge=0.0, le=10.0)
+    recovery_rate: float = Field(default=0.4, ge=0.0, le=1.0)
+    maturity_years: float = Field(gt=0.0, le=100.0)
+    risk_free_rate: float = Field(default=0.04, ge=-10.0, le=10.0)
+    payment_frequency: int = Field(default=4, ge=1, le=365)
+    notional: float = Field(default=1_000_000.0, gt=0.0, le=1e15)
+
+
+class CdsResponse(BaseModel):
+    hazard_rate: float
+    recovery_rate: float
+    maturity_years: float
+    payment_frequency: int
+    notional: float
+    fair_spread: float
+    fair_spread_bps: float
+    simple_spread_bps: float
+    protection_leg_pv: float
+    risky_pv01: float
+    expected_loss: float
+    survival_probability_at_maturity: float
+    warnings: List[str] = Field(default_factory=list)
+
+
+class RiskyBondRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    face_value: float = Field(gt=0.0, le=1e15)
+    coupon_rate: float = Field(ge=0.0, le=1.0)
+    maturity_years: float = Field(gt=0.0, le=100.0)
+    coupon_frequency: int = Field(default=2, ge=1, le=365)
+    risk_free_rate: float = Field(default=0.04, ge=-10.0, le=10.0)
+    hazard_rate: float = Field(ge=0.0, le=10.0)
+    recovery_rate: float = Field(default=0.4, ge=0.0, le=1.0)
+
+
+class RiskyBondCashFlow(BaseModel):
+    time: float
+    cash_flow: float
+    survival_probability: float
+    discount_factor: float
+    present_value: float
+    recovery_pv: float
+
+
+class RiskyBondResponse(BaseModel):
+    risky_bond_price: float
+    risk_free_bond_price: float
+    pv_coupons: float
+    pv_principal: float
+    pv_recovery: float
+    risky_yield: Optional[float] = None
+    credit_spread: Optional[float] = None
+    credit_spread_bps: Optional[float] = None
+    expected_loss: float
+    survival_probability_at_maturity: float
+    face_value: float
+    coupon_rate: float
+    maturity_years: float
+    coupon_frequency: int
+    cash_flows: List[RiskyBondCashFlow] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)

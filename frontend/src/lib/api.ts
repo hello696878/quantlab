@@ -45,6 +45,14 @@ import type {
   FxExposureResponse,
   FxOptionRequest,
   FxOptionResponse,
+  MertonRequest,
+  MertonResponse,
+  HazardRequest,
+  HazardResponse,
+  CdsRequest,
+  CdsResponse,
+  RiskyBondRequest,
+  RiskyBondResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -1053,6 +1061,24 @@ export function computeFxExposure(req: FxExposureRequest): Promise<FxExposureRes
 
 export function priceFxOption(req: FxOptionRequest): Promise<FxOptionResponse> {
   return postOptions<FxOptionResponse>("/api/fx/option", req);
+}
+
+// ── Credit Risk Lab ──────────────────────────────────────────────────────────
+
+export function computeMerton(req: MertonRequest): Promise<MertonResponse> {
+  return postOptions<MertonResponse>("/api/credit/merton", req);
+}
+
+export function computeHazard(req: HazardRequest): Promise<HazardResponse> {
+  return postOptions<HazardResponse>("/api/credit/hazard", req);
+}
+
+export function computeCds(req: CdsRequest): Promise<CdsResponse> {
+  return postOptions<CdsResponse>("/api/credit/cds", req);
+}
+
+export function priceRiskyBond(req: RiskyBondRequest): Promise<RiskyBondResponse> {
+  return postOptions<RiskyBondResponse>("/api/credit/risky-bond", req);
 }
 
 export async function fetchSampleCurve(): Promise<SampleCurveResponse> {

@@ -175,6 +175,18 @@ Return to the Command Center's **Platform Direction** panel (or open
   payoff chart. Emphasise: domestic-per-foreign convention; all result-card
   values are readable on the dark theme; no live FX rates, no FX vol surface,
   not investment advice.
+- **Credit Risk Lab** — *Merton Model*: asset value 120, debt face 100, asset
+  vol 25%, rf 4%, maturity 1, recovery 40% → equity / debt / distance to default
+  / default probability / credit spread cards + the equity-vs-debt capital
+  breakdown; drop the asset value to 80 to watch the default probability jump.
+  *Hazard / Survival*: λ 2%, recovery 40%, maturity 5 → survival (green) vs
+  cumulative-default (red) curves and the simple `λ·LGD` ≈ 120 bps card. *CDS
+  Spread*: λ 2%, recovery 40%, 5y, rf 4%, freq 4, notional 1,000,000 → fair
+  spread ≈ 120 bps with the protection/premium legs equal at the fair spread.
+  *Risky Bond*: face 1000, coupon 5%, 5y, semiannual, rf 4%, λ 2%, recovery 40%
+  → risky price below the risk-free price, the credit spread, and the
+  survival-weighted cash-flow table. Emphasise: stylized structural + flat-hazard
+  reduced-form models, no live CDS/bond data, no full CVA, not investment advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

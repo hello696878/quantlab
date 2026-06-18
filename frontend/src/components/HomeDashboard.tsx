@@ -1086,6 +1086,22 @@ export default function HomeDashboard({
               Open FX Lab →
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => onNav("credit")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+              Credit Risk Lab
+            </span>
+            <span className="text-xs text-slate-400">
+              Explore Merton structural credit, hazard rates, CDS spread approximation,
+              survival curves, and risky bond pricing — no live CDS data.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Credit Risk Lab →
+            </span>
+          </button>
         </div>
       </section>
 

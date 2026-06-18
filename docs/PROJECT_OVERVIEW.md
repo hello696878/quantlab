@@ -55,6 +55,7 @@ FastAPI Backend
   ├── yield_curve.py                Yield Curve Lab v1: discount factors, forwards, interpolation, curve shocks, bond pricing + duration/convexity/DV01 (pure)
   ├── short_rates.py                Short Rate Models Lab v1: Vasicek / CIR Monte Carlo simulation + analytic zero-coupon pricing, Feller diagnostic (pure)
   ├── fx.py                         FX Lab v1: interest rate parity forward, FX carry, PPP deviation, currency exposure + stress, Garman-Kohlhagen FX options (pure)
+  ├── credit.py                     Credit Risk Lab v1: Merton structural model, distance to default, hazard/survival curve, CDS spread approximation, risky bond pricing (pure)
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD

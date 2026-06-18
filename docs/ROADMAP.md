@@ -1030,6 +1030,32 @@ single-asset Backtest + Strategy Comparison:
   convention is domestic per 1 foreign; results ignore bid/ask, funding/costs,
   liquidity, and capital controls. Not advice
 
+### Phase 17.0 — Credit Risk Lab v1 ✅
+
+- New backend `app/credit.py` — **pure**, deterministic credit math reusing
+  `app.options.normal_cdf`: **Merton structural model** (equity as a call on
+  assets `E = V·N(d1) − D·e^{−rT}·N(d2)`, implied debt, **distance to default**,
+  risk-neutral **default probability** `N(−d2)`, credit spread, expected loss);
+  a constant-**hazard** reduced-form survival / default / expected-loss / risky-DF
+  curve; a simplified **CDS par spread** (protection-leg PV / risky PV01, plus the
+  credit-triangle `λ·(1−R)`); and **risky bond pricing** (survival-weighted
+  promised flows + recovery leg, risk-free price, and a flat-yield credit spread)
+- Four routes: `POST /credit/merton`, `/credit/hazard`, `/credit/cds`,
+  `/credit/risky-bond` (validated; bad recovery / negative hazard / maturity /
+  volatility / asset value → 422; never NaN/inf). 36 deterministic tests incl.
+  the accounting identity (E+Debt=V), leverage monotonicity, survival = `e^{−λt}`,
+  CDS ≈ `λ·LGD`, risky ≤ risk-free, and a cash-flow reconciliation
+- New top-level **Credit Risk Lab** workspace (Merton Model · Hazard / Survival ·
+  CDS Spread · Risky Bond · Education) with the shared **MetricCard** (readable
+  values), deterministic-palette charts (capital-structure breakdown,
+  survival-vs-default curves, CDS leg balance, risky-vs-risk-free price, cash-flow
+  PV), sidebar nav, dashboard card, and command-palette commands (Credit Risk Lab
+  + Merton / Hazard / CDS / Risky Bond)
+- Research/education only — **no** live CDS spreads, no live bond prices, **no
+  full CVA**, no credit-portfolio model, no rating-transition matrix, no
+  calibration. Results depend on asset value/volatility, recovery, capital
+  structure, liquidity, seniority, and covenants. Not advice
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -1101,8 +1127,10 @@ search · toasts, error boundary, loading/offline states.
    zero rates, discount factors, forwards, curve shocks, bond duration/convexity;
    16.1: Short Rate Models v1 — Vasicek / CIR simulation + analytic zero-coupon
    pricing; 16.2: FX Lab v1 — interest rate parity, carry, PPP, currency exposure,
-   Garman-Kohlhagen FX options; Hull-White, swap-curve bootstrapping, FX vol
-   surface, and credit curve remain planned / research)
+   Garman-Kohlhagen FX options; 17.0: Credit Risk Lab v1 — Merton structural model,
+   hazard / survival, CDS spread approximation, risky bond pricing; Hull-White,
+   swap-curve bootstrapping, FX vol surface, full CVA, and credit spread strategies
+   remain planned / research)
 10. **Real Estate Module** (research)
 11. **Microstructure & HFT Lab** — *educational simulations* (order-book toys,
     queue models) on synthetic data; **not** real HFT execution (research)
@@ -1128,7 +1156,7 @@ built**; everything else is planned/research/future:
 | 4 | Futures & Commodities | research |
 | 5 | FX | **built (v1)** — FX Lab: interest rate parity forward, FX carry, PPP deviation, currency exposure + stress, Garman-Kohlhagen FX options; FX vol surface, live rates planned |
 | 6 | Fixed Income & Rates | **built (v1)** — Yield Curve Lab (zero rates, discount factors, forwards, curve shocks, bond duration / convexity / DV01) + Short Rate Models Lab (Vasicek / CIR simulation + analytic zero-coupon pricing); Hull-White, swap-curve bootstrapping planned |
-| 7 | Credit | research |
+| 7 | Credit | **built (v1)** — Credit Risk Lab: Merton structural model + distance to default, reduced-form hazard / survival, simplified CDS par spread, risky bond pricing; full CVA, credit-portfolio, rating transitions, credit spread strategies planned |
 | 8 | Crypto | **built (partial)** — crypto tickers, 365-day annualization; exchange-native data future |
 | 9 | Real Estate | research |
 | 10 | Market Microstructure & HFT | future (educational simulations only) |

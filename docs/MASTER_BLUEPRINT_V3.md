@@ -82,7 +82,10 @@ reproducible and every limitation explicit.
    discount factors, forwards, curve shocks, bond duration/convexity/DV01 (16.0);
    Short Rate Models Lab — Vasicek / CIR simulation + analytic zero-coupon pricing
    (16.1). Planned: Hull-White, swap-curve bootstrapping, rolldown
-7. **Credit** — research (spread momentum, quality)
+7. **Credit** — **built (v1)**: Credit Risk Lab — Merton structural model +
+   distance to default, reduced-form hazard / survival, simplified CDS par spread,
+   risky bond pricing (17.0). Planned: full CVA, credit-portfolio model, rating
+   transitions, credit spread strategies
 8. **Crypto** — built (partial: tickers + 365-day convention); funding-rate /
    basis models research; exchange-native data future
 9. **Real Estate** — research (REIT factor / rate sensitivity)
@@ -110,7 +113,8 @@ reproducible and every limitation explicit.
 8. ~~Event-Driven & Arbitrage Module~~ — **built (v1)** (15.0: event study + merger-arb calculator)
 9. Rates / FX / Credit Module — **started** (16.0: Yield Curve Lab v1;
    16.1: Short Rate Models v1 — Vasicek / CIR; 16.2: FX Lab v1 — IRP / carry /
-   PPP / exposure / Garman-Kohlhagen)
+   PPP / exposure / Garman-Kohlhagen; 17.0: Credit Risk Lab v1 — Merton / hazard /
+   CDS / risky bond)
 10. Real Estate Module
 11. Microstructure & HFT Lab (educational simulations)
 12. Portfolio Studio + Ensemble Builder
