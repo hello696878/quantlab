@@ -85,7 +85,9 @@ def validate_scanner_inputs(
 
 def compute_rebalance_indices(date_index, first_valid: int, frequency: str) -> List[int]:
     """Indices (from ``first_valid``) on which to rebalance, by calendar group."""
-    valid = range(first_valid, len(date_index))
+    # A basket formed at index t can only earn the next-period return t→t+1.
+    # The final date is therefore not an actionable rebalance date.
+    valid = range(first_valid, max(first_valid, len(date_index) - 1))
     if frequency == "daily":
         return list(valid)
     seen = set()
@@ -221,11 +223,14 @@ def run_scanner_backtest(
     long_exp = np.sum(np.where(weights > 0, weights, 0.0), axis=1)
     short_exp = np.sum(np.where(weights < 0, weights, 0.0), axis=1)
 
-    # Averages over the dates a basket was actually held.
+    # Averages over the periods where a basket was actually held for P&L.
+    period_gross_exp = gross_exp[:-1]
+    period_net_exp = net_exp[:-1]
+    active_periods = np.isfinite(period_gross_exp) & (period_gross_exp > 1e-12)
     held = np.array(sorted(reb_used)) if reb_used else np.array([], dtype=int)
     avg_turnover = float(np.mean([turnover[t] for t in reb_used])) if reb_used else 0.0
-    avg_gross = float(np.mean(gross_exp[held])) if held.size else 0.0
-    avg_net = float(np.mean(net_exp[held])) if held.size else 0.0
+    avg_gross = float(np.mean(period_gross_exp[active_periods])) if active_periods.any() else 0.0
+    avg_net = float(np.mean(period_net_exp[active_periods])) if active_periods.any() else 0.0
     avg_longs = float(np.mean(n_long_hist)) if n_long_hist else 0.0
     avg_shorts = float(np.mean(n_short_hist)) if n_short_hist else 0.0
 
@@ -239,19 +244,21 @@ def run_scanner_backtest(
         {"date": series_dates[i], "gross": _clean(float(gross_series[i])), "net": _clean(float(net_series[i]))}
         for i in idx
     ]
-    # Exposure / turnover aligned to the same return days (weights/turnover at t+1).
+    # Exposure / turnover aligned to the same return days:
+    # series_dates[i] is the return from dates[i] to dates[i+1], so use
+    # weights[i] and turnover[i], the basket and cost that produced net_ret[i+1].
     exposures = [
         {
             "date": series_dates[i],
-            "gross": _clean(float(gross_exp[i + 1])),
-            "net": _clean(float(net_exp[i + 1])),
-            "long": _clean(float(long_exp[i + 1])),
-            "short": _clean(float(short_exp[i + 1])),
+            "gross": _clean(float(gross_exp[i])),
+            "net": _clean(float(net_exp[i])),
+            "long": _clean(float(long_exp[i])),
+            "short": _clean(float(short_exp[i])),
         }
         for i in idx
     ]
     turnover_series = [
-        {"date": series_dates[i], "turnover": _clean(float(turnover[i + 1]))}
+        {"date": series_dates[i], "turnover": _clean(float(turnover[i]))}
         for i in idx
     ]
 
@@ -317,17 +324,40 @@ def _build_latest_ranking(
     sectors: List[str],
     dates: List[str],
 ) -> Tuple[List[dict], Optional[str]]:
-    """Ranked preview (capped) of the most recent rebalance date."""
+    """Ranked preview (capped) of the most recent actionable rebalance date.
+
+    Large universes would otherwise return only the top names and hide the
+    short basket. The preview deliberately includes top, middle, and bottom
+    ranks so the UI can show long, neutral, and short examples without sending
+    the full score matrix.
+    """
     if not reb_used:
         return [], None
     t = max(reb_used)
     row = scores[t]
     w = weights[t]
     order = np.argsort(-np.where(np.isfinite(row), row, -np.inf), kind="stable")
+    finite_order = [int(i) for i in order if np.isfinite(row[i])]
+    if len(finite_order) <= _RANKING_CAP:
+        preview_order = finite_order
+    else:
+        edge = max(1, int(_RANKING_CAP * 0.4))
+        middle_count = max(0, _RANKING_CAP - 2 * edge)
+        middle_start = max(edge, (len(finite_order) - middle_count) // 2)
+        selected = (
+            finite_order[:edge]
+            + finite_order[middle_start : middle_start + middle_count]
+            + finite_order[-edge:]
+        )
+        seen = set()
+        preview_order = []
+        for i in selected:
+            if i not in seen:
+                seen.add(i)
+                preview_order.append(i)
     ranking: List[dict] = []
-    for rank, i in enumerate(order, start=1):
-        if not np.isfinite(row[i]):
-            continue
+    for i in preview_order:
+        rank = finite_order.index(i) + 1
         wi = float(w[i])
         side = "long" if wi > 0 else "short" if wi < 0 else "neutral"
         ranking.append(
@@ -340,6 +370,4 @@ def _build_latest_ranking(
                 "weight": _clean(wi),
             }
         )
-        if len(ranking) >= _RANKING_CAP:
-            break
     return ranking, dates[t]

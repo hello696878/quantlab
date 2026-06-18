@@ -2,10 +2,11 @@
  * Strategy Library model registry (v1).
  *
  * Single source of truth for the Strategy Library index + detail pages and
- * their Backtest Studio links.  Entries marked `status: "live"` are the
- * strategies actually implemented in the backend today; everything else is
- * explicitly planned/research/future per Master Blueprint v3 and must never
- * grow a "Run backtest" button until it ships.
+ * their Backtest Studio links. Entries marked `status: "live"` are the
+ * single-asset strategies implemented in Backtest Studio today. Entries marked
+ * `status: "built"` exist elsewhere in QuantLab (for example the Scanner Lab)
+ * but are not single-asset Backtest Studio strategies. Planned/research/future
+ * entries must never grow a run button until they ship.
  *
  * All content is educational research material — hypotheses, assumptions, and
  * failure modes — not trading recommendations.
@@ -13,7 +14,7 @@
 
 import type { StrategyType } from "@/lib/types";
 
-export type ModelStatus = "live" | "planned" | "research" | "future";
+export type ModelStatus = "live" | "built" | "planned" | "research" | "future";
 export type ModelDifficulty = "core" | "advanced" | "frontier";
 
 export interface ModelParamDoc {
@@ -483,30 +484,29 @@ export const MODEL_REGISTRY: ModelEntry[] = [
       "single-asset strategies. Trust-layer coverage for pairs is planned.",
   },
 
-  // ── Planned / research / future (Blueprint v3 — NOT implemented) ───────────
+  // ── Scanner-built / planned / research / future catalog ────────────────────
   {
     id: "cross_sectional_reversal",
     slug: "cross-sectional-reversal",
     name: "Cross-Sectional Linear Long-Short Reversion",
     category: "Equities · Mean Reversion",
-    status: "planned",
+    status: "built",
     difficulty: "advanced",
     description:
       "Rank a universe by negative demeaned recent return; long the laggards, short the leaders, " +
-      "dollar-neutral. Demonstrable now in the Cross-Sectional Scanner Lab on a synthetic universe " +
-      "(scanner-compatible); a full live-universe version remains planned.",
+      "dollar-neutral. Built in the Cross-Sectional Scanner Lab on a synthetic universe; a full " +
+      "live-universe scanner remains planned.",
   },
   {
     id: "cross_sectional_momentum",
     slug: "cross-sectional-momentum",
     name: "Cross-Sectional Momentum",
     category: "Equities · Momentum",
-    status: "planned",
+    status: "built",
     difficulty: "advanced",
     description:
-      "Rank a universe by trailing return; hold winners against losers. Demonstrable now in the " +
-      "Cross-Sectional Scanner Lab on a synthetic universe (scanner-compatible); a full live-universe " +
-      "version remains planned.",
+      "Rank a universe by trailing return; hold winners against losers. Built in the Cross-Sectional " +
+      "Scanner Lab on a synthetic universe; a full live-universe scanner remains planned.",
   },
   {
     id: "fama_french_factors",
@@ -561,7 +561,7 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 ];
 
 export const LIVE_MODELS = MODEL_REGISTRY.filter((m) => m.status === "live");
-export const PLANNED_MODELS = MODEL_REGISTRY.filter((m) => m.status !== "live");
+export const CATALOG_MODELS = MODEL_REGISTRY.filter((m) => m.status !== "live");
 
 export function findModelBySlug(slug: string): ModelEntry | undefined {
   return MODEL_REGISTRY.find((m) => m.slug === slug);

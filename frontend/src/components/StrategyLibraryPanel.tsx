@@ -2,8 +2,8 @@
 
 import { useState } from "react";
 import {
+  CATALOG_MODELS,
   LIVE_MODELS,
-  PLANNED_MODELS,
   findModelBySlug,
   type ModelEntry,
   type ModelStatus,
@@ -27,6 +27,7 @@ interface Props {
 
 const STATUS_STYLE: Record<ModelStatus, string> = {
   live: "bg-emerald-100 text-emerald-700",
+  built: "bg-cyan-100 text-cyan-700",
   planned: "bg-slate-100 text-slate-500",
   research: "bg-violet-100 text-violet-700",
   future: "bg-slate-100 text-slate-400",
@@ -34,6 +35,7 @@ const STATUS_STYLE: Record<ModelStatus, string> = {
 
 const STATUS_LABEL: Record<ModelStatus, string> = {
   live: "Live",
+  built: "Built",
   planned: "Planned",
   research: "Research",
   future: "Future",
@@ -85,9 +87,9 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 /**
- * Strategy Library v1 — educational pages for the live strategies plus an
- * honest catalog of planned/research models (Blueprint v3).  Research
- * material, not investment advice; planned models never get run buttons.
+ * Strategy Library v1 — educational pages for the live Backtest Studio
+ * strategies plus an honest catalog of scanner-built/planned/research models
+ * (Blueprint v3). Research material, not investment advice.
  */
 export default function StrategyLibraryPanel({
   onRunStrategy,
@@ -171,16 +173,16 @@ export default function StrategyLibraryPanel({
         </div>
       </div>
 
-      {/* Planned / research / future */}
+      {/* Scanner-built / planned / research / future */}
       <div>
-        <p className="section-title mb-1">Catalog — planned & research</p>
+        <p className="section-title mb-1">Catalog — scanner, planned & research</p>
         <p className="mb-3 text-xs text-slate-400">
-          From the Master Blueprint v3 model catalog. These are{" "}
-          <span className="font-medium text-slate-500">not implemented</span> —
-          listed for direction, with no run buttons until they ship.
+          From the Master Blueprint v3 model catalog. Built scanner entries are
+          available in Scanner Lab; planned/research entries remain directional
+          and carry no run buttons until they ship.
         </p>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-          {PLANNED_MODELS.map((m) => (
+          {CATALOG_MODELS.map((m) => (
             <div key={m.id} className="card flex flex-col gap-2 p-4">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-semibold text-slate-700">{m.name}</p>
@@ -416,10 +418,18 @@ function ModelDetail({
       ) : (
         <div className="card p-5">
           <p className="section-title mb-2">Status</p>
-          <p className="text-sm text-slate-500">
-            This model is {STATUS_LABEL[model.status].toLowerCase()} — it is not
-            implemented yet and cannot be backtested in QuantLab today.
-          </p>
+          {model.status === "built" ? (
+            <p className="text-sm text-slate-500">
+              This model is built in the Cross-Sectional Scanner Lab on a
+              synthetic universe. It is not a single-asset Backtest Studio
+              strategy, and live-universe scanning remains planned.
+            </p>
+          ) : (
+            <p className="text-sm text-slate-500">
+              This model is {STATUS_LABEL[model.status].toLowerCase()} — it is not
+              implemented yet and cannot be backtested in QuantLab today.
+            </p>
+          )}
         </div>
       )}
     </div>

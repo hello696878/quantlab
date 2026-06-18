@@ -112,11 +112,16 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
 
   const lq = num(inp.longQuantile);
   const sq = num(inp.shortQuantile);
+  const seedValue = num(inp.seed);
+  const seedValid = inp.seed.trim() === "" || (Number.isInteger(seedValue) && seedValue >= 0);
   const valid =
     Number.isInteger(num(inp.nAssets)) && num(inp.nAssets) >= 5 && num(inp.nAssets) <= 500 &&
-    Number.isInteger(num(inp.lookback)) && num(inp.lookback) >= 1 &&
+    Number.isInteger(num(inp.lookback)) && num(inp.lookback) >= 1 && num(inp.lookback) <= 252 &&
     lq > 0 && lq < 0.5 && sq > 0 && sq < 0.5 &&
-    num(inp.grossExposure) > 0 && num(inp.costBps) >= 0 &&
+    num(inp.grossExposure) > 0 && num(inp.grossExposure) <= 10 &&
+    num(inp.costBps) >= 0 && num(inp.costBps) <= 1000 &&
+    num(inp.minLiquidity) >= 0 && num(inp.minLiquidity) <= 1 &&
+    seedValid &&
     inp.startDate < inp.endDate;
 
   async function run(strategyOverride?: ScannerStrategy) {
@@ -152,10 +157,9 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
     }
   }
 
-  // Cap the ranking table to the extremes for readability.
+  // Backend already returns a capped top/middle/bottom preview so long, neutral,
+  // and short examples remain visible even for large universes.
   const ranking = result?.latest_ranking ?? [];
-  const rankingRows =
-    ranking.length > 60 ? [...ranking.slice(0, 25), null, ...ranking.slice(-25)] : ranking;
 
   return (
     <div className="space-y-5">
@@ -217,7 +221,8 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
         </div>
         {!valid && (
           <p className="text-[11px] text-slate-400">
-            Universe 5–500 assets, lookback ≥ 1, quantiles in (0, 0.5), gross &gt; 0, start before end.
+            Universe 5–500 assets, lookback 1–252, quantiles in (0, 0.5), gross 0–10,
+            cost 0–1000 bps, liquidity 0–1, optional seed ≥ 0, start before end.
           </p>
         )}
         {error && <p className="text-xs text-red-600">⚠ {error}</p>}
@@ -319,22 +324,16 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
                   </tr>
                 </thead>
                 <tbody>
-                  {rankingRows.map((row, i) =>
-                    row === null ? (
-                      <tr key={`gap-${i}`} className="border-t border-[var(--line)]">
-                        <td colSpan={6} className="px-2 py-1 text-center text-slate-500">⋯ middle ranks omitted ⋯</td>
-                      </tr>
-                    ) : (
-                      <tr key={row.ticker} className="border-t border-[var(--line)]">
-                        <td className="px-2 py-1 text-right mono">{row.rank}</td>
-                        <td className="px-2 py-1 text-left mono">{row.ticker}</td>
-                        <td className="px-2 py-1 text-left">{row.sector}</td>
-                        <td className="px-2 py-1 text-right mono">{fmt(row.score, 4)}</td>
-                        <td className="px-2 py-1 text-center font-semibold" style={{ color: sideColor(row.side) }}>{row.side}</td>
-                        <td className="px-2 py-1 text-right mono">{fmt(row.weight, 4)}</td>
-                      </tr>
-                    ),
-                  )}
+                  {ranking.map((row) => (
+                    <tr key={row.ticker} className="border-t border-[var(--line)]">
+                      <td className="px-2 py-1 text-right mono">{row.rank}</td>
+                      <td className="px-2 py-1 text-left mono">{row.ticker}</td>
+                      <td className="px-2 py-1 text-left">{row.sector}</td>
+                      <td className="px-2 py-1 text-right mono">{fmt(row.score, 4)}</td>
+                      <td className="px-2 py-1 text-center font-semibold" style={{ color: sideColor(row.side) }}>{row.side}</td>
+                      <td className="px-2 py-1 text-right mono">{fmt(row.weight, 4)}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>

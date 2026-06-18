@@ -1057,7 +1057,7 @@ export default function HomePage() {
     ...(
       [
         ["cross_sectional_reversal", "Open Scanner Lab", "scanner lab cross-sectional rank long short universe second engine"],
-        ["cross_sectional_reversal", "Run Cross-Sectional Reversal Demo", "cross-sectional reversal mean reversion long short rank scanner demo"],
+        ["cross_sectional_reversal", "Open Cross-Sectional Reversal Demo", "cross-sectional reversal mean reversion long short rank scanner demo"],
         ["cross_sectional_momentum", "Open Cross-Sectional Momentum Demo", "cross-sectional momentum long short rank scanner demo"],
       ] as const
     ).map(([s, title, keywords], i) => ({

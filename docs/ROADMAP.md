@@ -1066,16 +1066,19 @@ single-asset Backtest + Strategy Comparison:
   momentum = lookback return), **dollar-neutral** long/short bucketing
   (`neutralize.py`, gross 1.0 → +0.5 long / −0.5 short), portfolio **metrics**,
   and the `cross_sectional.py` orchestrator (rebalance scheduling, **lookahead-safe**
-  P&L, turnover-based costs, exposures, diagnostics, latest-date ranking)
+  P&L, turnover-based costs, period-aligned exposures, diagnostics, latest
+  actionable rebalance ranking)
 - **Lookahead-safe by construction**: weights decided from information through *t*
   are shifted forward one period, so `gross[k] = weights[k-1] · returns[k]` — never
   same-day; transaction cost (`turnover × bps/1e4`) is deducted from the return the
   position earns. Explicit tests prove the shift and the no-same-period-leakage rule
 - One route `POST /scanner/backtest` (validated; bad strategy / quantile / n_assets /
   lookback / date range → 422; capped ranking preview + downsampled chart series,
-  never the full N×A matrix). 30 deterministic tests (universe determinism/shape,
-  signal formulas, ranking, dollar-neutral sum ≈ 0, gross/long/short exposure,
-  lookahead shift, turnover, cost, equity compounding, insufficient-universe warning)
+  never the full N×A matrix). Deterministic tests cover universe determinism/shape,
+  finite positive prices, signal formulas, fixture ranking direction, ranking,
+  dollar-neutral sum ≈ 0, gross/long/short exposure, rebalance scheduling,
+  lookahead shift, turnover, cost, equity compounding, insufficient-universe warning,
+  large-universe ranking previews, and API validation
 - New top-level **Cross-Sectional Scanner** workspace (Setup · metric cards · equity /
   drawdown / exposure / turnover charts · latest ranking with long/short side badges ·
   diagnostics · Education) with the shared **MetricCard**, deterministic palette

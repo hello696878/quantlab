@@ -14,7 +14,7 @@ import numpy as np
 import pytest
 
 from app.scanner import ScannerInputError, run_scanner_backtest
-from app.scanner.cross_sectional import gross_returns_from_weights
+from app.scanner.cross_sectional import compute_rebalance_indices, gross_returns_from_weights
 from app.scanner.metrics import portfolio_metrics
 from app.scanner.neutralize import dollar_neutral_weights
 from app.scanner.sample_data import generate_sample_universe
@@ -48,6 +48,12 @@ def test_universe_deterministic_same_seed():
     assert a["dates"] == b["dates"]
 
 
+def test_universe_different_seed_changes_prices():
+    a = generate_sample_universe(30, "2022-01-01", "2022-06-01", 42)
+    b = generate_sample_universe(30, "2022-01-01", "2022-06-01", 43)
+    assert not np.array_equal(a["prices"], b["prices"])
+
+
 def test_universe_shape():
     u = generate_sample_universe(30, "2022-01-01", "2022-06-01", 42)
     n_dates = len(u["dates"])
@@ -63,6 +69,13 @@ def test_return_matrix_matches_prices():
     expected = prices[1:] / prices[:-1] - 1.0
     assert np.allclose(returns[1:], expected)
     assert np.allclose(returns[0], 0.0)
+
+
+def test_universe_prices_and_returns_finite_positive():
+    u = generate_sample_universe(40, "2022-01-01", "2022-06-01", 11)
+    assert np.all(np.isfinite(u["prices"]))
+    assert np.all(u["prices"] > 0)
+    assert np.all(np.isfinite(u["returns"]))
 
 
 # ---------------------------------------------------------------------------
@@ -87,6 +100,28 @@ def test_momentum_score_is_lookback_return():
     assert np.allclose(mom[mask], lb[mask])
 
 
+def test_reversal_fixture_ranks_underperformer_highest():
+    prices = np.array(
+        [
+            [100.0, 100.0, 100.0],
+            [95.0, 100.0, 105.0],
+        ]
+    )
+    rev = reversal_score(prices, 1)
+    assert rev[1, 0] > rev[1, 1] > rev[1, 2]
+
+
+def test_momentum_fixture_ranks_winner_highest():
+    prices = np.array(
+        [
+            [100.0, 100.0, 100.0],
+            [105.0, 100.0, 95.0],
+        ]
+    )
+    mom = momentum_score(prices, 1)
+    assert mom[1, 0] > mom[1, 1] > mom[1, 2]
+
+
 # ---------------------------------------------------------------------------
 # Ranking / neutralization (6, 7, 8, 9)
 # ---------------------------------------------------------------------------
@@ -100,6 +135,16 @@ def test_ranking_selects_correct_top_bottom():
     # highest score (idx 2) is long; lowest (idx 3) is short
     assert w[2] > 0 and w[3] < 0
     assert w[0] == 0 and w[1] == 0 and w[4] == 0
+
+
+def test_long_short_buckets_do_not_overlap():
+    scores = np.linspace(-1, 1, 20)
+    mask = np.ones(20, dtype=bool)
+    w, _, _, ok = dollar_neutral_weights(scores, mask, 0.25, 0.25, 1.0)
+    assert ok
+    long_idx = set(np.where(w > 0)[0])
+    short_idx = set(np.where(w < 0)[0])
+    assert long_idx.isdisjoint(short_idx)
 
 
 def test_dollar_neutral_weights_sum_zero():
@@ -152,6 +197,22 @@ def test_lookahead_no_same_period_leakage():
     assert g[2] == pytest.approx(0.0, abs=1e-12)  # W[1] is zero → no leakage from ret[2]
 
 
+def test_rebalance_indices_exclude_final_non_actionable_date():
+    u = generate_sample_universe(10, "2022-01-03", "2022-01-14", 42)
+    idx = compute_rebalance_indices(u["date_index"], first_valid=2, frequency="daily")
+    assert idx
+    assert max(idx) == len(u["date_index"]) - 2
+    assert len(u["date_index"]) - 1 not in idx
+
+
+def test_weekly_rebalance_indices_are_not_daily():
+    u = generate_sample_universe(10, "2022-01-03", "2022-02-28", 42)
+    daily = compute_rebalance_indices(u["date_index"], first_valid=2, frequency="daily")
+    weekly = compute_rebalance_indices(u["date_index"], first_valid=2, frequency="weekly")
+    monthly = compute_rebalance_indices(u["date_index"], first_valid=2, frequency="monthly")
+    assert 0 < len(monthly) < len(weekly) < len(daily)
+
+
 # ---------------------------------------------------------------------------
 # Turnover / cost / equity (12, 13, 14, 15)
 # ---------------------------------------------------------------------------
@@ -187,6 +248,21 @@ def test_scanner_net_equals_gross_minus_cost_in_run():
     # With positive cost, net should be <= gross on every reported day.
     for r in res["returns"]:
         assert r["net"] <= r["gross"] + 1e-9
+
+
+def test_cost_bps_zero_makes_reported_net_equal_gross():
+    res = run_scanner_backtest("cross_sectional_reversal", n_assets=40, start_date="2022-01-01",
+                               end_date="2022-12-31", cost_bps=0, seed=42)
+    for r in res["returns"]:
+        assert r["net"] == pytest.approx(r["gross"], abs=1e-9)
+
+
+def test_higher_cost_lowers_net_performance():
+    low = run_scanner_backtest("cross_sectional_reversal", n_assets=40, start_date="2022-01-01",
+                               end_date="2022-12-31", cost_bps=0, seed=42)
+    high = run_scanner_backtest("cross_sectional_reversal", n_assets=40, start_date="2022-01-01",
+                                end_date="2022-12-31", cost_bps=50, seed=42)
+    assert high["summary"]["total_return"] < low["summary"]["total_return"]
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +341,14 @@ def test_ranking_capped_and_has_sides():
     assert len(res["latest_ranking"]) <= 100
     sides = {row["side"] for row in res["latest_ranking"]}
     assert "long" in sides and "short" in sides
+
+
+def test_large_universe_ranking_preview_includes_neutral_and_short_rows():
+    res = run_scanner_backtest("cross_sectional_momentum", n_assets=500, start_date="2022-01-01",
+                               end_date="2022-12-31", seed=7)
+    assert len(res["latest_ranking"]) <= 100
+    sides = {row["side"] for row in res["latest_ranking"]}
+    assert {"long", "neutral", "short"}.issubset(sides)
 
 
 # ---------------------------------------------------------------------------
