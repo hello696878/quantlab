@@ -132,6 +132,10 @@ from app.credit import (
     price_merton_credit,
     price_risky_bond,
 )
+from app.scanner import (
+    ScannerInputError,
+    run_scanner_backtest,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -224,6 +228,8 @@ from app.schemas import (
     CdsResponse,
     RiskyBondRequest,
     RiskyBondResponse,
+    ScannerRequest,
+    ScannerResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -4365,3 +4371,42 @@ def credit_risky_bond(request: RiskyBondRequest) -> RiskyBondResponse:
     except CreditInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return RiskyBondResponse(**result)
+
+
+# ---------------------------------------------------------------------------
+# Cross-Sectional Scanner Engine endpoints (research v1)
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/scanner/backtest",
+    response_model=ScannerResponse,
+    tags=["scanner"],
+    summary="Cross-sectional scanner backtest (rank → long/short baskets → P&L)",
+    description=(
+        "Portfolio-level cross-sectional engine: ranks a synthetic universe each "
+        "rebalance date, forms dollar-neutral long/short baskets, and runs a "
+        "lookahead-safe vectorized backtest net of turnover costs. Educational — "
+        "synthetic sample universe, no live market data, no real-time scanning, "
+        "not investment advice."
+    ),
+)
+def scanner_backtest(request: ScannerRequest) -> ScannerResponse:
+    try:
+        result = run_scanner_backtest(
+            request.strategy,
+            request.n_assets,
+            request.start_date,
+            request.end_date,
+            request.lookback_days,
+            request.long_quantile,
+            request.short_quantile,
+            request.rebalance_frequency,
+            request.gross_exposure,
+            request.cost_bps,
+            request.min_liquidity,
+            request.seed,
+        )
+    except ScannerInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return ScannerResponse(**result)

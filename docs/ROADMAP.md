@@ -1058,6 +1058,36 @@ single-asset Backtest + Strategy Comparison:
   calibration. Results depend on asset value/volatility, recovery, capital
   structure, liquidity, seniority, and covenants. Not advice
 
+### Phase 18.0 — Cross-Sectional Scanner Engine v1 ✅
+
+- New backend `app/scanner/` package — a **second, portfolio-level engine**
+  (distinct from the single-instrument `app/backtest.py`): a synthetic universe
+  (`sample_data.py`), cross-sectional **signals** (reversal = `−(R − mean R)`,
+  momentum = lookback return), **dollar-neutral** long/short bucketing
+  (`neutralize.py`, gross 1.0 → +0.5 long / −0.5 short), portfolio **metrics**,
+  and the `cross_sectional.py` orchestrator (rebalance scheduling, **lookahead-safe**
+  P&L, turnover-based costs, exposures, diagnostics, latest-date ranking)
+- **Lookahead-safe by construction**: weights decided from information through *t*
+  are shifted forward one period, so `gross[k] = weights[k-1] · returns[k]` — never
+  same-day; transaction cost (`turnover × bps/1e4`) is deducted from the return the
+  position earns. Explicit tests prove the shift and the no-same-period-leakage rule
+- One route `POST /scanner/backtest` (validated; bad strategy / quantile / n_assets /
+  lookback / date range → 422; capped ranking preview + downsampled chart series,
+  never the full N×A matrix). 30 deterministic tests (universe determinism/shape,
+  signal formulas, ranking, dollar-neutral sum ≈ 0, gross/long/short exposure,
+  lookahead shift, turnover, cost, equity compounding, insufficient-universe warning)
+- New top-level **Cross-Sectional Scanner** workspace (Setup · metric cards · equity /
+  drawdown / exposure / turnover charts · latest ranking with long/short side badges ·
+  diagnostics · Education) with the shared **MetricCard**, deterministic palette
+  (long = emerald, short = red), sidebar nav, dashboard card, and command-palette
+  commands (Scanner Lab + reversal / momentum demos)
+- Synthetic universe is **clearly labelled** "for workflow demonstration — not live
+  market data"; it includes a *disclosed* mild short-term reversal so the demo shows
+  signal, explicitly **not** evidence the strategy works on real markets
+- The single-asset **Backtest Studio is unchanged**. Sector/beta neutralization,
+  volatility targeting, live universes, factor portfolios, intraday/IV scanners, ML
+  selection, and AFML integration remain planned/future. Educational, not advice
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -1136,7 +1166,11 @@ search · toasts, error boundary, loading/offline states.
 10. **Real Estate Module** (research)
 11. **Microstructure & HFT Lab** — *educational simulations* (order-book toys,
     queue models) on synthetic data; **not** real HFT execution (research)
-12. **Portfolio Studio + Strategy Ensemble Builder** (research)
+12. **Cross-Sectional Scanner Engine** — **built (v1)** (18.0: a *second engine* —
+    rank a synthetic universe, dollar-neutral long/short baskets, lookahead-safe
+    portfolio backtest; reversal + momentum signals. Sector/beta neutralization,
+    live universes, factor/IV/ML scanners, and AFML integration remain planned)
+13. **Portfolio Studio + Strategy Ensemble Builder** (research)
 13. **ML & AI Lab** — feature pipelines, walk-forward ML guards (research)
 14. **AI Explainer Copilot** — explains a result, never recommends trades
     (future)

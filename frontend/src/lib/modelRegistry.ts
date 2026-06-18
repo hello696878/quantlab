@@ -485,6 +485,18 @@ export const MODEL_REGISTRY: ModelEntry[] = [
 
   // ── Planned / research / future (Blueprint v3 — NOT implemented) ───────────
   {
+    id: "cross_sectional_reversal",
+    slug: "cross-sectional-reversal",
+    name: "Cross-Sectional Linear Long-Short Reversion",
+    category: "Equities · Mean Reversion",
+    status: "planned",
+    difficulty: "advanced",
+    description:
+      "Rank a universe by negative demeaned recent return; long the laggards, short the leaders, " +
+      "dollar-neutral. Demonstrable now in the Cross-Sectional Scanner Lab on a synthetic universe " +
+      "(scanner-compatible); a full live-universe version remains planned.",
+  },
+  {
     id: "cross_sectional_momentum",
     slug: "cross-sectional-momentum",
     name: "Cross-Sectional Momentum",
@@ -492,7 +504,9 @@ export const MODEL_REGISTRY: ModelEntry[] = [
     status: "planned",
     difficulty: "advanced",
     description:
-      "Rank a universe by trailing return; hold winners against losers. Needs multi-asset universes.",
+      "Rank a universe by trailing return; hold winners against losers. Demonstrable now in the " +
+      "Cross-Sectional Scanner Lab on a synthetic universe (scanner-compatible); a full live-universe " +
+      "version remains planned.",
   },
   {
     id: "fama_french_factors",

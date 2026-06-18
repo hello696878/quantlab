@@ -1102,6 +1102,22 @@ export default function HomeDashboard({
               Open Credit Risk Lab →
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => onNav("scanner")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+              Cross-Sectional Scanner
+            </span>
+            <span className="text-xs text-slate-400">
+              Rank a synthetic universe, form long/short baskets, and backtest portfolio-level
+              cross-sectional strategies — synthetic universe, no live market data.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Scanner Lab →
+            </span>
+          </button>
         </div>
       </section>
 

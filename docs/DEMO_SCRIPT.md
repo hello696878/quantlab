@@ -187,6 +187,17 @@ Return to the Command Center's **Platform Direction** panel (or open
   → risky price below the risk-free price, the credit spread, and the
   survival-weighted cash-flow table. Emphasise: stylized structural + flat-hazard
   reduced-form models, no live CDS/bond data, no full CVA, not investment advice.
+- **Cross-Sectional Scanner** — the *second engine*. Use the defaults (reversal,
+  50 assets, 2022-01-01 → 2024-12-31, lookback 5, long/short quantile 0.2, daily,
+  gross 1.0, cost 5 bps, seed 42) → **Run Scanner** → metric cards (total /
+  annualized return, Sharpe, max drawdown, avg turnover, avg gross ≈ 1.0, avg net
+  ≈ 0), the net equity curve, drawdown, long/short exposure (net ≈ 0), turnover,
+  the latest ranking table (long/short side badges, weights), and diagnostics.
+  Switch to **Momentum demo** and re-run to show the workflow generalizes. Try
+  long quantile 0.8 (friendly validation error) and n_assets 3 (insufficient
+  universe). Emphasise: a *second engine* (the single-asset Backtest Studio is
+  unchanged); signals are shifted forward one period (no lookahead); synthetic
+  universe for workflow demonstration, not live market data, not investment advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

@@ -53,6 +53,8 @@ import type {
   CdsResponse,
   RiskyBondRequest,
   RiskyBondResponse,
+  ScannerRequest,
+  ScannerResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -1079,6 +1081,12 @@ export function computeCds(req: CdsRequest): Promise<CdsResponse> {
 
 export function priceRiskyBond(req: RiskyBondRequest): Promise<RiskyBondResponse> {
   return postOptions<RiskyBondResponse>("/api/credit/risky-bond", req);
+}
+
+// ── Cross-Sectional Scanner Engine ───────────────────────────────────────────
+
+export function runScanner(req: ScannerRequest): Promise<ScannerResponse> {
+  return postOptions<ScannerResponse>("/api/scanner/backtest", req);
 }
 
 export async function fetchSampleCurve(): Promise<SampleCurveResponse> {

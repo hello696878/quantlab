@@ -2400,3 +2400,95 @@ export interface RiskyBondResponse {
   cash_flows: RiskyBondCashFlow[];
   warnings: string[];
 }
+
+// ── Cross-Sectional Scanner Engine ───────────────────────────────────────────
+
+export type ScannerStrategy = "cross_sectional_reversal" | "cross_sectional_momentum";
+export type RebalanceFrequency = "daily" | "weekly" | "monthly";
+
+export interface ScannerRequest {
+  strategy: ScannerStrategy;
+  universe_source: "synthetic";
+  n_assets: number;
+  start_date: string;
+  end_date: string;
+  lookback_days: number;
+  long_quantile: number;
+  short_quantile: number;
+  rebalance_frequency: RebalanceFrequency;
+  gross_exposure: number;
+  cost_bps: number;
+  min_liquidity: number;
+  seed: number | null;
+}
+
+export interface ScannerSummary {
+  total_return: number;
+  annualized_return: number;
+  annualized_volatility: number;
+  sharpe: number;
+  max_drawdown: number;
+  average_turnover: number;
+  average_gross_exposure: number;
+  average_net_exposure: number;
+  average_num_longs: number;
+  average_num_shorts: number;
+}
+
+export interface ScannerEquityPoint {
+  date: string;
+  equity: number;
+  drawdown: number;
+}
+
+export interface ScannerReturnPoint {
+  date: string;
+  gross: number;
+  net: number;
+}
+
+export interface ScannerExposurePoint {
+  date: string;
+  gross: number;
+  net: number;
+  long: number;
+  short: number;
+}
+
+export interface ScannerTurnoverPoint {
+  date: string;
+  turnover: number;
+}
+
+export interface ScannerRankingRow {
+  rank: number;
+  ticker: string;
+  sector: string;
+  score: number;
+  side: string;
+  weight: number;
+}
+
+export interface ScannerDiagnostics {
+  n_assets: number;
+  n_dates: number;
+  valid_rebalance_dates: number;
+  skipped_dates: number;
+  gross_exposure_target: number;
+  cost_bps: number;
+  rebalance_frequency: RebalanceFrequency;
+  lookback_days: number;
+  warnings: string[];
+}
+
+export interface ScannerResponse {
+  strategy: ScannerStrategy;
+  summary: ScannerSummary;
+  equity_curve: ScannerEquityPoint[];
+  returns: ScannerReturnPoint[];
+  exposures: ScannerExposurePoint[];
+  turnover: ScannerTurnoverPoint[];
+  latest_ranking: ScannerRankingRow[];
+  latest_rebalance_date: string | null;
+  diagnostics: ScannerDiagnostics;
+}

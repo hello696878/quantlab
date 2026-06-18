@@ -42,6 +42,7 @@ import EventLabPanel from "@/components/EventLabPanel";
 import YieldCurveLabPanel from "@/components/YieldCurveLabPanel";
 import FxLabPanel from "@/components/FxLabPanel";
 import CreditLabPanel from "@/components/CreditLabPanel";
+import ScannerLabPanel from "@/components/ScannerLabPanel";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -368,6 +369,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "Merton structural credit, distance to default, hazard rates and survival curves, CDS spread approximation, and risky bond pricing — no live CDS data, not investment advice.",
   },
+  scanner: {
+    title: "Cross-Sectional Scanner",
+    subtitle:
+      "A second engine: rank a synthetic universe, form dollar-neutral long/short baskets, and run a lookahead-safe portfolio backtest — synthetic universe, no live market data, not investment advice.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -501,6 +507,11 @@ export default function HomePage() {
     "merton",
   );
   const [creditKey, setCreditKey] = useState(0);
+
+  // Cross-Sectional Scanner: which strategy to seed (deep-linked from the palette).
+  const [scannerStrategy, setScannerStrategy] =
+    useState<"cross_sectional_reversal" | "cross_sectional_momentum">("cross_sectional_reversal");
+  const [scannerKey, setScannerKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -808,6 +819,7 @@ export default function HomePage() {
     { view: "rates", title: "Open Yield Curve Lab", keywords: "yield curve rates zero rate discount factor forward rate duration convexity dv01 bond pricing fixed income short rate vasicek cir mean reversion" },
     { view: "fx", title: "Open FX Lab", keywords: "fx foreign exchange currency forward rate interest rate parity carry ppp purchasing power parity exposure garman kohlhagen fx option" },
     { view: "credit", title: "Open Credit Risk Lab", keywords: "credit credit risk merton structural model distance to default default probability hazard rate survival curve cds credit spread risky bond recovery rate" },
+    { view: "scanner", title: "Open Cross-Sectional Scanner", keywords: "scanner cross-sectional rank long short universe equity scanner factor ranking mean reversion momentum dollar neutral scanner lab second engine" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1040,6 +1052,23 @@ export default function HomePage() {
         setCreditTab(t);
         setCreditKey((k) => k + 1);
         handleNav("credit");
+      },
+    })),
+    ...(
+      [
+        ["cross_sectional_reversal", "Open Scanner Lab", "scanner lab cross-sectional rank long short universe second engine"],
+        ["cross_sectional_reversal", "Run Cross-Sectional Reversal Demo", "cross-sectional reversal mean reversion long short rank scanner demo"],
+        ["cross_sectional_momentum", "Open Cross-Sectional Momentum Demo", "cross-sectional momentum long short rank scanner demo"],
+      ] as const
+    ).map(([s, title, keywords], i) => ({
+      id: `scanner-${i}`,
+      group: "Cross-Sectional Scanner",
+      title,
+      keywords,
+      run: () => {
+        setScannerStrategy(s);
+        setScannerKey((k) => k + 1);
+        handleNav("scanner");
       },
     })),
     // Report actions are only offered when they actually work (a result exists).
@@ -1485,6 +1514,9 @@ export default function HomePage() {
 
         {/* ── Credit Risk Lab ──────────────────────────────────────────── */}
         {view === "credit" && <CreditLabPanel key={creditKey} initialTab={creditTab} />}
+
+        {/* ── Cross-Sectional Scanner ──────────────────────────────────── */}
+        {view === "scanner" && <ScannerLabPanel key={scannerKey} initialStrategy={scannerStrategy} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

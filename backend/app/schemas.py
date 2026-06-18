@@ -4790,3 +4790,109 @@ class RiskyBondResponse(BaseModel):
     coupon_frequency: int
     cash_flows: List[RiskyBondCashFlow] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
+
+
+# ===========================================================================
+# Cross-Sectional Scanner Engine — research v1
+# ===========================================================================
+
+ScannerStrategy = Literal["cross_sectional_reversal", "cross_sectional_momentum"]
+RebalanceFrequency = Literal["daily", "weekly", "monthly"]
+
+
+class ScannerRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    strategy: ScannerStrategy = "cross_sectional_reversal"
+    universe_source: Literal["synthetic"] = "synthetic"
+    n_assets: int = Field(default=50, ge=5, le=500)
+    start_date: str = Field(default="2022-01-01")
+    end_date: str = Field(default="2024-12-31")
+    lookback_days: int = Field(default=5, ge=1, le=252)
+    long_quantile: float = Field(default=0.2, gt=0.0, lt=0.5)
+    short_quantile: float = Field(default=0.2, gt=0.0, lt=0.5)
+    rebalance_frequency: RebalanceFrequency = "daily"
+    gross_exposure: float = Field(default=1.0, gt=0.0, le=10.0)
+    cost_bps: float = Field(default=5.0, ge=0.0, le=1000.0)
+    min_liquidity: float = Field(default=0.0, ge=0.0, le=1.0)
+    seed: Optional[int] = Field(default=42, ge=0, le=2**32 - 1)
+
+    @field_validator("start_date", "end_date")
+    @classmethod
+    def _validate_iso(cls, v: str) -> str:
+        try:
+            date.fromisoformat(v)
+        except (ValueError, TypeError):
+            raise ValueError("date must be in YYYY-MM-DD format.")
+        return v
+
+
+class ScannerSummary(BaseModel):
+    total_return: float
+    annualized_return: float
+    annualized_volatility: float
+    sharpe: float
+    max_drawdown: float
+    average_turnover: float
+    average_gross_exposure: float
+    average_net_exposure: float
+    average_num_longs: float
+    average_num_shorts: float
+
+
+class ScannerEquityPoint(BaseModel):
+    date: str
+    equity: float
+    drawdown: float
+
+
+class ScannerReturnPoint(BaseModel):
+    date: str
+    gross: float
+    net: float
+
+
+class ScannerExposurePoint(BaseModel):
+    date: str
+    gross: float
+    net: float
+    long: float
+    short: float
+
+
+class ScannerTurnoverPoint(BaseModel):
+    date: str
+    turnover: float
+
+
+class ScannerRankingRow(BaseModel):
+    rank: int
+    ticker: str
+    sector: str
+    score: float
+    side: str
+    weight: float
+
+
+class ScannerDiagnostics(BaseModel):
+    n_assets: int
+    n_dates: int
+    valid_rebalance_dates: int
+    skipped_dates: int
+    gross_exposure_target: float
+    cost_bps: float
+    rebalance_frequency: RebalanceFrequency
+    lookback_days: int
+    warnings: List[str] = Field(default_factory=list)
+
+
+class ScannerResponse(BaseModel):
+    strategy: ScannerStrategy
+    summary: ScannerSummary
+    equity_curve: List[ScannerEquityPoint] = Field(default_factory=list)
+    returns: List[ScannerReturnPoint] = Field(default_factory=list)
+    exposures: List[ScannerExposurePoint] = Field(default_factory=list)
+    turnover: List[ScannerTurnoverPoint] = Field(default_factory=list)
+    latest_ranking: List[ScannerRankingRow] = Field(default_factory=list)
+    latest_rebalance_date: Optional[str] = None
+    diagnostics: ScannerDiagnostics

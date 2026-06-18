@@ -33,7 +33,8 @@ FastAPI Backend
   ├── main.py                       Route handlers, validation, response assembly
   ├── data.py                       yfinance OHLCV fetch and alignment
   ├── strategies.py                 Signal generation (all strategies, all shift by 1 day)
-  ├── backtest.py                   Vectorised P&L engine, trade log, benchmark, long/short
+  ├── backtest.py                   Vectorised single-instrument P&L engine, trade log, benchmark, long/short
+  ├── scanner/                      Cross-Sectional Scanner Engine v1 — second, portfolio-level engine (synthetic universe, signals, dollar-neutral baskets, lookahead-safe P&L)
   ├── custom_strategy.py            No-code rule evaluation (whitelisted operands, no eval)
   ├── portfolio.py                  Equal-weight, optimization, walk-forward, frontier, risk, stress, factor
   ├── metrics.py                    Performance statistics from an equity curve

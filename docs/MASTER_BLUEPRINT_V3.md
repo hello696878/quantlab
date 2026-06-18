@@ -26,7 +26,10 @@ reproducible and every limitation explicit.
 
 ## 2. Completed foundation (built)
 
-- Vectorized backtest engine (lookahead-free, costs, trade log)
+- Vectorized single-instrument backtest engine (lookahead-free, costs, trade log)
+- **Cross-Sectional Scanner Engine v1** — a *second engine* (18.0): ranks a
+  synthetic universe, forms dollar-neutral long/short baskets, and runs a
+  lookahead-safe portfolio backtest (reversal + momentum signals)
 - Strategies: SMA Crossover, RSI Mean Reversion, Bollinger Band, Time-Series
   Momentum, Volatility Breakout, Pairs Trading; long/short modes
 - Strategy Comparison with shared simulation settings
@@ -117,7 +120,10 @@ reproducible and every limitation explicit.
    CDS / risky bond)
 10. Real Estate Module
 11. Microstructure & HFT Lab (educational simulations)
-12. Portfolio Studio + Ensemble Builder
+12. ~~Cross-Sectional Scanner Engine~~ — **built (v1)** (18.0: second engine —
+    synthetic universe, dollar-neutral long/short, lookahead-safe portfolio
+    backtest; reversal + momentum)
+13. Portfolio Studio + Ensemble Builder
 13. ML & AI Lab
 14. AI Explainer Copilot
 15. 3D Visualization Engine

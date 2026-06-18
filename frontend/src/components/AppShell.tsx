@@ -16,6 +16,7 @@ export type View =
   | "rates"
   | "fx"
   | "credit"
+  | "scanner"
   | "csv"
   | "builder"
   | "portfolio"
