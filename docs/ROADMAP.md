@@ -1091,6 +1091,37 @@ single-asset Backtest + Strategy Comparison:
   volatility targeting, live universes, factor portfolios, intraday/IV scanners, ML
   selection, and AFML integration remain planned/future. Educational, not advice
 
+### Phase 19.0 — AFML Methodology Layer v1 ✅
+
+- New backend `app/finml/` package — a reusable **financial-ML methodology toolkit**
+  (inspired by *Advances in Financial Machine Learning*): a synthetic price path
+  (`sample_data.py` with a rolling-vol target), **symmetric CUSUM** event sampling
+  (`cusum.py`, fixed or vol-scaled threshold), **triple-barrier labeling**
+  (`labeling.py`, profit-take / stop-loss / vertical → ±1 / 0), **sample concurrency
+  + average uniqueness + sample weights** (`uniqueness.py`), and a `label_summary`
+  (`metrics.py`), wired by the `orchestrator.py`
+- **Leakage-aware by design**: event *formation* uses no future information; future
+  prices are used only to *assign* labels (as labeling requires). Overlapping labels
+  are down-weighted via uniqueness = mean(1/concurrency) over each label's life
+- One route `POST /finml/labeling-demo` (validated; bad threshold / vertical barrier /
+  n_days / volatility window → 422; downsampled/capped payloads, never raw matrices).
+  Deterministic tests cover path determinism/positivity, CUSUM fixtures (events +
+  none above a high threshold), triple-barrier profit-take/stop-loss/vertical
+  fixtures, end ≥ start + positive holding, concurrency 1 (non-overlap) / >1
+  (overlap), uniqueness 1 / <1, mean-1 normalized weights, label-count reconciliation,
+  threshold reactivity, and API validation
+- New top-level **AFML Methodology Lab** (shared Setup + summary cards · CUSUM
+  Sampling · Triple-Barrier · Sample Uniqueness · Education) with the shared
+  **MetricCard**, a deterministic palette (+1 emerald / −1 red / vertical amber),
+  a time-axis price chart with up/down event markers, a clickable label table that
+  overlays barriers for the selected event, concurrency + uniqueness charts, sidebar
+  nav, dashboard card, and command-palette commands (AFML + CUSUM / Triple-Barrier /
+  Sample Uniqueness)
+- A **methodology toolkit, not a model**: synthetic demo data, no features, no model
+  training, no live data. **Meta-labeling, information-driven bars, sequential
+  bootstrap, fractional differentiation, and purged K-fold / CPCV are planned, not
+  implemented.** Not a full AFML implementation, not investment advice
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -1173,14 +1204,18 @@ search · toasts, error boundary, loading/offline states.
     rank a synthetic universe, dollar-neutral long/short baskets, lookahead-safe
     portfolio backtest; reversal + momentum signals. Sector/beta neutralization,
     live universes, factor/IV/ML scanners, and AFML integration remain planned)
-13. **Portfolio Studio + Strategy Ensemble Builder** (research)
-13. **ML & AI Lab** — feature pipelines, walk-forward ML guards (research)
-14. **AI Explainer Copilot** — explains a result, never recommends trades
+13. **AFML Methodology Layer** — **built (v1)** (19.0: CUSUM event sampling,
+    triple-barrier labeling, sample concurrency + uniqueness weights on synthetic
+    data. Meta-labeling, information-driven bars, sequential bootstrap, fractional
+    differentiation, and purged K-fold / CPCV remain planned)
+14. **Portfolio Studio + Strategy Ensemble Builder** (research)
+15. **ML & AI Lab** — feature pipelines, walk-forward ML guards (research)
+16. **AI Explainer Copilot** — explains a result, never recommends trades
     (future)
-15. **3D Visualization Engine** — surfaces (vol, parameter sweeps) (future)
-16. **Dashboard & Content Engine** — ~~Quant Disasters series~~ **built**
+17. **3D Visualization Engine** — surfaces (vol, parameter sweeps) (future)
+18. **Dashboard & Content Engine** — ~~Quant Disasters series~~ **built**
     (13.2, six case studies); broader educational content engine (future)
-17. **Platform & Launch** — hosted demo, hardening, optional accounts (future)
+19. **Platform & Launch** — hosted demo, hardening, optional accounts (future)
 
 ### Long-term model catalog (12 categories)
 

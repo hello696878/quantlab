@@ -136,6 +136,10 @@ from app.scanner import (
     ScannerInputError,
     run_scanner_backtest,
 )
+from app.finml import (
+    FinmlInputError,
+    run_labeling_demo,
+)
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
 from app.custom_strategy_templates import (
@@ -230,6 +234,8 @@ from app.schemas import (
     RiskyBondResponse,
     ScannerRequest,
     ScannerResponse,
+    LabelingDemoRequest,
+    LabelingDemoResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -4410,3 +4416,40 @@ def scanner_backtest(request: ScannerRequest) -> ScannerResponse:
     except ScannerInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return ScannerResponse(**result)
+
+
+# ---------------------------------------------------------------------------
+# AFML Methodology Layer endpoints (research v1)
+# ---------------------------------------------------------------------------
+
+
+@app.post(
+    "/finml/labeling-demo",
+    response_model=LabelingDemoResponse,
+    tags=["finml"],
+    summary="AFML labeling demo (CUSUM events → triple-barrier labels → uniqueness)",
+    description=(
+        "Educational financial-ML labeling pipeline on a synthetic path: symmetric "
+        "CUSUM event sampling, triple-barrier labeling, sample concurrency, and "
+        "uniqueness weights. Not a trained model, no live data, no purged CV / "
+        "meta-labeling (planned). Not investment advice."
+    ),
+)
+def finml_labeling_demo(request: LabelingDemoRequest) -> LabelingDemoResponse:
+    try:
+        result = run_labeling_demo(
+            request.n_days,
+            request.start_price,
+            request.drift,
+            request.volatility,
+            request.seed,
+            request.cusum_threshold,
+            request.threshold_mode,
+            request.volatility_window,
+            request.profit_take_multiple,
+            request.stop_loss_multiple,
+            request.vertical_barrier_days,
+        )
+    except FinmlInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return LabelingDemoResponse(**result)

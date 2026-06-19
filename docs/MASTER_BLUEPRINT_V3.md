@@ -30,6 +30,9 @@ reproducible and every limitation explicit.
 - **Cross-Sectional Scanner Engine v1** — a *second engine* (18.0): ranks a
   synthetic universe, forms dollar-neutral long/short baskets, and runs a
   lookahead-safe portfolio backtest (reversal + momentum signals)
+- **AFML Methodology Layer v1** (19.0): leakage-aware labeling toolkit — CUSUM
+  event sampling, triple-barrier labeling, sample concurrency + uniqueness weights
+  on synthetic data (a methodology toolkit, not a trained model)
 - Strategies: SMA Crossover, RSI Mean Reversion, Bollinger Band, Time-Series
   Momentum, Volatility Breakout, Pairs Trading; long/short modes
 - Strategy Comparison with shared simulation settings
@@ -123,15 +126,18 @@ reproducible and every limitation explicit.
 12. ~~Cross-Sectional Scanner Engine~~ — **built (v1)** (18.0: second engine —
     synthetic universe, dollar-neutral long/short, lookahead-safe portfolio
     backtest; reversal + momentum)
-13. Portfolio Studio + Ensemble Builder
-13. ML & AI Lab
-14. AI Explainer Copilot
-15. 3D Visualization Engine
-16. Dashboard & Content Engine — Quant Disasters **built** (13.2); dashboard
+13. ~~AFML Methodology Layer~~ — **built (v1)** (19.0: CUSUM event sampling,
+    triple-barrier labeling, sample concurrency + uniqueness weights; meta-labeling,
+    sequential bootstrap, fractional differentiation, purged CV / CPCV planned)
+14. Portfolio Studio + Ensemble Builder
+15. ML & AI Lab
+16. AI Explainer Copilot
+17. 3D Visualization Engine
+18. Dashboard & Content Engine — Quant Disasters **built** (13.2); dashboard
     content hub **built** (13.3: hero workflows, Trust Layer grid, Content
     Engine cards, featured items, direction panel); broader content engine
     future
-17. Platform & Launch
+19. Platform & Launch
 
 ## 6. Hard constraints (apply to every phase)
 

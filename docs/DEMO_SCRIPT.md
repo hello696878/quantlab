@@ -198,6 +198,19 @@ Return to the Command Center's **Platform Direction** panel (or open
   universe). Emphasise: a *second engine* (the single-asset Backtest Studio is
   unchanged); signals are shifted forward one period (no lookahead); synthetic
   universe for workflow demonstration, not live market data, not investment advice.
+- **AFML Methodology Lab** — the financial-ML *labeling* layer. Use the defaults
+  (500 days, daily vol 1.5%, CUSUM threshold 2%, profit-take ×1.5, stop-loss ×1.0,
+  vertical 10 days, seed 42) → **Run labeling demo** → summary cards (events, +1 /
+  −1 / vertical counts, mean uniqueness, avg holding). *CUSUM Sampling*: the
+  synthetic path with up/down event markers + the event table. *Triple-Barrier*:
+  the label distribution and the label table — click a row to overlay that event's
+  profit-take / stop-loss / vertical barriers on the price chart. *Sample
+  Uniqueness*: the concurrency-over-time chart, the average-uniqueness histogram,
+  and the sample-weight table (overlapping labels get uniqueness < 1). Raise the
+  CUSUM threshold to show the event count drop; try threshold = −1 for a friendly
+  validation error. Emphasise: synthetic demo data, a labeling pipeline (not a
+  trained model), event formation uses no future info, and purged CV / meta-labeling
+  are planned — not a full AFML implementation, not investment advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

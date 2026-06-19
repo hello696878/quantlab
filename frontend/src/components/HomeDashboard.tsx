@@ -1118,6 +1118,22 @@ export default function HomeDashboard({
               Open Scanner Lab →
             </span>
           </button>
+          <button
+            type="button"
+            onClick={() => onNav("finml")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+              AFML Methodology Lab
+            </span>
+            <span className="text-xs text-slate-400">
+              Build leakage-aware financial-ML labels with CUSUM event sampling, triple barriers,
+              and sample uniqueness weights — synthetic demo data, not a trained model.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open AFML Lab →
+            </span>
+          </button>
         </div>
       </section>
 

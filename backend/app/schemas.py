@@ -4896,3 +4896,99 @@ class ScannerResponse(BaseModel):
     latest_ranking: List[ScannerRankingRow] = Field(default_factory=list)
     latest_rebalance_date: Optional[str] = None
     diagnostics: ScannerDiagnostics
+
+
+# ===========================================================================
+# AFML Methodology Layer — research v1 (CUSUM / triple-barrier / uniqueness)
+# ===========================================================================
+
+ThresholdMode = Literal["fixed", "vol_scaled"]
+
+
+class LabelingDemoRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    n_days: int = Field(default=500, ge=50, le=5000)
+    start_price: float = Field(default=100.0, gt=0.0, le=1e9)
+    drift: float = Field(default=0.0002, ge=-1.0, le=1.0)
+    volatility: float = Field(default=0.015, gt=0.0, le=1.0)
+    seed: Optional[int] = Field(default=42, ge=0, le=2**32 - 1)
+    cusum_threshold: float = Field(default=0.02, gt=0.0, le=10.0)
+    threshold_mode: ThresholdMode = "fixed"
+    volatility_window: int = Field(default=20, ge=2, le=1000)
+    profit_take_multiple: float = Field(default=1.5, gt=0.0, le=100.0)
+    stop_loss_multiple: float = Field(default=1.0, gt=0.0, le=100.0)
+    vertical_barrier_days: int = Field(default=10, ge=1, le=5000)
+
+
+class LabelingSummary(BaseModel):
+    n_days: int
+    n_events: int
+    positive_labels: int
+    negative_labels: int
+    zero_labels: int
+    mean_uniqueness: float
+    average_holding_period: float
+
+
+class LabelingParameters(BaseModel):
+    n_days: int
+    cusum_threshold: float
+    threshold_mode: ThresholdMode
+    volatility_window: int
+    profit_take_multiple: float
+    stop_loss_multiple: float
+    vertical_barrier_days: int
+
+
+class LabelingPricePoint(BaseModel):
+    date: str
+    close: float
+    volatility: float
+
+
+class LabelingEvent(BaseModel):
+    event_id: int
+    date: str
+    side_hint: str
+    threshold_used: float
+    return_at_event: float
+    price_at_event: float
+
+
+class LabelingLabel(BaseModel):
+    event_id: int
+    start_date: str
+    end_date: str
+    start_price: float
+    end_price: float
+    target_return: float
+    upper_barrier: float
+    lower_barrier: float
+    label: int
+    touched_barrier: str
+    realized_return: float
+    holding_period_days: int
+
+
+class LabelingConcurrencyPoint(BaseModel):
+    date: str
+    concurrency: int
+
+
+class LabelingWeight(BaseModel):
+    event_id: int
+    label: int
+    average_uniqueness: float
+    sample_weight: float
+
+
+class LabelingDemoResponse(BaseModel):
+    summary: LabelingSummary
+    parameters: LabelingParameters
+    price_series: List[LabelingPricePoint] = Field(default_factory=list)
+    events: List[LabelingEvent] = Field(default_factory=list)
+    labels: List[LabelingLabel] = Field(default_factory=list)
+    concurrency: List[LabelingConcurrencyPoint] = Field(default_factory=list)
+    weights: List[LabelingWeight] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)

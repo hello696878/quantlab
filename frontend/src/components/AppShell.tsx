@@ -17,6 +17,7 @@ export type View =
   | "fx"
   | "credit"
   | "scanner"
+  | "finml"
   | "csv"
   | "builder"
   | "portfolio"

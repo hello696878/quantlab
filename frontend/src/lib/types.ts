@@ -2492,3 +2492,94 @@ export interface ScannerResponse {
   latest_rebalance_date: string | null;
   diagnostics: ScannerDiagnostics;
 }
+
+// ── AFML Methodology Layer (CUSUM / triple-barrier / uniqueness) ──────────────
+
+export type ThresholdMode = "fixed" | "vol_scaled";
+
+export interface LabelingDemoRequest {
+  n_days: number;
+  start_price: number;
+  drift: number;
+  volatility: number;
+  seed: number | null;
+  cusum_threshold: number;
+  threshold_mode: ThresholdMode;
+  volatility_window: number;
+  profit_take_multiple: number;
+  stop_loss_multiple: number;
+  vertical_barrier_days: number;
+}
+
+export interface LabelingSummary {
+  n_days: number;
+  n_events: number;
+  positive_labels: number;
+  negative_labels: number;
+  zero_labels: number;
+  mean_uniqueness: number;
+  average_holding_period: number;
+}
+
+export interface LabelingParameters {
+  n_days: number;
+  cusum_threshold: number;
+  threshold_mode: ThresholdMode;
+  volatility_window: number;
+  profit_take_multiple: number;
+  stop_loss_multiple: number;
+  vertical_barrier_days: number;
+}
+
+export interface LabelingPricePoint {
+  date: string;
+  close: number;
+  volatility: number;
+}
+
+export interface LabelingEvent {
+  event_id: number;
+  date: string;
+  side_hint: string;
+  threshold_used: number;
+  return_at_event: number;
+  price_at_event: number;
+}
+
+export interface LabelingLabel {
+  event_id: number;
+  start_date: string;
+  end_date: string;
+  start_price: number;
+  end_price: number;
+  target_return: number;
+  upper_barrier: number;
+  lower_barrier: number;
+  label: number;
+  touched_barrier: string;
+  realized_return: number;
+  holding_period_days: number;
+}
+
+export interface LabelingConcurrencyPoint {
+  date: string;
+  concurrency: number;
+}
+
+export interface LabelingWeight {
+  event_id: number;
+  label: number;
+  average_uniqueness: number;
+  sample_weight: number;
+}
+
+export interface LabelingDemoResponse {
+  summary: LabelingSummary;
+  parameters: LabelingParameters;
+  price_series: LabelingPricePoint[];
+  events: LabelingEvent[];
+  labels: LabelingLabel[];
+  concurrency: LabelingConcurrencyPoint[];
+  weights: LabelingWeight[];
+  warnings: string[];
+}

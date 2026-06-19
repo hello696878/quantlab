@@ -43,6 +43,7 @@ import YieldCurveLabPanel from "@/components/YieldCurveLabPanel";
 import FxLabPanel from "@/components/FxLabPanel";
 import CreditLabPanel from "@/components/CreditLabPanel";
 import ScannerLabPanel from "@/components/ScannerLabPanel";
+import AfmlLabPanel from "@/components/AfmlLabPanel";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -374,6 +375,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "A second engine: rank a synthetic universe, form dollar-neutral long/short baskets, and run a lookahead-safe portfolio backtest — synthetic universe, no live market data, not investment advice.",
   },
+  finml: {
+    title: "AFML Methodology Lab",
+    subtitle:
+      "Leakage-aware financial-ML labeling: CUSUM event sampling, triple-barrier labels, sample concurrency, and uniqueness weights — synthetic demo data, not a trained model, not investment advice.",
+  },
   csv: {
     title: "CSV Backtest",
     subtitle: "Upload your own price history and run a single-asset strategy.",
@@ -512,6 +518,10 @@ export default function HomePage() {
   const [scannerStrategy, setScannerStrategy] =
     useState<"cross_sectional_reversal" | "cross_sectional_momentum">("cross_sectional_reversal");
   const [scannerKey, setScannerKey] = useState(0);
+
+  // AFML Methodology Lab: which tab to open on (deep-linked from the palette).
+  const [finmlTab, setFinmlTab] = useState<"cusum" | "labeling" | "uniqueness" | "education">("cusum");
+  const [finmlKey, setFinmlKey] = useState(0);
 
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
@@ -820,6 +830,7 @@ export default function HomePage() {
     { view: "fx", title: "Open FX Lab", keywords: "fx foreign exchange currency forward rate interest rate parity carry ppp purchasing power parity exposure garman kohlhagen fx option" },
     { view: "credit", title: "Open Credit Risk Lab", keywords: "credit credit risk merton structural model distance to default default probability hazard rate survival curve cds credit spread risky bond recovery rate" },
     { view: "scanner", title: "Open Cross-Sectional Scanner", keywords: "scanner cross-sectional rank long short universe equity scanner factor ranking mean reversion momentum dollar neutral scanner lab second engine" },
+    { view: "finml", title: "Open AFML Methodology Lab", keywords: "afml financial ml machine learning triple barrier cusum event sampling sample uniqueness concurrency labeling meta-labeling purged cv lopez de prado" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1069,6 +1080,23 @@ export default function HomePage() {
         setScannerStrategy(s);
         setScannerKey((k) => k + 1);
         handleNav("scanner");
+      },
+    })),
+    ...(
+      [
+        ["cusum", "Open CUSUM Sampling", "cusum event sampling afml financial ml cumulative filter"],
+        ["labeling", "Open Triple-Barrier Labeling", "triple barrier labeling afml profit take stop loss vertical label"],
+        ["uniqueness", "Open Sample Uniqueness", "sample uniqueness concurrency overlapping labels afml sample weights"],
+      ] as const
+    ).map(([t, title, keywords], i) => ({
+      id: `finml-${t}-${i}`,
+      group: "AFML Methodology Lab",
+      title,
+      keywords,
+      run: () => {
+        setFinmlTab(t);
+        setFinmlKey((k) => k + 1);
+        handleNav("finml");
       },
     })),
     // Report actions are only offered when they actually work (a result exists).
@@ -1517,6 +1545,9 @@ export default function HomePage() {
 
         {/* ── Cross-Sectional Scanner ──────────────────────────────────── */}
         {view === "scanner" && <ScannerLabPanel key={scannerKey} initialStrategy={scannerStrategy} />}
+
+        {/* ── AFML Methodology Lab ─────────────────────────────────────── */}
+        {view === "finml" && <AfmlLabPanel key={finmlKey} initialTab={finmlTab} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

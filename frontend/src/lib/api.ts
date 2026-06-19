@@ -55,6 +55,8 @@ import type {
   RiskyBondResponse,
   ScannerRequest,
   ScannerResponse,
+  LabelingDemoRequest,
+  LabelingDemoResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -1087,6 +1089,12 @@ export function priceRiskyBond(req: RiskyBondRequest): Promise<RiskyBondResponse
 
 export function runScanner(req: ScannerRequest): Promise<ScannerResponse> {
   return postOptions<ScannerResponse>("/api/scanner/backtest", req);
+}
+
+// ── AFML Methodology Layer ───────────────────────────────────────────────────
+
+export function runLabelingDemo(req: LabelingDemoRequest): Promise<LabelingDemoResponse> {
+  return postOptions<LabelingDemoResponse>("/api/finml/labeling-demo", req);
 }
 
 export async function fetchSampleCurve(): Promise<SampleCurveResponse> {
