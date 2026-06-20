@@ -122,8 +122,9 @@ def run_labeling_demo(
         "Synthetic path for methodology demonstration — not live market data.",
         "This is a labeling pipeline, not a trained model: no features, no model, no out-of-sample "
         "validation. Event formation uses no future information; future prices are only used to "
-        "assign labels (as labeling requires). Purged K-fold / CPCV, meta-labeling, sequential "
-        "bootstrap, and fractional differentiation are planned, not implemented.",
+        "assign labels (as labeling requires). The separate Purged CV demo provides overlap-aware "
+        "split diagnostics; CPCV, meta-labeling, sequential bootstrap, and fractional "
+        "differentiation are planned, not implemented.",
     ]
     if summary["n_events"] == 0:
         warnings.append(

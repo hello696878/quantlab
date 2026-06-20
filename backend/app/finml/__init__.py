@@ -10,11 +10,13 @@ It demonstrates the *labeling pipeline* that must come **before** model training
    stop-loss / vertical) is touched first.
 3. **Sample concurrency** — count overlapping label intervals.
 4. **Sample uniqueness weights** — down-weight overlapping (non-independent) labels.
+5. **Purged K-fold + embargo CV** — remove train labels that overlap each
+   contiguous test fold, then embargo post-test observations and report leakage.
 
 Educational / research only — **synthetic demo data**, no live market data, no
 model training, no meta-labeling, no sequential bootstrap, no fractional
-differentiation, no purged K-fold / CPCV (all planned). **Not** a full AFML
-implementation and not investment advice.
+differentiation, and no Combinatorial Purged CV (all planned). **Not** a full
+AFML implementation and not investment advice.
 """
 
 from app.finml.orchestrator import (  # noqa: F401

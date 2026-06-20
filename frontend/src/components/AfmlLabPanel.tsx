@@ -114,13 +114,26 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
 
   function set<K extends keyof UiInputs>(key: K, value: UiInputs[K]) {
     setInp((s) => ({ ...s, [key]: value }));
+    setError(null);
+    setCvError(null);
   }
 
   async function runCv() {
     if (cvLoading) return;
     const ns = num(nSplits);
     const emb = num(embargoPct);
-    if (!valid || !Number.isInteger(ns) || ns < 2 || ns > 20 || !(emb >= 0 && emb <= 0.2)) return;
+    if (!valid) {
+      setCvError("Fix the shared Setup values before running purged CV.");
+      return;
+    }
+    if (!Number.isInteger(ns) || ns < 2 || ns > 20) {
+      setCvError("Number of folds must be a whole number between 2 and 20.");
+      return;
+    }
+    if (!Number.isFinite(emb) || emb < 0 || emb > 0.2) {
+      setCvError("Embargo fraction must be between 0 and 0.2.");
+      return;
+    }
     setCvLoading(true);
     setCvError(null);
     setCvResult(null);
@@ -132,7 +145,8 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
         drift: num(inp.driftPct) / 100,
         volatility: num(inp.volPct) / 100,
         seed: inp.seed.trim() === "" ? null : num(inp.seed),
-        cusum_threshold: num(inp.thresholdPct) / 100,
+        cusum_threshold:
+          inp.thresholdMode === "fixed" ? num(inp.thresholdPct) / 100 : num(inp.thresholdPct),
         threshold_mode: inp.thresholdMode,
         volatility_window: num(inp.volWindow),
         profit_take_multiple: num(inp.profitTake),
@@ -164,6 +178,11 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
     num(inp.stopLoss) > 0 && num(inp.stopLoss) <= 100 &&
     Number.isInteger(num(inp.verticalDays)) && num(inp.verticalDays) >= 1 && num(inp.verticalDays) < nDays &&
     seedValid;
+  const cvNSplits = num(nSplits);
+  const cvEmbargo = num(embargoPct);
+  const cvValid =
+    valid && Number.isInteger(cvNSplits) && cvNSplits >= 2 && cvNSplits <= 20 &&
+    Number.isFinite(cvEmbargo) && cvEmbargo >= 0 && cvEmbargo <= 0.2;
 
   async function run() {
     if (!valid || loading) return;
@@ -238,9 +257,9 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
     <div className="space-y-5">
       <div className="card p-5">
         <p className="text-sm text-slate-300">
-          The AFML Methodology Lab demonstrates the <span className="font-medium">labeling pipeline</span>{" "}
+          The AFML Methodology Lab demonstrates the <span className="font-medium">labeling and validation-splitting pipeline</span>{" "}
           that must come before financial-ML model training: CUSUM event sampling, triple-barrier
-          labeling, sample concurrency, and overlap-aware sample-uniqueness weights.
+          labeling, sample concurrency, overlap-aware uniqueness weights, and purged K-fold with embargo.
         </p>
         <p className="mt-2 text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
@@ -288,7 +307,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
             positive barrier multiples ≤ 100, vertical days 1–days, optional seed ≥ 0.
           </p>
         )}
-        {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+        {error && <p className="text-xs text-red-400">⚠ {error}</p>}
         {result && (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
             <MetricCard label="Days" value={String(result.summary.n_days)} />
@@ -508,17 +527,19 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
               Reuses the synthetic path and triple-barrier labels from the Setup above, then forms
               purged K-fold splits with an embargo. Purging removes train labels whose intervals
               overlap the test fold; the embargo also removes train labels starting just after it.
+              “Overlap before” is the leakage-prone, contiguous standard K-fold baseline: no shuffle,
+              purging, or embargo.
             </p>
             <div className="flex flex-wrap items-end gap-3">
-              <Field label="Number of folds"><input type="number" className={inputCls + " w-28"} value={nSplits} step={1} onChange={(e) => setNSplits(e.target.value)} /></Field>
-              <Field label="Embargo (fraction)"><input type="number" className={inputCls + " w-28"} value={embargoPct} step={0.005} onChange={(e) => setEmbargoPct(e.target.value)} /></Field>
+              <Field label="Number of folds"><input type="number" className={inputCls + " w-28"} value={nSplits} step={1} onChange={(e) => { setNSplits(e.target.value); setCvError(null); }} /></Field>
+              <Field label="Embargo (fraction)"><input type="number" className={inputCls + " w-28"} value={embargoPct} step={0.005} onChange={(e) => { setEmbargoPct(e.target.value); setCvError(null); }} /></Field>
               <button
                 type="button"
                 onClick={runCv}
-                disabled={cvLoading}
+                disabled={!cvValid || cvLoading}
                 className={
                   "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-                  (!cvLoading
+                  (cvValid && !cvLoading
                     ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
                     : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
                 }
@@ -526,8 +547,15 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                 {cvLoading ? "Running…" : "Run purged CV"}
               </button>
             </div>
-            <p className="text-[11px] text-slate-400">Folds 2–20, embargo fraction 0–0.2. Other parameters come from the Setup section above.</p>
-            {cvError && <p className="text-xs text-red-600">⚠ {cvError}</p>}
+            <p className="text-[11px] text-slate-400">
+              Folds 2–20. Embargo is 0–0.2 of the full synthetic history and is rounded up to whole trading observations. Other parameters come from Setup.
+            </p>
+            {!cvValid && (
+              <p className="text-[11px] text-amber-400">
+                Enter valid Setup values, a whole-number fold count from 2 to 20, and an embargo fraction from 0 to 0.2.
+              </p>
+            )}
+            {cvError && <p className="text-xs text-red-400">⚠ {cvError}</p>}
           </div>
 
           {cvResult && (
@@ -537,20 +565,25 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                 <MetricCard label="Folds" value={String(cvResult.summary.n_splits)} tone="accent" />
                 <MetricCard label="Total purged" value={String(cvResult.summary.total_purged)} tone="warn" />
                 <MetricCard label="Total embargoed" value={String(cvResult.summary.total_embargoed)} tone="danger" />
-                <MetricCard label="Overlap folds (before)" value={String(cvResult.summary.folds_with_overlap_before_purge)} tone="warn" />
-                <MetricCard label="Overlap folds (after)" value={String(cvResult.summary.folds_with_overlap_after_purge)} tone={cvResult.summary.folds_with_overlap_after_purge === 0 ? "positive" : "danger"} />
+                <MetricCard label="Overlaps (before)" value={String(cvResult.summary.total_overlap_before_purge)} tone="warn" />
+                <MetricCard label="Overlaps (after purge)" value={String(cvResult.summary.total_overlap_after_purge)} tone={cvResult.summary.total_overlap_after_purge === 0 ? "positive" : "danger"} />
                 <MetricCard label="Avg train remaining" value={pct(cvResult.summary.average_train_fraction_remaining, 1)} />
               </div>
 
               {/* Fold timeline */}
               <div className="card space-y-2 p-5">
                 <p className="section-title">
-                  Fold timeline — fold {selectedFold} of {cvResult.summary.n_splits}
+                  Fold timeline — fold {selectedFold + 1} of {cvResult.summary.n_splits}
                 </p>
                 {(() => {
                   const fold = cvResult.folds[selectedFold];
                   if (!fold) return null;
-                  const maxIdx = Math.max(...cvResult.timeline.map((t) => t.end_index), 1);
+                  const maxIdx = Math.max(
+                    ...cvResult.timeline.map((t) => t.end_index),
+                    fold.embargo_end_index ?? 0,
+                    1,
+                  );
+                  const trainSet = new Set(fold.train_event_ids);
                   const testSet = new Set(fold.test_event_ids);
                   const purgedSet = new Set(fold.purged_event_ids);
                   const embSet = new Set(fold.embargoed_event_ids);
@@ -558,9 +591,19 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                   const rowH = Math.max(1.5, Math.min(5, 360 / Math.max(1, n)));
                   const H = n * rowH;
                   const roleColor = (id: number) =>
-                    testSet.has(id) ? TEST_COLOR : purgedSet.has(id) ? PURGE_COLOR : embSet.has(id) ? EMBARGO_COLOR : TRAIN_COLOR;
+                    testSet.has(id) ? TEST_COLOR : purgedSet.has(id) ? PURGE_COLOR : embSet.has(id) ? EMBARGO_COLOR : trainSet.has(id) ? TRAIN_COLOR : CHART_AXIS_LINE;
                   return (
                     <svg viewBox={`0 0 1000 ${H}`} preserveAspectRatio="none" className="w-full" style={{ height: Math.min(380, Math.max(120, H)) }}>
+                      {fold.embargo_start_index != null && fold.embargo_end_index != null && (
+                        <rect
+                          x={(fold.embargo_start_index / maxIdx) * 1000}
+                          y={0}
+                          width={Math.max(2, ((fold.embargo_end_index - fold.embargo_start_index + 1) / maxIdx) * 1000)}
+                          height={H}
+                          fill={EMBARGO_COLOR}
+                          opacity={0.08}
+                        />
+                      )}
                       {cvResult.timeline.map((ev, i) => {
                         const x = (ev.start_index / maxIdx) * 1000;
                         const w = Math.max(2, ((ev.end_index - ev.start_index) / maxIdx) * 1000);
@@ -573,13 +616,13 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                   <span style={{ color: TRAIN_COLOR }}>● Train</span>{"  "}
                   <span style={{ color: TEST_COLOR }}>● Test</span>{"  "}
                   <span style={{ color: PURGE_COLOR }}>● Purged</span>{"  "}
-                  <span style={{ color: EMBARGO_COLOR }}>● Embargoed</span> — each row is one label interval (x = time). Click a fold row below.
+                  <span style={{ color: EMBARGO_COLOR }}>● Embargoed</span> — the faint red band is the embargo window; each row is one label interval. Click a fold row below.
                 </p>
               </div>
 
               {/* Per-fold counts */}
               <div className="card space-y-2 p-5">
-                <p className="section-title">Train / test / purged / embargo — fold {selectedFold}</p>
+                <p className="section-title">Train / test / purged / embargo — fold {selectedFold + 1}</p>
                 {(() => {
                   const f = cvResult.folds[selectedFold];
                   if (!f) return null;
@@ -628,7 +671,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                           onClick={() => setSelectedFold(f.fold_id)}
                           className={"cursor-pointer border-t border-[var(--line)] " + (f.fold_id === selectedFold ? "bg-[var(--accent-softer)]" : "")}
                         >
-                          <td className="px-2 py-1 text-right mono">{f.fold_id}</td>
+                          <td className="px-2 py-1 text-right mono">{f.fold_id + 1}</td>
                           <td className="px-2 py-1 text-left mono">{f.test_start_date} → {f.test_end_date}</td>
                           <td className="px-2 py-1 text-right mono">{f.train_count_before}</td>
                           <td className="px-2 py-1 text-right mono">{f.train_count_after}</td>
@@ -643,6 +686,10 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                   </table>
                 </div>
               </div>
+
+              <p className="text-[11px] text-slate-400">
+                This run converted the embargo fraction to {cvResult.summary.embargo_bars} trading observation(s). Purged and embargo totals are fold-level removals, so one event may contribute in different folds.
+              </p>
 
               {cvResult.warnings.map((w, i) => (<p key={i} className="text-[11px] text-slate-400">⚠ {w}</p>))}
             </>

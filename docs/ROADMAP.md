@@ -1120,9 +1120,10 @@ single-asset Backtest + Strategy Comparison:
   nav, dashboard card, and command-palette commands (AFML + CUSUM / Triple-Barrier /
   Sample Uniqueness)
 - A **methodology toolkit, not a model**: synthetic demo data, no features, no model
-  training, no live data. **Meta-labeling, information-driven bars, sequential
-  bootstrap, fractional differentiation, and purged K-fold / CPCV are planned, not
-  implemented.** Not a full AFML implementation, not investment advice
+  training, no live data. At the end of 19.0, purged K-fold was still planned; it
+  was added in 19.1. **Meta-labeling, information-driven bars, sequential bootstrap,
+  fractional differentiation, and CPCV remain planned.** Not a full AFML
+  implementation, not investment advice
 
 ### Phase 19.1 — Purged K-Fold + Embargo CV v1 ✅
 

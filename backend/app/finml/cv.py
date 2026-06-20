@@ -15,6 +15,8 @@ not investment advice.  Interval convention is **inclusive** ``[start, end]``.
 from __future__ import annotations
 
 import math
+from datetime import date
+from numbers import Integral
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -42,17 +44,38 @@ def intervals_overlap(s1: int, e1: int, s2: int, e2: int) -> bool:
 
 def build_label_intervals(labels: List[dict]) -> List[dict]:
     """Normalize triple-barrier labels into ``{event_id, start, end, label}`` rows,
-    sorted by start (time order)."""
-    rows = [
-        {
-            "event_id": int(l["event_id"]),
-            "start": int(l["start_index"]),
-            "end": int(l["end_index"]),
-            "label": int(l["label"]),
-        }
-        for l in labels
-    ]
-    rows.sort(key=lambda r: (r["start"], r["end"]))
+    sorted by start (time order). Invalid or reversed intervals are rejected."""
+    rows: List[dict] = []
+    seen_event_ids = set()
+    for row_number, label in enumerate(labels):
+        try:
+            values = {
+                "event_id": label["event_id"],
+                "start": label["start_index"],
+                "end": label["end_index"],
+                "label": label["label"],
+            }
+        except (KeyError, TypeError) as exc:
+            raise FinmlInputError(f"Label interval {row_number} is missing a required field.") from exc
+
+        if any(isinstance(value, bool) or not isinstance(value, Integral) for value in values.values()):
+            raise FinmlInputError(f"Label interval {row_number} must contain integer fields.")
+
+        event_id = int(values["event_id"])
+        start = int(values["start"])
+        end = int(values["end"])
+        outcome = int(values["label"])
+        if event_id < 0 or event_id in seen_event_ids:
+            raise FinmlInputError("Label event_id values must be unique non-negative integers.")
+        if start < 0 or end < start:
+            raise FinmlInputError("Each label interval must satisfy 0 <= start_index <= end_index.")
+        if outcome not in (-1, 0, 1):
+            raise FinmlInputError("Label values must be -1, 0, or 1.")
+
+        seen_event_ids.add(event_id)
+        rows.append({"event_id": event_id, "start": start, "end": end, "label": outcome})
+
+    rows.sort(key=lambda r: (r["start"], r["end"], r["event_id"]))
     return rows
 
 
@@ -73,6 +96,11 @@ def count_overlaps(train_pos: List[int], test_pos: List[int], intervals: List[di
 
 def split_kfold_by_time(n_events: int, n_splits: int) -> List[List[int]]:
     """Standard time-ordered (no-shuffle) K-fold: contiguous test blocks of positions."""
+    if not isinstance(n_events, int) or isinstance(n_events, bool) or n_events < 1:
+        raise FinmlInputError("n_events must be a positive integer.")
+    validate_cv_inputs(n_splits, 0.0)
+    if n_splits > n_events:
+        raise FinmlInputError("n_splits cannot exceed the number of labeled events.")
     return [list(map(int, block)) for block in np.array_split(np.arange(n_events), n_splits)]
 
 
@@ -122,6 +150,21 @@ def make_purged_kfold_splits(
 ) -> List[dict]:
     """Build per-fold purged + embargoed splits with leakage diagnostics."""
     n_events = len(intervals)
+    if not isinstance(embargo_bars, int) or isinstance(embargo_bars, bool) or embargo_bars < 0:
+        raise FinmlInputError("embargo_bars must be a non-negative integer.")
+    if not dates:
+        raise FinmlInputError("dates must contain at least one observation.")
+    try:
+        parsed_dates = [date.fromisoformat(value) for value in dates]
+    except (TypeError, ValueError) as exc:
+        raise FinmlInputError("dates must contain valid ISO date strings.") from exc
+    if any(current <= previous for previous, current in zip(parsed_dates, parsed_dates[1:])):
+        raise FinmlInputError("dates must be strictly increasing.")
+    if any(iv["start"] < 0 or iv["end"] < iv["start"] or iv["end"] >= len(dates) for iv in intervals):
+        raise FinmlInputError("Label intervals must be ordered and fall within the available dates.")
+    if intervals != sorted(intervals, key=lambda r: (r["start"], r["end"], r["event_id"])):
+        raise FinmlInputError("Label intervals must be sorted by start date.")
+
     test_blocks = split_kfold_by_time(n_events, n_splits)
     folds: List[dict] = []
     for fold_id, test_pos in enumerate(test_blocks):
@@ -136,8 +179,8 @@ def make_purged_kfold_splits(
         standard_overlap = count_overlaps(train_std, test_pos, intervals)
 
         kept_after_purge, purged = purge_train_indices(train_std, test_pos, intervals)
+        after_purge_overlap = count_overlaps(kept_after_purge, test_pos, intervals)
         kept_after_embargo, embargoed = apply_embargo(kept_after_purge, test_end_bar, intervals, embargo_bars)
-        after_overlap = count_overlaps(kept_after_embargo, test_pos, intervals)
 
         n_bars = len(dates)
         embargo_start = test_end_bar + 1
@@ -153,6 +196,7 @@ def make_purged_kfold_splits(
         folds.append(
             {
                 "fold_id": fold_id,
+                "train_event_ids": [intervals[p]["event_id"] for p in kept_after_embargo],
                 "test_event_ids": [intervals[q]["event_id"] for q in test_pos],
                 "purged_event_ids": [intervals[p]["event_id"] for p in purged],
                 "embargoed_event_ids": [intervals[p]["event_id"] for p in embargoed],
@@ -160,14 +204,16 @@ def make_purged_kfold_splits(
                 "test_end_date": dates[test_end_bar],
                 "embargo_start_date": dates[embargo_start] if embargo_bars > 0 and embargo_start < n_bars else None,
                 "embargo_end_date": dates[embargo_end] if embargo_bars > 0 and embargo_start < n_bars else None,
+                "embargo_start_index": embargo_start if embargo_bars > 0 and embargo_start < n_bars else None,
+                "embargo_end_index": embargo_end if embargo_bars > 0 and embargo_start < n_bars else None,
                 "train_count_before": len(train_std),
                 "train_count_after": len(kept_after_embargo),
                 "test_count": len(test_pos),
                 "purged_count": len(purged),
                 "embargoed_count": len(embargoed),
                 "standard_train_overlap_count": standard_overlap,
-                "purged_overlap_count_after_purge": after_overlap,
-                "leakage_reduction": standard_overlap - after_overlap,
+                "purged_overlap_count_after_purge": after_purge_overlap,
+                "leakage_reduction": standard_overlap - after_purge_overlap,
                 "train_fraction_remaining": round(len(kept_after_embargo) / len(train_std), 6) if train_std else 0.0,
                 "warnings": warnings,
             }
@@ -175,9 +221,11 @@ def make_purged_kfold_splits(
     return folds
 
 
-def summarize_cv_splits(folds: List[dict], n_events: int, n_splits: int) -> dict:
+def summarize_cv_splits(folds: List[dict], n_events: int, n_splits: int, embargo_bars: int) -> dict:
     total_purged = sum(f["purged_count"] for f in folds)
     total_embargoed = sum(f["embargoed_count"] for f in folds)
+    total_overlap_before = sum(f["standard_train_overlap_count"] for f in folds)
+    total_overlap_after = sum(f["purged_overlap_count_after_purge"] for f in folds)
     before = sum(1 for f in folds if f["standard_train_overlap_count"] > 0)
     after = sum(1 for f in folds if f["purged_overlap_count_after_purge"] > 0)
     fracs = [f["train_fraction_remaining"] for f in folds]
@@ -185,8 +233,11 @@ def summarize_cv_splits(folds: List[dict], n_events: int, n_splits: int) -> dict
     return {
         "n_events": int(n_events),
         "n_splits": int(n_splits),
+        "embargo_bars": int(embargo_bars),
         "total_purged": int(total_purged),
         "total_embargoed": int(total_embargoed),
+        "total_overlap_before_purge": int(total_overlap_before),
+        "total_overlap_after_purge": int(total_overlap_after),
         "folds_with_overlap_before_purge": int(before),
         "folds_with_overlap_after_purge": int(after),
         "average_train_fraction_remaining": round(avg_frac, 6) if math.isfinite(avg_frac) else 0.0,
@@ -238,7 +289,8 @@ def run_purged_cv_demo(
     )
 
     intervals = build_label_intervals(labels)
-    n_events = len(intervals)
+    generated_event_count = len(intervals)
+    n_events = generated_event_count
     if n_events < n_splits:
         raise FinmlInputError(
             "Not enough labeled events to form the requested number of folds. Lower n_splits, lower "
@@ -248,10 +300,12 @@ def run_purged_cv_demo(
         intervals = intervals[:_EVENT_CAP]
         n_events = _EVENT_CAP
 
-    embargo_bars = int(round(embargo_pct * n_days))
+    # Embargo is a fraction of the full synthetic observation history. Round up
+    # so any positive fraction represents at least one trading observation.
+    embargo_bars = int(math.ceil(embargo_pct * n_days)) if embargo_pct > 0 else 0
 
     folds = make_purged_kfold_splits(intervals, n_splits, embargo_bars, dates)
-    summary = summarize_cv_splits(folds, n_events, n_splits)
+    summary = summarize_cv_splits(folds, n_events, n_splits, embargo_bars)
 
     timeline = [
         {
@@ -271,7 +325,19 @@ def run_purged_cv_demo(
         "model or remove all research bias. This is methodology only — no features, no model, no "
         "out-of-sample performance. Combinatorial Purged CV (CPCV) and model training are planned.",
         "Embargo is applied after purging; intervals are inclusive [start, end] in trading observations.",
+        f"embargo_pct is applied to the full {n_days}-observation synthetic history and rounded up "
+        f"to {embargo_bars} trading observation(s).",
     ]
+    if generated_event_count > _EVENT_CAP:
+        warnings.append(
+            f"The CV demo is capped at the first {_EVENT_CAP} time-ordered labels; "
+            f"{generated_event_count - _EVENT_CAP} later label(s) were omitted from split construction."
+        )
+    if threshold_mode == "vol_scaled":
+        warnings.append(
+            "Vol-scaled CUSUM mode interprets cusum_threshold as a multiplier of the rolling "
+            "volatility estimate, not as a fixed percentage return."
+        )
     for f in folds:
         for w in f["warnings"]:
             warnings.append(w)

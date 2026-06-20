@@ -2605,8 +2605,11 @@ export interface PurgedCvRequest {
 export interface PurgedCvSummary {
   n_events: number;
   n_splits: number;
+  embargo_bars: number;
   total_purged: number;
   total_embargoed: number;
+  total_overlap_before_purge: number;
+  total_overlap_after_purge: number;
   folds_with_overlap_before_purge: number;
   folds_with_overlap_after_purge: number;
   average_train_fraction_remaining: number;
@@ -2614,6 +2617,7 @@ export interface PurgedCvSummary {
 
 export interface PurgedCvFold {
   fold_id: number;
+  train_event_ids: number[];
   test_event_ids: number[];
   purged_event_ids: number[];
   embargoed_event_ids: number[];
@@ -2621,6 +2625,8 @@ export interface PurgedCvFold {
   test_end_date: string;
   embargo_start_date: string | null;
   embargo_end_date: string | null;
+  embargo_start_index: number | null;
+  embargo_end_index: number | null;
   train_count_before: number;
   train_count_after: number;
   test_count: number;

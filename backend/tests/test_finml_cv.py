@@ -8,15 +8,17 @@ No live data, no network.
 from __future__ import annotations
 
 import math
+from datetime import date, timedelta
 
 import pytest
 
-from app.finml import FinmlInputError, run_purged_cv_demo
+from app.finml import FinmlInputError, run_labeling_demo, run_purged_cv_demo
 from app.finml.cv import (
     apply_embargo,
     build_label_intervals,
     count_overlaps,
     intervals_overlap,
+    make_purged_kfold_splits,
     purge_train_indices,
     split_kfold_by_time,
 )
@@ -44,6 +46,11 @@ _OVERLAP_INTERVALS = [
 ]
 
 
+def _dates(n: int) -> list[str]:
+    start = date(2020, 1, 1)
+    return [(start + timedelta(days=i)).isoformat() for i in range(n)]
+
+
 # ---------------------------------------------------------------------------
 # Interval overlap (1, 2)
 # ---------------------------------------------------------------------------
@@ -53,6 +60,13 @@ def test_interval_overlap_detected():
     assert intervals_overlap(0, 5, 3, 8) is True
     assert intervals_overlap(3, 8, 0, 5) is True
     assert intervals_overlap(0, 5, 5, 9) is True  # inclusive touch
+
+
+def test_inclusive_overlap_boundary_cases():
+    assert intervals_overlap(1, 3, 3, 5) is True
+    assert intervals_overlap(1, 2, 3, 5) is False
+    assert intervals_overlap(2, 6, 3, 5) is True
+    assert intervals_overlap(6, 7, 3, 5) is False
 
 
 def test_non_overlapping_not_flagged():
@@ -72,6 +86,13 @@ def test_standard_kfold_creates_expected_folds():
     # Time-ordered, contiguous, non-overlapping.
     flat = [p for b in blocks for p in b]
     assert flat == list(range(20))
+    assert all(block == list(range(block[0], block[-1] + 1)) for block in blocks)
+    assert len(flat) == len(set(flat))
+
+
+def test_standard_kfold_rejects_more_folds_than_events():
+    with pytest.raises(FinmlInputError, match="cannot exceed"):
+        split_kfold_by_time(3, 4)
 
 
 # ---------------------------------------------------------------------------
@@ -98,6 +119,23 @@ def test_no_train_overlaps_test_after_purge():
     assert count_overlaps(kept, test_pos, intervals) == 0
 
 
+def test_fold_payload_exposes_disjoint_final_train_and_removed_ids():
+    folds = make_purged_kfold_splits(_OVERLAP_INTERVALS, 5, 2, _dates(50))
+    id_to_pos = {iv["event_id"]: i for i, iv in enumerate(_OVERLAP_INTERVALS)}
+    for fold in folds:
+        train = set(fold["train_event_ids"])
+        test = set(fold["test_event_ids"])
+        purged = set(fold["purged_event_ids"])
+        embargoed = set(fold["embargoed_event_ids"])
+        assert not (train & test or train & purged or train & embargoed)
+        assert not (test & purged or test & embargoed or purged & embargoed)
+        assert count_overlaps(
+            [id_to_pos[event_id] for event_id in train],
+            [id_to_pos[event_id] for event_id in test],
+            _OVERLAP_INTERVALS,
+        ) == 0
+
+
 # ---------------------------------------------------------------------------
 # Embargo (6, 7)
 # ---------------------------------------------------------------------------
@@ -120,6 +158,35 @@ def test_embargo_zero_removes_nothing():
     kept, embargoed = apply_embargo([1, 2, 3], test_end_bar=10, intervals=intervals, embargo_bars=0)
     assert embargoed == []
     assert kept == [1, 2, 3]
+
+
+def test_embargo_window_is_open_at_test_end_and_closed_at_window_end():
+    intervals = [
+        {"event_id": 0, "start": 2, "end": 2},
+        {"event_id": 1, "start": 3, "end": 3},
+        {"event_id": 2, "start": 5, "end": 5},
+        {"event_id": 3, "start": 6, "end": 6},
+    ]
+    kept, embargoed = apply_embargo([0, 1, 2, 3], 2, intervals, 3)
+    assert embargoed == [1, 2]
+    assert kept == [0, 3]
+
+
+def test_last_fold_embargo_is_safely_empty():
+    intervals = [{"event_id": i, "start": i, "end": i, "label": 1} for i in range(9)]
+    last = make_purged_kfold_splits(intervals, 3, 2, _dates(9))[-1]
+    assert last["embargoed_count"] == 0
+    assert last["embargo_start_date"] is None
+    assert last["embargo_end_date"] is None
+    assert last["embargo_start_index"] is None
+    assert last["embargo_end_index"] is None
+
+
+@pytest.mark.parametrize("dates", [["not-a-date"] * 9, list(reversed(_dates(9)))])
+def test_split_rejects_invalid_or_non_monotonic_dates(dates):
+    intervals = [{"event_id": i, "start": i, "end": i, "label": 1} for i in range(9)]
+    with pytest.raises(FinmlInputError, match="dates"):
+        make_purged_kfold_splits(intervals, 3, 0, dates)
 
 
 # ---------------------------------------------------------------------------
@@ -193,6 +260,48 @@ def test_build_label_intervals_sorted():
     assert [r["start"] for r in rows] == [2, 10]
 
 
+@pytest.mark.parametrize(
+    "labels",
+    [
+        [{"event_id": 0, "start_index": 3, "end_index": 2, "label": 1}],
+        [{"event_id": 0, "start_index": 1, "label": 1}],
+        [{"event_id": 0, "start_index": 1, "end_index": 2, "label": 2}],
+        [
+            {"event_id": 0, "start_index": 1, "end_index": 2, "label": 1},
+            {"event_id": 0, "start_index": 3, "end_index": 4, "label": -1},
+        ],
+    ],
+)
+def test_build_label_intervals_rejects_invalid_rows(labels):
+    with pytest.raises(FinmlInputError):
+        build_label_intervals(labels)
+
+
+def test_summary_diagnostics_match_fold_totals_and_fractions():
+    res = run_purged_cv_demo()
+    assert res["summary"]["total_overlap_before_purge"] == sum(
+        fold["standard_train_overlap_count"] for fold in res["folds"]
+    )
+    assert res["summary"]["total_overlap_after_purge"] == 0
+    assert all(0.0 <= fold["train_fraction_remaining"] <= 1.0 for fold in res["folds"])
+
+
+def test_positive_embargo_fraction_rounds_up_to_one_bar():
+    res = run_purged_cv_demo(n_days=100, n_splits=2, cusum_threshold=0.01, embargo_pct=0.0001)
+    assert res["summary"]["embargo_bars"] == 1
+
+
+def test_cv_reuses_same_labels_as_labeling_demo():
+    labeling = run_labeling_demo(seed=42, threshold_mode="vol_scaled", cusum_threshold=2.0)
+    cv = run_purged_cv_demo(seed=42, threshold_mode="vol_scaled", cusum_threshold=2.0)
+    assert cv["summary"]["n_events"] == labeling["summary"]["n_events"]
+    assert [(row["event_id"], row["start_date"], row["end_date"], row["label"]) for row in cv["timeline"]] == [
+        (row["event_id"], row["start_date"], row["end_date"], row["label"])
+        for row in labeling["labels"]
+    ]
+    assert any("multiplier" in warning for warning in cv["warnings"])
+
+
 # ---------------------------------------------------------------------------
 # API wiring
 # ---------------------------------------------------------------------------
@@ -214,6 +323,8 @@ def test_api_purged_cv(client):
     assert len(body["folds"]) == 5
     assert body["timeline"]
     assert body["summary"]["folds_with_overlap_after_purge"] == 0
+    assert body["summary"]["total_overlap_after_purge"] == 0
+    assert all(len(fold["train_event_ids"]) == fold["train_count_after"] for fold in body["folds"])
 
 
 def test_api_embargo_zero_reduces_embargo(client):

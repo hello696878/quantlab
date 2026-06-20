@@ -5028,8 +5028,11 @@ class PurgedCvRequest(BaseModel):
 class PurgedCvSummary(BaseModel):
     n_events: int
     n_splits: int
+    embargo_bars: int
     total_purged: int
     total_embargoed: int
+    total_overlap_before_purge: int
+    total_overlap_after_purge: int
     folds_with_overlap_before_purge: int
     folds_with_overlap_after_purge: int
     average_train_fraction_remaining: float
@@ -5037,6 +5040,7 @@ class PurgedCvSummary(BaseModel):
 
 class PurgedCvFold(BaseModel):
     fold_id: int
+    train_event_ids: List[int] = Field(default_factory=list)
     test_event_ids: List[int] = Field(default_factory=list)
     purged_event_ids: List[int] = Field(default_factory=list)
     embargoed_event_ids: List[int] = Field(default_factory=list)
@@ -5044,6 +5048,8 @@ class PurgedCvFold(BaseModel):
     test_end_date: str
     embargo_start_date: Optional[str] = None
     embargo_end_date: Optional[str] = None
+    embargo_start_index: Optional[int] = None
+    embargo_end_index: Optional[int] = None
     train_count_before: int
     train_count_after: int
     test_count: int

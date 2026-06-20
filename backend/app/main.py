@@ -4434,8 +4434,9 @@ def scanner_backtest(request: ScannerRequest) -> ScannerResponse:
     description=(
         "Educational financial-ML labeling pipeline on a synthetic path: symmetric "
         "CUSUM event sampling, triple-barrier labeling, sample concurrency, and "
-        "uniqueness weights. Not a trained model, no live data, no purged CV / "
-        "meta-labeling (planned). Not investment advice."
+        "uniqueness weights. The separate Purged CV endpoint provides purged K-fold "
+        "and embargo diagnostics. Not a trained model, no live data, no "
+        "meta-labeling. Not investment advice."
     ),
 )
 def finml_labeling_demo(request: LabelingDemoRequest) -> LabelingDemoResponse:
