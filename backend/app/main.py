@@ -140,6 +140,7 @@ from app.finml import (
     FinmlInputError,
     run_labeling_demo,
     run_purged_cv_demo,
+    run_sequential_bootstrap_demo,
 )
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
@@ -239,6 +240,8 @@ from app.schemas import (
     LabelingDemoResponse,
     PurgedCvRequest,
     PurgedCvResponse,
+    SequentialBootstrapRequest,
+    SequentialBootstrapResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -4492,3 +4495,39 @@ def finml_purged_cv_demo(request: PurgedCvRequest) -> PurgedCvResponse:
     except FinmlInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return PurgedCvResponse(**result)
+
+
+@app.post(
+    "/finml/sequential-bootstrap-demo",
+    response_model=SequentialBootstrapResponse,
+    tags=["finml"],
+    summary="Sequential bootstrap demo (uniqueness-aware sampling vs random)",
+    description=(
+        "Builds triple-barrier labels on a synthetic path, then draws a sequential "
+        "bootstrap sample (events chosen with probability proportional to marginal "
+        "average uniqueness) and compares its uniqueness to a random-bootstrap "
+        "baseline. Educational methodology — reduces sample dependence but does not "
+        "guarantee a better model. No live data, not investment advice."
+    ),
+)
+def finml_sequential_bootstrap_demo(request: SequentialBootstrapRequest) -> SequentialBootstrapResponse:
+    try:
+        result = run_sequential_bootstrap_demo(
+            request.n_days,
+            request.start_price,
+            request.drift,
+            request.volatility,
+            request.seed,
+            request.cusum_threshold,
+            request.threshold_mode,
+            request.volatility_window,
+            request.profit_take_multiple,
+            request.stop_loss_multiple,
+            request.vertical_barrier_days,
+            request.sample_size,
+            request.random_trials,
+            request.with_replacement,
+        )
+    except FinmlInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return SequentialBootstrapResponse(**result)

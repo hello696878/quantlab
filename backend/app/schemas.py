@@ -5076,3 +5076,71 @@ class PurgedCvResponse(BaseModel):
     folds: List[PurgedCvFold] = Field(default_factory=list)
     timeline: List[PurgedCvTimelineRow] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
+
+
+# ===========================================================================
+# AFML Sequential Bootstrap — research v1
+# ===========================================================================
+
+
+class SequentialBootstrapRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    n_days: int = Field(default=500, ge=50, le=5000)
+    start_price: float = Field(default=100.0, gt=0.0, le=1e9)
+    drift: float = Field(default=0.0002, ge=-1.0, le=1.0)
+    volatility: float = Field(default=0.015, gt=0.0, le=1.0)
+    seed: Optional[int] = Field(default=42, ge=0, le=2**32 - 1)
+    cusum_threshold: float = Field(default=0.02, gt=0.0, le=10.0)
+    threshold_mode: ThresholdMode = "fixed"
+    volatility_window: int = Field(default=20, ge=2, le=1000)
+    profit_take_multiple: float = Field(default=1.5, gt=0.0, le=100.0)
+    stop_loss_multiple: float = Field(default=1.0, gt=0.0, le=100.0)
+    vertical_barrier_days: int = Field(default=10, ge=1, le=5000)
+    sample_size: int = Field(default=25, ge=1, le=2000)
+    random_trials: int = Field(default=200, ge=1, le=1000)
+    with_replacement: bool = False
+
+
+class SequentialBootstrapSummary(BaseModel):
+    n_events: int
+    sample_size: int
+    with_replacement: bool
+    sequential_average_uniqueness: float
+    random_average_uniqueness: float
+    improvement_vs_random: float
+    overlap_reduction_note: str
+
+
+class SequentialBootstrapSelected(BaseModel):
+    draw_order: int
+    event_id: int
+    label: int
+    start_date: str
+    end_date: str
+    realized_return: float
+    average_uniqueness_after_draw: float
+    selection_probability: float
+
+
+class SequentialBootstrapBaseline(BaseModel):
+    mean: float
+    median: float
+    min: float
+    max: float
+    p25: float
+    p75: float
+    n_trials: int
+
+
+class SequentialBootstrapPathPoint(BaseModel):
+    draw: int
+    sequential_uniqueness: float
+
+
+class SequentialBootstrapResponse(BaseModel):
+    summary: SequentialBootstrapSummary
+    selected_events: List[SequentialBootstrapSelected] = Field(default_factory=list)
+    random_baseline: SequentialBootstrapBaseline
+    uniqueness_path: List[SequentialBootstrapPathPoint] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)

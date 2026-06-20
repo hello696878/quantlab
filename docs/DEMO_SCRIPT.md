@@ -213,10 +213,16 @@ Return to the Command Center's **Platform Direction** panel (or open
   avg train remaining), the fold table (overlap-after-purge = 0 everywhere), and the
   fold timeline (each label interval coloured train / test / purged / embargo —
   click a fold row to switch). Set embargo to 0 to drop the embargoed count; try
-  n_splits = 100 for a friendly validation error. Emphasise: synthetic demo data, a
-  labeling + validation pipeline (not a trained model), event formation uses no
-  future info, purged CV reduces overlap leakage but doesn't bless a model, and
-  CPCV / meta-labeling are planned — not a full AFML implementation, not advice.
+  n_splits = 100 for a friendly validation error. *Sequential Bootstrap*: sample
+  size 25, random trials 200 → **Run sequential bootstrap** → summary cards
+  (sequential vs random average uniqueness, improvement), the uniqueness-after-each-draw
+  path against the random-mean reference line, the comparison bar, the random-baseline
+  distribution, and the selected-events table; bump the CUSUM threshold down and the
+  vertical barrier up to increase overlap and watch the improvement grow. Emphasise:
+  synthetic demo data, a labeling + validation + sampling pipeline (not a trained
+  model), event formation uses no future info, purged CV reduces overlap leakage but
+  doesn't bless a model, sequential bootstrap reduces sample dependence (not model
+  risk), and CPCV / meta-labeling are planned — not a full AFML implementation, not advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

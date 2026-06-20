@@ -35,7 +35,7 @@ FastAPI Backend
   ├── strategies.py                 Signal generation (all strategies, all shift by 1 day)
   ├── backtest.py                   Vectorised single-instrument P&L engine, trade log, benchmark, long/short
   ├── scanner/                      Cross-Sectional Scanner Engine v1 — second, portfolio-level engine (synthetic universe, signals, dollar-neutral baskets, lookahead-safe P&L)
-  ├── finml/                        AFML Methodology Layer v1 — leakage-aware labeling + CV toolkit (CUSUM, triple-barrier labeling, concurrency + uniqueness weights, purged K-fold + embargo CV)
+  ├── finml/                        AFML Methodology Layer v1 — leakage-aware labeling + CV + sampling toolkit (CUSUM, triple-barrier labeling, concurrency + uniqueness weights, purged K-fold + embargo CV, sequential bootstrap)
   ├── custom_strategy.py            No-code rule evaluation (whitelisted operands, no eval)
   ├── portfolio.py                  Equal-weight, optimization, walk-forward, frontier, risk, stress, factor
   ├── metrics.py                    Performance statistics from an equity curve

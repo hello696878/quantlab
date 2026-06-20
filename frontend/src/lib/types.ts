@@ -2654,3 +2654,66 @@ export interface PurgedCvResponse {
   timeline: PurgedCvTimelineRow[];
   warnings: string[];
 }
+
+// ── AFML Sequential Bootstrap ────────────────────────────────────────────────
+
+export interface SequentialBootstrapRequest {
+  n_days: number;
+  start_price: number;
+  drift: number;
+  volatility: number;
+  seed: number | null;
+  cusum_threshold: number;
+  threshold_mode: ThresholdMode;
+  volatility_window: number;
+  profit_take_multiple: number;
+  stop_loss_multiple: number;
+  vertical_barrier_days: number;
+  sample_size: number;
+  random_trials: number;
+  with_replacement: boolean;
+}
+
+export interface SequentialBootstrapSummary {
+  n_events: number;
+  sample_size: number;
+  with_replacement: boolean;
+  sequential_average_uniqueness: number;
+  random_average_uniqueness: number;
+  improvement_vs_random: number;
+  overlap_reduction_note: string;
+}
+
+export interface SequentialBootstrapSelected {
+  draw_order: number;
+  event_id: number;
+  label: number;
+  start_date: string;
+  end_date: string;
+  realized_return: number;
+  average_uniqueness_after_draw: number;
+  selection_probability: number;
+}
+
+export interface SequentialBootstrapBaseline {
+  mean: number;
+  median: number;
+  min: number;
+  max: number;
+  p25: number;
+  p75: number;
+  n_trials: number;
+}
+
+export interface SequentialBootstrapPathPoint {
+  draw: number;
+  sequential_uniqueness: number;
+}
+
+export interface SequentialBootstrapResponse {
+  summary: SequentialBootstrapSummary;
+  selected_events: SequentialBootstrapSelected[];
+  random_baseline: SequentialBootstrapBaseline;
+  uniqueness_path: SequentialBootstrapPathPoint[];
+  warnings: string[];
+}

@@ -59,6 +59,8 @@ import type {
   LabelingDemoResponse,
   PurgedCvRequest,
   PurgedCvResponse,
+  SequentialBootstrapRequest,
+  SequentialBootstrapResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -1101,6 +1103,10 @@ export function runLabelingDemo(req: LabelingDemoRequest): Promise<LabelingDemoR
 
 export function runPurgedCvDemo(req: PurgedCvRequest): Promise<PurgedCvResponse> {
   return postOptions<PurgedCvResponse>("/api/finml/purged-cv-demo", req);
+}
+
+export function runSequentialBootstrapDemo(req: SequentialBootstrapRequest): Promise<SequentialBootstrapResponse> {
+  return postOptions<SequentialBootstrapResponse>("/api/finml/sequential-bootstrap-demo", req);
 }
 
 export async function fetchSampleCurve(): Promise<SampleCurveResponse> {

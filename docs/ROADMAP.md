@@ -1150,6 +1150,33 @@ single-asset Backtest + Strategy Comparison:
   guarantee a good model or remove research bias. CPCV, meta-labeling, sequential
   bootstrap, and fractional differentiation remain planned. Not investment advice
 
+### Phase 19.2 — Sequential Bootstrap v1 ✅
+
+- New backend `app/finml/bootstrap.py` — uniqueness-aware sampling reusing the AFML
+  synthetic path + triple-barrier labels: an **indicator matrix** (bar × event),
+  **sample average uniqueness** (mean of 1/concurrency over each event's active
+  bars), a **random-bootstrap baseline** (uniform sampling, distribution summary),
+  and the **sequential bootstrap** (draw events with probability ∝ marginal average
+  uniqueness, with/without replacement). The summary's sequential vs random
+  uniqueness are stable Monte-Carlo means (textbook comparison); one representative
+  draw drives the table / path / selection probabilities
+- One route `POST /finml/sequential-bootstrap-demo` (validated; sample_size ≥ 1 and
+  ≤ events when without replacement, random_trials 1–1000, too-few-events → friendly
+  422; bounded payload). 25 deterministic tests: indicator shape/overlap, uniqueness
+  = 1 (non-overlap) / < 1 (overlap), random + sequential determinism, sample-size /
+  valid-ids / no-duplicates (without replacement), finiteness, validation, overlap
+  sensitivity, no NaN/inf, + API
+- New **Sequential Bootstrap** tab in the AFML Methodology Lab (reuses the shared
+  labeling params; sample size, random trials, with-replacement toggle): summary
+  cards (sequential vs random uniqueness, improvement), a **uniqueness-after-each-draw**
+  path (with the random-mean reference line), a sequential-vs-random comparison bar,
+  the random-baseline distribution, and the selected-events table — distinct colors
+  (sequential emerald vs random amber)
+- Command-palette commands (Sequential Bootstrap) + updated dashboard card.
+  **Reduces sample dependence but does not guarantee a better model** — the benefit
+  grows with label overlap. Methodology only; meta-labeling, fractional
+  differentiation, and CPCV remain planned. Synthetic data, not investment advice
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -1234,8 +1261,8 @@ search · toasts, error boundary, loading/offline states.
     live universes, factor/IV/ML scanners, and AFML integration remain planned)
 13. **AFML Methodology Layer** — **built (v1)** (19.0: CUSUM event sampling,
     triple-barrier labeling, sample concurrency + uniqueness weights; 19.1: **purged
-    K-fold + embargo CV** with leakage diagnostics — all on synthetic data.
-    Meta-labeling, information-driven bars, sequential bootstrap, fractional
+    K-fold + embargo CV** with leakage diagnostics; 19.2: **sequential bootstrap** —
+    all on synthetic data. Meta-labeling, information-driven bars, fractional
     differentiation, and Combinatorial Purged CV (CPCV) remain planned)
 14. **Portfolio Studio + Strategy Ensemble Builder** (research)
 15. **ML & AI Lab** — feature pipelines, walk-forward ML guards (research)

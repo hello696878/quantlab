@@ -15,14 +15,14 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { BacktestApiError, runLabelingDemo, runPurgedCvDemo } from "@/lib/api";
-import type { LabelingDemoResponse, PurgedCvResponse, ThresholdMode } from "@/lib/types";
+import { BacktestApiError, runLabelingDemo, runPurgedCvDemo, runSequentialBootstrapDemo } from "@/lib/api";
+import type { LabelingDemoResponse, PurgedCvResponse, SequentialBootstrapResponse, ThresholdMode } from "@/lib/types";
 import MetricCard from "@/components/MetricCard";
 import NeonTooltip from "@/components/charts/NeonTooltip";
 import { CHART_AXIS, CHART_AXIS_LINE, CHART_GRID, CHART_REF_LINE, DANGER } from "@/components/charts/chartTheme";
 import { seriesColor } from "@/lib/chartPalette";
 
-type Tab = "cusum" | "labeling" | "uniqueness" | "purgedcv" | "education";
+type Tab = "cusum" | "labeling" | "uniqueness" | "purgedcv" | "seqboot" | "education";
 
 // Purged-CV role colors (distinct: train blue, test violet, purged amber, embargo red).
 const TRAIN_COLOR = seriesColor(1); // blue
@@ -112,6 +112,14 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
   const [cvLoading, setCvLoading] = useState(false);
   const [selectedFold, setSelectedFold] = useState(0);
 
+  // Sequential bootstrap (own inputs + result, reuses the shared labeling params).
+  const [sampleSize, setSampleSize] = useState("25");
+  const [randomTrials, setRandomTrials] = useState("200");
+  const [withReplacement, setWithReplacement] = useState(false);
+  const [sbResult, setSbResult] = useState<SequentialBootstrapResponse | null>(null);
+  const [sbError, setSbError] = useState<string | null>(null);
+  const [sbLoading, setSbLoading] = useState(false);
+
   function set<K extends keyof UiInputs>(key: K, value: UiInputs[K]) {
     setInp((s) => ({ ...s, [key]: value }));
     setError(null);
@@ -160,6 +168,39 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
       setCvError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
     } finally {
       setCvLoading(false);
+    }
+  }
+
+  async function runSb() {
+    if (sbLoading) return;
+    const ss = num(sampleSize);
+    const rt = num(randomTrials);
+    if (!valid || !Number.isInteger(ss) || ss < 1 || !Number.isInteger(rt) || rt < 1 || rt > 1000) return;
+    setSbLoading(true);
+    setSbError(null);
+    setSbResult(null);
+    try {
+      const res = await runSequentialBootstrapDemo({
+        n_days: num(inp.nDays),
+        start_price: num(inp.startPrice),
+        drift: num(inp.driftPct) / 100,
+        volatility: num(inp.volPct) / 100,
+        seed: inp.seed.trim() === "" ? null : num(inp.seed),
+        cusum_threshold: num(inp.thresholdPct) / 100,
+        threshold_mode: inp.thresholdMode,
+        volatility_window: num(inp.volWindow),
+        profit_take_multiple: num(inp.profitTake),
+        stop_loss_multiple: num(inp.stopLoss),
+        vertical_barrier_days: num(inp.verticalDays),
+        sample_size: ss,
+        random_trials: rt,
+        with_replacement: withReplacement,
+      });
+      setSbResult(res);
+    } catch (e) {
+      setSbError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setSbLoading(false);
     }
   }
 
@@ -328,6 +369,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
             ["labeling", "Triple-Barrier"],
             ["uniqueness", "Sample Uniqueness"],
             ["purgedcv", "Purged CV"],
+            ["seqboot", "Sequential Bootstrap"],
             ["education", "Education"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -700,6 +742,146 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
         </>
       )}
 
+      {/* Sequential Bootstrap */}
+      {tab === "seqboot" && (
+        <>
+          <div className="card space-y-3 p-5">
+            <p className="section-title">Sequential Bootstrap</p>
+            <p className="text-xs text-slate-500">
+              Reuses the synthetic path and triple-barrier labels from the Setup above. Draws a sample
+              of events one at a time with probability proportional to the marginal average uniqueness
+              they add, then compares its uniqueness to a uniform random-bootstrap baseline.
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="Sample size"><input type="number" className={inputCls + " w-28"} value={sampleSize} step={1} onChange={(e) => setSampleSize(e.target.value)} /></Field>
+              <Field label="Random trials"><input type="number" className={inputCls + " w-28"} value={randomTrials} step={50} onChange={(e) => setRandomTrials(e.target.value)} /></Field>
+              <label className="flex items-center gap-2 pb-1.5 text-xs text-slate-300">
+                <input type="checkbox" checked={withReplacement} onChange={(e) => setWithReplacement(e.target.checked)} />
+                With replacement
+              </label>
+              <button
+                type="button"
+                onClick={runSb}
+                disabled={sbLoading}
+                className={
+                  "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+                  (!sbLoading
+                    ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
+                    : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
+                }
+              >
+                {sbLoading ? "Running…" : "Run sequential bootstrap"}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">Sample size ≥ 1 (≤ events when without replacement); random trials 1–1000. Other parameters come from the Setup section above.</p>
+            {sbError && <p className="text-xs text-red-600">⚠ {sbError}</p>}
+          </div>
+
+          {sbResult && (
+            <>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                <MetricCard label="Labeled events" value={String(sbResult.summary.n_events)} />
+                <MetricCard label="Sample size" value={String(sbResult.summary.sample_size)} tone="accent" />
+                <MetricCard label="Sequential uniqueness" value={pct(sbResult.summary.sequential_average_uniqueness, 1)} tone="positive" />
+                <MetricCard label="Random uniqueness" value={pct(sbResult.summary.random_average_uniqueness, 1)} />
+                <MetricCard label="Improvement vs random" value={pct(sbResult.summary.improvement_vs_random, 2)} tone={sbResult.summary.improvement_vs_random >= 0 ? "positive" : "warn"} />
+                <MetricCard label="With replacement" value={sbResult.summary.with_replacement ? "Yes" : "No"} />
+              </div>
+              <p className="text-[11px] text-slate-400">{sbResult.summary.overlap_reduction_note}</p>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">Average uniqueness after each sequential draw</p>
+                <ResponsiveContainer width="100%" height={200}>
+                  <ComposedChart data={sbResult.uniqueness_path} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                    <XAxis dataKey="draw" type="number" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={{ stroke: CHART_AXIS_LINE }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={48} domain={[0, 1]} tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`} />
+                    <Tooltip content={<NeonTooltip formatValue={(v: number) => `${(v * 100).toFixed(2)}%`} formatLabel={(l) => (typeof l === "number" ? `Draw ${l}` : "")} />} />
+                    <ReferenceLine y={sbResult.summary.random_average_uniqueness} stroke={NEUTRAL_COLOR} strokeDasharray="6 4" />
+                    <Line type="monotone" dataKey="sequential_uniqueness" name="Sequential" stroke={POS_COLOR} strokeWidth={2} dot={false} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+                <p className="text-[11px] text-slate-400">
+                  <span style={{ color: POS_COLOR }}>— Sequential sample uniqueness</span>{"  "}
+                  <span style={{ color: NEUTRAL_COLOR }}>– – Random-bootstrap mean</span>.
+                </p>
+              </div>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">Sequential vs random uniqueness</p>
+                <ResponsiveContainer width="100%" height={170}>
+                  <ComposedChart
+                    data={[
+                      { name: "Sequential", value: sbResult.summary.sequential_average_uniqueness, color: POS_COLOR },
+                      { name: "Random mean", value: sbResult.summary.random_average_uniqueness, color: NEUTRAL_COLOR },
+                    ]}
+                    margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={{ stroke: CHART_AXIS_LINE }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={48} domain={[0, 1]} tickFormatter={(v: number) => `${(v * 100).toFixed(0)}%`} />
+                    <Tooltip content={<NeonTooltip formatValue={(v: number) => `${(v * 100).toFixed(2)}%`} />} />
+                    <Bar dataKey="value" name="Avg uniqueness" isAnimationActive={false}>
+                      <Cell fill={POS_COLOR} />
+                      <Cell fill={NEUTRAL_COLOR} />
+                    </Bar>
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">Random-bootstrap baseline ({sbResult.random_baseline.n_trials} trials)</p>
+                <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+                  <MetricCard label="Mean" value={pct(sbResult.random_baseline.mean, 1)} />
+                  <MetricCard label="Median" value={pct(sbResult.random_baseline.median, 1)} />
+                  <MetricCard label="p25" value={pct(sbResult.random_baseline.p25, 1)} />
+                  <MetricCard label="p75" value={pct(sbResult.random_baseline.p75, 1)} />
+                  <MetricCard label="Min" value={pct(sbResult.random_baseline.min, 1)} />
+                  <MetricCard label="Max" value={pct(sbResult.random_baseline.max, 1)} />
+                </div>
+              </div>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">Selected events (sequential sample)</p>
+                <div className="max-h-80 overflow-auto">
+                  <table className="w-full text-xs">
+                    <thead><tr className="text-slate-400">
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Draw</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Event</th>
+                      <th className="px-2 py-1 text-center font-medium uppercase tracking-wide">Label</th>
+                      <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Start</th>
+                      <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">End</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Realized</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Uniq after</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Sel. prob</th>
+                    </tr></thead>
+                    <tbody>
+                      {sbResult.selected_events.map((s) => (
+                        <tr key={s.draw_order} className="border-t border-[var(--line)]">
+                          <td className="px-2 py-1 text-right mono">{s.draw_order}</td>
+                          <td className="px-2 py-1 text-right mono">{s.event_id}</td>
+                          <td className="px-2 py-1 text-center font-semibold" style={{ color: s.label > 0 ? POS_COLOR : s.label < 0 ? NEG_COLOR : NEUTRAL_COLOR }}>{s.label > 0 ? "+1" : s.label}</td>
+                          <td className="px-2 py-1 text-left mono">{s.start_date}</td>
+                          <td className="px-2 py-1 text-left mono">{s.end_date}</td>
+                          <td className="px-2 py-1 text-right mono">{pct(s.realized_return)}</td>
+                          <td className="px-2 py-1 text-right mono">{fmt(s.average_uniqueness_after_draw)}</td>
+                          <td className="px-2 py-1 text-right mono">{fmt(s.selection_probability, 4)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              {sbResult.warnings.map((w, i) => (<p key={i} className="text-[11px] text-slate-400">⚠ {w}</p>))}
+            </>
+          )}
+          {!sbResult && !sbError && (
+            <div className="card p-5 text-sm text-slate-400">Run the sequential bootstrap demo to populate this tab.</div>
+          )}
+        </>
+      )}
+
       {(tab === "cusum" || tab === "labeling" || tab === "uniqueness") && !result && (
         <div className="card p-5 text-sm text-slate-400">Run the labeling demo to populate this tab.</div>
       )}
@@ -717,6 +899,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
             <li><span className="font-semibold text-slate-200">Random train/test splits leak:</span> financial labels look forward in time and overlap, so a naive shuffle puts near-duplicate, time-adjacent samples in both train and test — inflating measured skill. A plain split does not fix this.</li>
             <li><span className="font-semibold text-slate-200">Purged K-fold (built):</span> the Purged CV tab keeps the K-fold time order but <em>purges</em> training labels whose intervals overlap the test fold, so train and test no longer share outcomes — the per-fold "overlap after purge" should be 0.</li>
             <li><span className="font-semibold text-slate-200">Embargo (built):</span> beyond purging, an embargo removes training labels that start just after the test fold, where serial correlation still leaks. It is applied after purging.</li>
+            <li><span className="font-semibold text-slate-200">Sequential bootstrap (built):</span> a uniform bootstrap repeatedly samples overlapping (dependent) labels; the Sequential Bootstrap tab draws events with probability proportional to the marginal uniqueness they add, yielding a less-overlapping sample. It reduces dependence but does not guarantee better model performance — the benefit grows with how much the labels overlap.</li>
             <li><span className="font-semibold text-slate-200">Event sampling (CUSUM):</span> sampling on a fixed clock oversamples quiet periods. CUSUM samples only when cumulative movement is large, focusing labels on informative moments. Fixed mode uses a percentage-return threshold; vol-scaled mode uses a rolling-volatility multiplier.</li>
             <li><span className="font-semibold text-slate-200">Triple-barrier labeling:</span> a label is set by which barrier (profit-take / stop-loss / vertical-time) is hit first — a path-dependent, risk-aware label, unlike a fixed-horizon return sign.</li>
             <li><span className="font-semibold text-slate-200">Timing:</span> events are sampled using information available up to the event date. Future prices are used only to assign supervised-learning labels, not as trade signals or recommendations.</li>

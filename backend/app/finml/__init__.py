@@ -28,3 +28,7 @@ from app.finml.cv import (  # noqa: F401
     run_purged_cv_demo,
     validate_cv_inputs,
 )
+from app.finml.bootstrap import (  # noqa: F401
+    run_sequential_bootstrap_demo,
+    validate_bootstrap_inputs,
+)
