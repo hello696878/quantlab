@@ -102,12 +102,21 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
     setInp((s) => ({ ...s, [key]: value }));
   }
 
+  const thresholdRaw = num(inp.thresholdPct);
+  const seedValue = num(inp.seed);
+  const seedValid = inp.seed.trim() === "" || (Number.isInteger(seedValue) && seedValue >= 0);
+  const nDays = num(inp.nDays);
   const valid =
     Number.isInteger(num(inp.nDays)) && num(inp.nDays) >= 50 && num(inp.nDays) <= 5000 &&
-    num(inp.startPrice) > 0 && Number.isFinite(num(inp.driftPct)) && num(inp.volPct) > 0 &&
-    num(inp.thresholdPct) > 0 && Number.isInteger(num(inp.volWindow)) && num(inp.volWindow) >= 2 &&
-    num(inp.profitTake) > 0 && num(inp.stopLoss) > 0 &&
-    Number.isInteger(num(inp.verticalDays)) && num(inp.verticalDays) >= 1 && num(inp.verticalDays) < num(inp.nDays);
+    num(inp.startPrice) > 0 && num(inp.startPrice) <= 1_000_000_000 &&
+    Number.isFinite(num(inp.driftPct)) && Math.abs(num(inp.driftPct)) <= 100 &&
+    num(inp.volPct) > 0 && num(inp.volPct) <= 100 &&
+    thresholdRaw > 0 && (inp.thresholdMode === "fixed" ? thresholdRaw <= 1000 : thresholdRaw <= 10) &&
+    Number.isInteger(num(inp.volWindow)) && num(inp.volWindow) >= 2 && num(inp.volWindow) < nDays &&
+    num(inp.profitTake) > 0 && num(inp.profitTake) <= 100 &&
+    num(inp.stopLoss) > 0 && num(inp.stopLoss) <= 100 &&
+    Number.isInteger(num(inp.verticalDays)) && num(inp.verticalDays) >= 1 && num(inp.verticalDays) < nDays &&
+    seedValid;
 
   async function run() {
     if (!valid || loading) return;
@@ -122,7 +131,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
         drift: num(inp.driftPct) / 100,
         volatility: num(inp.volPct) / 100,
         seed: inp.seed.trim() === "" ? null : num(inp.seed),
-        cusum_threshold: num(inp.thresholdPct) / 100,
+        cusum_threshold: inp.thresholdMode === "fixed" ? thresholdRaw / 100 : thresholdRaw,
         threshold_mode: inp.thresholdMode,
         volatility_window: num(inp.volWindow),
         profit_take_multiple: num(inp.profitTake),
@@ -197,7 +206,9 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
           <Field label="Start price"><input type="number" className={inputCls} value={inp.startPrice} onChange={(e) => set("startPrice", e.target.value)} /></Field>
           <Field label="Daily drift (%)"><input type="number" className={inputCls} value={inp.driftPct} step={0.01} onChange={(e) => set("driftPct", e.target.value)} /></Field>
           <Field label="Daily vol (%)"><input type="number" className={inputCls} value={inp.volPct} step={0.25} onChange={(e) => set("volPct", e.target.value)} /></Field>
-          <Field label="CUSUM threshold (%)"><input type="number" className={inputCls} value={inp.thresholdPct} step={0.5} onChange={(e) => set("thresholdPct", e.target.value)} /></Field>
+          <Field label={inp.thresholdMode === "fixed" ? "CUSUM threshold (%)" : "CUSUM vol multiplier"}>
+            <input type="number" className={inputCls} value={inp.thresholdPct} step={0.5} onChange={(e) => set("thresholdPct", e.target.value)} />
+          </Field>
           <Field label="Threshold mode">
             <select className={inputCls} value={inp.thresholdMode} onChange={(e) => set("thresholdMode", e.target.value as ThresholdMode)}>
               <option value="fixed">fixed</option>
@@ -223,7 +234,13 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
         >
           {loading ? "Running…" : "Run labeling demo"}
         </button>
-        {!valid && <p className="text-[11px] text-slate-400">Days 50–5000, positive prices/vol/threshold/multiples, vol window ≥ 2, vertical days ≥ 1 and &lt; days.</p>}
+        {!valid && (
+          <p className="text-[11px] text-slate-400">
+            Days 50–5000, start price &gt; 0, drift within ±100%, daily vol 0–100%,
+            fixed CUSUM threshold 0–1000% or vol multiplier 0–10, vol window 2–days,
+            positive barrier multiples ≤ 100, vertical days 1–days, optional seed ≥ 0.
+          </p>
+        )}
         {error && <p className="text-xs text-red-600">⚠ {error}</p>}
         {result && (
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
@@ -449,8 +466,9 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
           <p className="section-title">Why financial-ML labeling is different</p>
           <ul className="space-y-2">
             <li><span className="font-semibold text-slate-200">Random train/test splits leak:</span> financial labels look forward in time and overlap, so a naive shuffle puts near-duplicate, time-adjacent samples in both train and test — inflating measured skill. Purged K-fold / CPCV (planned) fix this; a plain split does not.</li>
-            <li><span className="font-semibold text-slate-200">Event sampling (CUSUM):</span> sampling on a fixed clock oversamples quiet periods. CUSUM samples only when cumulative movement is large, focusing labels on informative moments.</li>
+            <li><span className="font-semibold text-slate-200">Event sampling (CUSUM):</span> sampling on a fixed clock oversamples quiet periods. CUSUM samples only when cumulative movement is large, focusing labels on informative moments. Fixed mode uses a percentage-return threshold; vol-scaled mode uses a rolling-volatility multiplier.</li>
             <li><span className="font-semibold text-slate-200">Triple-barrier labeling:</span> a label is set by which barrier (profit-take / stop-loss / vertical-time) is hit first — a path-dependent, risk-aware label, unlike a fixed-horizon return sign.</li>
+            <li><span className="font-semibold text-slate-200">Timing:</span> events are sampled using information available up to the event date. Future prices are used only to assign supervised-learning labels, not as trade signals or recommendations.</li>
             <li><span className="font-semibold text-slate-200">Overlapping labels → dependence:</span> labels whose holding windows overlap share outcomes and are not independent. Concurrency counts the overlap at each bar.</li>
             <li><span className="font-semibold text-slate-200">Sample uniqueness:</span> each label's uniqueness is the average of 1/concurrency over its life; using these as sample weights stops crowded periods from dominating training.</li>
             <li><span className="font-semibold text-slate-200">Not a model:</span> this is the labeling stage only — no features, no fitted model, synthetic data. Meta-labeling, information-driven bars, sequential bootstrap, fractional differentiation, and purged CV are planned. Not investment advice.</li>

@@ -45,6 +45,12 @@ def test_path_deterministic_same_seed():
     assert a["dates"] == b["dates"]
 
 
+def test_path_different_seed_changes_path():
+    a = generate_synthetic_path(200, 100, 0.0002, 0.015, 42, 20)
+    b = generate_synthetic_path(200, 100, 0.0002, 0.015, 43, 20)
+    assert not np.array_equal(a["close"], b["close"])
+
+
 def test_path_prices_positive():
     p = generate_synthetic_path(300, 100, 0.0, 0.02, 7, 20)
     assert np.all(p["close"] > 0)
@@ -55,6 +61,12 @@ def test_path_returns_and_vol_finite():
     assert np.all(np.isfinite(p["returns"]))
     assert np.all(np.isfinite(p["rolling_vol"]))
     assert np.all(p["rolling_vol"] > 0)
+
+
+def test_volatility_input_affects_path_variability():
+    low = generate_synthetic_path(500, 100, 0.0, 0.005, 42, 20)
+    high = generate_synthetic_path(500, 100, 0.0, 0.03, 42, 20)
+    assert float(np.std(high["returns"][1:])) > float(np.std(low["returns"][1:]))
 
 
 # ---------------------------------------------------------------------------
@@ -70,9 +82,34 @@ def test_cusum_creates_events_on_fixture():
     assert any(e["side"] == "negative" for e in events)
 
 
+def test_cusum_positive_fixture():
+    rets = np.array([0.0, 0.01, 0.01, 0.01])
+    events = cusum_events(rets, 0.02)
+    assert events == [{"index": 3, "side": "positive", "threshold_used": 0.02, "return_at_event": 0.01}]
+
+
+def test_cusum_negative_fixture():
+    rets = np.array([0.0, -0.01, -0.01, -0.01])
+    events = cusum_events(rets, 0.02)
+    assert events == [{"index": 3, "side": "negative", "threshold_used": 0.02, "return_at_event": -0.01}]
+
+
 def test_cusum_no_event_when_threshold_high():
     rets = np.array([0.0, 0.01, 0.01, 0.01, -0.01, -0.03])
     assert cusum_events(rets, 1.0) == []
+
+
+def test_cusum_vol_scaled_threshold_uses_multiplier():
+    rets = np.array([0.0, 0.01, 0.01, 0.01])
+    vol = np.full(4, 0.01)
+    events = cusum_events(rets, 2.0, threshold_mode="vol_scaled", rolling_vol=vol)
+    assert events and events[0]["threshold_used"] == pytest.approx(0.02, abs=1e-12)
+
+
+def test_cusum_skips_non_finite_returns():
+    rets = np.array([0.0, 0.01, np.nan, 0.01, 0.01])
+    events = cusum_events(rets, 0.02)
+    assert events == []
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +136,15 @@ def test_triple_barrier_vertical():
     vol = np.full(6, 0.05)  # wide barriers → neither touched
     lab = triple_barrier_labels(close, [0], vol, 1.5, 1.0, 5)[0]
     assert lab["touched_barrier"] == "vertical"
+
+
+def test_triple_barrier_vertical_zero_label_on_flat_path():
+    close = np.array([100, 100, 100, 100, 100, 100], dtype=float)
+    vol = np.full(6, 0.05)
+    lab = triple_barrier_labels(close, [0], vol, 1.5, 1.0, 5)[0]
+    assert lab["touched_barrier"] == "vertical"
+    assert lab["label"] == 0
+    assert lab["realized_return"] == pytest.approx(0.0)
 
 
 def test_label_end_after_start_and_holding_positive():
@@ -150,6 +196,11 @@ def test_sample_weights_finite_mean_one():
     assert float(np.mean(w)) == pytest.approx(1.0, abs=1e-9)
 
 
+def test_concurrency_clamps_out_of_range_intervals():
+    conc = compute_concurrency(5, [(-2, 1), (3, 9), (6, 8)])
+    assert conc.tolist() == [1.0, 1.0, 0.0, 1.0, 1.0]
+
+
 # ---------------------------------------------------------------------------
 # Orchestrator (16, 19) + reactivity
 # ---------------------------------------------------------------------------
@@ -167,6 +218,16 @@ def test_higher_threshold_reduces_events():
     low = run_labeling_demo(cusum_threshold=0.02)
     high = run_labeling_demo(cusum_threshold=0.08)
     assert high["summary"]["n_events"] <= low["summary"]["n_events"]
+
+
+def test_vol_scaled_demo_threshold_interpreted_as_multiplier():
+    res = run_labeling_demo(threshold_mode="vol_scaled", cusum_threshold=2.0)
+    assert any("multiplier" in w for w in res["warnings"])
+
+
+def test_shortened_vertical_barrier_warning():
+    res = run_labeling_demo(n_days=60, volatility=0.03, cusum_threshold=0.005, vertical_barrier_days=59)
+    assert any("shortened vertical barrier" in w for w in res["warnings"])
 
 
 def test_no_nan_in_response():

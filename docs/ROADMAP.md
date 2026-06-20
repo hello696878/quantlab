@@ -1096,7 +1096,8 @@ single-asset Backtest + Strategy Comparison:
 - New backend `app/finml/` package — a reusable **financial-ML methodology toolkit**
   (inspired by *Advances in Financial Machine Learning*): a synthetic price path
   (`sample_data.py` with a rolling-vol target), **symmetric CUSUM** event sampling
-  (`cusum.py`, fixed or vol-scaled threshold), **triple-barrier labeling**
+  (`cusum.py`, fixed absolute-return threshold or vol-scaled threshold multiplier),
+  **triple-barrier labeling**
   (`labeling.py`, profit-take / stop-loss / vertical → ±1 / 0), **sample concurrency
   + average uniqueness + sample weights** (`uniqueness.py`), and a `label_summary`
   (`metrics.py`), wired by the `orchestrator.py`
@@ -1105,11 +1106,12 @@ single-asset Backtest + Strategy Comparison:
   are down-weighted via uniqueness = mean(1/concurrency) over each label's life
 - One route `POST /finml/labeling-demo` (validated; bad threshold / vertical barrier /
   n_days / volatility window → 422; downsampled/capped payloads, never raw matrices).
-  Deterministic tests cover path determinism/positivity, CUSUM fixtures (events +
-  none above a high threshold), triple-barrier profit-take/stop-loss/vertical
+  Deterministic tests cover path determinism/positivity/volatility reactivity,
+  CUSUM fixtures (positive, negative, vol-scaled, non-finite-safe, and none above a
+  high threshold), triple-barrier profit-take/stop-loss/vertical
   fixtures, end ≥ start + positive holding, concurrency 1 (non-overlap) / >1
   (overlap), uniqueness 1 / <1, mean-1 normalized weights, label-count reconciliation,
-  threshold reactivity, and API validation
+  threshold reactivity, shortened-barrier warnings, and API validation
 - New top-level **AFML Methodology Lab** (shared Setup + summary cards · CUSUM
   Sampling · Triple-Barrier · Sample Uniqueness · Education) with the shared
   **MetricCard**, a deterministic palette (+1 emerald / −1 red / vertical amber),

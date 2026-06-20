@@ -4913,7 +4913,15 @@ class LabelingDemoRequest(BaseModel):
     drift: float = Field(default=0.0002, ge=-1.0, le=1.0)
     volatility: float = Field(default=0.015, gt=0.0, le=1.0)
     seed: Optional[int] = Field(default=42, ge=0, le=2**32 - 1)
-    cusum_threshold: float = Field(default=0.02, gt=0.0, le=10.0)
+    cusum_threshold: float = Field(
+        default=0.02,
+        gt=0.0,
+        le=10.0,
+        description=(
+            "CUSUM threshold. In fixed mode this is an absolute return level "
+            "(0.02 = 2%); in vol_scaled mode this is a multiplier of rolling volatility."
+        ),
+    )
     threshold_mode: ThresholdMode = "fixed"
     volatility_window: int = Field(default=20, ge=2, le=1000)
     profit_take_multiple: float = Field(default=1.5, gt=0.0, le=100.0)

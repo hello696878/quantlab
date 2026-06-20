@@ -130,6 +130,28 @@ def run_labeling_demo(
             "No events were sampled: the CUSUM threshold may be too high for this path. Lower the "
             "threshold or increase volatility / n_days."
         )
+    dropped_unlabeled = len(raw_events) - len(labels)
+    if dropped_unlabeled > 0:
+        warnings.append(
+            f"{dropped_unlabeled} final-bar event(s) were dropped because no forward price window "
+            "was available for triple-barrier labeling."
+        )
+    truncated = sum(1 for l in labels if l["start_index"] + vertical_barrier_days >= n_days)
+    if truncated > 0:
+        warnings.append(
+            f"{truncated} event(s) near the end of the synthetic path used a shortened vertical "
+            "barrier at the data boundary."
+        )
+    if len(labels) > _EVENT_CAP:
+        warnings.append(
+            f"Label, event, and weight tables are capped at {_EVENT_CAP} rows in the response; "
+            "summary counts are computed from all labeled events."
+        )
+    if threshold_mode == "vol_scaled":
+        warnings.append(
+            "Vol-scaled CUSUM mode interprets cusum_threshold as a multiplier of the rolling "
+            "volatility estimate, not as a fixed percentage return."
+        )
 
     # ── Chart-ready, downsampled / capped payloads ────────────────────────────
     pidx = _downsample(n_days, _SERIES_CAP)

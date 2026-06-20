@@ -32,14 +32,18 @@ def cusum_events(
     events: List[dict] = []
     for t in range(1, n):
         r = float(returns[t])
-        s_pos = max(0.0, s_pos + r)
-        s_neg = min(0.0, s_neg + r)
+        if not np.isfinite(r):
+            s_pos = 0.0
+            s_neg = 0.0
+            continue
         if threshold_mode == "vol_scaled" and rolling_vol is not None:
             h = float(threshold) * float(rolling_vol[t])
         else:
             h = float(threshold)
-        if h <= 0:
+        if not np.isfinite(h) or h <= 0:
             continue
+        s_pos = max(0.0, s_pos + r)
+        s_neg = min(0.0, s_neg + r)
         if s_pos > h:
             events.append({"index": t, "side": "positive", "threshold_used": h, "return_at_event": r})
             s_pos = 0.0
