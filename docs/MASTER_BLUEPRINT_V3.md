@@ -30,9 +30,10 @@ reproducible and every limitation explicit.
 - **Cross-Sectional Scanner Engine v1** — a *second engine* (18.0): ranks a
   synthetic universe, forms dollar-neutral long/short baskets, and runs a
   lookahead-safe portfolio backtest (reversal + momentum signals)
-- **AFML Methodology Layer v1** (19.0): leakage-aware labeling toolkit — CUSUM
-  event sampling, triple-barrier labeling, sample concurrency + uniqueness weights
-  on synthetic data (a methodology toolkit, not a trained model)
+- **AFML Methodology Layer v1** (19.0–19.1): leakage-aware labeling + validation
+  toolkit — CUSUM event sampling, triple-barrier labeling, sample concurrency +
+  uniqueness weights (19.0), and **purged K-fold + embargo cross-validation** with
+  leakage diagnostics (19.1), on synthetic data (a methodology toolkit, not a model)
 - Strategies: SMA Crossover, RSI Mean Reversion, Bollinger Band, Time-Series
   Momentum, Volatility Breakout, Pairs Trading; long/short modes
 - Strategy Comparison with shared simulation settings
@@ -127,8 +128,9 @@ reproducible and every limitation explicit.
     synthetic universe, dollar-neutral long/short, lookahead-safe portfolio
     backtest; reversal + momentum)
 13. ~~AFML Methodology Layer~~ — **built (v1)** (19.0: CUSUM event sampling,
-    triple-barrier labeling, sample concurrency + uniqueness weights; meta-labeling,
-    sequential bootstrap, fractional differentiation, purged CV / CPCV planned)
+    triple-barrier labeling, sample concurrency + uniqueness weights; 19.1: purged
+    K-fold + embargo CV with leakage diagnostics; meta-labeling, sequential
+    bootstrap, fractional differentiation, CPCV planned)
 14. Portfolio Studio + Ensemble Builder
 15. ML & AI Lab
 16. AI Explainer Copilot

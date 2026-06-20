@@ -57,6 +57,8 @@ import type {
   ScannerResponse,
   LabelingDemoRequest,
   LabelingDemoResponse,
+  PurgedCvRequest,
+  PurgedCvResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -1095,6 +1097,10 @@ export function runScanner(req: ScannerRequest): Promise<ScannerResponse> {
 
 export function runLabelingDemo(req: LabelingDemoRequest): Promise<LabelingDemoResponse> {
   return postOptions<LabelingDemoResponse>("/api/finml/labeling-demo", req);
+}
+
+export function runPurgedCvDemo(req: PurgedCvRequest): Promise<PurgedCvResponse> {
+  return postOptions<PurgedCvResponse>("/api/finml/purged-cv-demo", req);
 }
 
 export async function fetchSampleCurve(): Promise<SampleCurveResponse> {

@@ -139,6 +139,7 @@ from app.scanner import (
 from app.finml import (
     FinmlInputError,
     run_labeling_demo,
+    run_purged_cv_demo,
 )
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
@@ -236,6 +237,8 @@ from app.schemas import (
     ScannerResponse,
     LabelingDemoRequest,
     LabelingDemoResponse,
+    PurgedCvRequest,
+    PurgedCvResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -4453,3 +4456,38 @@ def finml_labeling_demo(request: LabelingDemoRequest) -> LabelingDemoResponse:
     except FinmlInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return LabelingDemoResponse(**result)
+
+
+@app.post(
+    "/finml/purged-cv-demo",
+    response_model=PurgedCvResponse,
+    tags=["finml"],
+    summary="Purged K-Fold + embargo cross-validation demo (leakage diagnostics)",
+    description=(
+        "Builds triple-barrier labels on a synthetic path, then forms purged "
+        "K-fold splits with an embargo and reports per-fold leakage diagnostics "
+        "(overlap before vs after purging). Educational methodology — not CPCV, "
+        "not model training, no live data. Purged CV reduces overlap leakage but "
+        "does not guarantee a good model. Not investment advice."
+    ),
+)
+def finml_purged_cv_demo(request: PurgedCvRequest) -> PurgedCvResponse:
+    try:
+        result = run_purged_cv_demo(
+            request.n_days,
+            request.start_price,
+            request.drift,
+            request.volatility,
+            request.seed,
+            request.cusum_threshold,
+            request.threshold_mode,
+            request.volatility_window,
+            request.profit_take_multiple,
+            request.stop_loss_multiple,
+            request.vertical_barrier_days,
+            request.n_splits,
+            request.embargo_pct,
+        )
+    except FinmlInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return PurgedCvResponse(**result)

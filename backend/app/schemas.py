@@ -5000,3 +5000,73 @@ class LabelingDemoResponse(BaseModel):
     concurrency: List[LabelingConcurrencyPoint] = Field(default_factory=list)
     weights: List[LabelingWeight] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
+
+
+# ===========================================================================
+# AFML Purged K-Fold + Embargo CV — research v1
+# ===========================================================================
+
+
+class PurgedCvRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    n_days: int = Field(default=500, ge=50, le=5000)
+    start_price: float = Field(default=100.0, gt=0.0, le=1e9)
+    drift: float = Field(default=0.0002, ge=-1.0, le=1.0)
+    volatility: float = Field(default=0.015, gt=0.0, le=1.0)
+    seed: Optional[int] = Field(default=42, ge=0, le=2**32 - 1)
+    cusum_threshold: float = Field(default=0.02, gt=0.0, le=10.0)
+    threshold_mode: ThresholdMode = "fixed"
+    volatility_window: int = Field(default=20, ge=2, le=1000)
+    profit_take_multiple: float = Field(default=1.5, gt=0.0, le=100.0)
+    stop_loss_multiple: float = Field(default=1.0, gt=0.0, le=100.0)
+    vertical_barrier_days: int = Field(default=10, ge=1, le=5000)
+    n_splits: int = Field(default=5, ge=2, le=20)
+    embargo_pct: float = Field(default=0.01, ge=0.0, le=0.2)
+
+
+class PurgedCvSummary(BaseModel):
+    n_events: int
+    n_splits: int
+    total_purged: int
+    total_embargoed: int
+    folds_with_overlap_before_purge: int
+    folds_with_overlap_after_purge: int
+    average_train_fraction_remaining: float
+
+
+class PurgedCvFold(BaseModel):
+    fold_id: int
+    test_event_ids: List[int] = Field(default_factory=list)
+    purged_event_ids: List[int] = Field(default_factory=list)
+    embargoed_event_ids: List[int] = Field(default_factory=list)
+    test_start_date: str
+    test_end_date: str
+    embargo_start_date: Optional[str] = None
+    embargo_end_date: Optional[str] = None
+    train_count_before: int
+    train_count_after: int
+    test_count: int
+    purged_count: int
+    embargoed_count: int
+    standard_train_overlap_count: int
+    purged_overlap_count_after_purge: int
+    leakage_reduction: int
+    train_fraction_remaining: float
+    warnings: List[str] = Field(default_factory=list)
+
+
+class PurgedCvTimelineRow(BaseModel):
+    event_id: int
+    start_date: str
+    end_date: str
+    start_index: int
+    end_index: int
+    label: int
+
+
+class PurgedCvResponse(BaseModel):
+    summary: PurgedCvSummary
+    folds: List[PurgedCvFold] = Field(default_factory=list)
+    timeline: List[PurgedCvTimelineRow] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)

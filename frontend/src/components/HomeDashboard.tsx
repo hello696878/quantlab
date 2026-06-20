@@ -1127,8 +1127,8 @@ export default function HomeDashboard({
               AFML Methodology Lab
             </span>
             <span className="text-xs text-slate-400">
-              Build leakage-aware financial-ML labels with CUSUM event sampling, triple barriers,
-              and sample uniqueness weights — synthetic demo data, not a trained model.
+              Build leakage-aware financial-ML labels and validation with CUSUM sampling, triple
+              barriers, uniqueness weights, and purged K-fold + embargo — synthetic data, not a model.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open AFML Lab →

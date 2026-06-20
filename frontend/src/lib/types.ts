@@ -2583,3 +2583,68 @@ export interface LabelingDemoResponse {
   weights: LabelingWeight[];
   warnings: string[];
 }
+
+// ── AFML Purged K-Fold + Embargo CV ──────────────────────────────────────────
+
+export interface PurgedCvRequest {
+  n_days: number;
+  start_price: number;
+  drift: number;
+  volatility: number;
+  seed: number | null;
+  cusum_threshold: number;
+  threshold_mode: ThresholdMode;
+  volatility_window: number;
+  profit_take_multiple: number;
+  stop_loss_multiple: number;
+  vertical_barrier_days: number;
+  n_splits: number;
+  embargo_pct: number;
+}
+
+export interface PurgedCvSummary {
+  n_events: number;
+  n_splits: number;
+  total_purged: number;
+  total_embargoed: number;
+  folds_with_overlap_before_purge: number;
+  folds_with_overlap_after_purge: number;
+  average_train_fraction_remaining: number;
+}
+
+export interface PurgedCvFold {
+  fold_id: number;
+  test_event_ids: number[];
+  purged_event_ids: number[];
+  embargoed_event_ids: number[];
+  test_start_date: string;
+  test_end_date: string;
+  embargo_start_date: string | null;
+  embargo_end_date: string | null;
+  train_count_before: number;
+  train_count_after: number;
+  test_count: number;
+  purged_count: number;
+  embargoed_count: number;
+  standard_train_overlap_count: number;
+  purged_overlap_count_after_purge: number;
+  leakage_reduction: number;
+  train_fraction_remaining: number;
+  warnings: string[];
+}
+
+export interface PurgedCvTimelineRow {
+  event_id: number;
+  start_date: string;
+  end_date: string;
+  start_index: number;
+  end_index: number;
+  label: number;
+}
+
+export interface PurgedCvResponse {
+  summary: PurgedCvSummary;
+  folds: PurgedCvFold[];
+  timeline: PurgedCvTimelineRow[];
+  warnings: string[];
+}

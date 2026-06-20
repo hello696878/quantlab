@@ -1124,6 +1124,31 @@ single-asset Backtest + Strategy Comparison:
   bootstrap, fractional differentiation, and purged K-fold / CPCV are planned, not
   implemented.** Not a full AFML implementation, not investment advice
 
+### Phase 19.1 — Purged K-Fold + Embargo CV v1 ✅
+
+- New backend `app/finml/cv.py` — leakage-aware cross-validation reusing the AFML
+  synthetic path + triple-barrier labels: inclusive label-interval overlap,
+  time-ordered **standard K-fold baseline** (for comparison, no shuffle), **purged
+  K-fold** (drop train labels overlapping a test interval), **embargo** (drop train
+  labels starting just after the test fold; applied after purging), per-fold
+  **leakage diagnostics** (overlap before vs after, purged/embargoed counts, train
+  fraction remaining), and a global summary
+- One route `POST /finml/purged-cv-demo` (validated; n_splits 2–20, embargo_pct
+  0–0.2, too-few-events → friendly 422; bounded payload). 24 deterministic tests:
+  overlap detection, K-fold baseline, purge removes overlaps + none remain after,
+  embargo window + embargo_pct=0 no-op, too-few-events error, fold-count
+  consistency, leakage > 0 before / = 0 after, determinism, no NaN/inf, + API
+- New **Purged CV** tab in the AFML Methodology Lab (reuses the shared labeling
+  params; n_splits + embargo inputs): summary cards (events, folds, total purged /
+  embargoed, overlap folds before vs after, avg train remaining), a click-to-select
+  **fold table**, a **fold timeline** (SVG: per-label intervals coloured
+  train/test/purged/embargo), and a per-fold counts chart — distinct colors
+  (train blue · test violet · purged amber · embargo red)
+- Command-palette commands (Purged K-Fold CV / Embargo CV) + updated dashboard card.
+  **Not CPCV, not model training** — purged CV reduces overlap leakage but does not
+  guarantee a good model or remove research bias. CPCV, meta-labeling, sequential
+  bootstrap, and fractional differentiation remain planned. Not investment advice
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -1207,9 +1232,10 @@ search · toasts, error boundary, loading/offline states.
     portfolio backtest; reversal + momentum signals. Sector/beta neutralization,
     live universes, factor/IV/ML scanners, and AFML integration remain planned)
 13. **AFML Methodology Layer** — **built (v1)** (19.0: CUSUM event sampling,
-    triple-barrier labeling, sample concurrency + uniqueness weights on synthetic
-    data. Meta-labeling, information-driven bars, sequential bootstrap, fractional
-    differentiation, and purged K-fold / CPCV remain planned)
+    triple-barrier labeling, sample concurrency + uniqueness weights; 19.1: **purged
+    K-fold + embargo CV** with leakage diagnostics — all on synthetic data.
+    Meta-labeling, information-driven bars, sequential bootstrap, fractional
+    differentiation, and Combinatorial Purged CV (CPCV) remain planned)
 14. **Portfolio Studio + Strategy Ensemble Builder** (research)
 15. **ML & AI Lab** — feature pipelines, walk-forward ML guards (research)
 16. **AI Explainer Copilot** — explains a result, never recommends trades

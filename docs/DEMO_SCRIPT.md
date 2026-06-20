@@ -208,9 +208,15 @@ Return to the Command Center's **Platform Direction** panel (or open
   Uniqueness*: the concurrency-over-time chart, the average-uniqueness histogram,
   and the sample-weight table (overlapping labels get uniqueness < 1). Raise the
   CUSUM threshold to show the event count drop; try threshold = −1 for a friendly
-  validation error. Emphasise: synthetic demo data, a labeling pipeline (not a
-  trained model), event formation uses no future info, and purged CV / meta-labeling
-  are planned — not a full AFML implementation, not investment advice.
+  validation error. *Purged CV*: with n_splits = 5 and embargo 0.01 → **Run purged
+  CV** → summary cards (overlap folds before vs after, total purged / embargoed,
+  avg train remaining), the fold table (overlap-after-purge = 0 everywhere), and the
+  fold timeline (each label interval coloured train / test / purged / embargo —
+  click a fold row to switch). Set embargo to 0 to drop the embargoed count; try
+  n_splits = 100 for a friendly validation error. Emphasise: synthetic demo data, a
+  labeling + validation pipeline (not a trained model), event formation uses no
+  future info, purged CV reduces overlap leakage but doesn't bless a model, and
+  CPCV / meta-labeling are planned — not a full AFML implementation, not advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

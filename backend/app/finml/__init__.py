@@ -22,3 +22,7 @@ from app.finml.orchestrator import (  # noqa: F401
     run_labeling_demo,
     validate_finml_inputs,
 )
+from app.finml.cv import (  # noqa: F401
+    run_purged_cv_demo,
+    validate_cv_inputs,
+)
