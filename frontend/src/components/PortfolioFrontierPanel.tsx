@@ -213,19 +213,19 @@ function SpecialCard({
       <div className="grid grid-cols-3 gap-2 text-center">
         <div>
           <p className="uplabel">Return</p>
-          <p className="mono text-sm font-semibold text-slate-900">
+          <p className="metric-value mono text-sm font-semibold">
             {fmtPct(point.expected_return, 1)}
           </p>
         </div>
         <div>
           <p className="uplabel">Vol</p>
-          <p className="mono text-sm font-semibold text-slate-900">
+          <p className="metric-value mono text-sm font-semibold">
             {fmtPct(point.volatility, 1)}
           </p>
         </div>
         <div>
           <p className="uplabel">Sharpe</p>
-          <p className="mono text-sm font-semibold text-slate-900">
+          <p className="metric-value mono text-sm font-semibold">
             {fmtRatio(point.sharpe, 2)}
           </p>
         </div>

@@ -298,19 +298,19 @@ export default function PortfolioOptimizePanel() {
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div className="card p-5">
               <p className="uplabel">Expected Annual Return</p>
-              <p className="mono text-2xl font-bold text-slate-900 mt-1">
+              <p className="metric-value mono mt-1 text-2xl font-bold">
                 {fmtPct(result.portfolio_expected_return, 1)}
               </p>
             </div>
             <div className="card p-5">
               <p className="uplabel">Annual Volatility</p>
-              <p className="mono text-2xl font-bold text-slate-900 mt-1">
+              <p className="metric-value mono mt-1 text-2xl font-bold">
                 {fmtPct(result.portfolio_volatility, 1)}
               </p>
             </div>
             <div className="card p-5">
               <p className="uplabel">Sharpe Ratio</p>
-              <p className="mono text-2xl font-bold text-slate-900 mt-1">
+              <p className="metric-value mono mt-1 text-2xl font-bold">
                 {fmtRatio(result.portfolio_sharpe, 2)}
               </p>
             </div>

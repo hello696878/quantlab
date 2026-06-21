@@ -39,7 +39,7 @@ function useContainerMode(ref: React.RefObject<HTMLElement>): Mode {
     if (!el || typeof ResizeObserver === "undefined") return;
     const ro = new ResizeObserver((entries) => {
       const w = entries[0].contentRect.width;
-      setMode(w >= 1040 ? "wide" : w >= 720 ? "mid" : "narrow");
+      setMode(w >= 1120 ? "wide" : w >= 720 ? "mid" : "narrow");
     });
     ro.observe(el);
     return () => ro.disconnect();
@@ -61,12 +61,10 @@ function changeColor(v: number): string {
 function MarketListItem({
   market,
   active,
-  dim,
   onSelect,
 }: {
   market: Market;
   active: boolean;
-  dim: boolean;
   onSelect: () => void;
 }) {
   const lead = market.indices[0];
@@ -80,7 +78,6 @@ function MarketListItem({
         background: active ? "var(--accent-softer)" : "var(--glass)",
         border: `1px solid ${active ? "var(--accent-line)" : "var(--line)"}`,
         boxShadow: active ? "inset 3px 0 0 var(--accent)" : undefined,
-        opacity: dim ? 0.4 : 1,
       }}
     >
       <span
@@ -128,6 +125,13 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
   const activeIds = filtering ? new Set(filtered.map((m) => m.id)) : null;
   const selected = findMarketById(selectedId);
   const rollups = regionRollup();
+
+  useEffect(() => {
+    if (!selectedId || !filtering) return;
+    if (!filterMarkets(region, query).some((market) => market.id === selectedId)) {
+      setSelectedId(null);
+    }
+  }, [filtering, query, region, selectedId]);
 
   function resetView() {
     setRegion("All");
@@ -212,7 +216,9 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
           </div>
 
           <div className="flex items-center justify-between">
-            <span className="section-title">Markets ({filtered.length})</span>
+            <span className="section-title" aria-live="polite">
+              Markets ({filtered.length})
+            </span>
             {selectedId && (
               <button
                 type="button"
@@ -226,15 +232,23 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
           </div>
 
           <div className="flex flex-col gap-1.5 overflow-y-auto pr-0.5" style={{ maxHeight: mode === "narrow" ? undefined : globeHeight - 150 }}>
-            {MARKETS.map((m) => (
+            {filtered.map((m) => (
               <MarketListItem
                 key={m.id}
                 market={m}
                 active={m.id === selectedId}
-                dim={activeIds != null && !activeIds.has(m.id)}
                 onSelect={() => setSelectedId(m.id)}
               />
             ))}
+            {filtered.length === 0 && (
+              <div
+                role="status"
+                className="rounded-lg px-3 py-5 text-center text-xs"
+                style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-mut)" }}
+              >
+                No sample markets match this search and region.
+              </div>
+            )}
           </div>
 
           <div>
@@ -244,7 +258,11 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
                 <button
                   key={q.id}
                   type="button"
-                  onClick={() => setSelectedId(q.id)}
+                  onClick={() => {
+                    setRegion("All");
+                    setQuery("");
+                    setSelectedId(q.id);
+                  }}
                   className="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors"
                   style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
                 >
@@ -275,12 +293,14 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
               className="mono rounded-md px-2 py-1 text-[10px] uppercase tracking-wide"
               style={{ background: "rgba(8,11,20,0.6)", border: "1px solid var(--line)", color: "var(--text-mut)" }}
             >
-              Synthetic data-viz
+              Static sample data
             </span>
             <div className="pointer-events-auto flex gap-1.5">
               <button
                 type="button"
                 onClick={() => setAutoRotate((v) => !v)}
+                aria-pressed={autoRotate}
+                aria-label={autoRotate ? "Pause globe rotation" : "Resume globe rotation"}
                 className="rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors"
                 style={{ background: "rgba(8,11,20,0.6)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
               >
@@ -337,7 +357,10 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
           <button
             key={r.region}
             type="button"
-            onClick={() => setRegion(r.region)}
+            onClick={() => {
+              setQuery("");
+              setRegion(r.region);
+            }}
             className="card flex items-center justify-between gap-3 p-3 text-left"
           >
             <span className="flex items-center gap-2">

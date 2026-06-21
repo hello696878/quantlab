@@ -149,7 +149,7 @@ export default function MetricsGrid({
 
             {/* Strategy value */}
             <div className="px-6 py-3 text-right min-w-[130px]">
-              <span className="tabular text-sm font-semibold text-slate-900">
+              <span className="metric-value tabular text-sm font-semibold">
                 {m.fmt(sv)}
               </span>
               <OutcomeTag better={better} />

@@ -36,9 +36,11 @@ future polish.
   GeoJSON. `prefers-reduced-motion` gates animation; a missing 2D context shows a
   graceful fallback (the market list stays usable).
 - `components/GlobeLabPanel.tsx` — **rebuilt** as a width-aware three-zone layout
-  (wide ≥1040 / mid 720–1039 / narrow <720 via a container `ResizeObserver`):
+  (wide ≥1120 / mid 720–1119 / narrow <720 via a container `ResizeObserver`):
   left rail (search · region filter · market list · quick-jump), center globe
   with overlay controls (spin/reset) + legend, right dossier, bottom region tape.
+  The market list contains only matching rows, filtered-out markers are not
+  clickable, and a selection is cleared if a new filter excludes it.
 - `components/globe/MarketDossier.tsx` — **redesigned**: sticky header with a
   region dot, **bias pill**, "Static demo data" badge, and "Last updated: Static
   sample"; sections renamed to Market Pulse / Macro Vitals / FX & Rates / Market

@@ -169,7 +169,7 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
             className="mono rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
             style={{ background: `color-mix(in oklch, ${bColor} 15%, transparent)`, border: `1px solid color-mix(in oklch, ${bColor} 35%, transparent)`, color: bColor }}
           >
-            {bias}
+            Sample bias: {bias}
           </span>
           <span
             className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
@@ -237,7 +237,7 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
             <StructureRow label="Policy rate" value={`${market.macro.policyRate}%`} />
           </div>
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-            FX values are placeholders; live / delayed FX quotes are planned.
+            FX values are placeholders; delayed FX quotes are planned.
           </p>
         </section>
 
@@ -282,7 +282,7 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
             })}
           </div>
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-            Sample headlines — live news integration planned. Sentiment pills are
+            Sample headlines — news integration planned. Sentiment pills are
             illustrative, not a model output.
           </p>
         </section>

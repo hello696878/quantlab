@@ -1049,7 +1049,7 @@ export default function HomeDashboard({
               Strategy Library
             </span>
             <span className="text-xs text-slate-400">
-              {LIVE_MODELS.length} live strategy models with hypothesis, signal
+              {LIVE_MODELS.length} implemented strategy models with hypothesis, signal
               logic, failure modes, and trust checklist.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">

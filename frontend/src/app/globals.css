@@ -323,6 +323,9 @@
     color: var(--text-mut); font-weight: 600;
   }
 
+  /* High-contrast data values independent of the inverted Tailwind slate ramp. */
+  .metric-value { color: var(--text-hi); }
+
   .mono { font-family: var(--font-mono); font-feature-settings: "tnum" 1; }
   .tabular { font-variant-numeric: tabular-nums; }
   .tnum { font-variant-numeric: tabular-nums; }

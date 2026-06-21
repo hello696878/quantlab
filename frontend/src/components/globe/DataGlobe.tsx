@@ -181,7 +181,7 @@ export default function DataGlobe({
   // Centre on the selected market (snap under reduced motion, else tween).
   useEffect(() => {
     if (!selectedId) return;
-    const m = MARKETS.find((mk) => mk.id === selectedId);
+    const m = byId.current.get(selectedId);
     if (!m) return;
     const target = { lon: m.lon, lat: clamp(m.lat, -68, 68) };
     if (reduced) {
@@ -443,12 +443,25 @@ export default function DataGlobe({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
     resize();
-    const ro = new ResizeObserver(resize);
-    ro.observe(wrap);
+    let ro: ResizeObserver | null = null;
+    if (typeof ResizeObserver !== "undefined") {
+      ro = new ResizeObserver(resize);
+      ro.observe(wrap);
+    } else {
+      window.addEventListener("resize", resize);
+    }
 
-    const id = window.setInterval(() => {
-      tickRef.current += 1;
+    let frameId = 0;
+    let lastFrame = 0;
+    const animate = (now: number) => {
+      frameId = window.requestAnimationFrame(animate);
       const p = propsRef.current;
+      const frameInterval = p.reduced && !draggingRef.current && !targetRef.current ? 250 : 33;
+      if (now - lastFrame < frameInterval) return;
+
+      const steps = lastFrame === 0 ? 1 : Math.min((now - lastFrame) / 33, 4);
+      lastFrame = now;
+      tickRef.current += steps;
       const rot = rotRef.current;
       const tgt = targetRef.current;
       if (!draggingRef.current) {
@@ -459,18 +472,24 @@ export default function DataGlobe({
             rotRef.current = { lon: normLon(tgt.lon), lat: tgt.lat };
             targetRef.current = null;
           } else {
-            rotRef.current = { lon: normLon(rot.lon + dLon * 0.16), lat: rot.lat + dLat * 0.16 };
+            const easing = 1 - Math.pow(0.84, steps);
+            rotRef.current = {
+              lon: normLon(rot.lon + dLon * easing),
+              lat: rot.lat + dLat * easing,
+            };
           }
         } else if (p.autoRotate && !p.reduced) {
-          rotRef.current = { lon: normLon(rot.lon - 0.18), lat: rot.lat };
+          rotRef.current = { lon: normLon(rot.lon - 0.18 * steps), lat: rot.lat };
         }
       }
       draw(ctx);
-    }, 33);
+    };
+    frameId = window.requestAnimationFrame(animate);
 
     return () => {
-      window.clearInterval(id);
-      ro.disconnect();
+      window.cancelAnimationFrame(frameId);
+      ro?.disconnect();
+      window.removeEventListener("resize", resize);
     };
   }, [draw]);
 
@@ -482,11 +501,13 @@ export default function DataGlobe({
     const x = clientX - rect.left;
     const y = clientY - rect.top;
     let best: { id: string; d: number } | null = null;
+    const activeIds = propsRef.current.activeIds;
     for (const s of screenRef.current) {
+      if (activeIds != null && !activeIds.has(s.id)) continue;
       const d = Math.hypot(s.sx - x, s.sy - y);
       if (d < 14 && (!best || d < best.d)) best = { id: s.id, d };
     }
-    return best ? MARKETS.find((m) => m.id === best!.id) ?? null : null;
+    return best ? byId.current.get(best.id) ?? null : null;
   }
 
   function onPointerDown(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -515,9 +536,9 @@ export default function DataGlobe({
       hoverIdRef.current = m.id;
       const rect = wrap.getBoundingClientRect();
       setHover({ m, x: e.clientX - rect.left, y: e.clientY - rect.top });
-    } else if (hover) {
+    } else {
       hoverIdRef.current = null;
-      setHover(null);
+      setHover((current) => (current ? null : current));
     }
   }
   function onPointerUp(e: React.PointerEvent<HTMLCanvasElement>) {
@@ -540,8 +561,7 @@ export default function DataGlobe({
           3D globe unavailable in this browser
         </p>
         <p className="mt-1 max-w-xs text-xs" style={{ color: "var(--text-mut)" }}>
-          Use the market list to open any country dossier — all data is static
-          illustrative sample data.
+          Use the market list below. All data is static illustrative sample data.
         </p>
       </div>
     );
@@ -558,8 +578,14 @@ export default function DataGlobe({
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
+        onPointerCancel={() => {
+          draggingRef.current = false;
+          hoverIdRef.current = null;
+          setHover(null);
+        }}
         onPointerLeave={() => {
           draggingRef.current = false;
+          hoverIdRef.current = null;
           setHover(null);
         }}
       />

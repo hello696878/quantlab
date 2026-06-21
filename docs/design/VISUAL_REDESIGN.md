@@ -131,8 +131,9 @@ stylized data-viz, not cartography):
   pulse; illustrative connections (US↔UK, US↔JP, CN↔HK, TW↔US, SG↔IN, …).
 - **Starfield** background; **drag to rotate** (yaw+pitch, pitch clamped); **auto-rotate**
   toggle; **reset view**; **hover tooltip**; **click marker → select**.
-- **Performance:** `setInterval(33ms)` ticker (advances even in hidden tabs), DPR-capped to 2,
-  ~6k land-dot samples/frame. Region filter dims non-matching markers/arcs.
+- **Performance:** `requestAnimationFrame` ticker (browser-paused in hidden tabs), roughly 30 fps
+  during motion and throttled under reduced motion, DPR-capped to 2, ~6k land-dot
+  samples/frame. Region filter dims non-matching markers/arcs and removes them from hit-testing.
 
 ## 14. Dossier panel spec
 

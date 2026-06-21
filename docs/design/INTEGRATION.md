@@ -2,8 +2,9 @@
 
 A high-fidelity, **design-only** prototype for the QuantLab quant research dashboard.
 Dark quant-terminal aesthetic crossed with a modern AI research lab. Six workspaces +
-a live Design Tokens reference, all driven by **seeded mock data** that mirrors your
-real FastAPI response shapes. **No network calls. Your repo is untouched.**
+an interactive Design Tokens reference, all driven by **seeded mock data** that mirrors
+the FastAPI response shapes. **No network calls.** This prototype remains separate from
+the production frontend; the implemented port is documented in `IMPLEMENTATION_NOTES.md`.
 
 Open `QuantLab Terminal.html`.
 
@@ -157,4 +158,5 @@ though `data-accent` theming is worth keeping as a user preference.
 
 ---
 
-*Prototype only — no real API calls, no changes to your repository.*
+*Prototype only — no real API calls. See `IMPLEMENTATION_NOTES.md` for the parts ported
+into the production frontend.*
