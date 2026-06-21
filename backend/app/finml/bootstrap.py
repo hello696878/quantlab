@@ -377,7 +377,8 @@ def run_sequential_bootstrap_demo(
         "Synthetic demo data — not live market data.",
         "Sequential bootstrap reduces sample dependence (overlap) but does NOT guarantee a better "
         "model or valid research by itself. This is methodology only — no features, no model, no "
-        "out-of-sample performance. Meta-labeling, fractional differentiation, and CPCV are planned.",
+        "out-of-sample performance. Fractional differentiation is available as a separate "
+        "preprocessing demo; meta-labeling and CPCV are planned.",
         f"Comparison uses one seeded sequential sample against the mean of {random_trials} uniform "
         "random-bootstrap samples; it is a sampling diagnostic, not a performance estimate.",
     ]

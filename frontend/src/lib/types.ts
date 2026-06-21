@@ -2738,6 +2738,7 @@ export interface FractionalDiffSummary {
   weight_count: number;
   warmup_period: number;
   usable_observations: number;
+  comparison_observations: number;
   data_loss_pct: number;
   fracdiff_correlation: number | null;
   firstdiff_correlation: number | null;
@@ -2766,6 +2767,15 @@ export interface FractionalDiffDiagnostics {
   original_lag1_autocorr: number | null;
   fracdiff_lag1_autocorr: number | null;
   firstdiff_lag1_autocorr: number | null;
+  original_rolling_mean_variability: number | null;
+  fracdiff_rolling_mean_variability: number | null;
+  firstdiff_rolling_mean_variability: number | null;
+  original_rolling_std_variability: number | null;
+  fracdiff_rolling_std_variability: number | null;
+  firstdiff_rolling_std_variability: number | null;
+  original_variance_ratio: number | null;
+  fracdiff_variance_ratio: number | null;
+  firstdiff_variance_ratio: number | null;
   diagnostic_note: string;
 }
 

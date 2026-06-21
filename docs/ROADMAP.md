@@ -1122,7 +1122,8 @@ single-asset Backtest + Strategy Comparison:
 - A **methodology toolkit, not a model**: synthetic demo data, no features, no model
   training, no live data. At the end of 19.0, purged K-fold was still planned; it
   was added in 19.1 and sequential bootstrap in 19.2. **Meta-labeling,
-  information-driven bars, fractional differentiation, and CPCV remain planned.**
+  information-driven bars and CPCV remain planned; fractional differentiation was
+  added in 19.3.**
   Not a full AFML implementation, not investment advice
 
 ### Phase 19.1 — Purged K-Fold + Embargo CV v1 ✅
@@ -1148,7 +1149,7 @@ single-asset Backtest + Strategy Comparison:
 - Command-palette commands (Purged K-Fold CV / Embargo CV) + updated dashboard card.
   **Not CPCV, not model training** — purged CV reduces overlap leakage but does not
   guarantee a good model or remove research bias. Sequential bootstrap was added
-  in 19.2; CPCV, meta-labeling, and fractional differentiation remain planned.
+  in 19.2 and fractional differentiation in 19.3; CPCV and meta-labeling remain planned.
   Not investment advice
 
 ### Phase 19.2 — Sequential Bootstrap v1 ✅
@@ -1175,8 +1176,8 @@ single-asset Backtest + Strategy Comparison:
   (sequential emerald vs random amber)
 - Command-palette commands (Sequential Bootstrap) + updated dashboard card.
   **Reduces sample dependence but does not guarantee a better model** — the benefit
-  grows with label overlap. Methodology only; meta-labeling, fractional
-  differentiation, and CPCV remain planned. Synthetic data, not investment advice
+  grows with label overlap. Methodology only; fractional differentiation was added
+  in 19.3, while meta-labeling and CPCV remain planned. Synthetic data, not advice
 
 ### Phase 19.3 — Fractional Differentiation v1 ✅
 
@@ -1191,8 +1192,8 @@ single-asset Backtest + Strategy Comparison:
   in (0,1), max_weights 2–1000 and < n_days → friendly 422; downsampled payload).
   24 deterministic tests: d=0.5 weights `[1, −0.5, −0.125, −0.0625]`, d=0 → original,
   d=1 → first difference, threshold/size truncation, warmup = weight_count−1, memory
-  corr finite with fracdiff > first-diff for d∈(0,1), d=0 corr ≈ 1, diagnostics
-  finite, validation, no NaN/inf, + API
+  correlations finite and aligned on common dates, d=0 corr ≈ 1, d=1 equals the
+  close-price first difference, heuristic diagnostics finite, validation, no NaN/inf, + API
 - New **Fractional Differentiation** tab in the AFML Methodology Lab (reuses the
   shared path params; d, weight threshold, max weights): summary cards (weight count,
   warmup, usable obs, data loss, fracdiff vs first-diff memory correlation), original-

@@ -34,8 +34,9 @@ reproducible and every limitation explicit.
   toolkit — CUSUM event sampling, triple-barrier labeling, sample concurrency +
   uniqueness weights (19.0), **purged K-fold + embargo cross-validation** with
   leakage diagnostics (19.1), **sequential bootstrap** (uniqueness-aware sampling)
-  (19.2), and **fractional differentiation** (memory-preserving stationarity
-  transform) (19.3), on synthetic data (a methodology toolkit, not a model)
+  (19.2), and **fractional differentiation** (fixed-width preprocessing with
+  memory and heuristic stability diagnostics) (19.3), on synthetic data
+  (a methodology toolkit, not a model)
 - Strategies: SMA Crossover, RSI Mean Reversion, Bollinger Band, Time-Series
   Momentum, Volatility Breakout, Pairs Trading; long/short modes
 - Strategy Comparison with shared simulation settings

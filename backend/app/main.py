@@ -4540,11 +4540,11 @@ def finml_sequential_bootstrap_demo(request: SequentialBootstrapRequest) -> Sequ
     "/finml/fractional-diff-demo",
     response_model=FractionalDiffResponse,
     tags=["finml"],
-    summary="Fractional differentiation demo (memory-preserving stationarity transform)",
+    summary="Fractional differentiation demo (memory and persistence diagnostics)",
     description=(
         "Fixed-width fractional differentiation of a synthetic price path: recursive "
         "weights, the transformed series vs the ordinary first difference, memory-"
-        "retention correlations, and heuristic stationarity-style diagnostics. "
+        "retention correlations, and heuristic persistence/stability diagnostics. "
         "Educational preprocessing — not a trading signal, not a formal stationarity "
         "test, no live data, not investment advice."
     ),

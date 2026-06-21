@@ -5171,6 +5171,7 @@ class FractionalDiffSummary(BaseModel):
     weight_count: int
     warmup_period: int
     usable_observations: int
+    comparison_observations: int
     data_loss_pct: float
     fracdiff_correlation: Optional[float] = None
     firstdiff_correlation: Optional[float] = None
@@ -5199,6 +5200,15 @@ class FractionalDiffDiagnostics(BaseModel):
     original_lag1_autocorr: Optional[float] = None
     fracdiff_lag1_autocorr: Optional[float] = None
     firstdiff_lag1_autocorr: Optional[float] = None
+    original_rolling_mean_variability: Optional[float] = None
+    fracdiff_rolling_mean_variability: Optional[float] = None
+    firstdiff_rolling_mean_variability: Optional[float] = None
+    original_rolling_std_variability: Optional[float] = None
+    fracdiff_rolling_std_variability: Optional[float] = None
+    firstdiff_rolling_std_variability: Optional[float] = None
+    original_variance_ratio: Optional[float] = None
+    fracdiff_variance_ratio: Optional[float] = None
+    firstdiff_variance_ratio: Optional[float] = None
     diagnostic_note: str
 
 

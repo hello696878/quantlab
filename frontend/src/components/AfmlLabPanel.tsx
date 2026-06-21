@@ -47,7 +47,7 @@ const UNIQ_COLOR = seriesColor(0);
 
 const CAVEAT =
   "Financial ML results depend on correct event definitions, barrier choices, volatility estimates, " +
-  "data quality, purging/embargo, uniqueness-aware sampling, and out-of-sample validation. Synthetic demo data — not live market " +
+  "data quality, preprocessing, purging/embargo, uniqueness-aware sampling, and out-of-sample validation. Synthetic demo data — not live market " +
   "data, not a trained model, not investment advice.";
 
 function num(s: string): number {
@@ -299,6 +299,13 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
   const sbValid =
     valid && Number.isInteger(sbSampleSize) && sbSampleSize >= 1 && sbSampleSize <= 2000 &&
     Number.isInteger(sbRandomTrials) && sbRandomTrials >= 1 && sbRandomTrials <= 1000;
+  const fdD = num(fracD);
+  const fdThreshold = num(weightThreshold);
+  const fdMaxWeights = num(maxWeights);
+  const fdValid =
+    valid && Number.isFinite(fdD) && fdD >= 0 && fdD <= 2 &&
+    Number.isFinite(fdThreshold) && fdThreshold > 0 && fdThreshold < 1 &&
+    Number.isInteger(fdMaxWeights) && fdMaxWeights >= 2 && fdMaxWeights <= 1000;
 
   async function run() {
     if (!valid || loading) return;
@@ -368,6 +375,16 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
   }, [result]);
 
   const selected = result?.labels.find((l) => l.event_id === selectedEvent) ?? null;
+
+  const fracDiffComparisonData = useMemo(() => {
+    if (!fdResult) return [];
+    const firstByDate = new Map(fdResult.series.first_difference.map((point) => [point.date, point.value]));
+    return fdResult.series.fractional_difference.map((point) => ({
+      t: toTs(point.date),
+      first: firstByDate.get(point.date),
+      frac: point.value,
+    }));
+  }, [fdResult]);
 
   return (
     <div className="space-y-5">
@@ -1004,20 +1021,20 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
             <p className="section-title">Fractional Differentiation</p>
             <p className="text-xs text-slate-500">
               Reuses the synthetic price path from the Setup above. Fixed-width fractional
-              differencing with order d removes non-stationarity while preserving more memory than an
-              ordinary first difference. Preprocessing only — not a trading signal.
+              differencing with order d targets lower persistence while retaining more level memory
+              than an ordinary close-price difference often does. Preprocessing only — not a trading signal.
             </p>
             <div className="flex flex-wrap items-end gap-3">
-              <Field label="d (0–2)"><input type="number" className={inputCls + " w-24"} value={fracD} step={0.1} onChange={(e) => setFracD(e.target.value)} /></Field>
-              <Field label="Weight threshold"><input type="number" className={inputCls + " w-28"} value={weightThreshold} step={0.001} onChange={(e) => setWeightThreshold(e.target.value)} /></Field>
-              <Field label="Max weights"><input type="number" className={inputCls + " w-28"} value={maxWeights} step={10} onChange={(e) => setMaxWeights(e.target.value)} /></Field>
+              <Field label="d (0–2)"><input type="number" className={inputCls + " w-24"} value={fracD} step={0.1} onChange={(e) => { setFracD(e.target.value); setFdError(null); }} /></Field>
+              <Field label="Weight threshold"><input type="number" className={inputCls + " w-28"} value={weightThreshold} step={0.001} onChange={(e) => { setWeightThreshold(e.target.value); setFdError(null); }} /></Field>
+              <Field label="Max weights"><input type="number" className={inputCls + " w-28"} value={maxWeights} step={10} onChange={(e) => { setMaxWeights(e.target.value); setFdError(null); }} /></Field>
               <button
                 type="button"
                 onClick={runFd}
-                disabled={fdLoading}
+                disabled={!fdValid || fdLoading}
                 className={
                   "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-                  (!fdLoading
+                  (fdValid && !fdLoading
                     ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
                     : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
                 }
@@ -1025,19 +1042,21 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                 {fdLoading ? "Running…" : "Run fractional differentiation"}
               </button>
             </div>
-            <p className="text-[11px] text-slate-400">d 0–2 (0 ≈ original, 1 ≈ first difference), weight threshold 0–1, max weights 2–1000 (&lt; days). Recommended d between 0 and 1.</p>
-            {fdError && <p className="text-xs text-red-600">⚠ {fdError}</p>}
+            <p className="text-[11px] text-slate-400">d 0–2 (0 = aligned level, 1 = close-price first difference), threshold strictly between 0 and 1, max weights 2–1000. Width is safely capped to the available history; d from 0 to 1 is the usual exploration range.</p>
+            {!fdValid && <p className="text-[11px] text-amber-400">Enter valid Setup values, d from 0 to 2, a threshold strictly between 0 and 1, and max weights from 2 to 1000.</p>}
+            {fdError && <p className="text-xs text-red-400">⚠ {fdError}</p>}
           </div>
 
           {fdResult && (
             <>
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
                 <MetricCard label="d" value={fmt(fdResult.summary.d, 2)} tone="accent" />
                 <MetricCard label="Weight count" value={String(fdResult.summary.weight_count)} />
                 <MetricCard label="Warmup period" value={String(fdResult.summary.warmup_period)} />
                 <MetricCard label="Usable obs" value={String(fdResult.summary.usable_observations)} />
+                <MetricCard label="Comparison obs" value={String(fdResult.summary.comparison_observations)} />
                 <MetricCard label="Data loss" value={pct(fdResult.summary.data_loss_pct, 1)} tone="warn" />
-                <MetricCard label="Fracdiff memory corr" value={fmt(fdResult.summary.fracdiff_correlation)} tone="positive" />
+                <MetricCard label="Fracdiff memory corr" value={fmt(fdResult.summary.fracdiff_correlation)} />
                 <MetricCard label="First-diff memory corr" value={fmt(fdResult.summary.firstdiff_correlation)} />
               </div>
 
@@ -1057,20 +1076,43 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
               <div className="card space-y-2 p-5">
                 <p className="section-title">First difference vs fractional difference (d = {fmt(fdResult.summary.d, 2)})</p>
                 <ResponsiveContainer width="100%" height={200}>
-                  <ComposedChart margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                  <ComposedChart data={fracDiffComparisonData} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
                     <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} scale="time" tick={{ fontSize: 10, fill: CHART_AXIS }} axisLine={{ stroke: CHART_AXIS_LINE }} tickLine={false} tickFormatter={fmtTs} minTickGap={48} allowDuplicatedCategory={false} />
                     <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={52} domain={["auto", "auto"]} />
                     <Tooltip content={<NeonTooltip formatValue={(v: number) => v.toFixed(4)} formatLabel={(l) => (typeof l === "number" ? fmtTs(l) : "")} />} />
                     <ReferenceLine y={0} stroke={CHART_REF_LINE} />
-                    <Line data={fdResult.series.first_difference.map((p) => ({ t: toTs(p.date), first: p.value }))} type="monotone" dataKey="first" name="First difference" stroke={FIRSTDIFF_COLOR} strokeWidth={1.2} dot={false} isAnimationActive={false} />
-                    <Line data={fdResult.series.fractional_difference.map((p) => ({ t: toTs(p.date), frac: p.value }))} type="monotone" dataKey="frac" name="Fractional difference" stroke={FRACDIFF_COLOR} strokeWidth={1.6} dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="first" name="Close-price first difference" stroke={FIRSTDIFF_COLOR} strokeWidth={1.2} dot={false} isAnimationActive={false} />
+                    <Line type="monotone" dataKey="frac" name="Fractional difference" stroke={FRACDIFF_COLOR} strokeWidth={1.6} dot={false} isAnimationActive={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
                 <p className="text-[11px] text-slate-400">
-                  <span style={{ color: FIRSTDIFF_COLOR }}>— First difference</span>{"  "}
-                  <span style={{ color: FRACDIFF_COLOR }}>— Fractional difference</span>. Fracdiff keeps more of the level's memory (higher correlation with the price).
+                  <span style={{ color: FIRSTDIFF_COLOR }}>— Close-price first difference</span>{"  "}
+                  <span style={{ color: FRACDIFF_COLOR }}>— Fractional difference</span>. Both lines use identical dates; higher level correlation indicates more retained memory, not better predictions.
                 </p>
+              </div>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">Memory-retention comparison</p>
+                <ResponsiveContainer width="100%" height={160}>
+                  <ComposedChart
+                    data={[
+                      { name: "Fractional", value: fdResult.summary.fracdiff_correlation, color: FRACDIFF_COLOR },
+                      { name: "First diff", value: fdResult.summary.firstdiff_correlation, color: FIRSTDIFF_COLOR },
+                    ]}
+                    margin={{ top: 4, right: 16, bottom: 4, left: 8 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                    <XAxis dataKey="name" tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={{ stroke: CHART_AXIS_LINE }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={48} domain={[-1, 1]} />
+                    <Tooltip content={<NeonTooltip formatValue={(v: number) => v.toFixed(4)} />} />
+                    <ReferenceLine y={0} stroke={CHART_REF_LINE} />
+                    <Bar dataKey="value" name="Correlation with aligned price" isAnimationActive={false}>
+                      <Cell fill={FRACDIFF_COLOR} />
+                      <Cell fill={FIRSTDIFF_COLOR} />
+                    </Bar>
+                  </ComposedChart>
+                </ResponsiveContainer>
               </div>
 
               <div className="card space-y-2 p-5">
@@ -1085,32 +1127,50 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                     <Bar dataKey="weight" name="Weight" fill={FRACDIFF_COLOR} isAnimationActive={false} />
                   </ComposedChart>
                 </ResponsiveContainer>
+                <div className="max-h-48 overflow-auto">
+                  <table className="w-full max-w-sm text-xs">
+                    <thead><tr className="text-slate-400"><th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Lag k</th><th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Weight</th></tr></thead>
+                    <tbody>{fdResult.weights.map((weight) => <tr key={weight.k} className="border-t border-[var(--line)]"><td className="px-2 py-1 text-right mono">{weight.k}</td><td className="px-2 py-1 text-right mono">{fmt(weight.weight, 6)}</td></tr>)}</tbody>
+                  </table>
+                </div>
               </div>
 
               <div className="card space-y-2 p-5">
                 <p className="section-title">Stationarity-style diagnostics (heuristic)</p>
                 <div className="overflow-x-auto">
-                  <table className="w-full max-w-xl text-xs">
+                  <table className="w-full min-w-[900px] text-xs">
                     <thead><tr className="text-slate-400">
                       <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Series</th>
-                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Trend slope</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">|Trend slope|</th>
                       <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Lag-1 autocorr</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Roll mean var.</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Roll std var.</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Variance ratio</th>
                     </tr></thead>
                     <tbody>
                       <tr className="border-t border-[var(--line)]">
                         <td className="px-2 py-1 text-left" style={{ color: ORIG_COLOR }}>Original</td>
                         <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.original_trend_slope, 5)}</td>
                         <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.original_lag1_autocorr)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.original_rolling_mean_variability)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.original_rolling_std_variability)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.original_variance_ratio)}</td>
                       </tr>
                       <tr className="border-t border-[var(--line)]">
                         <td className="px-2 py-1 text-left" style={{ color: FRACDIFF_COLOR }}>Fractional difference</td>
                         <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.fracdiff_trend_slope, 5)}</td>
                         <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.fracdiff_lag1_autocorr)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.fracdiff_rolling_mean_variability)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.fracdiff_rolling_std_variability)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.fracdiff_variance_ratio)}</td>
                       </tr>
                       <tr className="border-t border-[var(--line)]">
                         <td className="px-2 py-1 text-left" style={{ color: FIRSTDIFF_COLOR }}>First difference</td>
                         <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.firstdiff_trend_slope, 5)}</td>
                         <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.firstdiff_lag1_autocorr)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.firstdiff_rolling_mean_variability)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.firstdiff_rolling_std_variability)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.firstdiff_variance_ratio)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -1145,13 +1205,13 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
             <li><span className="font-semibold text-slate-200">Purged K-fold (built):</span> the Purged CV tab keeps the K-fold time order but <em>purges</em> training labels whose intervals overlap the test fold, so train and test no longer share outcomes — the per-fold "overlap after purge" should be 0.</li>
             <li><span className="font-semibold text-slate-200">Embargo (built):</span> beyond purging, an embargo removes training labels that start just after the test fold, where serial correlation still leaks. It is applied after purging.</li>
             <li><span className="font-semibold text-slate-200">Sequential bootstrap (built):</span> a uniform bootstrap repeatedly samples overlapping (dependent) labels; the Sequential Bootstrap tab draws events with probability proportional to the marginal uniqueness they add, yielding a less-overlapping sample. It reduces dependence but does not guarantee better model performance — the benefit grows with how much the labels overlap.</li>
-            <li><span className="font-semibold text-slate-200">Fractional differentiation (built):</span> ordinary first differencing makes a price series stationary but erases almost all memory; fractional differencing with 0 &lt; d &lt; 1 removes enough non-stationarity to be usable while keeping more memory (a higher correlation with the level). The fixed-width version truncates tiny weights so the window doesn't grow without bound. It is preprocessing, not a signal, and the diagnostics here are heuristic — not a formal stationarity (ADF) test.</li>
+            <li><span className="font-semibold text-slate-200">Fractional differentiation (built):</span> ordinary first differencing can reduce persistence but also erase level memory; fractional differencing with 0 &lt; d &lt; 1 targets a trade-off between the two. Fixed width truncates tiny weights so the window does not grow without bound. It is preprocessing, not a signal, and these diagnostics are heuristic — not a formal stationarity test.</li>
             <li><span className="font-semibold text-slate-200">Event sampling (CUSUM):</span> sampling on a fixed clock oversamples quiet periods. CUSUM samples only when cumulative movement is large, focusing labels on informative moments. Fixed mode uses a percentage-return threshold; vol-scaled mode uses a rolling-volatility multiplier.</li>
             <li><span className="font-semibold text-slate-200">Triple-barrier labeling:</span> a label is set by which barrier (profit-take / stop-loss / vertical-time) is hit first — a path-dependent, risk-aware label, unlike a fixed-horizon return sign.</li>
             <li><span className="font-semibold text-slate-200">Timing:</span> events are sampled using information available up to the event date. Future prices are used only to assign supervised-learning labels, not as trade signals or recommendations.</li>
             <li><span className="font-semibold text-slate-200">Overlapping labels → dependence:</span> labels whose holding windows overlap share outcomes and are not independent. Concurrency counts the overlap at each bar.</li>
             <li><span className="font-semibold text-slate-200">Sample uniqueness:</span> each label's uniqueness is the average of 1/concurrency over its life; using these as sample weights stops crowded periods from dominating training.</li>
-            <li><span className="font-semibold text-slate-200">Not a model:</span> this is labeling, validation splitting, and overlap-aware sampling only — no features, no fitted model, synthetic data. Purged K-fold, embargo, and sequential bootstrap reduce specific dependence/leakage channels but do not guarantee a good model. Meta-labeling, information-driven bars, fractional differentiation, and Combinatorial Purged CV (CPCV) are planned. Not investment advice.</li>
+            <li><span className="font-semibold text-slate-200">Not a model:</span> this is labeling, validation splitting, overlap-aware sampling, and preprocessing only — no fitted model, synthetic data. Purged K-fold, embargo, sequential bootstrap, and fractional differentiation address specific methodology problems but do not guarantee a useful model. Meta-labeling, information-driven bars, and CPCV are planned. Not investment advice.</li>
           </ul>
           <p className="text-[11px] text-slate-400">{CAVEAT}</p>
         </div>
