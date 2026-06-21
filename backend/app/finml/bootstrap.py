@@ -16,6 +16,7 @@ research.  Not investment advice.
 from __future__ import annotations
 
 import math
+from numbers import Integral
 from typing import List, Optional, Tuple
 
 import numpy as np
@@ -29,6 +30,8 @@ _MIN_TRIALS = 1
 _MAX_TRIALS = 1000
 _EVENT_CAP = 2000
 _MAX_SAMPLE = 2000
+_MAX_SEQUENTIAL_WORK = 50_000_000
+_MAX_RANDOM_WORK = 50_000_000
 
 
 def _clean(value: float, digits: int = 6) -> float:
@@ -42,38 +45,87 @@ def _clean(value: float, digits: int = 6) -> float:
 
 
 def build_indicator_matrix(intervals: List[dict], n_bars: int) -> np.ndarray:
-    """``(n_bars × n_events)`` 0/1 matrix; column i is 1 where event i is active."""
+    """Return a bar-by-event 0/1 matrix using inclusive intervals.
+
+    Columns preserve the input interval order, so column ``j`` corresponds to
+    ``intervals[j]["event_id"]``. Invalid, reversed, duplicate, or out-of-range
+    intervals are rejected rather than silently clipped.
+    """
+    if not isinstance(n_bars, Integral) or isinstance(n_bars, bool) or int(n_bars) < 1:
+        raise FinmlInputError("n_bars must be a positive integer.")
+    n_bars = int(n_bars)
     n_events = len(intervals)
-    ind = np.zeros((n_bars, n_events), dtype=np.int16)
+    ind = np.zeros((n_bars, n_events), dtype=np.uint8)
+    seen_event_ids = set()
     for j, iv in enumerate(intervals):
-        s = max(0, int(iv["start"]))
-        e = min(n_bars - 1, int(iv["end"]))
-        if e >= s:
-            ind[s : e + 1, j] = 1
+        try:
+            event_id, start, end = iv["event_id"], iv["start"], iv["end"]
+        except (KeyError, TypeError) as exc:
+            raise FinmlInputError(f"Indicator interval {j} is missing event_id, start, or end.") from exc
+        if any(isinstance(value, bool) or not isinstance(value, Integral) for value in (event_id, start, end)):
+            raise FinmlInputError(f"Indicator interval {j} must contain integer fields.")
+        event_id, start, end = int(event_id), int(start), int(end)
+        if event_id < 0 or event_id in seen_event_ids:
+            raise FinmlInputError("Indicator event_id values must be unique non-negative integers.")
+        if start < 0 or end < start or end >= n_bars:
+            raise FinmlInputError("Indicator intervals must satisfy 0 <= start <= end < n_bars.")
+        seen_event_ids.add(event_id)
+        ind[start : end + 1, j] = 1
     return ind
+
+
+def _validate_indicator(indicator: np.ndarray, require_events: bool = True) -> None:
+    if not isinstance(indicator, np.ndarray) or indicator.ndim != 2 or indicator.shape[0] < 1:
+        raise FinmlInputError("indicator must be a two-dimensional matrix with at least one row.")
+    if require_events and indicator.shape[1] < 1:
+        raise FinmlInputError("indicator must contain at least one event column.")
+    if not np.all(np.isfinite(indicator)) or not np.all((indicator == 0) | (indicator == 1)):
+        raise FinmlInputError("indicator must contain only finite 0/1 values.")
+    if require_events and np.any(indicator.sum(axis=0) <= 0):
+        raise FinmlInputError("Every indicator column must contain at least one active observation.")
+
+
+def _validate_positions(indicator: np.ndarray, positions: List[int]) -> List[int]:
+    clean: List[int] = []
+    for position in positions:
+        if isinstance(position, bool) or not isinstance(position, Integral):
+            raise FinmlInputError("Selected event positions must be integers.")
+        value = int(position)
+        if value < 0 or value >= indicator.shape[1]:
+            raise FinmlInputError("Selected event position is outside the indicator matrix.")
+        clean.append(value)
+    return clean
 
 
 def _active_rows(indicator: np.ndarray) -> List[np.ndarray]:
     return [np.where(indicator[:, j] > 0)[0] for j in range(indicator.shape[1])]
 
 
-def sample_average_uniqueness(indicator: np.ndarray, positions: List[int]) -> float:
-    """Average uniqueness of a (multiset) sample of event columns.
+def event_uniqueness(indicator: np.ndarray, positions: List[int]) -> List[float]:
+    """Return one uniqueness value per selected event occurrence.
 
     Concurrency at each bar = number of selected events active there; each
-    selected event's uniqueness is the mean of ``1/concurrency`` over its active
-    bars; the sample value is the mean across the selected events.
+    selected occurrence's uniqueness is the mean of ``1/concurrency`` over its
+    active bars. Duplicate positions are retained for with-replacement samples.
     """
+    _validate_indicator(indicator, require_events=bool(positions))
     if not positions:
-        return 1.0
-    c = indicator[:, positions].sum(axis=1).astype(float)
-    uniq: List[float] = []
-    for col in positions:
-        active = indicator[:, col] > 0
-        cc = c[active]
-        cc = cc[cc > 0]
-        uniq.append(float(np.mean(1.0 / cc)) if cc.size else 1.0)
-    return float(np.mean(uniq)) if uniq else 1.0
+        return []
+    positions = _validate_positions(indicator, positions)
+    selected = indicator[:, positions].astype(float)
+    concurrency = selected.sum(axis=1)
+    inverse = np.zeros_like(concurrency)
+    active_rows = concurrency > 0
+    inverse[active_rows] = 1.0 / concurrency[active_rows]
+    active_counts = selected.sum(axis=0)
+    values = (selected.T @ inverse) / active_counts
+    return [float(value) for value in values]
+
+
+def sample_average_uniqueness(indicator: np.ndarray, positions: List[int]) -> float:
+    """Average event uniqueness for a selected (possibly repeated) sample."""
+    values = event_uniqueness(indicator, positions)
+    return float(np.mean(values)) if values else 1.0
 
 
 def _avg_uniqueness_running(selected: List[int], active_rows: List[np.ndarray], c: np.ndarray) -> float:
@@ -87,6 +139,50 @@ def _avg_uniqueness_running(selected: List[int], active_rows: List[np.ndarray], 
         cc = cc[cc > 0]
         uniq.append(float(np.mean(1.0 / cc)) if cc.size else 1.0)
     return float(np.mean(uniq))
+
+
+def _candidate_probabilities_from_concurrency(
+    active_rows: List[np.ndarray], concurrency: np.ndarray, candidates: List[int]
+) -> Tuple[np.ndarray, np.ndarray]:
+    scores = np.empty(len(candidates), dtype=float)
+    for index, candidate in enumerate(candidates):
+        rows = active_rows[candidate]
+        scores[index] = float(np.mean(1.0 / (concurrency[rows] + 1.0)))
+    scores = np.where(np.isfinite(scores) & (scores >= 0.0), scores, 0.0)
+    total = float(scores.sum())
+    probabilities = (
+        scores / total
+        if math.isfinite(total) and total > 0.0
+        else np.full(len(candidates), 1.0 / len(candidates), dtype=float)
+    )
+    return scores, probabilities
+
+
+def candidate_probabilities(
+    indicator: np.ndarray, selected: List[int], candidates: Optional[List[int]] = None
+) -> Tuple[List[float], List[float]]:
+    """Return canonical candidate uniqueness scores and normalized probabilities.
+
+    A uniform probability fallback is used if all candidate scores become
+    degenerate; valid non-empty indicator columns normally make every score
+    strictly positive.
+    """
+    _validate_indicator(indicator)
+    selected = _validate_positions(indicator, selected)
+    candidate_positions = (
+        list(range(indicator.shape[1])) if candidates is None else _validate_positions(indicator, candidates)
+    )
+    if not candidate_positions:
+        raise FinmlInputError("At least one candidate event is required.")
+    concurrency = (
+        indicator[:, selected].sum(axis=1).astype(float)
+        if selected
+        else np.zeros(indicator.shape[0], dtype=float)
+    )
+    scores, probabilities = _candidate_probabilities_from_concurrency(
+        _active_rows(indicator), concurrency, candidate_positions
+    )
+    return scores.tolist(), probabilities.tolist()
 
 
 # ---------------------------------------------------------------------------
@@ -103,6 +199,14 @@ def random_bootstrap(
     with_replacement: bool,
 ) -> dict:
     """Uniform-sampling baseline: average uniqueness over ``n_trials`` random samples."""
+    _validate_indicator(indicator)
+    if n_events != indicator.shape[1]:
+        raise FinmlInputError("n_events must match the indicator matrix column count.")
+    validate_bootstrap_inputs(sample_size, n_trials)
+    if not isinstance(with_replacement, bool):
+        raise FinmlInputError("with_replacement must be boolean.")
+    if not with_replacement and sample_size > n_events:
+        raise FinmlInputError("sample_size cannot exceed n_events without replacement.")
     vals = np.empty(n_trials)
     for t in range(n_trials):
         if with_replacement:
@@ -133,6 +237,16 @@ def sequential_bootstrap(
 
     Returns ``(selected_positions, selection_probabilities, uniqueness_path)``.
     """
+    _validate_indicator(indicator)
+    if n_events != indicator.shape[1]:
+        raise FinmlInputError("n_events must match the indicator matrix column count.")
+    if not isinstance(sample_size, int) or isinstance(sample_size, bool) or sample_size < 1 or sample_size > _MAX_SAMPLE:
+        raise FinmlInputError(f"sample_size must be an integer between 1 and {_MAX_SAMPLE}.")
+    if not isinstance(with_replacement, bool):
+        raise FinmlInputError("with_replacement must be boolean.")
+    if not with_replacement and sample_size > n_events:
+        raise FinmlInputError("sample_size cannot exceed n_events without replacement.")
+
     active_rows = _active_rows(indicator)
     c = np.zeros(indicator.shape[0])
     selected: List[int] = []
@@ -144,12 +258,7 @@ def sequential_bootstrap(
         candidates = list(range(n_events)) if with_replacement else available
         if not candidates:
             break
-        avg_u = np.empty(len(candidates))
-        for idx, j in enumerate(candidates):
-            rows = active_rows[j]
-            avg_u[idx] = float(np.mean(1.0 / (c[rows] + 1.0))) if rows.size else 1.0
-        total = float(avg_u.sum())
-        delta = avg_u / total if total > 0 else np.full(len(candidates), 1.0 / len(candidates))
+        _scores, delta = _candidate_probabilities_from_concurrency(active_rows, c, candidates)
         choice = int(rng.choice(len(candidates), p=delta))
         j = candidates[choice]
         selected.append(j)
@@ -206,7 +315,8 @@ def run_sequential_bootstrap_demo(
         path["close"], [e["index"] for e in raw_events], path["rolling_vol"],
         profit_take_multiple, stop_loss_multiple, vertical_barrier_days,
     )
-    if len(labels) > _EVENT_CAP:
+    generated_event_count = len(labels)
+    if generated_event_count > _EVENT_CAP:
         labels = labels[:_EVENT_CAP]
     n_events = len(labels)
 
@@ -220,6 +330,14 @@ def run_sequential_bootstrap_demo(
             "Lower sample_size, enable replacement, or generate more events."
         )
 
+    sequential_work = n_days * n_events * sample_size
+    random_work = n_days * sample_size * random_trials
+    if sequential_work > _MAX_SEQUENTIAL_WORK or random_work > _MAX_RANDOM_WORK:
+        raise FinmlInputError(
+            "Requested bootstrap workload is too large for the interactive demo. Reduce n_days, "
+            "sample_size, random_trials, or the number of CUSUM events."
+        )
+
     intervals = [{"event_id": l["event_id"], "start": l["start_index"], "end": l["end_index"]} for l in labels]
     indicator = build_indicator_matrix(intervals, len(dates))
 
@@ -228,27 +346,20 @@ def run_sequential_bootstrap_demo(
 
     # First sequential draw is the representative sample shown in the table/path.
     selected, probs, uniq_path = sequential_bootstrap(indicator, n_events, sample_size, rng_seq, with_replacement)
-    seq_sample_uniq = [sample_average_uniqueness(indicator, selected)]
-    # For a stable (textbook) comparison, average uniqueness over several sequential
-    # draws — but only when cheap (the inner loop is O(sample_size · n_events)).
-    extra_trials = 0
-    if n_events * sample_size <= 20_000:
-        extra_trials = min(random_trials, 30) - 1
-    for _ in range(max(0, extra_trials)):
-        sel, _p, _path = sequential_bootstrap(indicator, n_events, sample_size, rng_seq, with_replacement)
-        seq_sample_uniq.append(sample_average_uniqueness(indicator, sel))
-    seq_avg = float(np.mean(seq_sample_uniq))
+    seq_avg = sample_average_uniqueness(indicator, selected)
 
     rand = random_bootstrap(indicator, n_events, sample_size, random_trials, rng_rand, with_replacement)
     improvement = seq_avg - rand["mean"]
 
     selected_events = [
         {
-            "draw_order": k,
+            "draw_order": k + 1,
             "event_id": labels[pos]["event_id"],
             "label": labels[pos]["label"],
             "start_date": dates[labels[pos]["start_index"]],
             "end_date": dates[labels[pos]["end_index"]],
+            "start_index": labels[pos]["start_index"],
+            "end_index": labels[pos]["end_index"],
             "realized_return": _clean(labels[pos]["realized_return"]),
             "average_uniqueness_after_draw": _clean(uniq_path[k]),
             "selection_probability": _clean(probs[k]),
@@ -257,9 +368,9 @@ def run_sequential_bootstrap_demo(
     ]
 
     note = (
-        "Sequential bootstrap selected a less-overlapping event sample in this synthetic demo."
+        "This seeded sequential draw had higher uniqueness than the random-bootstrap mean."
         if improvement > 0
-        else "Sequential and random bootstrap produced similar uniqueness on this synthetic sample."
+        else "This seeded sequential draw did not exceed the random-bootstrap mean; results vary by seed and overlap."
     )
 
     warnings = [
@@ -267,9 +378,21 @@ def run_sequential_bootstrap_demo(
         "Sequential bootstrap reduces sample dependence (overlap) but does NOT guarantee a better "
         "model or valid research by itself. This is methodology only — no features, no model, no "
         "out-of-sample performance. Meta-labeling, fractional differentiation, and CPCV are planned.",
+        f"Comparison uses one seeded sequential sample against the mean of {random_trials} uniform "
+        "random-bootstrap samples; it is a sampling diagnostic, not a performance estimate.",
     ]
+    if generated_event_count > _EVENT_CAP:
+        warnings.append(
+            f"The bootstrap demo is capped at the first {_EVENT_CAP} time-ordered labels; "
+            f"{generated_event_count - _EVENT_CAP} later label(s) were omitted."
+        )
     if with_replacement:
         warnings.append("Sampling with replacement: an event may be drawn more than once.")
+    if threshold_mode == "vol_scaled":
+        warnings.append(
+            "Vol-scaled CUSUM mode interprets cusum_threshold as a multiplier of rolling volatility, "
+            "not as a fixed percentage return."
+        )
 
     return {
         "summary": {
@@ -292,7 +415,7 @@ def run_sequential_bootstrap_demo(
             "n_trials": rand["n_trials"],
         },
         "uniqueness_path": [
-            {"draw": k, "sequential_uniqueness": _clean(u)} for k, u in enumerate(uniq_path)
+            {"draw": k + 1, "sequential_uniqueness": _clean(u)} for k, u in enumerate(uniq_path)
         ],
         "warnings": warnings,
     }

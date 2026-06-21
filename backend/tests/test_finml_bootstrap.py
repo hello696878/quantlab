@@ -12,9 +12,11 @@ import math
 import numpy as np
 import pytest
 
-from app.finml import FinmlInputError, run_sequential_bootstrap_demo
+from app.finml import FinmlInputError, run_labeling_demo, run_sequential_bootstrap_demo
 from app.finml.bootstrap import (
     build_indicator_matrix,
+    candidate_probabilities,
+    event_uniqueness,
     random_bootstrap,
     sample_average_uniqueness,
     sequential_bootstrap,
@@ -59,6 +61,36 @@ def test_indicator_matrix_overlap():
     assert int((ind[:, 0] + ind[:, 1]).max()) == 2  # both active in [3,5]
 
 
+def test_indicator_matrix_inclusive_boundary_overlap():
+    intervals = [{"event_id": 10, "start": 1, "end": 3}, {"event_id": 20, "start": 3, "end": 5}]
+    ind = build_indicator_matrix(intervals, 7)
+    assert ind[3].tolist() == [1, 1]
+    assert int((ind[:, 0] + ind[:, 1]).sum()) == 6
+
+
+def test_indicator_columns_preserve_event_order():
+    intervals = [{"event_id": 42, "start": 4, "end": 4}, {"event_id": 7, "start": 1, "end": 2}]
+    ind = build_indicator_matrix(intervals, 6)
+    assert np.where(ind[:, 0] == 1)[0].tolist() == [4]
+    assert np.where(ind[:, 1] == 1)[0].tolist() == [1, 2]
+
+
+@pytest.mark.parametrize(
+    "intervals,n_bars",
+    [
+        ([{"event_id": 0, "start": 3, "end": 2}], 5),
+        ([{"event_id": 0, "start": -1, "end": 2}], 5),
+        ([{"event_id": 0, "start": 1, "end": 5}], 5),
+        ([{"event_id": 0, "start": 1}], 5),
+        ([{"event_id": 0, "start": 1, "end": 2}, {"event_id": 0, "start": 3, "end": 4}], 5),
+        ([], 0),
+    ],
+)
+def test_indicator_matrix_rejects_invalid_intervals(intervals, n_bars):
+    with pytest.raises(FinmlInputError):
+        build_indicator_matrix(intervals, n_bars)
+
+
 # ---------------------------------------------------------------------------
 # Average uniqueness (4, 5)
 # ---------------------------------------------------------------------------
@@ -74,6 +106,20 @@ def test_average_uniqueness_below_one_for_overlap():
     assert sample_average_uniqueness(ind, [0, 1]) < 1.0
 
 
+def test_event_uniqueness_aligns_with_selected_positions_and_mean():
+    ind = build_indicator_matrix([{"event_id": 0, "start": 0, "end": 2}, {"event_id": 1, "start": 2, "end": 4}], 5)
+    values = event_uniqueness(ind, [1, 0])
+    assert values == pytest.approx([5 / 6, 5 / 6])
+    assert sample_average_uniqueness(ind, [1, 0]) == pytest.approx(np.mean(values))
+
+
+def test_empty_selection_and_repeated_event_uniqueness():
+    ind = build_indicator_matrix([{"event_id": 0, "start": 0, "end": 2}], 4)
+    assert event_uniqueness(ind, []) == []
+    assert sample_average_uniqueness(ind, []) == 1.0
+    assert sample_average_uniqueness(ind, [0, 0]) == pytest.approx(0.5)
+
+
 # ---------------------------------------------------------------------------
 # Random + sequential bootstrap (6, 7, 8, 9, 10)
 # ---------------------------------------------------------------------------
@@ -84,6 +130,24 @@ def test_random_bootstrap_deterministic():
     a = random_bootstrap(ind, 10, 5, 50, np.random.default_rng(1), with_replacement=True)
     b = random_bootstrap(ind, 10, 5, 50, np.random.default_rng(1), with_replacement=True)
     assert a["mean"] == b["mean"] and a["p25"] == b["p25"]
+    assert a["min"] <= a["p25"] <= a["median"] <= a["p75"] <= a["max"]
+
+
+def test_random_bootstrap_without_replacement_draws_unique_positions():
+    class RecordingRng:
+        def __init__(self):
+            self.rng = np.random.default_rng(4)
+            self.draws = []
+
+        def choice(self, *args, **kwargs):
+            draw = self.rng.choice(*args, **kwargs)
+            self.draws.append(draw.tolist())
+            return draw
+
+    ind = build_indicator_matrix([{"event_id": i, "start": i, "end": i + 1} for i in range(8)], 10)
+    rng = RecordingRng()
+    random_bootstrap(ind, 8, 5, 10, rng, with_replacement=False)
+    assert all(len(draw) == len(set(draw)) == 5 for draw in rng.draws)
 
 
 def test_sequential_bootstrap_deterministic():
@@ -109,6 +173,28 @@ def test_sequential_bootstrap_without_replacement_no_duplicates():
     ind = build_indicator_matrix([{"event_id": i, "start": i, "end": i + 3} for i in range(12)], 20)
     sel, _p, _path = sequential_bootstrap(ind, 12, 12, np.random.default_rng(9), with_replacement=False)
     assert len(sel) == len(set(sel))
+
+
+def test_candidate_probabilities_are_normalized_and_prefer_less_overlap():
+    ind = build_indicator_matrix(
+        [
+            {"event_id": 0, "start": 0, "end": 4},
+            {"event_id": 1, "start": 2, "end": 6},
+            {"event_id": 2, "start": 8, "end": 9},
+        ],
+        10,
+    )
+    scores, probabilities = candidate_probabilities(ind, selected=[0], candidates=[1, 2])
+    assert all(math.isfinite(value) and value >= 0 for value in scores + probabilities)
+    assert sum(probabilities) == pytest.approx(1.0)
+    assert scores[1] > scores[0]
+    assert probabilities[1] > probabilities[0]
+
+
+def test_sequential_helper_rejects_oversized_sample_without_replacement():
+    ind = build_indicator_matrix([{"event_id": i, "start": i, "end": i} for i in range(3)], 3)
+    with pytest.raises(FinmlInputError, match="cannot exceed"):
+        sequential_bootstrap(ind, 3, 4, np.random.default_rng(1), with_replacement=False)
 
 
 # ---------------------------------------------------------------------------
@@ -154,6 +240,12 @@ def test_demo_deterministic_and_finite():
     _assert_all_finite(a)
     assert len(a["selected_events"]) == a["summary"]["sample_size"]
     assert len(a["uniqueness_path"]) == a["summary"]["sample_size"]
+    assert a["selected_events"][0]["draw_order"] == 1
+    assert a["uniqueness_path"][0]["draw"] == 1
+    assert a["summary"]["sequential_average_uniqueness"] == pytest.approx(
+        a["uniqueness_path"][-1]["sequential_uniqueness"], abs=1e-6
+    )
+    assert all(event["start_index"] <= event["end_index"] for event in a["selected_events"])
 
 
 def test_with_replacement_runs():
@@ -162,11 +254,31 @@ def test_with_replacement_runs():
     assert res["summary"]["with_replacement"] is True
 
 
-def test_higher_overlap_increases_improvement():
-    low = run_sequential_bootstrap_demo()
+def test_higher_overlap_scenario_remains_finite_without_performance_guarantee():
     high = run_sequential_bootstrap_demo(cusum_threshold=0.01, vertical_barrier_days=25, sample_size=30)
-    # Sequential should help at least as much when labels overlap more.
-    assert high["summary"]["improvement_vs_random"] >= -1e-6
+    assert math.isfinite(high["summary"]["improvement_vs_random"])
+    assert "seeded sequential" in high["summary"]["overlap_reduction_note"]
+
+
+def test_different_seed_produces_valid_sample():
+    first = run_sequential_bootstrap_demo(seed=42)
+    second = run_sequential_bootstrap_demo(seed=43)
+    _assert_all_finite(second)
+    assert first["selected_events"] != second["selected_events"]
+
+
+def test_unsafe_combined_workload_rejected():
+    with pytest.raises(FinmlInputError, match="workload"):
+        run_sequential_bootstrap_demo(sample_size=2000, random_trials=1000, with_replacement=True)
+
+
+def test_vol_scaled_bootstrap_reuses_labeling_semantics():
+    labeling = run_labeling_demo(threshold_mode="vol_scaled", cusum_threshold=2.0)
+    bootstrap = run_sequential_bootstrap_demo(
+        threshold_mode="vol_scaled", cusum_threshold=2.0, sample_size=10, random_trials=20
+    )
+    assert bootstrap["summary"]["n_events"] == labeling["summary"]["n_events"]
+    assert any("multiplier" in warning for warning in bootstrap["warnings"])
 
 
 # ---------------------------------------------------------------------------
@@ -189,6 +301,10 @@ def test_api_sequential_bootstrap(client):
     assert body["summary"]["sample_size"] == 25
     assert len(body["selected_events"]) == 25
     assert body["random_baseline"]["n_trials"] == 200
+    assert body["summary"]["sequential_average_uniqueness"] == pytest.approx(
+        body["uniqueness_path"][-1]["sequential_uniqueness"], abs=1e-6
+    )
+    assert "indicator" not in body
     ids = [e["event_id"] for e in body["selected_events"]]
     assert len(ids) == len(set(ids))  # without replacement
 

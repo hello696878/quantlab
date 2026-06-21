@@ -217,8 +217,8 @@ Return to the Command Center's **Platform Direction** panel (or open
   size 25, random trials 200 → **Run sequential bootstrap** → summary cards
   (sequential vs random average uniqueness, improvement), the uniqueness-after-each-draw
   path against the random-mean reference line, the comparison bar, the random-baseline
-  distribution, and the selected-events table; bump the CUSUM threshold down and the
-  vertical barrier up to increase overlap and watch the improvement grow. Emphasise:
+  distribution, selected-interval timeline, and selected-events table; bump the CUSUM
+  threshold down and the vertical barrier up to explore how overlap changes the comparison. Emphasise:
   synthetic demo data, a labeling + validation + sampling pipeline (not a trained
   model), event formation uses no future info, purged CV reduces overlap leakage but
   doesn't bless a model, sequential bootstrap reduces sample dependence (not model

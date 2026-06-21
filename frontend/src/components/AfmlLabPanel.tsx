@@ -42,7 +42,7 @@ const UNIQ_COLOR = seriesColor(0);
 
 const CAVEAT =
   "Financial ML results depend on correct event definitions, barrier choices, volatility estimates, " +
-  "data quality, purging/embargo, and out-of-sample validation. Synthetic demo data — not live market " +
+  "data quality, purging/embargo, uniqueness-aware sampling, and out-of-sample validation. Synthetic demo data — not live market " +
   "data, not a trained model, not investment advice.";
 
 function num(s: string): number {
@@ -124,6 +124,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
     setInp((s) => ({ ...s, [key]: value }));
     setError(null);
     setCvError(null);
+    setSbError(null);
   }
 
   async function runCv() {
@@ -175,7 +176,18 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
     if (sbLoading) return;
     const ss = num(sampleSize);
     const rt = num(randomTrials);
-    if (!valid || !Number.isInteger(ss) || ss < 1 || !Number.isInteger(rt) || rt < 1 || rt > 1000) return;
+    if (!valid) {
+      setSbError("Fix the shared Setup values before running sequential bootstrap.");
+      return;
+    }
+    if (!Number.isInteger(ss) || ss < 1 || ss > 2000) {
+      setSbError("Sample size must be a whole number between 1 and 2000.");
+      return;
+    }
+    if (!Number.isInteger(rt) || rt < 1 || rt > 1000) {
+      setSbError("Random trials must be a whole number between 1 and 1000.");
+      return;
+    }
     setSbLoading(true);
     setSbError(null);
     setSbResult(null);
@@ -186,7 +198,8 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
         drift: num(inp.driftPct) / 100,
         volatility: num(inp.volPct) / 100,
         seed: inp.seed.trim() === "" ? null : num(inp.seed),
-        cusum_threshold: num(inp.thresholdPct) / 100,
+        cusum_threshold:
+          inp.thresholdMode === "fixed" ? num(inp.thresholdPct) / 100 : num(inp.thresholdPct),
         threshold_mode: inp.thresholdMode,
         volatility_window: num(inp.volWindow),
         profit_take_multiple: num(inp.profitTake),
@@ -224,6 +237,11 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
   const cvValid =
     valid && Number.isInteger(cvNSplits) && cvNSplits >= 2 && cvNSplits <= 20 &&
     Number.isFinite(cvEmbargo) && cvEmbargo >= 0 && cvEmbargo <= 0.2;
+  const sbSampleSize = num(sampleSize);
+  const sbRandomTrials = num(randomTrials);
+  const sbValid =
+    valid && Number.isInteger(sbSampleSize) && sbSampleSize >= 1 && sbSampleSize <= 2000 &&
+    Number.isInteger(sbRandomTrials) && sbRandomTrials >= 1 && sbRandomTrials <= 1000;
 
   async function run() {
     if (!valid || loading) return;
@@ -300,7 +318,8 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
         <p className="text-sm text-slate-300">
           The AFML Methodology Lab demonstrates the <span className="font-medium">labeling and validation-splitting pipeline</span>{" "}
           that must come before financial-ML model training: CUSUM event sampling, triple-barrier
-          labeling, sample concurrency, overlap-aware uniqueness weights, and purged K-fold with embargo.
+          labeling, sample concurrency, overlap-aware uniqueness weights, purged K-fold with embargo,
+          and sequential bootstrap.
         </p>
         <p className="mt-2 text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
@@ -753,19 +772,19 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
               they add, then compares its uniqueness to a uniform random-bootstrap baseline.
             </p>
             <div className="flex flex-wrap items-end gap-3">
-              <Field label="Sample size"><input type="number" className={inputCls + " w-28"} value={sampleSize} step={1} onChange={(e) => setSampleSize(e.target.value)} /></Field>
-              <Field label="Random trials"><input type="number" className={inputCls + " w-28"} value={randomTrials} step={50} onChange={(e) => setRandomTrials(e.target.value)} /></Field>
+              <Field label="Sample size"><input type="number" className={inputCls + " w-28"} value={sampleSize} step={1} onChange={(e) => { setSampleSize(e.target.value); setSbError(null); }} /></Field>
+              <Field label="Random trials"><input type="number" className={inputCls + " w-28"} value={randomTrials} step={50} onChange={(e) => { setRandomTrials(e.target.value); setSbError(null); }} /></Field>
               <label className="flex items-center gap-2 pb-1.5 text-xs text-slate-300">
-                <input type="checkbox" checked={withReplacement} onChange={(e) => setWithReplacement(e.target.checked)} />
+                <input type="checkbox" checked={withReplacement} onChange={(e) => { setWithReplacement(e.target.checked); setSbError(null); }} />
                 With replacement
               </label>
               <button
                 type="button"
                 onClick={runSb}
-                disabled={sbLoading}
+                disabled={!sbValid || sbLoading}
                 className={
                   "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
-                  (!sbLoading
+                  (sbValid && !sbLoading
                     ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
                     : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
                 }
@@ -773,8 +792,11 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                 {sbLoading ? "Running…" : "Run sequential bootstrap"}
               </button>
             </div>
-            <p className="text-[11px] text-slate-400">Sample size ≥ 1 (≤ events when without replacement); random trials 1–1000. Other parameters come from the Setup section above.</p>
-            {sbError && <p className="text-xs text-red-600">⚠ {sbError}</p>}
+            <p className="text-[11px] text-slate-400">Sample size 1–2000 (and no more than labeled events without replacement); random trials 1–1000. Unsafe combined workloads are rejected by the backend.</p>
+            {!sbValid && (
+              <p className="text-[11px] text-amber-400">Enter valid Setup values, a whole-number sample size from 1 to 2000, and random trials from 1 to 1000.</p>
+            )}
+            {sbError && <p className="text-xs text-red-400">⚠ {sbError}</p>}
           </div>
 
           {sbResult && (
@@ -788,6 +810,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                 <MetricCard label="With replacement" value={sbResult.summary.with_replacement ? "Yes" : "No"} />
               </div>
               <p className="text-[11px] text-slate-400">{sbResult.summary.overlap_reduction_note}</p>
+              <p className="text-[11px] text-slate-400">The sequential value is the final uniqueness of the seeded sample shown below; the random value is the mean across the requested baseline trials.</p>
 
               <div className="card space-y-2 p-5">
                 <p className="section-title">Average uniqueness after each sequential draw</p>
@@ -839,6 +862,40 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
                   <MetricCard label="Min" value={pct(sbResult.random_baseline.min, 1)} />
                   <MetricCard label="Max" value={pct(sbResult.random_baseline.max, 1)} />
                 </div>
+              </div>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">Selected event intervals</p>
+                {(() => {
+                  const displayed = sbResult.selected_events.slice(0, 250);
+                  const barCount = Math.max(...displayed.map((event) => event.end_index + 1), 1);
+                  const rowHeight = Math.max(2, Math.min(6, 360 / Math.max(displayed.length, 1)));
+                  const height = displayed.length * rowHeight;
+                  return (
+                    <svg viewBox={`0 0 1000 ${height}`} preserveAspectRatio="none" className="w-full" style={{ height: Math.min(360, Math.max(100, height)) }}>
+                      {displayed.map((event, index) => {
+                        const color = event.label > 0 ? POS_COLOR : event.label < 0 ? NEG_COLOR : NEUTRAL_COLOR;
+                        return (
+                          <rect
+                            key={event.draw_order}
+                            x={(event.start_index / barCount) * 1000}
+                            y={index * rowHeight}
+                            width={Math.max(2, ((event.end_index - event.start_index + 1) / barCount) * 1000)}
+                            height={Math.max(1, rowHeight - 0.5)}
+                            fill={color}
+                          >
+                            <title>{`Draw ${event.draw_order}: event ${event.event_id}, label ${event.label}, ${event.start_date} to ${event.end_date}`}</title>
+                          </rect>
+                        );
+                      })}
+                    </svg>
+                  );
+                })()}
+                <p className="text-[11px] text-slate-400">
+                  <span style={{ color: POS_COLOR }}>● +1</span>{"  "}
+                  <span style={{ color: NEG_COLOR }}>● -1</span>{"  "}
+                  <span style={{ color: NEUTRAL_COLOR }}>● 0</span> — one row per selected draw; up to the first 250 draws are shown.
+                </p>
               </div>
 
               <div className="card space-y-2 p-5">
@@ -905,7 +962,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
             <li><span className="font-semibold text-slate-200">Timing:</span> events are sampled using information available up to the event date. Future prices are used only to assign supervised-learning labels, not as trade signals or recommendations.</li>
             <li><span className="font-semibold text-slate-200">Overlapping labels → dependence:</span> labels whose holding windows overlap share outcomes and are not independent. Concurrency counts the overlap at each bar.</li>
             <li><span className="font-semibold text-slate-200">Sample uniqueness:</span> each label's uniqueness is the average of 1/concurrency over its life; using these as sample weights stops crowded periods from dominating training.</li>
-            <li><span className="font-semibold text-slate-200">Not a model:</span> this is the labeling + validation-splitting stage only — no features, no fitted model, synthetic data. Purged K-fold + embargo reduce overlap leakage but do not guarantee a good model. Meta-labeling, information-driven bars, sequential bootstrap, fractional differentiation, and Combinatorial Purged CV (CPCV) are planned. Not investment advice.</li>
+            <li><span className="font-semibold text-slate-200">Not a model:</span> this is labeling, validation splitting, and overlap-aware sampling only — no features, no fitted model, synthetic data. Purged K-fold, embargo, and sequential bootstrap reduce specific dependence/leakage channels but do not guarantee a good model. Meta-labeling, information-driven bars, fractional differentiation, and Combinatorial Purged CV (CPCV) are planned. Not investment advice.</li>
           </ul>
           <p className="text-[11px] text-slate-400">{CAVEAT}</p>
         </div>

@@ -1121,9 +1121,9 @@ single-asset Backtest + Strategy Comparison:
   Sample Uniqueness)
 - A **methodology toolkit, not a model**: synthetic demo data, no features, no model
   training, no live data. At the end of 19.0, purged K-fold was still planned; it
-  was added in 19.1. **Meta-labeling, information-driven bars, sequential bootstrap,
-  fractional differentiation, and CPCV remain planned.** Not a full AFML
-  implementation, not investment advice
+  was added in 19.1 and sequential bootstrap in 19.2. **Meta-labeling,
+  information-driven bars, fractional differentiation, and CPCV remain planned.**
+  Not a full AFML implementation, not investment advice
 
 ### Phase 19.1 — Purged K-Fold + Embargo CV v1 ✅
 
@@ -1147,8 +1147,9 @@ single-asset Backtest + Strategy Comparison:
   (train blue · test violet · purged amber · embargo red)
 - Command-palette commands (Purged K-Fold CV / Embargo CV) + updated dashboard card.
   **Not CPCV, not model training** — purged CV reduces overlap leakage but does not
-  guarantee a good model or remove research bias. CPCV, meta-labeling, sequential
-  bootstrap, and fractional differentiation remain planned. Not investment advice
+  guarantee a good model or remove research bias. Sequential bootstrap was added
+  in 19.2; CPCV, meta-labeling, and fractional differentiation remain planned.
+  Not investment advice
 
 ### Phase 19.2 — Sequential Bootstrap v1 ✅
 
@@ -1157,9 +1158,9 @@ single-asset Backtest + Strategy Comparison:
   **sample average uniqueness** (mean of 1/concurrency over each event's active
   bars), a **random-bootstrap baseline** (uniform sampling, distribution summary),
   and the **sequential bootstrap** (draw events with probability ∝ marginal average
-  uniqueness, with/without replacement). The summary's sequential vs random
-  uniqueness are stable Monte-Carlo means (textbook comparison); one representative
-  draw drives the table / path / selection probabilities
+  uniqueness, with/without replacement). The sequential summary is the final
+  uniqueness of one reproducible seeded draw; the random baseline is a distribution
+  over the requested number of uniform draws, and the UI states that comparison basis
 - One route `POST /finml/sequential-bootstrap-demo` (validated; sample_size ≥ 1 and
   ≤ events when without replacement, random_trials 1–1000, too-few-events → friendly
   422; bounded payload). 25 deterministic tests: indicator shape/overlap, uniqueness

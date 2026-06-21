@@ -12,11 +12,13 @@ It demonstrates the *labeling pipeline* that must come **before** model training
 4. **Sample uniqueness weights** — down-weight overlapping (non-independent) labels.
 5. **Purged K-fold + embargo CV** — remove train labels that overlap each
    contiguous test fold, then embargo post-test observations and report leakage.
+6. **Sequential bootstrap** — sample events with probabilities driven by their
+   uniqueness under the already-selected sample.
 
 Educational / research only — **synthetic demo data**, no live market data, no
-model training, no meta-labeling, no sequential bootstrap, no fractional
-differentiation, and no Combinatorial Purged CV (all planned). **Not** a full
-AFML implementation and not investment advice.
+model training, no meta-labeling, no fractional differentiation, and no
+Combinatorial Purged CV (all planned). **Not** a full AFML implementation and
+not investment advice.
 """
 
 from app.finml.orchestrator import (  # noqa: F401

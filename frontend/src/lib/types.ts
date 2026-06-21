@@ -2690,6 +2690,8 @@ export interface SequentialBootstrapSelected {
   label: number;
   start_date: string;
   end_date: string;
+  start_index: number;
+  end_index: number;
   realized_return: number;
   average_uniqueness_after_draw: number;
   selection_probability: number;

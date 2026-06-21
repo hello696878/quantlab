@@ -5118,6 +5118,8 @@ class SequentialBootstrapSelected(BaseModel):
     label: int
     start_date: str
     end_date: str
+    start_index: int
+    end_index: int
     realized_return: float
     average_uniqueness_after_draw: float
     selection_probability: float

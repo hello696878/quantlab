@@ -123,8 +123,8 @@ def run_labeling_demo(
         "This is a labeling pipeline, not a trained model: no features, no model, no out-of-sample "
         "validation. Event formation uses no future information; future prices are only used to "
         "assign labels (as labeling requires). The separate Purged CV demo provides overlap-aware "
-        "split diagnostics; CPCV, meta-labeling, sequential bootstrap, and fractional "
-        "differentiation are planned, not implemented.",
+        "split diagnostics, and the Sequential Bootstrap demo provides uniqueness-aware sampling. "
+        "CPCV, meta-labeling, and fractional differentiation are planned, not implemented.",
     ]
     if summary["n_events"] == 0:
         warnings.append(
