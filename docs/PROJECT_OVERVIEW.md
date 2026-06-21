@@ -58,6 +58,8 @@ FastAPI Backend
   ├── short_rates.py                Short Rate Models Lab v1: Vasicek / CIR Monte Carlo simulation + analytic zero-coupon pricing, Feller diagnostic (pure)
   ├── fx.py                         FX Lab v1: interest rate parity forward, FX carry, PPP deviation, currency exposure + stress, Garman-Kohlhagen FX options (pure)
   ├── credit.py                     Credit Risk Lab v1: Merton structural model, distance to default, hazard/survival curve, CDS spread approximation, risky bond pricing (pure)
+  ├── globe/                        Global Markets Globe Data Layer v1 (20.2): typed country-dossier models, 15 static sample markets, service accessors, and future adapter stubs (FRED macro / delayed index / FX / news — no live fetch)
+  ├── globe_routes.py               Globe API router: GET /globe/markets, /globe/markets/{id} (friendly 404), /globe/regions — static sample data only
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD
@@ -212,9 +214,16 @@ tooltip; **no Three.js / WebGL**, with a graceful canvas-unavailable fallback an
 `prefers-reduced-motion` gating), a right `components/globe/MarketDossier.tsx`
 panel (sticky header + bias pill + Market Pulse / Macro Vitals / FX & Rates /
 Market Structure / Sample Headlines / QuantLab Actions), and a bottom region
-tape. The keyboard-accessible market list remains the no-pointer fallback. All
-values are static illustrative sample data — no live market data, FX, macro, or
-news is fetched.
+tape. The keyboard-accessible market list remains the no-pointer fallback.
+
+**v1 Data Layer (20.2):** `lib/globe/remote.ts` fetches the typed backend
+dossier dataset (`GET /api/globe/markets`) and maps it into the UI `Market`
+shape; `GlobeLabPanel` renders the bundled `MARKETS` immediately, upgrades to
+the backend data when reachable, and otherwise shows a non-blocking "Backend
+globe data unavailable; using bundled static sample data." warning. A header
+chip shows the active source ("Backend static dataset" / "Bundled static
+fallback"). All values are static illustrative sample data — no live market
+data, FX, macro, or news is fetched.
 
 ### `src/app/page.tsx`
 

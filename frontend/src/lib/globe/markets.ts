@@ -127,7 +127,7 @@ function makeSparkline(seed: number, drift: number): number[] {
 // yet pre-filled; deep-linked, market-aware routing is future work).
 // ---------------------------------------------------------------------------
 
-const CROSS_LINKS: MarketLink[] = [
+export const CROSS_LINKS: MarketLink[] = [
   { label: "Backtest an index strategy", view: "backtest" },
   { label: "Open Cross-Sectional Scanner", view: "scanner" },
   { label: "View rates (Yield Curve Lab)", view: "rates" },
@@ -595,9 +595,10 @@ export function findMarketById(id: string | null | undefined): Market | null {
 export function filterMarkets(
   region: MarketRegion | "All",
   query: string,
+  list: Market[] = MARKETS,
 ): Market[] {
   const q = query.trim().toLowerCase();
-  return MARKETS.filter((m) => {
+  return list.filter((m) => {
     if (region !== "All" && m.region !== region) return false;
     if (!q) return true;
     return (

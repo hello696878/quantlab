@@ -252,7 +252,13 @@ Return to the Command Center's **Platform Direction** panel (or open
   is unavailable), **all values are static illustrative sample data** (not
   real-time quotes, FX, macro, or news; arcs and the bias pill are decorative);
   live FRED macro, delayed index/FX quotes, news/sentiment, and GeoJSON borders
-  are planned — not investment advice.
+  are planned — not investment advice. **Data Layer (20.2):** open the network
+  tab to see the page call `GET /api/globe/markets` (typed backend dossier API);
+  the header chip reads "Backend static dataset". Stop the backend and reload to
+  show the graceful fallback — the chip flips to "Bundled static fallback" with a
+  non-blocking "Backend globe data unavailable…" warning and the globe stays
+  fully usable. Even the backend payload is static sample data; the FRED/quotes/
+  news adapters are inert stubs (no live fetch).
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

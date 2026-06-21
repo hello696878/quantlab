@@ -1264,6 +1264,36 @@ single-asset Backtest + Strategy Comparison:
 - No backend changes; **no finance/backtest/options/AFML/scanner logic touched**;
   no live data, API keys, or real-time claims added. `npx tsc --noEmit` clean.
 
+### Phase 20.2 — Global Markets Globe Data Layer v1 ✅
+
+- **Backend data-architecture** step (not a live-data step). New `app/globe/`
+  package: `models.py` (typed Pydantic country-dossier schema — id, country,
+  region, lat/lon, currency, exchange, trading hours, timezone, indices, macro,
+  fx, rates, market structure, headlines, links, **`source_status`** +
+  `is_sample` flags + `static_data_notice`), `sample_markets.py` (15 markets
+  mirrored from the bundled frontend dataset, deterministic numeric sample
+  levels/sparklines), `service.py` (accessors + region rollups), and
+  `adapters.py` (FRED macro / delayed index / FX / news **stubs that raise
+  `NotImplementedError` — no live fetch, no API key, no HTTP**).
+- New `app/globe_routes.py` APIRouter (included in `main.py`): `GET /globe/markets`
+  (markets + count + `data_status` + notice), `GET /globe/markets/{id}` (friendly
+  404 "Market not found."), `GET /globe/regions`. 25 tests in `tests/test_globe.py`
+  (200, ≥15 markets, required fields, unique ids/countries, valid lat/lon, notice,
+  `source_status == static_sample`, ≥1 index, macro + structure present, `/us`,
+  404, no NaN/Inf, adapters perform no live fetch).
+- **Frontend**: `lib/globe/remote.ts` fetches `GET /api/globe/markets` and maps
+  the backend dossier into the UI `Market` shape; `GlobeLabPanel` renders the
+  bundled data immediately, upgrades to backend data when reachable, and falls
+  back with a non-blocking warning otherwise — all v1.1 interactions unchanged.
+  Header data-status chips: "Backend static dataset" / "Bundled static fallback"
+  + "Live macro planned / Quotes planned / News planned".
+- Dashboard Globe card badge → **"Static data API v1"**. Command-palette globe
+  commands unchanged.
+- **Still 100% static sample data** — index levels/FX values are surfaced as
+  "Sample" in the UI, every record is `is_sample`, and the adapters are inert.
+  No live data, no real-time claims, not investment advice. `pytest` green;
+  `npx tsc --noEmit` clean.
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

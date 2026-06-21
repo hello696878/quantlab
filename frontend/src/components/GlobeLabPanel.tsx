@@ -22,12 +22,12 @@ import {
   MARKET_REGIONS,
   REGION_COLORS,
   filterMarkets,
-  findMarketById,
   meanIndexChange,
   regionRollup,
   type Market,
   type MarketRegion,
 } from "@/lib/globe/markets";
+import { fetchGlobeMarkets } from "@/lib/globe/remote";
 import { fmtPct } from "@/lib/format";
 
 type Mode = "wide" | "mid" | "narrow";
@@ -120,18 +120,37 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
   const [autoRotate, setAutoRotate] = useState(true);
   const [resetSignal, setResetSignal] = useState(0);
 
+  // Market data: render bundled static data immediately, then upgrade to the
+  // backend data layer if reachable (else fall back with a non-blocking warning).
+  const [markets, setMarkets] = useState<Market[]>(MARKETS);
+  const [dataStatus, setDataStatus] = useState<"loading" | "backend" | "fallback">("loading");
+
+  useEffect(() => {
+    const ctrl = new AbortController();
+    fetchGlobeMarkets(ctrl.signal)
+      .then((res) => {
+        setMarkets(res.markets);
+        setDataStatus("backend");
+      })
+      .catch(() => {
+        setMarkets(MARKETS);
+        setDataStatus("fallback");
+      });
+    return () => ctrl.abort();
+  }, []);
+
   const filtering = region !== "All" || query.trim() !== "";
-  const filtered = filterMarkets(region, query);
+  const filtered = filterMarkets(region, query, markets);
   const activeIds = filtering ? new Set(filtered.map((m) => m.id)) : null;
-  const selected = findMarketById(selectedId);
-  const rollups = regionRollup();
+  const selected = markets.find((m) => m.id === selectedId) ?? null;
+  const rollups = regionRollup(markets);
 
   useEffect(() => {
     if (!selectedId || !filtering) return;
-    if (!filterMarkets(region, query).some((market) => market.id === selectedId)) {
+    if (!filterMarkets(region, query, markets).some((market) => market.id === selectedId)) {
       setSelectedId(null);
     }
-  }, [filtering, query, region, selectedId]);
+  }, [filtering, query, region, selectedId, markets]);
 
   function resetView() {
     setRegion("All");
@@ -170,10 +189,11 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
               </span>
             </div>
             <p className="mt-1 max-w-2xl text-sm" style={{ color: "var(--text-mut)" }}>
-              A mission-control map of {MARKETS.length} sample markets. Drag the globe
-              to rotate, click a marker — or a row in the rail — to open a country
-              dossier with indices, macro vitals, currency &amp; rates, market
-              structure, sample headlines, and QuantLab cross-links.
+              A mission-control map of {markets.length} sample markets backed by a
+              typed country-dossier data layer. Drag the globe to rotate, click a
+              marker — or a row in the rail — to open a country dossier with
+              indices, macro vitals, currency &amp; rates, market structure,
+              sample headlines, and QuantLab cross-links.
             </p>
           </div>
           <span
@@ -188,7 +208,44 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
           news integration are planned. Not real-time market data and not
           investment advice.
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-1.5">
+          <span
+            className="mono rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            style={{
+              background: dataStatus === "fallback" ? "var(--warn-soft)" : "var(--accent-softer)",
+              border: `1px solid ${dataStatus === "fallback" ? "var(--line)" : "var(--accent-line)"}`,
+              color: dataStatus === "fallback" ? "var(--warn)" : "var(--accent-text)",
+            }}
+          >
+            {dataStatus === "backend"
+              ? "Backend static dataset"
+              : dataStatus === "fallback"
+                ? "Bundled static fallback"
+                : "Loading data layer…"}
+          </span>
+          {["Live macro planned", "Quotes planned", "News planned"].map((t) => (
+            <span
+              key={t}
+              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+              style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-mut)" }}
+            >
+              {t}
+            </span>
+          ))}
+        </div>
       </div>
+
+      {/* Non-blocking fallback warning when the backend data layer is unreachable. */}
+      {dataStatus === "fallback" && (
+        <div
+          role="status"
+          className="flex items-start gap-2.5 rounded-xl p-3 text-sm"
+          style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+        >
+          <span aria-hidden className="mt-0.5 flex-shrink-0">⚠</span>
+          <p>Backend globe data unavailable; using bundled static sample data.</p>
+        </div>
+      )}
 
       {/* ── Mission-control grid ──────────────────────────────────────────── */}
       <div style={gridStyle}>
@@ -277,7 +334,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
         <div style={{ gridArea: "globe" }} className="card relative overflow-hidden p-0">
           <div style={{ height: globeHeight }}>
             <DataGlobe
-              markets={MARKETS}
+              markets={markets}
               activeIds={activeIds}
               arcs={MARKET_ARCS}
               selectedId={selectedId}

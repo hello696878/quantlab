@@ -79,3 +79,15 @@ bias pill are decorative/illustrative. No "live", "real-time", "current prices",
 - No backend files touched; the backend test suite is unaffected.
 - Per instructions, **no** `npm run build` / `npm run dev` / `next build` /
   `next dev` was run — the user builds locally.
+
+## Phase 20.2 — Globe Data Layer (follow-up)
+A separate, **backend** phase made the Globe data-source-ready (still static):
+- New `backend/app/globe/` package (typed dossier `models.py`, `sample_markets.py`
+  mirroring the 15 markets, `service.py`, inert future `adapters.py`) +
+  `app/globe_routes.py` (`GET /globe/markets`, `/globe/markets/{id}`,
+  `/globe/regions`) included in `main.py`; `tests/test_globe.py` (25 tests).
+- Frontend `lib/globe/remote.ts` fetches the API and maps it to the UI `Market`
+  shape; `GlobeLabPanel` upgrades to backend data when reachable and falls back
+  to the bundled dataset with a non-blocking warning + a data-source chip.
+- Still 100% static sample data — adapters raise `NotImplementedError` (no live
+  fetch, no keys, no HTTP). Dashboard card badge → "Static data API v1".

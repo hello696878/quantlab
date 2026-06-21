@@ -63,6 +63,7 @@ from app.risk_management import (
 )
 from app.annualization import resolve_annualization
 from app.market_data import assess_data_quality
+from app.globe_routes import router as globe_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -365,6 +366,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Global Markets Globe data layer (Phase 20.2) — static sample dossier API.
+app.include_router(globe_router)
 
 
 # ---------------------------------------------------------------------------
