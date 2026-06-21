@@ -359,12 +359,12 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
       <div className="card space-y-3 p-5 text-sm text-slate-400">
         <p className="section-title">How the scanner engine works</p>
         <ul className="space-y-2">
-          <li><span className="font-semibold text-slate-200">Universe → matrices:</span> instead of one price series, the engine builds a price matrix (date × asset), a signal/score matrix, and a dollar-neutral weight matrix, then collapses them to one portfolio return series.</li>
-          <li><span className="font-semibold text-slate-200">Rank & bucket:</span> each rebalance date, assets are ranked by their cross-sectional score; the top quantile is the long basket, the bottom quantile the short basket.</li>
-          <li><span className="font-semibold text-slate-200">Dollar-neutral:</span> longs sum to +gross/2 and shorts to −gross/2, so net exposure ≈ 0 and gross exposure = the target (default 1.0).</li>
-          <li><span className="font-semibold text-slate-200">Lookahead-safe:</span> signals use information through date t; weights are shifted forward one period before P&L, so weights at t earn the return from t to t+1 — never the same-day return.</li>
-          <li><span className="font-semibold text-slate-200">Costs & turnover:</span> turnover = Σ|wₜ − wₜ₋₁|; cost = turnover × bps/10000 is deducted from the gross return the position earns.</li>
-          <li><span className="font-semibold text-slate-200">Limitations:</span> synthetic universe (no survivorship/point-in-time issues modeled), no market impact, borrow, or capacity; sector/beta neutralization, live universes, and ML selection are planned. Educational, not investment advice.</li>
+          <li><span className="font-semibold text-slate-900">Universe → matrices:</span> instead of one price series, the engine builds a price matrix (date × asset), a signal/score matrix, and a dollar-neutral weight matrix, then collapses them to one portfolio return series.</li>
+          <li><span className="font-semibold text-slate-900">Rank & bucket:</span> each rebalance date, assets are ranked by their cross-sectional score; the top quantile is the long basket, the bottom quantile the short basket.</li>
+          <li><span className="font-semibold text-slate-900">Dollar-neutral:</span> longs sum to +gross/2 and shorts to −gross/2, so net exposure ≈ 0 and gross exposure = the target (default 1.0).</li>
+          <li><span className="font-semibold text-slate-900">Lookahead-safe:</span> signals use information through date t; weights are shifted forward one period before P&L, so weights at t earn the return from t to t+1 — never the same-day return.</li>
+          <li><span className="font-semibold text-slate-900">Costs & turnover:</span> turnover = Σ|wₜ − wₜ₋₁|; cost = turnover × bps/10000 is deducted from the gross return the position earns.</li>
+          <li><span className="font-semibold text-slate-900">Limitations:</span> synthetic universe (no survivorship/point-in-time issues modeled), no market impact, borrow, or capacity; sector/beta neutralization, live universes, and ML selection are planned. Educational, not investment advice.</li>
         </ul>
         <p className="text-[11px] text-slate-400">{CAVEAT}</p>
       </div>

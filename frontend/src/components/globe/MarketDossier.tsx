@@ -1,28 +1,28 @@
 "use client";
 
 /**
- * Market dossier side panel for the Global Markets Globe.
+ * Market dossier panel for the Global Markets Globe v1.1.
  *
- * Every value shown here is static illustrative sample data (see
- * lib/globe/markets.ts). The panel makes that explicit with a badge and
- * per-section notes — no live, real-time, or country-level financial data is
- * fetched.
+ * Premium "financial-intelligence" card: sticky header (flag, region dot,
+ * currency, exchange, bias pill, Static-sample badge, "Last updated: Static
+ * sample") + six sections — Market Pulse, Macro Vitals, FX & Rates, Market
+ * Structure, Sample Headlines, QuantLab Actions.
+ *
+ * Every value is static illustrative sample data (see lib/globe/markets.ts).
+ * No live, real-time, or country-level financial data is fetched.
  */
 
 import type { View } from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
 import {
+  REGION_COLORS,
   SENTIMENT_TONE,
+  marketBias,
   type Market,
   type MarketIndex,
+  type Sentiment,
 } from "@/lib/globe/markets";
 import { fmtPct } from "@/lib/format";
-
-const REGION_COLOR: Record<string, string> = {
-  Americas: "var(--cyan)",
-  Europe: "var(--violet)",
-  "Asia-Pacific": "var(--emerald)",
-};
 
 const SENTIMENT_COLOR: Record<"positive" | "danger" | "default", string> = {
   positive: "var(--pos)",
@@ -30,9 +30,13 @@ const SENTIMENT_COLOR: Record<"positive" | "danger" | "default", string> = {
   default: "var(--text-mut)",
 };
 
+function biasColor(bias: Sentiment): string {
+  return SENTIMENT_COLOR[SENTIMENT_TONE[bias]];
+}
+
 /** Tiny dependency-free sparkline (illustrative shape only — no axis/units). */
-function Sparkline({ data }: { data: number[] }) {
-  const w = 92;
+function Sparkline({ data, up }: { data: number[]; up: boolean }) {
+  const w = 96;
   const h = 26;
   if (data.length < 2) return null;
   const min = Math.min(...data);
@@ -45,7 +49,6 @@ function Sparkline({ data }: { data: number[] }) {
       return `${x.toFixed(1)},${y.toFixed(1)}`;
     })
     .join(" ");
-  const up = data[data.length - 1] >= data[0];
   const color = up ? "var(--pos)" : "var(--neg)";
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} aria-hidden>
@@ -61,7 +64,7 @@ function changeStyle(v: number): React.CSSProperties {
 function IndexRow({ idx }: { idx: MarketIndex }) {
   return (
     <div
-      className="flex items-center justify-between gap-3 rounded-lg px-3 py-2"
+      className="flex items-center justify-between gap-3 rounded-xl px-3 py-2"
       style={{ background: "var(--glass)", border: "1px solid var(--line)" }}
     >
       <div className="min-w-0">
@@ -73,8 +76,8 @@ function IndexRow({ idx }: { idx: MarketIndex }) {
         </p>
       </div>
       <div className="flex items-center gap-3">
-        <Sparkline data={idx.sparkline} />
-        <span className="mono text-sm font-semibold" style={changeStyle(idx.changePct)}>
+        <Sparkline data={idx.sparkline} up={idx.changePct >= 0} />
+        <span className="mono w-14 text-right text-sm font-semibold" style={changeStyle(idx.changePct)}>
           {fmtPct(idx.changePct, 2)}
         </span>
       </div>
@@ -106,175 +109,206 @@ interface MarketDossierProps {
 }
 
 export default function MarketDossier({ market, onNav, onClose }: MarketDossierProps) {
-  const accent = REGION_COLOR[market.region] ?? "var(--accent)";
+  const accent = REGION_COLORS[market.region] ?? "var(--accent)";
+  const bias = marketBias(market);
+  const bColor = biasColor(bias);
+
   return (
-    <div className="card p-5">
-      {/* ── Header ──────────────────────────────────────────────────────── */}
-      <div className="flex items-start justify-between gap-3">
-        <div className="flex items-start gap-3">
-          <span aria-hidden className="text-3xl leading-none">
-            {market.flag}
-          </span>
-          <div>
-            <h2 className="text-lg font-bold" style={{ color: "var(--text-hi)" }}>
-              {market.country}
-            </h2>
-            <p className="text-xs" style={{ color: "var(--text-mut)" }}>
-              <span style={{ color: accent }}>{market.region}</span> · {market.subregion}
-            </p>
-            <p className="mt-1 text-xs" style={{ color: "var(--text-mut)" }}>
-              <span className="mono" style={{ color: "var(--text-hi)" }}>
-                {market.currency}
-              </span>{" "}
-              · {market.exchange}
-            </p>
-          </div>
-        </div>
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close dossier"
-          className="flex-shrink-0 rounded-md px-2 py-1 text-xs font-medium transition-colors"
-          style={{ border: "1px solid var(--line)", color: "var(--text-mut)" }}
-        >
-          ✕
-        </button>
-      </div>
-
-      <div className="mt-3">
-        <span
-          className="rounded-full px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wide"
-          style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
-        >
-          Static demo data
-        </span>
-      </div>
-
-      <div className="my-4 neon-divider" />
-
-      {/* ── Equity indices ──────────────────────────────────────────────── */}
-      <section>
-        <SectionLabel>Equity indices</SectionLabel>
-        <div className="space-y-2">
-          {market.indices.map((idx) => (
-            <IndexRow key={idx.ticker} idx={idx} />
-          ))}
-        </div>
-        <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-          Levels are placeholders; daily change % and sparklines are illustrative
-          shapes — delayed index quotes are planned.
-        </p>
-      </section>
-
-      {/* ── Macro snapshot ──────────────────────────────────────────────── */}
-      <section className="mt-4">
-        <SectionLabel>Macro snapshot</SectionLabel>
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-          <MetricCard label="GDP growth" value={`${market.macro.gdpGrowth.toFixed(1)}%`} tone="accent" />
-          <MetricCard label="Inflation" value={`${market.macro.inflation.toFixed(1)}%`} tone="warn" />
-          <MetricCard label="Unemployment" value={`${market.macro.unemployment.toFixed(1)}%`} />
-          <MetricCard label="Policy rate" value={`${market.macro.policyRate}%`} tone="accent" />
-          <MetricCard label="Debt / GDP" value={`${market.macro.debtToGdp}%`} />
-        </div>
-        <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-          Illustrative static figures — live FRED / macro wiring is planned.
-        </p>
-      </section>
-
-      {/* ── Currency and rates ──────────────────────────────────────────── */}
-      <section className="mt-4">
-        <SectionLabel>Currency &amp; rates</SectionLabel>
-        <div className="rounded-lg p-3" style={{ background: "var(--glass)", border: "1px solid var(--line)" }}>
-          <StructureRow label="Currency" value={market.currency} />
-          {market.fx.map((f) => (
-            <div key={f.pair} className="flex items-baseline justify-between gap-3 py-1">
-              <span className="text-xs" style={{ color: "var(--text-mut)" }}>
-                {f.pair}
-              </span>
-              <span className="flex items-baseline gap-2">
-                <span className="text-xs font-medium" style={{ color: "var(--text-hi)" }}>
-                  {f.value}
-                </span>
-                <span className="mono text-xs font-semibold" style={changeStyle(f.changePct)}>
-                  {fmtPct(f.changePct, 2)}
-                </span>
-              </span>
-            </div>
-          ))}
-          <StructureRow label="Policy rate" value={`${market.macro.policyRate}%`} />
-        </div>
-        <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-          FX values are placeholders; live / delayed FX quotes are planned.
-        </p>
-      </section>
-
-      {/* ── Market structure ────────────────────────────────────────────── */}
-      <section className="mt-4">
-        <SectionLabel>Market structure</SectionLabel>
-        <div className="rounded-lg p-3" style={{ background: "var(--glass)", border: "1px solid var(--line)" }}>
-          <StructureRow label="Exchange" value={market.exchange} />
-          <StructureRow label="Trading hours" value={market.tradingHours} />
-          <StructureRow label="Settlement" value={market.marketStructure.settlement} />
-          <StructureRow label="Market cap" value={market.marketStructure.marketCap} />
-          <StructureRow label="Listed companies" value={market.marketStructure.listedCompanies} />
-        </div>
-        <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-mut)" }}>
-          {market.marketStructure.notes}
-        </p>
-      </section>
-
-      {/* ── News placeholder ────────────────────────────────────────────── */}
-      <section className="mt-4">
-        <SectionLabel>Market news</SectionLabel>
-        <div className="space-y-2">
-          {market.headlines.map((h) => {
-            const color = SENTIMENT_COLOR[SENTIMENT_TONE[h.sentiment]];
-            return (
-              <div
-                key={h.title}
-                className="flex items-start justify-between gap-3 rounded-lg px-3 py-2"
-                style={{ background: "var(--glass)", border: "1px solid var(--line)" }}
-              >
-                <span className="text-xs" style={{ color: "var(--text-hi)" }}>
-                  {h.title}
-                </span>
+    <div className="card overflow-hidden">
+      {/* ── Sticky header ───────────────────────────────────────────────── */}
+      <div
+        className="sticky top-0 z-10 px-5 pb-3 pt-4"
+        style={{ background: "rgba(10,14,24,0.92)", backdropFilter: "blur(10px)", borderBottom: "1px solid var(--line)" }}
+      >
+        {/* accent band */}
+        <div
+          aria-hidden
+          className="absolute inset-x-0 top-0 h-[3px]"
+          style={{ background: `linear-gradient(90deg, ${accent}, transparent)` }}
+        />
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-start gap-3">
+            <span aria-hidden className="text-3xl leading-none">
+              {market.flag}
+            </span>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-bold" style={{ color: "var(--text-hi)" }}>
+                  {market.country}
+                </h2>
                 <span
-                  className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
-                  style={{ border: `1px solid ${color}`, color }}
-                >
-                  {h.sentiment}
+                  aria-hidden
+                  className="h-2 w-2 flex-shrink-0 rounded-full"
+                  style={{ background: accent, boxShadow: `0 0 8px ${accent}` }}
+                />
+              </div>
+              <p className="mt-0.5 text-xs" style={{ color: "var(--text-mut)" }}>
+                <span style={{ color: accent }}>{market.region}</span> · {market.subregion}
+              </p>
+              <p className="mt-0.5 text-xs" style={{ color: "var(--text-mut)" }}>
+                <span className="mono" style={{ color: "var(--text-hi)" }}>
+                  {market.currency}
+                </span>{" "}
+                · {market.exchange}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close dossier"
+            className="flex-shrink-0 rounded-md px-2 py-1 text-xs font-medium transition-colors"
+            style={{ border: "1px solid var(--line)", color: "var(--text-mut)" }}
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span
+            className="mono rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            style={{ background: `color-mix(in oklch, ${bColor} 15%, transparent)`, border: `1px solid color-mix(in oklch, ${bColor} 35%, transparent)`, color: bColor }}
+          >
+            {bias}
+          </span>
+          <span
+            className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+          >
+            Static demo data
+          </span>
+          <span className="text-[10px]" style={{ color: "var(--text-faint)" }}>
+            Last updated: Static sample
+          </span>
+        </div>
+      </div>
+
+      {/* ── Body ────────────────────────────────────────────────────────── */}
+      <div className="space-y-4 p-5">
+        {/* Market Pulse */}
+        <section>
+          <SectionLabel>Market Pulse</SectionLabel>
+          <div className="space-y-2">
+            {market.indices.map((idx) => (
+              <IndexRow key={idx.ticker} idx={idx} />
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
+            Levels are placeholders; change % and sparklines are illustrative —
+            delayed index quotes are planned.
+          </p>
+        </section>
+
+        {/* Macro Vitals */}
+        <section>
+          <SectionLabel>Macro Vitals</SectionLabel>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            <MetricCard label="GDP growth" value={`${market.macro.gdpGrowth.toFixed(1)}%`} tone="accent" />
+            <MetricCard label="Inflation" value={`${market.macro.inflation.toFixed(1)}%`} tone="warn" />
+            <MetricCard label="Unemployment" value={`${market.macro.unemployment.toFixed(1)}%`} />
+            <MetricCard label="Policy rate" value={`${market.macro.policyRate}%`} tone="accent" />
+            <MetricCard label="Debt / GDP" value={`${market.macro.debtToGdp}%`} />
+          </div>
+          <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
+            Illustrative static figures — live FRED / macro wiring is planned.
+          </p>
+        </section>
+
+        {/* FX & Rates */}
+        <section>
+          <SectionLabel>FX &amp; Rates</SectionLabel>
+          <div className="rounded-xl p-3" style={{ background: "var(--glass)", border: "1px solid var(--line)" }}>
+            <StructureRow label="Currency" value={market.currency} />
+            {market.fx.map((f) => (
+              <div key={f.pair} className="flex items-baseline justify-between gap-3 py-1">
+                <span className="text-xs" style={{ color: "var(--text-mut)" }}>
+                  {f.pair}
+                </span>
+                <span className="flex items-baseline gap-2">
+                  <span className="text-xs font-medium" style={{ color: "var(--text-hi)" }}>
+                    {f.value}
+                  </span>
+                  <span className="mono text-xs font-semibold" style={changeStyle(f.changePct)}>
+                    {fmtPct(f.changePct, 2)}
+                  </span>
                 </span>
               </div>
-            );
-          })}
-        </div>
-        <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-          Sample headlines — live news integration planned. Sentiment tags are
-          illustrative, not a model output.
-        </p>
-      </section>
+            ))}
+            <StructureRow label="Policy rate" value={`${market.macro.policyRate}%`} />
+          </div>
+          <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
+            FX values are placeholders; live / delayed FX quotes are planned.
+          </p>
+        </section>
 
-      {/* ── Cross-links ─────────────────────────────────────────────────── */}
-      <section className="mt-4">
-        <SectionLabel>Open in QuantLab</SectionLabel>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {market.links.map((l) => (
-            <button
-              key={l.label}
-              type="button"
-              onClick={() => onNav(l.view)}
-              className="rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors"
-              style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
-            >
-              {l.label} →
-            </button>
-          ))}
-        </div>
-        <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-          Cross-links open the related QuantLab module; market-specific
-          pre-filling is planned.
-        </p>
-      </section>
+        {/* Market Structure */}
+        <section>
+          <SectionLabel>Market Structure</SectionLabel>
+          <div className="rounded-xl p-3" style={{ background: "var(--glass)", border: "1px solid var(--line)" }}>
+            <StructureRow label="Exchange" value={market.exchange} />
+            <StructureRow label="Trading hours" value={market.tradingHours} />
+            <StructureRow label="Settlement" value={market.marketStructure.settlement} />
+            <StructureRow label="Market cap" value={market.marketStructure.marketCap} />
+            <StructureRow label="Listed companies" value={market.marketStructure.listedCompanies} />
+          </div>
+          <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-mut)" }}>
+            {market.marketStructure.notes}
+          </p>
+        </section>
+
+        {/* Sample Headlines */}
+        <section>
+          <SectionLabel>Sample Headlines</SectionLabel>
+          <div className="space-y-2">
+            {market.headlines.map((h) => {
+              const color = SENTIMENT_COLOR[SENTIMENT_TONE[h.sentiment]];
+              return (
+                <div
+                  key={h.title}
+                  className="flex items-start justify-between gap-3 rounded-xl px-3 py-2"
+                  style={{ background: "var(--glass)", border: "1px solid var(--line)" }}
+                >
+                  <span className="text-xs" style={{ color: "var(--text-hi)" }}>
+                    {h.title}
+                  </span>
+                  <span
+                    className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                    style={{ border: `1px solid ${color}`, color }}
+                  >
+                    {h.sentiment}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
+            Sample headlines — live news integration planned. Sentiment pills are
+            illustrative, not a model output.
+          </p>
+        </section>
+
+        {/* QuantLab Actions */}
+        <section>
+          <SectionLabel>QuantLab Actions</SectionLabel>
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+            {market.links.map((l) => (
+              <button
+                key={l.label}
+                type="button"
+                onClick={() => onNav(l.view)}
+                className="rounded-lg px-3 py-2 text-left text-xs font-semibold transition-colors"
+                style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
+              >
+                {l.label} →
+              </button>
+            ))}
+          </div>
+          <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
+            Cross-links open the related QuantLab module; market-specific
+            pre-filling is planned.
+          </p>
+        </section>
+      </div>
     </div>
   );
 }

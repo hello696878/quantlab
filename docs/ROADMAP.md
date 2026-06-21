@@ -1231,6 +1231,39 @@ single-asset Backtest + Strategy Comparison:
   advice.** Live FRED macro, delayed index / FX quotes, news / sentiment, and
   GeoJSON country borders are planned future work
 
+### Phase 20.1 — Visual Redesign & Global Markets Globe v1.1 ✅
+
+- Implemented the **Claude Design** "mission-control" redesign (sources in
+  `docs/design/`: VISUAL_REDESIGN.md · THEME_SYSTEM.md · INTEGRATION.md). The
+  token system and shared components were already aligned with the design; this
+  pass focused on the globe + a global metric-contrast fix.
+- **Globe v1.1**: replaced the SVG globe with a hand-built **canvas 2D**
+  `components/globe/DataGlobe.tsx` (orthographic projection, dot-matrix
+  landmass, atmosphere halo, starfield, 30° graticule, region-colored pulsing
+  markers with back-face culling, great-circle "capital-flow" arcs with a
+  travelling pulse, drag/auto-rotate/reset, hover tooltip; `prefers-reduced-motion`
+  gating; graceful canvas-unavailable fallback — still **no Three.js / WebGL,
+  no new npm dependency**). Rebuilt `GlobeLabPanel` into a width-aware
+  **three-zone** layout (wide/mid/narrow via a container `ResizeObserver`): left
+  rail (search · region filter · market list · quick-jump), center globe with
+  overlay controls + legend, right dossier, and a bottom **region tape**.
+- **Dossier redesign**: sticky header + region dot + **bias pill** + "Static
+  demo data" badge + "Last updated: Static sample", sections renamed to Market
+  Pulse / Macro Vitals / FX & Rates / Market Structure / Sample Headlines /
+  QuantLab Actions.
+- **Globe data**: added design **region colors** (Americas #5b9bff · Europe
+  #2bd6a0 · APAC #f0b648), **MARKET_ARCS**, `marketBias`, and `regionRollup`.
+- **Dashboard**: Globe card badge → "Static data v1.1"; added a **Global
+  Markets** region-tape strip (static-sample badge, cross-links to the globe).
+- **Metric-card contrast fix (global)**: audited every lab; fixed dark-on-dark
+  `text-slate-100/200` value/emphasis text (EventLab metric value, AFML / FX /
+  Credit / Scanner / Rates education labels, SaveReport headings, and two
+  `hover:text-slate-200` states) to the bright `text-slate-900` token. The
+  shared `MetricCard` already used explicit CSS tokens and stays the source of
+  truth for readable values.
+- No backend changes; **no finance/backtest/options/AFML/scanner logic touched**;
+  no live data, API keys, or real-time claims added. `npx tsc --noEmit` clean.
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

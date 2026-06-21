@@ -631,7 +631,7 @@ function CreditEducationTab() {
       <ul className="space-y-2">
         {items.map(([title, body]) => (
           <li key={title}>
-            <span className="font-semibold text-slate-200">{title}:</span> {body}
+            <span className="font-semibold text-slate-900">{title}:</span> {body}
           </li>
         ))}
       </ul>

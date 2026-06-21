@@ -193,18 +193,28 @@ and distinct. The Options Lab also has a button-driven **Model Comparison** tab
 
 ### `src/lib/globe/markets.ts` + `src/components/GlobeLabPanel.tsx`
 
-Global Markets Globe v1 (Phase 20.0) — a **frontend-only, static-data** flagship
-explore experience. `lib/globe/markets.ts` is the single source of truth: 15
-deterministic **sample markets** (country, region, lat/lon, currency, exchange,
+Global Markets Globe (Phase 20.0 v1 → 20.1 v1.1) — a **frontend-only, static-data**
+flagship explore experience. `lib/globe/markets.ts` is the single source of truth:
+15 deterministic **sample markets** (country, region, lat/lon, currency, exchange,
 trading hours, equity indices + deterministic sparklines, macro snapshot, FX
 pairs, market structure, sample headlines with sentiment, and QuantLab
-cross-links) plus `filterMarkets` / `findMarketById` helpers. `GlobeLabPanel`
-composes a **dependency-free SVG orthographic globe** (`components/globe/Globe.tsx`
-— drag-to-rotate, auto-rotate, graticule, atmosphere glow, pulsing markers, hover
-tooltip, selection centring; **no Three.js / WebGL**), a region filter, a search
-box, a keyboard-accessible market list (the WebGL-free fallback), and the
-`components/globe/MarketDossier.tsx` side panel. All values are static
-illustrative sample data — no live market data, FX, macro, or news is fetched.
+cross-links) plus `filterMarkets` / `findMarketById`, design **region colors**,
+**MARKET_ARCS**, and `marketBias` / `regionRollup` helpers.
+
+**v1.1 (visual redesign)** rebuilds the page as a width-aware three-zone
+"mission control" layout (`GlobeLabPanel`, wide/mid/narrow via a container
+`ResizeObserver`): a left rail (search · region filter · market list ·
+quick-jump), a center **canvas 2D globe** (`components/globe/DataGlobe.tsx` —
+orthographic projection, dot-matrix landmass, atmosphere halo, starfield, 30°
+graticule, region-colored pulsing markers with back-face culling, great-circle
+"capital-flow" arcs with a travelling pulse, drag/auto-rotate/reset, hover
+tooltip; **no Three.js / WebGL**, with a graceful canvas-unavailable fallback and
+`prefers-reduced-motion` gating), a right `components/globe/MarketDossier.tsx`
+panel (sticky header + bias pill + Market Pulse / Macro Vitals / FX & Rates /
+Market Structure / Sample Headlines / QuantLab Actions), and a bottom region
+tape. The keyboard-accessible market list remains the no-pointer fallback. All
+values are static illustrative sample data — no live market data, FX, macro, or
+news is fetched.
 
 ### `src/app/page.tsx`
 

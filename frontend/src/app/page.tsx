@@ -1192,7 +1192,7 @@ export default function HomePage() {
               type="button"
               onClick={() => setDemoNotice(null)}
               aria-label="Dismiss demo hint"
-              className="flex-shrink-0 px-1 text-slate-400 transition-colors hover:text-slate-200"
+              className="flex-shrink-0 px-1 text-slate-400 transition-colors hover:text-slate-900"
             >
               ✕
             </button>

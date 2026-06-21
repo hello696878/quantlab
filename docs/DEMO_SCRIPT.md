@@ -232,20 +232,27 @@ Return to the Command Center's **Platform Direction** panel (or open
   try d = −0.5 for a friendly validation error. Emphasise: fractional differentiation
   is preprocessing (not a signal), targets a memory/persistence trade-off, and the
   diagnostics are heuristic — not a formal stationarity test.
-- **Global Markets Globe** — the flagship explore experience. Open **Global Markets
-  Globe** from the sidebar (or the hero "Explore Global Markets" button). Drag the
-  3D globe to rotate it, hover a pulsing marker for its tooltip, then click
-  **United States** → the dossier opens (the globe re-centres on it): header +
-  **"Static demo data"** badge, equity indices with sparklines, the macro snapshot,
-  currency & rates, market structure, sample headlines with **Bullish / Bearish /
-  Neutral** tags, and **Open in QuantLab** cross-links. Click **Japan** and
-  **Taiwan** to show more dossiers; filter to **Asia-Pacific** and search
-  `Taiwan`, then **Reset**. Use Ctrl/Cmd+K → "Open Taiwan Market Dossier" to show
-  the deep-link. Emphasise: a pure-SVG globe (no WebGL/Three.js — the market list
-  is the keyboard-accessible fallback), **all values are static illustrative
-  sample data** (not real-time quotes, FX, macro, or news); live FRED macro,
-  delayed index/FX quotes, news/sentiment, and GeoJSON borders are planned — not
-  investment advice.
+- **Global Markets Globe (v1.1)** — the flagship "mission-control" explore
+  experience. Open **Global Markets Globe** from the sidebar (or the hero
+  "Explore Global Markets" button). Note the three zones: left rail
+  (search · region filter · market list · quick-jump), center **canvas globe**
+  (dot-matrix continents, atmosphere halo, starfield, pulsing region-colored
+  markers, illustrative great-circle arcs), and right dossier. Drag the globe to
+  rotate, toggle **⏸ Spin**, hover a marker for its tooltip, then click
+  **United States** → the dossier opens and the globe re-centres on it: sticky
+  header with a **bias pill** + **"Static demo data"** badge + "Last updated:
+  Static sample", then **Market Pulse** (indices + sparklines), **Macro Vitals**,
+  **FX & Rates**, **Market Structure**, **Sample Headlines** with
+  **Bullish / Bearish / Neutral** pills, and **QuantLab Actions**. Use the
+  quick-jump chips (US / UK / Japan / Hong Kong), filter to **APAC** and search
+  `Taiwan`, then **Reset**. Point at the bottom **region tape** and the dashboard
+  **Global Markets** strip. Use Ctrl/Cmd+K → "Open Taiwan Market Dossier" for the
+  deep-link. Emphasise: a hand-built canvas globe (no WebGL/Three.js — the market
+  list is the keyboard-accessible fallback, with a graceful message if 2D canvas
+  is unavailable), **all values are static illustrative sample data** (not
+  real-time quotes, FX, macro, or news; arcs and the bias pill are decorative);
+  live FRED macro, delayed index/FX quotes, news/sentiment, and GeoJSON borders
+  are planned — not investment advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

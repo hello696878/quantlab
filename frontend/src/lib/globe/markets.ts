@@ -619,3 +619,74 @@ export const SENTIMENT_TONE: Record<Sentiment, "positive" | "danger" | "default"
   Bearish: "danger",
   Neutral: "default",
 };
+
+// ---------------------------------------------------------------------------
+// Visual-redesign helpers (Globe v1.1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Region marker colors for the globe + dossier, matching the Claude Design
+ * spec (VISUAL_REDESIGN §2). Concrete hex (not theme accents) so the four
+ * regions stay distinguishable regardless of the active accent theme.
+ */
+export const REGION_COLORS: Record<MarketRegion, string> = {
+  Americas: "#5b9bff",
+  Europe: "#2bd6a0",
+  "Asia-Pacific": "#f0b648",
+};
+
+/** Illustrative "capital-flow" connections drawn as great-circle arcs. */
+export const MARKET_ARCS: readonly [string, string][] = [
+  ["us", "uk"],
+  ["us", "jp"],
+  ["cn", "hk"],
+  ["tw", "us"],
+  ["sg", "in"],
+] as const;
+
+/** Mean of a market's sample index daily changes (illustrative only). */
+export function meanIndexChange(market: Market): number {
+  if (market.indices.length === 0) return 0;
+  const sum = market.indices.reduce((acc, i) => acc + i.changePct, 0);
+  return sum / market.indices.length;
+}
+
+/**
+ * Deterministic directional bias from the static sample index changes. This is
+ * an illustrative label for the dossier "bias pill" — not a forecast, a model
+ * output, or a recommendation.
+ */
+export function marketBias(market: Market): Sentiment {
+  const m = meanIndexChange(market);
+  if (m > 0.002) return "Bullish";
+  if (m < -0.0005) return "Bearish";
+  return "Neutral";
+}
+
+export interface RegionRollup {
+  region: MarketRegion;
+  /** Average of each member market's mean index change (illustrative). */
+  avgChange: number;
+  advancers: number;
+  decliners: number;
+  count: number;
+}
+
+/** Region tape rollup for the dashboard + globe bottom strip (sample data). */
+export function regionRollup(markets: Market[] = MARKETS): RegionRollup[] {
+  return MARKET_REGIONS.map((region) => {
+    const members = markets.filter((m) => m.region === region);
+    const changes = members.map(meanIndexChange);
+    const avgChange =
+      changes.length === 0
+        ? 0
+        : changes.reduce((a, b) => a + b, 0) / changes.length;
+    return {
+      region,
+      avgChange,
+      advancers: changes.filter((c) => c > 0).length,
+      decliners: changes.filter((c) => c < 0).length,
+      count: members.length,
+    };
+  });
+}

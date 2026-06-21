@@ -111,7 +111,7 @@ export default function SaveReportModal({
       >
         {savedId === null ? (
           <>
-            <h3 className="text-base font-bold text-slate-100">
+            <h3 className="text-base font-bold text-slate-900">
               Save to Report Gallery
             </h3>
             <p className="mt-1 text-xs text-slate-400">
@@ -202,10 +202,10 @@ export default function SaveReportModal({
           </>
         ) : (
           <div className="py-2 text-center">
-            <p className="text-sm font-semibold text-slate-100">Report saved ✓</p>
+            <p className="text-sm font-semibold text-slate-900">Report saved ✓</p>
             <p className="mt-1 text-xs text-slate-400">
               Find it in the{" "}
-              <span className="font-medium text-slate-200">Saved Reports</span>{" "}
+              <span className="font-medium text-slate-900">Saved Reports</span>{" "}
               workspace.
             </p>
             <button

@@ -10,6 +10,7 @@ import {
 } from "@/lib/api";
 import type { SavedBacktestSummary, SavedReportSummary } from "@/lib/types";
 import { fmtPct, fmtRatio } from "@/lib/format";
+import { REGION_COLORS, regionRollup } from "@/lib/globe/markets";
 import { DEMO_PRESETS, type DemoPresetId } from "@/lib/demoPresets";
 import { SkeletonCard } from "@/components/ui/LoadingSkeleton";
 import OfflineState from "@/components/ui/OfflineState";
@@ -617,6 +618,45 @@ export default function HomeDashboard({
         </div>
       </div>
 
+      {/* ── Global Markets strip ─────────────────────────────────────────── */}
+      <section>
+        <div className="mb-3 flex items-center justify-between">
+          <p className="section-title">Global Markets</p>
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+            style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+          >
+            Static sample
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {regionRollup().map((r) => (
+            <button
+              key={r.region}
+              type="button"
+              onClick={() => onNav("globe")}
+              className="card flex items-center justify-between gap-3 p-3 text-left"
+            >
+              <span className="flex items-center gap-2">
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ background: REGION_COLORS[r.region], boxShadow: `0 0 6px ${REGION_COLORS[r.region]}` }}
+                />
+                <span className="text-xs font-semibold" style={{ color: "var(--text-hi)" }}>
+                  {r.region}
+                </span>
+              </span>
+              <span
+                className="mono text-sm font-semibold"
+                style={{ color: r.avgChange > 0 ? "var(--pos)" : r.avgChange < 0 ? "var(--neg)" : "var(--text-mut)" }}
+              >
+                {fmtPct(r.avgChange, 2)}
+              </span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* ── Onboarding / Guided demo ─────────────────────────────────────── */}
       {hidden === true && (
         <button
@@ -645,7 +685,7 @@ export default function HomeDashboard({
               <button
                 type="button"
                 onClick={() => setOnboardingHidden(true)}
-                className="flex-shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-400 transition-colors hover:text-slate-200"
+                className="flex-shrink-0 rounded-md px-2 py-1 text-xs font-medium text-slate-400 transition-colors hover:text-slate-900"
                 style={{ border: "1px solid var(--line)" }}
               >
                 Hide onboarding
@@ -988,13 +1028,13 @@ export default function HomeDashboard({
                 className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
-                Static data v1
+                Static data v1.1
               </span>
             </span>
             <span className="text-xs text-slate-400">
               Explore a 3D map of global markets and open country-level financial
               dossiers with indices, macro snapshots, currencies, market
-              structure, and QuantLab cross-links — static illustrative data.
+              structure, and QuantLab cross-links.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Globe →
