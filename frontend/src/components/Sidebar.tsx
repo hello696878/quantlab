@@ -33,6 +33,8 @@ const ICONS: Record<string, string> = {
   credit: "M4 6h16v12H4zM4 10h16M8 15h4",
   scanner: "M4 14h3v6H4zM10.5 9h3v11h-3zM17 4h3v16h-3z",
   finml: "M4 18 9 9l4 5 3-6 4 7M4 4v16h16",
+  globe:
+    "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18Zm0 0c2.5 2.4 3.8 5.6 3.8 9s-1.3 6.6-3.8 9c-2.5-2.4-3.8-5.6-3.8-9S9.5 5.4 12 3ZM3.2 9h17.6M3.2 15h17.6",
 };
 
 function Icon({ name, size = 17 }: { name: string; size?: number }) {
@@ -104,6 +106,7 @@ function Logo() {
 
 export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "home" },
+  { id: "globe", label: "Global Markets Globe", icon: "globe" },
   { id: "backtest", label: "Backtest", icon: "backtest" },
   { id: "library", label: "Strategy Library", icon: "library" },
   { id: "replications", label: "Paper Replications", icon: "papers" },

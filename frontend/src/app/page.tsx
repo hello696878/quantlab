@@ -44,6 +44,8 @@ import FxLabPanel from "@/components/FxLabPanel";
 import CreditLabPanel from "@/components/CreditLabPanel";
 import ScannerLabPanel from "@/components/ScannerLabPanel";
 import AfmlLabPanel from "@/components/AfmlLabPanel";
+import GlobeLabPanel from "@/components/GlobeLabPanel";
+import { MARKETS } from "@/lib/globe/markets";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -326,6 +328,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "Research, backtest, optimize, and report trading strategies from one local dashboard.",
   },
+  globe: {
+    title: "Global Markets Globe",
+    subtitle:
+      "Explore an interactive 3D map of 15 sample markets and open country-level financial dossiers — static illustrative data, not real-time market data, not investment advice.",
+  },
   backtest: {
     title: "Backtest",
     subtitle: "Run a single strategy on real historical market data.",
@@ -523,6 +530,10 @@ export default function HomePage() {
   const [finmlTab, setFinmlTab] = useState<"cusum" | "labeling" | "uniqueness" | "purgedcv" | "seqboot" | "fracdiff" | "education">("cusum");
   const [finmlKey, setFinmlKey] = useState(0);
 
+  // Global Markets Globe: which market to preselect (deep-linked from palette).
+  const [globeMarketId, setGlobeMarketId] = useState<string | null>(null);
+  const [globeKey, setGlobeKey] = useState(0);
+
   // Saved reports (Report Gallery) state
   const [savedReportsRefreshKey, setSavedReportsRefreshKey] = useState(0);
   const [savedReportDetailId, setSavedReportDetailId] = useState<number | null>(
@@ -627,6 +638,19 @@ export default function HomePage() {
     setPaperKey((k) => k + 1);
     setDisasterSlug(null);
     setDisasterKey((k) => k + 1);
+    // Sidebar / nav-command entry to the globe always opens with no market
+    // preselected (palette market commands deep-select via openGlobe instead).
+    if (next === "globe") setGlobeMarketId(null);
+  }
+
+  /** Open the Global Markets Globe, optionally preselecting a market dossier. */
+  function openGlobe(marketId: string | null) {
+    setSavedDetailId(null);
+    setSavedReportDetailId(null);
+    setDemoNotice(null);
+    setGlobeMarketId(marketId);
+    setGlobeKey((k) => k + 1);
+    setView("globe");
   }
 
   /** Open the Strategy Library on a specific model page (command palette). */
@@ -820,6 +844,7 @@ export default function HomePage() {
   // Demo definitions come straight from DEMO_PRESETS (no duplication).
   const NAV_COMMANDS: { view: View; title: string; keywords: string }[] = [
     { view: "home", title: "Go to Home", keywords: "command center dashboard" },
+    { view: "globe", title: "Open Global Markets Globe", keywords: "globe global markets world markets country macro fx indices market dossier united states japan taiwan germany india europe asia explore map 3d earth" },
     { view: "backtest", title: "Go to Backtest", keywords: "single asset run strategy" },
     { view: "library", title: "Open Strategy Library", keywords: "models catalog docs education strategy pages" },
     { view: "replications", title: "Open Paper Replications", keywords: "papers research academic momentum pairs replication" },
@@ -1105,6 +1130,23 @@ export default function HomePage() {
         handleNav("finml");
       },
     })),
+    {
+      id: "globe-open",
+      group: "Global Markets Globe",
+      title: "Explore Global Markets",
+      keywords:
+        "globe global markets world markets country macro fx indices market dossier map 3d earth explore europe asia americas",
+      run: () => openGlobe(null),
+    },
+    ...MARKETS.map((m) => ({
+      id: `globe-${m.id}`,
+      group: "Global Markets Globe",
+      title: `Open ${m.country} Market Dossier`,
+      keywords: `globe market dossier ${m.country} ${m.region} ${m.subregion} ${m.currency} ${m.exchange} ${m.indices
+        .map((i) => `${i.name} ${i.ticker}`)
+        .join(" ")}`,
+      run: () => openGlobe(m.id),
+    })),
     // Report actions are only offered when they actually work (a result exists).
     ...(result
       ? [
@@ -1167,6 +1209,15 @@ export default function HomePage() {
             onOpenLibraryPage={openLibraryPage}
             onOpenPaperPage={openPaperPage}
             onOpenDisasterPage={openDisasterPage}
+          />
+        )}
+
+        {/* ── Global Markets Globe ─────────────────────────────────────── */}
+        {view === "globe" && (
+          <GlobeLabPanel
+            key={globeKey}
+            initialMarketId={globeMarketId}
+            onNav={handleNav}
           />
         )}
 

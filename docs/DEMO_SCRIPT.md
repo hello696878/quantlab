@@ -232,6 +232,20 @@ Return to the Command Center's **Platform Direction** panel (or open
   try d = −0.5 for a friendly validation error. Emphasise: fractional differentiation
   is preprocessing (not a signal), targets a memory/persistence trade-off, and the
   diagnostics are heuristic — not a formal stationarity test.
+- **Global Markets Globe** — the flagship explore experience. Open **Global Markets
+  Globe** from the sidebar (or the hero "Explore Global Markets" button). Drag the
+  3D globe to rotate it, hover a pulsing marker for its tooltip, then click
+  **United States** → the dossier opens (the globe re-centres on it): header +
+  **"Static demo data"** badge, equity indices with sparklines, the macro snapshot,
+  currency & rates, market structure, sample headlines with **Bullish / Bearish /
+  Neutral** tags, and **Open in QuantLab** cross-links. Click **Japan** and
+  **Taiwan** to show more dossiers; filter to **Asia-Pacific** and search
+  `Taiwan`, then **Reset**. Use Ctrl/Cmd+K → "Open Taiwan Market Dossier" to show
+  the deep-link. Emphasise: a pure-SVG globe (no WebGL/Three.js — the market list
+  is the keyboard-accessible fallback), **all values are static illustrative
+  sample data** (not real-time quotes, FX, macro, or news); live FRED macro,
+  delayed index/FX quotes, news/sentiment, and GeoJSON borders are planned — not
+  investment advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

@@ -1203,6 +1203,34 @@ single-asset Backtest + Strategy Comparison:
   **Preprocessing, not a trading signal**; diagnostics are heuristic, not a formal
   stationarity test. Meta-labeling and CPCV remain planned. Synthetic data, not advice
 
+### Phase 20.0 — Global Markets Globe v1 ✅
+
+- **Frontend-only, static-data** flagship explore experience. New
+  `frontend/src/lib/globe/markets.ts` — 15 deterministic **sample markets** (US,
+  Canada, UK, Germany, France, Switzerland, Japan, China, Hong Kong, Taiwan,
+  South Korea, India, Singapore, Australia, Brazil) each with country/region/
+  lat-lon, currency, exchange, trading hours, equity indices + deterministic
+  sparklines, macro snapshot (GDP / inflation / unemployment / policy rate /
+  debt-to-GDP), FX pair(s), market structure, sample headlines with sentiment,
+  and QuantLab cross-links — plus `filterMarkets` / `findMarketById` helpers
+- New `/globe` workspace (`components/GlobeLabPanel.tsx`): a **dependency-free
+  SVG orthographic globe** (`components/globe/Globe.tsx` — hand-rolled lat/lon →
+  3D → 2D projection, drag-to-rotate, reduced-motion-aware auto-rotate,
+  graticule, atmosphere glow, pulsing markers hidden on the far hemisphere,
+  hover tooltip, selection centring; **no Three.js / WebGL, no new npm
+  dependency**), a region filter (All / Americas / Europe / Asia-Pacific), a
+  search box, a keyboard-accessible market list (the WebGL-free fallback), and a
+  `components/globe/MarketDossier.tsx` side panel (header + "Static demo data"
+  badge · equity indices + sparklines · macro snapshot · currency & rates ·
+  market structure · sample headlines + sentiment tags · cross-links)
+- Sidebar nav entry, `VIEW_META`, deep-link state, dashboard card (badge
+  "Static data v1") + hero CTA, Platform-Direction chip, and command-palette
+  commands ("Explore Global Markets" + an "Open … Market Dossier" command per
+  market). No backend changes; `npx tsc --noEmit` clean; `pytest` unaffected
+- **Static illustrative sample data — not real-time quotes, not investment
+  advice.** Live FRED macro, delayed index / FX quotes, news / sentiment, and
+  GeoJSON country borders are planned future work
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -1290,14 +1318,19 @@ search · toasts, error boundary, loading/offline states.
     K-fold + embargo CV** with leakage diagnostics; 19.2: **sequential bootstrap**;
     19.3: **fractional differentiation** — all on synthetic data. Meta-labeling,
     information-driven bars, and Combinatorial Purged CV (CPCV) remain planned)
-14. **Portfolio Studio + Strategy Ensemble Builder** (research)
-15. **ML & AI Lab** — feature pipelines, walk-forward ML guards (research)
-16. **AI Explainer Copilot** — explains a result, never recommends trades
+14. **Global Markets Globe** — **built (v1)** (20.0: interactive dependency-free
+    SVG 3D globe + 15 static sample-market dossiers — indices, macro, currency /
+    rates, market structure, sample headlines, QuantLab cross-links. Live FRED
+    macro, delayed index / FX quotes, news / sentiment, and GeoJSON country
+    borders remain planned; static illustrative data, not real-time)
+15. **Portfolio Studio + Strategy Ensemble Builder** (research)
+16. **ML & AI Lab** — feature pipelines, walk-forward ML guards (research)
+17. **AI Explainer Copilot** — explains a result, never recommends trades
     (future)
-17. **3D Visualization Engine** — surfaces (vol, parameter sweeps) (future)
-18. **Dashboard & Content Engine** — ~~Quant Disasters series~~ **built**
+18. **3D Visualization Engine** — surfaces (vol, parameter sweeps) (future)
+19. **Dashboard & Content Engine** — ~~Quant Disasters series~~ **built**
     (13.2, six case studies); broader educational content engine (future)
-19. **Platform & Launch** — hosted demo, hardening, optional accounts (future)
+20. **Platform & Launch** — hosted demo, hardening, optional accounts (future)
 
 ### Long-term model catalog (12 categories)
 

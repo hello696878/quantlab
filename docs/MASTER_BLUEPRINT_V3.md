@@ -37,6 +37,12 @@ reproducible and every limitation explicit.
   (19.2), and **fractional differentiation** (fixed-width preprocessing with
   memory and heuristic stability diagnostics) (19.3), on synthetic data
   (a methodology toolkit, not a model)
+- **Global Markets Globe v1** (20.0) — a flagship explore experience: an
+  interactive **dependency-free SVG 3D globe** (no Three.js / WebGL) over 15
+  static **sample-market dossiers** (equity indices, macro snapshot, currency /
+  rates, market structure, sample headlines, QuantLab cross-links). Static
+  illustrative data — **not real-time** (live FRED macro, delayed index / FX
+  quotes, news / sentiment, and GeoJSON borders are planned)
 - Strategies: SMA Crossover, RSI Mean Reversion, Bollinger Band, Time-Series
   Momentum, Volatility Breakout, Pairs Trading; long/short modes
 - Strategy Comparison with shared simulation settings
@@ -134,15 +140,20 @@ reproducible and every limitation explicit.
     triple-barrier labeling, sample concurrency + uniqueness weights; 19.1: purged
     K-fold + embargo CV with leakage diagnostics; 19.2: sequential bootstrap;
     19.3: fractional differentiation; meta-labeling, CPCV planned)
-14. Portfolio Studio + Ensemble Builder
-15. ML & AI Lab
-16. AI Explainer Copilot
-17. 3D Visualization Engine
-18. Dashboard & Content Engine — Quant Disasters **built** (13.2); dashboard
+14. ~~Global Markets Globe~~ — **built (v1)** (20.0: interactive dependency-free
+    SVG 3D globe + 15 static sample-market dossiers — indices, macro, currency /
+    rates, market structure, sample headlines, QuantLab cross-links; live FRED
+    macro, delayed index / FX quotes, news / sentiment, and GeoJSON borders
+    planned; static illustrative data, not real-time)
+15. Portfolio Studio + Ensemble Builder
+16. ML & AI Lab
+17. AI Explainer Copilot
+18. 3D Visualization Engine
+19. Dashboard & Content Engine — Quant Disasters **built** (13.2); dashboard
     content hub **built** (13.3: hero workflows, Trust Layer grid, Content
     Engine cards, featured items, direction panel); broader content engine
     future
-19. Platform & Launch
+20. Platform & Launch
 
 ## 6. Hard constraints (apply to every phase)
 

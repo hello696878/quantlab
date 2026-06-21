@@ -396,6 +396,21 @@
 @keyframes rise { from { transform: translateY(8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .rise { animation: rise 0.45s var(--ease-out) both; }
 
+/* Global Markets Globe — pulsing market markers (SVG circles). */
+@keyframes globePulse {
+  0%   { transform: scale(0.7); opacity: 0.7; }
+  70%  { transform: scale(2.1); opacity: 0; }
+  100% { transform: scale(2.1); opacity: 0; }
+}
+.globe-pulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: globePulse 2.4s var(--ease) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .globe-pulse { animation: none; opacity: 0.5; }
+}
+
 /* Skeleton loading placeholder: muted block with a subtle moving shimmer. */
 @keyframes shimmer { 100% { transform: translateX(100%); } }
 .skeleton {

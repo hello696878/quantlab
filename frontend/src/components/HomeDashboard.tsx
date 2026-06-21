@@ -112,6 +112,7 @@ const ROADMAP_STATUS: { label: string; status: "Built" | "Planned" | "Future" }[
   { label: "Strategy Library", status: "Built" },
   { label: "Paper Replications", status: "Built" },
   { label: "Quant Disasters", status: "Built" },
+  { label: "Global Markets Globe", status: "Built" },
   { label: "Options & Volatility Lab", status: "Built" },
   { label: "Event-Driven / Arbitrage Module", status: "Planned" },
   { label: "Portfolio Ensemble Builder", status: "Planned" },
@@ -596,6 +597,10 @@ export default function HomeDashboard({
           <Badge>Research-only</Badge>
         </div>
         <div className="mt-4 flex flex-wrap gap-2">
+          <PrimaryButton
+            label="Explore Global Markets"
+            onClick={() => onNav("globe")}
+          />
           <PrimaryButton label="Run Backtest" onClick={() => onNav("backtest")} />
           <PrimaryButton
             label="Open Strategy Library"
@@ -970,6 +975,31 @@ export default function HomeDashboard({
           fail.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <button
+            type="button"
+            onClick={() => onNav("globe")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                Global Markets Globe
+              </span>
+              <span
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+              >
+                Static data v1
+              </span>
+            </span>
+            <span className="text-xs text-slate-400">
+              Explore a 3D map of global markets and open country-level financial
+              dossiers with indices, macro snapshots, currencies, market
+              structure, and QuantLab cross-links — static illustrative data.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Globe →
+            </span>
+          </button>
           <button
             type="button"
             onClick={() => onNav("library")}

@@ -191,6 +191,21 @@ seed the common base inputs and per-model defaults across the Options Lab tabs;
 and distinct. The Options Lab also has a button-driven **Model Comparison** tab
 (Black–Scholes vs binomial vs Monte Carlo vs Heston) — educational, none "correct".
 
+### `src/lib/globe/markets.ts` + `src/components/GlobeLabPanel.tsx`
+
+Global Markets Globe v1 (Phase 20.0) — a **frontend-only, static-data** flagship
+explore experience. `lib/globe/markets.ts` is the single source of truth: 15
+deterministic **sample markets** (country, region, lat/lon, currency, exchange,
+trading hours, equity indices + deterministic sparklines, macro snapshot, FX
+pairs, market structure, sample headlines with sentiment, and QuantLab
+cross-links) plus `filterMarkets` / `findMarketById` helpers. `GlobeLabPanel`
+composes a **dependency-free SVG orthographic globe** (`components/globe/Globe.tsx`
+— drag-to-rotate, auto-rotate, graticule, atmosphere glow, pulsing markers, hover
+tooltip, selection centring; **no Three.js / WebGL**), a region filter, a search
+box, a keyboard-accessible market list (the WebGL-free fallback), and the
+`components/globe/MarketDossier.tsx` side panel. All values are static
+illustrative sample data — no live market data, FX, macro, or news is fetched.
+
 ### `src/app/page.tsx`
 
 Root page component. Owns all strategy and research parameter state. Renders `BacktestForm` on the left and the appropriate result panels on the right. Tabs switch between Backtest and each research tool.
