@@ -34,3 +34,8 @@ from app.finml.bootstrap import (  # noqa: F401
     run_sequential_bootstrap_demo,
     validate_bootstrap_inputs,
 )
+from app.finml.fractional_diff import (  # noqa: F401
+    get_fracdiff_weights,
+    run_fractional_diff_demo,
+    validate_fracdiff_inputs,
+)

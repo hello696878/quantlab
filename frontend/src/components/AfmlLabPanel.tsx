@@ -15,14 +15,19 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { BacktestApiError, runLabelingDemo, runPurgedCvDemo, runSequentialBootstrapDemo } from "@/lib/api";
-import type { LabelingDemoResponse, PurgedCvResponse, SequentialBootstrapResponse, ThresholdMode } from "@/lib/types";
+import { BacktestApiError, runLabelingDemo, runPurgedCvDemo, runSequentialBootstrapDemo, runFractionalDiffDemo } from "@/lib/api";
+import type { LabelingDemoResponse, PurgedCvResponse, SequentialBootstrapResponse, FractionalDiffResponse, ThresholdMode } from "@/lib/types";
 import MetricCard from "@/components/MetricCard";
 import NeonTooltip from "@/components/charts/NeonTooltip";
 import { CHART_AXIS, CHART_AXIS_LINE, CHART_GRID, CHART_REF_LINE, DANGER } from "@/components/charts/chartTheme";
 import { seriesColor } from "@/lib/chartPalette";
 
-type Tab = "cusum" | "labeling" | "uniqueness" | "purgedcv" | "seqboot" | "education";
+type Tab = "cusum" | "labeling" | "uniqueness" | "purgedcv" | "seqboot" | "fracdiff" | "education";
+
+// Fractional-diff series colors (distinct: original cyan, first-diff amber, fracdiff violet).
+const ORIG_COLOR = seriesColor(0); // cyan
+const FIRSTDIFF_COLOR = seriesColor(4); // amber
+const FRACDIFF_COLOR = seriesColor(2); // violet
 
 // Purged-CV role colors (distinct: train blue, test violet, purged amber, embargo red).
 const TRAIN_COLOR = seriesColor(1); // blue
@@ -120,11 +125,20 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
   const [sbError, setSbError] = useState<string | null>(null);
   const [sbLoading, setSbLoading] = useState(false);
 
+  // Fractional differentiation (own inputs + result, reuses the shared path params).
+  const [fracD, setFracD] = useState("0.5");
+  const [weightThreshold, setWeightThreshold] = useState("0.001");
+  const [maxWeights, setMaxWeights] = useState("200");
+  const [fdResult, setFdResult] = useState<FractionalDiffResponse | null>(null);
+  const [fdError, setFdError] = useState<string | null>(null);
+  const [fdLoading, setFdLoading] = useState(false);
+
   function set<K extends keyof UiInputs>(key: K, value: UiInputs[K]) {
     setInp((s) => ({ ...s, [key]: value }));
     setError(null);
     setCvError(null);
     setSbError(null);
+    setFdError(null);
   }
 
   async function runCv() {
@@ -214,6 +228,49 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
       setSbError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
     } finally {
       setSbLoading(false);
+    }
+  }
+
+  async function runFd() {
+    if (fdLoading) return;
+    const dv = num(fracD);
+    const thr = num(weightThreshold);
+    const mw = num(maxWeights);
+    if (!valid) {
+      setFdError("Fix the shared Setup values before running fractional differentiation.");
+      return;
+    }
+    if (!Number.isFinite(dv) || dv < 0 || dv > 2) {
+      setFdError("d must be between 0 and 2.");
+      return;
+    }
+    if (!Number.isFinite(thr) || thr <= 0 || thr >= 1) {
+      setFdError("Weight threshold must be between 0 and 1 (exclusive).");
+      return;
+    }
+    if (!Number.isInteger(mw) || mw < 2 || mw > 1000) {
+      setFdError("Max weights must be a whole number between 2 and 1000.");
+      return;
+    }
+    setFdLoading(true);
+    setFdError(null);
+    setFdResult(null);
+    try {
+      const res = await runFractionalDiffDemo({
+        n_days: num(inp.nDays),
+        start_price: num(inp.startPrice),
+        drift: num(inp.driftPct) / 100,
+        volatility: num(inp.volPct) / 100,
+        seed: inp.seed.trim() === "" ? null : num(inp.seed),
+        d: dv,
+        weight_threshold: thr,
+        max_weights: mw,
+      });
+      setFdResult(res);
+    } catch (e) {
+      setFdError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+    } finally {
+      setFdLoading(false);
     }
   }
 
@@ -389,6 +446,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
             ["uniqueness", "Sample Uniqueness"],
             ["purgedcv", "Purged CV"],
             ["seqboot", "Sequential Bootstrap"],
+            ["fracdiff", "Fractional Differentiation"],
             ["education", "Education"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
@@ -939,6 +997,136 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
         </>
       )}
 
+      {/* Fractional Differentiation */}
+      {tab === "fracdiff" && (
+        <>
+          <div className="card space-y-3 p-5">
+            <p className="section-title">Fractional Differentiation</p>
+            <p className="text-xs text-slate-500">
+              Reuses the synthetic price path from the Setup above. Fixed-width fractional
+              differencing with order d removes non-stationarity while preserving more memory than an
+              ordinary first difference. Preprocessing only — not a trading signal.
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <Field label="d (0–2)"><input type="number" className={inputCls + " w-24"} value={fracD} step={0.1} onChange={(e) => setFracD(e.target.value)} /></Field>
+              <Field label="Weight threshold"><input type="number" className={inputCls + " w-28"} value={weightThreshold} step={0.001} onChange={(e) => setWeightThreshold(e.target.value)} /></Field>
+              <Field label="Max weights"><input type="number" className={inputCls + " w-28"} value={maxWeights} step={10} onChange={(e) => setMaxWeights(e.target.value)} /></Field>
+              <button
+                type="button"
+                onClick={runFd}
+                disabled={fdLoading}
+                className={
+                  "rounded-lg px-4 py-2 text-sm font-semibold transition-colors " +
+                  (!fdLoading
+                    ? "bg-[var(--accent)] text-[var(--on-accent)] shadow-[var(--accent-glow)] hover:brightness-110"
+                    : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
+                }
+              >
+                {fdLoading ? "Running…" : "Run fractional differentiation"}
+              </button>
+            </div>
+            <p className="text-[11px] text-slate-400">d 0–2 (0 ≈ original, 1 ≈ first difference), weight threshold 0–1, max weights 2–1000 (&lt; days). Recommended d between 0 and 1.</p>
+            {fdError && <p className="text-xs text-red-600">⚠ {fdError}</p>}
+          </div>
+
+          {fdResult && (
+            <>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-7">
+                <MetricCard label="d" value={fmt(fdResult.summary.d, 2)} tone="accent" />
+                <MetricCard label="Weight count" value={String(fdResult.summary.weight_count)} />
+                <MetricCard label="Warmup period" value={String(fdResult.summary.warmup_period)} />
+                <MetricCard label="Usable obs" value={String(fdResult.summary.usable_observations)} />
+                <MetricCard label="Data loss" value={pct(fdResult.summary.data_loss_pct, 1)} tone="warn" />
+                <MetricCard label="Fracdiff memory corr" value={fmt(fdResult.summary.fracdiff_correlation)} tone="positive" />
+                <MetricCard label="First-diff memory corr" value={fmt(fdResult.summary.firstdiff_correlation)} />
+              </div>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">Original price</p>
+                <ResponsiveContainer width="100%" height={180}>
+                  <ComposedChart data={fdResult.series.original.map((p) => ({ t: toTs(p.date), value: p.value }))} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                    <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} scale="time" tick={{ fontSize: 10, fill: CHART_AXIS }} axisLine={{ stroke: CHART_AXIS_LINE }} tickLine={false} tickFormatter={fmtTs} minTickGap={48} />
+                    <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={52} domain={["auto", "auto"]} />
+                    <Tooltip content={<NeonTooltip formatValue={(v: number) => v.toFixed(2)} formatLabel={(l) => (typeof l === "number" ? fmtTs(l) : "")} />} />
+                    <Line type="monotone" dataKey="value" name="Price" stroke={ORIG_COLOR} strokeWidth={1.6} dot={false} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">First difference vs fractional difference (d = {fmt(fdResult.summary.d, 2)})</p>
+                <ResponsiveContainer width="100%" height={200}>
+                  <ComposedChart margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                    <XAxis dataKey="t" type="number" domain={["dataMin", "dataMax"]} scale="time" tick={{ fontSize: 10, fill: CHART_AXIS }} axisLine={{ stroke: CHART_AXIS_LINE }} tickLine={false} tickFormatter={fmtTs} minTickGap={48} allowDuplicatedCategory={false} />
+                    <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={52} domain={["auto", "auto"]} />
+                    <Tooltip content={<NeonTooltip formatValue={(v: number) => v.toFixed(4)} formatLabel={(l) => (typeof l === "number" ? fmtTs(l) : "")} />} />
+                    <ReferenceLine y={0} stroke={CHART_REF_LINE} />
+                    <Line data={fdResult.series.first_difference.map((p) => ({ t: toTs(p.date), first: p.value }))} type="monotone" dataKey="first" name="First difference" stroke={FIRSTDIFF_COLOR} strokeWidth={1.2} dot={false} isAnimationActive={false} />
+                    <Line data={fdResult.series.fractional_difference.map((p) => ({ t: toTs(p.date), frac: p.value }))} type="monotone" dataKey="frac" name="Fractional difference" stroke={FRACDIFF_COLOR} strokeWidth={1.6} dot={false} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+                <p className="text-[11px] text-slate-400">
+                  <span style={{ color: FIRSTDIFF_COLOR }}>— First difference</span>{"  "}
+                  <span style={{ color: FRACDIFF_COLOR }}>— Fractional difference</span>. Fracdiff keeps more of the level's memory (higher correlation with the price).
+                </p>
+              </div>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">Fractional-differencing weights</p>
+                <ResponsiveContainer width="100%" height={160}>
+                  <ComposedChart data={fdResult.weights} margin={{ top: 4, right: 16, bottom: 4, left: 8 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={CHART_GRID} />
+                    <XAxis dataKey="k" type="number" domain={["dataMin", "dataMax"]} tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={{ stroke: CHART_AXIS_LINE }} tickLine={false} />
+                    <YAxis tick={{ fontSize: 11, fill: CHART_AXIS }} axisLine={false} tickLine={false} width={52} />
+                    <Tooltip content={<NeonTooltip formatValue={(v: number) => v.toFixed(5)} formatLabel={(l) => (typeof l === "number" ? `k=${l}` : "")} />} />
+                    <ReferenceLine y={0} stroke={CHART_REF_LINE} />
+                    <Bar dataKey="weight" name="Weight" fill={FRACDIFF_COLOR} isAnimationActive={false} />
+                  </ComposedChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div className="card space-y-2 p-5">
+                <p className="section-title">Stationarity-style diagnostics (heuristic)</p>
+                <div className="overflow-x-auto">
+                  <table className="w-full max-w-xl text-xs">
+                    <thead><tr className="text-slate-400">
+                      <th className="px-2 py-1 text-left font-medium uppercase tracking-wide">Series</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Trend slope</th>
+                      <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Lag-1 autocorr</th>
+                    </tr></thead>
+                    <tbody>
+                      <tr className="border-t border-[var(--line)]">
+                        <td className="px-2 py-1 text-left" style={{ color: ORIG_COLOR }}>Original</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.original_trend_slope, 5)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.original_lag1_autocorr)}</td>
+                      </tr>
+                      <tr className="border-t border-[var(--line)]">
+                        <td className="px-2 py-1 text-left" style={{ color: FRACDIFF_COLOR }}>Fractional difference</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.fracdiff_trend_slope, 5)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.fracdiff_lag1_autocorr)}</td>
+                      </tr>
+                      <tr className="border-t border-[var(--line)]">
+                        <td className="px-2 py-1 text-left" style={{ color: FIRSTDIFF_COLOR }}>First difference</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.firstdiff_trend_slope, 5)}</td>
+                        <td className="px-2 py-1 text-right mono">{fmt(fdResult.diagnostics.firstdiff_lag1_autocorr)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                <p className="text-[11px] text-slate-400">{fdResult.diagnostics.diagnostic_note}</p>
+              </div>
+
+              {fdResult.warnings.map((w, i) => (<p key={i} className="text-[11px] text-slate-400">⚠ {w}</p>))}
+            </>
+          )}
+          {!fdResult && !fdError && (
+            <div className="card p-5 text-sm text-slate-400">Run the fractional differentiation demo to populate this tab.</div>
+          )}
+        </>
+      )}
+
       {(tab === "cusum" || tab === "labeling" || tab === "uniqueness") && !result && (
         <div className="card p-5 text-sm text-slate-400">Run the labeling demo to populate this tab.</div>
       )}
@@ -957,6 +1145,7 @@ export default function AfmlLabPanel({ initialTab = "cusum" }: { initialTab?: Ta
             <li><span className="font-semibold text-slate-200">Purged K-fold (built):</span> the Purged CV tab keeps the K-fold time order but <em>purges</em> training labels whose intervals overlap the test fold, so train and test no longer share outcomes — the per-fold "overlap after purge" should be 0.</li>
             <li><span className="font-semibold text-slate-200">Embargo (built):</span> beyond purging, an embargo removes training labels that start just after the test fold, where serial correlation still leaks. It is applied after purging.</li>
             <li><span className="font-semibold text-slate-200">Sequential bootstrap (built):</span> a uniform bootstrap repeatedly samples overlapping (dependent) labels; the Sequential Bootstrap tab draws events with probability proportional to the marginal uniqueness they add, yielding a less-overlapping sample. It reduces dependence but does not guarantee better model performance — the benefit grows with how much the labels overlap.</li>
+            <li><span className="font-semibold text-slate-200">Fractional differentiation (built):</span> ordinary first differencing makes a price series stationary but erases almost all memory; fractional differencing with 0 &lt; d &lt; 1 removes enough non-stationarity to be usable while keeping more memory (a higher correlation with the level). The fixed-width version truncates tiny weights so the window doesn't grow without bound. It is preprocessing, not a signal, and the diagnostics here are heuristic — not a formal stationarity (ADF) test.</li>
             <li><span className="font-semibold text-slate-200">Event sampling (CUSUM):</span> sampling on a fixed clock oversamples quiet periods. CUSUM samples only when cumulative movement is large, focusing labels on informative moments. Fixed mode uses a percentage-return threshold; vol-scaled mode uses a rolling-volatility multiplier.</li>
             <li><span className="font-semibold text-slate-200">Triple-barrier labeling:</span> a label is set by which barrier (profit-take / stop-loss / vertical-time) is hit first — a path-dependent, risk-aware label, unlike a fixed-horizon return sign.</li>
             <li><span className="font-semibold text-slate-200">Timing:</span> events are sampled using information available up to the event date. Future prices are used only to assign supervised-learning labels, not as trade signals or recommendations.</li>

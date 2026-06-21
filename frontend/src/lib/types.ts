@@ -2719,3 +2719,60 @@ export interface SequentialBootstrapResponse {
   uniqueness_path: SequentialBootstrapPathPoint[];
   warnings: string[];
 }
+
+// ── AFML Fractional Differentiation ──────────────────────────────────────────
+
+export interface FractionalDiffRequest {
+  n_days: number;
+  start_price: number;
+  drift: number;
+  volatility: number;
+  seed: number | null;
+  d: number;
+  weight_threshold: number;
+  max_weights: number;
+}
+
+export interface FractionalDiffSummary {
+  d: number;
+  weight_count: number;
+  warmup_period: number;
+  usable_observations: number;
+  data_loss_pct: number;
+  fracdiff_correlation: number | null;
+  firstdiff_correlation: number | null;
+}
+
+export interface FractionalDiffPoint {
+  date: string;
+  value: number;
+}
+
+export interface FractionalDiffSeries {
+  original: FractionalDiffPoint[];
+  first_difference: FractionalDiffPoint[];
+  fractional_difference: FractionalDiffPoint[];
+}
+
+export interface FractionalDiffWeight {
+  k: number;
+  weight: number;
+}
+
+export interface FractionalDiffDiagnostics {
+  original_trend_slope: number | null;
+  fracdiff_trend_slope: number | null;
+  firstdiff_trend_slope: number | null;
+  original_lag1_autocorr: number | null;
+  fracdiff_lag1_autocorr: number | null;
+  firstdiff_lag1_autocorr: number | null;
+  diagnostic_note: string;
+}
+
+export interface FractionalDiffResponse {
+  summary: FractionalDiffSummary;
+  series: FractionalDiffSeries;
+  weights: FractionalDiffWeight[];
+  diagnostics: FractionalDiffDiagnostics;
+  warnings: string[];
+}

@@ -520,7 +520,7 @@ export default function HomePage() {
   const [scannerKey, setScannerKey] = useState(0);
 
   // AFML Methodology Lab: which tab to open on (deep-linked from the palette).
-  const [finmlTab, setFinmlTab] = useState<"cusum" | "labeling" | "uniqueness" | "purgedcv" | "seqboot" | "education">("cusum");
+  const [finmlTab, setFinmlTab] = useState<"cusum" | "labeling" | "uniqueness" | "purgedcv" | "seqboot" | "fracdiff" | "education">("cusum");
   const [finmlKey, setFinmlKey] = useState(0);
 
   // Saved reports (Report Gallery) state
@@ -830,7 +830,7 @@ export default function HomePage() {
     { view: "fx", title: "Open FX Lab", keywords: "fx foreign exchange currency forward rate interest rate parity carry ppp purchasing power parity exposure garman kohlhagen fx option" },
     { view: "credit", title: "Open Credit Risk Lab", keywords: "credit credit risk merton structural model distance to default default probability hazard rate survival curve cds credit spread risky bond recovery rate" },
     { view: "scanner", title: "Open Cross-Sectional Scanner", keywords: "scanner cross-sectional rank long short universe equity scanner factor ranking mean reversion momentum dollar neutral scanner lab second engine" },
-    { view: "finml", title: "Open AFML Methodology Lab", keywords: "afml financial ml machine learning triple barrier cusum event sampling sample uniqueness concurrency labeling meta-labeling purged k-fold embargo cross validation leakage label overlap sequential bootstrap cpcv lopez de prado" },
+    { view: "finml", title: "Open AFML Methodology Lab", keywords: "afml financial ml machine learning triple barrier cusum event sampling sample uniqueness concurrency labeling meta-labeling purged k-fold embargo cross validation leakage label overlap sequential bootstrap fractional differentiation fracdiff stationarity cpcv lopez de prado" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1091,6 +1091,8 @@ export default function HomePage() {
         ["purgedcv", "Open Embargo CV", "embargo cross validation purged k-fold leakage afml financial ml cv"],
         ["seqboot", "Open Sequential Bootstrap", "sequential bootstrap afml sample uniqueness overlapping labels bootstrap concurrency financial ml sampling"],
         ["seqboot", "Open AFML Sequential Bootstrap", "sequential bootstrap uniqueness aware sampling afml random bootstrap comparison"],
+        ["fracdiff", "Open Fractional Differentiation", "fractional differentiation fracdiff differencing stationarity memory retention time series preprocessing afml"],
+        ["fracdiff", "Open AFML Fractional Differentiation", "fractional differencing fracdiff stationarity transform memory afml"],
       ] as const
     ).map(([t, title, keywords], i) => ({
       id: `finml-${t}-${i}`,

@@ -1178,6 +1178,30 @@ single-asset Backtest + Strategy Comparison:
   grows with label overlap. Methodology only; meta-labeling, fractional
   differentiation, and CPCV remain planned. Synthetic data, not investment advice
 
+### Phase 19.3 — Fractional Differentiation v1 ✅
+
+- New backend `app/finml/fractional_diff.py` — fixed-width fractional differencing
+  reusing the AFML synthetic path: recursive **weights** (`w[0]=1`,
+  `w[k] = -w[k-1]·(d-k+1)/k`, truncated once `|w| < threshold` or `max_weights`),
+  the **fixed-width transform** (`fracdiff[t] = Σ_k w[k]·series[t-k]` after a
+  warmup of `width-1`), an ordinary first-difference baseline, **memory-retention**
+  correlations (level vs fracdiff / first diff), and lightweight **stationarity-style**
+  diagnostics (trend slope + lag-1 autocorrelation; no heavy statsmodels dependency)
+- One route `POST /finml/fractional-diff-demo` (validated; d 0–2, weight_threshold
+  in (0,1), max_weights 2–1000 and < n_days → friendly 422; downsampled payload).
+  24 deterministic tests: d=0.5 weights `[1, −0.5, −0.125, −0.0625]`, d=0 → original,
+  d=1 → first difference, threshold/size truncation, warmup = weight_count−1, memory
+  corr finite with fracdiff > first-diff for d∈(0,1), d=0 corr ≈ 1, diagnostics
+  finite, validation, no NaN/inf, + API
+- New **Fractional Differentiation** tab in the AFML Methodology Lab (reuses the
+  shared path params; d, weight threshold, max weights): summary cards (weight count,
+  warmup, usable obs, data loss, fracdiff vs first-diff memory correlation), original-
+  price / first-diff-vs-fracdiff / weights charts, and a stationarity-diagnostics
+  table — distinct colors (original cyan · first diff amber · fracdiff violet)
+- Command-palette commands (Fractional Differentiation) + updated dashboard card.
+  **Preprocessing, not a trading signal**; diagnostics are heuristic, not a formal
+  stationarity test. Meta-labeling and CPCV remain planned. Synthetic data, not advice
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots
@@ -1262,9 +1286,9 @@ search · toasts, error boundary, loading/offline states.
     live universes, factor/IV/ML scanners, and AFML integration remain planned)
 13. **AFML Methodology Layer** — **built (v1)** (19.0: CUSUM event sampling,
     triple-barrier labeling, sample concurrency + uniqueness weights; 19.1: **purged
-    K-fold + embargo CV** with leakage diagnostics; 19.2: **sequential bootstrap** —
-    all on synthetic data. Meta-labeling, information-driven bars, fractional
-    differentiation, and Combinatorial Purged CV (CPCV) remain planned)
+    K-fold + embargo CV** with leakage diagnostics; 19.2: **sequential bootstrap**;
+    19.3: **fractional differentiation** — all on synthetic data. Meta-labeling,
+    information-driven bars, and Combinatorial Purged CV (CPCV) remain planned)
 14. **Portfolio Studio + Strategy Ensemble Builder** (research)
 15. **ML & AI Lab** — feature pipelines, walk-forward ML guards (research)
 16. **AI Explainer Copilot** — explains a result, never recommends trades

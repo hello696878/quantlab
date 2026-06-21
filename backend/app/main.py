@@ -141,6 +141,7 @@ from app.finml import (
     run_labeling_demo,
     run_purged_cv_demo,
     run_sequential_bootstrap_demo,
+    run_fractional_diff_demo,
 )
 from app.csv_data import parse_price_csv
 from app.custom_strategy import custom_strategy_signals, required_window
@@ -242,6 +243,8 @@ from app.schemas import (
     PurgedCvResponse,
     SequentialBootstrapRequest,
     SequentialBootstrapResponse,
+    FractionalDiffRequest,
+    FractionalDiffResponse,
     PayoffRequest,
     PayoffResponse,
     SampleSurfaceRequest,
@@ -4531,3 +4534,33 @@ def finml_sequential_bootstrap_demo(request: SequentialBootstrapRequest) -> Sequ
     except FinmlInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))
     return SequentialBootstrapResponse(**result)
+
+
+@app.post(
+    "/finml/fractional-diff-demo",
+    response_model=FractionalDiffResponse,
+    tags=["finml"],
+    summary="Fractional differentiation demo (memory-preserving stationarity transform)",
+    description=(
+        "Fixed-width fractional differentiation of a synthetic price path: recursive "
+        "weights, the transformed series vs the ordinary first difference, memory-"
+        "retention correlations, and heuristic stationarity-style diagnostics. "
+        "Educational preprocessing — not a trading signal, not a formal stationarity "
+        "test, no live data, not investment advice."
+    ),
+)
+def finml_fractional_diff_demo(request: FractionalDiffRequest) -> FractionalDiffResponse:
+    try:
+        result = run_fractional_diff_demo(
+            request.n_days,
+            request.start_price,
+            request.drift,
+            request.volatility,
+            request.seed,
+            request.d,
+            request.weight_threshold,
+            request.max_weights,
+        )
+    except FinmlInputError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    return FractionalDiffResponse(**result)

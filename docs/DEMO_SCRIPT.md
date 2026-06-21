@@ -223,6 +223,15 @@ Return to the Command Center's **Platform Direction** panel (or open
   model), event formation uses no future info, purged CV reduces overlap leakage but
   doesn't bless a model, sequential bootstrap reduces sample dependence (not model
   risk), and CPCV / meta-labeling are planned — not a full AFML implementation, not advice.
+  *Fractional Differentiation*: d = 0.5, weight threshold 0.001, max weights 200 →
+  **Run fractional differentiation** → summary cards (weight count ≈ 44, warmup,
+  data loss, fracdiff vs first-diff memory correlation), the original-price chart, the
+  first-diff-vs-fracdiff overlay, the weights bar chart, and the stationarity-style
+  diagnostics table (original lag-1 autocorr near 1, fracdiff lower, first-diff near 0).
+  Set d = 0 (fracdiff ≈ original, memory corr ≈ 1), then d = 1 (≈ first difference);
+  try d = −0.5 for a friendly validation error. Emphasise: fractional differentiation
+  is preprocessing (not a signal), keeps more memory than first differencing, and the
+  diagnostics are heuristic — not a formal stationarity test.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

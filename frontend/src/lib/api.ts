@@ -61,6 +61,8 @@ import type {
   PurgedCvResponse,
   SequentialBootstrapRequest,
   SequentialBootstrapResponse,
+  FractionalDiffRequest,
+  FractionalDiffResponse,
   PayoffRequest,
   PayoffResponse,
   SampleSurfaceRequest,
@@ -1107,6 +1109,10 @@ export function runPurgedCvDemo(req: PurgedCvRequest): Promise<PurgedCvResponse>
 
 export function runSequentialBootstrapDemo(req: SequentialBootstrapRequest): Promise<SequentialBootstrapResponse> {
   return postOptions<SequentialBootstrapResponse>("/api/finml/sequential-bootstrap-demo", req);
+}
+
+export function runFractionalDiffDemo(req: FractionalDiffRequest): Promise<FractionalDiffResponse> {
+  return postOptions<FractionalDiffResponse>("/api/finml/fractional-diff-demo", req);
 }
 
 export async function fetchSampleCurve(): Promise<SampleCurveResponse> {

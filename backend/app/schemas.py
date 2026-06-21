@@ -5146,3 +5146,65 @@ class SequentialBootstrapResponse(BaseModel):
     random_baseline: SequentialBootstrapBaseline
     uniqueness_path: List[SequentialBootstrapPathPoint] = Field(default_factory=list)
     warnings: List[str] = Field(default_factory=list)
+
+
+# ===========================================================================
+# AFML Fractional Differentiation — research v1
+# ===========================================================================
+
+
+class FractionalDiffRequest(BaseModel):
+    model_config = ConfigDict(allow_inf_nan=False)
+
+    n_days: int = Field(default=500, ge=50, le=5000)
+    start_price: float = Field(default=100.0, gt=0.0, le=1e9)
+    drift: float = Field(default=0.0002, ge=-1.0, le=1.0)
+    volatility: float = Field(default=0.015, gt=0.0, le=1.0)
+    seed: Optional[int] = Field(default=42, ge=0, le=2**32 - 1)
+    d: float = Field(default=0.5, ge=0.0, le=2.0)
+    weight_threshold: float = Field(default=0.001, gt=0.0, lt=1.0)
+    max_weights: int = Field(default=200, ge=2, le=1000)
+
+
+class FractionalDiffSummary(BaseModel):
+    d: float
+    weight_count: int
+    warmup_period: int
+    usable_observations: int
+    data_loss_pct: float
+    fracdiff_correlation: Optional[float] = None
+    firstdiff_correlation: Optional[float] = None
+
+
+class FractionalDiffPoint(BaseModel):
+    date: str
+    value: float
+
+
+class FractionalDiffSeries(BaseModel):
+    original: List[FractionalDiffPoint] = Field(default_factory=list)
+    first_difference: List[FractionalDiffPoint] = Field(default_factory=list)
+    fractional_difference: List[FractionalDiffPoint] = Field(default_factory=list)
+
+
+class FractionalDiffWeight(BaseModel):
+    k: int
+    weight: float
+
+
+class FractionalDiffDiagnostics(BaseModel):
+    original_trend_slope: Optional[float] = None
+    fracdiff_trend_slope: Optional[float] = None
+    firstdiff_trend_slope: Optional[float] = None
+    original_lag1_autocorr: Optional[float] = None
+    fracdiff_lag1_autocorr: Optional[float] = None
+    firstdiff_lag1_autocorr: Optional[float] = None
+    diagnostic_note: str
+
+
+class FractionalDiffResponse(BaseModel):
+    summary: FractionalDiffSummary
+    series: FractionalDiffSeries
+    weights: List[FractionalDiffWeight] = Field(default_factory=list)
+    diagnostics: FractionalDiffDiagnostics
+    warnings: List[str] = Field(default_factory=list)

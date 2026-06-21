@@ -1128,8 +1128,8 @@ export default function HomeDashboard({
             </span>
             <span className="text-xs text-slate-400">
               Build leakage-aware financial-ML labels and validation with CUSUM sampling, triple
-              barriers, uniqueness weights, purged K-fold + embargo, and sequential bootstrap —
-              synthetic data, not a model.
+              barriers, uniqueness weights, purged K-fold + embargo, sequential bootstrap, and
+              fractional differentiation — synthetic data, not a model.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open AFML Lab →
