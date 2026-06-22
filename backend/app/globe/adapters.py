@@ -4,8 +4,9 @@ Data-source adapters for the Global Markets Globe.
 Phase 20.3 adds the **first cautious real-data integration**: an *optional*,
 config-gated FRED macro adapter (`FredMacroAdapter`). It is **disabled by
 default**, requires no API key for normal local development, and **fails closed
-to static sample data** on any problem. Index quotes, FX quotes, and news remain
-inert planned stubs.
+to static sample data** on any problem. Optional delayed index/FX quotes live in
+`app/globe/quotes.py` (also disabled by default); only the news adapter remains
+an inert planned stub here.
 
 Honesty / safety constraints:
 - Default app behaviour is unchanged: static illustrative sample data.

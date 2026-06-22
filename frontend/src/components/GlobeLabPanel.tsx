@@ -138,7 +138,10 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
       .then((res) => {
         if (cancelled) return;
         setMarkets(res.markets);
-        setHasFredEnrichment(res.dataStatus === "mixed_static_and_fred");
+        setHasFredEnrichment(
+          res.dataStatus === "mixed_static_and_fred" ||
+            res.dataStatus === "mixed_static_fred_quotes",
+        );
         setDataNotice(res.notice);
         setWarnings(res.warnings);
         setDataStatus("backend");
@@ -175,12 +178,14 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
     (m) => m.indicesSource === "delayed_quote" || m.fxSource === "delayed_quote",
   );
   const quotesUnavailable =
-    !quotesLive &&
     markets.some(
       (m) => m.indicesSource === "quote_unavailable" || m.fxSource === "quote_unavailable",
     );
   const quotesChip = quotesLive
-    ? { text: "Delayed quotes (index/FX)", tone: "var(--pos)" }
+    ? {
+        text: quotesUnavailable ? "Delayed quotes · partial failures" : "Delayed quotes · partial coverage",
+        tone: quotesUnavailable ? "var(--warn)" : "var(--pos)",
+      }
     : quotesUnavailable
       ? { text: "Quotes unavailable — static", tone: "var(--warn)" }
       : { text: "Delayed quotes optional (off)", tone: "var(--text-mut)" };
@@ -240,7 +245,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
             className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
             style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
           >
-            Static core + optional FRED
+            Static core + optional adapters
           </span>
         </div>
         <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
@@ -256,9 +261,13 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
             }}
           >
             {dataStatus === "backend"
-              ? hasFredEnrichment
-                ? "Backend static + partial FRED"
-                : "Backend static dataset"
+              ? hasFredEnrichment && quotesLive
+                ? "Backend static + FRED + delayed quotes"
+                : hasFredEnrichment
+                  ? "Backend static + partial FRED"
+                  : quotesLive
+                    ? "Backend static + delayed quotes"
+                    : "Backend static dataset"
               : dataStatus === "fallback"
                 ? "Bundled static fallback"
                 : "Loading data layer…"}

@@ -19,6 +19,7 @@ from __future__ import annotations
 import math
 import time
 from dataclasses import dataclass
+from datetime import date
 from typing import Callable, Dict, List, Optional, Protocol, Tuple
 
 from app.globe.models import MarketDossier
@@ -74,7 +75,7 @@ MAX_QUOTE_CACHE_TTL_SECONDS = 86_400
 _TRUE = {"1", "true", "yes", "on"}
 
 
-@dataclass
+@dataclass(frozen=True)
 class QuoteResult:
     """A single delayed quote (never real-time)."""
 
@@ -139,6 +140,14 @@ def _finite(value: object) -> Optional[float]:
     return v
 
 
+def _iso_date(value: object) -> Optional[str]:
+    """Return a canonical ISO date, or None for missing/malformed provenance."""
+    try:
+        return date.fromisoformat(str(value)).isoformat()
+    except (TypeError, ValueError):
+        return None
+
+
 class YfinanceQuoteProvider:
     """
     Delayed-quote provider reusing the project's existing **yfinance** dependency.
@@ -159,23 +168,31 @@ class YfinanceQuoteProvider:
 
     def _latest(self, symbol: str) -> Optional[Tuple[float, float, str]]:
         try:
-            hist = self._yf.Ticker(symbol).history(period="5d")
+            hist = self._yf.Ticker(symbol).history(
+                period="5d",
+                interval="1d",
+                timeout=self.timeout_seconds,
+            )
         except Exception:
             return None
         if hist is None or getattr(hist, "empty", True) or "Close" not in hist:
             return None
-        closes = [c for c in (_finite(x) for x in hist["Close"].tolist()) if c is not None]
-        if not closes:
+        observations: List[Tuple[float, str]] = []
+        for raw_date, raw_close in zip(hist.index.tolist(), hist["Close"].tolist()):
+            close = _finite(raw_close)
+            try:
+                observation_date = _iso_date(raw_date.date())
+            except Exception:
+                observation_date = None
+            if close is not None and close > 0 and observation_date is not None:
+                observations.append((close, observation_date))
+        if not observations:
             return None
-        last = closes[-1]
-        prev = closes[-2] if len(closes) >= 2 else last
+        last, as_of = observations[-1]
+        prev = observations[-2][0] if len(observations) >= 2 else last
         change_pct = ((last / prev) - 1.0) * 100.0 if prev else 0.0
         if not math.isfinite(change_pct):
             change_pct = 0.0
-        try:
-            as_of = str(hist.index[-1].date())
-        except Exception:
-            as_of = "unknown"
         return (last, change_pct, as_of)
 
     def fetch_index_quote(self, symbol: str) -> Optional[QuoteResult]:
@@ -189,8 +206,8 @@ class YfinanceQuoteProvider:
         return self.fetch_index_quote(symbol)
 
 
-# Module-level TTL cache: {(provider, symbol): (expires_at, QuoteResult)}.
-_QUOTE_CACHE: Dict[Tuple[str, str], Tuple[float, QuoteResult]] = {}
+# Module-level TTL cache: {(provider, quote_kind, symbol): (expiry, result)}.
+_QUOTE_CACHE: Dict[Tuple[str, str, str], Tuple[float, QuoteResult]] = {}
 
 
 def clear_quote_cache() -> None:
@@ -222,10 +239,15 @@ class _BaseQuoteAdapter:
     def available(self) -> bool:
         return bool(self.config.enabled and self.provider is not None)
 
-    def _cached(self, symbol: str, fetch: Callable[[str], Optional[QuoteResult]]) -> Optional[QuoteResult]:
+    def _cached(
+        self,
+        symbol: str,
+        quote_kind: str,
+        fetch: Callable[[str], Optional[QuoteResult]],
+    ) -> Optional[QuoteResult]:
         if not self.available():
             return None
-        key = (self.config.provider, symbol)
+        key = (self.config.provider, quote_kind, symbol)
         now = time.time()
         hit = _QUOTE_CACHE.get(key)
         if hit and hit[0] > now:
@@ -236,15 +258,36 @@ class _BaseQuoteAdapter:
             return None
         if result is None:
             return None
-        value = _finite(result.value)
-        change = _finite(result.change_pct)
-        if value is None or change is None:
+        value = _finite(getattr(result, "value", None))
+        change = _finite(getattr(result, "change_pct", None))
+        as_of = _iso_date(getattr(result, "as_of", None))
+        name = getattr(result, "name", None)
+        source = getattr(result, "source", None)
+        if (
+            value is None
+            or value <= 0
+            or change is None
+            or as_of is None
+            or getattr(result, "symbol", None) != symbol
+            or not isinstance(name, str)
+            or not name.strip()
+            or not isinstance(source, str)
+            or not source.strip()
+            or getattr(result, "is_delayed", None) is not True
+        ):
             return None
-        result.value = value
-        result.change_pct = change
+        normalized = QuoteResult(
+            symbol=symbol,
+            name=name.strip(),
+            value=value,
+            change_pct=change,
+            as_of=as_of,
+            source=source.strip(),
+            is_delayed=True,
+        )
         if self.config.cache_ttl_seconds > 0:
-            _QUOTE_CACHE[key] = (now + self.config.cache_ttl_seconds, result)
-        return result
+            _QUOTE_CACHE[key] = (now + self.config.cache_ttl_seconds, normalized)
+        return normalized
 
 
 class DelayedIndexQuoteAdapter(_BaseQuoteAdapter):
@@ -256,7 +299,7 @@ class DelayedIndexQuoteAdapter(_BaseQuoteAdapter):
         symbol = INDEX_SYMBOL_MAP.get((market_id or "").lower())
         if not symbol or self.provider is None:
             return None
-        return self._cached(symbol, self.provider.fetch_index_quote)
+        return self._cached(symbol, "index", self.provider.fetch_index_quote)
 
 
 class FxQuoteAdapter(_BaseQuoteAdapter):
@@ -268,7 +311,7 @@ class FxQuoteAdapter(_BaseQuoteAdapter):
         symbol = FX_SYMBOL_MAP.get((market_id or "").lower())
         if not symbol or self.provider is None:
             return None
-        return self._cached(symbol, self.provider.fetch_fx_quote)
+        return self._cached(symbol, "fx", self.provider.fetch_fx_quote)
 
 
 def enrich_market_with_quotes(
@@ -310,7 +353,7 @@ def enrich_market_with_quotes(
                         "level": quote.value,
                         "change_pct": quote.change_pct,
                         "is_sample": False,
-                        "as_of_date": quote.as_of if quote.as_of != "unknown" else None,
+                        "as_of_date": quote.as_of,
                     }
                 )
                 updates["indices"] = [primary, *dossier.indices[1:]]
@@ -339,7 +382,7 @@ def enrich_market_with_quotes(
                         "rate": quote.value,
                         "change_pct": quote.change_pct,
                         "is_sample": False,
-                        "as_of_date": quote.as_of if quote.as_of != "unknown" else None,
+                        "as_of_date": quote.as_of,
                     }
                 )
                 updates["fx"] = [primary_fx, *dossier.fx[1:]]

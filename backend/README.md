@@ -16,7 +16,7 @@ backend/
 │   ├── strategies.py       signal generation (lookahead-bias-free)
 │   ├── backtest.py         vectorised backtest engine + transaction costs
 │   ├── metrics.py          Sharpe, Sortino, CAGR, drawdown, Calmar, win-rate, …
-│   ├── globe/              typed dossiers + optional US FRED macro adapter
+│   ├── globe/              typed dossiers + optional FRED/delayed quote adapters
 │   ├── globe_routes.py     read-only Global Markets Globe API routes
 │   └── utils.py            shared helpers
 ├── tests/
@@ -32,7 +32,7 @@ backend/
 │   ├── test_sma_sweep.py         SMA Parameter Sweep research tests
 │   ├── test_sma_train_test.py    SMA Train/Test Validation research tests
 │   ├── test_sma_walk_forward.py  SMA Walk-Forward Optimization research tests
-│   └── test_globe.py             static dossier API/schema/adapter tests
+│   └── test_globe.py             dossier API/schema/FRED/quote adapter tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -84,9 +84,10 @@ Liveness check.
 ### Global Markets Globe Endpoints
 
 These endpoints return a deterministic static illustrative core. An optional,
-disabled-by-default FRED adapter can source selected US macro fields when
-configured locally; all unsupported macro fields and all index, FX, structure,
-and headline data remain static. No real-time market coverage is provided.
+disabled-by-default FRED adapter can source selected US macro fields, and a
+separate disabled-by-default yfinance adapter can enrich supported primary
+index/FX rows with delayed quotes. All unsupported fields remain static. No
+real-time market coverage is provided.
 
 | Endpoint | Description |
 |---|---|
@@ -95,9 +96,9 @@ and headline data remain static. No real-time market coverage is provided.
 | `GET /globe/regions` | Static market counts by region |
 
 The FRED adapter is fail-closed and documents exact field/date provenance. It
-never returns its API key. Delayed index/FX quote and news adapters remain inert
-stubs in `app/globe/adapters.py`. See `docs/GLOBE_DATA.md` for local opt-in
-configuration and limitations.
+never returns its API key. The delayed quote adapter also fails closed, requires
+no API key, and never claims real-time data. The news adapter remains an inert
+stub. See `docs/GLOBE_DATA.md` for local opt-in configuration and limitations.
 
 ---
 

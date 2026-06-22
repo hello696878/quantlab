@@ -137,7 +137,7 @@ function macroNote(market: Market): string {
         return `${MACRO_FIELD_LABELS[field]}${observationDate ? ` (${observationDate})` : ""}`;
       })
       .join(", ");
-    return `FRED-sourced fields: ${details || "Not available"}. All remaining macro values, indices, FX, structure, and headlines are static sample data.`;
+    return `FRED-sourced fields: ${details || "Not available"}. All remaining macro values are static sample data; index/FX provenance is labelled separately, and structure/headlines remain sample data.`;
   }
   if (market.macroSource === "fred_unavailable") {
     return "FRED macro was requested but unavailable; showing static sample figures.";
@@ -208,11 +208,20 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
   const fredFields = new Set<MacroField>(market.macroFredFields ?? []);
   const hasFredMacro =
     market.macroSource === "fred_live" && fredFields.size > 0;
-  const dataLabel = hasFredMacro
-    ? "Static core + partial FRED"
-    : market.macroSource === "fred_unavailable"
-      ? "Static macro fallback"
-      : "Static demo data";
+  const hasDelayedQuotes =
+    market.indicesSource === "delayed_quote" || market.fxSource === "delayed_quote";
+  const quoteUnavailable =
+    market.indicesSource === "quote_unavailable" || market.fxSource === "quote_unavailable";
+  const dataLabel =
+    hasFredMacro && hasDelayedQuotes
+      ? "Static core + FRED + delayed quotes"
+      : hasFredMacro
+        ? "Static core + partial FRED"
+        : hasDelayedQuotes
+          ? "Static core + delayed quotes"
+          : market.macroSource === "fred_unavailable" || quoteUnavailable
+            ? "Static fallback data"
+            : "Static demo data";
 
   return (
     <div className="card overflow-hidden">
@@ -281,7 +290,9 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
           <span className="text-[10px]" style={{ color: "var(--text-faint)" }}>
             {hasFredMacro
               ? `Oldest FRED observation: ${market.macroAsOf ?? "date unavailable"}`
-              : "Last updated: Static sample"}
+              : hasDelayedQuotes
+                ? "Delayed quote dates are shown by section"
+                : "Last updated: Static sample"}
           </span>
         </div>
       </div>
@@ -302,7 +313,9 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
             {market.indicesSource === "delayed_quote"
               ? "Primary index level is a delayed quote (not real-time); sparklines remain illustrative."
-              : "Levels shown as “Sample”; change % and sparklines are illustrative. Optional delayed index quotes are off by default."}
+              : market.indicesSource === "quote_unavailable"
+                ? "Delayed index quote was requested but unavailable; showing static sample data."
+                : "Levels shown as “Sample”; change % and sparklines are illustrative. Optional delayed index quotes are off by default."}
           </p>
         </section>
 
@@ -356,7 +369,9 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
             {market.fxSource === "delayed_quote"
               ? "Primary FX rate is a delayed quote (not real-time)."
-              : "FX values shown as “Sample”. Optional delayed FX quotes are off by default."}
+              : market.fxSource === "quote_unavailable"
+                ? "Delayed FX quote was requested but unavailable; showing static sample data."
+                : "FX values shown as “Sample”. Optional delayed FX quotes are off by default."}
           </p>
         </section>
 

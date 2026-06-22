@@ -3,8 +3,8 @@ Service layer for the Global Markets Globe data layer.
 
 Phase 20.2 added static accessors. Phase 20.3 adds an *optional* FRED macro
 enrichment pass (`build_markets_response` / `build_single_market`) that is
-**disabled by default** and **fails closed to static sample data**. Indices, FX,
-market structure, and news always remain static sample data in this phase.
+**disabled by default** and **fails closed to static sample data**. Index and FX
+fields may be optionally enriched with delayed quotes; all others stay static.
 """
 
 from __future__ import annotations
@@ -18,6 +18,7 @@ from app.globe.quotes import (
     FxQuoteAdapter,
     GlobeQuotesConfig,
     enrich_market_with_quotes,
+    resolve_quote_provider,
 )
 from app.globe.sample_markets import SAMPLE_MARKETS, STATIC_DATA_NOTICE
 
@@ -87,6 +88,10 @@ def build_markets_response(
     cfg = config or FredMacroConfig()
     adp = adapter or FredMacroAdapter(cfg)
     qcfg = quotes_config or GlobeQuotesConfig()
+    if qcfg.enabled and (index_adapter is None or fx_adapter is None):
+        quote_provider = resolve_quote_provider(qcfg)
+        index_adapter = index_adapter or DelayedIndexQuoteAdapter(qcfg, quote_provider)
+        fx_adapter = fx_adapter or FxQuoteAdapter(qcfg, quote_provider)
 
     enriched: List[MarketDossier] = []
     warnings: List[str] = []
@@ -126,6 +131,10 @@ def build_single_market(
     cfg = config or FredMacroConfig()
     adp = adapter or FredMacroAdapter(cfg)
     qcfg = quotes_config or GlobeQuotesConfig()
+    if qcfg.enabled and (index_adapter is None or fx_adapter is None):
+        quote_provider = resolve_quote_provider(qcfg)
+        index_adapter = index_adapter or DelayedIndexQuoteAdapter(qcfg, quote_provider)
+        fx_adapter = fx_adapter or FxQuoteAdapter(qcfg, quote_provider)
     dossier, _state, _warns = adp.enrich_market_with_fred_macro(base)
     dossier, _idx, _fx, _qwarns = enrich_market_with_quotes(
         dossier, qcfg, index_adapter, fx_adapter

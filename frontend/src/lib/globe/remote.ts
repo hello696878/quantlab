@@ -7,8 +7,8 @@
  * caller falls back to the bundled static `MARKETS` — the Globe never breaks.
  *
  * The backend payload has a static illustrative core and may carry field-level
- * provenance for optional US FRED macro enrichment. Index and FX values are
- * mapped to the literal "Sample" so the UI never shows a fabricated level;
+ * provenance for optional US FRED macro and delayed index/FX enrichment. Static
+ * values map to "Sample", while validated delayed quotes show their value;
  * backend `change_pct` is in percent and is converted to the decimal expected
  * by the UI formatters.
  */
@@ -169,6 +169,38 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
+function isIsoDate(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return (
+    Number.isFinite(parsed.getTime()) &&
+    parsed.toISOString().slice(0, 10) === value
+  );
+}
+
+function hasValidQuoteProvenance(
+  items: unknown,
+  source: QuoteSourceState,
+  valueKey: "level" | "rate",
+): boolean {
+  if (!Array.isArray(items) || items.length === 0) return false;
+  return items.every((item, index) => {
+    if (
+      !isRecord(item) ||
+      !isFiniteNumber(item[valueKey]) ||
+      item[valueKey] <= 0
+    ) {
+      return false;
+    }
+    if (source === "delayed_quote" && index === 0) {
+      return item.is_sample === false && isIsoDate(item.as_of_date);
+    }
+    return item.is_sample === true && item.as_of_date == null;
+  });
+}
+
 function hasValidSources(value: unknown): value is DtoSourceStatus {
   if (!isRecord(value)) return false;
   const macroOk = MACRO_STATES.includes(value.macro as MacroSourceState);
@@ -233,6 +265,7 @@ function isDossier(value: unknown): value is DtoDossier {
       (item.as_of_date == null || isNonEmptyString(item.as_of_date)) &&
       Array.isArray(item.sparkline) && item.sparkline.length > 1 && item.sparkline.every(isFiniteNumber)
     ) &&
+    hasValidQuoteProvenance(indices, sources.indices, "level") &&
     isRecord(macro) && ["gdp_growth", "inflation", "unemployment", "policy_rate", "debt_to_gdp"].every(
       (key) => isFiniteNumber(macro[key]),
     ) && typeof macro.is_sample === "boolean" &&
@@ -243,6 +276,7 @@ function isDossier(value: unknown): value is DtoDossier {
       isFiniteNumber(item.change_pct) && typeof item.is_sample === "boolean" &&
       (item.as_of_date == null || isNonEmptyString(item.as_of_date))
     ) &&
+    hasValidQuoteProvenance(fx, sources.fx, "rate") &&
     isRecord(rates) && isFiniteNumber(rates.policy_rate) &&
       (rates.ten_year_yield === null || isFiniteNumber(rates.ten_year_yield)) && rates.is_sample === true &&
     isRecord(structure) && ["market_cap", "listed_companies", "settlement", "notes"].every(
@@ -272,7 +306,27 @@ function parseResponse(value: unknown): DtoResponse {
       !value.markets.every(isDossier) || value.count !== value.markets.length) {
     throw new Error("globe markets response did not match the dossier schema");
   }
-  return value as unknown as DtoResponse;
+  const response = value as unknown as DtoResponse;
+  const anyFred = response.markets.some(
+    (market) => market.source_status.macro === "fred_live",
+  );
+  const anyQuote = response.markets.some(
+    (market) =>
+      market.source_status.indices === "delayed_quote" ||
+      market.source_status.fx === "delayed_quote",
+  );
+  const expectedStatus: DataStatus =
+    anyFred && anyQuote
+      ? "mixed_static_fred_quotes"
+      : anyFred
+        ? "mixed_static_and_fred"
+        : anyQuote
+          ? "mixed_static_and_quotes"
+          : "static_sample";
+  if (response.data_status !== expectedStatus) {
+    throw new Error("globe markets response has inconsistent source status");
+  }
+  return response;
 }
 
 function mapDossier(d: DtoDossier): Market {

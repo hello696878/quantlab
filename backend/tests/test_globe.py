@@ -6,24 +6,28 @@ that the future adapter stubs perform no live fetch. No network calls.
 """
 
 import math
+from types import SimpleNamespace
 
 import pytest
 from pydantic import ValidationError
 
 from app.globe import adapters as globe_adapters
+from app.globe import quotes as globe_quotes
+from app.globe import service as globe_service
 from app.globe.adapters import (
     FredMacroAdapter,
     FredMacroConfig,
     clear_fred_cache,
 )
+from app.globe.models import MarketIndex
 from app.globe.quotes import (
     DelayedIndexQuoteAdapter,
     FxQuoteAdapter,
     GlobeQuotesConfig,
     QuoteResult,
+    YfinanceQuoteProvider,
     clear_quote_cache,
 )
-from app.globe.models import MarketIndex
 from app.globe.service import (
     build_markets_response,
     get_all_markets,
@@ -430,12 +434,27 @@ def test_single_market_endpoint_static_by_default(client):
 class _FakeQuoteProvider:
     """Injectable quote provider — no network. Configurable for success/failure."""
 
-    def __init__(self, value=5000.0, change_pct=0.5, as_of="2024-05-01", raises=False, invalid=False):
+    def __init__(
+        self,
+        value=5000.0,
+        change_pct=0.5,
+        as_of="2024-05-01",
+        raises=False,
+        invalid=False,
+        symbol_override=None,
+        name="fake quote",
+        source="fake",
+        is_delayed=True,
+    ):
         self._value = value
         self._change = change_pct
         self._as_of = as_of
         self._raises = raises
         self._invalid = invalid
+        self._symbol_override = symbol_override
+        self._name = name
+        self._source = source
+        self._is_delayed = is_delayed
         self.calls = 0
 
     def fetch_index_quote(self, symbol):
@@ -443,7 +462,15 @@ class _FakeQuoteProvider:
         if self._raises:
             raise RuntimeError("provider down")
         value = float("nan") if self._invalid else self._value
-        return QuoteResult(symbol=symbol, name=symbol, value=value, change_pct=self._change, as_of=self._as_of, source="fake")
+        return QuoteResult(
+            symbol=self._symbol_override or symbol,
+            name=self._name,
+            value=value,
+            change_pct=self._change,
+            as_of=self._as_of,
+            source=self._source,
+            is_delayed=self._is_delayed,
+        )
 
     def fetch_fx_quote(self, symbol):
         return self.fetch_index_quote(symbol)
@@ -571,6 +598,167 @@ def test_quote_cache_dedupes_calls():
     assert idx.fetch_index_quote("us") is not None
     assert idx.fetch_index_quote("us") is not None
     assert provider.calls == 1  # second call served from cache
+
+@pytest.mark.parametrize(
+    "provider_kwargs",
+
+    [
+        {"value": 0.0},
+        {"value": -1.0},
+        {"as_of": "not-a-date"},
+        {"symbol_override": "WRONG"},
+        {"name": ""},
+        {"source": ""},
+        {"is_delayed": False},
+    ],
+)
+def test_quote_payload_validation_fails_closed(provider_kwargs):
+    provider = _FakeQuoteProvider(**provider_kwargs)
+    adapter = DelayedIndexQuoteAdapter(_quotes_cfg(), provider)
+    assert adapter.fetch_index_quote("us") is None
+
+
+def test_malformed_quote_object_fails_closed():
+    class MalformedProvider:
+        def fetch_index_quote(self, symbol):  # noqa: ARG002
+            return object()
+
+        def fetch_fx_quote(self, symbol):  # noqa: ARG002
+            return object()
+
+    adapter = DelayedIndexQuoteAdapter(_quotes_cfg(), MalformedProvider())
+    assert adapter.fetch_index_quote("us") is None
+
+
+def test_yfinance_quote_uses_timeout_and_aligns_date_to_valid_close():
+    pd = pytest.importorskip("pandas")
+    captured = {}
+
+    class FakeTicker:
+        def history(self, **kwargs):
+            captured.update(kwargs)
+            return pd.DataFrame(
+                {"Close": [100.0, 110.0, float("nan")]},
+                index=pd.to_datetime(["2024-01-01", "2024-01-02", "2024-01-03"]),
+            )
+
+    provider = object.__new__(YfinanceQuoteProvider)
+    provider._yf = SimpleNamespace(Ticker=lambda symbol: FakeTicker())
+    provider.timeout_seconds = 2.5
+
+    result = provider.fetch_index_quote("^TEST")
+    assert result is not None
+    assert result.value == 110.0
+    assert result.change_pct == pytest.approx(10.0)
+    assert result.as_of == "2024-01-02"
+    assert captured == {"period": "5d", "interval": "1d", "timeout": 2.5}
+
+
+def test_quote_cache_separates_index_and_fx_namespaces(monkeypatch):
+    class SplitProvider:
+        def __init__(self):
+            self.index_calls = 0
+            self.fx_calls = 0
+
+        def fetch_index_quote(self, symbol):
+            self.index_calls += 1
+            return QuoteResult(symbol, "index", 5000.0, 0.1, "2024-01-01", "fake")
+
+        def fetch_fx_quote(self, symbol):
+            self.fx_calls += 1
+            return QuoteResult(symbol, "fx", 1.25, 0.2, "2024-01-01", "fake")
+
+    monkeypatch.setitem(globe_quotes.INDEX_SYMBOL_MAP, "us", "SHARED")
+    monkeypatch.setitem(globe_quotes.FX_SYMBOL_MAP, "ca", "SHARED")
+    provider = SplitProvider()
+    cfg = _quotes_cfg(ttl=3600)
+    index_adapter = DelayedIndexQuoteAdapter(cfg, provider)
+    fx_adapter = FxQuoteAdapter(cfg, provider)
+
+    assert index_adapter.fetch_index_quote("us").value == 5000.0
+    assert fx_adapter.fetch_fx_quote("ca").value == 1.25
+    assert provider.index_calls == 1
+    assert provider.fx_calls == 1
+
+
+def test_combined_fred_and_quotes_preserve_provenance_and_static_source():
+    base_before = get_market("us").model_dump()
+    fred_cfg = _enabled_config()
+    quote_provider = _FakeQuoteProvider()
+    index_adapter, fx_adapter = _quote_adapters(quote_provider)
+
+    markets, status, _notice, _warnings = build_markets_response(
+        fred_cfg,
+        adapter=FredMacroAdapter(fred_cfg, fetcher=_fake_fetcher()),
+        quotes_config=_quotes_cfg(),
+        index_adapter=index_adapter,
+        fx_adapter=fx_adapter,
+    )
+
+    us = next(market for market in markets if market.id == "us")
+    assert status == "mixed_static_fred_quotes"
+    assert us.source_status.macro == "fred_live"
+    assert us.source_status.indices == "delayed_quote"
+    assert us.macro.fred_fields
+    assert us.indices[0].is_sample is False
+    assert get_market("us").model_dump() == base_before
+
+
+def test_quote_provider_is_resolved_once_per_markets_response(monkeypatch):
+    calls = {"count": 0}
+    provider = _FakeQuoteProvider()
+
+    def resolve(config):  # noqa: ARG001
+        calls["count"] += 1
+        return provider
+
+    monkeypatch.setattr(globe_service, "resolve_quote_provider", resolve)
+    globe_service.build_markets_response(quotes_config=_quotes_cfg())
+    assert calls["count"] == 1
+
+
+def test_quote_environment_config_is_bounded():
+    cfg = GlobeQuotesConfig.from_env(
+        {
+            "GLOBE_QUOTES_ENABLED": "YES",
+            "GLOBE_QUOTES_PROVIDER": " YFINANCE ",
+            "GLOBE_QUOTES_TIMEOUT_SECONDS": "inf",
+            "GLOBE_QUOTES_CACHE_TTL_SECONDS": "9999999",
+        }
+    )
+    assert cfg.enabled is True
+    assert cfg.provider == "yfinance"
+    assert cfg.timeout_seconds == 5.0
+    assert cfg.cache_ttl_seconds == globe_quotes.MAX_QUOTE_CACHE_TTL_SECONDS
+
+    bounded = GlobeQuotesConfig.from_env(
+        {
+            "GLOBE_QUOTES_TIMEOUT_SECONDS": "999",
+            "GLOBE_QUOTES_CACHE_TTL_SECONDS": "-5",
+        }
+    )
+    assert bounded.timeout_seconds == globe_quotes.MAX_QUOTE_TIMEOUT_SECONDS
+    assert bounded.cache_ttl_seconds == 0
+
+
+def test_quote_symbol_maps_are_explicit_and_directionally_aligned():
+    assert "cn" not in globe_quotes.INDEX_SYMBOL_MAP
+    assert globe_quotes.FX_SYMBOL_MAP == {
+        "ca": "CAD=X",
+        "uk": "GBPUSD=X",
+        "de": "EURUSD=X",
+        "fr": "EURUSD=X",
+        "ch": "CHF=X",
+        "jp": "JPY=X",
+        "cn": "CNY=X",
+        "hk": "HKD=X",
+        "tw": "TWD=X",
+        "kr": "KRW=X",
+        "in": "INR=X",
+        "sg": "SGD=X",
+        "au": "AUDUSD=X",
+        "br": "BRL=X",
+    }
 
 
 def test_quotes_response_no_nan_via_endpoint(client):

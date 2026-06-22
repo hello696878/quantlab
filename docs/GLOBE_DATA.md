@@ -1,10 +1,10 @@
-# Global Markets Globe — Data & the optional FRED macro adapter
+# Global Markets Globe — Data and optional adapters
 
 The Global Markets Globe ships in **stages**. Today it is a static-data showcase
-with an *optional, opt-in* first real-data integration for **macro** figures
-(FRED). Everything else — index levels, FX quotes, market structure, headlines —
-is static illustrative sample data, and there is **no live/real-time market
-data, no news, no scraping, and no investment advice** anywhere.
+with optional, opt-in integrations for selected **macro** figures (FRED) and
+**delayed primary index/FX quotes** (yfinance). Everything else is static
+illustrative sample data, and there is **no live/real-time market data, live
+news, scraping, or investment advice** anywhere.
 
 ## Default behaviour (no setup needed)
 
@@ -23,7 +23,7 @@ You never need an API key for local development.
 | Section | Source today | Status value | Future |
 |---|---|---|---|
 | Macro (GDP/inflation/unemployment/policy rate/debt-GDP) | static sample (optional FRED for US) | `static_sample` · `fred_live` · `fred_unavailable` | broader FRED coverage |
-| Equity indices | static sample | `static_sample` | delayed quotes (planned) |
+| Equity indices | static sample (optional delayed quote) | `static_sample` · `delayed_quote` · `quote_unavailable` | broader coverage |
 | FX | static sample (optional delayed quote) | `static_sample` · `delayed_quote` · `quote_unavailable` | broader coverage |
 | Headlines / sentiment | static sample | `static_sample` | news feed (planned) |
 
@@ -119,8 +119,9 @@ GLOBE_QUOTES_ENABLED=true
 - Quotes disabled → no provider call; everything static.
 - Enabled but provider unavailable (unknown provider, or yfinance import fails)
   → supported markets report `quote_unavailable` + a warning; data stays static.
-- Provider error / invalid (non-finite) value → that field stays static and is
-  marked `quote_unavailable`.
+- Provider error or invalid value/provenance (non-finite or nonpositive value,
+  mismatched symbol, missing ISO date, or non-delayed result) → that field stays
+  static and is marked `quote_unavailable`.
 - A small in-memory TTL cache (default 15 min) avoids refetching the same symbol.
 - Enabling quotes can slow the first `/globe/markets` response on a cold cache
   (several delayed-quote fetches); the frontend's graceful fallback may show the
@@ -135,6 +136,7 @@ delayed quote.
 ## Honesty guardrails
 
 - Not real-time. Not a live market terminal. No complete global macro coverage.
-- Index prices, FX, and news are static/planned — not live.
+- Index/FX fields are static by default and only supported primary rows may use
+  optional delayed quotes. News remains static/planned. Nothing is real-time.
 - No live trading, broker integration, paid providers, or scraping.
 - Educational / research only — **not investment advice**.

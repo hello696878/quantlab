@@ -2,9 +2,10 @@
 Typed Pydantic models for the Global Markets Globe data layer (Phase 20.2).
 
 These describe a country / market **dossier** with a static illustrative core.
-An optional adapter may source selected US macro fields from FRED; field-level
+Optional adapters may source selected US macro fields from FRED and enrich the
+primary index/FX rows with delayed (never real-time) quotes; field-level
 provenance and `source_status` keep that partial enrichment machine-readable.
-Indices, FX, structure, and headlines remain sample data in this phase.
+Market structure and headlines remain sample data in this phase.
 """
 
 from __future__ import annotations

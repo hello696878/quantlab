@@ -10,9 +10,11 @@ Read-only endpoints over the static sample dossier dataset:
 By default this is **static illustrative sample data** — no live data, no
 network calls, no real-time claims. An *optional*, config-gated FRED macro
 adapter (disabled unless ``GLOBE_FRED_ENABLED=true`` and ``FRED_API_KEY`` are
-set) may enrich the macro block of supported markets; everything else (indices,
-FX, market structure, news) always stays static sample. The adapter fails closed
-to static data and the API key is never returned to clients.
+set) may enrich the macro block of supported markets, and a separate
+disabled-by-default quote adapter (``GLOBE_QUOTES_ENABLED=true``) may enrich the
+primary index/FX rows of supported markets with **delayed** (never real-time)
+quotes; market structure and news always stay static sample. Both adapters fail
+closed to static data and no API key is ever returned to clients.
 """
 
 from __future__ import annotations

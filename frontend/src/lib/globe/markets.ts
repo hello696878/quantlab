@@ -4,8 +4,8 @@
  * IMPORTANT — this is deterministic, hand-authored SAMPLE data for the
  * educational showcase and frontend fallback. It is not a real-time feed. The
  * backend may optionally source selected US macro fields from FRED; index, FX,
- * market-cap, listed-company, and headline values remain illustrative.
- * Delayed index/FX quotes and a news/sentiment feed are planned future work.
+ * market-cap, listed-company, and headline values remain illustrative unless
+ * the optional delayed index/FX adapter enriches a supported primary quote.
  *
  * Cross-links route into existing QuantLab modules via the in-app `View`
  * router (this app is a single-page workspace switcher, not a multi-route
@@ -36,12 +36,12 @@ export type MacroField =
   | "debt_to_gdp";
 
 export const STATIC_DATA_NOTICE =
-  "Static illustrative data for indices, FX, market structure, and headlines. Optional US FRED macro enrichment is off by default; delayed quotes and news are planned.";
+  "Static illustrative data is the default. Optional US FRED macro and delayed index/FX quote adapters may enrich supported fields; news integration is planned.";
 
 export interface MarketIndex {
   name: string;
   ticker: string;
-  /** Always the literal "Sample" — v1 carries no real index levels. */
+  /** "Sample" for static rows; formatted delayed level for an enriched primary row. */
   level: string;
   /** Illustrative daily change, decimal (0.0042 = +0.42%). */
   changePct: number;
@@ -59,7 +59,7 @@ export interface MarketMacro {
 
 export interface MarketFx {
   pair: string;
-  /** Always the literal "Sample" — v1 carries no real FX levels. */
+  /** "Sample" for static rows; formatted delayed rate for an enriched primary row. */
   value: string;
   changePct: number;
 }
@@ -85,8 +85,8 @@ export interface MarketLink {
 /**
  * Provenance of a market's macro block. Bundled static data leaves this unset
  * (treated as "static_sample"); the backend data layer sets it per market.
- * Only macro can become non-static in this phase (FRED); indices/FX/news stay
- * static sample.
+ * Macro may be enriched from FRED; index/FX provenance is tracked separately
+ * by QuoteSourceState. News remains static sample.
  */
 export type MacroSourceState =
   | "static_sample"

@@ -25,8 +25,9 @@ from app.globe.models import (
 )
 
 STATIC_DATA_NOTICE = (
-    "Static illustrative data. Live FRED macro, delayed index/FX quotes, and "
-    "news integration are planned."
+    "Static illustrative data is the default. Optional FRED macro and delayed "
+    "index/FX quote adapters may enrich supported fields when configured; news "
+    "integration is planned."
 )
 
 # Shared cross-links (open the related QuantLab module). The frontend routes
