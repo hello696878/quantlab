@@ -94,6 +94,17 @@ export type MacroSourceState =
   | "fred_unavailable"
   | "planned";
 
+/**
+ * Provenance of a market's index / FX block. Bundled static data leaves this
+ * unset (treated as "static_sample"); the optional delayed-quote adapter sets
+ * it per market when enabled. Quotes are delayed, never real-time.
+ */
+export type QuoteSourceState =
+  | "static_sample"
+  | "delayed_quote"
+  | "quote_unavailable"
+  | "planned";
+
 export interface Market {
   id: string;
   country: string;
@@ -120,6 +131,14 @@ export interface Market {
   macroFredFields?: MacroField[];
   /** Per-field FRED observation dates. */
   macroFredAsOf?: Partial<Record<MacroField, string>>;
+  /** Index-block provenance (undefined → static sample). Set by the quote adapter. */
+  indicesSource?: QuoteSourceState;
+  /** FX-block provenance (undefined → static sample). Set by the quote adapter. */
+  fxSource?: QuoteSourceState;
+  /** Delayed index "as of" date when enriched. */
+  indicesAsOf?: string | null;
+  /** Delayed FX "as of" date when enriched. */
+  fxAsOf?: string | null;
 }
 
 // ---------------------------------------------------------------------------

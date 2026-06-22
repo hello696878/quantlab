@@ -266,6 +266,14 @@ Return to the Command Center's **Platform Direction** panel (or open
   committed), the US dossier reads "Macro: Partial FRED", marks only the
   FRED-sourced metric cards, and shows per-field observation dates. Inflation,
   debt/GDP, every unsupported country, indices, FX, and news remain static.
+  **Delayed quotes (20.4):** by default the dossier shows "Index quotes: static
+  sample" and "FX: static sample". Set `GLOBE_QUOTES_ENABLED=true` with
+  `GLOBE_QUOTES_PROVIDER=mock` (no real provider) → supported markets show
+  "… unavailable — static fallback" + a non-blocking warning (never crashes).
+  With the default `yfinance` provider + network, supported markets (e.g. US
+  index, Japan index+FX) show a **delayed** level/rate and "Index quotes:
+  delayed · as of …" — delayed, never real-time; unsupported markets and
+  secondary rows stay static.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

@@ -13,6 +13,12 @@ from typing import List, Optional, Tuple
 
 from app.globe.adapters import FredMacroAdapter, FredMacroConfig
 from app.globe.models import MarketDossier, RegionCount
+from app.globe.quotes import (
+    DelayedIndexQuoteAdapter,
+    FxQuoteAdapter,
+    GlobeQuotesConfig,
+    enrich_market_with_quotes,
+)
 from app.globe.sample_markets import SAMPLE_MARKETS, STATIC_DATA_NOTICE
 
 DATA_STATUS = "static_sample"
@@ -20,10 +26,21 @@ DATA_NOTICE = STATIC_DATA_NOTICE
 
 # Markets-endpoint notice: honest about what is (and is not) live.
 MARKETS_NOTICE = (
-    "Static illustrative data for indices, FX, market structure, and headlines. "
-    "FRED macro integration is optional; delayed index/FX quotes and news "
-    "integration are planned. Not real-time market data and not investment advice."
+    "Static illustrative data remains the default. Optional FRED macro and "
+    "delayed index/FX quote adapters can enrich supported fields when "
+    "configured. News integration is planned. Not real-time market data and "
+    "not investment advice."
 )
+
+
+def _combine_data_status(any_fred: bool, any_quote: bool) -> str:
+    if any_fred and any_quote:
+        return "mixed_static_fred_quotes"
+    if any_fred:
+        return "mixed_static_and_fred"
+    if any_quote:
+        return "mixed_static_and_quotes"
+    return "static_sample"
 
 _REGION_ORDER = ("Americas", "Europe", "Asia-Pacific")
 
@@ -58,29 +75,39 @@ def get_regions() -> List[RegionCount]:
 def build_markets_response(
     config: Optional[FredMacroConfig] = None,
     adapter: Optional[FredMacroAdapter] = None,
+    quotes_config: Optional[GlobeQuotesConfig] = None,
+    index_adapter: Optional[DelayedIndexQuoteAdapter] = None,
+    fx_adapter: Optional[FxQuoteAdapter] = None,
 ) -> Tuple[List[MarketDossier], str, str, List[str]]:
     """
-    Return (markets, data_status, notice, warnings) with optional FRED macro
-    enrichment. With FRED disabled (default) this is pure static sample data and
-    performs no external calls.
+    Return (markets, data_status, notice, warnings) with optional FRED macro and
+    optional delayed index/FX quote enrichment. With both disabled (default) this
+    is pure static sample data and performs no external calls.
     """
     cfg = config or FredMacroConfig()
     adp = adapter or FredMacroAdapter(cfg)
+    qcfg = quotes_config or GlobeQuotesConfig()
 
     enriched: List[MarketDossier] = []
     warnings: List[str] = []
     any_fred = False
+    any_quote = False
 
     for market in SAMPLE_MARKETS:
         dossier, macro_state, warns = adp.enrich_market_with_fred_macro(market)
+        dossier, idx_state, fx_state, quote_warns = enrich_market_with_quotes(
+            dossier, qcfg, index_adapter, fx_adapter
+        )
         enriched.append(dossier)
         if macro_state == "fred_live":
             any_fred = True
-        for w in warns:
+        if idx_state == "delayed_quote" or fx_state == "delayed_quote":
+            any_quote = True
+        for w in (*warns, *quote_warns):
             if w not in warnings:
                 warnings.append(w)
 
-    data_status = "mixed_static_and_fred" if any_fred else "static_sample"
+    data_status = _combine_data_status(any_fred, any_quote)
     return (enriched, data_status, MARKETS_NOTICE, warnings)
 
 
@@ -88,12 +115,19 @@ def build_single_market(
     market_id: str,
     config: Optional[FredMacroConfig] = None,
     adapter: Optional[FredMacroAdapter] = None,
+    quotes_config: Optional[GlobeQuotesConfig] = None,
+    index_adapter: Optional[DelayedIndexQuoteAdapter] = None,
+    fx_adapter: Optional[FxQuoteAdapter] = None,
 ) -> Optional[MarketDossier]:
-    """Return one dossier (optionally FRED-enriched), or None if unknown."""
+    """Return one dossier (optionally FRED + delayed-quote enriched), or None."""
     base = get_market(market_id)
     if base is None:
         return None
     cfg = config or FredMacroConfig()
     adp = adapter or FredMacroAdapter(cfg)
+    qcfg = quotes_config or GlobeQuotesConfig()
     dossier, _state, _warns = adp.enrich_market_with_fred_macro(base)
+    dossier, _idx, _fx, _qwarns = enrich_market_with_quotes(
+        dossier, qcfg, index_adapter, fx_adapter
+    )
     return dossier

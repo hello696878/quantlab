@@ -8,13 +8,21 @@ stubs for future delayed index/FX quotes and news/sentiment.
 """
 
 from app.globe.adapters import (
-    DelayedIndexQuoteAdapter,
     FredMacroAdapter,
     FredMacroConfig,
-    FxQuoteAdapter,
     NewsSentimentAdapter,
     PLANNED_ADAPTERS,
     clear_fred_cache,
+)
+from app.globe.quotes import (
+    DelayedIndexQuoteAdapter,
+    FxQuoteAdapter,
+    GlobeQuotesConfig,
+    QuoteResult,
+    YfinanceQuoteProvider,
+    clear_quote_cache,
+    enrich_market_with_quotes,
+    resolve_quote_provider,
 )
 from app.globe.models import (
     MarketDossier,
@@ -51,6 +59,12 @@ __all__ = [
     "clear_fred_cache",
     "DelayedIndexQuoteAdapter",
     "FxQuoteAdapter",
+    "GlobeQuotesConfig",
+    "QuoteResult",
+    "YfinanceQuoteProvider",
+    "clear_quote_cache",
+    "enrich_market_with_quotes",
+    "resolve_quote_provider",
     "NewsSentimentAdapter",
     "PLANNED_ADAPTERS",
 ]

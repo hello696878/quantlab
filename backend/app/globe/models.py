@@ -22,8 +22,15 @@ SourceState = Literal[
     "planned",
     "fred_live",
     "fred_unavailable",
+    "delayed_quote",
+    "quote_unavailable",
 ]
-DataStatus = Literal["static_sample", "mixed_static_and_fred"]
+DataStatus = Literal[
+    "static_sample",
+    "mixed_static_and_fred",
+    "mixed_static_and_quotes",
+    "mixed_static_fred_quotes",
+]
 MacroField = Literal[
     "gdp_growth",
     "inflation",
@@ -49,6 +56,8 @@ class MarketIndex(GlobeModel):
     change_pct: FiniteFloat  # percent (0.42 == +0.42%)
     sparkline: List[FiniteFloat] = Field(min_length=2)
     is_sample: bool = True
+    # Set when sourced from a delayed-quote provider (e.g. "2024-05-01").
+    as_of_date: Optional[NonEmptyStr] = None
 
 
 class MarketMacro(GlobeModel):
@@ -72,6 +81,8 @@ class MarketFx(GlobeModel):
     rate: FiniteFloat
     change_pct: FiniteFloat  # percent
     is_sample: bool = True
+    # Set when sourced from a delayed-quote provider.
+    as_of_date: Optional[NonEmptyStr] = None
 
 
 class MarketRates(GlobeModel):

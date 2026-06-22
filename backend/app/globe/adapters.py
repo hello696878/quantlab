@@ -46,28 +46,6 @@ class _PlannedAdapter:
         return False
 
 
-class DelayedIndexQuoteAdapter(_PlannedAdapter):
-    """Future adapter for delayed (not real-time) equity-index quotes. Inert in this phase."""
-
-    name = "delayed-index-quotes"
-
-    def fetch_index_quotes(self, market_id: str, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError(
-            "Delayed index-quote integration is planned for a future phase."
-        )
-
-
-class FxQuoteAdapter(_PlannedAdapter):
-    """Future adapter for FX quotes. Inert in this phase."""
-
-    name = "fx-quotes"
-
-    def fetch_fx_quotes(self, base: str, quote: str, *args: Any, **kwargs: Any) -> Any:
-        raise NotImplementedError(
-            "FX quote integration is planned for a future phase."
-        )
-
-
 class NewsSentimentAdapter(_PlannedAdapter):
     """Future adapter for market news + sentiment. Inert in this phase (no scraping)."""
 
@@ -79,12 +57,9 @@ class NewsSentimentAdapter(_PlannedAdapter):
         )
 
 
-# These three remain planned/inert.
-PLANNED_ADAPTERS = (
-    DelayedIndexQuoteAdapter,
-    FxQuoteAdapter,
-    NewsSentimentAdapter,
-)
+# News remains the only planned/inert adapter. Delayed index / FX quote adapters
+# are implemented (optional, config-gated) in app/globe/quotes.py.
+PLANNED_ADAPTERS = (NewsSentimentAdapter,)
 
 
 # ---------------------------------------------------------------------------

@@ -21,6 +21,7 @@ from fastapi import APIRouter, HTTPException
 
 from app.globe.adapters import FredMacroConfig
 from app.globe.models import MarketDossier, MarketsResponse, RegionsResponse
+from app.globe.quotes import GlobeQuotesConfig
 from app.globe.service import (
     DATA_NOTICE,
     DATA_STATUS,
@@ -44,7 +45,8 @@ router = APIRouter(prefix="/globe", tags=["globe"])
 )
 def list_markets() -> MarketsResponse:
     markets, data_status, notice, warnings = build_markets_response(
-        FredMacroConfig.from_env()
+        FredMacroConfig.from_env(),
+        quotes_config=GlobeQuotesConfig.from_env(),
     )
     return MarketsResponse(
         markets=markets,
@@ -81,7 +83,11 @@ def list_regions() -> RegionsResponse:
 def get_market_endpoint(market_id: str) -> MarketDossier:
     if get_market(market_id) is None:
         raise HTTPException(status_code=404, detail="Market not found.")
-    dossier = build_single_market(market_id, FredMacroConfig.from_env())
+    dossier = build_single_market(
+        market_id,
+        FredMacroConfig.from_env(),
+        quotes_config=GlobeQuotesConfig.from_env(),
+    )
     if dossier is None:  # pragma: no cover — guarded above
         raise HTTPException(status_code=404, detail="Market not found.")
     return dossier

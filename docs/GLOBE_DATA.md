@@ -24,11 +24,13 @@ You never need an API key for local development.
 |---|---|---|---|
 | Macro (GDP/inflation/unemployment/policy rate/debt-GDP) | static sample (optional FRED for US) | `static_sample` · `fred_live` · `fred_unavailable` | broader FRED coverage |
 | Equity indices | static sample | `static_sample` | delayed quotes (planned) |
-| FX | static sample | `static_sample` | delayed quotes (planned) |
+| FX | static sample (optional delayed quote) | `static_sample` · `delayed_quote` · `quote_unavailable` | broader coverage |
 | Headlines / sentiment | static sample | `static_sample` | news feed (planned) |
 
-The markets-response `data_status` is `static_sample` normally, or
-`mixed_static_and_fred` when at least one market's macro was enriched from FRED.
+The markets-response `data_status` is `static_sample` normally, or one of
+`mixed_static_and_fred`, `mixed_static_and_quotes`, or `mixed_static_fred_quotes`
+when at least one market's macro (FRED) and/or index/FX (delayed quote) was
+enriched.
 
 ## Enabling the optional FRED macro adapter (advanced, local only)
 
@@ -83,6 +85,52 @@ The adapter never breaks the app:
 - Partial series success retains static values for failed fields, records only
   successful fields as FRED-sourced, and returns a partial-data warning.
 - A small in-memory TTL cache (default 1h) avoids refetching the same series.
+
+## Enabling the optional delayed index / FX quote adapter (advanced, local only)
+
+The quote adapter is **disabled by default** and requires **no API key**. When
+enabled it enriches the **primary index** and **FX pair** of *supported* markets
+with **delayed** (never real-time) quotes, reusing the project's existing free
+**yfinance** dependency. To try it locally, in `backend/.env`:
+
+```
+GLOBE_QUOTES_ENABLED=true
+# GLOBE_QUOTES_PROVIDER=yfinance   # default; any other value → static fallback
+# GLOBE_QUOTES_TIMEOUT_SECONDS=5
+# GLOBE_QUOTES_CACHE_TTL_SECONDS=900
+```
+
+### What enrichment does (v1 coverage)
+
+- **Limited coverage.** Primary equity index for a curated set of markets
+  (US, Canada, UK, Germany, France, Switzerland, Japan, Hong Kong, Taiwan,
+  South Korea, India, Singapore, Australia, Brazil) and the primary FX pair for
+  the non-USD-base markets. Unmapped markets/fields stay static and are never
+  fetched or labelled as delayed quotes.
+- On success, the market's `source_status.indices` / `source_status.fx` becomes
+  `delayed_quote`, the enriched value's `is_sample` becomes `false`, and an
+  `as_of_date` is attached. Only the **primary** index / FX row is enriched;
+  secondary rows stay static.
+- Response `data_status` becomes `mixed_static_and_quotes` (or
+  `mixed_static_fred_quotes` if FRED is also live).
+
+### Fail-closed behaviour
+
+- Quotes disabled → no provider call; everything static.
+- Enabled but provider unavailable (unknown provider, or yfinance import fails)
+  → supported markets report `quote_unavailable` + a warning; data stays static.
+- Provider error / invalid (non-finite) value → that field stays static and is
+  marked `quote_unavailable`.
+- A small in-memory TTL cache (default 15 min) avoids refetching the same symbol.
+- Enabling quotes can slow the first `/globe/markets` response on a cold cache
+  (several delayed-quote fetches); the frontend's graceful fallback may show the
+  bundled static dataset if the backend is slow. This is expected and safe.
+
+### Honesty
+
+Quotes are **delayed**, never real-time. No live tick data, no streaming, no
+websocket, no broker, no trading, no paid feed. Unsupported markets never claim a
+delayed quote.
 
 ## Honesty guardrails
 

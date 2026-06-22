@@ -19,20 +19,43 @@ import {
   type MacroSourceState,
   type Market,
   type MarketRegion,
+  type QuoteSourceState,
   type Sentiment,
 } from "@/lib/globe/markets";
 
 type StaticSampleStatus = "static_sample";
-type DataStatus = "static_sample" | "mixed_static_and_fred";
+type DataStatus =
+  | "static_sample"
+  | "mixed_static_and_fred"
+  | "mixed_static_and_quotes"
+  | "mixed_static_fred_quotes";
 
-// Only macro may become non-static in this phase (optional FRED enrichment);
-// indices/FX/news always stay static sample.
+// Macro may become non-static via optional FRED; indices/FX may become
+// delayed-quote / quote-unavailable via the optional quote adapter. News stays
+// static sample in this phase.
 const MACRO_STATES: readonly MacroSourceState[] = [
   "static_sample",
   "fred_live",
   "fred_unavailable",
   "planned",
 ];
+const QUOTE_STATES: readonly QuoteSourceState[] = [
+  "static_sample",
+  "delayed_quote",
+  "quote_unavailable",
+  "planned",
+];
+const DATA_STATUSES: readonly DataStatus[] = [
+  "static_sample",
+  "mixed_static_and_fred",
+  "mixed_static_and_quotes",
+  "mixed_static_fred_quotes",
+];
+
+/** Format a delayed level/rate for display (real quote shown; static = "Sample"). */
+function formatQuote(n: number): string {
+  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
 const MACRO_FIELDS: readonly MacroField[] = [
   "gdp_growth",
   "inflation",
@@ -47,7 +70,8 @@ interface DtoIndex {
   level: number;
   change_pct: number;
   sparkline: number[];
-  is_sample: true;
+  is_sample: boolean;
+  as_of_date?: string | null;
 }
 interface DtoMacro {
   gdp_growth: number;
@@ -64,7 +88,8 @@ interface DtoFx {
   pair: string;
   rate: number;
   change_pct: number;
-  is_sample: true;
+  is_sample: boolean;
+  as_of_date?: string | null;
 }
 interface DtoRates {
   policy_rate: number;
@@ -89,8 +114,8 @@ interface DtoLink {
 }
 interface DtoSourceStatus {
   macro: MacroSourceState;
-  indices: StaticSampleStatus;
-  fx: StaticSampleStatus;
+  indices: QuoteSourceState;
+  fx: QuoteSourceState;
   news: StaticSampleStatus;
 }
 interface DtoDossier {
@@ -147,10 +172,10 @@ function isNonEmptyString(value: unknown): value is string {
 function hasValidSources(value: unknown): value is DtoSourceStatus {
   if (!isRecord(value)) return false;
   const macroOk = MACRO_STATES.includes(value.macro as MacroSourceState);
-  const restOk = ["indices", "fx", "news"].every(
-    (key) => value[key] === "static_sample",
-  );
-  return macroOk && restOk;
+  const indicesOk = QUOTE_STATES.includes(value.indices as QuoteSourceState);
+  const fxOk = QUOTE_STATES.includes(value.fx as QuoteSourceState);
+  const newsOk = value.news === "static_sample";
+  return macroOk && indicesOk && fxOk && newsOk;
 }
 
 function hasValidMacroProvenance(
@@ -204,7 +229,8 @@ function isDossier(value: unknown): value is DtoDossier {
     isFiniteNumber(d.lon) && d.lon >= -180 && d.lon <= 180 &&
     Array.isArray(indices) && indices.length > 0 && indices.every((item) =>
       isRecord(item) && isNonEmptyString(item.name) && isNonEmptyString(item.ticker) &&
-      isFiniteNumber(item.level) && isFiniteNumber(item.change_pct) && item.is_sample === true &&
+      isFiniteNumber(item.level) && isFiniteNumber(item.change_pct) && typeof item.is_sample === "boolean" &&
+      (item.as_of_date == null || isNonEmptyString(item.as_of_date)) &&
       Array.isArray(item.sparkline) && item.sparkline.length > 1 && item.sparkline.every(isFiniteNumber)
     ) &&
     isRecord(macro) && ["gdp_growth", "inflation", "unemployment", "policy_rate", "debt_to_gdp"].every(
@@ -214,7 +240,8 @@ function isDossier(value: unknown): value is DtoDossier {
     hasValidMacroProvenance(macro, sources.macro) &&
     Array.isArray(fx) && fx.length > 0 && fx.every((item) =>
       isRecord(item) && isNonEmptyString(item.pair) && isFiniteNumber(item.rate) &&
-      isFiniteNumber(item.change_pct) && item.is_sample === true
+      isFiniteNumber(item.change_pct) && typeof item.is_sample === "boolean" &&
+      (item.as_of_date == null || isNonEmptyString(item.as_of_date))
     ) &&
     isRecord(rates) && isFiniteNumber(rates.policy_rate) &&
       (rates.ten_year_yield === null || isFiniteNumber(rates.ten_year_yield)) && rates.is_sample === true &&
@@ -234,7 +261,7 @@ function isDossier(value: unknown): value is DtoDossier {
 function parseResponse(value: unknown): DtoResponse {
   const dataStatusOk =
     isRecord(value) &&
-    (value.data_status === "static_sample" || value.data_status === "mixed_static_and_fred");
+    DATA_STATUSES.includes(value.data_status as DataStatus);
   const warningsOk =
     !isRecord(value) ||
     value.warnings === undefined ||
@@ -263,7 +290,8 @@ function mapDossier(d: DtoDossier): Market {
     indices: d.indices.map((i) => ({
       name: i.name,
       ticker: i.ticker,
-      level: "Sample", // never surface a fabricated level
+      // Static rows show the literal "Sample"; only a real delayed quote shows a level.
+      level: i.is_sample ? "Sample" : formatQuote(i.level),
       changePct: i.change_pct / 100, // percent → decimal for fmtPct
       sparkline: i.sparkline,
     })),
@@ -276,7 +304,7 @@ function mapDossier(d: DtoDossier): Market {
     },
     fx: d.fx.map((f) => ({
       pair: f.pair,
-      value: "Sample",
+      value: f.is_sample ? "Sample" : formatQuote(f.rate),
       changePct: f.change_pct / 100,
     })),
     marketStructure: {
@@ -291,6 +319,10 @@ function mapDossier(d: DtoDossier): Market {
     macroAsOf: d.macro.as_of_date ?? null,
     macroFredFields: d.macro.fred_fields,
     macroFredAsOf: d.macro.fred_as_of,
+    indicesSource: d.source_status.indices,
+    fxSource: d.source_status.fx,
+    indicesAsOf: d.indices[0]?.as_of_date ?? null,
+    fxAsOf: d.fx[0]?.as_of_date ?? null,
   };
 }
 

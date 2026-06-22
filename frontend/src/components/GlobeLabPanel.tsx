@@ -171,6 +171,20 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
       ? { text: "FRED unavailable — static macro", tone: "var(--warn)" }
       : { text: "FRED macro optional (off)", tone: "var(--text-mut)" };
 
+  const quotesLive = markets.some(
+    (m) => m.indicesSource === "delayed_quote" || m.fxSource === "delayed_quote",
+  );
+  const quotesUnavailable =
+    !quotesLive &&
+    markets.some(
+      (m) => m.indicesSource === "quote_unavailable" || m.fxSource === "quote_unavailable",
+    );
+  const quotesChip = quotesLive
+    ? { text: "Delayed quotes (index/FX)", tone: "var(--pos)" }
+    : quotesUnavailable
+      ? { text: "Quotes unavailable — static", tone: "var(--warn)" }
+      : { text: "Delayed quotes optional (off)", tone: "var(--text-mut)" };
+
   useEffect(() => {
     if (!selectedId || !filtering) return;
     if (!filterMarkets(region, query, markets).some((market) => market.id === selectedId)) {
@@ -255,7 +269,13 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
           >
             {macroChip.text}
           </span>
-          {["Quotes planned", "News planned"].map((t) => (
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{ background: `color-mix(in oklch, ${quotesChip.tone} 12%, transparent)`, border: `1px solid color-mix(in oklch, ${quotesChip.tone} 30%, transparent)`, color: quotesChip.tone }}
+          >
+            {quotesChip.text}
+          </span>
+          {["News planned"].map((t) => (
             <span
               key={t}
               className="rounded-full px-2 py-0.5 text-[10px] font-medium"

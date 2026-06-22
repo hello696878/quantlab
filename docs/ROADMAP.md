@@ -1326,6 +1326,39 @@ single-asset Backtest + Strategy Comparison:
   New `backend/.env.example` (no keys); `.env` already gitignored. Setup +
   limits documented in `docs/GLOBE_DATA.md`. `pytest` green; `tsc` clean.
 
+### Phase 20.4 — Globe Delayed Index & FX Quotes Adapter v1 ✅
+
+- Second **optional**, cautious quote-data integration (parallel to FRED 20.3).
+  New `app/globe/quotes.py`: `GlobeQuotesConfig` (env: `GLOBE_QUOTES_ENABLED`
+  default false · `GLOBE_QUOTES_PROVIDER` default "yfinance" · timeout · cache
+  TTL), `QuoteResult`, a `QuoteProvider` protocol, a `YfinanceQuoteProvider`
+  (reuses the existing free yfinance dependency; **delayed, never real-time**),
+  curated `INDEX_SYMBOL_MAP` / `FX_SYMBOL_MAP`, an in-memory TTL cache, and the
+  `DelayedIndexQuoteAdapter` / `FxQuoteAdapter` + `enrich_market_with_quotes`.
+  **Disabled by default; no API key; fails closed to static** on disabled /
+  provider-unavailable / error / invalid value. Only the **primary** index/FX
+  row of *mapped* markets is enriched; unmapped markets/fields stay static and
+  never claim a delayed quote. The inert index/FX stubs were removed from
+  `adapters.py` (`PLANNED_ADAPTERS` now = news only).
+- Models widened: `SourceState += delayed_quote, quote_unavailable`; `MarketIndex`
+  / `MarketFx` gain `as_of_date`; `DataStatus += mixed_static_and_quotes,
+  mixed_static_fred_quotes`. Service `build_markets_response` /
+  `build_single_market` run FRED then quote enrichment and combine `data_status`;
+  routes pass `GlobeQuotesConfig.from_env()`. No secrets in responses.
+- Frontend: `remote.ts` parser accepts the new quote source states + boolean
+  `is_sample` + `as_of_date` + the new `data_status` values, shows the **real
+  delayed level/rate** only when enriched (else "Sample"), and carries
+  `indicesSource`/`fxSource`/`as_of`. The dossier shows honest **Index quotes**
+  and **FX** source chips ("static sample" / "delayed · as of …" / "unavailable —
+  static fallback"); the page header shows a dynamic delayed-quotes chip.
+  Dashboard card badge → "Static API + optional delayed quotes".
+- 17 new quote tests (mocked provider, **no network**): disabled→no call+static,
+  index/FX mock success→delayed_quote+enriched, invalid/exception→fallback,
+  provider-unavailable→quote_unavailable+warning, unsupported market never
+  delayed, cache dedupe, no NaN/Inf. `.env.example` + `docs/GLOBE_DATA.md`
+  updated. `pytest` green; `npx tsc --noEmit` clean. **Delayed, not real-time;
+  no trading; not investment advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

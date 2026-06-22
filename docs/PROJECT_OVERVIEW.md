@@ -58,7 +58,7 @@ FastAPI Backend
   ├── short_rates.py                Short Rate Models Lab v1: Vasicek / CIR Monte Carlo simulation + analytic zero-coupon pricing, Feller diagnostic (pure)
   ├── fx.py                         FX Lab v1: interest rate parity forward, FX carry, PPP deviation, currency exposure + stress, Garman-Kohlhagen FX options (pure)
   ├── credit.py                     Credit Risk Lab v1: Merton structural model, distance to default, hazard/survival curve, CDS spread approximation, risky bond pricing (pure)
-  ├── globe/                        Global Markets Globe Data Layer (20.2 typed dossier + 15 static markets + service) with an optional, config-gated FRED macro adapter (20.3: disabled by default, fails closed to static, US-only v1, in-memory TTL cache; delayed index / FX / news remain inert stubs)
+  ├── globe/                        Global Markets Globe Data Layer (20.2 typed dossier + 15 static markets + service) with optional, config-gated, fail-closed adapters: FRED macro (20.3, adapters.py — US-only) and delayed index/FX quotes (20.4, quotes.py — curated markets, reuses yfinance, delayed not real-time, TTL cache); news remains an inert stub
   ├── globe_routes.py               Globe API router: GET /globe/markets, /globe/markets/{id} (friendly 404), /globe/regions — static sample data only
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD

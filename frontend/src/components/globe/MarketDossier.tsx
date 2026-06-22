@@ -23,6 +23,7 @@ import {
   type MacroSourceState,
   type Market,
   type MarketIndex,
+  type QuoteSourceState,
   type Sentiment,
 } from "@/lib/globe/markets";
 import { fmtPct } from "@/lib/format";
@@ -144,6 +145,35 @@ function macroNote(market: Market): string {
   return "Illustrative static figures; optional US FRED macro enrichment is off by default.";
 }
 
+/** Honest delayed-quote provenance chip for the index / FX sections. */
+function QuoteSourceChip({
+  label,
+  source,
+  asOf,
+}: {
+  label: string;
+  source: QuoteSourceState | undefined;
+  asOf: string | null | undefined;
+}) {
+  const s = source ?? "static_sample";
+  const text =
+    s === "delayed_quote"
+      ? `${label}: delayed${asOf ? ` · as of ${asOf}` : ""}`
+      : s === "quote_unavailable"
+        ? `${label} unavailable — static fallback`
+        : `${label}: static sample`;
+  const color =
+    s === "delayed_quote" ? "var(--pos)" : s === "quote_unavailable" ? "var(--warn)" : "var(--text-mut)";
+  return (
+    <span
+      className="mono rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide"
+      style={{ background: `color-mix(in oklch, ${color} 14%, transparent)`, border: `1px solid color-mix(in oklch, ${color} 32%, transparent)`, color }}
+    >
+      {text}
+    </span>
+  );
+}
+
 function macroMetricLabel(
   label: string,
   field: MacroField,
@@ -260,15 +290,19 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
       <div className="space-y-4 p-5">
         {/* Market Pulse */}
         <section>
-          <SectionLabel>Market Pulse</SectionLabel>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="section-title">Market Pulse</p>
+            <QuoteSourceChip label="Index quotes" source={market.indicesSource} asOf={market.indicesAsOf} />
+          </div>
           <div className="space-y-2">
             {market.indices.map((idx) => (
               <IndexRow key={idx.ticker} idx={idx} />
             ))}
           </div>
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-            Levels are placeholders; change % and sparklines are illustrative —
-            delayed index quotes are planned.
+            {market.indicesSource === "delayed_quote"
+              ? "Primary index level is a delayed quote (not real-time); sparklines remain illustrative."
+              : "Levels shown as “Sample”; change % and sparklines are illustrative. Optional delayed index quotes are off by default."}
           </p>
         </section>
 
@@ -296,7 +330,10 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
 
         {/* FX & Rates */}
         <section>
-          <SectionLabel>FX &amp; Rates</SectionLabel>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="section-title">FX &amp; Rates</p>
+            <QuoteSourceChip label="FX" source={market.fxSource} asOf={market.fxAsOf} />
+          </div>
           <div className="rounded-xl p-3" style={{ background: "var(--glass)", border: "1px solid var(--line)" }}>
             <StructureRow label="Currency" value={market.currency} />
             {market.fx.map((f) => (
@@ -317,7 +354,9 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
             <StructureRow label="Policy rate" value={`${market.macro.policyRate}%`} />
           </div>
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-            FX values are placeholders; delayed FX quotes are planned.
+            {market.fxSource === "delayed_quote"
+              ? "Primary FX rate is a delayed quote (not real-time)."
+              : "FX values shown as “Sample”. Optional delayed FX quotes are off by default."}
           </p>
         </section>
 

@@ -16,6 +16,13 @@ from app.globe.adapters import (
     FredMacroConfig,
     clear_fred_cache,
 )
+from app.globe.quotes import (
+    DelayedIndexQuoteAdapter,
+    FxQuoteAdapter,
+    GlobeQuotesConfig,
+    QuoteResult,
+    clear_quote_cache,
+)
 from app.globe.models import MarketIndex
 from app.globe.service import (
     build_markets_response,
@@ -61,11 +68,17 @@ def _fred_defaults(monkeypatch):
         "FRED_BASE_URL",
         "FRED_TIMEOUT_SECONDS",
         "GLOBE_FRED_CACHE_TTL_SECONDS",
+        "GLOBE_QUOTES_ENABLED",
+        "GLOBE_QUOTES_PROVIDER",
+        "GLOBE_QUOTES_TIMEOUT_SECONDS",
+        "GLOBE_QUOTES_CACHE_TTL_SECONDS",
     ):
         monkeypatch.delenv(key, raising=False)
     clear_fred_cache()
+    clear_quote_cache()
     yield
     clear_fred_cache()
+    clear_quote_cache()
 
 
 @pytest.fixture
@@ -276,16 +289,6 @@ def test_adapters_report_planned_and_not_live():
         assert a.is_live() is False
 
 
-def test_index_adapter_does_not_fetch():
-    with pytest.raises(NotImplementedError):
-        globe_adapters.DelayedIndexQuoteAdapter().fetch_index_quotes("us")
-
-
-def test_fx_adapter_does_not_fetch():
-    with pytest.raises(NotImplementedError):
-        globe_adapters.FxQuoteAdapter().fetch_fx_quotes("USD", "JPY")
-
-
 def test_news_adapter_does_not_fetch():
     with pytest.raises(NotImplementedError):
         globe_adapters.NewsSentimentAdapter().fetch_headlines("us")
@@ -417,6 +420,161 @@ def test_single_market_endpoint_static_by_default(client):
     body = client.get("/globe/markets/us").json()
     assert body["id"] == "us"
     assert body["source_status"]["macro"] == "static_sample"
+
+
+# ---------------------------------------------------------------------------
+# Delayed index & FX quote adapter (Phase 20.4) — optional, fail-closed
+# ---------------------------------------------------------------------------
+
+
+class _FakeQuoteProvider:
+    """Injectable quote provider — no network. Configurable for success/failure."""
+
+    def __init__(self, value=5000.0, change_pct=0.5, as_of="2024-05-01", raises=False, invalid=False):
+        self._value = value
+        self._change = change_pct
+        self._as_of = as_of
+        self._raises = raises
+        self._invalid = invalid
+        self.calls = 0
+
+    def fetch_index_quote(self, symbol):
+        self.calls += 1
+        if self._raises:
+            raise RuntimeError("provider down")
+        value = float("nan") if self._invalid else self._value
+        return QuoteResult(symbol=symbol, name=symbol, value=value, change_pct=self._change, as_of=self._as_of, source="fake")
+
+    def fetch_fx_quote(self, symbol):
+        return self.fetch_index_quote(symbol)
+
+
+def _quotes_cfg(ttl=0):
+    return GlobeQuotesConfig(enabled=True, provider="yfinance", timeout_seconds=1.0, cache_ttl_seconds=ttl)
+
+
+def _quote_adapters(provider, cfg=None):
+    cfg = cfg or _quotes_cfg()
+    return DelayedIndexQuoteAdapter(cfg, provider), FxQuoteAdapter(cfg, provider)
+
+
+def test_quotes_disabled_by_default():
+    cfg = GlobeQuotesConfig.from_env({})
+    assert cfg.enabled is False
+
+
+def test_quotes_disabled_no_provider_call():
+    provider = _FakeQuoteProvider(raises=True)
+    cfg = GlobeQuotesConfig()  # disabled
+    idx, fxa = DelayedIndexQuoteAdapter(cfg, provider), FxQuoteAdapter(cfg, provider)
+    markets, status, _n, warnings = build_markets_response(
+        quotes_config=cfg, index_adapter=idx, fx_adapter=fxa
+    )
+    assert provider.calls == 0
+    assert status == "static_sample"
+    us = next(m for m in markets if m.id == "us")
+    assert us.source_status.indices == "static_sample"
+    assert us.source_status.fx == "static_sample"
+    assert warnings == []
+
+
+def test_quotes_disabled_endpoint_static(client):
+    body = client.get("/globe/markets").json()
+    assert all(m["source_status"]["indices"] == "static_sample" for m in body["markets"])
+    assert all(m["source_status"]["fx"] == "static_sample" for m in body["markets"])
+
+
+def test_quotes_index_success_enriches():
+    provider = _FakeQuoteProvider(value=5234.5, change_pct=0.42, as_of="2024-06-01")
+    idx, fxa = _quote_adapters(provider)
+    markets, status, _n, _w = build_markets_response(
+        quotes_config=_quotes_cfg(), index_adapter=idx, fx_adapter=fxa
+    )
+    us = next(m for m in markets if m.id == "us")
+    assert us.source_status.indices == "delayed_quote"
+    assert us.indices[0].is_sample is False
+    assert us.indices[0].level == 5234.5
+    assert us.indices[0].as_of_date == "2024-06-01"
+    assert us.source_status.fx == "static_sample"  # US has no FX mapping
+    assert status == "mixed_static_and_quotes"
+
+
+def test_quotes_fx_success_enriches():
+    provider = _FakeQuoteProvider(value=151.2, change_pct=0.2, as_of="2024-06-01")
+    idx, fxa = _quote_adapters(provider)
+    markets, _s, _n, _w = build_markets_response(
+        quotes_config=_quotes_cfg(), index_adapter=idx, fx_adapter=fxa
+    )
+    jp = next(m for m in markets if m.id == "jp")
+    assert jp.source_status.fx == "delayed_quote"
+    assert jp.fx[0].is_sample is False
+    assert jp.fx[0].rate == 151.2
+
+
+def test_quotes_invalid_value_falls_back():
+    provider = _FakeQuoteProvider(invalid=True)
+    idx, fxa = _quote_adapters(provider)
+    markets, status, _n, _w = build_markets_response(
+        quotes_config=_quotes_cfg(), index_adapter=idx, fx_adapter=fxa
+    )
+    us = next(m for m in markets if m.id == "us")
+    assert us.source_status.indices == "quote_unavailable"
+    assert us.indices[0].is_sample is True
+    assert status == "static_sample"
+
+
+def test_quotes_provider_exception_falls_back():
+    provider = _FakeQuoteProvider(raises=True)
+    idx, fxa = _quote_adapters(provider)
+    markets, _s, _n, _w = build_markets_response(
+        quotes_config=_quotes_cfg(), index_adapter=idx, fx_adapter=fxa
+    )
+    us = next(m for m in markets if m.id == "us")
+    assert us.source_status.indices == "quote_unavailable"
+    assert us.indices[0].is_sample is True
+
+
+def test_unsupported_market_not_delayed_quote():
+    provider = _FakeQuoteProvider()
+    idx, fxa = _quote_adapters(provider)
+    markets, _s, _n, _w = build_markets_response(
+        quotes_config=_quotes_cfg(), index_adapter=idx, fx_adapter=fxa
+    )
+    cn = next(m for m in markets if m.id == "cn")  # no index mapping for China
+    assert cn.source_status.indices == "static_sample"
+    assert cn.indices[0].is_sample is True
+
+
+def test_quotes_enabled_provider_unavailable_route(client, monkeypatch):
+    monkeypatch.setenv("GLOBE_QUOTES_ENABLED", "true")
+    monkeypatch.setenv("GLOBE_QUOTES_PROVIDER", "mock")  # unknown → no real provider
+    body = client.get("/globe/markets").json()
+    us = next(m for m in body["markets"] if m["id"] == "us")
+    assert us["source_status"]["indices"] == "quote_unavailable"
+    assert us["indices"][0]["is_sample"] is True
+    assert any("provider unavailable" in w.lower() for w in body["warnings"])
+
+
+def test_enriched_quotes_no_nan_or_inf():
+    provider = _FakeQuoteProvider(value=5000.0, change_pct=0.3)
+    idx, fxa = _quote_adapters(provider)
+    markets, _s, _n, _w = build_markets_response(
+        quotes_config=_quotes_cfg(), index_adapter=idx, fx_adapter=fxa
+    )
+    for m in markets:
+        _assert_all_finite(m.model_dump())
+
+
+def test_quote_cache_dedupes_calls():
+    provider = _FakeQuoteProvider()
+    idx = DelayedIndexQuoteAdapter(_quotes_cfg(ttl=3600), provider)
+    assert idx.fetch_index_quote("us") is not None
+    assert idx.fetch_index_quote("us") is not None
+    assert provider.calls == 1  # second call served from cache
+
+
+def test_quotes_response_no_nan_via_endpoint(client):
+    _assert_all_finite(client.get("/globe/markets").json())
 
 
 def test_latest_valid_observation_skips_fred_missing_marker():
