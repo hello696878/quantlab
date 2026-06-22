@@ -77,6 +77,18 @@ export interface MarketLink {
   view: View;
 }
 
+/**
+ * Provenance of a market's macro block. Bundled static data leaves this unset
+ * (treated as "static_sample"); the backend data layer sets it per market.
+ * Only macro can become non-static in this phase (FRED); indices/FX/news stay
+ * static sample.
+ */
+export type MacroSourceState =
+  | "static_sample"
+  | "fred_live"
+  | "fred_unavailable"
+  | "planned";
+
 export interface Market {
   id: string;
   country: string;
@@ -95,6 +107,10 @@ export interface Market {
   marketStructure: MarketStructure;
   headlines: MarketHeadline[];
   links: MarketLink[];
+  /** Macro provenance (undefined → static sample). Set by the backend layer. */
+  macroSource?: MacroSourceState;
+  /** Macro "as of" date when (partly) enriched from FRED. */
+  macroAsOf?: string | null;
 }
 
 // ---------------------------------------------------------------------------

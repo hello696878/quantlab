@@ -126,6 +126,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
   const [markets, setMarkets] = useState<Market[]>(MARKETS);
   const [dataStatus, setDataStatus] = useState<"loading" | "backend" | "fallback">("loading");
   const [dataNotice, setDataNotice] = useState(STATIC_DATA_NOTICE);
+  const [warnings, setWarnings] = useState<string[]>([]);
 
   useEffect(() => {
     const ctrl = new AbortController();
@@ -136,12 +137,14 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
         if (cancelled) return;
         setMarkets(res.markets);
         setDataNotice(res.notice);
+        setWarnings(res.warnings);
         setDataStatus("backend");
       })
       .catch(() => {
         if (cancelled) return;
         setMarkets(MARKETS);
         setDataNotice(STATIC_DATA_NOTICE);
+        setWarnings([]);
         setDataStatus("fallback");
       });
     return () => {
@@ -156,6 +159,13 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
   const activeIds = filtering ? new Set(filtered.map((m) => m.id)) : null;
   const selected = markets.find((m) => m.id === selectedId) ?? null;
   const rollups = regionRollup(markets);
+  const fredLive = markets.some((m) => m.macroSource === "fred_live");
+  const fredUnavailable = !fredLive && markets.some((m) => m.macroSource === "fred_unavailable");
+  const macroChip = fredLive
+    ? { text: "FRED macro live (US)", tone: "var(--pos)" }
+    : fredUnavailable
+      ? { text: "FRED unavailable — static macro", tone: "var(--warn)" }
+      : { text: "Live macro planned", tone: "var(--text-mut)" };
 
   useEffect(() => {
     if (!selectedId || !filtering) return;
@@ -233,7 +243,13 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
                 ? "Bundled static fallback"
                 : "Loading data layer…"}
           </span>
-          {["Live macro planned", "Quotes planned", "News planned"].map((t) => (
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{ background: `color-mix(in oklch, ${macroChip.tone} 12%, transparent)`, border: `1px solid color-mix(in oklch, ${macroChip.tone} 30%, transparent)`, color: macroChip.tone }}
+          >
+            {macroChip.text}
+          </span>
+          {["Quotes planned", "News planned"].map((t) => (
             <span
               key={t}
               className="rounded-full px-2 py-0.5 text-[10px] font-medium"
@@ -254,6 +270,22 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
         >
           <span aria-hidden className="mt-0.5 flex-shrink-0">⚠</span>
           <p>Backend globe data unavailable; using bundled static sample data.</p>
+        </div>
+      )}
+
+      {/* Non-blocking FRED adapter notices (e.g. enabled but no API key). */}
+      {warnings.length > 0 && (
+        <div
+          role="status"
+          className="rounded-xl p-3 text-xs"
+          style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-mut)" }}
+        >
+          {warnings.map((w) => (
+            <p key={w} className="flex items-start gap-2">
+              <span aria-hidden className="mt-0.5 flex-shrink-0">ⓘ</span>
+              <span>{w}</span>
+            </p>
+          ))}
         </div>
       )}
 

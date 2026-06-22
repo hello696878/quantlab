@@ -257,8 +257,15 @@ Return to the Command Center's **Platform Direction** panel (or open
   the header chip reads "Backend static dataset". Stop the backend and reload to
   show the graceful fallback — the chip flips to "Bundled static fallback" with a
   non-blocking "Backend globe data unavailable…" warning and the globe stays
-  fully usable. Even the backend payload is static sample data; the FRED/quotes/
-  news adapters are inert stubs (no live fetch).
+  fully usable. Even the backend payload is static sample data; the quotes/news
+  adapters are inert stubs (no live fetch). **FRED macro (20.3):** by default
+  the dossier macro chip reads "Macro: Static sample". To show the optional
+  adapter, set `GLOBE_FRED_ENABLED=true` with no key → a non-blocking
+  "FRED macro adapter enabled but no API key configured…" notice appears and the
+  US macro chip reads "FRED unavailable, static fallback" (app never crashes).
+  With a personal `FRED_API_KEY` set locally (never committed), the US dossier
+  macro chip reads "Macro: FRED · as of …" while every other market and every
+  other section stays static. Indices, FX, and news are never live.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

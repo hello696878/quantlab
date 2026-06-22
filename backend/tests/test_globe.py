@@ -11,8 +11,18 @@ import pytest
 from pydantic import ValidationError
 
 from app.globe import adapters as globe_adapters
+from app.globe.adapters import (
+    FredMacroAdapter,
+    FredMacroConfig,
+    clear_fred_cache,
+)
 from app.globe.models import MarketIndex
-from app.globe.service import get_all_markets, get_market, get_regions
+from app.globe.service import (
+    build_markets_response,
+    get_all_markets,
+    get_market,
+    get_regions,
+)
 
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
 main_module = pytest.importorskip("app.main")
@@ -42,9 +52,44 @@ def _assert_all_finite(obj):
         assert math.isfinite(obj), f"non-finite float in payload: {obj}"
 
 
+@pytest.fixture(autouse=True)
+def _fred_defaults(monkeypatch):
+    """Keep every test deterministic: FRED disabled + clean cache by default."""
+    for key in (
+        "GLOBE_FRED_ENABLED",
+        "FRED_API_KEY",
+        "FRED_BASE_URL",
+        "FRED_TIMEOUT_SECONDS",
+        "GLOBE_FRED_CACHE_TTL_SECONDS",
+    ):
+        monkeypatch.delenv(key, raising=False)
+    clear_fred_cache()
+    yield
+    clear_fred_cache()
+
+
 @pytest.fixture
 def client():
     return TestClient(main_module.app)
+
+
+def _fake_fetcher(value="5.33", date="2024-05-01"):
+    """A FRED fetcher stub that returns one observation. No network."""
+
+    def fetch(url, timeout):  # noqa: ARG001
+        return {"observations": [{"date": date, "value": value}]}
+
+    return fetch
+
+
+def _enabled_config(key="TEST_KEY", ttl=0):
+    return FredMacroConfig(
+        enabled=True,
+        api_key=key,
+        base_url="https://fred.test",
+        timeout_seconds=1.0,
+        cache_ttl_seconds=ttl,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -231,11 +276,6 @@ def test_adapters_report_planned_and_not_live():
         assert a.is_live() is False
 
 
-def test_fred_adapter_does_not_fetch():
-    with pytest.raises(NotImplementedError):
-        globe_adapters.FredMacroAdapter().fetch_country_macro("us")
-
-
 def test_index_adapter_does_not_fetch():
     with pytest.raises(NotImplementedError):
         globe_adapters.DelayedIndexQuoteAdapter().fetch_index_quotes("us")
@@ -249,3 +289,125 @@ def test_fx_adapter_does_not_fetch():
 def test_news_adapter_does_not_fetch():
     with pytest.raises(NotImplementedError):
         globe_adapters.NewsSentimentAdapter().fetch_headlines("us")
+
+
+# ---------------------------------------------------------------------------
+# FRED macro adapter (Phase 20.3) — optional, config-gated, fail-closed
+# ---------------------------------------------------------------------------
+
+def test_fred_disabled_by_default():
+    cfg = FredMacroConfig.from_env({})
+    assert cfg.enabled is False
+    adapter = FredMacroAdapter(cfg)
+    assert adapter.is_live() is False
+    assert adapter.source_state() == "static_sample"
+
+
+def test_disabled_endpoint_is_static(client):
+    body = client.get("/globe/markets").json()
+    assert body["data_status"] == "static_sample"
+    assert all(m["source_status"]["macro"] == "static_sample" for m in body["markets"])
+    assert body["warnings"] == []
+
+
+def test_disabled_adapter_is_not_called():
+    def boom(url, timeout):  # noqa: ARG001
+        raise AssertionError("fetcher must not be called when FRED is disabled")
+
+    cfg = FredMacroConfig()  # disabled
+    adapter = FredMacroAdapter(cfg, fetcher=boom)
+    markets, status, _notice, warnings = build_markets_response(cfg, adapter=adapter)
+    us = next(m for m in markets if m.id == "us")
+    assert status == "static_sample"
+    assert us.source_status.macro == "static_sample"
+    assert us.macro.is_sample is True
+    assert warnings == []
+
+
+def test_enabled_without_key_falls_back(client, monkeypatch):
+    monkeypatch.setenv("GLOBE_FRED_ENABLED", "true")  # no FRED_API_KEY
+    body = client.get("/globe/markets").json()
+    assert body["data_status"] == "static_sample"  # nothing went live
+    assert any("api key" in w.lower() for w in body["warnings"])
+    us = next(m for m in body["markets"] if m["id"] == "us")
+    assert us["source_status"]["macro"] == "fred_unavailable"
+    assert us["macro"]["is_sample"] is True  # data unchanged
+
+
+def test_mock_fred_success_enriches_us():
+    cfg = _enabled_config()
+    adapter = FredMacroAdapter(cfg, fetcher=_fake_fetcher("3.21", "2024-06-01"))
+    markets, status, _notice, warnings = build_markets_response(cfg, adapter=adapter)
+    us = next(m for m in markets if m.id == "us")
+    assert us.source_status.macro == "fred_live"
+    assert us.macro.is_sample is False
+    assert us.macro.policy_rate == 3.21
+    assert us.macro.as_of_date == "2024-06-01"
+    assert status == "mixed_static_and_fred"
+    assert warnings == []
+    # Unsupported markets stay static and never claim live macro.
+    jp = next(m for m in markets if m.id == "jp")
+    assert jp.source_status.macro == "static_sample"
+    assert jp.macro.is_sample is True
+
+
+def test_mock_fred_invalid_value_falls_back():
+    cfg = _enabled_config()
+    adapter = FredMacroAdapter(cfg, fetcher=_fake_fetcher("."))  # FRED missing value
+    markets, status, _notice, warnings = build_markets_response(cfg, adapter=adapter)
+    us = next(m for m in markets if m.id == "us")
+    assert us.source_status.macro == "fred_unavailable"
+    assert us.macro.is_sample is True  # static value retained
+    assert status == "static_sample"
+    assert any("us" in w for w in warnings)
+
+
+def test_mock_fred_network_failure_falls_back():
+    def boom(url, timeout):  # noqa: ARG001
+        raise RuntimeError("network down")
+
+    cfg = _enabled_config()
+    adapter = FredMacroAdapter(cfg, fetcher=boom)
+    markets, status, _notice, _warnings = build_markets_response(cfg, adapter=adapter)
+    us = next(m for m in markets if m.id == "us")
+    assert us.source_status.macro == "fred_unavailable"
+    assert us.macro.is_sample is True
+    assert status == "static_sample"
+
+
+def test_api_key_never_in_response():
+    secret = "SUPER_SECRET_KEY_123"
+    cfg = FredMacroConfig(enabled=True, api_key=secret, base_url="https://fred.test")
+    adapter = FredMacroAdapter(cfg, fetcher=_fake_fetcher("2.0", "2024-01-01"))
+    markets, _status, notice, warnings = build_markets_response(cfg, adapter=adapter)
+    blob = " ".join(m.model_dump_json() for m in markets) + " ".join(warnings) + notice
+    assert secret not in blob
+    assert "api_key" not in blob
+
+
+def test_enriched_markets_no_nan_or_inf():
+    cfg = _enabled_config()
+    adapter = FredMacroAdapter(cfg, fetcher=_fake_fetcher("3.5", "2024-06-01"))
+    markets, _status, _notice, _warnings = build_markets_response(cfg, adapter=adapter)
+    for m in markets:
+        _assert_all_finite(m.model_dump())
+
+
+def test_series_cache_dedupes_calls():
+    calls = {"n": 0}
+
+    def counting(url, timeout):  # noqa: ARG001
+        calls["n"] += 1
+        return {"observations": [{"date": "2024-01-01", "value": "1.0"}]}
+
+    cfg = _enabled_config(ttl=3600)
+    adapter = FredMacroAdapter(cfg, fetcher=counting)
+    assert adapter.fetch_series_latest("FEDFUNDS") == (1.0, "2024-01-01")
+    assert adapter.fetch_series_latest("FEDFUNDS") == (1.0, "2024-01-01")
+    assert calls["n"] == 1  # second call served from cache
+
+
+def test_single_market_endpoint_static_by_default(client):
+    body = client.get("/globe/markets/us").json()
+    assert body["id"] == "us"
+    assert body["source_status"]["macro"] == "static_sample"

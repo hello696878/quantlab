@@ -1297,6 +1297,34 @@ single-asset Backtest + Strategy Comparison:
   No live data, no real-time claims, not investment advice. `pytest` green;
   `npx tsc --noEmit` clean.
 
+### Phase 20.3 — Globe FRED Macro Adapter v1 ✅
+
+- First **optional**, cautious real-data integration for Globe **macro** only.
+  `app/globe/adapters.py`: `FredMacroConfig` (env: `GLOBE_FRED_ENABLED` default
+  false · `FRED_API_KEY` · `FRED_BASE_URL` · `FRED_TIMEOUT_SECONDS` ·
+  `GLOBE_FRED_CACHE_TTL_SECONDS`) + `FredMacroAdapter` (`fetch_series_latest` /
+  `fetch_market_macro` / `enrich_market_with_fred_macro`, injectable fetcher,
+  stdlib `urllib`, in-memory TTL cache). **Disabled by default; no key required
+  for local dev; fails closed to static sample on disabled / no-key / network
+  error / invalid value.** US-only v1 mapping (FEDFUNDS / UNRATE /
+  A191RL1Q225SBEA; inflation + debt-to-GDP stay static); delayed index / FX /
+  news remain inert stubs.
+- Models widened: `SourceState += fred_live, fred_unavailable`; `MarketMacro`
+  gains `as_of_date`; `MarketsResponse.data_status` adds `mixed_static_and_fred`
+  + a `warnings` list. Service `build_markets_response` / `build_single_market`
+  orchestrate enrichment; routes read `FredMacroConfig.from_env()`. The **API
+  key is never returned** to clients.
+- Frontend: `remote.ts` parser widened to accept the new states/warnings and
+  carry `macroSource` / `macroAsOf`; the dossier shows an honest **macro source
+  chip** ("Macro: Static sample" / "Macro: FRED" / "Macro: FRED unavailable,
+  static fallback"); the page shows a dynamic macro chip + non-blocking FRED
+  warnings. Default app behaviour is unchanged (static).
+- 13 new FRED tests (mocked fetcher, **no network**: disabled→static + adapter
+  not called, enabled-no-key→fred_unavailable+warning, mock success→fred_live,
+  invalid/network→fallback, key-never-in-response, cache dedupe, no NaN/Inf).
+  New `backend/.env.example` (no keys); `.env` already gitignored. Setup +
+  limits documented in `docs/GLOBE_DATA.md`. `pytest` green; `tsc` clean.
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

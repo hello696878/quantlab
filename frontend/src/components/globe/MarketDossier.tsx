@@ -18,6 +18,7 @@ import {
   REGION_COLORS,
   SENTIMENT_TONE,
   marketBias,
+  type MacroSourceState,
   type Market,
   type MarketIndex,
   type Sentiment,
@@ -87,6 +88,43 @@ function IndexRow({ idx }: { idx: MarketIndex }) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return <p className="section-title mb-2">{children}</p>;
+}
+
+/** Honest macro provenance chip (static sample by default; FRED if enriched). */
+function MacroSourceChip({
+  source,
+  asOf,
+}: {
+  source: MacroSourceState | undefined;
+  asOf: string | null | undefined;
+}) {
+  const s = source ?? "static_sample";
+  const label =
+    s === "fred_live"
+      ? `Macro: FRED${asOf ? ` · as of ${asOf}` : ""}`
+      : s === "fred_unavailable"
+        ? "Macro: FRED unavailable, static fallback"
+        : "Macro: Static sample";
+  const color =
+    s === "fred_live" ? "var(--pos)" : s === "fred_unavailable" ? "var(--warn)" : "var(--text-mut)";
+  return (
+    <span
+      className="mono rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide"
+      style={{ background: `color-mix(in oklch, ${color} 14%, transparent)`, border: `1px solid color-mix(in oklch, ${color} 32%, transparent)`, color }}
+    >
+      {label}
+    </span>
+  );
+}
+
+function macroNote(source: MacroSourceState | undefined): string {
+  if (source === "fred_live") {
+    return "Selected macro fields from FRED (US, v1); inflation and debt/GDP remain static sample. Indices, FX, structure, and news are static.";
+  }
+  if (source === "fred_unavailable") {
+    return "FRED macro was requested but unavailable; showing static sample figures.";
+  }
+  return "Illustrative static figures — optional FRED macro enrichment is available (off by default).";
 }
 
 function StructureRow({ label, value }: { label: string; value: string }) {
@@ -201,7 +239,10 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
 
         {/* Macro Vitals */}
         <section>
-          <SectionLabel>Macro Vitals</SectionLabel>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="section-title">Macro Vitals</p>
+            <MacroSourceChip source={market.macroSource} asOf={market.macroAsOf} />
+          </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
             <MetricCard label="GDP growth" value={`${market.macro.gdpGrowth.toFixed(1)}%`} tone="accent" />
             <MetricCard label="Inflation" value={`${market.macro.inflation.toFixed(1)}%`} tone="warn" />
@@ -210,7 +251,7 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
             <MetricCard label="Debt / GDP" value={`${market.macro.debtToGdp}%`} />
           </div>
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-            Illustrative static figures — live FRED / macro wiring is planned.
+            {macroNote(market.macroSource)}
           </p>
         </section>
 

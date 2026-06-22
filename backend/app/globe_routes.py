@@ -7,20 +7,25 @@ Read-only endpoints over the static sample dossier dataset:
     GET /globe/markets/{market_id} — a single market dossier (friendly 404)
     GET /globe/regions             — region → count rollups
 
-**Static illustrative sample data only** — no live data, no network calls, no
-real-time claims. The response `data_status` is always ``static_sample`` and
-every dossier's `source_status` is ``static_sample``.
+By default this is **static illustrative sample data** — no live data, no
+network calls, no real-time claims. An *optional*, config-gated FRED macro
+adapter (disabled unless ``GLOBE_FRED_ENABLED=true`` and ``FRED_API_KEY`` are
+set) may enrich the macro block of supported markets; everything else (indices,
+FX, market structure, news) always stays static sample. The adapter fails closed
+to static data and the API key is never returned to clients.
 """
 
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException
 
+from app.globe.adapters import FredMacroConfig
 from app.globe.models import MarketDossier, MarketsResponse, RegionsResponse
 from app.globe.service import (
     DATA_NOTICE,
     DATA_STATUS,
-    get_all_markets,
+    build_markets_response,
+    build_single_market,
     get_market,
     get_regions,
 )
@@ -33,17 +38,20 @@ router = APIRouter(prefix="/globe", tags=["globe"])
     response_model=MarketsResponse,
     summary="List all sample market dossiers",
     description=(
-        "Return all 15 static sample country/market dossiers. "
-        "Static illustrative data — not real-time, not live market data."
+        "Return all 15 sample country/market dossiers. Static illustrative data "
+        "by default; optional FRED macro enrichment when configured."
     ),
 )
 def list_markets() -> MarketsResponse:
-    markets = get_all_markets()
+    markets, data_status, notice, warnings = build_markets_response(
+        FredMacroConfig.from_env()
+    )
     return MarketsResponse(
         markets=markets,
         count=len(markets),
-        data_status=DATA_STATUS,
-        notice=DATA_NOTICE,
+        data_status=data_status,
+        notice=notice,
+        warnings=warnings,
     )
 
 
@@ -71,7 +79,9 @@ def list_regions() -> RegionsResponse:
     ),
 )
 def get_market_endpoint(market_id: str) -> MarketDossier:
-    market = get_market(market_id)
-    if market is None:
+    if get_market(market_id) is None:
         raise HTTPException(status_code=404, detail="Market not found.")
-    return market
+    dossier = build_single_market(market_id, FredMacroConfig.from_env())
+    if dossier is None:  # pragma: no cover — guarded above
+        raise HTTPException(status_code=404, detail="Market not found.")
+    return dossier

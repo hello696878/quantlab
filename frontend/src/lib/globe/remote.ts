@@ -15,12 +15,23 @@
 
 import {
   CROSS_LINKS,
+  type MacroSourceState,
   type Market,
   type MarketRegion,
   type Sentiment,
 } from "@/lib/globe/markets";
 
 type StaticSampleStatus = "static_sample";
+type DataStatus = "static_sample" | "mixed_static_and_fred";
+
+// Only macro may become non-static in this phase (optional FRED enrichment);
+// indices/FX/news always stay static sample.
+const MACRO_STATES: readonly MacroSourceState[] = [
+  "static_sample",
+  "fred_live",
+  "fred_unavailable",
+  "planned",
+];
 
 interface DtoIndex {
   name: string;
@@ -36,7 +47,8 @@ interface DtoMacro {
   unemployment: number;
   policy_rate: number;
   debt_to_gdp: number;
-  is_sample: true;
+  is_sample: boolean;
+  as_of_date?: string | null;
 }
 interface DtoFx {
   pair: string;
@@ -66,7 +78,7 @@ interface DtoLink {
   href: string;
 }
 interface DtoSourceStatus {
-  macro: StaticSampleStatus;
+  macro: MacroSourceState;
   indices: StaticSampleStatus;
   fx: StaticSampleStatus;
   news: StaticSampleStatus;
@@ -96,14 +108,16 @@ interface DtoDossier {
 interface DtoResponse {
   markets: DtoDossier[];
   count: number;
-  data_status: StaticSampleStatus;
+  data_status: DataStatus;
   notice: string;
+  warnings?: string[];
 }
 
 export interface GlobeMarketsResult {
   markets: Market[];
   notice: string;
-  dataStatus: StaticSampleStatus;
+  dataStatus: DataStatus;
+  warnings: string[];
 }
 
 const REGIONS: readonly MarketRegion[] = ["Americas", "Europe", "Asia-Pacific"];
@@ -120,11 +134,13 @@ function isNonEmptyString(value: unknown): value is string {
   return typeof value === "string" && value.trim().length > 0;
 }
 
-function hasStaticSources(value: unknown): value is DtoSourceStatus {
+function hasValidSources(value: unknown): value is DtoSourceStatus {
   if (!isRecord(value)) return false;
-  return ["macro", "indices", "fx", "news"].every(
+  const macroOk = MACRO_STATES.includes(value.macro as MacroSourceState);
+  const restOk = ["indices", "fx", "news"].every(
     (key) => value[key] === "static_sample",
   );
+  return macroOk && restOk;
 }
 
 function isDossier(value: unknown): value is DtoDossier {
@@ -151,7 +167,8 @@ function isDossier(value: unknown): value is DtoDossier {
     ) &&
     isRecord(macro) && ["gdp_growth", "inflation", "unemployment", "policy_rate", "debt_to_gdp"].every(
       (key) => isFiniteNumber(macro[key]),
-    ) && macro.is_sample === true &&
+    ) && typeof macro.is_sample === "boolean" &&
+    (macro.as_of_date == null || isNonEmptyString(macro.as_of_date)) &&
     Array.isArray(fx) && fx.length > 0 && fx.every((item) =>
       isRecord(item) && isNonEmptyString(item.pair) && isFiniteNumber(item.rate) &&
       isFiniteNumber(item.change_pct) && item.is_sample === true
@@ -168,16 +185,23 @@ function isDossier(value: unknown): value is DtoDossier {
     Array.isArray(links) && links.length > 0 && links.every((item) =>
       isRecord(item) && isNonEmptyString(item.label) && isNonEmptyString(item.href)
     ) &&
-    hasStaticSources(d.source_status)
+    hasValidSources(d.source_status)
   );
 }
 
 function parseResponse(value: unknown): DtoResponse {
-  if (!isRecord(value) || value.data_status !== "static_sample" ||
+  const dataStatusOk =
+    isRecord(value) &&
+    (value.data_status === "static_sample" || value.data_status === "mixed_static_and_fred");
+  const warningsOk =
+    !isRecord(value) ||
+    value.warnings === undefined ||
+    (Array.isArray(value.warnings) && value.warnings.every(isNonEmptyString));
+  if (!isRecord(value) || !dataStatusOk || !warningsOk ||
       !isNonEmptyString(value.notice) || !value.notice.includes("Static illustrative data") ||
       !Array.isArray(value.markets) || value.markets.length === 0 ||
       !value.markets.every(isDossier) || value.count !== value.markets.length) {
-    throw new Error("globe markets response did not match the static dossier schema");
+    throw new Error("globe markets response did not match the dossier schema");
   }
   return value as unknown as DtoResponse;
 }
@@ -221,6 +245,8 @@ function mapDossier(d: DtoDossier): Market {
     },
     headlines: d.headlines.map((h) => ({ title: h.title, sentiment: h.sentiment })),
     links: CROSS_LINKS,
+    macroSource: d.source_status.macro,
+    macroAsOf: d.macro.as_of_date ?? null,
   };
 }
 
@@ -241,6 +267,7 @@ export async function fetchGlobeMarkets(
   const data = parseResponse(await res.json());
   return {
     markets: data.markets.map(mapDossier),
+    warnings: data.warnings ?? [],
     notice: data.notice,
     dataStatus: data.data_status,
   };
