@@ -561,7 +561,8 @@ export default function DataGlobe({
           3D globe unavailable in this browser
         </p>
         <p className="mt-1 max-w-xs text-xs" style={{ color: "var(--text-mut)" }}>
-          Use the market list below. All data is static illustrative sample data.
+          Use the market list below. Core market data is illustrative; optional
+          FRED fields retain their source labels.
         </p>
       </div>
     );

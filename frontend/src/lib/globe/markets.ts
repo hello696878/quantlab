@@ -1,12 +1,11 @@
 /**
  * Global Markets Globe — static illustrative market data (v1).
  *
- * IMPORTANT — this is deterministic, hand-authored SAMPLE data for an
- * educational showcase. It is NOT live, NOT real-time, and NOT a market data
- * feed. Macro numbers, index levels, FX values, market-cap and listed-company
- * figures are illustrative placeholders. Live FRED macro, delayed index/FX
- * quotes, and a news/sentiment feed are planned future work (see
- * docs/LIMITATIONS.md and docs/ROADMAP.md).
+ * IMPORTANT — this is deterministic, hand-authored SAMPLE data for the
+ * educational showcase and frontend fallback. It is not a real-time feed. The
+ * backend may optionally source selected US macro fields from FRED; index, FX,
+ * market-cap, listed-company, and headline values remain illustrative.
+ * Delayed index/FX quotes and a news/sentiment feed are planned future work.
  *
  * Cross-links route into existing QuantLab modules via the in-app `View`
  * router (this app is a single-page workspace switcher, not a multi-route
@@ -29,9 +28,15 @@ export const MARKET_REGIONS: readonly MarketRegion[] = [
 ] as const;
 
 export type Sentiment = "Bullish" | "Bearish" | "Neutral";
+export type MacroField =
+  | "gdp_growth"
+  | "inflation"
+  | "unemployment"
+  | "policy_rate"
+  | "debt_to_gdp";
 
 export const STATIC_DATA_NOTICE =
-  "Static illustrative data. Live FRED macro, delayed index/FX quotes, and news integration are planned.";
+  "Static illustrative data for indices, FX, market structure, and headlines. Optional US FRED macro enrichment is off by default; delayed quotes and news are planned.";
 
 export interface MarketIndex {
   name: string;
@@ -111,6 +116,10 @@ export interface Market {
   macroSource?: MacroSourceState;
   /** Macro "as of" date when (partly) enriched from FRED. */
   macroAsOf?: string | null;
+  /** Exact macro fields sourced from FRED; all remaining fields are sample data. */
+  macroFredFields?: MacroField[];
+  /** Per-field FRED observation dates. */
+  macroFredAsOf?: Partial<Record<MacroField, string>>;
 }
 
 // ---------------------------------------------------------------------------

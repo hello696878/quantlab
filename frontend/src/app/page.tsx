@@ -331,7 +331,7 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
   globe: {
     title: "Global Markets Globe",
     subtitle:
-      "Explore an interactive 3D map of 15 sample markets and open country-level financial dossiers — static illustrative data, not real-time market data, not investment advice.",
+      "Explore 15 country dossiers with a static illustrative core and optional US FRED macro enrichment — not real-time market data or investment advice.",
   },
   backtest: {
     title: "Backtest",

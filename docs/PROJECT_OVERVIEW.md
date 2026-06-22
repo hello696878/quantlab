@@ -221,9 +221,11 @@ dossier dataset (`GET /api/globe/markets`) and maps it into the UI `Market`
 shape; `GlobeLabPanel` renders the bundled `MARKETS` immediately, upgrades to
 the backend data when reachable, and otherwise shows a non-blocking "Backend
 globe data unavailable; using bundled static sample data." warning. A header
-chip shows the active source ("Backend static dataset" / "Bundled static
-fallback"). All values are static illustrative sample data — no live market
-data, FX, macro, or news is fetched.
+chip shows the active source ("Backend static dataset", "Backend static +
+partial FRED", or "Bundled static fallback"). The core dataset remains
+illustrative; optional US FRED enrichment is preserved with field-level
+observation dates. Indices, FX, market structure, and headlines remain static,
+with no real-time coverage claim.
 
 ### `src/app/page.tsx`
 

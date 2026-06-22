@@ -6,15 +6,16 @@
  * `Market` shape the UI already consumes. If the backend is unavailable, the
  * caller falls back to the bundled static `MARKETS` — the Globe never breaks.
  *
- * Even the backend payload is **static illustrative sample data** (every record
- * is `is_sample`, `source_status` is `static_sample`). Index levels and FX
- * values are mapped to the literal "Sample" so the UI never shows a fabricated
- * level; backend `change_pct` is in percent and is converted to the decimal the
- * UI formatters expect.
+ * The backend payload has a static illustrative core and may carry field-level
+ * provenance for optional US FRED macro enrichment. Index and FX values are
+ * mapped to the literal "Sample" so the UI never shows a fabricated level;
+ * backend `change_pct` is in percent and is converted to the decimal expected
+ * by the UI formatters.
  */
 
 import {
   CROSS_LINKS,
+  type MacroField,
   type MacroSourceState,
   type Market,
   type MarketRegion,
@@ -31,6 +32,13 @@ const MACRO_STATES: readonly MacroSourceState[] = [
   "fred_live",
   "fred_unavailable",
   "planned",
+];
+const MACRO_FIELDS: readonly MacroField[] = [
+  "gdp_growth",
+  "inflation",
+  "unemployment",
+  "policy_rate",
+  "debt_to_gdp",
 ];
 
 interface DtoIndex {
@@ -49,6 +57,8 @@ interface DtoMacro {
   debt_to_gdp: number;
   is_sample: boolean;
   as_of_date?: string | null;
+  fred_fields: MacroField[];
+  fred_as_of: Partial<Record<MacroField, string>>;
 }
 interface DtoFx {
   pair: string;
@@ -143,9 +153,41 @@ function hasValidSources(value: unknown): value is DtoSourceStatus {
   return macroOk && restOk;
 }
 
+function hasValidMacroProvenance(
+  value: unknown,
+  source: MacroSourceState,
+): boolean {
+  if (!isRecord(value)) return false;
+  const fields = value.fred_fields;
+  const dates = value.fred_as_of;
+  if (!Array.isArray(fields) || !isRecord(dates)) return false;
+  if (
+    new Set(fields).size !== fields.length ||
+    !fields.every((field) => MACRO_FIELDS.includes(field as MacroField))
+  ) {
+    return false;
+  }
+  const datesValid = Object.entries(dates).every(
+    ([field, observationDate]) =>
+      MACRO_FIELDS.includes(field as MacroField) &&
+      fields.includes(field) &&
+      isNonEmptyString(observationDate),
+  );
+  if (!datesValid) return false;
+  if (source === "fred_live") {
+    return (
+      fields.length > 0 &&
+      fields.every((field) => isNonEmptyString(dates[field as MacroField]))
+    );
+  }
+  return fields.length === 0 && Object.keys(dates).length === 0;
+}
+
 function isDossier(value: unknown): value is DtoDossier {
   if (!isRecord(value)) return false;
   const d = value as Record<string, unknown>;
+  if (!hasValidSources(d.source_status)) return false;
+  const sources = d.source_status;
   const indices = d.indices;
   const fx = d.fx;
   const headlines = d.headlines;
@@ -169,6 +211,7 @@ function isDossier(value: unknown): value is DtoDossier {
       (key) => isFiniteNumber(macro[key]),
     ) && typeof macro.is_sample === "boolean" &&
     (macro.as_of_date == null || isNonEmptyString(macro.as_of_date)) &&
+    hasValidMacroProvenance(macro, sources.macro) &&
     Array.isArray(fx) && fx.length > 0 && fx.every((item) =>
       isRecord(item) && isNonEmptyString(item.pair) && isFiniteNumber(item.rate) &&
       isFiniteNumber(item.change_pct) && item.is_sample === true
@@ -184,8 +227,7 @@ function isDossier(value: unknown): value is DtoDossier {
     ) &&
     Array.isArray(links) && links.length > 0 && links.every((item) =>
       isRecord(item) && isNonEmptyString(item.label) && isNonEmptyString(item.href)
-    ) &&
-    hasValidSources(d.source_status)
+    )
   );
 }
 
@@ -247,6 +289,8 @@ function mapDossier(d: DtoDossier): Market {
     links: CROSS_LINKS,
     macroSource: d.source_status.macro,
     macroAsOf: d.macro.as_of_date ?? null,
+    macroFredFields: d.macro.fred_fields,
+    macroFredAsOf: d.macro.fred_as_of,
   };
 }
 

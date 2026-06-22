@@ -18,10 +18,12 @@ Honesty / safety constraints:
 from __future__ import annotations
 
 import json
+import math
 import time
 import urllib.parse
 import urllib.request
 from dataclasses import dataclass
+from datetime import date
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from app.globe.models import MarketDossier
@@ -90,6 +92,17 @@ PLANNED_ADAPTERS = (
 # ---------------------------------------------------------------------------
 
 DEFAULT_FRED_BASE_URL = "https://api.stlouisfed.org/fred"
+MAX_FRED_TIMEOUT_SECONDS = 30.0
+MAX_FRED_CACHE_TTL_SECONDS = 86_400
+MAX_FRED_RESPONSE_BYTES = 1_000_000
+FRED_OBSERVATION_LIMIT = 10
+MACRO_VALUE_FIELDS = frozenset({
+    "gdp_growth",
+    "inflation",
+    "unemployment",
+    "policy_rate",
+    "debt_to_gdp",
+})
 
 # v1 coverage: United States only. Each value is a FRED series id whose latest
 # observation is already a percentage rate (no YoY math). `inflation` and
@@ -123,10 +136,12 @@ class FredMacroConfig:
         e = env if env is not None else os.environ
         enabled = str(e.get("GLOBE_FRED_ENABLED", "")).strip().lower() in _TRUE
         api_key = (e.get("FRED_API_KEY") or "").strip() or None
-        base_url = (e.get("FRED_BASE_URL") or "").strip() or DEFAULT_FRED_BASE_URL
+        base_url = _safe_base_url(e.get("FRED_BASE_URL"))
         try:
             timeout = float(e.get("FRED_TIMEOUT_SECONDS") or 5.0)
         except (TypeError, ValueError):
+            timeout = 5.0
+        if not math.isfinite(timeout) or timeout <= 0:
             timeout = 5.0
         try:
             ttl = int(e.get("GLOBE_FRED_CACHE_TTL_SECONDS") or 3600)
@@ -135,9 +150,9 @@ class FredMacroConfig:
         return cls(
             enabled=enabled,
             api_key=api_key,
-            base_url=base_url.rstrip("/"),
-            timeout_seconds=max(0.5, timeout),
-            cache_ttl_seconds=max(0, ttl),
+            base_url=base_url,
+            timeout_seconds=min(max(0.5, timeout), MAX_FRED_TIMEOUT_SECONDS),
+            cache_ttl_seconds=min(max(0, ttl), MAX_FRED_CACHE_TTL_SECONDS),
         )
 
 
@@ -157,9 +172,15 @@ Fetcher = Callable[[str, float], Any]
 
 
 def _default_fetcher(url: str, timeout: float) -> Any:
+    parsed = urllib.parse.urlparse(url)
+    if parsed.scheme != "https":
+        raise ValueError("FRED requests require HTTPS.")
     req = urllib.request.Request(url, headers={"User-Agent": "QuantLab/globe-fred"})
-    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (https only, opt-in)
-        return json.loads(resp.read().decode("utf-8"))
+    with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (validated HTTPS)
+        raw = resp.read(MAX_FRED_RESPONSE_BYTES + 1)
+    if len(raw) > MAX_FRED_RESPONSE_BYTES:
+        raise ValueError("FRED response exceeded the configured safety limit.")
+    return json.loads(raw.decode("utf-8"))
 
 
 def _coerce_value(raw: Any) -> Optional[float]:
@@ -176,6 +197,16 @@ def _coerce_value(raw: Any) -> Optional[float]:
     if v != v or v in (float("inf"), float("-inf")):
         return None
     return v
+
+
+def _coerce_date(raw: Any) -> Optional[str]:
+    """Return an ISO observation date, rejecting malformed source values."""
+    value = str(raw or "").strip()
+    try:
+        date.fromisoformat(value)
+    except ValueError:
+        return None
+    return value
 
 
 class FredMacroAdapter:
@@ -223,7 +254,7 @@ class FredMacroAdapter:
                     "api_key": self.config.api_key or "",
                     "file_type": "json",
                     "sort_order": "desc",
-                    "limit": 1,
+                    "limit": FRED_OBSERVATION_LIMIT,
                 }
             )
             url = f"{self.config.base_url}/series/observations?{params}"
@@ -233,40 +264,40 @@ class FredMacroAdapter:
             observations = payload.get("observations")
             if not isinstance(observations, list) or not observations:
                 return None
-            obs = observations[0]
-            if not isinstance(obs, dict):
-                return None
-            value = _coerce_value(obs.get("value"))
-            if value is None:
-                return None
-            as_of = str(obs.get("date") or "").strip() or "unknown"
-            if self.config.cache_ttl_seconds > 0:
-                _SERIES_CACHE[cache_key] = (
-                    now + self.config.cache_ttl_seconds,
-                    value,
-                    as_of,
-                )
-            return (value, as_of)
+            for obs in observations:
+                if not isinstance(obs, dict):
+                    continue
+                value = _coerce_value(obs.get("value"))
+                as_of = _coerce_date(obs.get("date"))
+                if value is None or as_of is None:
+                    continue
+                if self.config.cache_ttl_seconds > 0:
+                    _SERIES_CACHE[cache_key] = (
+                        now + self.config.cache_ttl_seconds,
+                        value,
+                        as_of,
+                    )
+                return (value, as_of)
+            return None
         except Exception:
             # Fail closed on any network / parse / unexpected error.
             return None
 
-    def fetch_market_macro(self, market_id: str) -> Tuple[Dict[str, float], Optional[str]]:
-        """Return ({macro_field: value}, latest_as_of_date) for mapped series."""
+    def fetch_market_macro(self, market_id: str) -> Tuple[Dict[str, float], Dict[str, str]]:
+        """Return mapped values and their individual observation dates."""
         mapping = FRED_SERIES_MAP.get((market_id or "").lower())
         if not mapping:
-            return ({}, None)
+            return ({}, {})
         values: Dict[str, float] = {}
-        as_of: Optional[str] = None
+        as_of_by_field: Dict[str, str] = {}
         for field, series_id in mapping.items():
             result = self.fetch_series_latest(series_id)
             if result is None:
                 continue
-            value, date = result
+            value, observation_date = result
             values[field] = value
-            if as_of is None or (date != "unknown" and date > as_of):
-                as_of = date
-        return (values, as_of)
+            as_of_by_field[field] = observation_date
+        return (values, as_of_by_field)
 
     def enrich_market_with_fred_macro(
         self, dossier: MarketDossier
@@ -280,21 +311,22 @@ class FredMacroAdapter:
         if not self.config.enabled:
             return (dossier, "static_sample", [])
 
+        mapping = FRED_SERIES_MAP.get(dossier.id)
+        if not mapping:
+            # Unsupported markets remain static and never attempt a FRED call.
+            return (dossier, "static_sample", [])
+
         if not self.config.api_key:
             warning = (
                 "FRED macro adapter enabled but no API key configured; using "
-                "static sample data."
+                "static sample data for the supported US macro fields."
             )
             return (_with_macro_state(dossier, "fred_unavailable"), "fred_unavailable", [warning])
 
-        if dossier.id not in FRED_SERIES_MAP:
-            # No mapping for this market → keep static, do not claim live.
-            return (dossier, "static_sample", [])
-
         try:
-            values, as_of = self.fetch_market_macro(dossier.id)
+            values, as_of_by_field = self.fetch_market_macro(dossier.id)
         except Exception:
-            values, as_of = {}, None
+            values, as_of_by_field = {}, {}
 
         if not values:
             warning = (
@@ -303,17 +335,52 @@ class FredMacroAdapter:
             )
             return (_with_macro_state(dossier, "fred_unavailable"), "fred_unavailable", [warning])
 
+        fred_fields = list(values)
+        aggregate_as_of = min(as_of_by_field.values()) if as_of_by_field else None
         new_macro = dossier.macro.model_copy(
-            update={**values, "is_sample": False, "as_of_date": as_of}
+            update={
+                **values,
+                "is_sample": len(values) < len(MACRO_VALUE_FIELDS),
+                "as_of_date": aggregate_as_of,
+                "fred_fields": fred_fields,
+                "fred_as_of": as_of_by_field,
+            }
         )
         new_status = dossier.source_status.model_copy(update={"macro": "fred_live"})
         enriched = dossier.model_copy(
             update={"macro": new_macro, "source_status": new_status}
         )
-        return (enriched, "fred_live", [])
+
+        missing_fields = [field for field in mapping if field not in values]
+        warnings: List[str] = []
+        if missing_fields:
+            warnings.append(
+                f"FRED returned only partial macro data for '{dossier.id}'; "
+                f"static sample fallback retained for: {', '.join(missing_fields)}."
+            )
+        return (enriched, "fred_live", warnings)
 
 
 def _with_macro_state(dossier: MarketDossier, macro_state: str) -> MarketDossier:
     """Return a copy of the dossier with source_status.macro set (data unchanged)."""
     new_status = dossier.source_status.model_copy(update={"macro": macro_state})
     return dossier.model_copy(update={"source_status": new_status})
+
+
+def _safe_base_url(raw: Optional[str]) -> str:
+    """Accept only an absolute HTTPS endpoint without credentials or a query."""
+    candidate = (raw or "").strip().rstrip("/") or DEFAULT_FRED_BASE_URL
+    try:
+        parsed = urllib.parse.urlparse(candidate)
+    except ValueError:
+        return DEFAULT_FRED_BASE_URL
+    if (
+        parsed.scheme != "https"
+        or not parsed.netloc
+        or parsed.username is not None
+        or parsed.password is not None
+        or parsed.query
+        or parsed.fragment
+    ):
+        return DEFAULT_FRED_BASE_URL
+    return candidate

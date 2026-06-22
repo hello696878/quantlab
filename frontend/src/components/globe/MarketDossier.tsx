@@ -8,8 +8,9 @@
  * sample") + six sections — Market Pulse, Macro Vitals, FX & Rates, Market
  * Structure, Sample Headlines, QuantLab Actions.
  *
- * Every value is static illustrative sample data (see lib/globe/markets.ts).
- * No live, real-time, or country-level financial data is fetched.
+ * The bundled fallback is static illustrative data. The backend may optionally
+ * source selected US macro fields from FRED; field-level provenance is shown
+ * explicitly. Index, FX, structure, and headline values remain sample data.
  */
 
 import type { View } from "@/components/AppShell";
@@ -18,6 +19,7 @@ import {
   REGION_COLORS,
   SENTIMENT_TONE,
   marketBias,
+  type MacroField,
   type MacroSourceState,
   type Market,
   type MarketIndex,
@@ -29,6 +31,13 @@ const SENTIMENT_COLOR: Record<"positive" | "danger" | "default", string> = {
   positive: "var(--pos)",
   danger: "var(--neg)",
   default: "var(--text-mut)",
+};
+const MACRO_FIELD_LABELS: Record<MacroField, string> = {
+  gdp_growth: "GDP growth",
+  inflation: "Inflation",
+  unemployment: "Unemployment",
+  policy_rate: "Policy rate",
+  debt_to_gdp: "Debt / GDP",
 };
 
 function biasColor(bias: Sentiment): string {
@@ -94,14 +103,16 @@ function SectionLabel({ children }: { children: React.ReactNode }) {
 function MacroSourceChip({
   source,
   asOf,
+  fieldCount,
 }: {
   source: MacroSourceState | undefined;
   asOf: string | null | undefined;
+  fieldCount: number;
 }) {
   const s = source ?? "static_sample";
   const label =
     s === "fred_live"
-      ? `Macro: FRED${asOf ? ` · as of ${asOf}` : ""}`
+      ? `Macro: Partial FRED · ${fieldCount} field${fieldCount === 1 ? "" : "s"}${asOf ? ` · oldest ${asOf}` : ""}`
       : s === "fred_unavailable"
         ? "Macro: FRED unavailable, static fallback"
         : "Macro: Static sample";
@@ -117,14 +128,28 @@ function MacroSourceChip({
   );
 }
 
-function macroNote(source: MacroSourceState | undefined): string {
-  if (source === "fred_live") {
-    return "Selected macro fields from FRED (US, v1); inflation and debt/GDP remain static sample. Indices, FX, structure, and news are static.";
+function macroNote(market: Market): string {
+  if (market.macroSource === "fred_live") {
+    const details = (market.macroFredFields ?? [])
+      .map((field) => {
+        const observationDate = market.macroFredAsOf?.[field];
+        return `${MACRO_FIELD_LABELS[field]}${observationDate ? ` (${observationDate})` : ""}`;
+      })
+      .join(", ");
+    return `FRED-sourced fields: ${details || "Not available"}. All remaining macro values, indices, FX, structure, and headlines are static sample data.`;
   }
-  if (source === "fred_unavailable") {
+  if (market.macroSource === "fred_unavailable") {
     return "FRED macro was requested but unavailable; showing static sample figures.";
   }
-  return "Illustrative static figures — optional FRED macro enrichment is available (off by default).";
+  return "Illustrative static figures; optional US FRED macro enrichment is off by default.";
+}
+
+function macroMetricLabel(
+  label: string,
+  field: MacroField,
+  fredFields: Set<MacroField>,
+): string {
+  return fredFields.has(field) ? `${label} · FRED` : label;
 }
 
 function StructureRow({ label, value }: { label: string; value: string }) {
@@ -150,6 +175,14 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
   const accent = REGION_COLORS[market.region] ?? "var(--accent)";
   const bias = marketBias(market);
   const bColor = biasColor(bias);
+  const fredFields = new Set<MacroField>(market.macroFredFields ?? []);
+  const hasFredMacro =
+    market.macroSource === "fred_live" && fredFields.size > 0;
+  const dataLabel = hasFredMacro
+    ? "Static core + partial FRED"
+    : market.macroSource === "fred_unavailable"
+      ? "Static macro fallback"
+      : "Static demo data";
 
   return (
     <div className="card overflow-hidden">
@@ -213,10 +246,12 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
             className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
             style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
           >
-            Static demo data
+            {dataLabel}
           </span>
           <span className="text-[10px]" style={{ color: "var(--text-faint)" }}>
-            Last updated: Static sample
+            {hasFredMacro
+              ? `Oldest FRED observation: ${market.macroAsOf ?? "date unavailable"}`
+              : "Last updated: Static sample"}
           </span>
         </div>
       </div>
@@ -241,17 +276,21 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
         <section>
           <div className="mb-2 flex items-center justify-between gap-2">
             <p className="section-title">Macro Vitals</p>
-            <MacroSourceChip source={market.macroSource} asOf={market.macroAsOf} />
+            <MacroSourceChip
+              source={market.macroSource}
+              asOf={market.macroAsOf}
+              fieldCount={fredFields.size}
+            />
           </div>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-            <MetricCard label="GDP growth" value={`${market.macro.gdpGrowth.toFixed(1)}%`} tone="accent" />
-            <MetricCard label="Inflation" value={`${market.macro.inflation.toFixed(1)}%`} tone="warn" />
-            <MetricCard label="Unemployment" value={`${market.macro.unemployment.toFixed(1)}%`} />
-            <MetricCard label="Policy rate" value={`${market.macro.policyRate}%`} tone="accent" />
-            <MetricCard label="Debt / GDP" value={`${market.macro.debtToGdp}%`} />
+            <MetricCard label={macroMetricLabel("GDP growth", "gdp_growth", fredFields)} value={`${market.macro.gdpGrowth.toFixed(1)}%`} tone="accent" />
+            <MetricCard label={macroMetricLabel("Inflation", "inflation", fredFields)} value={`${market.macro.inflation.toFixed(1)}%`} tone="warn" />
+            <MetricCard label={macroMetricLabel("Unemployment", "unemployment", fredFields)} value={`${market.macro.unemployment.toFixed(1)}%`} />
+            <MetricCard label={macroMetricLabel("Policy rate", "policy_rate", fredFields)} value={`${market.macro.policyRate}%`} tone="accent" />
+            <MetricCard label={macroMetricLabel("Debt / GDP", "debt_to_gdp", fredFields)} value={`${market.macro.debtToGdp}%`} />
           </div>
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-            {macroNote(market.macroSource)}
+            {macroNote(market)}
           </p>
         </section>
 

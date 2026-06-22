@@ -3,8 +3,9 @@
 Interactive backtesting and research dashboard built with **Next.js 14 · React 18 · Tailwind CSS 3 · Recharts 2**.
 
 Analysis results come from the FastAPI backend. The Global Markets Globe uses a
-typed backend static-sample API and an explicitly labelled bundled static fallback;
-it never presents sample data as live market data.
+typed backend API with a static illustrative core, optional field-level US FRED
+macro enrichment, and an explicitly labelled bundled static fallback. It never
+presents the remaining sample data as live market data.
 
 ---
 
@@ -90,8 +91,10 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `GET /api/globe/regions` | `GET /globe/regions` |
 
 The Globe renders bundled static sample data immediately, then uses the validated
-backend static dataset when available. If the backend is unavailable or returns an
-invalid payload, the UI keeps the bundled dataset and shows a visible fallback notice.
+backend dataset when available. The parser requires exact FRED field/date
+provenance for any enriched macro values. If the backend is unavailable or returns
+an invalid payload, the UI keeps the bundled dataset and shows a visible fallback
+notice. Optional FRED setup is documented in `../docs/GLOBE_DATA.md`.
 
 Default backend base URL: `http://localhost:8000`
 

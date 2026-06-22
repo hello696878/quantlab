@@ -1,15 +1,15 @@
 """
 Typed Pydantic models for the Global Markets Globe data layer (Phase 20.2).
 
-These describe a country / market **dossier**. Every payload is **static
-illustrative sample data** — there is no live market data, FX, macro, or news.
-The `is_sample` flags and `source_status` make that explicit and machine-readable
-so a future phase can flip individual sources to live without changing the shape.
+These describe a country / market **dossier** with a static illustrative core.
+An optional adapter may source selected US macro fields from FRED; field-level
+provenance and `source_status` keep that partial enrichment machine-readable.
+Indices, FX, structure, and headlines remain sample data in this phase.
 """
 
 from __future__ import annotations
 
-from typing import Annotated, List, Literal, Optional
+from typing import Annotated, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, StringConstraints
 
@@ -24,6 +24,13 @@ SourceState = Literal[
     "fred_unavailable",
 ]
 DataStatus = Literal["static_sample", "mixed_static_and_fred"]
+MacroField = Literal[
+    "gdp_growth",
+    "inflation",
+    "unemployment",
+    "policy_rate",
+    "debt_to_gdp",
+]
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 Latitude = Annotated[FiniteFloat, Field(ge=-90.0, le=90.0)]
 Longitude = Annotated[FiniteFloat, Field(ge=-180.0, le=180.0)]
@@ -50,9 +57,14 @@ class MarketMacro(GlobeModel):
     unemployment: FiniteFloat
     policy_rate: FiniteFloat
     debt_to_gdp: FiniteFloat
+    # True while at least one field remains illustrative sample data.
     is_sample: bool = True
-    # Set when (some) fields are enriched from FRED (e.g. "2024-05-01").
+    # Conservative aggregate date: oldest observation date among FRED fields.
     as_of_date: Optional[NonEmptyStr] = None
+    # Field-level provenance avoids presenting a partially enriched macro block
+    # as wholly sourced from FRED.
+    fred_fields: List[MacroField] = Field(default_factory=list)
+    fred_as_of: Dict[MacroField, NonEmptyStr] = Field(default_factory=dict)
 
 
 class MarketFx(GlobeModel):

@@ -249,23 +249,23 @@ Return to the Command Center's **Platform Direction** panel (or open
   **Global Markets** strip. Use Ctrl/Cmd+K → "Open Taiwan Market Dossier" for the
   deep-link. Emphasise: a hand-built canvas globe (no WebGL/Three.js — the market
   list is the keyboard-accessible fallback, with a graceful message if 2D canvas
-  is unavailable), **all values are static illustrative sample data** (not
-  real-time quotes, FX, macro, or news; arcs and the bias pill are decorative);
-  live FRED macro, delayed index/FX quotes, news/sentiment, and GeoJSON borders
-  are planned — not investment advice. **Data Layer (20.2):** open the network
-  tab to see the page call `GET /api/globe/markets` (typed backend dossier API);
-  the header chip reads "Backend static dataset". Stop the backend and reload to
-  show the graceful fallback — the chip flips to "Bundled static fallback" with a
+  is unavailable), **indices, FX, market structure, and headlines are static
+  illustrative sample data**; the arcs and bias pill are decorative. Optional
+  US FRED macro observations can be enabled locally, while delayed index/FX
+  quotes, news/sentiment, and GeoJSON borders remain planned — not investment
+  advice. **Data Layer (20.2):** open the network tab to see the page call
+  `GET /api/globe/markets` (typed backend dossier API); the header chip reads
+  "Backend static dataset" by default. Stop the backend and reload to show the
+  graceful fallback — the chip flips to "Bundled static fallback" with a
   non-blocking "Backend globe data unavailable…" warning and the globe stays
-  fully usable. Even the backend payload is static sample data; the quotes/news
-  adapters are inert stubs (no live fetch). **FRED macro (20.3):** by default
-  the dossier macro chip reads "Macro: Static sample". To show the optional
-  adapter, set `GLOBE_FRED_ENABLED=true` with no key → a non-blocking
-  "FRED macro adapter enabled but no API key configured…" notice appears and the
-  US macro chip reads "FRED unavailable, static fallback" (app never crashes).
-  With a personal `FRED_API_KEY` set locally (never committed), the US dossier
-  macro chip reads "Macro: FRED · as of …" while every other market and every
-  other section stays static. Indices, FX, and news are never live.
+  fully usable. **FRED macro (20.3):** by default the dossier macro chip reads
+  "Macro: Static sample". To show the fail-closed path, set
+  `GLOBE_FRED_ENABLED=true` with no key: a non-blocking warning appears and the
+  US macro chip reads "FRED unavailable, static fallback"; unsupported markets
+  remain static. With a personal `FRED_API_KEY` loaded locally (never
+  committed), the US dossier reads "Macro: Partial FRED", marks only the
+  FRED-sourced metric cards, and shows per-field observation dates. Inflation,
+  debt/GDP, every unsupported country, indices, FX, and news remain static.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

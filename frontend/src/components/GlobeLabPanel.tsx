@@ -8,8 +8,9 @@
  * quick-jump), a center canvas globe (DataGlobe) with overlay controls + a
  * legend, and a right dossier panel — plus a bottom region "tape".
  *
- * All data is static illustrative sample data — no live market data, FX,
- * macro, or news is fetched (see lib/globe/markets.ts).
+ * Bundled data is static illustrative sample data. The backend may optionally
+ * source selected US macro fields from FRED; index, FX, structure, and headline
+ * data remain static, with no real-time coverage claim.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -125,6 +126,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
   // backend data layer if reachable (else fall back with a non-blocking warning).
   const [markets, setMarkets] = useState<Market[]>(MARKETS);
   const [dataStatus, setDataStatus] = useState<"loading" | "backend" | "fallback">("loading");
+  const [hasFredEnrichment, setHasFredEnrichment] = useState(false);
   const [dataNotice, setDataNotice] = useState(STATIC_DATA_NOTICE);
   const [warnings, setWarnings] = useState<string[]>([]);
 
@@ -136,6 +138,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
       .then((res) => {
         if (cancelled) return;
         setMarkets(res.markets);
+        setHasFredEnrichment(res.dataStatus === "mixed_static_and_fred");
         setDataNotice(res.notice);
         setWarnings(res.warnings);
         setDataStatus("backend");
@@ -143,6 +146,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
       .catch(() => {
         if (cancelled) return;
         setMarkets(MARKETS);
+        setHasFredEnrichment(false);
         setDataNotice(STATIC_DATA_NOTICE);
         setWarnings([]);
         setDataStatus("fallback");
@@ -162,10 +166,10 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
   const fredLive = markets.some((m) => m.macroSource === "fred_live");
   const fredUnavailable = !fredLive && markets.some((m) => m.macroSource === "fred_unavailable");
   const macroChip = fredLive
-    ? { text: "FRED macro live (US)", tone: "var(--pos)" }
+    ? { text: "Partial FRED macro (US)", tone: "var(--pos)" }
     : fredUnavailable
       ? { text: "FRED unavailable — static macro", tone: "var(--warn)" }
-      : { text: "Live macro planned", tone: "var(--text-mut)" };
+      : { text: "FRED macro optional (off)", tone: "var(--text-mut)" };
 
   useEffect(() => {
     if (!selectedId || !filtering) return;
@@ -222,7 +226,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
             className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
             style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
           >
-            Static data v1.1
+            Static core + optional FRED
           </span>
         </div>
         <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
@@ -238,7 +242,9 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
             }}
           >
             {dataStatus === "backend"
-              ? "Backend static dataset"
+              ? hasFredEnrichment
+                ? "Backend static + partial FRED"
+                : "Backend static dataset"
               : dataStatus === "fallback"
                 ? "Bundled static fallback"
                 : "Loading data layer…"}

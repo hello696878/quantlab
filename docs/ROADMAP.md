@@ -1310,18 +1310,19 @@ single-asset Backtest + Strategy Comparison:
   A191RL1Q225SBEA; inflation + debt-to-GDP stay static); delayed index / FX /
   news remain inert stubs.
 - Models widened: `SourceState += fred_live, fred_unavailable`; `MarketMacro`
-  gains `as_of_date`; `MarketsResponse.data_status` adds `mixed_static_and_fred`
-  + a `warnings` list. Service `build_markets_response` / `build_single_market`
-  orchestrate enrichment; routes read `FredMacroConfig.from_env()`. The **API
-  key is never returned** to clients.
+  carries `as_of_date`, `fred_fields`, and per-field `fred_as_of`;
+  `MarketsResponse.data_status` adds `mixed_static_and_fred` + a `warnings`
+  list. Service `build_markets_response` / `build_single_market` orchestrate
+  enrichment; routes read `FredMacroConfig.from_env()`. The **API key is never
+  returned** to clients.
 - Frontend: `remote.ts` parser widened to accept the new states/warnings and
-  carry `macroSource` / `macroAsOf`; the dossier shows an honest **macro source
-  chip** ("Macro: Static sample" / "Macro: FRED" / "Macro: FRED unavailable,
-  static fallback"); the page shows a dynamic macro chip + non-blocking FRED
-  warnings. Default app behaviour is unchanged (static).
-- 13 new FRED tests (mocked fetcher, **no network**: disabled→static + adapter
-  not called, enabled-no-key→fred_unavailable+warning, mock success→fred_live,
-  invalid/network→fallback, key-never-in-response, cache dedupe, no NaN/Inf).
+  require field/date provenance for enriched values; the dossier shows
+  "Macro: Partial FRED", labels only sourced fields, and retains explicit static
+  fallback states. Default app behaviour is unchanged (static).
+- FRED tests use mocked fetchers only (**no network**) and cover disabled/no-key,
+  unsupported markets, complete and partial success, latest `.` observations,
+  malformed dates, config bounds, network fallback, key secrecy, cache dedupe,
+  and no NaN/Inf.
   New `backend/.env.example` (no keys); `.env` already gitignored. Setup +
   limits documented in `docs/GLOBE_DATA.md`. `pytest` green; `tsc` clean.
 

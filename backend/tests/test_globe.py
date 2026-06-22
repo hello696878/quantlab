@@ -332,6 +332,9 @@ def test_enabled_without_key_falls_back(client, monkeypatch):
     us = next(m for m in body["markets"] if m["id"] == "us")
     assert us["source_status"]["macro"] == "fred_unavailable"
     assert us["macro"]["is_sample"] is True  # data unchanged
+    unsupported = [m for m in body["markets"] if m["id"] != "us"]
+    assert unsupported
+    assert all(m["source_status"]["macro"] == "static_sample" for m in unsupported)
 
 
 def test_mock_fred_success_enriches_us():
@@ -340,9 +343,12 @@ def test_mock_fred_success_enriches_us():
     markets, status, _notice, warnings = build_markets_response(cfg, adapter=adapter)
     us = next(m for m in markets if m.id == "us")
     assert us.source_status.macro == "fred_live"
-    assert us.macro.is_sample is False
+    assert us.macro.is_sample is True  # inflation and debt/GDP remain static
     assert us.macro.policy_rate == 3.21
     assert us.macro.as_of_date == "2024-06-01"
+    assert us.macro.fred_fields == ["policy_rate", "unemployment", "gdp_growth"]
+    assert set(us.macro.fred_as_of) == set(us.macro.fred_fields)
+    assert set(us.macro.fred_as_of.values()) == {"2024-06-01"}
     assert status == "mixed_static_and_fred"
     assert warnings == []
     # Unsupported markets stay static and never claim live macro.
@@ -411,3 +417,136 @@ def test_single_market_endpoint_static_by_default(client):
     body = client.get("/globe/markets/us").json()
     assert body["id"] == "us"
     assert body["source_status"]["macro"] == "static_sample"
+
+
+def test_latest_valid_observation_skips_fred_missing_marker():
+    seen = {}
+
+    def fetch(url, timeout):  # noqa: ARG001
+        seen["url"] = url
+        return {
+            "observations": [
+                {"date": "2024-06-01", "value": "."},
+                {"date": "2024-05-01", "value": "4.75"},
+            ]
+        }
+
+    adapter = FredMacroAdapter(_enabled_config(), fetcher=fetch)
+    assert adapter.fetch_series_latest("FEDFUNDS") == (4.75, "2024-05-01")
+    assert "limit=10" in seen["url"]
+
+
+def test_series_with_malformed_date_falls_back_safely():
+    adapter = FredMacroAdapter(
+        _enabled_config(),
+        fetcher=_fake_fetcher("4.75", "not-a-date"),
+    )
+    assert adapter.fetch_series_latest("FEDFUNDS") is None
+
+
+def test_partial_fred_success_retains_static_fields_and_warns():
+    def partial_fetch(url, timeout):  # noqa: ARG001
+        if "FEDFUNDS" in url:
+            return {"observations": [{"date": "2024-06-01", "value": "5.25"}]}
+        return {"observations": [{"date": "2024-06-01", "value": "."}]}
+
+    cfg = _enabled_config()
+    markets, status, _notice, warnings = build_markets_response(
+        cfg,
+        adapter=FredMacroAdapter(cfg, fetcher=partial_fetch),
+    )
+    us = next(m for m in markets if m.id == "us")
+    assert status == "mixed_static_and_fred"
+    assert us.macro.is_sample is True
+    assert us.macro.fred_fields == ["policy_rate"]
+    assert us.macro.fred_as_of == {"policy_rate": "2024-06-01"}
+    assert us.macro.policy_rate == 5.25
+    assert us.macro.unemployment == get_market("us").macro.unemployment
+    assert any("partial" in warning.lower() for warning in warnings)
+
+
+def test_macro_aggregate_date_is_oldest_enriched_observation():
+    dates = {
+        "FEDFUNDS": ("5.25", "2024-06-01"),
+        "UNRATE": ("4.0", "2024-05-01"),
+        "A191RL1Q225SBEA": ("1.4", "2024-03-01"),
+    }
+
+    def dated_fetch(url, timeout):  # noqa: ARG001
+        series = next(series_id for series_id in dates if series_id in url)
+        value, observation_date = dates[series]
+        return {"observations": [{"date": observation_date, "value": value}]}
+
+    cfg = _enabled_config()
+    markets, _status, _notice, _warnings = build_markets_response(
+        cfg,
+        adapter=FredMacroAdapter(cfg, fetcher=dated_fetch),
+    )
+    us = next(m for m in markets if m.id == "us")
+    assert us.macro.as_of_date == "2024-03-01"
+    assert us.macro.fred_as_of["policy_rate"] == "2024-06-01"
+    assert us.macro.fred_as_of["gdp_growth"] == "2024-03-01"
+
+
+def test_unsupported_market_never_calls_fred():
+    def boom(url, timeout):  # noqa: ARG001
+        raise AssertionError("unsupported market must not call FRED")
+
+    adapter = FredMacroAdapter(_enabled_config(), fetcher=boom)
+    dossier, state, warnings = adapter.enrich_market_with_fred_macro(get_market("jp"))
+    assert dossier.source_status.macro == "static_sample"
+    assert state == "static_sample"
+    assert warnings == []
+
+
+def test_fred_environment_config_is_bounded_and_https_only():
+    cfg = FredMacroConfig.from_env(
+        {
+            "GLOBE_FRED_ENABLED": "true",
+            "FRED_BASE_URL": "http://example.test/fred?api_key=leak",
+            "FRED_TIMEOUT_SECONDS": "inf",
+            "GLOBE_FRED_CACHE_TTL_SECONDS": "9999999",
+        }
+    )
+    assert cfg.base_url == globe_adapters.DEFAULT_FRED_BASE_URL
+    assert cfg.timeout_seconds == 5.0
+    assert cfg.cache_ttl_seconds == globe_adapters.MAX_FRED_CACHE_TTL_SECONDS
+
+    bounded = FredMacroConfig.from_env(
+        {
+            "FRED_BASE_URL": "https://fred.example.test/custom/",
+            "FRED_TIMEOUT_SECONDS": "999",
+            "GLOBE_FRED_CACHE_TTL_SECONDS": "-5",
+        }
+    )
+    assert bounded.base_url == "https://fred.example.test/custom"
+    assert bounded.timeout_seconds == globe_adapters.MAX_FRED_TIMEOUT_SECONDS
+    assert bounded.cache_ttl_seconds == 0
+
+
+def test_fred_endpoint_success_has_field_provenance_and_no_api_key(
+    client, monkeypatch
+):
+    secret = "ENDPOINT_SECRET_KEY"
+    monkeypatch.setenv("GLOBE_FRED_ENABLED", "true")
+    monkeypatch.setenv("FRED_API_KEY", secret)
+    monkeypatch.setattr(
+        globe_adapters,
+        "_default_fetcher",
+        _fake_fetcher("2.5", "2024-04-01"),
+    )
+
+    response = client.get("/globe/markets")
+    assert response.status_code == 200
+    body = response.json()
+    us = next(m for m in body["markets"] if m["id"] == "us")
+    assert body["data_status"] == "mixed_static_and_fred"
+    assert us["source_status"]["macro"] == "fred_live"
+    assert us["macro"]["is_sample"] is True
+    assert set(us["macro"]["fred_fields"]) == {
+        "policy_rate",
+        "unemployment",
+        "gdp_growth",
+    }
+    assert secret not in response.text
+    assert "api_key" not in response.text
