@@ -38,6 +38,13 @@ to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Dashboard, sidebar, command-palette/search, Black–Scholes paper, and
   Volmageddon cross-links.
 
+### Fixed
+
+- Strategy Comparison is now placed beside Backtest and Strategy Library in
+  the sidebar; the fixed desktop rail scrolls vertically on shorter screens.
+- Global Markets Globe API payloads reject non-finite values and the frontend
+  validates the complete static dossier schema before using backend data.
+
 ### Limitations
 
 - Educational calculator only: American exercise is limited to the simplified

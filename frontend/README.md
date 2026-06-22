@@ -2,7 +2,9 @@
 
 Interactive backtesting and research dashboard built with **Next.js 14 · React 18 · Tailwind CSS 3 · Recharts 2**.
 
-All displayed results come from the FastAPI backend — no fake data.
+Analysis results come from the FastAPI backend. The Global Markets Globe uses a
+typed backend static-sample API and an explicitly labelled bundled static fallback;
+it never presents sample data as live market data.
 
 ---
 
@@ -83,6 +85,13 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/research/sma-train-test` | `POST /research/sma-train-test` |
 | `POST /api/research/sma-walk-forward` | `POST /research/sma-walk-forward` |
 | `POST /api/research/strategy-comparison` | `POST /research/strategy-comparison` |
+| `GET /api/globe/markets` | `GET /globe/markets` |
+| `GET /api/globe/markets/:id` | `GET /globe/markets/{market_id}` |
+| `GET /api/globe/regions` | `GET /globe/regions` |
+
+The Globe renders bundled static sample data immediately, then uses the validated
+backend static dataset when available. If the backend is unavailable or returns an
+invalid payload, the UI keeps the bundled dataset and shows a visible fallback notice.
 
 Default backend base URL: `http://localhost:8000`
 

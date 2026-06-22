@@ -8,8 +8,10 @@ that the future adapter stubs perform no live fetch. No network calls.
 import math
 
 import pytest
+from pydantic import ValidationError
 
 from app.globe import adapters as globe_adapters
+from app.globe.models import MarketIndex
 from app.globe.service import get_all_markets, get_market, get_regions
 
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
@@ -22,6 +24,11 @@ REQUIRED_TOP_FIELDS = [
     "source_status",
 ]
 VALID_REGIONS = {"Americas", "Europe", "Asia-Pacific"}
+REQUIRED_COUNTRIES = {
+    "United States", "Canada", "United Kingdom", "Germany", "France",
+    "Japan", "China", "Hong Kong", "Taiwan", "South Korea", "India",
+    "Singapore", "Australia", "Brazil", "Switzerland",
+}
 
 
 def _assert_all_finite(obj):
@@ -70,6 +77,11 @@ def test_market_ids_unique(client):
 def test_country_names_unique(client):
     names = [m["country"] for m in client.get("/globe/markets").json()["markets"]]
     assert len(names) == len(set(names))
+
+
+def test_required_countries_present(client):
+    names = {m["country"] for m in client.get("/globe/markets").json()["markets"]}
+    assert REQUIRED_COUNTRIES <= names
 
 
 def test_lat_lon_valid(client):
@@ -123,6 +135,16 @@ def test_every_market_has_structure_section(client):
         assert m["rates"]["is_sample"] is True
 
 
+def test_every_nested_data_section_is_marked_sample(client):
+    for m in client.get("/globe/markets").json()["markets"]:
+        assert m["macro"]["is_sample"] is True
+        assert m["rates"]["is_sample"] is True
+        assert m["market_structure"]["is_sample"] is True
+        assert all(item["is_sample"] is True for item in m["indices"])
+        assert all(item["is_sample"] is True for item in m["fx"])
+        assert all(item["is_sample"] is True for item in m["headlines"])
+
+
 # ---------------------------------------------------------------------------
 # Endpoint: GET /globe/markets/{id}
 # ---------------------------------------------------------------------------
@@ -169,6 +191,17 @@ def test_markets_no_nan_or_inf(client):
 def test_single_market_no_nan_or_inf(client):
     for mid in ["us", "jp", "tw", "de", "in", "br"]:
         _assert_all_finite(client.get(f"/globe/markets/{mid}").json())
+
+
+def test_schema_rejects_nonfinite_numbers():
+    with pytest.raises(ValidationError):
+        MarketIndex(
+            name="Sample Index",
+            ticker="SAMPLE",
+            level=float("nan"),
+            change_pct=0.0,
+            sparkline=[1.0, 2.0],
+        )
 
 
 # ---------------------------------------------------------------------------

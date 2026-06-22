@@ -85,7 +85,7 @@ A separate, **backend** phase made the Globe data-source-ready (still static):
 - New `backend/app/globe/` package (typed dossier `models.py`, `sample_markets.py`
   mirroring the 15 markets, `service.py`, inert future `adapters.py`) +
   `app/globe_routes.py` (`GET /globe/markets`, `/globe/markets/{id}`,
-  `/globe/regions`) included in `main.py`; `tests/test_globe.py` (25 tests).
+  `/globe/regions`) included in `main.py`; `tests/test_globe.py` (28 tests).
 - Frontend `lib/globe/remote.ts` fetches the API and maps it to the UI `Market`
   shape; `GlobeLabPanel` upgrades to backend data when reachable and falls back
   to the bundled dataset with a non-blocking warning + a data-source chip.

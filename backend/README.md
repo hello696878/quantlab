@@ -16,6 +16,8 @@ backend/
 │   ├── strategies.py       signal generation (lookahead-bias-free)
 │   ├── backtest.py         vectorised backtest engine + transaction costs
 │   ├── metrics.py          Sharpe, Sortino, CAGR, drawdown, Calmar, win-rate, …
+│   ├── globe/              typed static-sample market dossiers + inert adapters
+│   ├── globe_routes.py     read-only Global Markets Globe API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -29,7 +31,8 @@ backend/
 │   ├── test_api_pairs.py         Pairs Trading API tests
 │   ├── test_sma_sweep.py         SMA Parameter Sweep research tests
 │   ├── test_sma_train_test.py    SMA Train/Test Validation research tests
-│   └── test_sma_walk_forward.py  SMA Walk-Forward Optimization research tests
+│   ├── test_sma_walk_forward.py  SMA Walk-Forward Optimization research tests
+│   └── test_globe.py             static dossier API/schema/adapter tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -75,6 +78,22 @@ Liveness check.
 ```json
 { "status": "ok", "version": "0.1.0" }
 ```
+
+---
+
+### Global Markets Globe Endpoints
+
+These endpoints return deterministic, static illustrative sample data. They do
+not call external providers or provide real-time market coverage.
+
+| Endpoint | Description |
+|---|---|
+| `GET /globe/markets` | All 15 typed sample market dossiers plus data status and notice |
+| `GET /globe/markets/{market_id}` | One dossier; unknown ids return `404 Market not found.` |
+| `GET /globe/regions` | Static market counts by region |
+
+Future FRED macro, delayed index/FX quote, and news adapters are inert stubs in
+`app/globe/adapters.py`; they require no API keys and make no network calls.
 
 ---
 

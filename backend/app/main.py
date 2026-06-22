@@ -4,6 +4,9 @@ QuantLab FastAPI application.
 Endpoints
 ---------
 GET  /health                            — liveness check
+GET  /globe/markets                     — list static sample market dossiers
+GET  /globe/markets/{market_id}         — get one static sample market dossier
+GET  /globe/regions                     — static sample market counts by region
 POST /backtest/sma-crossover            — run an SMA crossover backtest
 POST /backtest/rsi-mean-reversion       — run an RSI mean-reversion backtest
 POST /backtest/bollinger-band           — run a Bollinger Band mean-reversion backtest

@@ -21,6 +21,7 @@ import {
   MARKET_ARCS,
   MARKET_REGIONS,
   REGION_COLORS,
+  STATIC_DATA_NOTICE,
   filterMarkets,
   meanIndexChange,
   regionRollup,
@@ -124,19 +125,30 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
   // backend data layer if reachable (else fall back with a non-blocking warning).
   const [markets, setMarkets] = useState<Market[]>(MARKETS);
   const [dataStatus, setDataStatus] = useState<"loading" | "backend" | "fallback">("loading");
+  const [dataNotice, setDataNotice] = useState(STATIC_DATA_NOTICE);
 
   useEffect(() => {
     const ctrl = new AbortController();
+    let cancelled = false;
+    const timeoutId = window.setTimeout(() => ctrl.abort(), 5000);
     fetchGlobeMarkets(ctrl.signal)
       .then((res) => {
+        if (cancelled) return;
         setMarkets(res.markets);
+        setDataNotice(res.notice);
         setDataStatus("backend");
       })
       .catch(() => {
+        if (cancelled) return;
         setMarkets(MARKETS);
+        setDataNotice(STATIC_DATA_NOTICE);
         setDataStatus("fallback");
       });
-    return () => ctrl.abort();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timeoutId);
+      ctrl.abort();
+    };
   }, []);
 
   const filtering = region !== "All" || query.trim() !== "";
@@ -204,9 +216,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
           </span>
         </div>
         <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
-          Static illustrative data. Live FRED macro, delayed index/FX quotes, and
-          news integration are planned. Not real-time market data and not
-          investment advice.
+          {dataNotice} Not real-time market data and not investment advice.
         </p>
         <div className="mt-3 flex flex-wrap items-center gap-1.5">
           <span

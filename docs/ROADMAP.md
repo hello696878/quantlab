@@ -1277,7 +1277,7 @@ single-asset Backtest + Strategy Comparison:
   `NotImplementedError` — no live fetch, no API key, no HTTP**).
 - New `app/globe_routes.py` APIRouter (included in `main.py`): `GET /globe/markets`
   (markets + count + `data_status` + notice), `GET /globe/markets/{id}` (friendly
-  404 "Market not found."), `GET /globe/regions`. 25 tests in `tests/test_globe.py`
+  404 "Market not found."), `GET /globe/regions`. 28 tests in `tests/test_globe.py`
   (200, ≥15 markets, required fields, unique ids/countries, valid lat/lon, notice,
   `source_status == static_sample`, ≥1 index, macro + structure present, `/us`,
   404, no NaN/Inf, adapters perform no live fetch).
@@ -1289,6 +1289,9 @@ single-asset Backtest + Strategy Comparison:
   + "Live macro planned / Quotes planned / News planned".
 - Dashboard Globe card badge → **"Static data API v1"**. Command-palette globe
   commands unchanged.
+- Sidebar hotfix: **Strategy Comparison** is placed beside Backtest / Strategy
+  Library and the fixed desktop rail scrolls vertically, so the existing route
+  remains reachable and visibly highlights on shorter screens.
 - **Still 100% static sample data** — index levels/FX values are surfaced as
   "Sample" in the UI, every record is `is_sample`, and the adapters are inert.
   No live data, no real-time claims, not investment advice. `pytest` green;

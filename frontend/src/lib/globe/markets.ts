@@ -30,6 +30,9 @@ export const MARKET_REGIONS: readonly MarketRegion[] = [
 
 export type Sentiment = "Bullish" | "Bearish" | "Neutral";
 
+export const STATIC_DATA_NOTICE =
+  "Static illustrative data. Live FRED macro, delayed index/FX quotes, and news integration are planned.";
+
 export interface MarketIndex {
   name: string;
   ticker: string;

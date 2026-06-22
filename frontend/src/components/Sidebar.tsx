@@ -109,6 +109,7 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "globe", label: "Global Markets Globe", icon: "globe" },
   { id: "backtest", label: "Backtest", icon: "backtest" },
   { id: "library", label: "Strategy Library", icon: "library" },
+  { id: "comparison", label: "Strategy Comparison", icon: "compare" },
   { id: "replications", label: "Paper Replications", icon: "papers" },
   { id: "disasters", label: "Quant Disasters", icon: "warning" },
   { id: "options", label: "Options Lab", icon: "options" },
@@ -124,7 +125,6 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "sweep", label: "Parameter Sweep", icon: "sweep" },
   { id: "train-test", label: "Train/Test Validation", icon: "research" },
   { id: "walk-forward", label: "Walk-Forward", icon: "walkfwd" },
-  { id: "comparison", label: "Strategy Comparison", icon: "compare" },
   { id: "saved", label: "Saved Backtests", icon: "saved" },
   { id: "reports", label: "Saved Reports", icon: "report" },
   { id: "settings", label: "Settings", icon: "settings" },
@@ -138,7 +138,7 @@ interface SidebarProps {
 export default function Sidebar({ active, onNav }: SidebarProps) {
   return (
     <aside
-      className="shell-sidebar fixed bottom-0 left-0 right-0 z-30 flex h-16 w-full items-center gap-2 overflow-x-auto px-3 py-2 md:top-0 md:bottom-auto md:h-screen md:w-56 md:flex-col md:items-stretch md:overflow-visible md:px-3.5 md:py-5"
+      className="shell-sidebar fixed bottom-0 left-0 right-0 z-30 flex h-16 w-full items-center gap-2 overflow-x-auto px-3 py-2 md:top-0 md:bottom-auto md:h-screen md:w-56 md:flex-col md:items-stretch md:overflow-x-hidden md:overflow-y-auto md:px-3.5 md:py-5"
       style={{
         background: "rgba(8,11,20,0.55)",
         backdropFilter: "blur(8px)",
