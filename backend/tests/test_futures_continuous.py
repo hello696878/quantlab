@@ -13,16 +13,32 @@ import logging
 import numpy as np
 import pandas as pd
 import pytest
+import yaml
 
-from app.instruments import RollMethod, get_instrument
-from app.datastore.store import CONTINUOUS_COLUMNS
+from app.instruments import FuturesSpec, RollMethod, default_instruments_dir, get_instrument
+from app.datastore import RawFuturesStore
+from app.datastore.store import CONTINUOUS_COLUMNS, finalize_continuous, validate_raw_futures
 from app.datastore.futures_continuous import (
     ContinuousBuildError,
     RollEvent,
     RollScheduleError,
     build_continuous_futures,
     compute_roll_schedule,
+    continuous_config_hash,
 )
+
+
+def _es_spec(**dotted_overrides) -> FuturesSpec:
+    """ES spec from es.yaml, with optional dotted overrides e.g.
+    ``_es_spec(**{"rollover.fallback_days_before_expiry": 5})``."""
+    data = yaml.safe_load((default_instruments_dir() / "es.yaml").read_text(encoding="utf-8"))
+    for dotted, value in dotted_overrides.items():
+        keys = dotted.split(".")
+        node = data
+        for key in keys[:-1]:
+            node = node[key]
+        node[keys[-1]] = value
+    return FuturesSpec(**data)
 
 ES = get_instrument("ES")
 
@@ -343,3 +359,85 @@ def test_missing_overlap_at_roll_seam_raises():
     rows += _rows("ESM24", esm, 1000, None, EXP_M24, price=[5100 + i for i in range(len(esm))])
     with pytest.raises(ContinuousBuildError):
         build_continuous_futures(pd.DataFrame(rows), ES, "ratio")
+
+
+# --------------------------------------------------------------------------- #
+# Reproducibility hash (Commit 5)
+# --------------------------------------------------------------------------- #
+
+
+def test_hash_same_for_same_inputs():
+    df = _seam_df()
+    assert continuous_config_hash(df, ES, "ratio") == continuous_config_hash(df, ES, "ratio")
+
+
+def test_hash_stable_for_unsorted_raw():
+    df = _seam_df()
+    shuffled = df.sample(frac=1, random_state=5).reset_index(drop=True)
+    assert continuous_config_hash(shuffled, ES, "ratio") == continuous_config_hash(df, ES, "ratio")
+
+
+def test_hash_changes_with_adjustment_method():
+    df = _seam_df()
+    assert continuous_config_hash(df, ES, "ratio") != continuous_config_hash(df, ES, "panama")
+
+
+def test_hash_changes_with_fallback_days_before_expiry():
+    df = _seam_df()
+    other = _es_spec(**{"rollover.fallback_days_before_expiry": 5})
+    assert continuous_config_hash(df, ES, "ratio") != continuous_config_hash(df, other, "ratio")
+
+
+def test_hash_changes_with_raw_prices():
+    df = _seam_df()
+    changed = _seam_df()
+    for col in ("open", "high", "low", "close"):  # shift one bar coherently
+        changed.loc[0, col] = changed.loc[0, col] + 5.0
+    assert continuous_config_hash(df, ES, "ratio") != continuous_config_hash(changed, ES, "ratio")
+
+
+# --------------------------------------------------------------------------- #
+# End-to-end Phase 1 pipeline (Commit 5)
+# --------------------------------------------------------------------------- #
+
+
+def test_end_to_end_phase1_pipeline(tmp_path):
+    raw = _seam_df()
+
+    # 1. validate raw
+    norm = validate_raw_futures(raw)
+    assert len(norm) == len(raw)
+
+    # 2. roll schedule
+    events = compute_roll_schedule(raw, ES)
+    assert len(events) == 1 and events[0].from_contract == "ESH24"
+
+    # 3-4. build both adjustments
+    ratio = build_continuous_futures(raw, ES, "ratio")
+    panama = build_continuous_futures(raw, ES, "panama")
+
+    # 5. write + read both back
+    store = RawFuturesStore(tmp_path)
+    ratio_path = store.write_continuous(ratio, "synthetic")
+    panama_path = store.write_continuous(panama, "synthetic")
+    assert ratio_path != panama_path and ratio_path.exists() and panama_path.exists()
+    pd.testing.assert_frame_equal(
+        store.read_continuous("ES", "synthetic", "ratio"), finalize_continuous(ratio)
+    )
+    pd.testing.assert_frame_equal(
+        store.read_continuous("ES", "synthetic", "panama"), finalize_continuous(panama)
+    )
+
+    # 6. raw and adjusted remain separate (older segment adjusted != raw)
+    older = ratio[ratio["active_contract"] == "ESH24"]
+    assert not np.allclose(older["close_raw"], older["close_adjusted"])
+    assert np.allclose(older["close_raw"], [_ESH_CLOSE_PREV - (7 - i) for i in range(len(older))])
+
+    # 7. no artificial roll seam spike (ratio reflects the held return)
+    s = _by_date(ratio)["close_adjusted"]
+    assert s[ROLL] / s[PREV] - 1.0 == pytest.approx(_ESM_CLOSE_ROLL / _ESM_CLOSE_PREV - 1.0, rel=1e-12)
+
+    # 8. deterministic output + stable hash (incl. row reordering)
+    pd.testing.assert_frame_equal(build_continuous_futures(raw, ES, "ratio"), ratio)
+    shuffled = raw.sample(frac=1, random_state=3).reset_index(drop=True)
+    assert continuous_config_hash(shuffled, ES, "ratio") == continuous_config_hash(raw, ES, "ratio")

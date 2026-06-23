@@ -39,13 +39,15 @@ from __future__ import annotations
 
 import bisect
 import datetime
+import hashlib
+import json
 import logging
 from dataclasses import dataclass, field
 
 import pandas as pd
 
 from app.instruments import AdjustmentMethod, FuturesSpec, RollMethod, parse_contract_symbol
-from app.datastore.store import finalize_continuous, validate_raw_futures
+from app.datastore.store import finalize_continuous, raw_data_version_hash, validate_raw_futures
 
 logger = logging.getLogger(__name__)
 
@@ -431,3 +433,50 @@ def build_continuous_futures(
         out.loc[mask, "roll_reason"] = ev.roll_reason
     out = out.drop(columns="_date")
     return finalize_continuous(out)
+
+
+# --------------------------------------------------------------------------- #
+# Reproducibility — continuous build config hash
+# --------------------------------------------------------------------------- #
+
+_CONTINUOUS_CONFIG_SCHEMA = "continuous_futures_config_v1"
+
+
+def _canonical_json(config: dict) -> str:
+    """Compact, key-sorted, deterministic JSON (mirrors app.reproducibility)."""
+    return json.dumps(config, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def continuous_config_hash(
+    raw_df: pd.DataFrame,
+    spec: FuturesSpec,
+    adjustment_method: str | AdjustmentMethod = "ratio",
+) -> str:
+    """Deterministic SHA-256 over the result-changing continuous-build inputs.
+
+    Depends on the raw data version, the adjustment method, and every spec field
+    that affects stitching (root, cycle months, expiry rule, and the full
+    rollover config).  Because roll events are a deterministic function of these
+    inputs, the hash already changes whenever the computed schedule would.
+
+    Stable when equivalent raw rows are reordered (the raw hash sorts first) and
+    when the same config is rebuilt.  Never depends on outputs.
+    """
+    method = _coerce_adjustment(adjustment_method)
+    cfg = spec.rollover
+    config = {
+        "schema_version": _CONTINUOUS_CONFIG_SCHEMA,
+        "raw_data_version": raw_data_version_hash(raw_df),
+        "root_symbol": spec.root_symbol,
+        "adjustment_method": method.value,
+        "contract_months": list(spec.contract_months),
+        "expiry_rule": spec.expiry_rule.value,
+        "rollover": {
+            "primary_rule": cfg.primary_rule.value,
+            "fallback_rule": cfg.fallback_rule.value,
+            "fallback_days_before_expiry": cfg.fallback_days_before_expiry,
+            "confirmation_days": cfg.confirmation_days,
+            "lookback_window_days": cfg.lookback_window_days,
+        },
+    }
+    return hashlib.sha256(_canonical_json(config).encode("utf-8")).hexdigest()
