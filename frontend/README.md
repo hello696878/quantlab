@@ -90,6 +90,13 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `GET /api/globe/markets` | `GET /globe/markets` |
 | `GET /api/globe/markets/:id` | `GET /globe/markets/{market_id}` |
 | `GET /api/globe/regions` | `GET /globe/regions` |
+| `GET /api/portfolio-risk/sample` | `GET /portfolio-risk/sample` |
+| `POST /api/portfolio-risk/analyze` | `POST /portfolio-risk/analyze` |
+
+The **Portfolio Risk Lab** (`PortfolioRiskLabPanel`, view `risklab`) loads the
+deterministic sample portfolio, lets you edit weights, and re-analyses live via
+`/api/portfolio-risk/analyze`. All data is static illustrative sample data —
+long-only v1, educational, not a production risk engine, not investment advice.
 
 The Globe renders bundled static sample data immediately, then uses the validated
 backend dataset when available. The parser requires exact FRED field/date

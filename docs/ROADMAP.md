@@ -1453,6 +1453,38 @@ single-asset Backtest + Strategy Comparison:
   `PROJECT_OVERVIEW.md`, `README.md`, `frontend/README.md`. **Educational
   navigation/UX only — no live data, no signals, not investment advice.**
 
+### Phase 21.0 — Portfolio Risk Lab v1 ✅
+
+- **New core analytics lab on deterministic static-sample data.** No live data,
+  no broker/trading, no paid providers, no API keys, no scraping, not advice.
+  Existing backtest/AFML/scanner logic untouched; the existing price-based
+  `app.portfolio` module is left as-is (this is a separate package).
+- Backend: new `app/portfolio_risk/` package (`models.py` strict Pydantic v2 with
+  `extra="forbid"` + `FiniteFloat`; `sample.py` deterministic 8-asset portfolio
+  with a fixed seed `20240517` and 36-month correlated return series; `service.py`
+  pure analytics) + `app/portfolio_risk_routes.py` (`GET /portfolio-risk/sample`,
+  `POST /portfolio-risk/analyze`), wired via `include_router`.
+- Analytics: normalized weights, expected return, volatility, Sharpe, covariance
+  (annualised, tied to stated vols × sample correlation) and correlation matrices,
+  marginal / component / percent risk contributions, historical VaR & CVaR
+  (monthly, loss-positive), optional stress P&L, a deterministic long-only
+  efficient frontier (seeded candidate cloud, upper envelope), minimum-variance
+  portfolio, and risk parity (convex log-barrier equal-risk-budget via scipy).
+  Validation: rejects empty portfolio, negative weights (long-only), non-finite
+  values, volatility ≤ 0, and out-of-range confidence; no NaN/Infinity in/out.
+- Frontend: new `PortfolioRiskLabPanel` (view `risklab`) with hero + editable
+  weights (normalize/reset) + key metrics + dependency-free SVG efficient-frontier
+  scatter + risk-contribution table + correlation & covariance grids + frontier
+  portfolios + stress scenario + copyable formula/limitations panel; new
+  `lib/portfolioRisk.ts` types + API client. Wired into Sidebar, Dashboard card
+  ("Portfolio analytics" badge), and Command Palette (Open Portfolio Risk Lab,
+  Portfolio VaR and CVaR, Risk Contribution Lab, Efficient Frontier Lab).
+- 21 new backend tests (deterministic, no network) — full suite green
+  (**1816 passed**); `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`, `frontend/README.md`,
+  `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample,
+  long-only v1, educational — not a production risk engine, not investment advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

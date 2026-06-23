@@ -60,6 +60,8 @@ FastAPI Backend
   ├── credit.py                     Credit Risk Lab v1: Merton structural model, distance to default, hazard/survival curve, CDS spread approximation, risky bond pricing (pure)
   ├── globe/                        Global Markets Globe Data Layer (20.2 typed dossier + 15 static markets + service) with optional, config-gated, fail-closed adapters: FRED macro (20.3, adapters.py — US-only), delayed index/FX quotes (20.4, quotes.py — curated markets, reuses yfinance, delayed not real-time, TTL cache), and a news-sentiment scaffold (20.5, news.py — static sample headlines + sentiment, no live news/scraping/API)
   ├── globe_routes.py               Globe API router: GET /globe/markets, /globe/markets/{id} (friendly 404), /globe/regions — static sample data only
+  ├── portfolio_risk/               Portfolio Risk Lab v1 (21.0): models.py (strict typed schema), sample.py (deterministic 8-asset fixed-seed sample), service.py (return/vol/Sharpe, covariance/correlation, marginal & component risk contributions, historical VaR/CVaR, stress P&L, deterministic efficient frontier, min-variance, convex risk parity) — static sample, long-only v1, not advice
+  ├── portfolio_risk_routes.py      Portfolio Risk Lab API router: GET /portfolio-risk/sample, POST /portfolio-risk/analyze — static sample data only
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD

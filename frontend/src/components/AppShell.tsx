@@ -19,6 +19,7 @@ export type View =
   | "credit"
   | "scanner"
   | "finml"
+  | "risklab"
   | "csv"
   | "builder"
   | "portfolio"

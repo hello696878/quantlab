@@ -187,6 +187,19 @@ Return to the Command Center's **Platform Direction** panel (or open
   → risky price below the risk-free price, the credit spread, and the
   survival-weighted cash-flow table. Emphasise: stylized structural + flat-hazard
   reduced-form models, no live CDS/bond data, no full CVA, not investment advice.
+- **Portfolio Risk Lab (21.0)** — open from the sidebar (or Ctrl/Cmd+K → "Open
+  Portfolio Risk Lab"). The deterministic 8-asset sample loads and analyses
+  automatically: key-metric cards (expected return, volatility, Sharpe, monthly
+  VaR / CVaR), the efficient-frontier scatter with **Current / Min variance /
+  Risk parity** markers, the risk-contribution table (note the % risk column sums
+  to 100% — diversifiers like US Treasury and gold carry less risk than their
+  weight), and the correlation & covariance grids. Edit a weight (e.g. push US
+  Equity to 0.5) and watch every metric update live; click **Normalize weights**
+  to rescale to 100%, then **Reset sample**. Switch confidence to 99% to widen
+  VaR/CVaR. Show the **Risk-off shock** stress table and the estimated portfolio
+  impact, then the copyable formula reference. Emphasise: static illustrative
+  sample data, long-only v1, monthly historical VaR/CVaR example, a deterministic
+  frontier demonstration — not a production risk engine, not investment advice.
 - **Cross-Sectional Scanner** — the *second engine*. Use the defaults (reversal,
   50 assets, 2022-01-01 → 2024-12-31, lookback 5, long/short quantile 0.2, daily,
   gross 1.0, cost 5 bps, seed 42) → **Run Scanner** → metric cards (total /

@@ -31,6 +31,7 @@ const ICONS: Record<string, string> = {
   rates: "M3 17c3 0 4-9 7-9s4 6 7 6 3-7 4-7M3 21h18",
   fx: "M4 7h11l-3-3m3 3-3 3M20 17H9l3-3m-3 3 3 3",
   credit: "M4 6h16v12H4zM4 10h16M8 15h4",
+  risklab: "M21 21H3V3M7 16l4-5 3 3 5-7M19 6h-3M19 6v3",
   scanner: "M4 14h3v6H4zM10.5 9h3v11h-3zM17 4h3v16h-3z",
   finml: "M4 18 9 9l4 5 3-6 4 7M4 4v16h16",
   globe:
@@ -117,6 +118,7 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "rates", label: "Yield Curve Lab", icon: "rates" },
   { id: "fx", label: "FX Lab", icon: "fx" },
   { id: "credit", label: "Credit Risk Lab", icon: "credit" },
+  { id: "risklab", label: "Portfolio Risk Lab", icon: "risklab" },
   { id: "scanner", label: "Cross-Sectional Scanner", icon: "scanner" },
   { id: "finml", label: "AFML Methodology Lab", icon: "finml" },
   { id: "csv", label: "CSV Backtest", icon: "upload" },

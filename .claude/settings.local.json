@@ -15,7 +15,22 @@
       "Read(//c/c/quantlab/frontend/src/app/**)",
       "Read(//c/c/quantlab/frontend/src/components/**)",
       "Bash(/c/quantlab/backend/venv/Scripts/python.exe -c \"import pydantic, sys; print\\('pydantic', pydantic.VERSION\\); print\\('yaml?', __import__\\('importlib'\\).util.find_spec\\('yaml'\\) is not None\\)\")",
-      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -c \"import yaml; print\\('PyYAML', yaml.__version__\\)\")"
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -c \"import yaml; print\\('PyYAML', yaml.__version__\\)\")",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest backend/tests/test_instruments_registry.py -v)",
+      "Bash(git check-ignore *)",
+      "Bash(git --no-pager log -1 --stat)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -c \"import importlib.util as u; print\\('pyarrow:', u.find_spec\\('pyarrow'\\) is not None\\); print\\('fastparquet:', u.find_spec\\('fastparquet'\\) is not None\\); import pandas as pd; print\\('pandas', pd.__version__\\)\")",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest backend/tests/test_store.py -v)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest backend/tests/test_instruments_registry.py backend/tests/test_store.py -v)",
+      "Bash(git --no-pager diff -- .gitignore)",
+      "Bash(git --no-pager diff --stat -- .gitignore)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest backend/tests/test_futures_continuous.py -v)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest backend/tests/test_instruments_registry.py backend/tests/test_store.py backend/tests/test_futures_continuous.py -v)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_portfolio_risk.py -q)",
+      "Bash(echo \"TSC_EXIT: $?\")",
+      "Bash(git worktree *)",
+      "Read(//c/quantlab-phase1-futures/backend/**)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py -v)"
     ]
   }
 }

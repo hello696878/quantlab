@@ -18,6 +18,8 @@ backend/
 │   ├── metrics.py          Sharpe, Sortino, CAGR, drawdown, Calmar, win-rate, …
 │   ├── globe/              typed dossiers + optional FRED/delayed quote adapters
 │   ├── globe_routes.py     read-only Global Markets Globe API routes
+│   ├── portfolio_risk/     static-sample portfolio analytics (models/sample/service)
+│   ├── portfolio_risk_routes.py  Portfolio Risk Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -32,7 +34,8 @@ backend/
 │   ├── test_sma_sweep.py         SMA Parameter Sweep research tests
 │   ├── test_sma_train_test.py    SMA Train/Test Validation research tests
 │   ├── test_sma_walk_forward.py  SMA Walk-Forward Optimization research tests
-│   └── test_globe.py             dossier API/schema/FRED/quote adapter tests
+│   ├── test_globe.py             dossier API/schema/FRED/quote adapter tests
+│   └── test_portfolio_risk.py    Portfolio Risk Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -99,6 +102,24 @@ The FRED adapter is fail-closed and documents exact field/date provenance. It
 never returns its API key. The delayed quote adapter also fails closed, requires
 no API key, and never claims real-time data. The news adapter remains an inert
 stub. See `docs/GLOBE_DATA.md` for local opt-in configuration and limitations.
+
+---
+
+### Portfolio Risk Lab Endpoints
+
+Deterministic static-sample portfolio analytics (Phase 21.0). No live data, no
+network calls, long-only by default, educational only — not investment advice.
+
+| Endpoint | Description |
+|---|---|
+| `GET /portfolio-risk/sample` | Deterministic 8-asset sample portfolio (fixed-seed monthly return series, default risk-free rate, confidence, and stress scenario) |
+| `POST /portfolio-risk/analyze` | Full analytics: normalized weights, expected return, volatility, Sharpe, covariance/correlation, marginal/component/percent risk contributions, historical VaR/CVaR (monthly), optional stress P&L, deterministic efficient frontier, minimum-variance and risk-parity portfolios |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): weights are
+normalized, negative weights are rejected in long-only mode, volatility must be
+> 0, confidence must be in `[0.5, 0.999]`, and no NaN/Infinity can enter or
+leave. Every response carries `data_status = "static_sample"` and an educational
+disclaimer.
 
 ---
 

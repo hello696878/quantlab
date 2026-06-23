@@ -44,6 +44,7 @@ import FxLabPanel from "@/components/FxLabPanel";
 import CreditLabPanel from "@/components/CreditLabPanel";
 import ScannerLabPanel from "@/components/ScannerLabPanel";
 import AfmlLabPanel from "@/components/AfmlLabPanel";
+import PortfolioRiskLabPanel from "@/components/PortfolioRiskLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -382,6 +383,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Credit Risk Lab",
     subtitle:
       "Merton structural credit, distance to default, hazard rates and survival curves, CDS spread approximation, and risky bond pricing — no live CDS data, not investment advice.",
+  },
+  risklab: {
+    title: "Portfolio Risk Lab",
+    subtitle:
+      "Portfolio return, volatility, Sharpe, covariance/correlation, marginal & component risk contributions, historical VaR/CVaR, stress P&L, efficient frontier, min-variance and risk-parity portfolios — deterministic static sample data, not investment advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -953,6 +959,7 @@ export default function HomePage() {
     { view: "credit", title: "Open Credit Risk Lab", keywords: "credit credit risk merton structural model distance to default default probability hazard rate survival curve cds credit spread risky bond recovery rate" },
     { view: "scanner", title: "Open Cross-Sectional Scanner", keywords: "scanner cross-sectional rank long short universe equity scanner factor ranking mean reversion momentum dollar neutral scanner lab second engine" },
     { view: "finml", title: "Open AFML Methodology Lab", keywords: "afml financial ml machine learning triple barrier cusum event sampling sample uniqueness concurrency labeling meta-labeling purged k-fold embargo cross validation leakage label overlap sequential bootstrap fractional differentiation fracdiff stationarity cpcv lopez de prado" },
+    { view: "risklab", title: "Open Portfolio Risk Lab", keywords: "portfolio risk lab analytics expected return volatility sharpe covariance correlation marginal component risk contribution value at risk var cvar expected shortfall stress scenario efficient frontier minimum variance risk parity allocation weights" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1226,6 +1233,19 @@ export default function HomePage() {
         setFinmlKey((k) => k + 1);
         handleNav("finml");
       },
+    })),
+    ...(
+      [
+        ["Portfolio VaR and CVaR", "portfolio value at risk var cvar expected shortfall tail risk historical confidence level loss"],
+        ["Risk Contribution Lab", "portfolio risk contribution marginal component percent risk budgeting concentration which assets drive risk"],
+        ["Efficient Frontier Lab", "portfolio efficient frontier minimum variance risk parity mean variance optimization candidate portfolios"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `risklab-${title}`,
+      group: "Portfolio Risk Lab",
+      title,
+      keywords,
+      run: () => handleNav("risklab"),
     })),
     {
       id: "globe-open",
@@ -1744,6 +1764,9 @@ export default function HomePage() {
 
         {/* ── AFML Methodology Lab ─────────────────────────────────────── */}
         {view === "finml" && <AfmlLabPanel key={finmlKey} initialTab={finmlTab} />}
+
+        {/* ── Portfolio Risk Lab ───────────────────────────────────────── */}
+        {view === "risklab" && <PortfolioRiskLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

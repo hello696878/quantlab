@@ -67,6 +67,7 @@ from app.risk_management import (
 from app.annualization import resolve_annualization
 from app.market_data import assess_data_quality
 from app.globe_routes import router as globe_router
+from app.portfolio_risk_routes import router as portfolio_risk_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -372,6 +373,9 @@ app.add_middleware(
 
 # Global Markets Globe data layer (Phase 20.2) — static sample dossier API.
 app.include_router(globe_router)
+
+# Portfolio Risk Lab (Phase 21.0) — static sample portfolio analytics API.
+app.include_router(portfolio_risk_router)
 
 
 # ---------------------------------------------------------------------------
