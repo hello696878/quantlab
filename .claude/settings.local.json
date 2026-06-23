@@ -7,7 +7,13 @@
       "Bash(ls docs/)",
       "Bash(ls frontend/README.md)",
       "Bash(npx tsc *)",
-      "Bash(echo \"EXIT: $?\")"
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(git --no-pager show 9b9fa5e -- docs/GLOBE_DATA.md)",
+      "Bash(git --no-pager diff .claude/settings.local.json)",
+      "Bash(git checkout *)",
+      "Bash(./venv/Scripts/python.exe -m pytest -q)",
+      "Read(//c/c/quantlab/frontend/src/app/**)",
+      "Read(//c/c/quantlab/frontend/src/components/**)"
     ]
   }
 }

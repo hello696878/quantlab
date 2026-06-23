@@ -70,9 +70,11 @@ export function readGlobeParams(): { isGlobe: boolean; market: string | null } {
 }
 
 /**
- * Resolve a requested market id against the set of known ids.
+ * Resolve a requested market id against the set of known ids. Matching is
+ * case-insensitive and the canonical (known) id is returned, so a link like
+ * `?market=TW` selects Taiwan and normalises to `?market=tw`.
  *  - empty / null request → no selection (`{ id: null, notFound: false }`)
- *  - known id             → that id
+ *  - known id             → that id (canonical casing)
  *  - unknown id           → the default market, flagged `notFound` so the UI can
  *                           show "Market not found; showing default market."
  */
@@ -80,8 +82,10 @@ export function resolveMarketId(
   requestedId: string | null | undefined,
   knownIds: readonly string[],
 ): { id: string | null; notFound: boolean } {
-  if (!requestedId) return { id: null, notFound: false };
-  if (knownIds.includes(requestedId)) return { id: requestedId, notFound: false };
+  const normalized = requestedId?.trim().toLowerCase();
+  if (!normalized) return { id: null, notFound: false };
+  const match = knownIds.find((known) => known.toLowerCase() === normalized);
+  if (match) return { id: match, notFound: false };
   const fallback = knownIds.includes(DEFAULT_MARKET_ID)
     ? DEFAULT_MARKET_ID
     : knownIds[0] ?? null;
