@@ -1,10 +1,13 @@
 """
 Global Markets Globe data layer.
 
-A typed, static-sample country/market **dossier** data layer (Phase 20.2) with an
-*optional*, config-gated **FRED macro adapter** (Phase 20.3) that is disabled by
-default and fails closed to static sample data. `adapters.py` also holds inert
-stubs for future delayed index/FX quotes and news/sentiment.
+A typed, static-sample country/market **dossier** data layer (Phase 20.2) with
+*optional*, config-gated enrichment adapters that are all **disabled by default**
+and **fail closed to static sample data**: a **FRED macro adapter** (Phase 20.3,
+`adapters.py`), a **delayed index/FX quote adapter** (Phase 20.4, `quotes.py`),
+and a **news-sentiment scaffold** (Phase 20.5, `news.py`) that always serves the
+bundled static sample headlines. The only inert stub left in `adapters.py` is the
+placeholder for a future *live* news provider; v1 never fetches live news.
 """
 
 from app.globe.adapters import (

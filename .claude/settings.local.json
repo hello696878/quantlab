@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(./venv/Scripts/python.exe -c ' *)",
+      "Read(//c/c/quantlab/backend/**)",
+      "Read(//c/c/quantlab/docs/**)"
+    ]
+  }
+}
