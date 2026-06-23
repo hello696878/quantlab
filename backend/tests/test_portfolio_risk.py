@@ -256,6 +256,122 @@ def test_analyze_without_stress_scenario():
     assert out.stress_result is None
 
 
+# --------------------------------------------------------------------------- #
+# Phase 21.1 — Factor exposure & scenario stress
+# --------------------------------------------------------------------------- #
+def test_factor_definitions_returned():
+    out = _analyze()
+    assert len(out.factors) == 9
+    for f in out.factors:
+        assert f.id and f.name and f.volatility > 0.0
+    assert out.factor_order == [f.id for f in out.factors]
+
+
+def test_factor_exposure_matrix_dimensions():
+    out = _analyze()
+    n = len(out.asset_order)
+    k = len(out.factor_order)
+    assert len(out.factor_exposures) == n
+    assert all(len(row) == k for row in out.factor_exposures)
+
+
+def test_portfolio_factor_exposure_equals_bt_w():
+    import numpy as np
+
+    out = _analyze()
+    b = np.array(out.factor_exposures)  # (n, k) in asset_order × factor_order
+    w = np.array([out.normalized_weights[a] for a in out.asset_order])
+    port_beta = b.T @ w
+    for j, fx in enumerate(out.portfolio_factor_exposure):
+        assert fx.factor_id == out.factor_order[j]
+        assert math.isclose(fx.exposure, float(port_beta[j]), abs_tol=1e-9)
+
+
+def test_factor_covariance_square_and_symmetric():
+    out = _analyze()
+    k = len(out.factor_order)
+    fc = out.factor_covariance_matrix
+    assert len(fc) == k and all(len(row) == k for row in fc)
+    for i in range(k):
+        for j in range(k):
+            assert math.isclose(fc[i][j], fc[j][i], abs_tol=1e-12)
+
+
+def test_model_variance_non_negative_and_finite():
+    out = _analyze()
+    fm = out.factor_model
+    assert fm.model_variance >= 0.0
+    assert fm.factor_variance >= 0.0
+    assert math.isfinite(fm.model_volatility)
+
+
+def test_factor_and_specific_contributions_sum_to_one():
+    out = _analyze()
+    factor_pct = sum(fx.percent_risk_contribution for fx in out.portfolio_factor_exposure)
+    total = factor_pct + out.specific_risk_contribution.percent_risk_contribution
+    assert math.isclose(total, 1.0, abs_tol=1e-6)
+    for fx in out.portfolio_factor_exposure:
+        assert math.isfinite(fx.contribution_to_volatility)
+        assert math.isfinite(fx.percent_risk_contribution)
+
+
+def test_specific_risk_contribution_non_negative():
+    out = _analyze()
+    s = out.specific_risk_contribution
+    assert s.variance >= 0.0
+    assert s.percent_risk_contribution >= -1e-12
+
+
+def test_scenario_library_deterministic():
+    a, b = _analyze(), _analyze()
+    ids = [s.id for s in a.scenario_library]
+    assert {"equity_selloff", "rates_shock", "usd_squeeze", "commodity_rally", "credit_stress"} <= set(ids)
+    assert [s.portfolio_return_impact for s in a.scenario_results] == [
+        s.portfolio_return_impact for s in b.scenario_results
+    ]
+
+
+def test_scenario_shocks_and_impacts_finite():
+    out = _analyze()
+    for sr in out.scenario_results:
+        for fi in sr.factor_impact:
+            assert math.isfinite(fi.shock) and math.isfinite(fi.impact)
+        for ai in sr.asset_impact:
+            assert math.isfinite(ai.impact) and math.isfinite(ai.contribution)
+
+
+def test_scenario_portfolio_impact_equals_weighted_asset_impact():
+    out = _analyze()
+    for sr in out.scenario_results:
+        weighted = sum(ai.contribution for ai in sr.asset_impact)
+        assert math.isclose(sr.portfolio_return_impact, weighted, abs_tol=1e-12)
+        for ai in sr.asset_impact:
+            expect = out.normalized_weights[ai.asset_id] * ai.impact
+            assert math.isclose(ai.contribution, expect, abs_tol=1e-12)
+
+
+def test_scenario_worst_and_best_assets_present():
+    out = _analyze()
+    for sr in out.scenario_results:
+        ids = {ai.asset_id for ai in sr.asset_impact}
+        assert sr.worst_asset in ids
+        assert sr.best_asset in ids
+        impacts = {ai.asset_id: ai.impact for ai in sr.asset_impact}
+        assert impacts[sr.worst_asset] <= impacts[sr.best_asset] + 1e-12
+
+
+def test_custom_scenario_appended():
+    custom = {
+        "id": "my_custom",
+        "name": "Custom shock",
+        "description": "An illustrative custom factor shock.",
+        "factor_shocks": {"equity_market": -0.10},
+    }
+    out = _analyze(custom_scenarios=[custom])
+    ids = [s.scenario_id for s in out.scenario_results]
+    assert "my_custom" in ids
+
+
 def test_single_asset_portfolio_does_not_crash():
     # A 1-asset portfolio is valid input (min_length=1); np.corrcoef collapses a
     # single series to a 0-d scalar, so the covariance path must stay well-shaped.

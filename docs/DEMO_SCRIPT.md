@@ -200,6 +200,18 @@ Return to the Command Center's **Platform Direction** panel (or open
   impact, then the copyable formula reference. Emphasise: static illustrative
   sample data, long-only v1, monthly historical VaR/CVaR example, a deterministic
   frontier demonstration — not a production risk engine, not investment advice.
+  **Factor & scenario layer (21.1):** scroll to **Factor exposure** (per-asset
+  beta heatmap across Equity Market / Size / Value / Momentum / Rates / Credit /
+  USD / Commodity / Volatility), **Portfolio factor exposure** (β = Bᵀw key
+  factors), and **Factor risk decomposition** (factor contributions + a Specific
+  /idiosyncratic row; note factor % + specific % = 100%). In **Scenario stress**,
+  click through **Equity selloff → Rates shock → USD squeeze → Commodity rally →
+  Credit stress** and watch the portfolio impact, asset-impact and factor-impact
+  tables, and worst/best asset update; then change a weight (e.g. raise Gold) and
+  watch factor exposure and scenarios re-compute. Emphasise: factor betas are
+  deterministic illustrative values (not estimated), factors are orthogonal in
+  v1, scenarios are educational sample shocks — a simplified factor model, not a
+  production risk model, not investment advice.
 - **Cross-Sectional Scanner** — the *second engine*. Use the defaults (reversal,
   50 assets, 2022-01-01 → 2024-12-31, lookback 5, long/short quantile 0.2, daily,
   gross 1.0, cost 5 bps, seed 42) → **Run Scanner** → metric cards (total /

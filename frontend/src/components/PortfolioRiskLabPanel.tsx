@@ -38,6 +38,16 @@ function corrColor(v: number): string {
   return `color-mix(in oklch, var(--neg) ${Math.round(-t * 55)}%, transparent)`;
 }
 
+/** Diverging colour for a beta/exposure cell scaled by the matrix's max |value|. */
+function betaColor(v: number, scale: number): string {
+  const t = scale > 0 ? Math.max(-1, Math.min(1, v / scale)) : 0;
+  if (t >= 0) return `color-mix(in oklch, var(--pos) ${Math.round(t * 50)}%, transparent)`;
+  return `color-mix(in oklch, var(--neg) ${Math.round(-t * 50)}%, transparent)`;
+}
+
+/** Factor ids highlighted in the compact "Portfolio factor exposure" strip. */
+const KEY_FACTORS = ["equity_market", "rates", "credit", "fx_dollar", "commodity", "volatility"];
+
 // --------------------------------------------------------------------------- //
 // Efficient frontier scatter (dependency-free SVG)
 // --------------------------------------------------------------------------- //
@@ -130,6 +140,7 @@ export default function PortfolioRiskLabPanel() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [scenarioId, setScenarioId] = useState("equity_selloff");
 
   // Load the deterministic sample portfolio on mount.
   useEffect(() => {
@@ -224,6 +235,21 @@ export default function PortfolioRiskLabPanel() {
 
   const order = result?.asset_order ?? assets.map((a) => a.id);
   const tickerOf = (id: string) => assets.find((a) => a.id === id)?.ticker ?? id;
+  const factorShort: Record<string, string> = {
+    equity_market: "Eq Mkt",
+    size: "Size",
+    value: "Value",
+    momentum: "Mom",
+    rates: "Rates",
+    credit: "Credit",
+    fx_dollar: "USD",
+    commodity: "Comm",
+    volatility: "Vol",
+  };
+  const selectedScenario =
+    result?.scenario_results.find((s) => s.scenario_id === scenarioId) ??
+    result?.scenario_results[0] ??
+    null;
 
   if (loadError) {
     return (
@@ -533,6 +559,193 @@ export default function PortfolioRiskLabPanel() {
               </div>
             )}
           </div>
+
+          {/* ── Factor exposure matrix ───────────────────────────────────── */}
+          <div className="card p-4">
+            <p className="section-title mb-1">Factor exposure</p>
+            <p className="mb-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Deterministic illustrative betas (not estimated from live data).
+            </p>
+            <div className="overflow-x-auto">
+              <table className="mono w-full text-[11px]">
+                <thead>
+                  <tr>
+                    <th className="px-1.5 py-1 text-left" style={{ color: "var(--text-mut)" }}>Asset</th>
+                    {result.factor_order.map((fid) => (
+                      <th key={fid} className="px-1.5 py-1 text-center" style={{ color: "var(--text-mut)" }}>{factorShort[fid] ?? fid}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {result.factor_exposures.map((row, i) => {
+                    const scale = Math.max(1, ...result.factor_exposures.flat().map((x) => Math.abs(x)));
+                    return (
+                      <tr key={order[i]}>
+                        <td className="px-1.5 py-1 font-semibold" style={{ color: "var(--text-hi)" }}>{tickerOf(order[i])}</td>
+                        {row.map((v, j) => (
+                          <td key={j} className="px-1.5 py-1 text-center" style={{ background: betaColor(v, scale), color: "var(--text-hi)" }}>
+                            {v.toFixed(2)}
+                          </td>
+                        ))}
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* ── Portfolio factor exposure + factor risk decomposition ────── */}
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-2">
+            <div className="card p-4">
+              <p className="section-title mb-2">Portfolio factor exposure</p>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                {KEY_FACTORS.map((fid) => {
+                  const fx = result.portfolio_factor_exposure.find((p) => p.factor_id === fid);
+                  if (!fx) return null;
+                  return <MetricCard key={fid} label={`${fx.name} β`} value={num(fx.exposure, 2)} tone={fx.exposure >= 0 ? "accent" : "danger"} />;
+                })}
+              </div>
+              <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                Portfolio beta to each factor = Bᵀw (weighted asset betas).
+              </p>
+            </div>
+
+            <div className="card p-4">
+              <p className="section-title mb-2">Factor risk decomposition</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ color: "var(--text-mut)" }}>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Factor</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Exposure</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Vol contrib</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">% Risk</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.portfolio_factor_exposure.map((fx) => (
+                      <tr key={fx.factor_id} style={{ borderTop: "1px solid var(--line)" }}>
+                        <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>{fx.name}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{num(fx.exposure, 2)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(fx.contribution_to_volatility, 2)}</td>
+                        <td className="mono px-2 py-1.5 text-right font-semibold" style={{ color: "var(--text-hi)" }}>{pct(fx.percent_risk_contribution, 1)}</td>
+                      </tr>
+                    ))}
+                    <tr style={{ borderTop: "2px solid var(--line)" }}>
+                      <td className="px-2 py-1.5 font-semibold" style={{ color: "var(--text-hi)" }}>Specific (idiosyncratic)</td>
+                      <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>—</td>
+                      <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(result.specific_risk_contribution.contribution_to_volatility, 2)}</td>
+                      <td className="mono px-2 py-1.5 text-right font-semibold" style={{ color: "var(--text-hi)" }}>{pct(result.specific_risk_contribution.percent_risk_contribution, 1)}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                Variance-share convention: factor % + specific % = 100%. Model vol ≈ {pct(result.factor_model.model_volatility, 1)}.
+              </p>
+            </div>
+          </div>
+
+          {/* ── Scenario stress ──────────────────────────────────────────── */}
+          <div className="card p-4">
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="section-title">Scenario stress</p>
+              <div className="flex flex-wrap gap-1.5">
+                {result.scenario_library.map((s) => (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => setScenarioId(s.id)}
+                    aria-pressed={selectedScenario?.scenario_id === s.id}
+                    className="rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                    style={{
+                      background: selectedScenario?.scenario_id === s.id ? "var(--accent-softer)" : "var(--glass)",
+                      border: `1px solid ${selectedScenario?.scenario_id === s.id ? "var(--accent-line)" : "var(--line)"}`,
+                      color: selectedScenario?.scenario_id === s.id ? "var(--accent-text)" : "var(--text-hi)",
+                    }}
+                  >
+                    {s.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {selectedScenario && (
+              <>
+                {(() => {
+                  const def = result.scenario_library.find((s) => s.id === selectedScenario.scenario_id);
+                  return def ? <p className="mb-2 text-xs" style={{ color: "var(--text-mut)" }}>{def.description}</p> : null;
+                })()}
+                <div className="mb-3 flex flex-wrap items-center gap-3">
+                  <div className="rounded-lg px-3 py-2" style={{ background: "var(--glass)", border: "1px solid var(--line)" }}>
+                    <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-mut)" }}>Portfolio impact</span>
+                    <p className="mono text-lg font-bold" style={{ color: changeColor(selectedScenario.portfolio_return_impact) }}>
+                      {pct(selectedScenario.portfolio_return_impact)}
+                    </p>
+                  </div>
+                  <span className="text-xs" style={{ color: "var(--text-mut)" }}>
+                    Worst: <span className="font-semibold" style={{ color: "var(--neg)" }}>{tickerOf(selectedScenario.worst_asset)}</span>
+                    {"  ·  "}Best: <span className="font-semibold" style={{ color: "var(--pos)" }}>{tickerOf(selectedScenario.best_asset)}</span>
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                  <div>
+                    <p className="section-title mb-1">Asset impact</p>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr style={{ color: "var(--text-mut)" }}>
+                            <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Asset</th>
+                            <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Impact</th>
+                            <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Contribution</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {selectedScenario.asset_impact.map((ai) => (
+                            <tr key={ai.asset_id} style={{ borderTop: "1px solid var(--line)" }}>
+                              <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>{tickerOf(ai.asset_id)}</td>
+                              <td className="mono px-2 py-1.5 text-right" style={{ color: changeColor(ai.impact) }}>{pct(ai.impact)}</td>
+                              <td className="mono px-2 py-1.5 text-right" style={{ color: changeColor(ai.contribution) }}>{pct(ai.contribution)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="section-title mb-1">Factor impact</p>
+                    {selectedScenario.factor_impact.length > 0 ? (
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr style={{ color: "var(--text-mut)" }}>
+                              <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Factor</th>
+                              <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Shock</th>
+                              <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Impact</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {selectedScenario.factor_impact.map((fi) => (
+                              <tr key={fi.factor_id} style={{ borderTop: "1px solid var(--line)" }}>
+                                <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>{fi.name}</td>
+                                <td className="mono px-2 py-1.5 text-right" style={{ color: changeColor(fi.shock) }}>{pct(fi.shock)}</td>
+                                <td className="mono px-2 py-1.5 text-right" style={{ color: changeColor(fi.impact) }}>{pct(fi.impact)}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    ) : (
+                      <p className="text-sm" style={{ color: "var(--text-mut)" }}>No factor shocks in this scenario.</p>
+                    )}
+                    <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                      Factor impact = portfolio beta × factor shock; asset-specific shocks (if any) are shown only on the assets, so there is no double counting.
+                    </p>
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
         </>
       )}
 
@@ -561,6 +774,9 @@ export default function PortfolioRiskLabPanel() {
               <li>Risk contributions show which assets actually drive portfolio risk — not just which have the largest weights.</li>
               <li>VaR/CVaR quantify tail loss; CVaR captures the average severity beyond the VaR threshold.</li>
               <li>The frontier, minimum-variance, and risk-parity portfolios illustrate different objectives.</li>
+              <li><span className="font-semibold">Factor exposure</span> (portfolio β = Bᵀw) shows which systematic risks the portfolio carries; factor covariance turns those betas into a risk view.</li>
+              <li><span className="font-semibold">Specific risk</span> is the idiosyncratic part not explained by the factors; with the variance-share convention factor % + specific % = 100%.</li>
+              <li><span className="font-semibold">Scenario shocks</span> translate factor moves into asset and portfolio P&amp;L — a transparent “what if this factor moves” lens.</li>
             </ul>
           </div>
           <div>
@@ -570,7 +786,8 @@ export default function PortfolioRiskLabPanel() {
               <li>Long-only v1; covariance ties stated annual volatilities to the sample correlation.</li>
               <li>Historical VaR/CVaR are a monthly-horizon example from a short sample series.</li>
               <li>The efficient frontier is a deterministic sample demonstration, not an optimiser guarantee.</li>
-              <li>Not a production risk engine.</li>
+              <li>Factor betas are <span className="font-semibold">deterministic illustrative values</span>, not estimated from data; factors are treated as orthogonal in v1, and specific variance is a floored residual.</li>
+              <li>Scenarios are <span className="font-semibold">educational sample shocks</span>, not a current macro view — a simplified factor model, not a production risk model.</li>
             </ul>
           </div>
         </div>

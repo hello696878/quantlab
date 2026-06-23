@@ -74,6 +74,72 @@ export interface StressResult {
   portfolio_pnl: number;
 }
 
+export interface FactorDefinition {
+  id: string;
+  name: string;
+  category: string;
+  description: string;
+  volatility: number;
+  is_sample: boolean;
+}
+
+export interface PortfolioFactorExposure {
+  factor_id: string;
+  name: string;
+  exposure: number;
+  contribution_to_variance: number;
+  contribution_to_volatility: number;
+  percent_risk_contribution: number;
+}
+
+export interface SpecificRiskContribution {
+  variance: number;
+  contribution_to_volatility: number;
+  percent_risk_contribution: number;
+}
+
+export interface FactorModelSummary {
+  factor_variance: number;
+  specific_variance: number;
+  model_variance: number;
+  model_volatility: number;
+}
+
+export interface ScenarioDefinition {
+  id: string;
+  name: string;
+  description: string;
+  factor_shocks: Record<string, number>;
+  asset_shocks?: Record<string, number> | null;
+  is_sample: boolean;
+}
+
+export interface ScenarioFactorImpact {
+  factor_id: string;
+  name: string;
+  shock: number;
+  impact: number;
+}
+
+export interface ScenarioAssetImpact {
+  asset_id: string;
+  name: string;
+  weight: number;
+  impact: number;
+  contribution: number;
+}
+
+export interface ScenarioResult {
+  scenario_id: string;
+  name: string;
+  portfolio_return_impact: number;
+  factor_impact: ScenarioFactorImpact[];
+  asset_impact: ScenarioAssetImpact[];
+  worst_asset: string;
+  best_asset: string;
+  notes: string[];
+}
+
 export interface PortfolioAnalysisResponse {
   asset_order: string[];
   asset_names: Record<string, string>;
@@ -93,6 +159,16 @@ export interface PortfolioAnalysisResponse {
   efficient_frontier: FrontierPoint[];
   min_variance_portfolio: NamedPortfolio;
   risk_parity_portfolio: NamedPortfolio;
+  factors: FactorDefinition[];
+  factor_order: string[];
+  factor_exposures: number[][];
+  factor_covariance_matrix: number[][];
+  factor_correlation_matrix: number[][];
+  portfolio_factor_exposure: PortfolioFactorExposure[];
+  specific_risk_contribution: SpecificRiskContribution;
+  factor_model: FactorModelSummary;
+  scenario_library: ScenarioDefinition[];
+  scenario_results: ScenarioResult[];
   notes: string[];
   data_status: "static_sample";
   disclaimer: string;
@@ -175,4 +251,13 @@ Component risk (CCR)    CCR_i = w_i · MCR_i
 Percent risk           CCR_i / σ_p
 Historical VaR         VaR_c = −quantile(r_p, 1 − c)
 Historical CVaR / ES   CVaR_c = −mean(r_p ≤ quantile(r_p, 1 − c))
-Stress P&L             Σ w_i · stress_return_i`;
+Stress P&L             Σ w_i · stress_return_i
+
+Factor exposure        portfolio_beta = Bᵀw
+Factor variance        β_pᵀ F β_p
+Specific variance      wᵀ D w   (D = diag of residual variances)
+Model variance         factor_variance + specific_variance
+Factor % risk          (β_p,f · (F β_p)_f) / model_variance
+Specific % risk        specific_variance / model_variance
+Scenario asset impact  Σ_f beta_i,f · shock_f + asset_specific_shock_i
+Scenario portfolio P&L Σ_i w_i · asset_impact_i`;

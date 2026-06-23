@@ -57,6 +57,8 @@ class PortfolioAnalysisRequest(PortfolioModel):
     confidence_level: Annotated[FiniteFloat, Field(ge=0.5, le=0.999)] = 0.95
     stress_scenario: Optional[StressScenario] = None
     allow_short: bool = False
+    # Optional extra factor-shock scenarios appended to the sample library.
+    custom_scenarios: List["ScenarioDefinition"] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def _validate(self) -> "PortfolioAnalysisRequest":
@@ -118,6 +120,75 @@ class StressResult(PortfolioModel):
     portfolio_pnl: FiniteFloat
 
 
+# --------------------------------------------------------------------------- #
+# Factor model & scenario stress (Phase 21.1)
+# --------------------------------------------------------------------------- #
+class FactorDefinition(PortfolioModel):
+    id: NonEmptyStr
+    name: NonEmptyStr
+    category: NonEmptyStr
+    description: NonEmptyStr
+    volatility: PositiveFloat
+    is_sample: bool = True
+
+
+class PortfolioFactorExposure(PortfolioModel):
+    factor_id: NonEmptyStr
+    name: NonEmptyStr
+    exposure: FiniteFloat  # portfolio beta to the factor (Bᵀw)
+    contribution_to_variance: FiniteFloat
+    contribution_to_volatility: FiniteFloat
+    percent_risk_contribution: FiniteFloat  # variance-share convention
+
+
+class SpecificRiskContribution(PortfolioModel):
+    variance: FiniteFloat
+    contribution_to_volatility: FiniteFloat
+    percent_risk_contribution: FiniteFloat
+
+
+class FactorModelSummary(PortfolioModel):
+    factor_variance: FiniteFloat
+    specific_variance: FiniteFloat
+    model_variance: FiniteFloat
+    model_volatility: FiniteFloat
+
+
+class ScenarioDefinition(PortfolioModel):
+    id: NonEmptyStr
+    name: NonEmptyStr
+    description: NonEmptyStr
+    factor_shocks: Dict[str, FiniteFloat]
+    asset_shocks: Optional[Dict[str, FiniteFloat]] = None
+    is_sample: bool = True
+
+
+class ScenarioFactorImpact(PortfolioModel):
+    factor_id: NonEmptyStr
+    name: NonEmptyStr
+    shock: FiniteFloat
+    impact: FiniteFloat  # portfolio_beta_factor * shock_factor
+
+
+class ScenarioAssetImpact(PortfolioModel):
+    asset_id: NonEmptyStr
+    name: NonEmptyStr
+    weight: FiniteFloat
+    impact: FiniteFloat  # asset return impact
+    contribution: FiniteFloat  # weight * impact
+
+
+class ScenarioResult(PortfolioModel):
+    scenario_id: NonEmptyStr
+    name: NonEmptyStr
+    portfolio_return_impact: FiniteFloat
+    factor_impact: List[ScenarioFactorImpact]
+    asset_impact: List[ScenarioAssetImpact]
+    worst_asset: NonEmptyStr
+    best_asset: NonEmptyStr
+    notes: List[NonEmptyStr]
+
+
 class PortfolioAnalysisResponse(PortfolioModel):
     asset_order: List[NonEmptyStr]
     asset_names: Dict[str, NonEmptyStr]
@@ -137,6 +208,17 @@ class PortfolioAnalysisResponse(PortfolioModel):
     efficient_frontier: List[FrontierPoint]
     min_variance_portfolio: NamedPortfolio
     risk_parity_portfolio: NamedPortfolio
+    # Factor model & scenario stress (Phase 21.1).
+    factors: List[FactorDefinition]
+    factor_order: List[NonEmptyStr]
+    factor_exposures: List[List[FiniteFloat]]  # assets × factors beta matrix
+    factor_covariance_matrix: List[List[FiniteFloat]]
+    factor_correlation_matrix: List[List[FiniteFloat]]
+    portfolio_factor_exposure: List[PortfolioFactorExposure]
+    specific_risk_contribution: SpecificRiskContribution
+    factor_model: FactorModelSummary
+    scenario_library: List[ScenarioDefinition]
+    scenario_results: List[ScenarioResult]
     notes: List[NonEmptyStr]
     data_status: Literal["static_sample"] = "static_sample"
     disclaimer: NonEmptyStr
@@ -150,3 +232,8 @@ class SamplePortfolioResponse(PortfolioModel):
     data_status: Literal["static_sample"] = "static_sample"
     disclaimer: NonEmptyStr
     notes: List[NonEmptyStr]
+
+
+# ``PortfolioAnalysisRequest.custom_scenarios`` forward-references
+# ``ScenarioDefinition`` (defined below it), so resolve it now.
+PortfolioAnalysisRequest.model_rebuild()

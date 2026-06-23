@@ -1239,6 +1239,9 @@ export default function HomePage() {
         ["Portfolio VaR and CVaR", "portfolio value at risk var cvar expected shortfall tail risk historical confidence level loss"],
         ["Risk Contribution Lab", "portfolio risk contribution marginal component percent risk budgeting concentration which assets drive risk"],
         ["Efficient Frontier Lab", "portfolio efficient frontier minimum variance risk parity mean variance optimization candidate portfolios"],
+        ["Portfolio Factor Exposure", "portfolio factor exposure beta equity market size value momentum rates credit fx dollar commodity volatility loadings"],
+        ["Portfolio Scenario Stress", "portfolio scenario stress test equity selloff rates shock usd squeeze commodity rally credit stress shock factor impact worst best asset"],
+        ["Factor Risk Decomposition", "portfolio factor risk decomposition specific idiosyncratic risk contribution factor covariance variance share"],
       ] as const
     ).map(([title, keywords]) => ({
       id: `risklab-${title}`,

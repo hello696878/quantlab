@@ -28,6 +28,11 @@ from app.portfolio_risk.models import (
     PortfolioAsset,
     StressResult,
 )
+from app.portfolio_risk.factors import (
+    compute_factor_block,
+    compute_scenarios,
+    scenario_library,
+)
 from app.portfolio_risk.sample import DISCLAIMER
 
 _MIN_VOL = 1e-12
@@ -220,6 +225,11 @@ def analyze_portfolio(req: PortfolioAnalysisRequest) -> PortfolioAnalysisRespons
     )
     risk_parity = _risk_parity(mu, cov, ids, rf)
 
+    # Factor exposure / risk decomposition + deterministic scenario stress.
+    factor_block = compute_factor_block(w, ids, vols)
+    scenarios = scenario_library() + list(req.custom_scenarios)
+    scenario_results = compute_scenarios(w, ids, names, scenarios)
+
     return PortfolioAnalysisResponse(
         asset_order=ids,
         asset_names=names,
@@ -239,6 +249,16 @@ def analyze_portfolio(req: PortfolioAnalysisRequest) -> PortfolioAnalysisRespons
         efficient_frontier=frontier,
         min_variance_portfolio=min_variance,
         risk_parity_portfolio=risk_parity,
+        factors=factor_block["factors"],
+        factor_order=factor_block["factor_order"],
+        factor_exposures=factor_block["factor_exposures"],
+        factor_covariance_matrix=factor_block["factor_covariance_matrix"],
+        factor_correlation_matrix=factor_block["factor_correlation_matrix"],
+        portfolio_factor_exposure=factor_block["portfolio_factor_exposure"],
+        specific_risk_contribution=factor_block["specific_risk_contribution"],
+        factor_model=factor_block["factor_model"],
+        scenario_library=scenarios,
+        scenario_results=scenario_results,
         notes=[
             "Weights are normalised to sum to 1 before analysis.",
             "Covariance is annualised: it ties each asset's stated annual "
@@ -247,6 +267,11 @@ def analyze_portfolio(req: PortfolioAnalysisRequest) -> PortfolioAnalysisRespons
             "sample monthly return series (loss-positive convention).",
             "The efficient frontier, minimum-variance, and risk-parity portfolios "
             "are long-only and derived from a deterministic candidate set.",
+            "Factor betas are deterministic illustrative values (not estimated "
+            "from live data); factors are treated as orthogonal in v1.",
+            "Factor and specific percent risk contributions use the variance-share "
+            "convention and sum to 1.",
+            "Scenario shocks are illustrative educational examples — not a forecast.",
         ],
         disclaimer=DISCLAIMER,
     )

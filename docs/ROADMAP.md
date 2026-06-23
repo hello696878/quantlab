@@ -1485,6 +1485,38 @@ single-asset Backtest + Strategy Comparison:
   `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample,
   long-only v1, educational — not a production risk engine, not investment advice.**
 
+### Phase 21.1 — Portfolio Factor Exposure & Scenario Stress v1 ✅
+
+- **Additive extension of Portfolio Risk Lab v1** — all existing fields and
+  behaviour preserved. Deterministic static-sample data only; no live data, no
+  trading, no API keys, not advice. Existing backtest/AFML/scanner untouched.
+- Backend: new `app/portfolio_risk/factors.py` (9 illustrative factors with
+  hand-authored per-asset betas; factors treated as **orthogonal in v1** →
+  diagonal factor covariance; specific variance = floored residual of stated
+  variance over factor-explained variance; 5 sample scenarios). New models
+  (`FactorDefinition`, `PortfolioFactorExposure`, `SpecificRiskContribution`,
+  `FactorModelSummary`, `ScenarioDefinition`, `ScenarioResult`, …) added to
+  `models.py`; `analyze_portfolio` now also returns `factors`, `factor_order`,
+  `factor_exposures` (B matrix), `factor_covariance_matrix`,
+  `factor_correlation_matrix`, `portfolio_factor_exposure` (β=Bᵀw + risk
+  contributions), `specific_risk_contribution`, `factor_model`,
+  `scenario_library`, and `scenario_results`. Request gains optional
+  `custom_scenarios`. Percent risk contributions use the variance-share
+  convention (factor % + specific % = 1).
+- Frontend: `PortfolioRiskLabPanel` extended with a **Factor exposure** beta
+  heatmap, **Portfolio factor exposure** strip, **Factor risk decomposition**
+  table (+ specific risk), and a **Scenario stress** panel (selector →
+  portfolio impact, asset-impact + factor-impact tables, worst/best asset);
+  `lib/portfolioRisk.ts` types + formula reference extended. Dashboard card badge
+  → "Portfolio analytics + factor risk"; palette adds Portfolio Factor Exposure,
+  Portfolio Scenario Stress, Factor Risk Decomposition.
+- 12 new factor/scenario backend tests (the portfolio-risk file now has 34) —
+  full suite green (**1829 passed**); `npx tsc --noEmit` clean; no frontend build
+  run (per instructions). Docs: `README.md`,
+  `backend/README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`,
+  `frontend/README.md`. **Illustrative betas (not estimated), educational sample
+  scenarios, simplified factor model — not a production risk model, not advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

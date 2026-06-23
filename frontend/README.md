@@ -95,8 +95,13 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 
 The **Portfolio Risk Lab** (`PortfolioRiskLabPanel`, view `risklab`) loads the
 deterministic sample portfolio, lets you edit weights, and re-analyses live via
-`/api/portfolio-risk/analyze`. All data is static illustrative sample data —
-long-only v1, educational, not a production risk engine, not investment advice.
+`/api/portfolio-risk/analyze`. It shows return/volatility/Sharpe, VaR/CVaR, risk
+contributions, the efficient frontier, and (Phase 21.1) **factor exposure**, a
+**factor risk decomposition** (factor + specific/idiosyncratic), and a
+**deterministic scenario-stress** panel (equity selloff, rates shock, USD
+squeeze, commodity rally, credit stress). All data is static illustrative sample
+data with deterministic illustrative factor betas — long-only v1, educational,
+not a production risk model, not investment advice.
 
 The Globe renders bundled static sample data immediately, then uses the validated
 backend dataset when available. The parser requires exact FRED field/date

@@ -12,14 +12,27 @@ It never fetches live data, makes no network calls, and is educational only —
 not investment advice and not a production risk engine.
 """
 
+from app.portfolio_risk.factors import (
+    FACTOR_IDS,
+    compute_factor_block,
+    compute_scenarios,
+    factor_definitions,
+    scenario_library,
+)
 from app.portfolio_risk.models import (
     AssetRiskContribution,
+    FactorDefinition,
+    FactorModelSummary,
     FrontierPoint,
     NamedPortfolio,
     PortfolioAnalysisRequest,
     PortfolioAnalysisResponse,
     PortfolioAsset,
+    PortfolioFactorExposure,
     SamplePortfolioResponse,
+    ScenarioDefinition,
+    ScenarioResult,
+    SpecificRiskContribution,
     StressResult,
     StressScenario,
 )
@@ -28,14 +41,25 @@ from app.portfolio_risk.service import DISCLAIMER, analyze_portfolio
 
 __all__ = [
     "AssetRiskContribution",
+    "FactorDefinition",
+    "FactorModelSummary",
     "FrontierPoint",
     "NamedPortfolio",
     "PortfolioAnalysisRequest",
     "PortfolioAnalysisResponse",
     "PortfolioAsset",
+    "PortfolioFactorExposure",
     "SamplePortfolioResponse",
+    "ScenarioDefinition",
+    "ScenarioResult",
+    "SpecificRiskContribution",
     "StressResult",
     "StressScenario",
+    "FACTOR_IDS",
+    "compute_factor_block",
+    "compute_scenarios",
+    "factor_definitions",
+    "scenario_library",
     "build_sample_response",
     "sample_assets",
     "DISCLAIMER",
