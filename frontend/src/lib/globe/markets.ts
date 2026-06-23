@@ -184,10 +184,10 @@ function makeSparkline(seed: number, drift: number): number[] {
 // ---------------------------------------------------------------------------
 
 export const CROSS_LINKS: MarketLink[] = [
-  { label: "Backtest an index strategy", view: "backtest" },
-  { label: "Open Cross-Sectional Scanner", view: "scanner" },
-  { label: "View rates (Yield Curve Lab)", view: "rates" },
-  { label: "Open FX Lab", view: "fx" },
+  { label: "Backtest this index", view: "backtest" },
+  { label: "Open Scanner", view: "scanner" },
+  { label: "View FX Lab", view: "fx" },
+  { label: "View Rates Lab", view: "rates" },
 ];
 
 // ---------------------------------------------------------------------------

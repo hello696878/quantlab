@@ -13,8 +13,10 @@
  * explicitly. Index, FX, structure, and headline values remain sample data.
  */
 
+import { useEffect, useState } from "react";
 import type { View } from "@/components/AppShell";
 import MetricCard from "@/components/MetricCard";
+import { buildGlobeShareUrl } from "@/lib/globe/permalink";
 import {
   REGION_COLORS,
   SENTIMENT_TONE,
@@ -219,6 +221,27 @@ interface MarketDossierProps {
 }
 
 export default function MarketDossier({ market, onNav, onClose }: MarketDossierProps) {
+  // Share-link copy feedback. Reset whenever the dossier switches markets.
+  const [copyMsg, setCopyMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  useEffect(() => setCopyMsg(null), [market.id]);
+
+  async function handleShare() {
+    const url = buildGlobeShareUrl(market.id);
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setCopyMsg({ ok: true, text: "Copied Globe dossier link." });
+        return;
+      }
+    } catch {
+      // fall through to the manual-copy message
+    }
+    setCopyMsg({
+      ok: false,
+      text: `Could not copy automatically. Copy the URL from your browser: ${url}`,
+    });
+  }
+
   const accent = REGION_COLORS[market.region] ?? "var(--accent)";
   const bias = marketBias(market);
   const bColor = biasColor(bias);
@@ -280,16 +303,42 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
               </p>
             </div>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close dossier"
-            className="flex-shrink-0 rounded-md px-2 py-1 text-xs font-medium transition-colors"
-            style={{ border: "1px solid var(--line)", color: "var(--text-mut)" }}
-          >
-            ✕
-          </button>
+          <div className="flex flex-shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={handleShare}
+              aria-label={`Copy a shareable link to the ${market.country} market dossier`}
+              className="rounded-md px-2 py-1 text-xs font-semibold transition-colors"
+              style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
+            >
+              🔗 Share
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close dossier"
+              className="rounded-md px-2 py-1 text-xs font-medium transition-colors"
+              style={{ border: "1px solid var(--line)", color: "var(--text-mut)" }}
+            >
+              ✕
+            </button>
+          </div>
         </div>
+
+        {copyMsg && (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mt-2 break-words rounded-lg px-2.5 py-1.5 text-[11px]"
+            style={{
+              background: copyMsg.ok ? "var(--accent-softer)" : "var(--warn-soft)",
+              border: `1px solid ${copyMsg.ok ? "var(--accent-line)" : "var(--line)"}`,
+              color: copyMsg.ok ? "var(--accent-text)" : "var(--warn)",
+            }}
+          >
+            {copyMsg.text}
+          </p>
+        )}
 
         <div className="mt-3 flex flex-wrap items-center gap-2">
           <span

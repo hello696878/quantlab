@@ -1394,6 +1394,35 @@ single-asset Backtest + Strategy Comparison:
   suite + full `pytest` green; `npx tsc --noEmit` clean. **Sample/educational
   only; not a news feed, not a sentiment model, not investment advice.**
 
+### Phase 20.6 — Globe Dossier Permalinks & Cross-Module Routing v1 ✅
+
+- **Frontend-only navigation/UX.** No backend changes, no new data, no live
+  data/news, no scraping, no API keys, no investment advice; finance/backtest/
+  AFML/scanner logic untouched.
+- New `lib/globe/permalink.ts` (URL helpers) and `app/globe/page.tsx` (a thin
+  server redirect from `/globe?market=<id>` to the canonical
+  `/?view=globe&market=<id>`). QuantLab is a single-page workspace switcher, so
+  dossier permalinks are encoded as query params on the app page.
+- Deep-link entry: opening a permalink selects the market and opens its dossier
+  automatically, in both backend and bundled-static-fallback modes (selection is
+  by id). Unknown id → falls back to the **default market (US)** with a
+  "Market not found; showing default market." notice and URL normalisation.
+- URL state: marker/list/quick-jump clicks push `?market=<id>` (no reload);
+  the page re-derives state on `popstate` so **browser back/forward** walks the
+  visited dossiers with no stale selection; a filter that hides the selection
+  closes the dossier and drops `?market` (documented behaviour).
+- Dossier header **🔗 Share** button copies the permalink (`navigator.clipboard`
+  with a manual-copy fallback message) — works in fallback mode too. Command
+  Palette deep-links every country dossier (US/Taiwan/Japan/Germany/India
+  searchable by abbreviation) + Open/Explore Global Markets; Dashboard globe card
+  links to the five featured dossiers. Dossier actions (Backtest this index,
+  Open Scanner, View FX Lab, View Rates Lab) route into existing modules;
+  market-specific pre-filling remains future work.
+- `npx tsc --noEmit` clean; no frontend build run (per instructions). Docs:
+  `GLOBE_DATA.md`, `DEMO_SCRIPT.md`, `PROJECT_OVERVIEW.md`, `README.md`,
+  `frontend/README.md`. **Navigation/UX only — not real-time, not a live
+  terminal, not investment advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

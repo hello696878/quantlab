@@ -30,7 +30,11 @@ import {
   type MarketRegion,
 } from "@/lib/globe/markets";
 import { fetchGlobeMarkets } from "@/lib/globe/remote";
+import { resolveMarketId, writeGlobeUrl } from "@/lib/globe/permalink";
 import { fmtPct } from "@/lib/format";
+
+/** Stable list of bundled market ids — used to validate permalink ids. */
+const MARKET_IDS: readonly string[] = MARKETS.map((m) => m.id);
 
 type Mode = "wide" | "mid" | "narrow";
 
@@ -118,9 +122,35 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
 
   const [region, setRegion] = useState<MarketRegion | "All">("All");
   const [query, setQuery] = useState("");
-  const [selectedId, setSelectedId] = useState<string | null>(initialMarketId ?? null);
+  // Resolve the deep-linked market id: a known id selects it; an unknown id
+  // falls back to the default market and flags `marketNotFound` for the notice.
+  const requested = resolveMarketId(initialMarketId, MARKET_IDS);
+  const [selectedId, setSelectedId] = useState<string | null>(requested.id);
+  const [marketNotFound, setMarketNotFound] = useState<boolean>(requested.notFound);
   const [autoRotate, setAutoRotate] = useState(true);
   const [resetSignal, setResetSignal] = useState(0);
+
+  /** User-initiated selection: opens a dossier and records a history entry. */
+  function selectMarket(id: string) {
+    setSelectedId(id);
+    setMarketNotFound(false);
+    writeGlobeUrl(id, "push");
+  }
+  /** User-initiated clear: closes the dossier and records a history entry. */
+  function clearSelection() {
+    setSelectedId(null);
+    setMarketNotFound(false);
+    writeGlobeUrl(null, "push");
+  }
+
+  // Normalise the address bar to the resolved selection on entry (covers
+  // deep-link entry, the invalid-id fallback, and programmatic jumps from the
+  // palette/dashboard). Replace keeps a single history entry; in-panel clicks
+  // push their own entries so browser back/forward walks the visited dossiers.
+  useEffect(() => {
+    writeGlobeUrl(selectedId, "replace");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // Market data: render bundled static data immediately, then upgrade to the
   // backend data layer if reachable (else fall back with a non-blocking warning).
@@ -195,10 +225,14 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
     ? { text: "News unavailable — static", tone: "var(--warn)" }
     : { text: "News: sample (live planned)", tone: "var(--text-mut)" };
 
+  // If a filter/search hides the currently selected market, clear the dossier
+  // and drop ?market from the URL (replace — this isn't a user navigation).
   useEffect(() => {
     if (!selectedId || !filtering) return;
     if (!filterMarkets(region, query, markets).some((market) => market.id === selectedId)) {
       setSelectedId(null);
+      setMarketNotFound(false);
+      writeGlobeUrl(null, "replace");
     }
   }, [filtering, query, region, selectedId, markets]);
 
@@ -206,7 +240,9 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
     setRegion("All");
     setQuery("");
     setSelectedId(null);
+    setMarketNotFound(false);
     setResetSignal((k) => k + 1);
+    writeGlobeUrl(null, "push");
   }
 
   // ── Layout grids per container mode ─────────────────────────────────────
@@ -326,6 +362,27 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
         </div>
       )}
 
+      {/* Friendly fallback when a permalink names an unknown market id. */}
+      {marketNotFound && (
+        <div
+          role="status"
+          className="flex items-start gap-2.5 rounded-xl p-3 text-sm"
+          style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+        >
+          <span aria-hidden className="mt-0.5 flex-shrink-0">⚠</span>
+          <p className="flex-1">Market not found; showing default market.</p>
+          <button
+            type="button"
+            onClick={() => setMarketNotFound(false)}
+            aria-label="Dismiss market-not-found notice"
+            className="flex-shrink-0 px-1"
+            style={{ color: "var(--text-mut)" }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* ── Mission-control grid ──────────────────────────────────────────── */}
       <div style={gridStyle}>
         {/* Left rail */}
@@ -358,7 +415,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
             {selectedId && (
               <button
                 type="button"
-                onClick={() => setSelectedId(null)}
+                onClick={clearSelection}
                 className="text-[11px] font-medium"
                 style={{ color: "var(--accent-text)" }}
               >
@@ -373,7 +430,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
                 key={m.id}
                 market={m}
                 active={m.id === selectedId}
-                onSelect={() => setSelectedId(m.id)}
+                onSelect={() => selectMarket(m.id)}
               />
             ))}
             {filtered.length === 0 && (
@@ -397,7 +454,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
                   onClick={() => {
                     setRegion("All");
                     setQuery("");
-                    setSelectedId(q.id);
+                    selectMarket(q.id);
                   }}
                   className="rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors"
                   style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
@@ -417,7 +474,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
               activeIds={activeIds}
               arcs={MARKET_ARCS}
               selectedId={selectedId}
-              onSelect={setSelectedId}
+              onSelect={selectMarket}
               autoRotate={autoRotate}
               resetSignal={resetSignal}
             />
@@ -471,7 +528,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
         {/* Right dossier */}
         <div style={{ gridArea: "dossier", ...dossierScroll }}>
           {selected ? (
-            <MarketDossier market={selected} onNav={onNav} onClose={() => setSelectedId(null)} />
+            <MarketDossier market={selected} onNav={onNav} onClose={clearSelection} />
           ) : (
             <div className="card flex min-h-[300px] flex-col items-center justify-center p-8 text-center">
               <span aria-hidden className="text-4xl">🌐</span>

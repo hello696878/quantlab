@@ -98,6 +98,13 @@ delayed quotes. If the backend is unavailable or returns an invalid payload, the
 UI keeps the bundled dataset and shows a visible fallback notice. Optional
 adapter setup is documented in `../docs/GLOBE_DATA.md`.
 
+Country dossiers are shareable via permalinks: `/?view=globe&market=<id>`
+(canonical) or `/globe?market=<id>` (redirects to the canonical form). Opening a
+permalink deep-selects the dossier in both backend and bundled-fallback modes;
+an unknown id falls back to the default market (US) with a "Market not found"
+notice. Marker/list clicks update the URL (no reload), browser back/forward walks
+visited dossiers, and the dossier header has a Share button that copies the link.
+
 Default backend base URL: `http://localhost:8000`
 
 ---

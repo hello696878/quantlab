@@ -227,6 +227,19 @@ illustrative; optional US FRED enrichment is preserved with field-level
 observation dates. Indices, FX, market structure, and headlines remain static,
 with no real-time coverage claim.
 
+**Permalinks & cross-module routing (20.6):** `lib/globe/permalink.ts` centralises
+shareable dossier URLs. Country dossiers are deep-linkable via
+`/?view=globe&market=<id>` (canonical) or `/globe?market=<id>` (a thin
+`app/globe/page.tsx` redirect to the canonical form). The page reads the URL on
+load and on `popstate` (browser back/forward); marker/list clicks update the URL
+without a reload; an unknown id falls back to the default market (US) with a
+"Market not found; showing default market." notice. The dossier header has a
+**Share** button (clipboard copy with a manual-copy fallback), the Command
+Palette deep-links every country dossier, and the Dashboard globe card links to
+the US/Taiwan/Japan/Germany/India dossiers. Dossier actions (Backtest this index,
+Open Scanner, View FX Lab, View Rates Lab) route into existing modules;
+market-specific pre-filling is future work. Navigation/UX only — no new data.
+
 ### `src/app/page.tsx`
 
 Root page component. Owns all strategy and research parameter state. Renders `BacktestForm` on the left and the appropriate result panels on the right. Tabs switch between Backtest and each research tool.

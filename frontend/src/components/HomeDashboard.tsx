@@ -132,6 +132,15 @@ const CHECKLIST_ITEMS: { step: ChecklistStep; label: string }[] = [
   { step: "built_strategy", label: "Build a custom strategy" },
 ];
 
+/** Featured country dossiers surfaced as Globe permalink shortcuts. */
+const GLOBE_QUICK_LINKS: { id: string; label: string }[] = [
+  { id: "us", label: "US" },
+  { id: "tw", label: "Taiwan" },
+  { id: "jp", label: "Japan" },
+  { id: "de", label: "Germany" },
+  { id: "in", label: "India" },
+];
+
 // ---------------------------------------------------------------------------
 // Small building blocks
 // ---------------------------------------------------------------------------
@@ -360,6 +369,8 @@ interface HomeDashboardProps {
   onOpenLibraryPage?: (slug: string | null) => void;
   onOpenPaperPage?: (slug: string | null) => void;
   onOpenDisasterPage?: (slug: string | null) => void;
+  /** Open the Globe, optionally deep-selecting a country dossier (permalink). */
+  onOpenGlobe?: (marketId: string | null) => void;
 }
 
 export default function HomeDashboard({
@@ -370,7 +381,11 @@ export default function HomeDashboard({
   onOpenLibraryPage,
   onOpenPaperPage,
   onOpenDisasterPage,
+  onOpenGlobe,
 }: HomeDashboardProps) {
+  /** Open a country dossier permalink (falls back to the globe index). */
+  const openMarket = (id: string) =>
+    onOpenGlobe ? onOpenGlobe(id) : onNav("globe");
   const [backtests, setBacktests] = useState<SavedBacktestSummary[]>([]);
   const [reports, setReports] = useState<SavedReportSummary[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
@@ -1015,11 +1030,7 @@ export default function HomeDashboard({
           fail.
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <button
-            type="button"
-            onClick={() => onNav("globe")}
-            className="card flex flex-col gap-1 p-4 text-left"
-          >
+          <div className="card flex flex-col gap-1 p-4">
             <span className="flex items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Global Markets Globe
@@ -1035,12 +1046,31 @@ export default function HomeDashboard({
               Explore a 3D map backed by a typed country-dossier data layer.
               Static data remains the default; optional macro and delayed quote
               adapters can enrich supported fields. News sentiment is represented
-              by sample headlines, with live news integration planned.
+              by sample headlines, with live news integration planned. Country
+              dossiers are shareable permalinks (e.g. ?view=globe&amp;market=us).
             </span>
-            <span className="mt-1 text-xs font-medium text-blue-600">
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              {GLOBE_QUICK_LINKS.map((q) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  onClick={() => openMarket(q.id)}
+                  aria-label={`Open the ${q.label} market dossier`}
+                  className="rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors"
+                  style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
+                >
+                  {q.label}
+                </button>
+              ))}
+            </div>
+            <button
+              type="button"
+              onClick={() => onNav("globe")}
+              className="mt-1 self-start text-xs font-medium text-blue-600"
+            >
               Open Globe →
-            </span>
-          </button>
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => onNav("library")}

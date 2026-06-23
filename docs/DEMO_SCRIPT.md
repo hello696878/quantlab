@@ -280,6 +280,17 @@ Return to the Command Center's **Platform Direction** panel (or open
   provider) → the chip flips to "News unavailable — static fallback" with a
   non-blocking warning; headlines stay static (never crashes). It's a scaffold
   only — **no live news, no scraping, no API, no AI summarizer**.
+  **Dossier permalinks (20.6):** open **`/globe?market=tw`** (or
+  `/?view=globe&market=tw`) — Taiwan's dossier opens automatically with the
+  marker highlighted; try `/globe?market=jp` and `/globe?market=bad-id` (the
+  latter falls back to the US default with a "Market not found; showing default
+  market." notice, no crash). Click markers for US/Germany/India and watch the
+  URL update (`?market=us/de/in`); use browser **Back/Forward** to walk the
+  visited dossiers. Click the dossier **🔗 Share** button → "Copied Globe dossier
+  link." (the copied URL includes `?market=<id>`). Stop the backend and reopen
+  `/globe?market=tw` — Taiwan still selects from bundled fallback data. In
+  Ctrl/Cmd+K search "US/Taiwan/Japan/Germany/India Market Dossier"; the Dashboard
+  globe card links straight to those dossiers. Navigation/UX only — no new data.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

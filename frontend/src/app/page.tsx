@@ -46,6 +46,11 @@ import ScannerLabPanel from "@/components/ScannerLabPanel";
 import AfmlLabPanel from "@/components/AfmlLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
+import {
+  clearGlobeUrl,
+  readGlobeParams,
+  writeGlobeUrl,
+} from "@/lib/globe/permalink";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -448,6 +453,26 @@ function SectionIntro({
   );
 }
 
+// Extra search aliases for the per-country dossier palette commands, so common
+// abbreviations ("US", "UK", "Japan") and short codes resolve the right market.
+const GLOBE_MARKET_ALIASES: Record<string, string> = {
+  us: "US USA U.S. America United States",
+  ca: "CA Canada",
+  uk: "UK U.K. Britain Great Britain United Kingdom",
+  de: "DE Germany Deutschland",
+  fr: "FR France",
+  ch: "CH Switzerland Swiss",
+  jp: "JP Japan Nippon",
+  cn: "CN China Mainland",
+  hk: "HK Hong Kong",
+  tw: "TW Taiwan",
+  kr: "KR Korea South Korea",
+  in: "IN India",
+  sg: "SG Singapore",
+  au: "AU Australia",
+  br: "BR Brazil Brasil",
+};
+
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
@@ -591,6 +616,35 @@ export default function HomePage() {
     setFormKey((k) => k + 1);
   }, []);
 
+  // Globe permalinks: deep-link entry + browser back/forward.
+  //  - On first load, if the URL is a globe permalink (/?view=globe&market=…,
+  //    or /globe?market=… which redirects here), open the globe with that
+  //    market. An unknown id is handled by the panel (default + notice).
+  //  - On popstate, re-derive the workspace from the URL so the dossier (or
+  //    leaving the globe) always matches the address bar — no stale selection.
+  useEffect(() => {
+    const entry = readGlobeParams();
+    if (entry.isGlobe) openGlobe(entry.market, { push: false });
+
+    function onPopState() {
+      const here = readGlobeParams();
+      if (here.isGlobe) {
+        setSavedDetailId(null);
+        setSavedReportDetailId(null);
+        setDemoNotice(null);
+        setGlobeMarketId(here.market);
+        setGlobeKey((k) => k + 1);
+        setView("globe");
+      } else {
+        setGlobeMarketId(null);
+        setView("home");
+      }
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleRun() {
     if (loading) return;
 
@@ -625,6 +679,7 @@ export default function HomePage() {
   }
 
   function handleNav(next: View) {
+    const leavingGlobe = view === "globe" && next !== "globe";
     setView(next);
     setDemoNotice(null);
     setBuilderDemoTemplateId(null);
@@ -640,17 +695,32 @@ export default function HomePage() {
     setDisasterKey((k) => k + 1);
     // Sidebar / nav-command entry to the globe always opens with no market
     // preselected (palette market commands deep-select via openGlobe instead).
-    if (next === "globe") setGlobeMarketId(null);
+    // Keep the address bar in sync so the globe is shareable and back/forward
+    // works: entering pushes ?view=globe; leaving clears the globe query.
+    if (next === "globe") {
+      setGlobeMarketId(null);
+      setGlobeKey((k) => k + 1);
+      writeGlobeUrl(null, "push");
+    } else if (leavingGlobe) {
+      clearGlobeUrl("push");
+    }
   }
 
-  /** Open the Global Markets Globe, optionally preselecting a market dossier. */
-  function openGlobe(marketId: string | null) {
+  /**
+   * Open the Global Markets Globe, optionally preselecting a market dossier.
+   * `push` (default) records a history entry so the dossier is shareable and
+   * back/forward works; the initial deep-link entry passes `push: false` since
+   * the loaded URL is already the current history entry (the panel normalises
+   * it on mount).
+   */
+  function openGlobe(marketId: string | null, opts: { push?: boolean } = {}) {
     setSavedDetailId(null);
     setSavedReportDetailId(null);
     setDemoNotice(null);
     setGlobeMarketId(marketId);
     setGlobeKey((k) => k + 1);
     setView("globe");
+    if (opts.push ?? true) writeGlobeUrl(marketId, "push");
   }
 
   /** Open the Strategy Library on a specific model page (command palette). */
@@ -1142,7 +1212,7 @@ export default function HomePage() {
       id: `globe-${m.id}`,
       group: "Global Markets Globe",
       title: `Open ${m.country} Market Dossier`,
-      keywords: `globe market dossier ${m.country} ${m.region} ${m.subregion} ${m.currency} ${m.exchange} ${m.indices
+      keywords: `globe market dossier ${GLOBE_MARKET_ALIASES[m.id] ?? m.id} ${m.country} ${m.region} ${m.subregion} ${m.currency} ${m.exchange} ${m.indices
         .map((i) => `${i.name} ${i.ticker}`)
         .join(" ")}`,
       run: () => openGlobe(m.id),
@@ -1209,6 +1279,7 @@ export default function HomePage() {
             onOpenLibraryPage={openLibraryPage}
             onOpenPaperPage={openPaperPage}
             onOpenDisasterPage={openDisasterPage}
+            onOpenGlobe={openGlobe}
           />
         )}
 

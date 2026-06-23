@@ -3,7 +3,11 @@
     "allow": [
       "Bash(./venv/Scripts/python.exe -c ' *)",
       "Read(//c/c/quantlab/backend/**)",
-      "Read(//c/c/quantlab/docs/**)"
+      "Read(//c/c/quantlab/docs/**)",
+      "Bash(ls docs/)",
+      "Bash(ls frontend/README.md)",
+      "Bash(npx tsc *)",
+      "Bash(echo \"EXIT: $?\")"
     ]
   }
 }

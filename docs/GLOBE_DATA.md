@@ -157,6 +157,41 @@ GLOBE_NEWS_ENABLED=false      # default; static sample headlines
   fallback") chip and the copy *"Sample headlines — live news integration
   planned."* No "live/latest/breaking/current/real-time news" wording.
 
+## Dossier permalinks & cross-module routing (Phase 20.6)
+
+QuantLab is a single-page workspace switcher, so country dossiers are shareable
+via **query-param permalinks** on the app page:
+
+- Canonical: **`/?view=globe&market=<id>`** (e.g. `…&market=tw`).
+- Convenience: **`/globe?market=<id>`** — a thin route that redirects to the
+  canonical form. `/globe` (no market) opens the globe with no selection.
+
+Behaviour:
+
+- Opening a permalink selects the market and opens its dossier automatically,
+  in **both** backend-available and bundled-static-fallback modes (selection is
+  by id, independent of the data source).
+- An **unknown market id** does not crash: the globe falls back to the default
+  market (United States), shows *"Market not found; showing default market."*,
+  and the address bar is normalised to the default.
+- Clicking a marker / market row updates the URL (`?market=<id>`) without a page
+  reload, and **browser back/forward** walks the visited dossiers.
+- If a search/region filter hides the selected market, the dossier closes and
+  `?market` is dropped (documented, stable behaviour).
+- The dossier header has a **Share** button that copies the permalink
+  (`navigator.clipboard`, with a manual-copy fallback message). It works in
+  fallback mode too, since the URL doesn't depend on the backend.
+- The Command Palette exposes **Open `<Country>` Market Dossier** for all 15
+  markets (US/Taiwan/Japan/Germany/India searchable by abbreviation), plus
+  **Open Global Markets Globe** / **Explore Global Markets**. The Dashboard globe
+  card links straight to the US/Taiwan/Japan/Germany/India dossiers.
+- Dossier **QuantLab Actions** (Backtest this index, Open Scanner, View FX Lab,
+  View Rates Lab) route into the existing modules. Market-specific pre-filling of
+  those modules is **future work** (the links open the module, not a prefilled
+  state). No fake or broken routes are created.
+
+This is navigation/UX only — no new data, no live data, no investment advice.
+
 ## Honesty guardrails
 
 - Not real-time. Not a live market terminal. No complete global macro coverage.
