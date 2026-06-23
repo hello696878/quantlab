@@ -13,7 +13,9 @@
       "Bash(git checkout *)",
       "Bash(./venv/Scripts/python.exe -m pytest -q)",
       "Read(//c/c/quantlab/frontend/src/app/**)",
-      "Read(//c/c/quantlab/frontend/src/components/**)"
+      "Read(//c/c/quantlab/frontend/src/components/**)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -c \"import pydantic, sys; print\\('pydantic', pydantic.VERSION\\); print\\('yaml?', __import__\\('importlib'\\).util.find_spec\\('yaml'\\) is not None\\)\")",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -c \"import yaml; print\\('PyYAML', yaml.__version__\\)\")"
     ]
   }
 }
