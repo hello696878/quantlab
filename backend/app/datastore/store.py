@@ -55,6 +55,33 @@ REQUIRED_COLUMNS: list[str] = [
 _PRICE_COLUMNS = ["open", "high", "low", "close"]
 _STRING_COLUMNS = ["root_symbol", "contract_symbol", "source", "timezone"]
 
+# Canonical continuous-series schema (built by app.datastore.futures_continuous).
+CONTINUOUS_COLUMNS: list[str] = [
+    "timestamp",
+    "root_symbol",
+    "active_contract",
+    "open_raw",
+    "high_raw",
+    "low_raw",
+    "close_raw",
+    "volume",
+    "open_interest",
+    "adjustment_method",
+    "adjustment_factor",
+    "open_adjusted",
+    "high_adjusted",
+    "low_adjusted",
+    "close_adjusted",
+    "roll_flag",
+    "roll_reason",
+]
+
+_CONTINUOUS_FLOAT_COLUMNS = [
+    "open_raw", "high_raw", "low_raw", "close_raw",
+    "open_adjusted", "high_adjusted", "low_adjusted", "close_adjusted",
+    "open_interest", "adjustment_factor",
+]
+
 # Storage namespace layout (raw kept separate from continuous/adjusted).
 RAW_SUBDIR = "raw"
 CONTINUOUS_SUBDIR = "continuous"
@@ -189,6 +216,36 @@ def raw_data_version_hash(df: pd.DataFrame) -> str:
 
 
 # --------------------------------------------------------------------------- #
+# Continuous-series normalization
+# --------------------------------------------------------------------------- #
+
+
+def finalize_continuous(df: pd.DataFrame) -> pd.DataFrame:
+    """Validate column presence and canonicalize dtypes/order of a continuous frame.
+
+    Used by both the continuous builder and the store reader so a written frame
+    round-trips to an identical normalized frame.
+    """
+    missing = [c for c in CONTINUOUS_COLUMNS if c not in df.columns]
+    if missing:
+        raise RawSchemaError(f"continuous frame missing required columns: {missing}")
+    out = df.loc[:, CONTINUOUS_COLUMNS].copy()
+    out["timestamp"] = pd.to_datetime(out["timestamp"], utc=True)
+    for col in _CONTINUOUS_FLOAT_COLUMNS:
+        out[col] = pd.to_numeric(out[col]).astype("float64")
+    out["volume"] = pd.to_numeric(out["volume"]).astype("int64")
+    roll_flag = out["roll_flag"]
+    if roll_flag.dtype == object:
+        roll_flag = roll_flag.map(lambda v: str(v).strip().lower() in ("true", "1", "yes"))
+    out["roll_flag"] = roll_flag.astype(bool)
+    for col in ["root_symbol", "active_contract", "adjustment_method"]:
+        out[col] = out[col].astype(str)
+    out["roll_reason"] = out["roll_reason"].fillna("").astype(str)
+    out = out.sort_values("timestamp", kind="stable").reset_index(drop=True)
+    return out[CONTINUOUS_COLUMNS]
+
+
+# --------------------------------------------------------------------------- #
 # Storage
 # --------------------------------------------------------------------------- #
 
@@ -285,4 +342,56 @@ class RawFuturesStore:
         raise FileNotFoundError(
             f"no raw data for root={root_symbol!r} contract={contract_symbol!r} "
             f"source={source!r} under {self.raw_root()}"
+        )
+
+    # --- continuous series (separate namespace from raw) ---
+
+    def continuous_path(
+        self,
+        root_symbol: str,
+        source: str,
+        adjustment_method: str,
+        fmt: str | None = None,
+    ) -> Path:
+        ext = fmt or self.storage_format
+        return (
+            self.continuous_root()
+            / _slug(source)
+            / _slug(root_symbol)
+            / f"{_slug(adjustment_method)}.{ext}"
+        )
+
+    def write_continuous(self, df: pd.DataFrame, source: str) -> Path:
+        """Validate + write one continuous series (single root, single method)."""
+        fin = finalize_continuous(df)
+        roots = fin["root_symbol"].unique()
+        methods = fin["adjustment_method"].unique()
+        if len(roots) != 1 or len(methods) != 1:
+            raise RawSchemaError(
+                "continuous frame must contain exactly one root_symbol and one "
+                f"adjustment_method (got roots={list(roots)}, methods={list(methods)})"
+            )
+        path = self.continuous_path(roots[0], source, methods[0])
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if self.storage_format == "parquet":
+            fin.to_parquet(path, index=False)
+        else:
+            out = fin.copy()
+            out["timestamp"] = out["timestamp"].map(lambda t: t.isoformat())
+            out.to_csv(path, index=False, lineterminator="\n")
+        return path
+
+    def read_continuous(
+        self, root_symbol: str, source: str, adjustment_method: str
+    ) -> pd.DataFrame:
+        """Read one continuous series back, normalized via :func:`finalize_continuous`."""
+        candidates = (self.storage_format, "parquet" if self.storage_format == "csv" else "csv")
+        for fmt in candidates:
+            path = self.continuous_path(root_symbol, source, adjustment_method, fmt=fmt)
+            if path.exists():
+                raw = pd.read_parquet(path) if fmt == "parquet" else pd.read_csv(path)
+                return finalize_continuous(raw)
+        raise FileNotFoundError(
+            f"no continuous data for root={root_symbol!r} source={source!r} "
+            f"adjustment={adjustment_method!r} under {self.continuous_root()}"
         )

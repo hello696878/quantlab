@@ -39,13 +39,15 @@ from __future__ import annotations
 
 import bisect
 import datetime
+import hashlib
+import json
 import logging
 from dataclasses import dataclass, field
 
 import pandas as pd
 
-from app.instruments import FuturesSpec, RollMethod, parse_contract_symbol
-from app.datastore.store import validate_raw_futures
+from app.instruments import AdjustmentMethod, FuturesSpec, RollMethod, parse_contract_symbol
+from app.datastore.store import finalize_continuous, raw_data_version_hash, validate_raw_futures
 
 logger = logging.getLogger(__name__)
 
@@ -272,3 +274,209 @@ def _resolve_pair(
         f"roll {front.symbol}->{nxt.symbol}: could not resolve — primary rule did not "
         f"confirm and fallback found no session on/before the target date"
     )
+
+
+# --------------------------------------------------------------------------- #
+# Continuous series builder (stitching + ratio / Panama adjustment)
+# --------------------------------------------------------------------------- #
+
+
+class ContinuousBuildError(ValueError):
+    """Raised when a continuous series cannot be built from the inputs."""
+
+
+_ADJUSTMENT_ALIASES = {
+    "ratio": AdjustmentMethod.RATIO,
+    "panama": AdjustmentMethod.PANAMA,
+    "none": AdjustmentMethod.NONE,
+}
+
+_OHLC_ADJUSTED = [
+    ("open_adjusted", "open_raw"),
+    ("high_adjusted", "high_raw"),
+    ("low_adjusted", "low_raw"),
+    ("close_adjusted", "close_raw"),
+]
+
+
+def _coerce_adjustment(method: object) -> AdjustmentMethod:
+    if isinstance(method, AdjustmentMethod):
+        return method
+    try:
+        return _ADJUSTMENT_ALIASES[str(method).strip().lower()]
+    except KeyError:
+        raise ContinuousBuildError(
+            f"unsupported adjustment_method {method!r}; expected one of "
+            f"{sorted(_ADJUSTMENT_ALIASES)}"
+        ) from None
+
+
+def build_continuous_futures(
+    raw_df: pd.DataFrame,
+    spec: FuturesSpec,
+    adjustment_method: str | AdjustmentMethod = "ratio",
+) -> pd.DataFrame:
+    """Build one deterministic continuous daily series for ``spec``.
+
+    ``*_raw`` columns are always the held active contract's genuine unadjusted
+    prices.  ``*_adjusted`` are back-adjusted so the newest segment is unchanged
+    (ratio factor 1.0 / Panama offset 0.0) and older segments are corrected at
+    each roll seam using the latest common prior session, so that:
+
+    * ratio: ``pct_change(close_adjusted)`` at the seam is the new contract's own
+      held return (not the raw inter-contract gap);
+    * Panama: ``diff(close_adjusted)`` at the seam is the new contract's own point
+      change (no phantom PnL).
+
+    Does not mutate ``raw_df``.  Raises :class:`ContinuousBuildError` on an
+    unsupported method or a roll seam with no common prior session.
+    """
+    method = _coerce_adjustment(adjustment_method)
+    norm = validate_raw_futures(raw_df)  # returns a copy; input never mutated
+    events = compute_roll_schedule(norm, spec)
+
+    if events:
+        ordered = [events[0].from_contract] + [ev.to_contract for ev in events]
+    else:
+        ordered = sorted(norm["contract_symbol"].unique())  # single in-cycle contract
+    roll_dates = [ev.roll_date for ev in events]
+    n = len(ordered)
+
+    by_contract: dict[str, pd.DataFrame] = {}
+    close_map: dict[str, dict[datetime.date, float]] = {}
+    date_set: dict[str, set[datetime.date]] = {}
+    for sym in ordered:
+        g = norm[norm["contract_symbol"] == sym].copy()
+        g["date"] = g["timestamp"].dt.date
+        g = g.sort_values("date", kind="stable")
+        by_contract[sym] = g
+        close_map[sym] = dict(zip(g["date"], g["close"]))
+        date_set[sym] = set(g["date"])
+
+    # Per-roll seam factors from the latest common prior session (both closes).
+    ratios = [1.0] * len(events)
+    gaps = [0.0] * len(events)
+    for k, ev in enumerate(events):
+        old, new, r = ev.from_contract, ev.to_contract, ev.roll_date
+        if r not in date_set[new]:
+            raise ContinuousBuildError(
+                f"roll {old}->{new}: new contract has no bar on roll_date {r}"
+            )
+        commons = [d for d in date_set[old] if d < r and d in date_set[new]]
+        if not commons:
+            raise ContinuousBuildError(
+                f"roll {old}->{new}: no common prior session before {r} with both "
+                f"closes; cannot compute the adjustment"
+            )
+        ov = max(commons)
+        old_close = float(close_map[old][ov])
+        new_close = float(close_map[new][ov])
+        ratios[k] = new_close / old_close
+        gaps[k] = new_close - old_close
+
+    # Back-adjust: newest segment untouched, cumulate over later rolls.
+    cum_ratio = [1.0] * n
+    cum_offset = [0.0] * n
+    for i in range(n - 2, -1, -1):
+        cum_ratio[i] = cum_ratio[i + 1] * ratios[i]
+        cum_offset[i] = cum_offset[i + 1] + gaps[i]
+
+    blocks: list[pd.DataFrame] = []
+    for i, sym in enumerate(ordered):
+        g = by_contract[sym]
+        d = g["date"]
+        sel = pd.Series(True, index=g.index)
+        if i > 0:
+            sel &= d >= roll_dates[i - 1]
+        if i < n - 1:
+            sel &= d < roll_dates[i]
+        seg = g[sel].reset_index(drop=True)
+
+        if method is AdjustmentMethod.RATIO:
+            factor = cum_ratio[i]
+        elif method is AdjustmentMethod.PANAMA:
+            factor = cum_offset[i]
+        else:
+            factor = 1.0
+
+        block = pd.DataFrame(
+            {
+                "timestamp": seg["timestamp"],
+                "root_symbol": spec.root_symbol,
+                "active_contract": sym,
+                "open_raw": seg["open"],
+                "high_raw": seg["high"],
+                "low_raw": seg["low"],
+                "close_raw": seg["close"],
+                "volume": seg["volume"],
+                "open_interest": seg["open_interest"],
+                "adjustment_method": method.value,
+                "adjustment_factor": factor,
+            }
+        )
+        for adj_col, raw_col in _OHLC_ADJUSTED:
+            if method is AdjustmentMethod.PANAMA:
+                block[adj_col] = block[raw_col] + factor
+            elif method is AdjustmentMethod.RATIO:
+                block[adj_col] = block[raw_col] * factor
+            else:
+                block[adj_col] = block[raw_col]
+        block["roll_flag"] = False
+        block["roll_reason"] = ""
+        blocks.append(block)
+
+    out = pd.concat(blocks, ignore_index=True)
+    out["_date"] = out["timestamp"].dt.date
+    for ev in events:
+        mask = (out["_date"] == ev.roll_date) & (out["active_contract"] == ev.to_contract)
+        out.loc[mask, "roll_flag"] = True
+        out.loc[mask, "roll_reason"] = ev.roll_reason
+    out = out.drop(columns="_date")
+    return finalize_continuous(out)
+
+
+# --------------------------------------------------------------------------- #
+# Reproducibility — continuous build config hash
+# --------------------------------------------------------------------------- #
+
+_CONTINUOUS_CONFIG_SCHEMA = "continuous_futures_config_v1"
+
+
+def _canonical_json(config: dict) -> str:
+    """Compact, key-sorted, deterministic JSON (mirrors app.reproducibility)."""
+    return json.dumps(config, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+
+
+def continuous_config_hash(
+    raw_df: pd.DataFrame,
+    spec: FuturesSpec,
+    adjustment_method: str | AdjustmentMethod = "ratio",
+) -> str:
+    """Deterministic SHA-256 over the result-changing continuous-build inputs.
+
+    Depends on the raw data version, the adjustment method, and every spec field
+    that affects stitching (root, cycle months, expiry rule, and the full
+    rollover config).  Because roll events are a deterministic function of these
+    inputs, the hash already changes whenever the computed schedule would.
+
+    Stable when equivalent raw rows are reordered (the raw hash sorts first) and
+    when the same config is rebuilt.  Never depends on outputs.
+    """
+    method = _coerce_adjustment(adjustment_method)
+    cfg = spec.rollover
+    config = {
+        "schema_version": _CONTINUOUS_CONFIG_SCHEMA,
+        "raw_data_version": raw_data_version_hash(raw_df),
+        "root_symbol": spec.root_symbol,
+        "adjustment_method": method.value,
+        "contract_months": list(spec.contract_months),
+        "expiry_rule": spec.expiry_rule.value,
+        "rollover": {
+            "primary_rule": cfg.primary_rule.value,
+            "fallback_rule": cfg.fallback_rule.value,
+            "fallback_days_before_expiry": cfg.fallback_days_before_expiry,
+            "confirmation_days": cfg.confirmation_days,
+            "lookback_window_days": cfg.lookback_window_days,
+        },
+    }
+    return hashlib.sha256(_canonical_json(config).encode("utf-8")).hexdigest()

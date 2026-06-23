@@ -158,3 +158,70 @@ def test_hash_changes_when_data_changes():
     changed = make_raw_df()
     changed.loc[0, "volume"] = changed.loc[0, "volume"] + 1  # value change, stays coherent
     assert raw_data_version_hash(df) != raw_data_version_hash(changed)
+
+
+# --- continuous storage (Commit 4) ---
+
+
+def _raw_two_contract_df() -> pd.DataFrame:
+    """Two ES contracts at different levels, OI missing -> fallback roll (for the builder)."""
+    dates = list(pd.date_range("2024-02-26", "2024-03-15", freq="B"))
+    rows = []
+    for symbol, base, expiry in [("ESH24", 5000, "2024-03-15"), ("ESM24", 5100, "2024-06-21")]:
+        for i, d in enumerate(dates):
+            open_ = base + i
+            close = open_ + 1.0
+            rows.append(
+                {
+                    "timestamp": pd.Timestamp(d),
+                    "open": open_,
+                    "high": max(open_, close) + 1.0,
+                    "low": min(open_, close) - 1.0,
+                    "close": close,
+                    "volume": 1000,
+                    "open_interest": None,
+                    "root_symbol": "ES",
+                    "contract_symbol": symbol,
+                    "expiry": pd.Timestamp(expiry),
+                    "source": "synthetic",
+                    "timezone": "America/Chicago",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_continuous_path_separate_from_raw(tmp_path):
+    store = RawFuturesStore(tmp_path)
+    cp = store.continuous_path("ES", "synthetic", "ratio")
+    rp = store.raw_path("ES", "ESH24", "synthetic")
+    assert "continuous" in cp.parts and "raw" not in cp.parts
+    assert "raw" in rp.parts and "continuous" not in rp.parts
+    assert store.continuous_root() != store.raw_root()
+
+
+def test_continuous_write_and_read_back(tmp_path):
+    from app.datastore.store import finalize_continuous
+    from app.datastore.futures_continuous import build_continuous_futures
+    from app.instruments import get_instrument
+
+    built = build_continuous_futures(_raw_two_contract_df(), get_instrument("ES"), "ratio")
+    store = RawFuturesStore(tmp_path)
+    path = store.write_continuous(built, "synthetic")
+    assert path.exists()
+    back = store.read_continuous("ES", "synthetic", "ratio")
+    pd.testing.assert_frame_equal(back, finalize_continuous(built))
+
+
+def test_ratio_and_panama_outputs_do_not_overwrite(tmp_path):
+    from app.datastore.futures_continuous import build_continuous_futures
+    from app.instruments import get_instrument
+
+    spec = get_instrument("ES")
+    raw = _raw_two_contract_df()
+    store = RawFuturesStore(tmp_path)
+    ratio_path = store.write_continuous(build_continuous_futures(raw, spec, "ratio"), "synthetic")
+    panama_path = store.write_continuous(build_continuous_futures(raw, spec, "panama"), "synthetic")
+    assert ratio_path != panama_path
+    assert ratio_path.exists() and panama_path.exists()
+    assert (store.read_continuous("ES", "synthetic", "ratio")["adjustment_method"] == "ratio").all()
+    assert (store.read_continuous("ES", "synthetic", "panama")["adjustment_method"] == "panama").all()

@@ -398,3 +398,37 @@ Responsibilities: parquet read/write for raw + adjusted series; sqlite metadata
 ES continuous series (both adjustments) reproducible from raw by config hash,
 roll dates persisted and explained, zero phantom-return artifacts at the seam,
 all tests green under `backend\venv\Scripts\python.exe -m pytest`.
+
+---
+
+## Appendix B — Phase 1 progress (futures data pipeline)
+
+Built incrementally on the `phase1-futures` branch (worktree-isolated from
+concurrent work on `main`). Modules live under `backend/app/instruments/` and
+`backend/app/datastore/` (the `datastore` name avoids colliding with the
+existing `app.data` provider module).
+
+| Commit | Scope |
+|---|---|
+| **Commit 1** | ES futures instrument spec layer (`instruments/`: validated, immutable `FuturesSpec`; CME month codes; third-Friday expiry; registry). |
+| **Commit 2** | Raw futures schema validation + local storage (`datastore/store.py`: `validate_raw_futures`, `raw_data_version_hash`, `RawFuturesStore`, CSV fallback when parquet is unavailable). |
+| **Commit 2.5** | Local data/artifact `.gitignore` safety (block raw/processed data, models, experiment outputs from being committed). |
+| **Commit 3** | Futures roll calendar (`datastore/futures_continuous.py`: `compute_roll_schedule` — volume/OI primary rule, days-before-expiry fallback, deterministic, no silent assumptions). |
+| **Commit 4** | Continuous futures stitching with ratio and Panama adjustment (`build_continuous_futures`); raw vs adjusted stored separately. |
+| **Commit 5** | Reproducibility hash (`continuous_config_hash`) + end-to-end synthetic validation; this progress note. |
+
+### B.1 Adjustment warnings (must be surfaced in any report)
+
+- **Prefer ratio-adjusted** series for return-based analysis: it preserves the
+  held contract's percentage returns across roll seams.
+- **Panama-adjusted** series preserves *point changes* but **distorts percentage
+  returns** — use it for level/spread study and charting, not return P&L.
+- **Back-adjusted historical price levels are fictitious** (both methods); never
+  apply absolute-price logic to them.
+- **Raw held-contract prices (`*_raw`) remain the source of truth for execution**
+  — adjusted columns are derived and must never be treated as traded prices.
+
+> Scope note: Phase 1 is the futures *data pipeline* only — no ML, no backtest
+> integration, no AI report, no CFD/options, no real-data download. Data is
+> synthetic/illustrative; correctness (lookahead-free, seam-correct, reproducible)
+> comes before breadth.
