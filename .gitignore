@@ -16,3 +16,31 @@ frontend/tsconfig.tsbuildinfo
 
 # Local SQLite database — lives on disk, never commit it
 backend/data/*.db
+
+# ── Local QuantLab data & ML artifacts (Commit 2.5) ─────────────────────────
+# Raw/processed market data, model artifacts, and experiment outputs live on
+# disk and must never be committed. Source, configs/ (e.g. configs/instruments/
+# *.yaml), docs/, notebooks, and example fixtures (e.g. sample_prices.csv) are
+# intentionally NOT ignored. Keep ML source in app/ modules (e.g. ml/models.py),
+# not a top-level models/ package, so these dir rules don't shadow code.
+
+# Local data directories (market data written by app.datastore, etc.)
+data/
+
+# Model artifacts & experiment outputs
+artifacts/
+models/
+checkpoints/
+mlruns/
+
+# Generated/experiment reports (curated docs/ and example reports stay tracked)
+reports/generated/
+reports/experiments/
+
+# Data / model artifact files (any location)
+*.parquet
+*.feather
+*.h5
+*.hdf5
+*.pkl
+*.joblib
