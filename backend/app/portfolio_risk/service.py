@@ -47,7 +47,9 @@ def _covariance(vols: np.ndarray, series: np.ndarray) -> tuple[np.ndarray, np.nd
     """Sample correlation from the series; covariance tied to stated annual vols."""
     n = len(vols)
     if series.shape[1] >= 2:
-        corr = np.corrcoef(series)
+        # np.corrcoef collapses a single-asset series to a 0-d scalar; force an
+        # (n, n) matrix so fill_diagonal / outer stay well-shaped for n == 1.
+        corr = np.asarray(np.corrcoef(series), dtype=float).reshape(n, n)
     else:  # pragma: no cover - request validator enforces >= 12 observations
         corr = np.eye(n)
     corr = np.clip(np.nan_to_num(corr, nan=0.0), -1.0, 1.0)

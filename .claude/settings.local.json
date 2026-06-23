@@ -30,7 +30,9 @@
       "Bash(echo \"TSC_EXIT: $?\")",
       "Bash(git worktree *)",
       "Read(//c/quantlab-phase1-futures/backend/**)",
-      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py -v)"
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py -v)",
+      "Read(//c/quantlab-phase1-futures/**)",
+      "Bash(ls docs/AI_QUANT_ARCHITECTURE.md)"
     ]
   }
 }

@@ -254,3 +254,21 @@ def test_no_nan_or_infinity_in_response(client):
 def test_analyze_without_stress_scenario():
     out = _analyze(stress_scenario=None)
     assert out.stress_result is None
+
+
+def test_single_asset_portfolio_does_not_crash():
+    # A 1-asset portfolio is valid input (min_length=1); np.corrcoef collapses a
+    # single series to a 0-d scalar, so the covariance path must stay well-shaped.
+    one = sample_assets()[0].model_dump()
+    one["weight"] = 1.0
+    out = analyze_portfolio(PortfolioAnalysisRequest(assets=[one], stress_scenario=None))
+    assert out.correlation_matrix == [[1.0]]
+    assert len(out.covariance_matrix) == 1 and len(out.covariance_matrix[0]) == 1
+    assert math.isclose(out.volatility, one["volatility"], rel_tol=1e-9)
+    assert math.isclose(
+        sum(c.percent_contribution for c in out.asset_risk_contributions),
+        1.0,
+        abs_tol=1e-9,
+    )
+    assert out.historical_cvar >= out.historical_var
+    assert math.isclose(sum(out.normalized_weights.values()), 1.0, abs_tol=1e-9)
