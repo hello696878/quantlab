@@ -220,13 +220,51 @@ interface MarketDossierProps {
   onClose: () => void;
 }
 
+/**
+ * Build a short plain-text summary of the dossier for the "Copy summary" button.
+ * Honest by construction: states static-by-default, the per-section source
+ * status, that news is sample-only, and the not-investment-advice disclaimer.
+ */
+function buildDossierSummary(market: Market): string {
+  const macro =
+    market.macroSource === "fred_live"
+      ? "Partial FRED-enriched (US); other fields static sample"
+      : market.macroSource === "fred_unavailable"
+        ? "FRED unavailable; static sample"
+        : "Static sample";
+  const hasDelayed =
+    market.indicesSource === "delayed_quote" || market.fxSource === "delayed_quote";
+  const quoteUnavail =
+    market.indicesSource === "quote_unavailable" ||
+    market.fxSource === "quote_unavailable";
+  const quotes = hasDelayed
+    ? "Delayed quotes on supported rows (not real-time); others static sample"
+    : quoteUnavail
+      ? "Quotes unavailable; static sample"
+      : "Static sample";
+  const news =
+    market.newsSource === "news_unavailable"
+      ? "Unavailable; static sample headlines"
+      : "Sample headlines only; live news integration planned";
+  return [
+    `QuantLab Globe Dossier — ${market.country}`,
+    `Region: ${market.region}`,
+    `Primary index: ${market.indices[0]?.name ?? "n/a"}`,
+    `Macro: ${macro}`,
+    `Index/FX: ${quotes}`,
+    `News: ${news}`,
+    "Data status: Static sample by default; optional adapters may enrich supported fields.",
+    "Educational use only. Not investment advice.",
+  ].join("\n");
+}
+
 export default function MarketDossier({ market, onNav, onClose }: MarketDossierProps) {
   // Share-link copy feedback. Reset whenever the dossier switches markets.
   const [copyMsg, setCopyMsg] = useState<{ ok: boolean; text: string } | null>(null);
   useEffect(() => setCopyMsg(null), [market.id]);
 
   async function handleShare() {
-    const url = buildGlobeShareUrl(market.id);
+    const url = buildGlobeShareUrl({ market: market.id });
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
@@ -239,6 +277,23 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
     setCopyMsg({
       ok: false,
       text: `Could not copy automatically. Copy the URL from your browser: ${url}`,
+    });
+  }
+
+  async function handleCopySummary() {
+    const summary = buildDossierSummary(market);
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(summary);
+        setCopyMsg({ ok: true, text: "Copied dossier summary." });
+        return;
+      }
+    } catch {
+      // fall through to the manual-copy message
+    }
+    setCopyMsg({
+      ok: false,
+      text: "Could not copy automatically. Copy the text manually.",
     });
   }
 
@@ -303,7 +358,7 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
               </p>
             </div>
           </div>
-          <div className="flex flex-shrink-0 items-center gap-1.5">
+          <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1.5">
             <button
               type="button"
               onClick={handleShare}
@@ -312,6 +367,15 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
               style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
             >
               🔗 Share
+            </button>
+            <button
+              type="button"
+              onClick={handleCopySummary}
+              aria-label={`Copy a plain-text summary of the ${market.country} dossier`}
+              className="rounded-md px-2 py-1 text-xs font-semibold transition-colors"
+              style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
+            >
+              📋 Copy summary
             </button>
             <button
               type="button"

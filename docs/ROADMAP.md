@@ -1423,6 +1423,36 @@ single-asset Backtest + Strategy Comparison:
   `frontend/README.md`. **Navigation/UX only — not real-time, not a live
   terminal, not investment advice.**
 
+### Phase 20.7 — Globe Guided Tour & Presentation Mode v1 ✅
+
+- **Frontend-only UX / demo layer.** No backend changes, no new data, no live
+  data/news, no scraping, no external APIs, no API keys, no investment advice;
+  finance/backtest/AFML/scanner logic untouched.
+- New `lib/globe/tours.ts`: four typed, static, **educational** curated walks
+  (`global`, `asia`, `macro`, `risk`) over the existing 15 sample markets — each
+  step selects a market and shows a teaching explanation (not a recommendation,
+  not a signal, not live data).
+- URL state extended (`lib/globe/permalink.ts` now carries `{market, tour,
+  presentation}`): `?tour=<id>` deep-links a tour (matching step or first step;
+  unknown tour → "Tour not found; showing Globe normally."), `?presentation=1`
+  opens a screenshot-friendly layout (rail + region tape hidden; source-status
+  badges and static-data notice stay visible). `/globe` redirect preserves
+  market/tour/presentation. Next/Previous push history; back/forward stays in
+  sync; Exit drops `?tour` and keeps `?market`. No router loops.
+- Guided Tour card: title, step counter, current market, explanation, optional
+  educational "things to explore" hints, Previous/Next/Exit/Copy-dossier-link,
+  and progress dots. Presentation toggle in the globe overlay; honest
+  "Educational tour only…" disclaimer.
+- Dossier **Copy summary** button copies a short plain-text summary (market,
+  region, primary index, per-section source status, static-data line, not-advice
+  disclaimer). Command Palette: *Start Global/Asia/Macro Regime/Risk Lens Tour*,
+  *Open Globe Presentation Mode*, *Open Taiwan/US Globe Presentation* (existing
+  commands kept). Dashboard globe card: *Guided Global Tour* / *Asia Tour*.
+- Works in both backend and bundled-fallback modes. `npx tsc --noEmit` clean; no
+  frontend build run (per instructions). Docs: `GLOBE_DATA.md`, `DEMO_SCRIPT.md`,
+  `PROJECT_OVERVIEW.md`, `README.md`, `frontend/README.md`. **Educational
+  navigation/UX only — no live data, no signals, not investment advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

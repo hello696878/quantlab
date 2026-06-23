@@ -291,6 +291,20 @@ Return to the Command Center's **Platform Direction** panel (or open
   `/globe?market=tw` — Taiwan still selects from bundled fallback data. In
   Ctrl/Cmd+K search "US/Taiwan/Japan/Germany/India Market Dossier"; the Dashboard
   globe card links straight to those dossiers. Navigation/UX only — no new data.
+  **Guided tours & presentation mode (20.7):** open **`/globe?tour=global`** — the
+  Guided Tour card opens, the first market (US) is selected, and its dossier
+  opens. Click **Next/Previous** to walk the curated steps (the URL updates,
+  e.g. `?market=tw&tour=global`); **Exit tour** drops `?tour` but keeps the
+  market. Try `/globe?market=tw&tour=asia` (Taiwan's step in the Asia tour) and
+  `/globe?tour=bad-tour` (friendly "Tour not found; showing Globe normally."
+  notice, no crash). Toggle **⤢ Present** (or open `/globe?market=tw&presentation=1`)
+  for a screenshot-friendly layout — rail/tape hidden, globe + dossier + tour card
+  emphasised, source badges and static-data notice still visible. Click the
+  dossier **📋 Copy summary** → "Copied dossier summary." (text includes the
+  market name and the static-data / not-investment-advice disclaimer). Stop the
+  backend and reopen `/globe?tour=asia` — the tour still works on bundled
+  fallback. Palette: *Start Global/Asia/Macro Regime/Risk Lens Tour*, *Open Globe
+  Presentation Mode*. Educational tours only — no live data, no signals, not advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

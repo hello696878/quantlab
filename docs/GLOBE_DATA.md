@@ -192,6 +192,42 @@ Behaviour:
 
 This is navigation/UX only — no new data, no live data, no investment advice.
 
+## Guided tours & presentation mode (Phase 20.7)
+
+Frontend-only, static, educational additions on top of the Globe — **no new data
+source and no live-data claim**.
+
+- **Guided tours.** Four curated, ordered walks across the existing sample
+  markets, defined in `lib/globe/tours.ts`: `global`, `asia`, `macro`, `risk`.
+  Each step selects a market and shows a short *educational* explanation (a
+  teaching lens — **not a recommendation, not a signal, not live data**). The
+  Guided Tour card has Previous / Next / Exit tour / Copy dossier link controls,
+  a step counter, and progress dots.
+- **Query params.** In addition to `market`, the Globe now reads:
+  - `tour` — `/globe?tour=global` (or `/?view=globe&tour=asia`). Combine with a
+    market: `/globe?market=tw&tour=asia` selects Taiwan's step if it is in the
+    tour, otherwise the first step. An **unknown tour id** shows a friendly
+    *"Tour not found; showing Globe normally."* notice and the Globe still works.
+  - `presentation` — `/globe?presentation=1` (or `&presentation=1`) opens a
+    screenshot-friendly layout that hides the rail and region tape and
+    emphasises the globe + dossier + tour card. **Source-status badges and the
+    static-data notice stay visible.** Toggling is also available from the globe
+    overlay; it updates the URL without a reload.
+  - Next/Previous push history entries (`/globe?market=jp&tour=asia`), and
+    browser back/forward keeps the tour step and market in sync. Exiting a tour
+    drops `?tour` but keeps the current `?market`.
+- **Copy dossier summary.** The dossier has a **Copy summary** button that copies
+  a short plain-text summary — market name, region, primary index, per-section
+  source status (macro / index-FX / news), a static-data line, and an
+  "Educational use only. Not investment advice." disclaimer.
+- **Entry points.** The Command Palette adds *Start Global/Asia/Macro Regime/Risk
+  Lens Tour*, *Open Globe Presentation Mode*, and *Open Taiwan/US Globe
+  Presentation*; the Dashboard globe card adds *Guided Global Tour* / *Asia Tour*
+  buttons alongside the country links. Existing globe/dossier commands are kept.
+
+Tours and presentation mode work the same whether the backend is available or the
+frontend is on bundled static fallback — they are pure UI over the existing data.
+
 ## Honesty guardrails
 
 - Not real-time. Not a live market terminal. No complete global macro coverage.

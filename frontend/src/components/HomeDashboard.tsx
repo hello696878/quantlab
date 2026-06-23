@@ -371,6 +371,8 @@ interface HomeDashboardProps {
   onOpenDisasterPage?: (slug: string | null) => void;
   /** Open the Globe, optionally deep-selecting a country dossier (permalink). */
   onOpenGlobe?: (marketId: string | null) => void;
+  /** Start a guided Globe tour by id (Phase 20.7). */
+  onStartTour?: (tourId: string) => void;
 }
 
 export default function HomeDashboard({
@@ -382,10 +384,14 @@ export default function HomeDashboard({
   onOpenPaperPage,
   onOpenDisasterPage,
   onOpenGlobe,
+  onStartTour,
 }: HomeDashboardProps) {
   /** Open a country dossier permalink (falls back to the globe index). */
   const openMarket = (id: string) =>
     onOpenGlobe ? onOpenGlobe(id) : onNav("globe");
+  /** Start a guided Globe tour (falls back to the globe index). */
+  const startTour = (id: string) =>
+    onStartTour ? onStartTour(id) : onNav("globe");
   const [backtests, setBacktests] = useState<SavedBacktestSummary[]>([]);
   const [reports, setReports] = useState<SavedReportSummary[]>([]);
   const [online, setOnline] = useState<boolean | null>(null);
@@ -1062,6 +1068,26 @@ export default function HomeDashboard({
                   {q.label}
                 </button>
               ))}
+            </div>
+            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => startTour("global")}
+                aria-label="Start the guided global markets tour"
+                className="rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors"
+                style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
+              >
+                ▶ Guided Global Tour
+              </button>
+              <button
+                type="button"
+                onClick={() => startTour("asia")}
+                aria-label="Start the Asia markets tour"
+                className="rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors"
+                style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
+              >
+                ▶ Asia Tour
+              </button>
             </div>
             <button
               type="button"

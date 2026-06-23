@@ -30,7 +30,12 @@ import {
   type MarketRegion,
 } from "@/lib/globe/markets";
 import { fetchGlobeMarkets } from "@/lib/globe/remote";
-import { resolveMarketId, writeGlobeUrl } from "@/lib/globe/permalink";
+import {
+  buildGlobeShareUrl,
+  resolveMarketId,
+  writeGlobeUrl,
+} from "@/lib/globe/permalink";
+import { getTour, resolveTour } from "@/lib/globe/tours";
 import { fmtPct } from "@/lib/format";
 
 /** Stable list of bundled market ids — used to validate permalink ids. */
@@ -113,42 +118,141 @@ function MarketListItem({
 
 interface GlobeLabPanelProps {
   initialMarketId?: string | null;
+  /** Optional guided-tour id to start on entry (Phase 20.7). */
+  initialTour?: string | null;
+  /** Open in presentation mode (Phase 20.7). */
+  initialPresentation?: boolean;
   onNav: (view: View) => void;
 }
 
-export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelProps) {
+export default function GlobeLabPanel({
+  initialMarketId,
+  initialTour,
+  initialPresentation,
+  onNav,
+}: GlobeLabPanelProps) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const mode = useContainerMode(wrapRef);
 
   const [region, setRegion] = useState<MarketRegion | "All">("All");
   const [query, setQuery] = useState("");
-  // Resolve the deep-linked market id: a known id selects it; an unknown id
-  // falls back to the default market and flags `marketNotFound` for the notice.
-  const requested = resolveMarketId(initialMarketId, MARKET_IDS);
-  const [selectedId, setSelectedId] = useState<string | null>(requested.id);
-  const [marketNotFound, setMarketNotFound] = useState<boolean>(requested.notFound);
+
+  // Resolve the deep-linked tour + market id together:
+  //  - valid tour  → select the matching step's market, else the first step.
+  //  - no tour      → resolve the market id (known id selects it; unknown id
+  //                   falls back to the default market and flags `marketNotFound`).
+  //  - invalid tour → no tour, flag `tourNotFound` for a friendly notice.
+  const requestedTour = resolveTour(initialTour);
+  const initialActiveTour = requestedTour.id ? getTour(requestedTour.id) : null;
+  let initSelected: string | null;
+  let initMarketNotFound = false;
+  if (initialActiveTour) {
+    const idx = initialMarketId
+      ? initialActiveTour.steps.findIndex(
+          (s) => s.marketId.toLowerCase() === initialMarketId.toLowerCase(),
+        )
+      : -1;
+    initSelected =
+      idx >= 0
+        ? initialActiveTour.steps[idx].marketId
+        : initialActiveTour.steps[0].marketId;
+  } else {
+    const r = resolveMarketId(initialMarketId, MARKET_IDS);
+    initSelected = r.id;
+    initMarketNotFound = r.notFound;
+  }
+
+  const [selectedId, setSelectedId] = useState<string | null>(initSelected);
+  const [marketNotFound, setMarketNotFound] = useState<boolean>(initMarketNotFound);
+  const [tourId, setTourId] = useState<string | null>(requestedTour.id);
+  const [tourNotFound, setTourNotFound] = useState<boolean>(requestedTour.notFound);
+  const [presentation, setPresentation] = useState<boolean>(initialPresentation ?? false);
+  const [tourCopyMsg, setTourCopyMsg] = useState<string | null>(null);
   const [autoRotate, setAutoRotate] = useState(true);
   const [resetSignal, setResetSignal] = useState(0);
 
-  /** User-initiated selection: opens a dossier and records a history entry. */
+  /**
+   * User-initiated selection. During a tour: selecting another tour step jumps
+   * to it; selecting an off-tour market leaves the curated tour. Always records
+   * a history entry so browser back/forward walks the visited dossiers.
+   */
   function selectMarket(id: string) {
-    setSelectedId(id);
     setMarketNotFound(false);
-    writeGlobeUrl(id, "push");
+    const tour = getTour(tourId);
+    if (tour && !tour.steps.some((s) => s.marketId === id)) {
+      // Off-tour click → leave the tour.
+      setTourId(null);
+      setSelectedId(id);
+      writeGlobeUrl({ market: id, tour: null, presentation }, "push");
+      return;
+    }
+    setSelectedId(id);
+    writeGlobeUrl({ market: id, tour: tourId, presentation }, "push");
   }
-  /** User-initiated clear: closes the dossier and records a history entry. */
+  /** User-initiated clear: closes the dossier and exits any active tour. */
   function clearSelection() {
     setSelectedId(null);
     setMarketNotFound(false);
-    writeGlobeUrl(null, "push");
+    setTourId(null);
+    writeGlobeUrl({ market: null, tour: null, presentation }, "push");
   }
 
-  // Normalise the address bar to the resolved selection on entry (covers
-  // deep-link entry, the invalid-id fallback, and programmatic jumps from the
+  /** Advance to the next tour step (selecting its market). */
+  function tourNext() {
+    const tour = getTour(tourId);
+    if (!tour) return;
+    const step = tour.steps.findIndex((s) => s.marketId === selectedId);
+    const idx = step < 0 ? 0 : Math.min(step + 1, tour.steps.length - 1);
+    const id = tour.steps[idx].marketId;
+    setSelectedId(id);
+    setMarketNotFound(false);
+    writeGlobeUrl({ market: id, tour: tour.id, presentation }, "push");
+  }
+  /** Go back to the previous tour step. */
+  function tourPrev() {
+    const tour = getTour(tourId);
+    if (!tour) return;
+    const step = tour.steps.findIndex((s) => s.marketId === selectedId);
+    const idx = step < 0 ? 0 : Math.max(step - 1, 0);
+    const id = tour.steps[idx].marketId;
+    setSelectedId(id);
+    setMarketNotFound(false);
+    writeGlobeUrl({ market: id, tour: tour.id, presentation }, "push");
+  }
+  /** Exit the tour but keep the current market selected (drops ?tour). */
+  function exitTour() {
+    setTourId(null);
+    setTourNotFound(false);
+    setTourCopyMsg(null);
+    writeGlobeUrl({ market: selectedId, tour: null, presentation }, "push");
+  }
+  /** Toggle presentation mode (replace — a view mode, not a navigation). */
+  function togglePresentation() {
+    const next = !presentation;
+    setPresentation(next);
+    writeGlobeUrl({ market: selectedId, tour: tourId, presentation: next }, "replace");
+  }
+  /** Copy a shareable link to the current tour step. */
+  async function copyTourLink() {
+    const url = buildGlobeShareUrl({ market: selectedId, tour: tourId, presentation });
+    try {
+      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        setTourCopyMsg("Copied tour link.");
+        return;
+      }
+    } catch {
+      // fall through to manual-copy message
+    }
+    setTourCopyMsg(`Could not copy automatically. Copy this link: ${url}`);
+  }
+
+  // Normalise the address bar to the resolved state on entry (covers deep-link
+  // entry, the invalid-id/tour fallback, and programmatic jumps from the
   // palette/dashboard). Replace keeps a single history entry; in-panel clicks
-  // push their own entries so browser back/forward walks the visited dossiers.
+  // push their own entries so browser back/forward walks the visited steps.
   useEffect(() => {
-    writeGlobeUrl(selectedId, "replace");
+    writeGlobeUrl({ market: selectedId, tour: tourId, presentation }, "replace");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -227,27 +331,41 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
 
   // If a filter/search hides the currently selected market, clear the dossier
   // and drop ?market from the URL (replace — this isn't a user navigation).
+  // Skipped during a guided tour so the curated step stays selected.
   useEffect(() => {
-    if (!selectedId || !filtering) return;
+    if (tourId || !selectedId || !filtering) return;
     if (!filterMarkets(region, query, markets).some((market) => market.id === selectedId)) {
       setSelectedId(null);
       setMarketNotFound(false);
-      writeGlobeUrl(null, "replace");
+      writeGlobeUrl({ market: null, tour: null, presentation }, "replace");
     }
-  }, [filtering, query, region, selectedId, markets]);
+  }, [filtering, query, region, selectedId, markets, tourId, presentation]);
 
   function resetView() {
     setRegion("All");
     setQuery("");
     setSelectedId(null);
     setMarketNotFound(false);
+    setTourId(null);
     setResetSignal((k) => k + 1);
-    writeGlobeUrl(null, "push");
+    writeGlobeUrl({ market: null, tour: null, presentation }, "push");
   }
 
+  // ── Tour derivation (single source of truth = tourId + selectedId) ──────
+  const activeTour = getTour(tourId);
+  const tourStepIndex = activeTour
+    ? activeTour.steps.findIndex((s) => s.marketId === selectedId)
+    : -1;
+  const tourStep =
+    activeTour && tourStepIndex >= 0 ? activeTour.steps[tourStepIndex] : null;
+
   // ── Layout grids per container mode ─────────────────────────────────────
-  const gridStyle: React.CSSProperties =
-    mode === "wide"
+  // Presentation mode hides the rail/tape and emphasises globe + dossier.
+  const gridStyle: React.CSSProperties = presentation
+    ? mode === "narrow"
+      ? { display: "grid", gap: 16, gridTemplateColumns: "minmax(0,1fr)", gridTemplateAreas: '"globe" "dossier"' }
+      : { display: "grid", gap: 16, gridTemplateColumns: "minmax(0,1fr) 400px", gridTemplateAreas: '"globe dossier"', alignItems: "start" }
+    : mode === "wide"
       ? { display: "grid", gap: 16, gridTemplateColumns: "248px minmax(0,1fr) 372px", gridTemplateAreas: '"rail globe dossier"', alignItems: "start" }
       : mode === "mid"
         ? { display: "grid", gap: 16, gridTemplateColumns: "minmax(0,1fr) 360px", gridTemplateAreas: '"globe globe" "rail dossier"', alignItems: "start" }
@@ -256,6 +374,8 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
   const globeHeight = mode === "wide" ? 560 : mode === "mid" ? 460 : 360;
   const dossierScroll: React.CSSProperties =
     mode === "narrow" ? {} : { maxHeight: "calc(100vh - 7rem)", overflowY: "auto" };
+  // In presentation mode the rail (and its filters) are hidden, so show all markers.
+  const effectiveActiveIds = presentation ? null : activeIds;
 
   return (
     <div ref={wrapRef} className="space-y-4">
@@ -274,20 +394,32 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
                 v1.1
               </span>
             </div>
-            <p className="mt-1 max-w-2xl text-sm" style={{ color: "var(--text-mut)" }}>
-              A mission-control map of {markets.length} sample markets backed by a
-              typed country-dossier data layer. Drag the globe to rotate, click a
-              marker — or a row in the rail — to open a country dossier with
-              indices, macro vitals, currency &amp; rates, market structure,
-              sample headlines, and QuantLab cross-links.
-            </p>
+            {!presentation && (
+              <p className="mt-1 max-w-2xl text-sm" style={{ color: "var(--text-mut)" }}>
+                A mission-control map of {markets.length} sample markets backed by a
+                typed country-dossier data layer. Drag the globe to rotate, click a
+                marker — or a row in the rail — to open a country dossier with
+                indices, macro vitals, currency &amp; rates, market structure,
+                sample headlines, and QuantLab cross-links.
+              </p>
+            )}
           </div>
-          <span
-            className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
-            style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
-          >
-            Static core + optional adapters
-          </span>
+          <div className="flex flex-wrap items-center gap-1.5">
+            {presentation && (
+              <span
+                className="mono rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
+              >
+                Presentation mode
+              </span>
+            )}
+            <span
+              className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+              style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+            >
+              Static core + optional adapters
+            </span>
+          </div>
         </div>
         <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
           {dataNotice} Not real-time market data and not investment advice.
@@ -383,9 +515,148 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
         </div>
       )}
 
+      {/* Friendly fallback when a permalink names an unknown tour id. */}
+      {tourNotFound && (
+        <div
+          role="status"
+          className="flex items-start gap-2.5 rounded-xl p-3 text-sm"
+          style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+        >
+          <span aria-hidden className="mt-0.5 flex-shrink-0">⚠</span>
+          <p className="flex-1">Tour not found; showing Globe normally.</p>
+          <button
+            type="button"
+            onClick={() => setTourNotFound(false)}
+            aria-label="Dismiss tour-not-found notice"
+            className="flex-shrink-0 px-1"
+            style={{ color: "var(--text-mut)" }}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* ── Guided Tour card (Phase 20.7) ─────────────────────────────────── */}
+      {activeTour && (
+        <div
+          className="card panel-glow p-4"
+          role="region"
+          aria-label={`Guided tour: ${activeTour.title}`}
+        >
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="mono rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                  style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
+                >
+                  Guided tour
+                </span>
+                <h2 className="text-sm font-bold" style={{ color: "var(--text-hi)" }}>
+                  {activeTour.title}
+                </h2>
+                <span className="mono text-[11px]" style={{ color: "var(--text-mut)" }} aria-live="polite">
+                  Step {Math.max(tourStepIndex, 0) + 1} / {activeTour.steps.length}
+                </span>
+              </div>
+              {tourStep && (
+                <>
+                  <p className="mt-1.5 text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                    {selected?.flag} {tourStep.title}
+                  </p>
+                  <p className="mono text-[10px] uppercase tracking-wide" style={{ color: "var(--accent-text)" }}>
+                    {tourStep.focus}
+                  </p>
+                  <p className="mt-1 max-w-2xl text-xs" style={{ color: "var(--text-mut)" }}>
+                    {tourStep.explanation}
+                  </p>
+                  {tourStep.suggestedActions && tourStep.suggestedActions.length > 0 && (
+                    <ul className="mt-1.5 flex flex-wrap gap-1.5">
+                      {tourStep.suggestedActions.map((a) => (
+                        <li
+                          key={a}
+                          className="rounded-md px-2 py-0.5 text-[10px]"
+                          style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-mut)" }}
+                        >
+                          {a}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </>
+              )}
+            </div>
+            <div className="flex items-center gap-1" aria-hidden>
+              {activeTour.steps.map((s, i) => (
+                <span
+                  key={s.marketId}
+                  className="h-1.5 rounded-full transition-all"
+                  style={{
+                    width: i === tourStepIndex ? 16 : 6,
+                    background: i === tourStepIndex ? "var(--accent)" : "var(--line)",
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-3 flex flex-wrap items-center gap-1.5">
+            <button
+              type="button"
+              onClick={tourPrev}
+              disabled={tourStepIndex <= 0}
+              aria-label="Previous tour step"
+              className="rounded-md px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-40"
+              style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
+            >
+              ← Previous
+            </button>
+            <button
+              type="button"
+              onClick={tourNext}
+              disabled={tourStepIndex >= activeTour.steps.length - 1}
+              aria-label="Next tour step"
+              className="rounded-md px-3 py-1 text-xs font-semibold transition-colors disabled:opacity-40"
+              style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
+            >
+              Next →
+            </button>
+            <button
+              type="button"
+              onClick={copyTourLink}
+              aria-label="Copy a shareable link to this tour step"
+              className="rounded-md px-3 py-1 text-xs font-semibold transition-colors"
+              style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
+            >
+              🔗 Copy dossier link
+            </button>
+            <button
+              type="button"
+              onClick={exitTour}
+              aria-label="Exit guided tour"
+              className="rounded-md px-3 py-1 text-xs font-medium transition-colors"
+              style={{ border: "1px solid var(--line)", color: "var(--text-mut)" }}
+            >
+              Exit tour
+            </button>
+          </div>
+          {tourCopyMsg && (
+            <p role="status" aria-live="polite" className="mt-2 break-words text-[11px]" style={{ color: "var(--accent-text)" }}>
+              {tourCopyMsg}
+            </p>
+          )}
+          <p className="mt-2 text-[10px]" style={{ color: "var(--text-faint)" }}>
+            Educational tour only. Data is static by default; optional macro and
+            delayed quote adapters may enrich supported fields when configured. Not
+            investment advice.
+          </p>
+        </div>
+      )}
+
       {/* ── Mission-control grid ──────────────────────────────────────────── */}
       <div style={gridStyle}>
-        {/* Left rail */}
+        {/* Left rail (hidden in presentation mode) */}
+        {!presentation && (
         <div style={{ gridArea: "rail" }} className="card flex flex-col gap-3 p-3">
           <input
             type="search"
@@ -465,13 +736,14 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
             </div>
           </div>
         </div>
+        )}
 
         {/* Center globe */}
         <div style={{ gridArea: "globe" }} className="card relative overflow-hidden p-0">
           <div style={{ height: globeHeight }}>
             <DataGlobe
               markets={markets}
-              activeIds={activeIds}
+              activeIds={effectiveActiveIds}
               arcs={MARKET_ARCS}
               selectedId={selectedId}
               onSelect={selectMarket}
@@ -506,6 +778,20 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
                 style={{ background: "rgba(8,11,20,0.6)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
               >
                 Reset
+              </button>
+              <button
+                type="button"
+                onClick={togglePresentation}
+                aria-pressed={presentation}
+                aria-label={presentation ? "Exit presentation mode" : "Enter presentation mode"}
+                className="rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                style={{
+                  background: presentation ? "var(--accent-softer)" : "rgba(8,11,20,0.6)",
+                  border: `1px solid ${presentation ? "var(--accent-line)" : "var(--line)"}`,
+                  color: presentation ? "var(--accent-text)" : "var(--text-hi)",
+                }}
+              >
+                {presentation ? "⤢ Exit present" : "⤢ Present"}
               </button>
             </div>
           </div>
@@ -544,7 +830,8 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
         </div>
       </div>
 
-      {/* ── Bottom region tape ────────────────────────────────────────────── */}
+      {/* ── Bottom region tape (hidden in presentation mode) ──────────────── */}
+      {!presentation && (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {rollups.map((r) => (
           <button
@@ -586,6 +873,7 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

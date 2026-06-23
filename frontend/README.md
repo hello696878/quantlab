@@ -105,6 +105,15 @@ an unknown id falls back to the default market (US) with a "Market not found"
 notice. Marker/list clicks update the URL (no reload), browser back/forward walks
 visited dossiers, and the dossier header has a Share button that copies the link.
 
+Guided tours and presentation mode (Phase 20.7) add two more query params:
+`tour` (`/globe?tour=global|asia|macro|risk`, an educational curated walk with
+Previous/Next/Exit controls; an unknown tour shows a friendly notice) and
+`presentation` (`/globe?presentation=1`, a screenshot-friendly layout that keeps
+the source-status badges and static-data notice visible). The dossier also has a
+**Copy summary** button (plain-text, honest source-status summary). Tours and
+presentation mode are frontend-only and work in both backend and fallback modes —
+static, educational, not investment advice.
+
 Default backend base URL: `http://localhost:8000`
 
 ---

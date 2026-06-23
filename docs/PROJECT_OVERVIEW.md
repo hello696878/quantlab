@@ -240,6 +240,17 @@ the US/Taiwan/Japan/Germany/India dossiers. Dossier actions (Backtest this index
 Open Scanner, View FX Lab, View Rates Lab) route into existing modules;
 market-specific pre-filling is future work. Navigation/UX only — no new data.
 
+**Guided tours & presentation mode (20.7):** `lib/globe/tours.ts` defines four
+static, educational curated walks (`global`, `asia`, `macro`, `risk`) over the
+existing sample markets. The Globe reads two more query params — `tour`
+(`/globe?tour=asia`, deep-links the tour and its first/matching step; an unknown
+tour shows a "Tour not found" notice) and `presentation` (`/globe?presentation=1`,
+a screenshot-friendly layout that hides the rail/tape but keeps the source badges
+and static-data notice). The Guided Tour card has Previous/Next/Exit/Copy-link
+controls + progress dots; the dossier gains a **Copy summary** button (plain-text,
+honest source-status summary). All frontend-only, static, educational — no new
+data, no live claim, not investment advice.
+
 ### `src/app/page.tsx`
 
 Root page component. Owns all strategy and research parameter state. Renders `BacktestForm` on the left and the appropriate result panels on the right. Tabs switch between Backtest and each research tool.

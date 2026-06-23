@@ -21,24 +21,39 @@ export const GLOBE_VIEW = "globe";
 /** Default market when a permalink omits or names an unknown market. */
 export const DEFAULT_MARKET_ID = "us";
 
+/**
+ * The full globe URL state. Beyond the selected `market` (Phase 20.6), Phase 20.7
+ * adds an optional guided `tour` and a `presentation` flag. All are optional and
+ * independent — a plain market permalink stays `?view=globe&market=<id>`.
+ */
+export interface GlobeUrlState {
+  market: string | null;
+  tour?: string | null;
+  presentation?: boolean;
+}
+
 /** Build the canonical query string for a globe permalink (no origin/path). */
-export function buildGlobeQuery(marketId: string | null | undefined): string {
-  return marketId
-    ? `?view=${GLOBE_VIEW}&market=${encodeURIComponent(marketId)}`
-    : `?view=${GLOBE_VIEW}`;
+export function buildGlobeQuery(state: GlobeUrlState): string {
+  const params = new URLSearchParams();
+  params.set("view", GLOBE_VIEW);
+  if (state.market) params.set("market", state.market);
+  if (state.tour) params.set("tour", state.tour);
+  if (state.presentation) params.set("presentation", "1");
+  return `?${params.toString()}`;
 }
 
 /**
- * Update the address bar to the globe permalink for `marketId` without a page
+ * Update the address bar to the globe permalink for `state` without a page
  * reload. `push` adds a history entry (user navigations); `replace` rewrites the
- * current entry (normalisation, deep-link entry, invalid-id fallback).
+ * current entry (normalisation, deep-link entry, invalid-id fallback, mode
+ * toggles).
  */
 export function writeGlobeUrl(
-  marketId: string | null | undefined,
+  state: GlobeUrlState,
   mode: "push" | "replace",
 ): void {
   if (typeof window === "undefined") return;
-  const url = window.location.pathname + buildGlobeQuery(marketId);
+  const url = window.location.pathname + buildGlobeQuery(state);
   if (mode === "push") window.history.pushState(null, "", url);
   else window.history.replaceState(null, "", url);
 }
@@ -51,21 +66,31 @@ export function clearGlobeUrl(mode: "push" | "replace"): void {
   else window.history.replaceState(null, "", url);
 }
 
-/** Absolute, shareable permalink for a market dossier (origin + path + query). */
-export function buildGlobeShareUrl(marketId: string): string {
-  if (typeof window === "undefined") return buildGlobeQuery(marketId);
+/** Absolute, shareable permalink for a globe state (origin + path + query). */
+export function buildGlobeShareUrl(state: GlobeUrlState): string {
+  if (typeof window === "undefined") return buildGlobeQuery(state);
   const { origin, pathname } = window.location;
-  return `${origin}${pathname}${buildGlobeQuery(marketId)}`;
+  return `${origin}${pathname}${buildGlobeQuery(state)}`;
 }
 
 /** Read the current globe URL state from `window.location.search`. */
-export function readGlobeParams(): { isGlobe: boolean; market: string | null } {
-  if (typeof window === "undefined") return { isGlobe: false, market: null };
+export function readGlobeParams(): {
+  isGlobe: boolean;
+  market: string | null;
+  tour: string | null;
+  presentation: boolean;
+} {
+  if (typeof window === "undefined") {
+    return { isGlobe: false, market: null, tour: null, presentation: false };
+  }
   const params = new URLSearchParams(window.location.search);
   const market = params.get("market");
+  const tour = params.get("tour");
   return {
     isGlobe: params.get("view") === GLOBE_VIEW,
     market: market && market.trim() ? market.trim() : null,
+    tour: tour && tour.trim() ? tour.trim() : null,
+    presentation: params.get("presentation") === "1",
   };
 }
 

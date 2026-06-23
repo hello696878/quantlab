@@ -51,6 +51,7 @@ import {
   readGlobeParams,
   writeGlobeUrl,
 } from "@/lib/globe/permalink";
+import { TOUR_LIST } from "@/lib/globe/tours";
 import { buildBenchmarkChartSeries } from "@/lib/benchmarkCharts";
 import ShortSellingWarning from "@/components/ShortSellingWarning";
 import ExportReportButton from "@/components/ExportReportButton";
@@ -555,8 +556,11 @@ export default function HomePage() {
   const [finmlTab, setFinmlTab] = useState<"cusum" | "labeling" | "uniqueness" | "purgedcv" | "seqboot" | "fracdiff" | "education">("cusum");
   const [finmlKey, setFinmlKey] = useState(0);
 
-  // Global Markets Globe: which market to preselect (deep-linked from palette).
+  // Global Markets Globe: which market to preselect (deep-linked from palette),
+  // plus optional guided-tour id and presentation-mode flag (Phase 20.7).
   const [globeMarketId, setGlobeMarketId] = useState<string | null>(null);
+  const [globeTour, setGlobeTour] = useState<string | null>(null);
+  const [globePresentation, setGlobePresentation] = useState(false);
   const [globeKey, setGlobeKey] = useState(0);
 
   // Saved reports (Report Gallery) state
@@ -624,7 +628,13 @@ export default function HomePage() {
   //    leaving the globe) always matches the address bar — no stale selection.
   useEffect(() => {
     const entry = readGlobeParams();
-    if (entry.isGlobe) openGlobe(entry.market, { push: false });
+    if (entry.isGlobe) {
+      openGlobe(entry.market, {
+        tour: entry.tour,
+        presentation: entry.presentation,
+        push: false,
+      });
+    }
 
     function onPopState() {
       const here = readGlobeParams();
@@ -633,10 +643,14 @@ export default function HomePage() {
         setSavedReportDetailId(null);
         setDemoNotice(null);
         setGlobeMarketId(here.market);
+        setGlobeTour(here.tour);
+        setGlobePresentation(here.presentation);
         setGlobeKey((k) => k + 1);
         setView("globe");
       } else {
         setGlobeMarketId(null);
+        setGlobeTour(null);
+        setGlobePresentation(false);
         setView("home");
       }
     }
@@ -699,28 +713,41 @@ export default function HomePage() {
     // works: entering pushes ?view=globe; leaving clears the globe query.
     if (next === "globe") {
       setGlobeMarketId(null);
+      setGlobeTour(null);
+      setGlobePresentation(false);
       setGlobeKey((k) => k + 1);
-      writeGlobeUrl(null, "push");
+      writeGlobeUrl({ market: null }, "push");
     } else if (leavingGlobe) {
       clearGlobeUrl("push");
     }
   }
 
   /**
-   * Open the Global Markets Globe, optionally preselecting a market dossier.
-   * `push` (default) records a history entry so the dossier is shareable and
+   * Open the Global Markets Globe, optionally preselecting a market dossier and
+   * starting a guided tour / presentation mode (Phase 20.7).
+   * `push` (default) records a history entry so the state is shareable and
    * back/forward works; the initial deep-link entry passes `push: false` since
    * the loaded URL is already the current history entry (the panel normalises
-   * it on mount).
+   * it on mount). When a tour is requested the panel resolves the actual market
+   * (first step or the matching step) and normalises the URL on mount.
    */
-  function openGlobe(marketId: string | null, opts: { push?: boolean } = {}) {
+  function openGlobe(
+    marketId: string | null,
+    opts: { tour?: string | null; presentation?: boolean; push?: boolean } = {},
+  ) {
+    const tour = opts.tour ?? null;
+    const presentation = opts.presentation ?? false;
     setSavedDetailId(null);
     setSavedReportDetailId(null);
     setDemoNotice(null);
     setGlobeMarketId(marketId);
+    setGlobeTour(tour);
+    setGlobePresentation(presentation);
     setGlobeKey((k) => k + 1);
     setView("globe");
-    if (opts.push ?? true) writeGlobeUrl(marketId, "push");
+    if (opts.push ?? true) {
+      writeGlobeUrl({ market: marketId, tour, presentation }, "push");
+    }
   }
 
   /** Open the Strategy Library on a specific model page (command palette). */
@@ -1217,6 +1244,44 @@ export default function HomePage() {
         .join(" ")}`,
       run: () => openGlobe(m.id),
     })),
+    ...TOUR_LIST.map((t) => ({
+      id: `globe-tour-${t.id}`,
+      group: "Global Markets Globe",
+      title:
+        t.id === "global"
+          ? "Start Global Markets Tour"
+          : t.id === "asia"
+            ? "Start Asia Markets Tour"
+            : t.id === "macro"
+              ? "Start Macro Regime Tour"
+              : "Start Risk Lens Tour",
+      keywords: `globe guided tour presentation walkthrough demo ${t.id} ${t.title} ${t.subtitle} ${t.steps
+        .map((s) => s.marketId)
+        .join(" ")}`,
+      run: () => openGlobe(null, { tour: t.id }),
+    })),
+    {
+      id: "globe-presentation",
+      group: "Global Markets Globe",
+      title: "Open Globe Presentation Mode",
+      keywords:
+        "globe presentation mode demo screenshot clean fullscreen kiosk briefing present",
+      run: () => openGlobe(null, { presentation: true }),
+    },
+    {
+      id: "globe-presentation-tw",
+      group: "Global Markets Globe",
+      title: "Open Taiwan Globe Presentation",
+      keywords: "globe presentation taiwan tw dossier demo screenshot present",
+      run: () => openGlobe("tw", { presentation: true }),
+    },
+    {
+      id: "globe-presentation-us",
+      group: "Global Markets Globe",
+      title: "Open US Globe Presentation",
+      keywords: "globe presentation us usa united states dossier demo screenshot present",
+      run: () => openGlobe("us", { presentation: true }),
+    },
     // Report actions are only offered when they actually work (a result exists).
     ...(result
       ? [
@@ -1280,6 +1345,7 @@ export default function HomePage() {
             onOpenPaperPage={openPaperPage}
             onOpenDisasterPage={openDisasterPage}
             onOpenGlobe={openGlobe}
+            onStartTour={(tour) => openGlobe(null, { tour })}
           />
         )}
 
@@ -1288,6 +1354,8 @@ export default function HomePage() {
           <GlobeLabPanel
             key={globeKey}
             initialMarketId={globeMarketId}
+            initialTour={globeTour}
+            initialPresentation={globePresentation}
             onNav={handleNav}
           />
         )}
