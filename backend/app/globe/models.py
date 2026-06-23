@@ -25,7 +25,11 @@ SourceState = Literal[
     "fred_unavailable",
     "delayed_quote",
     "quote_unavailable",
+    "news_unavailable",
 ]
+# Per-headline provenance. v1 only ever produces static_sample (live news is not
+# implemented); news_unavailable / planned describe future / fallback states.
+NewsSource = Literal["static_sample", "news_unavailable", "planned"]
 DataStatus = Literal[
     "static_sample",
     "mixed_static_and_fred",
@@ -104,6 +108,11 @@ class MarketHeadline(GlobeModel):
     title: NonEmptyStr
     sentiment: Sentiment
     is_sample: bool = True
+    # Provenance + optional future-provider metadata (all sample in v1).
+    source: NewsSource = "static_sample"
+    as_of_date: Optional[NonEmptyStr] = None
+    url: Optional[NonEmptyStr] = None
+    note: Optional[NonEmptyStr] = None
 
 
 class MarketLink(GlobeModel):

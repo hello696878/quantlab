@@ -24,6 +24,7 @@ from app.globe.quotes import (
     enrich_market_with_quotes,
     resolve_quote_provider,
 )
+from app.globe.news import GlobeNewsConfig, enrich_market_with_news
 from app.globe.models import (
     MarketDossier,
     MarketsResponse,
@@ -65,6 +66,8 @@ __all__ = [
     "clear_quote_cache",
     "enrich_market_with_quotes",
     "resolve_quote_provider",
+    "GlobeNewsConfig",
+    "enrich_market_with_news",
     "NewsSentimentAdapter",
     "PLANNED_ADAPTERS",
 ]

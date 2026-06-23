@@ -19,11 +19,11 @@ import {
   type MacroSourceState,
   type Market,
   type MarketRegion,
+  type NewsSourceState,
   type QuoteSourceState,
   type Sentiment,
 } from "@/lib/globe/markets";
 
-type StaticSampleStatus = "static_sample";
 type DataStatus =
   | "static_sample"
   | "mixed_static_and_fred"
@@ -43,6 +43,11 @@ const QUOTE_STATES: readonly QuoteSourceState[] = [
   "static_sample",
   "delayed_quote",
   "quote_unavailable",
+  "planned",
+];
+const NEWS_STATES: readonly NewsSourceState[] = [
+  "static_sample",
+  "news_unavailable",
   "planned",
 ];
 const DATA_STATUSES: readonly DataStatus[] = [
@@ -106,7 +111,11 @@ interface DtoStructure {
 interface DtoHeadline {
   title: string;
   sentiment: Sentiment;
-  is_sample: true;
+  is_sample: boolean;
+  source?: NewsSourceState;
+  as_of_date?: string | null;
+  url?: string | null;
+  note?: string | null;
 }
 interface DtoLink {
   label: string;
@@ -116,7 +125,7 @@ interface DtoSourceStatus {
   macro: MacroSourceState;
   indices: QuoteSourceState;
   fx: QuoteSourceState;
-  news: StaticSampleStatus;
+  news: NewsSourceState;
 }
 interface DtoDossier {
   id: string;
@@ -206,7 +215,7 @@ function hasValidSources(value: unknown): value is DtoSourceStatus {
   const macroOk = MACRO_STATES.includes(value.macro as MacroSourceState);
   const indicesOk = QUOTE_STATES.includes(value.indices as QuoteSourceState);
   const fxOk = QUOTE_STATES.includes(value.fx as QuoteSourceState);
-  const newsOk = value.news === "static_sample";
+  const newsOk = NEWS_STATES.includes(value.news as NewsSourceState);
   return macroOk && indicesOk && fxOk && newsOk;
 }
 
@@ -377,6 +386,7 @@ function mapDossier(d: DtoDossier): Market {
     fxSource: d.source_status.fx,
     indicesAsOf: d.indices[0]?.as_of_date ?? null,
     fxAsOf: d.fx[0]?.as_of_date ?? null,
+    newsSource: d.source_status.news,
   };
 }
 

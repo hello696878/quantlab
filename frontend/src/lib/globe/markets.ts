@@ -105,6 +105,13 @@ export type QuoteSourceState =
   | "quote_unavailable"
   | "planned";
 
+/**
+ * Provenance of a market's news/headlines block. v1 is always static sample
+ * (no live news); `news_unavailable` is the honest fallback when an unconfigured
+ * news provider is requested.
+ */
+export type NewsSourceState = "static_sample" | "news_unavailable" | "planned";
+
 export interface Market {
   id: string;
   country: string;
@@ -139,6 +146,8 @@ export interface Market {
   indicesAsOf?: string | null;
   /** Delayed FX "as of" date when enriched. */
   fxAsOf?: string | null;
+  /** News-block provenance (undefined → static sample). */
+  newsSource?: NewsSourceState;
 }
 
 // ---------------------------------------------------------------------------

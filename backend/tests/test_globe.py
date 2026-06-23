@@ -20,6 +20,7 @@ from app.globe.adapters import (
     clear_fred_cache,
 )
 from app.globe.models import MarketIndex
+from app.globe.news import GlobeNewsConfig
 from app.globe.quotes import (
     DelayedIndexQuoteAdapter,
     FxQuoteAdapter,
@@ -76,6 +77,8 @@ def _fred_defaults(monkeypatch):
         "GLOBE_QUOTES_PROVIDER",
         "GLOBE_QUOTES_TIMEOUT_SECONDS",
         "GLOBE_QUOTES_CACHE_TTL_SECONDS",
+        "GLOBE_NEWS_ENABLED",
+        "GLOBE_NEWS_PROVIDER",
     ):
         monkeypatch.delenv(key, raising=False)
     clear_fred_cache()
@@ -896,3 +899,117 @@ def test_fred_endpoint_success_has_field_provenance_and_no_api_key(
     }
     assert secret not in response.text
     assert "api_key" not in response.text
+
+
+# ---------------------------------------------------------------------------
+# News sentiment layer (Phase 20.5) — static sample scaffold, no live news
+# ---------------------------------------------------------------------------
+
+_SENTIMENTS = {"Bullish", "Bearish", "Neutral"}
+_FORBIDDEN_NEWS_WORDS = ("latest", "breaking", "today")
+
+
+def test_news_config_disabled_by_default():
+    cfg = GlobeNewsConfig.from_env({})
+    assert cfg.enabled is False
+    assert cfg.provider == "static"
+
+
+def test_every_market_has_headlines(client):
+    for m in client.get("/globe/markets").json()["markets"]:
+        assert len(m["headlines"]) >= 1
+
+
+def test_every_headline_has_title_and_valid_sentiment(client):
+    for m in client.get("/globe/markets").json()["markets"]:
+        for h in m["headlines"]:
+            assert isinstance(h["title"], str) and h["title"].strip()
+            assert h["sentiment"] in _SENTIMENTS
+
+
+def test_every_headline_is_sample_and_static_source(client):
+    for m in client.get("/globe/markets").json()["markets"]:
+        for h in m["headlines"]:
+            assert h["is_sample"] is True
+            assert h["source"] == "static_sample"
+
+
+def test_news_source_status_static_by_default(client):
+    for m in client.get("/globe/markets").json()["markets"]:
+        assert m["source_status"]["news"] == "static_sample"
+
+
+def test_headlines_avoid_live_news_wording(client):
+    for m in client.get("/globe/markets").json()["markets"]:
+        for h in m["headlines"]:
+            lowered = h["title"].lower()
+            for word in _FORBIDDEN_NEWS_WORDS:
+                assert word not in lowered, f"{m['id']} headline uses '{word}': {h['title']}"
+
+
+def test_invalid_sentiment_rejected():
+    from pydantic import ValidationError as _VE
+
+    from app.globe.models import MarketHeadline
+
+    with pytest.raises(_VE):
+        MarketHeadline(title="Sample headline", sentiment="VeryBullish")
+
+
+def test_news_disabled_does_not_change_static(client):
+    # Default config (news disabled) → all static, no news warning.
+    body = client.get("/globe/markets").json()
+    assert all(m["source_status"]["news"] == "static_sample" for m in body["markets"])
+    assert not any("news adapter" in w.lower() for w in body["warnings"])
+
+
+def test_news_enabled_static_provider_stays_static():
+    markets, _status, _notice, warnings = build_markets_response(
+        news_config=GlobeNewsConfig(enabled=True, provider="static")
+    )
+    assert all(m.source_status.news == "static_sample" for m in markets)
+    assert not any("news adapter" in w.lower() for w in warnings)
+
+
+def test_news_enabled_unknown_provider_falls_back_with_warning():
+    markets, _status, _notice, warnings = build_markets_response(
+        news_config=GlobeNewsConfig(enabled=True, provider="live")
+    )
+    us = next(m for m in markets if m.id == "us")
+    assert us.source_status.news == "news_unavailable"
+    # Headlines stay static sample — never fabricated / never live.
+    assert all(h.is_sample is True for h in us.headlines)
+    assert any("news adapter is not configured" in w.lower() for w in warnings)
+
+
+def test_news_enabled_unknown_provider_route_does_not_crash(client, monkeypatch):
+    monkeypatch.setenv("GLOBE_NEWS_ENABLED", "true")
+    monkeypatch.setenv("GLOBE_NEWS_PROVIDER", "live")
+    resp = client.get("/globe/markets")
+    assert resp.status_code == 200
+    body = resp.json()
+    us = next(m for m in body["markets"] if m["id"] == "us")
+    assert us["source_status"]["news"] == "news_unavailable"
+    assert all(h["is_sample"] is True for h in us["headlines"])
+    assert any("news adapter is not configured" in w.lower() for w in body["warnings"])
+
+
+def test_news_adapter_stub_raises():
+    adapter = globe_adapters.NewsSentimentAdapter()
+    with pytest.raises(NotImplementedError):
+        adapter.fetch_market_news("us")
+    with pytest.raises(NotImplementedError):
+        adapter.fetch_headlines("us")
+
+
+def test_news_does_not_affect_data_status_or_macro_quotes(client, monkeypatch):
+    monkeypatch.setenv("GLOBE_NEWS_ENABLED", "true")
+    monkeypatch.setenv("GLOBE_NEWS_PROVIDER", "live")
+    body = client.get("/globe/markets").json()
+    # News never flips data_status (that is macro/quotes only) and never touches
+    # macro / indices / fx source status.
+    assert body["data_status"] == "static_sample"
+    for m in body["markets"]:
+        assert m["source_status"]["macro"] == "static_sample"
+        assert m["source_status"]["indices"] == "static_sample"
+        assert m["source_status"]["fx"] == "static_sample"

@@ -48,13 +48,24 @@ class _PlannedAdapter:
 
 
 class NewsSentimentAdapter(_PlannedAdapter):
-    """Future adapter for market news + sentiment. Inert in this phase (no scraping)."""
+    """
+    Future adapter for country-level financial headlines and sentiment.
+
+    The current phase intentionally does **not** fetch live news, scrape sites,
+    call external news/LLM APIs, or require an API key. Both methods raise so the
+    normal request path falls back to static sample headlines.
+    """
 
     name = "news-sentiment"
 
     def fetch_headlines(self, market_id: str, *args: Any, **kwargs: Any) -> Any:
         raise NotImplementedError(
             "News / sentiment integration is planned for a future phase."
+        )
+
+    def fetch_market_news(self, market_id: str, *args: Any, **kwargs: Any) -> Any:
+        raise NotImplementedError(
+            "Live news integration is planned for a future phase."
         )
 
 

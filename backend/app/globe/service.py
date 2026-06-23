@@ -20,6 +20,7 @@ from app.globe.quotes import (
     enrich_market_with_quotes,
     resolve_quote_provider,
 )
+from app.globe.news import GlobeNewsConfig, enrich_market_with_news
 from app.globe.sample_markets import SAMPLE_MARKETS, STATIC_DATA_NOTICE
 
 DATA_STATUS = "static_sample"
@@ -79,15 +80,18 @@ def build_markets_response(
     quotes_config: Optional[GlobeQuotesConfig] = None,
     index_adapter: Optional[DelayedIndexQuoteAdapter] = None,
     fx_adapter: Optional[FxQuoteAdapter] = None,
+    news_config: Optional[GlobeNewsConfig] = None,
 ) -> Tuple[List[MarketDossier], str, str, List[str]]:
     """
-    Return (markets, data_status, notice, warnings) with optional FRED macro and
-    optional delayed index/FX quote enrichment. With both disabled (default) this
-    is pure static sample data and performs no external calls.
+    Return (markets, data_status, notice, warnings) with optional FRED macro,
+    optional delayed index/FX quote, and the optional news scaffold. With all
+    disabled (default) this is pure static sample data and performs no external
+    calls.
     """
     cfg = config or FredMacroConfig()
     adp = adapter or FredMacroAdapter(cfg)
     qcfg = quotes_config or GlobeQuotesConfig()
+    ncfg = news_config or GlobeNewsConfig()
     if qcfg.enabled and (index_adapter is None or fx_adapter is None):
         quote_provider = resolve_quote_provider(qcfg)
         index_adapter = index_adapter or DelayedIndexQuoteAdapter(qcfg, quote_provider)
@@ -103,12 +107,13 @@ def build_markets_response(
         dossier, idx_state, fx_state, quote_warns = enrich_market_with_quotes(
             dossier, qcfg, index_adapter, fx_adapter
         )
+        dossier, _news_state, news_warns = enrich_market_with_news(dossier, ncfg)
         enriched.append(dossier)
         if macro_state == "fred_live":
             any_fred = True
         if idx_state == "delayed_quote" or fx_state == "delayed_quote":
             any_quote = True
-        for w in (*warns, *quote_warns):
+        for w in (*warns, *quote_warns, *news_warns):
             if w not in warnings:
                 warnings.append(w)
 
@@ -123,14 +128,16 @@ def build_single_market(
     quotes_config: Optional[GlobeQuotesConfig] = None,
     index_adapter: Optional[DelayedIndexQuoteAdapter] = None,
     fx_adapter: Optional[FxQuoteAdapter] = None,
+    news_config: Optional[GlobeNewsConfig] = None,
 ) -> Optional[MarketDossier]:
-    """Return one dossier (optionally FRED + delayed-quote enriched), or None."""
+    """Return one dossier (optionally FRED + delayed-quote + news enriched), or None."""
     base = get_market(market_id)
     if base is None:
         return None
     cfg = config or FredMacroConfig()
     adp = adapter or FredMacroAdapter(cfg)
     qcfg = quotes_config or GlobeQuotesConfig()
+    ncfg = news_config or GlobeNewsConfig()
     if qcfg.enabled and (index_adapter is None or fx_adapter is None):
         quote_provider = resolve_quote_provider(qcfg)
         index_adapter = index_adapter or DelayedIndexQuoteAdapter(qcfg, quote_provider)
@@ -139,4 +146,5 @@ def build_single_market(
     dossier, _idx, _fx, _qwarns = enrich_market_with_quotes(
         dossier, qcfg, index_adapter, fx_adapter
     )
+    dossier, _news, _nwarns = enrich_market_with_news(dossier, ncfg)
     return dossier

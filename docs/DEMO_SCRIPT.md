@@ -273,7 +273,13 @@ Return to the Command Center's **Platform Direction** panel (or open
   With the default `yfinance` provider + network, supported markets (e.g. US
   index, Japan index+FX) show a **delayed** level/rate and "Index quotes:
   delayed · as of …" — delayed, never real-time; unsupported markets and
-  secondary rows stay static.
+  secondary rows stay static. **News sentiment (20.5):** the dossier **Sample
+  Headlines** section shows a "News: static sample" chip, the copy "Sample
+  headlines — live news integration planned.", and Bullish/Bearish/Neutral
+  pills. Set `GLOBE_NEWS_ENABLED=true` with `GLOBE_NEWS_PROVIDER=live` (no real
+  provider) → the chip flips to "News unavailable — static fallback" with a
+  non-blocking warning; headlines stay static (never crashes). It's a scaffold
+  only — **no live news, no scraping, no API, no AI summarizer**.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

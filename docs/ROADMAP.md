@@ -1359,6 +1359,41 @@ single-asset Backtest + Strategy Comparison:
   updated. `pytest` green; `npx tsc --noEmit` clean. **Delayed, not real-time;
   no trading; not investment advice.**
 
+### Phase 20.5 — Globe News Sentiment Layer v1 ✅
+
+- A **safe scaffold only — NOT live news.** New `app/globe/news.py`:
+  `GlobeNewsConfig` (env: `GLOBE_NEWS_ENABLED` default false · `GLOBE_NEWS_PROVIDER`
+  default "static") + `enrich_market_with_news` (fail-closed; **no external
+  call, no scraping, no news/LLM API, no API key**). The existing
+  `NewsSentimentAdapter` stub gained a `fetch_market_news` method (raises
+  `NotImplementedError`). v1 always serves the bundled **static sample
+  headlines**.
+- Schema: `MarketHeadline` gained `source` (NewsSource), `as_of_date`, `url`,
+  `note` (all sample/None in v1); `SourceState += news_unavailable`; sentiment
+  stays constrained to **Bullish / Bearish / Neutral** (invalid rejected).
+- Behaviour: disabled (default) or `provider=static` → `source_status.news =
+  static_sample`, no warning; enabled with any other provider → headlines stay
+  static, `source_status.news = news_unavailable` + a non-blocking warning
+  ("Globe news adapter is not configured; using static sample headlines").
+  News never changes `data_status` and never touches macro/index/FX status.
+  Service runs the news pass after FRED + quotes; routes pass
+  `GlobeNewsConfig.from_env()`.
+- Frontend: `remote.ts` parser accepts the news source states + headline
+  `source` field and carries `newsSource`; the dossier **Sample Headlines**
+  section shows a **News: static sample / News unavailable — static fallback**
+  chip + the copy "Sample headlines — live news integration planned." with
+  Bullish/Bearish/Neutral pills (no live/latest/breaking/current/real-time
+  wording); the page header shows a dynamic news chip. Dashboard card badge →
+  "Static API + optional adapters".
+- 13 new news tests (mocked, **no network**): headlines present + valid
+  sentiment + `is_sample` + `source=static_sample` by default, no
+  latest/breaking/today wording, disabled→no change, enabled-static→static,
+  enabled-unknown-provider→news_unavailable+warning (incl. route), invalid
+  sentiment rejected, adapter stub raises, news never flips data_status,
+  no NaN/Inf. `.env.example` + `docs/GLOBE_DATA.md` updated. Focused globe
+  suite + full `pytest` green; `npx tsc --noEmit` clean. **Sample/educational
+  only; not a news feed, not a sentiment model, not investment advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

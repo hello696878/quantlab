@@ -25,7 +25,7 @@ You never need an API key for local development.
 | Macro (GDP/inflation/unemployment/policy rate/debt-GDP) | static sample (optional FRED for US) | `static_sample` · `fred_live` · `fred_unavailable` | broader FRED coverage |
 | Equity indices | static sample (optional delayed quote) | `static_sample` · `delayed_quote` · `quote_unavailable` | broader coverage |
 | FX | static sample (optional delayed quote) | `static_sample` · `delayed_quote` · `quote_unavailable` | broader coverage |
-| Headlines / sentiment | static sample | `static_sample` | news feed (planned) |
+| Headlines / sentiment | static sample (scaffold) | `static_sample` · `news_unavailable` | live news feed (planned) |
 
 The markets-response `data_status` is `static_sample` normally, or one of
 `mixed_static_and_fred`, `mixed_static_and_quotes`, or `mixed_static_fred_quotes`
@@ -132,6 +132,30 @@ GLOBE_QUOTES_ENABLED=true
 Quotes are **delayed**, never real-time. No live tick data, no streaming, no
 websocket, no broker, no trading, no paid feed. Unsupported markets never claim a
 delayed quote.
+
+## News sentiment (scaffold only — no live news)
+
+Phase 20.5 adds a **safe news-sentiment scaffold**, not live news. v1 **always**
+serves the bundled **static sample headlines** in each dossier, each with a
+`sentiment` of **Bullish / Bearish / Neutral** (illustrative, not a model
+output). There is **no live news fetch, no scraping, no external news/LLM API,
+and no API key** anywhere.
+
+```
+GLOBE_NEWS_ENABLED=false      # default; static sample headlines
+# GLOBE_NEWS_PROVIDER=static  # default static provider; no real provider in v1
+```
+
+- Disabled (default) or `GLOBE_NEWS_PROVIDER=static` → `source_status.news =
+  static_sample`, no warning.
+- Enabled with any *other* provider → no real provider is wired in v1, so
+  headlines stay static and `source_status.news = news_unavailable` with a
+  non-blocking warning: *"Globe news adapter is not configured; using static
+  sample headlines."* Still no external call; never crashes.
+- News never changes `data_status` and never affects macro / index / FX status.
+  The dossier shows a **"News: static sample"** (or "News unavailable — static
+  fallback") chip and the copy *"Sample headlines — live news integration
+  planned."* No "live/latest/breaking/current/real-time news" wording.
 
 ## Honesty guardrails
 

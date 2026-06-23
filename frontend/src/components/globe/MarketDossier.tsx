@@ -23,6 +23,7 @@ import {
   type MacroSourceState,
   type Market,
   type MarketIndex,
+  type NewsSourceState,
   type QuoteSourceState,
   type Sentiment,
 } from "@/lib/globe/markets";
@@ -164,6 +165,22 @@ function QuoteSourceChip({
         : `${label}: static sample`;
   const color =
     s === "delayed_quote" ? "var(--pos)" : s === "quote_unavailable" ? "var(--warn)" : "var(--text-mut)";
+  return (
+    <span
+      className="mono rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide"
+      style={{ background: `color-mix(in oklch, ${color} 14%, transparent)`, border: `1px solid color-mix(in oklch, ${color} 32%, transparent)`, color }}
+    >
+      {text}
+    </span>
+  );
+}
+
+/** Honest news provenance chip (static sample by default; never live in v1). */
+function NewsSourceChip({ source }: { source: NewsSourceState | undefined }) {
+  const s = source ?? "static_sample";
+  const text =
+    s === "news_unavailable" ? "News unavailable — static fallback" : "News: static sample";
+  const color = s === "news_unavailable" ? "var(--warn)" : "var(--text-mut)";
   return (
     <span
       className="mono rounded-full px-2 py-0.5 text-[9.5px] font-semibold uppercase tracking-wide"
@@ -392,7 +409,20 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
 
         {/* Sample Headlines */}
         <section>
-          <SectionLabel>Sample Headlines</SectionLabel>
+          <div className="mb-2 flex items-center justify-between gap-2">
+            <p className="section-title">Sample Headlines</p>
+            <NewsSourceChip source={market.newsSource} />
+          </div>
+          {market.newsSource === "news_unavailable" && (
+            <p
+              role="status"
+              className="mb-2 rounded-lg px-3 py-2 text-[11px]"
+              style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+            >
+              A news provider was requested but is not configured; showing static
+              sample headlines.
+            </p>
+          )}
           <div className="space-y-2">
             {market.headlines.map((h) => {
               const color = SENTIMENT_COLOR[SENTIMENT_TONE[h.sentiment]];
@@ -416,7 +446,7 @@ export default function MarketDossier({ market, onNav, onClose }: MarketDossierP
             })}
           </div>
           <p className="mt-1.5 text-[11px]" style={{ color: "var(--text-faint)" }}>
-            Sample headlines — news integration planned. Sentiment pills are
+            Sample headlines — live news integration planned. Sentiment pills are
             illustrative, not a model output.
           </p>
         </section>

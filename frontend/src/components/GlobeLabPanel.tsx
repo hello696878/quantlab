@@ -190,6 +190,11 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
       ? { text: "Quotes unavailable — static", tone: "var(--warn)" }
       : { text: "Delayed quotes optional (off)", tone: "var(--text-mut)" };
 
+  const newsUnavailable = markets.some((m) => m.newsSource === "news_unavailable");
+  const newsChip = newsUnavailable
+    ? { text: "News unavailable — static", tone: "var(--warn)" }
+    : { text: "News: sample (live planned)", tone: "var(--text-mut)" };
+
   useEffect(() => {
     if (!selectedId || !filtering) return;
     if (!filterMarkets(region, query, markets).some((market) => market.id === selectedId)) {
@@ -284,15 +289,12 @@ export default function GlobeLabPanel({ initialMarketId, onNav }: GlobeLabPanelP
           >
             {quotesChip.text}
           </span>
-          {["News planned"].map((t) => (
-            <span
-              key={t}
-              className="rounded-full px-2 py-0.5 text-[10px] font-medium"
-              style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-mut)" }}
-            >
-              {t}
-            </span>
-          ))}
+          <span
+            className="rounded-full px-2 py-0.5 text-[10px] font-medium"
+            style={{ background: `color-mix(in oklch, ${newsChip.tone} 12%, transparent)`, border: `1px solid color-mix(in oklch, ${newsChip.tone} 30%, transparent)`, color: newsChip.tone }}
+          >
+            {newsChip.text}
+          </span>
         </div>
       </div>
 

@@ -1028,14 +1028,14 @@ export default function HomeDashboard({
                 className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
-                Static API + optional delayed quotes
+                Static API + optional adapters
               </span>
             </span>
             <span className="text-xs text-slate-400">
               Explore a 3D map backed by a typed country-dossier data layer.
-              Static data remains the default; optional FRED macro and delayed
-              index/FX quote adapters can enrich supported fields when
-              configured. News is planned.
+              Static data remains the default; optional macro and delayed quote
+              adapters can enrich supported fields. News sentiment is represented
+              by sample headlines, with live news integration planned.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Globe →
