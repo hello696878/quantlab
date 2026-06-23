@@ -10,13 +10,17 @@ processing, and off-cycle rejection.
 import datetime
 import logging
 
+import numpy as np
 import pandas as pd
 import pytest
 
 from app.instruments import RollMethod, get_instrument
+from app.datastore.store import CONTINUOUS_COLUMNS
 from app.datastore.futures_continuous import (
+    ContinuousBuildError,
     RollEvent,
     RollScheduleError,
+    build_continuous_futures,
     compute_roll_schedule,
 )
 
@@ -34,8 +38,9 @@ def _rows(symbol, dates, volume, open_interest, expiry, price=5000.0, source="sy
     for i, d in enumerate(dates):
         vol = volume[i] if isinstance(volume, (list, tuple)) else volume
         oi = open_interest[i] if isinstance(open_interest, (list, tuple)) else open_interest
-        open_ = price
-        close = price + 1.0
+        p = price[i] if isinstance(price, (list, tuple)) else price
+        open_ = p
+        close = p + 1.0
         rows.append(
             {
                 "timestamp": pd.Timestamp(d),
@@ -175,3 +180,166 @@ def test_off_cycle_contract_is_not_silently_included():
     with pytest.raises(RollScheduleError) as exc:
         compute_roll_schedule(df, ES)
     assert "ESF24" in str(exc.value)
+
+
+# --------------------------------------------------------------------------- #
+# Continuous builder (Commit 4)
+# --------------------------------------------------------------------------- #
+
+ROLL = datetime.date(2024, 3, 7)   # fallback roll: EXP_H24 (Mar 15) - 8 calendar days
+PREV = datetime.date(2024, 3, 6)   # last held session of the old contract
+
+# Seam fixture price levels: ESH24 close = 5001+i, ESM24 close = 5101+i (gap 100).
+# At PREV (i=7): ESH24 close 5008, ESM24 close 5108. At ROLL (i=8): ESM24 close 5109.
+_ESH_CLOSE_PREV = 5008.0
+_ESM_CLOSE_PREV = 5108.0
+_ESM_CLOSE_ROLL = 5109.0
+
+
+def _seam_df():
+    """Two contracts at different price levels (100-pt gap); OI missing -> fallback roll."""
+    dates = list(pd.date_range("2024-02-26", "2024-03-15", freq="B"))
+    n = len(dates)
+    rows = _rows("ESH24", dates, 1000, None, EXP_H24, price=[5000 + i for i in range(n)])
+    rows += _rows("ESM24", dates, 1000, None, EXP_M24, price=[5100 + i for i in range(n)])
+    return pd.DataFrame(rows)
+
+
+def _by_date(out):
+    return out.set_index(out["timestamp"].dt.date)
+
+
+# --- structure ---
+
+
+def test_continuous_has_required_columns():
+    out = build_continuous_futures(_seam_df(), ES, "ratio")
+    assert list(out.columns) == CONTINUOUS_COLUMNS
+
+
+def test_continuous_timestamps_unique():
+    out = build_continuous_futures(_seam_df(), ES, "ratio")
+    assert out["timestamp"].is_unique
+
+
+def test_active_contract_never_missing():
+    out = build_continuous_futures(_seam_df(), ES, "ratio")
+    assert out["active_contract"].notna().all()
+    assert (out["active_contract"].astype(str) != "").all()
+
+
+def test_active_contract_switches_on_roll_date():
+    out = build_continuous_futures(_seam_df(), ES, "ratio")
+    d = out["timestamp"].dt.date
+    assert (out.loc[d < ROLL, "active_contract"] == "ESH24").all()
+    assert (out.loc[d >= ROLL, "active_contract"] == "ESM24").all()
+
+
+def test_roll_flag_true_only_on_roll_date():
+    out = build_continuous_futures(_seam_df(), ES, "ratio")
+    assert int(out["roll_flag"].sum()) == 1
+    roll_row = out[out["roll_flag"]]
+    assert roll_row["timestamp"].dt.date.iloc[0] == ROLL
+    assert roll_row["active_contract"].iloc[0] == "ESM24"
+
+
+def test_roll_reason_populated_on_roll_date():
+    out = build_continuous_futures(_seam_df(), ES, "ratio")
+    assert out[out["roll_flag"]]["roll_reason"].iloc[0]  # non-empty
+    assert (out[~out["roll_flag"]]["roll_reason"] == "").all()
+
+
+def test_input_raw_df_not_mutated():
+    df = _seam_df()
+    before = df.copy(deep=True)
+    build_continuous_futures(df, ES, "ratio")
+    pd.testing.assert_frame_equal(df, before)
+
+
+def test_build_is_deterministic():
+    df = _seam_df()
+    pd.testing.assert_frame_equal(
+        build_continuous_futures(df, ES, "ratio"),
+        build_continuous_futures(df, ES, "ratio"),
+    )
+
+
+# --- ratio adjustment ---
+
+
+def test_ratio_no_pct_spike_at_roll():
+    s = _by_date(build_continuous_futures(_seam_df(), ES, "ratio"))["close_adjusted"]
+    seam_return = s[ROLL] / s[PREV] - 1.0
+    held_return = _ESM_CLOSE_ROLL / _ESM_CLOSE_PREV - 1.0  # new contract's own return
+    raw_gap_return = _ESM_CLOSE_ROLL / _ESH_CLOSE_PREV - 1.0  # the WRONG, spiky one
+    assert seam_return == pytest.approx(held_return, rel=1e-12)
+    assert abs(seam_return - raw_gap_return) > 1e-4
+
+
+def test_ratio_newest_segment_factor_is_one():
+    out = build_continuous_futures(_seam_df(), ES, "ratio")
+    newest = out[out["active_contract"] == "ESM24"]
+    assert (newest["adjustment_factor"] == 1.0).all()
+
+
+def test_ratio_older_segment_factor_is_multiplicative():
+    out = build_continuous_futures(_seam_df(), ES, "ratio")
+    older = out[out["active_contract"] == "ESH24"]
+    assert older["adjustment_factor"].nunique() == 1
+    assert older["adjustment_factor"].iloc[0] == pytest.approx(_ESM_CLOSE_PREV / _ESH_CLOSE_PREV)
+    assert np.allclose(older["close_adjusted"], older["close_raw"] * older["adjustment_factor"])
+
+
+def test_ratio_raw_prices_unchanged():
+    s = _by_date(build_continuous_futures(_seam_df(), ES, "ratio"))
+    assert s.loc[PREV, "close_raw"] == pytest.approx(_ESH_CLOSE_PREV)   # held ESH24 close
+    assert s.loc[ROLL, "close_raw"] == pytest.approx(_ESM_CLOSE_ROLL)   # held ESM24 close
+
+
+# --- Panama adjustment ---
+
+
+def test_panama_no_phantom_pnl_at_roll():
+    s = _by_date(build_continuous_futures(_seam_df(), ES, "panama"))["close_adjusted"]
+    seam_diff = s[ROLL] - s[PREV]
+    held_diff = _ESM_CLOSE_ROLL - _ESM_CLOSE_PREV       # new contract's own point change (1.0)
+    raw_gap_diff = _ESM_CLOSE_ROLL - _ESH_CLOSE_PREV     # the WRONG, phantom one (101.0)
+    assert seam_diff == pytest.approx(held_diff)
+    assert abs(seam_diff - raw_gap_diff) > 1e-6
+
+
+def test_panama_newest_segment_factor_is_zero():
+    out = build_continuous_futures(_seam_df(), ES, "panama")
+    newest = out[out["active_contract"] == "ESM24"]
+    assert (newest["adjustment_factor"] == 0.0).all()
+
+
+def test_panama_older_segment_factor_is_additive():
+    out = build_continuous_futures(_seam_df(), ES, "panama")
+    older = out[out["active_contract"] == "ESH24"]
+    assert older["adjustment_factor"].iloc[0] == pytest.approx(_ESM_CLOSE_PREV - _ESH_CLOSE_PREV)
+    assert np.allclose(older["close_adjusted"], older["close_raw"] + older["adjustment_factor"])
+
+
+def test_panama_raw_prices_unchanged():
+    s = _by_date(build_continuous_futures(_seam_df(), ES, "panama"))
+    assert s.loc[PREV, "close_raw"] == pytest.approx(_ESH_CLOSE_PREV)
+    assert s.loc[ROLL, "close_raw"] == pytest.approx(_ESM_CLOSE_ROLL)
+
+
+# --- error handling ---
+
+
+def test_unsupported_adjustment_method_raises():
+    with pytest.raises(ContinuousBuildError):
+        build_continuous_futures(_seam_df(), ES, "bogus")
+
+
+def test_missing_overlap_at_roll_seam_raises():
+    # ESM24 only starts on the roll date -> no common prior session with ESH24.
+    esh = list(pd.date_range("2024-02-26", "2024-03-15", freq="B"))
+    esm = list(pd.date_range("2024-03-07", "2024-03-15", freq="B"))
+    rows = _rows("ESH24", esh, 1000, None, EXP_H24, price=[5000 + i for i in range(len(esh))])
+    rows += _rows("ESM24", esm, 1000, None, EXP_M24, price=[5100 + i for i in range(len(esm))])
+    with pytest.raises(ContinuousBuildError):
+        build_continuous_futures(pd.DataFrame(rows), ES, "ratio")
