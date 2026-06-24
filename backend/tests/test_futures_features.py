@@ -13,8 +13,12 @@ import pytest
 from pydantic import ValidationError
 
 from app.instruments import AdjustmentMethod, get_instrument
-from app.datastore.store import CONTINUOUS_COLUMNS
-from app.datastore.futures_continuous import build_continuous_futures
+from app.datastore.store import CONTINUOUS_COLUMNS, validate_raw_futures
+from app.datastore.futures_continuous import (
+    build_continuous_futures,
+    compute_roll_schedule,
+    continuous_config_hash,
+)
 from app.features import (
     DEFAULT_ES_FEATURES,
     FeatureError,
@@ -26,6 +30,8 @@ from app.features import (
     validate_continuous_input,
     validate_feature_specs,
 )
+
+ES = get_instrument("ES")
 
 IMPLEMENTED_FEATURES = [
     "return_1",
@@ -742,3 +748,116 @@ def test_truncation_invariance_around_roll():
         trunc = build_feature_matrix(df.iloc[: t + 1])
         for col in IMPLEMENTED_FEATURES:
             assert _equal_or_nan(full.loc[t, col], trunc.loc[t, col]), (col, t)
+
+
+# --------------------------------------------------------------------------- #
+# Commit 5 — end-to-end pipeline + hash provenance
+# --------------------------------------------------------------------------- #
+
+
+def _e2e_raw_df() -> pd.DataFrame:
+    """Three ES contracts, OI missing -> two fallback rolls; a long continuous series."""
+    rows = []
+    contracts = [
+        ("ESH24", 5000.0, "2024-03-15", pd.date_range("2024-01-02", "2024-03-15", freq="B")),
+        ("ESM24", 5100.0, "2024-06-21", pd.date_range("2024-01-02", "2024-06-21", freq="B")),
+        ("ESU24", 5200.0, "2024-09-20", pd.date_range("2024-04-01", "2024-09-20", freq="B")),
+    ]
+    for symbol, base, expiry, dates in contracts:
+        for i, d in enumerate(dates):
+            price = base + 0.5 * i
+            close = price + 1.0
+            rows.append(
+                {
+                    "timestamp": pd.Timestamp(d),
+                    "open": price,
+                    "high": max(price, close) + 1.0,
+                    "low": min(price, close) - 1.0,
+                    "close": close,
+                    "volume": 1000 + i,
+                    "open_interest": None,
+                    "root_symbol": "ES",
+                    "contract_symbol": symbol,
+                    "expiry": pd.Timestamp(expiry),
+                    "source": "synthetic",
+                    "timezone": "America/Chicago",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def test_end_to_end_phase2_pipeline():
+    raw = _e2e_raw_df()
+
+    # 1-2. validate raw, compute roll schedule (two fallback rolls)
+    validate_raw_futures(raw)
+    events = compute_roll_schedule(raw, ES)
+    assert len(events) == 2
+
+    # 3. ratio-adjusted continuous + upstream provenance hash
+    cont = build_continuous_futures(raw, ES, "ratio")
+    cont_hash = continuous_config_hash(raw, ES, "ratio")
+
+    # 4. full feature matrix, upstream hash chained; input must not mutate
+    before = cont.copy(deep=True)
+    fm = build_feature_matrix(cont, DEFAULT_ES_FEATURES, upstream_continuous_hash=cont_hash)
+    pd.testing.assert_frame_equal(cont, before)
+
+    # all 16 features + metadata columns present
+    for col in IMPLEMENTED_FEATURES:
+        assert col in fm.columns
+    for col in ["timestamp", "root_symbol", "active_contract",
+                "is_warmup", "source_adjustment_method", "feature_config_hash"]:
+        assert col in fm.columns
+    assert (fm["source_adjustment_method"] == "ratio").all()
+
+    # feature hash: stable + chained to the upstream continuous hash
+    assert fm["feature_config_hash"].nunique() == 1
+    assert fm["feature_config_hash"].iloc[0] == feature_config_hash(DEFAULT_ES_FEATURES, cont_hash)
+    assert feature_config_hash(DEFAULT_ES_FEATURES, cont_hash) != feature_config_hash(
+        DEFAULT_ES_FEATURES, cont_hash + "x"
+    )
+    assert feature_config_hash(DEFAULT_ES_FEATURES, cont_hash) != feature_config_hash(
+        DEFAULT_ES_FEATURES
+    )
+    modified = [_valid_return_spec("return_1", window=2)] + DEFAULT_ES_FEATURES[1:]
+    assert feature_config_hash(modified, cont_hash) != feature_config_hash(
+        DEFAULT_ES_FEATURES, cont_hash
+    )
+
+    # no roll-seam leakage: return_1 at rolls is a normal move, not the ~2% raw gap
+    roll_rows = fm.index[fm["roll_flag"] == 1.0].tolist()
+    assert len(roll_rows) == 2
+    for r in roll_rows:
+        assert abs(fm.loc[r, "return_1"]) < 0.005
+
+    # non-warmup rows have no NaN except the documented days_since_roll-before-first-roll
+    cols = [c for c in IMPLEMENTED_FEATURES if c != "days_since_roll"]
+    assert not fm.loc[~fm["is_warmup"], cols].isna().any().any()
+
+    # truncation-invariance around the first roll (before / on / after)
+    r0 = roll_rows[0]
+    full = build_feature_matrix(cont)
+    for t in (r0 - 3, r0 - 1, r0, r0 + 1, len(cont) - 1):
+        trunc = build_feature_matrix(cont.iloc[: t + 1])
+        for col in IMPLEMENTED_FEATURES:
+            assert _equal_or_nan(full.loc[t, col], trunc.loc[t, col]), (col, t)
+
+
+def test_feature_hash_provenance_chain():
+    raw = _e2e_raw_df()
+    upstream = continuous_config_hash(raw, ES, "ratio")
+    baseline = feature_config_hash(DEFAULT_ES_FEATURES, upstream)
+    assert feature_config_hash(DEFAULT_ES_FEATURES, upstream) == baseline       # same config+upstream
+    assert feature_config_hash(DEFAULT_ES_FEATURES, upstream + "z") != baseline  # different upstream
+    assert feature_config_hash(DEFAULT_ES_FEATURES, None) != baseline            # no upstream
+    modified = [_valid_return_spec("return_1", window=3)] + DEFAULT_ES_FEATURES[1:]
+    assert feature_config_hash(modified, upstream) != baseline                   # modified spec
+
+
+def test_pipeline_deterministic_under_row_shuffle():
+    raw = _e2e_raw_df()
+    fm1 = build_feature_matrix(build_continuous_futures(raw, ES, "ratio"))
+    shuffled = raw.sample(frac=1, random_state=17).reset_index(drop=True)
+    fm2 = build_feature_matrix(build_continuous_futures(shuffled, ES, "ratio"))
+    pd.testing.assert_frame_equal(fm1, fm2)

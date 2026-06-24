@@ -1,16 +1,11 @@
 """
-Futures feature matrix builder (Phase 2 — commit 2).
+Futures feature matrix builder (Phase 2).
 
 Computes a leakage-safe, deterministic feature matrix from a Phase 1
-**ratio-adjusted** continuous frame.  Commit 2 implements the basic price /
-return / volatility / rolling features only:
-
-    return_1, return_5, return_20, realized_vol_20,
-    rolling_high_20, rolling_low_20,
-    close_to_rolling_high_20, close_to_rolling_low_20
-
-Transforms not yet implemented (RSI, ATR, MA gap, z-score, calendar, roll
-metadata) are **skipped with a logged warning** — they land in later commits.
+**ratio-adjusted** continuous frame.  All 16 ``DEFAULT_ES_FEATURES`` transforms
+are implemented (price / return / volatility / rolling, RSI / ATR / MA gap, and
+volume / calendar / roll metadata).  Any transform without a registered compute
+function is skipped with a logged warning.
 
 Discipline (Phase 2 plan §C.2):
 
@@ -230,9 +225,9 @@ def build_feature_matrix(
 ) -> pd.DataFrame:
     """Build a deterministic, leakage-safe feature matrix.
 
-    ``continuous_df`` must be a Phase 1 ratio-adjusted continuous frame.  Only the
-    transforms implemented in this commit are computed; the rest are skipped with
-    a warning.  The input is never mutated.
+    ``continuous_df`` must be a Phase 1 ratio-adjusted continuous frame.  Every
+    transform with a registered compute function is computed; any unknown
+    transform is skipped with a warning.  The input is never mutated.
     """
     validate_continuous_input(continuous_df)
     validate_feature_specs(specs)
