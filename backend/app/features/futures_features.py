@@ -30,6 +30,7 @@ import logging
 import math
 from typing import Optional
 
+import numpy as np
 import pandas as pd
 
 from app.datastore.store import finalize_continuous
@@ -88,7 +89,77 @@ def _f_ratio_to_rolling_min(cdf: pd.DataFrame, spec: FeatureSpec) -> pd.Series:
     return close / rolling - 1.0
 
 
-# Transforms implemented in this commit. Others are skipped (logged).
+def _f_ma_gap(cdf: pd.DataFrame, spec: FeatureSpec) -> pd.Series:
+    short, long = spec.windows[0], spec.windows[1]
+    close = cdf[spec.input_columns[0]]
+    ma_short = close.rolling(short).mean()
+    ma_long = close.rolling(long).mean()
+    return (ma_short - ma_long) / ma_long
+
+
+def _wilder_smooth(values: pd.Series, period: int) -> pd.Series:
+    """Wilder's smoothing (causal / trailing).
+
+    Seed = simple mean of the first ``period`` *valid* values; thereafter
+    ``avg_t = (avg_{t-1} * (period - 1) + value_t) / period``.  Leading NaNs
+    (warmup) are preserved before the seed; only past values are ever used.
+    """
+    arr = values.to_numpy(dtype=float)
+    n = len(arr)
+    out = np.full(n, np.nan)
+    run = 0
+    seed = None
+    for i in range(n):
+        run = run + 1 if not np.isnan(arr[i]) else 0
+        if run >= period:
+            seed = i
+            break
+    if seed is None:
+        return pd.Series(out, index=values.index)
+    out[seed] = arr[seed - period + 1: seed + 1].mean()
+    for t in range(seed + 1, n):
+        out[t] = (out[t - 1] * (period - 1) + arr[t]) / period
+    return pd.Series(out, index=values.index)
+
+
+def _f_rsi(cdf: pd.DataFrame, spec: FeatureSpec) -> pd.Series:
+    period = spec.params["period"]
+    close = cdf[spec.input_columns[0]]
+    change = close.diff()  # NaN on the first bar -> warmup propagates
+    gain = change.clip(lower=0.0)
+    loss = (-change).clip(lower=0.0)
+    avg_gain = _wilder_smooth(gain, period)
+    avg_loss = _wilder_smooth(loss, period)
+    with np.errstate(divide="ignore", invalid="ignore"):
+        rs = avg_gain / avg_loss
+        rsi = 100.0 - 100.0 / (1.0 + rs)
+    # Zero-loss window (no down-moves) -> RSI 100; warmup rows (avg_loss NaN) stay NaN.
+    rsi = rsi.where(avg_loss != 0.0, 100.0)
+    return rsi.where(avg_loss.notna())
+
+
+def _f_atr(cdf: pd.DataFrame, spec: FeatureSpec) -> pd.Series:
+    """Wilder ATR in adjusted price points. The first bar has no prior close, so
+    it has no true range; ATR is Wilder-smoothed from the next bar onward.
+    ``params['normalize'] == 'close'`` returns the scale-relative ATR/close.
+    """
+    period = spec.params["period"]
+    high = cdf[spec.input_columns[0]]
+    low = cdf[spec.input_columns[1]]
+    close = cdf[spec.input_columns[2]]
+    prev_close = close.shift(1)
+    true_range = pd.concat(
+        [(high - low), (high - prev_close).abs(), (low - prev_close).abs()],
+        axis=1,
+    ).max(axis=1)
+    true_range = true_range.where(prev_close.notna())  # no prior close on the first bar
+    atr = _wilder_smooth(true_range, period)
+    if spec.params.get("normalize") == "close":
+        return atr / close
+    return atr
+
+
+# Transforms implemented so far. Others are skipped (logged).
 _COMPUTE = {
     TransformType.RETURN: _f_return,
     TransformType.REALIZED_VOL: _f_realized_vol,
@@ -96,6 +167,9 @@ _COMPUTE = {
     TransformType.ROLLING_MIN: _f_rolling_min,
     TransformType.RATIO_TO_ROLLING_MAX: _f_ratio_to_rolling_max,
     TransformType.RATIO_TO_ROLLING_MIN: _f_ratio_to_rolling_min,
+    TransformType.MA_GAP: _f_ma_gap,
+    TransformType.RSI: _f_rsi,
+    TransformType.ATR: _f_atr,
 }
 
 

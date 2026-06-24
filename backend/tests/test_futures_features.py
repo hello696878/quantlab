@@ -36,6 +36,10 @@ IMPLEMENTED_FEATURES = [
     "rolling_low_20",
     "close_to_rolling_high_20",
     "close_to_rolling_low_20",
+    "moving_average_gap_10_50",
+    "RSI_14",
+    "ATR_14",
+    "ATR_14_pct",
 ]
 
 
@@ -377,9 +381,9 @@ def test_close_to_rolling_match_manual_formula():
 
 def test_warmup_rows_marked_explicitly():
     fm = build_feature_matrix(_ratio_continuous(60))
-    # longest warmup feature: return_20 / realized_vol_20 first valid at index 20.
-    assert fm["is_warmup"].iloc[:20].all()
-    assert not fm["is_warmup"].iloc[20:].any()
+    # longest-warmup feature is moving_average_gap_10_50: first valid at index 49.
+    assert fm["is_warmup"].iloc[:49].all()
+    assert not fm["is_warmup"].iloc[49:].any()
 
 
 def test_non_warmup_rows_have_no_nans():
@@ -415,7 +419,8 @@ def _equal_or_nan(a, b) -> bool:
 def test_truncation_invariance():
     df = _ratio_continuous(60)
     full = build_feature_matrix(df)
-    for t in (3, 21, 35, 59):
+    # include the Wilder-indicator seed (14) and the MA-gap region (55).
+    for t in (3, 14, 21, 35, 55, 59):
         trunc = build_feature_matrix(df.iloc[: t + 1])
         for col in IMPLEMENTED_FEATURES:
             assert _equal_or_nan(full.loc[t, col], trunc.loc[t, col]), (col, t)
@@ -433,3 +438,174 @@ def test_seam_return_uses_adjusted_not_raw_gap():
     raw_gap_return = 5109 / 5008 - 1.0    # the WRONG, spiky one
     assert by_date.loc[roll, "return_1"] == pytest.approx(held_return, rel=1e-9)
     assert abs(by_date.loc[roll, "return_1"] - raw_gap_return) > 1e-4
+
+
+# --------------------------------------------------------------------------- #
+# Commit 3 — technical indicators (MA gap, RSI, ATR, ATR%)
+# --------------------------------------------------------------------------- #
+
+
+def _scaled_continuous(n: int = 60, scale: float = 2.0) -> pd.DataFrame:
+    """Ratio continuous frame where adjusted prices = ``scale`` x raw prices."""
+    idx = pd.date_range("2024-01-01", periods=n, freq="B", tz="UTC")
+    raw_close = np.array([4000.0 + i for i in range(n)])
+    raw_high = raw_close + 3.0
+    raw_low = raw_close - 3.0
+    df = pd.DataFrame(
+        {
+            "timestamp": idx,
+            "root_symbol": "ES",
+            "active_contract": "ESH24",
+            "open_raw": raw_close,
+            "high_raw": raw_high,
+            "low_raw": raw_low,
+            "close_raw": raw_close,
+            "volume": 1000,
+            "open_interest": 2000.0,
+            "adjustment_method": "ratio",
+            "adjustment_factor": scale,
+            "open_adjusted": raw_close * scale,
+            "high_adjusted": raw_high * scale,
+            "low_adjusted": raw_low * scale,
+            "close_adjusted": raw_close * scale,
+            "roll_flag": False,
+            "roll_reason": "",
+        }
+    )
+    return df[CONTINUOUS_COLUMNS]
+
+
+def _ref_rsi(close, period: int = 14):
+    c = list(close)
+    n = len(c)
+    out = [float("nan")] * n
+    gains = [0.0] * n
+    losses = [0.0] * n
+    for i in range(1, n):
+        change = c[i] - c[i - 1]
+        gains[i] = max(change, 0.0)
+        losses[i] = max(-change, 0.0)
+    if n <= period:
+        return out
+
+    def rsi_val(avg_gain, avg_loss):
+        if avg_loss == 0.0:
+            return 100.0
+        return 100.0 - 100.0 / (1.0 + avg_gain / avg_loss)
+
+    ag = sum(gains[1 : period + 1]) / period
+    al = sum(losses[1 : period + 1]) / period
+    out[period] = rsi_val(ag, al)
+    for t in range(period + 1, n):
+        ag = (ag * (period - 1) + gains[t]) / period
+        al = (al * (period - 1) + losses[t]) / period
+        out[t] = rsi_val(ag, al)
+    return out
+
+
+def _ref_atr(high, low, close, period: int = 14, normalize=None):
+    import math as _math
+
+    h, l, c = list(high), list(low), list(close)
+    n = len(h)
+    tr = [float("nan")] * n
+    for i in range(1, n):
+        tr[i] = max(h[i] - l[i], abs(h[i] - c[i - 1]), abs(l[i] - c[i - 1]))
+    out = [float("nan")] * n
+    if n > period:
+        out[period] = sum(tr[1 : period + 1]) / period
+        for t in range(period + 1, n):
+            out[t] = (out[t - 1] * (period - 1) + tr[t]) / period
+    if normalize == "close":
+        out = [out[i] / c[i] if not _math.isnan(out[i]) else float("nan") for i in range(n)]
+    return out
+
+
+# --- MA gap ---
+
+
+def test_ma_gap_matches_manual_formula():
+    df = _ratio_continuous(80)
+    fm = build_feature_matrix(df)
+    close = pd.Series(df["close_adjusted"].to_numpy())
+    expected = (close.rolling(10).mean() - close.rolling(50).mean()) / close.rolling(50).mean()
+    np.testing.assert_allclose(
+        fm["moving_average_gap_10_50"].to_numpy(), expected.to_numpy(), equal_nan=True
+    )
+
+
+def test_ma_gap_warmup_before_ma50():
+    fm = build_feature_matrix(_ratio_continuous(80))
+    assert fm["moving_average_gap_10_50"].iloc[:49].isna().all()
+    assert fm["moving_average_gap_10_50"].iloc[49:].notna().all()
+
+
+# --- RSI ---
+
+
+def test_rsi_matches_reference():
+    df = _ratio_continuous(60)
+    fm = build_feature_matrix(df)
+    expected = np.array(_ref_rsi(df["close_adjusted"].to_numpy(), 14), dtype=float)
+    np.testing.assert_allclose(fm["RSI_14"].to_numpy(), expected, equal_nan=True, rtol=1e-9)
+
+
+def test_rsi_all_up_zero_loss_is_100():
+    n = 40
+    idx = pd.date_range("2024-01-01", periods=n, freq="B", tz="UTC")
+    closes = np.array([5000.0 + 10.0 * i for i in range(n)])  # strictly increasing
+    df = pd.DataFrame(
+        {
+            "timestamp": idx, "root_symbol": "ES", "active_contract": "ESH24",
+            "open_raw": closes, "high_raw": closes + 5.0, "low_raw": closes - 5.0, "close_raw": closes,
+            "volume": 1000, "open_interest": 2000.0,
+            "adjustment_method": "ratio", "adjustment_factor": 1.0,
+            "open_adjusted": closes, "high_adjusted": closes + 5.0,
+            "low_adjusted": closes - 5.0, "close_adjusted": closes,
+            "roll_flag": False, "roll_reason": "",
+        }
+    )[CONTINUOUS_COLUMNS]
+    rsi = build_feature_matrix(df)["RSI_14"].dropna()
+    assert (rsi == 100.0).all()
+
+
+# --- ATR ---
+
+
+def test_atr_matches_reference():
+    df = _ratio_continuous(60)
+    fm = build_feature_matrix(df)
+    expected = np.array(
+        _ref_atr(df["high_adjusted"].to_numpy(), df["low_adjusted"].to_numpy(),
+                 df["close_adjusted"].to_numpy(), 14),
+        dtype=float,
+    )
+    np.testing.assert_allclose(fm["ATR_14"].to_numpy(), expected, equal_nan=True, rtol=1e-9)
+
+
+def test_atr_pct_equals_atr_over_close():
+    df = _ratio_continuous(60)
+    fm = build_feature_matrix(df)
+    expected = fm["ATR_14"].to_numpy() / df["close_adjusted"].to_numpy()
+    np.testing.assert_allclose(fm["ATR_14_pct"].to_numpy(), expected, equal_nan=True, rtol=1e-12)
+
+
+def test_atr_uses_adjusted_not_raw_prices():
+    df = _scaled_continuous(60, scale=2.0)  # adjusted = 2x raw
+    fm = build_feature_matrix(df)
+    atr_adj = np.array(
+        _ref_atr(df["high_adjusted"].to_numpy(), df["low_adjusted"].to_numpy(),
+                 df["close_adjusted"].to_numpy(), 14), dtype=float
+    )
+    atr_raw = np.array(
+        _ref_atr(df["high_raw"].to_numpy(), df["low_raw"].to_numpy(),
+                 df["close_raw"].to_numpy(), 14), dtype=float
+    )
+    np.testing.assert_allclose(fm["ATR_14"].to_numpy(), atr_adj, equal_nan=True, rtol=1e-9)
+    assert abs(fm["ATR_14"].iloc[30] - atr_raw[30]) > 1e-6  # not the raw-based ATR
+
+
+def test_default_emits_indicator_columns():
+    fm = build_feature_matrix(_ratio_continuous(60))
+    for col in ["moving_average_gap_10_50", "RSI_14", "ATR_14", "ATR_14_pct"]:
+        assert col in fm.columns

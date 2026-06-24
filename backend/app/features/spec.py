@@ -176,7 +176,7 @@ DEFAULT_ES_FEATURES: list[FeatureSpec] = [
         price_space=PriceSpace.ADJUSTED,
         required_adjustment=_RATIO,
         params={"annualize": True, "trading_days": 252},
-        warmup=21,
+        warmup=20,
         description="Annualized (x sqrt(252)) std of daily returns over 20 sessions.",
     ),
     FeatureSpec(
@@ -186,7 +186,7 @@ DEFAULT_ES_FEATURES: list[FeatureSpec] = [
         windows=[20],
         price_space=PriceSpace.ADJUSTED,
         required_adjustment=_RATIO,
-        warmup=20,
+        warmup=19,
         description="20-session rolling high (adjusted; absolute level back-adjusted).",
     ),
     FeatureSpec(
@@ -196,7 +196,7 @@ DEFAULT_ES_FEATURES: list[FeatureSpec] = [
         windows=[20],
         price_space=PriceSpace.ADJUSTED,
         required_adjustment=_RATIO,
-        warmup=20,
+        warmup=19,
         description="20-session rolling low (adjusted; absolute level back-adjusted).",
     ),
     FeatureSpec(
@@ -206,7 +206,7 @@ DEFAULT_ES_FEATURES: list[FeatureSpec] = [
         windows=[20],
         price_space=PriceSpace.ADJUSTED,
         required_adjustment=_RATIO,
-        warmup=20,
+        warmup=19,
         description="close / rolling_high_20 - 1 (scale-invariant).",
     ),
     FeatureSpec(
@@ -216,7 +216,7 @@ DEFAULT_ES_FEATURES: list[FeatureSpec] = [
         windows=[20],
         price_space=PriceSpace.ADJUSTED,
         required_adjustment=_RATIO,
-        warmup=20,
+        warmup=19,
         description="close / rolling_low_20 - 1 (scale-invariant).",
     ),
     FeatureSpec(
@@ -226,7 +226,7 @@ DEFAULT_ES_FEATURES: list[FeatureSpec] = [
         windows=[10, 50],
         price_space=PriceSpace.ADJUSTED,
         required_adjustment=_RATIO,
-        warmup=50,
+        warmup=49,
         description="(MA10 - MA50) / MA50 (relative, scale-invariant).",
     ),
     FeatureSpec(
