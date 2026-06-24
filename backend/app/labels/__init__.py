@@ -1,9 +1,9 @@
 """Futures supervised-label layer (Phase 3).
 
-Commit 1 ships the label config + basic return-based labels: ``LabelSpec``, the
-enums, the default ES label registry, ``label_config_hash``, and
-``build_label_matrix`` (forward-return / direction / vol-adjusted). Dataset
-assembly, signals, and the backtest adapter land in later commits.
+Ships the label config + return-based labels (`LabelSpec`, enums, the default ES
+label registry, `label_config_hash`, `build_label_matrix`) and the supervised
+`build_supervised_dataset` assembler (features + labels + provenance + trainable
+flags). Signals and the backtest adapter land in later commits.
 """
 
 from app.labels.spec import (
@@ -16,6 +16,7 @@ from app.labels.spec import (
     label_config_hash,
 )
 from app.labels.futures_labels import build_label_matrix
+from app.labels.dataset import DatasetError, build_supervised_dataset
 
 __all__ = [
     "LabelSpec",
@@ -26,4 +27,6 @@ __all__ = [
     "DEFAULT_ES_LABELS",
     "label_config_hash",
     "build_label_matrix",
+    "DatasetError",
+    "build_supervised_dataset",
 ]

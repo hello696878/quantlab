@@ -15,11 +15,13 @@ from app.datastore.store import CONTINUOUS_COLUMNS
 from app.features import DEFAULT_ES_FEATURES, build_feature_matrix, feature_config_hash
 from app.labels import (
     DEFAULT_ES_LABELS,
+    DatasetError,
     LabelError,
     LabelSpec,
     LabelType,
     PriceSpace,
     build_label_matrix,
+    build_supervised_dataset,
     label_config_hash,
 )
 
@@ -242,3 +244,125 @@ def test_all_label_columns_emitted():
     lm = build_label_matrix(df, feature_df=build_feature_matrix(df))
     for col in LABEL_COLUMNS + ["timestamp", "root_symbol", "active_contract", "label_config_hash"]:
         assert col in lm.columns
+
+
+# --------------------------------------------------------------------------- #
+# Commit 2 — supervised dataset assembly
+# --------------------------------------------------------------------------- #
+
+
+def _feature_label(n: int = 80):
+    df = _continuous(n)
+    feat = build_feature_matrix(df)
+    lab = build_label_matrix(df, feature_df=feat)
+    return feat, lab
+
+
+def test_dataset_joins_on_keys():
+    feat, lab = _feature_label()
+    ds = build_supervised_dataset(feat, lab)
+    assert list(ds.columns[:3]) == ["timestamp", "root_symbol", "active_contract"]
+    assert len(ds) == len(feat) == len(lab)
+    # keys preserved and aligned
+    assert (ds["root_symbol"] == "ES").all()
+
+
+def test_dataset_has_feature_and_label_namespaces():
+    feat, lab = _feature_label()
+    ds = build_supervised_dataset(feat, lab)
+    assert "feature__return_1" in ds.columns
+    assert "feature__realized_vol_20" in ds.columns
+    assert "label__forward_return_1" in ds.columns
+    assert "label__volatility_adjusted_return_5" in ds.columns
+
+
+def test_feature_and_label_namespaces_are_disjoint():
+    feat, lab = _feature_label()
+    ds = build_supervised_dataset(feat, lab)
+    feature_cols = {c for c in ds.columns if c.startswith("feature__")}
+    label_cols = {c for c in ds.columns if c.startswith("label__")}
+    assert feature_cols and label_cols
+    assert feature_cols.isdisjoint(label_cols)
+    # no label name leaked into the feature namespace and vice versa
+    assert "feature__forward_return_1" not in ds.columns
+    assert "label__return_1" not in ds.columns
+
+
+def test_is_label_valid_false_for_nan_label_tail():
+    feat, lab = _feature_label(80)
+    ds = build_supervised_dataset(feat, lab)
+    # last 6 rows have NaN forward_return_5 / vol_adjusted_5 -> not label-valid
+    assert not ds["is_label_valid"].iloc[-6:].any()
+    assert ds["is_label_valid"].iloc[49:-6].all()  # post-warmup, pre-tail are valid
+
+
+def test_is_trainable_excludes_warmup_and_nan_labels():
+    feat, lab = _feature_label(80)
+    ds = build_supervised_dataset(feat, lab)
+    # warmup rows (0..48 from MA-gap) are not trainable
+    assert not ds["is_trainable"].iloc[:49].any()
+    # NaN-label tail (last 6) is not trainable
+    assert not ds["is_trainable"].iloc[-6:].any()
+    # the middle band is trainable
+    assert ds["is_trainable"].iloc[49:-6].all()
+
+
+def test_days_since_roll_nan_does_not_block_trainable():
+    # _continuous has no rolls -> days_since_roll all NaN, but that must not by
+    # itself make non-warmup, valid-label rows untrainable.
+    feat, lab = _feature_label(80)
+    ds = build_supervised_dataset(feat, lab)
+    assert ds["feature__days_since_roll"].isna().all()
+    assert ds["is_trainable"].any()  # trainable rows still exist
+
+
+def test_drop_untrainable_removes_warmup_and_nan_label_rows():
+    feat, lab = _feature_label(80)
+    full = build_supervised_dataset(feat, lab)
+    dropped = build_supervised_dataset(feat, lab, drop_untrainable=True)
+    assert len(dropped) == int(full["is_trainable"].sum())
+    assert dropped["is_trainable"].all()
+
+
+def test_provenance_hashes_preserved():
+    feat, lab = _feature_label()
+    ds = build_supervised_dataset(feat, lab)
+    assert "feature_config_hash" in ds.columns
+    assert "label_config_hash" in ds.columns
+    assert ds["feature_config_hash"].iloc[0] == feat["feature_config_hash"].iloc[0]
+    assert ds["label_config_hash"].iloc[0] == lab["label_config_hash"].iloc[0]
+
+
+def test_dataset_does_not_mutate_inputs():
+    feat, lab = _feature_label()
+    feat_before = feat.copy(deep=True)
+    lab_before = lab.copy(deep=True)
+    build_supervised_dataset(feat, lab)
+    pd.testing.assert_frame_equal(feat, feat_before)
+    pd.testing.assert_frame_equal(lab, lab_before)
+
+
+def test_dataset_deterministic_and_order_invariant():
+    feat, lab = _feature_label()
+    ds1 = build_supervised_dataset(feat, lab)
+    ds2 = build_supervised_dataset(feat, lab)
+    pd.testing.assert_frame_equal(ds1, ds2)
+    # shuffled input rows produce the same sorted dataset
+    feat_s = feat.sample(frac=1, random_state=3).reset_index(drop=True)
+    lab_s = lab.sample(frac=1, random_state=9).reset_index(drop=True)
+    ds_shuffled = build_supervised_dataset(feat_s, lab_s)
+    pd.testing.assert_frame_equal(ds_shuffled, ds1)
+
+
+def test_dataset_key_mismatch_raises():
+    feat, lab = _feature_label()
+    with pytest.raises(DatasetError):
+        build_supervised_dataset(feat, lab.iloc[:-1])  # label missing the last key
+
+
+def test_dataset_missing_required_columns_raises():
+    feat, lab = _feature_label()
+    with pytest.raises(DatasetError):
+        build_supervised_dataset(feat.drop(columns=["active_contract"]), lab)
+    with pytest.raises(DatasetError):
+        build_supervised_dataset(feat, lab.drop(columns=["label_config_hash"]))
