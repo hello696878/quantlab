@@ -435,12 +435,13 @@ existing `app.data` provider module).
 
 ---
 
-## Appendix C — Phase 2 Futures Feature Engineering Plan
+## Appendix C — Phase 2 Futures Feature Engineering
 
 Phase 2 builds the **feature engineering layer** on top of the Phase 1 ES
 continuous pipeline: it turns a **ratio-adjusted** continuous frame into a
-**leakage-safe feature matrix** for later ML and backtesting. This appendix is a
-plan — not yet implemented.
+**leakage-safe feature matrix** for later ML and backtesting. **Implemented** in
+`backend/app/features/` (commits 1–5). Sections C.1–C.9 describe the design;
+**§C.10 records the as-built status.**
 
 ### C.1 Scope
 
@@ -606,3 +607,57 @@ explicitly (`drop_warmup=False` default).
 > download.** Ratio-adjusted continuous futures are the input for return-based
 > features; Panama is rejected for percentage returns; `*_raw` stays as
 > execution/reference prices.
+
+### C.10 As-built status (Phase 2 complete)
+
+Implemented in `backend/app/features/` across five commits; tests are synthetic
+only, no network. `build_feature_matrix(continuous_df, specs=DEFAULT_ES_FEATURES,
+upstream_continuous_hash=None, drop_warmup=False)` consumes a Phase 1 continuous
+frame and returns the matrix below.
+
+**16 ES features (all built):** `return_1`, `return_5`, `return_20`,
+`realized_vol_20`, `rolling_high_20`, `rolling_low_20`,
+`close_to_rolling_high_20`, `close_to_rolling_low_20`,
+`moving_average_gap_10_50`, `RSI_14`, `ATR_14`, `ATR_14_pct`, `volume_zscore_20`,
+`day_of_week`, `roll_flag`, `days_since_roll`.
+
+**Adjustment discipline (enforced):** return / level / indicator features read
+`*_adjusted` and require `adjustment_method == "ratio"`; a Panama (or any
+non-ratio) frame raises `FeatureError`. **`*_raw` prices stay as
+execution/reference and are never the default feature input.** Volume / calendar
+/ roll features use `price_space = NONE` (no adjustment).
+
+**Warmup:** `is_warmup` is True on any row where a trailing-window feature is
+still NaN (longest is `moving_average_gap_10_50`, first valid at index 49). No
+fill / interpolation. **`days_since_roll` is excluded from `is_warmup`** — it is
+NaN before the first roll in the frame *by design* (a documented condition, not a
+warmup), so a non-warmup row may legitimately carry a NaN `days_since_roll`.
+
+**Per-feature conventions:**
+- `realized_vol_20`: sample std (ddof=1) of daily ratio-adjusted returns over 20
+  sessions, **annualized ×√252** (a convention, not a measured value).
+- `RSI_14`: Wilder smoothing (seed = SMA of the first 14 changes, then the
+  recursive update); **zero-loss windows → RSI 100**.
+- `ATR_14`: Wilder ATR in **adjusted price points** (back-adjusted absolute scale
+  is fictitious for history). The first bar has no prior close, so no true range.
+  **`ATR_14_pct = ATR_14 / close` is the ML-preferred, scale-relative form.**
+- `volume_zscore_20`: trailing z-score of `volume`; futures volume is
+  contract-specific and not back-adjusted, so it can **jump around roll periods**.
+- `day_of_week`: session weekday 0–4 (numeric, no one-hot).
+
+**Reproducibility / provenance:** `feature_config_hash(specs,
+continuous_config_hash=None)` is SHA-256 over a canonical JSON of the spec set
+(order-stable by name), **chained with the upstream Phase 1
+`continuous_config_hash`** — giving full raw → continuous → features provenance.
+The hash changes when the feature config changes OR when the upstream continuous
+hash changes; it is stable for identical config. It is emitted as a constant
+column in the matrix alongside `source_adjustment_method`.
+
+**Leakage guarantees (test-proven):**
+- **Truncation-invariance** — a feature at `t` is identical whether computed on
+  the full frame or on `frame[:t+1]` (tested before / on / after a roll seam).
+- **Roll-seam return** — `return_1` at a roll equals the held contract's
+  ratio-adjusted return, never the raw inter-contract price gap.
+- **Input non-mutation** — the continuous input frame is never modified.
+- **Deterministic output** — identical input + config ⇒ identical matrix, and
+  row-order differences in the raw input wash out after normalization.
