@@ -40,6 +40,10 @@ IMPLEMENTED_FEATURES = [
     "RSI_14",
     "ATR_14",
     "ATR_14_pct",
+    "volume_zscore_20",
+    "day_of_week",
+    "roll_flag",
+    "days_since_roll",
 ]
 
 
@@ -66,7 +70,7 @@ def _continuous_frame(n: int = 3) -> pd.DataFrame:
             "high_raw": 5002.0,
             "low_raw": 4999.0,
             "close_raw": 5001.0,
-            "volume": 1000,
+            "volume": np.array([1000 + 10 * i for i in range(n)]),
             "open_interest": 2000.0,
             "adjustment_method": "ratio",
             "adjustment_factor": 1.0,
@@ -249,7 +253,7 @@ def _ratio_continuous(n: int = 60) -> pd.DataFrame:
             "high_raw": highs,
             "low_raw": lows,
             "close_raw": closes,
-            "volume": 1000,
+            "volume": np.array([1000 + 10 * i for i in range(n)]),
             "open_interest": 2000.0,
             "adjustment_method": "ratio",
             "adjustment_factor": 1.0,
@@ -388,7 +392,9 @@ def test_warmup_rows_marked_explicitly():
 
 def test_non_warmup_rows_have_no_nans():
     fm = build_feature_matrix(_ratio_continuous(60))
-    non_warmup = fm.loc[~fm["is_warmup"], IMPLEMENTED_FEATURES]
+    # days_since_roll is NaN before the first roll (documented), so exclude it.
+    cols = [c for c in IMPLEMENTED_FEATURES if c != "days_since_roll"]
+    non_warmup = fm.loc[~fm["is_warmup"], cols]
     assert not non_warmup.isna().any().any()
 
 
@@ -460,7 +466,7 @@ def _scaled_continuous(n: int = 60, scale: float = 2.0) -> pd.DataFrame:
             "high_raw": raw_high,
             "low_raw": raw_low,
             "close_raw": raw_close,
-            "volume": 1000,
+            "volume": np.array([1000 + 10 * i for i in range(n)]),
             "open_interest": 2000.0,
             "adjustment_method": "ratio",
             "adjustment_factor": scale,
@@ -558,7 +564,7 @@ def test_rsi_all_up_zero_loss_is_100():
         {
             "timestamp": idx, "root_symbol": "ES", "active_contract": "ESH24",
             "open_raw": closes, "high_raw": closes + 5.0, "low_raw": closes - 5.0, "close_raw": closes,
-            "volume": 1000, "open_interest": 2000.0,
+            "volume": np.array([1000 + 10 * i for i in range(n)]), "open_interest": 2000.0,
             "adjustment_method": "ratio", "adjustment_factor": 1.0,
             "open_adjusted": closes, "high_adjusted": closes + 5.0,
             "low_adjusted": closes - 5.0, "close_adjusted": closes,
@@ -609,3 +615,130 @@ def test_default_emits_indicator_columns():
     fm = build_feature_matrix(_ratio_continuous(60))
     for col in ["moving_average_gap_10_50", "RSI_14", "ATR_14", "ATR_14_pct"]:
         assert col in fm.columns
+
+
+# --------------------------------------------------------------------------- #
+# Commit 4 — volume / calendar / roll metadata features
+# --------------------------------------------------------------------------- #
+
+
+def _continuous_with_rolls(n: int = 60, roll_at=()) -> pd.DataFrame:
+    """Single-root ratio continuous frame with roll_flag True at given indices."""
+    idx = pd.date_range("2024-01-01", periods=n, freq="B", tz="UTC")
+    closes = np.array([5000.0 + 1.0 * i for i in range(n)])
+    volume = np.array([1000 + 10 * i for i in range(n)])
+    roll = np.zeros(n, dtype=bool)
+    for r in roll_at:
+        roll[r] = True
+    df = pd.DataFrame(
+        {
+            "timestamp": idx,
+            "root_symbol": "ES",
+            "active_contract": "ESH24",
+            "open_raw": closes,
+            "high_raw": closes + 5.0,
+            "low_raw": closes - 5.0,
+            "close_raw": closes,
+            "volume": volume,
+            "open_interest": 2000.0,
+            "adjustment_method": "ratio",
+            "adjustment_factor": 1.0,
+            "open_adjusted": closes,
+            "high_adjusted": closes + 5.0,
+            "low_adjusted": closes - 5.0,
+            "close_adjusted": closes,
+            "roll_flag": roll,
+            "roll_reason": ["roll" if roll[i] else "" for i in range(n)],
+        }
+    )
+    return df[CONTINUOUS_COLUMNS]
+
+
+# --- volume z-score ---
+
+
+def test_volume_zscore_matches_manual():
+    df = _ratio_continuous(60)
+    fm = build_feature_matrix(df)
+    vol = pd.Series(df["volume"].to_numpy(), dtype=float)
+    expected = (vol - vol.rolling(20).mean()) / vol.rolling(20).std()
+    np.testing.assert_allclose(
+        fm["volume_zscore_20"].to_numpy(), expected.to_numpy(), equal_nan=True, rtol=1e-9
+    )
+
+
+def test_volume_zscore_warmup():
+    fm = build_feature_matrix(_ratio_continuous(60))
+    assert fm["volume_zscore_20"].iloc[:19].isna().all()
+    assert fm["volume_zscore_20"].iloc[19:].notna().all()
+
+
+# --- day_of_week ---
+
+
+def test_day_of_week_matches_weekday():
+    df = _continuous_with_rolls(20)
+    fm = build_feature_matrix(df)
+    expected = df["timestamp"].dt.dayofweek.astype(float).to_numpy()
+    np.testing.assert_array_equal(fm["day_of_week"].to_numpy(), expected)
+    assert set(np.unique(fm["day_of_week"].to_numpy())).issubset({0.0, 1.0, 2.0, 3.0, 4.0})
+
+
+# --- roll_flag passthrough ---
+
+
+def test_roll_flag_passthrough_matches_input():
+    df = _continuous_with_rolls(20, roll_at=(5, 12))
+    fm = build_feature_matrix(df)
+    np.testing.assert_array_equal(
+        fm["roll_flag"].to_numpy(), df["roll_flag"].astype(float).to_numpy()
+    )
+    assert set(np.where(fm["roll_flag"].to_numpy() == 1.0)[0].tolist()) == {5, 12}
+
+
+# --- days_since_roll ---
+
+
+def test_days_since_roll_semantics():
+    df = _continuous_with_rolls(20, roll_at=(5, 12))
+    dsr = build_feature_matrix(df)["days_since_roll"]
+    assert dsr.iloc[:5].isna().all()                       # before first roll -> NaN
+    assert dsr.iloc[5] == 0.0 and dsr.iloc[12] == 0.0       # 0 on roll rows
+    assert list(dsr.iloc[5:12]) == [0, 1, 2, 3, 4, 5, 6]    # increments after first roll
+    assert list(dsr.iloc[12:20]) == [0, 1, 2, 3, 4, 5, 6, 7]  # resets at second roll
+
+
+def test_days_since_roll_excluded_from_warmup():
+    # A frame with no rolls -> days_since_roll all NaN, but non-warmup rows still exist.
+    fm = build_feature_matrix(_ratio_continuous(60))
+    assert fm["days_since_roll"].isna().all()
+    assert not fm["is_warmup"].iloc[49:].any()
+
+
+# --- all 16 features ---
+
+
+def test_all_16_features_emitted():
+    assert len(IMPLEMENTED_FEATURES) == 16
+    fm = build_feature_matrix(_ratio_continuous(60))
+    for col in IMPLEMENTED_FEATURES:
+        assert col in fm.columns
+
+
+def test_input_not_mutated_with_full_registry():
+    df = _continuous_with_rolls(60, roll_at=(30,))
+    before = df.copy(deep=True)
+    build_feature_matrix(df)
+    pd.testing.assert_frame_equal(df, before)
+
+
+# --- leakage: truncation invariance across a roll ---
+
+
+def test_truncation_invariance_around_roll():
+    df = _continuous_with_rolls(60, roll_at=(30,))
+    full = build_feature_matrix(df)
+    for t in (25, 29, 30, 31, 55, 59):  # before / on / after the roll
+        trunc = build_feature_matrix(df.iloc[: t + 1])
+        for col in IMPLEMENTED_FEATURES:
+            assert _equal_or_nan(full.loc[t, col], trunc.loc[t, col]), (col, t)

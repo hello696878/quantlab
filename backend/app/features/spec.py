@@ -265,7 +265,7 @@ DEFAULT_ES_FEATURES: list[FeatureSpec] = [
         input_columns=["volume"],
         windows=[20],
         price_space=PriceSpace.NONE,
-        warmup=20,
+        warmup=19,
         description="20-session z-score of volume (contract discontinuity at rolls).",
     ),
     FeatureSpec(

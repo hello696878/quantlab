@@ -159,6 +159,46 @@ def _f_atr(cdf: pd.DataFrame, spec: FeatureSpec) -> pd.Series:
     return atr
 
 
+def _f_zscore(cdf: pd.DataFrame, spec: FeatureSpec) -> pd.Series:
+    n = spec.windows[0]
+    series = cdf[spec.input_columns[0]].astype(float)
+    mean = series.rolling(n).mean()
+    std = series.rolling(n).std()  # sample std (ddof=1)
+    # Futures volume is contract-specific (NOT back-adjusted), so it can jump at
+    # rolls; a window spanning a roll mixes two contracts' volume levels.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        return (series - mean) / std
+
+
+def _f_calendar_dow(cdf: pd.DataFrame, spec: FeatureSpec) -> pd.Series:
+    # Weekday of the session timestamp: Monday=0 .. Friday=4. No one-hot encoding.
+    return cdf[spec.input_columns[0]].dt.dayofweek.astype(float)
+
+
+def _f_passthrough(cdf: pd.DataFrame, spec: FeatureSpec) -> pd.Series:
+    # roll_flag carried through unchanged as 0.0/1.0; roll dates are NOT recomputed.
+    return cdf[spec.input_columns[0]].astype(float)
+
+
+def _f_days_since_flag(cdf: pd.DataFrame, spec: FeatureSpec) -> pd.Series:
+    """Sessions since the most recent True flag at/before ``t`` (0 on flag rows).
+
+    NaN before the first flag in the frame; resets to 0 at each flag, then
+    increments by 1 each session.  Uses only past/current flags (causal).
+    """
+    flags = cdf[spec.input_columns[0]].astype(bool).to_numpy()
+    n = len(flags)
+    out = np.full(n, np.nan)
+    last = None
+    for i in range(n):
+        if flags[i]:
+            last = i
+            out[i] = 0.0
+        elif last is not None:
+            out[i] = float(i - last)
+    return pd.Series(out, index=cdf.index)
+
+
 # Transforms implemented so far. Others are skipped (logged).
 _COMPUTE = {
     TransformType.RETURN: _f_return,
@@ -170,6 +210,10 @@ _COMPUTE = {
     TransformType.MA_GAP: _f_ma_gap,
     TransformType.RSI: _f_rsi,
     TransformType.ATR: _f_atr,
+    TransformType.ZSCORE: _f_zscore,
+    TransformType.CALENDAR_DOW: _f_calendar_dow,
+    TransformType.PASSTHROUGH: _f_passthrough,
+    TransformType.DAYS_SINCE_FLAG: _f_days_since_flag,
 }
 
 
@@ -205,6 +249,7 @@ def build_feature_matrix(
 
     out = cdf.loc[:, _METADATA_FRONT].copy()
     feature_columns: list[str] = []
+    warmup_columns: list[str] = []
     skipped: list[str] = []
 
     for spec in specs:
@@ -219,6 +264,10 @@ def build_feature_matrix(
             )
         out[spec.output_name] = compute(cdf, spec)
         feature_columns.append(spec.output_name)
+        # days_since_roll is NaN before the first roll *by design* — a documented
+        # condition, not a trailing-window warmup — so it does not drive is_warmup.
+        if spec.transform is not TransformType.DAYS_SINCE_FLAG:
+            warmup_columns.append(spec.output_name)
 
     if skipped:
         logger.warning(
@@ -227,8 +276,8 @@ def build_feature_matrix(
             ", ".join(skipped),
         )
 
-    if feature_columns:
-        out["is_warmup"] = out[feature_columns].isna().any(axis=1)
+    if warmup_columns:
+        out["is_warmup"] = out[warmup_columns].isna().any(axis=1)
     else:
         out["is_warmup"] = pd.Series(False, index=out.index, dtype=bool)
     out["source_adjustment_method"] = frame_adjustment
