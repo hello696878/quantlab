@@ -20,6 +20,7 @@ import {
   num,
   pct,
   PORTFOLIO_FORMULAS,
+  type MonteCarloSummary,
   type PortfolioAnalysisResponse,
   type PortfolioAsset,
   type SamplePortfolioResponse,
@@ -128,6 +129,46 @@ function FrontierChart({ result }: { result: PortfolioAnalysisResponse }) {
 }
 
 // --------------------------------------------------------------------------- //
+// Monte Carlo fan chart (dependency-free SVG)
+// --------------------------------------------------------------------------- //
+function FanChart({ mc }: { mc: MonteCarloSummary }) {
+  const w = 560;
+  const h = 240;
+  const pad = { l: 56, r: 12, t: 12, b: 28 };
+  const pts = mc.fan_chart_points;
+  if (pts.length < 2) return null;
+  const maxDay = pts[pts.length - 1].day || 1;
+  const lows = pts.map((p) => p.p05);
+  const highs = pts.map((p) => p.p95);
+  const yMin = Math.min(...lows, mc.initial_value);
+  const yMax = Math.max(...highs);
+  const ySpan = yMax - yMin || 1;
+  const sx = (d: number) => pad.l + (d / maxDay) * (w - pad.l - pad.r);
+  const sy = (v: number) => h - pad.b - ((v - yMin) / ySpan) * (h - pad.t - pad.b);
+  const area = (top: (p: typeof pts[number]) => number, bot: (p: typeof pts[number]) => number) => {
+    const up = pts.map((p) => `${sx(p.day).toFixed(1)},${sy(top(p)).toFixed(1)}`).join(" ");
+    const down = [...pts].reverse().map((p) => `${sx(p.day).toFixed(1)},${sy(bot(p)).toFixed(1)}`).join(" ");
+    return `${up} ${down}`;
+  };
+  const line = (f: (p: typeof pts[number]) => number) =>
+    pts.map((p) => `${sx(p.day).toFixed(1)},${sy(f(p)).toFixed(1)}`).join(" ");
+  return (
+    <svg viewBox={`0 0 ${w} ${h}`} width="100%" role="img" aria-label="Monte Carlo wealth fan chart">
+      <polygon points={area((p) => p.p95, (p) => p.p05)} fill="var(--accent)" opacity={0.12} />
+      <polygon points={area((p) => p.p75, (p) => p.p25)} fill="var(--accent)" opacity={0.2} />
+      <polyline points={line((p) => p.median)} fill="none" stroke="var(--accent)" strokeWidth={1.8} />
+      <line x1={pad.l} y1={sy(mc.initial_value)} x2={w - pad.r} y2={sy(mc.initial_value)} stroke="var(--text-faint)" strokeDasharray="3 3" />
+      <line x1={pad.l} y1={h - pad.b} x2={w - pad.r} y2={h - pad.b} stroke="var(--line)" />
+      <line x1={pad.l} y1={pad.t} x2={pad.l} y2={h - pad.b} stroke="var(--line)" />
+      <text x={pad.l - 6} y={pad.t + 8} textAnchor="end" fontSize="9" fill="var(--text-faint)">{Math.round(yMax).toLocaleString()}</text>
+      <text x={pad.l - 6} y={h - pad.b} textAnchor="end" fontSize="9" fill="var(--text-faint)">{Math.round(yMin).toLocaleString()}</text>
+      <text x={w - pad.r} y={h - pad.b + 14} textAnchor="end" fontSize="9" fill="var(--text-faint)">day {maxDay}</text>
+      <text x={(pad.l + w - pad.r) / 2} y={h - 4} textAnchor="middle" fontSize="10" fill="var(--text-mut)">Wealth paths · p05–p95 band, median line</text>
+    </svg>
+  );
+}
+
+// --------------------------------------------------------------------------- //
 // Main panel
 // --------------------------------------------------------------------------- //
 export default function PortfolioRiskLabPanel() {
@@ -145,6 +186,9 @@ export default function PortfolioRiskLabPanel() {
   const [targetReturnStr, setTargetReturnStr] = useState("");
   const [targetVolStr, setTargetVolStr] = useState("");
   const [compareId, setCompareId] = useState("max_sharpe");
+  const [simHorizon, setSimHorizon] = useState(252);
+  const [simPaths, setSimPaths] = useState(500);
+  const [simSeed, setSimSeed] = useState(42);
 
   // Load the deterministic sample portfolio on mount.
   useEffect(() => {
@@ -192,7 +236,7 @@ export default function PortfolioRiskLabPanel() {
   })();
 
   // Auto-run analysis (debounced) whenever inputs change.
-  const reqKey = `${JSON.stringify(parsedWeights.out)}|${riskFree}|${confidence}|${maxWeightNum}|${targetReturnNum}|${targetVolNum}`;
+  const reqKey = `${JSON.stringify(parsedWeights.out)}|${riskFree}|${confidence}|${maxWeightNum}|${targetReturnNum}|${targetVolNum}|${simHorizon}|${simPaths}|${simSeed}`;
   useEffect(() => {
     if (!sample || assets.length === 0) return;
     if (parsedWeights.sum <= 0) {
@@ -212,6 +256,12 @@ export default function PortfolioRiskLabPanel() {
             max_weight: maxWeightNum,
             target_return: targetReturnNum ?? null,
             target_volatility: targetVolNum ?? null,
+          },
+          simulation_config: {
+            horizon_days: simHorizon,
+            num_paths: simPaths,
+            seed: simSeed,
+            method: "parametric_gaussian",
           },
         },
         ctrl.signal,
@@ -999,6 +1049,152 @@ export default function PortfolioRiskLabPanel() {
               </div>
             </div>
           )}
+
+          {/* ── Monte Carlo simulation ───────────────────────────────────── */}
+          {result.monte_carlo && (() => {
+            const mc = result.monte_carlo;
+            const money = (v: number) => Math.round(v).toLocaleString();
+            return (
+              <div className="card p-4">
+                <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                  <p className="section-title">Monte Carlo simulation</p>
+                  <span className="mono text-[11px]" style={{ color: "var(--text-faint)" }}>
+                    {mc.method === "parametric_gaussian" ? "Parametric Gaussian" : "Historical bootstrap"} · {mc.num_paths} paths · {mc.horizon_days}d · seed {mc.seed} · start {money(mc.initial_value)}
+                  </span>
+                </div>
+                <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <label className="block">
+                    <span className="section-title">Horizon (days)</span>
+                    <select aria-label="Simulation horizon in days" value={simHorizon} onChange={(e) => setSimHorizon(Number.parseInt(e.target.value, 10))} className="ql-input mt-1 w-full px-2 py-1 text-sm">
+                      {[63, 126, 252, 504].map((d) => <option key={d} value={d}>{d}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="section-title">Paths</span>
+                    <select aria-label="Number of simulation paths" value={simPaths} onChange={(e) => setSimPaths(Number.parseInt(e.target.value, 10))} className="ql-input mt-1 w-full px-2 py-1 text-sm">
+                      {[200, 500, 1000, 2000].map((p) => <option key={p} value={p}>{p}</option>)}
+                    </select>
+                  </label>
+                  <label className="block">
+                    <span className="section-title">Seed</span>
+                    <input type="number" inputMode="numeric" aria-label="Simulation random seed" value={simSeed} onChange={(e) => setSimSeed(Number.parseInt(e.target.value, 10) || 0)} className="ql-input mt-1 w-full px-2 py-1 text-sm" />
+                  </label>
+                  <div className="flex items-end">
+                    <span className="text-[11px]" style={{ color: "var(--text-faint)" }}>DD threshold {pct(mc.drawdown_threshold)}</span>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                  <MetricCard label="Terminal mean" value={money(mc.terminal_wealth_mean)} tone="accent" />
+                  <MetricCard label="Median" value={money(mc.terminal_wealth_median)} />
+                  <MetricCard label="P05" value={money(mc.terminal_wealth_p05)} tone="warn" />
+                  <MetricCard label="P95" value={money(mc.terminal_wealth_p95)} tone="positive" />
+                  <MetricCard label="Prob of loss" value={pct(mc.probability_of_loss, 1)} tone="warn" />
+                  <MetricCard label={`Prob DD < ${pct(mc.drawdown_threshold, 0)}`} value={pct(mc.probability_drawdown_breach, 1)} tone="danger" />
+                  <MetricCard label="Sim VaR 95 (horizon)" value={pct(mc.simulated_var_95)} tone="warn" />
+                  <MetricCard label="Sim CVaR 95 (horizon)" value={pct(mc.simulated_cvar_95)} tone="danger" />
+                  <MetricCard label="Max DD mean" value={pct(mc.max_drawdown_mean)} />
+                  <MetricCard label="Max DD p05" value={pct(mc.max_drawdown_p05)} tone="danger" />
+                </div>
+                <div className="mt-3"><FanChart mc={mc} /></div>
+                <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                  Simulation uses deterministic sample data and a fixed seed. It is not a forecast.
+                </p>
+              </div>
+            );
+          })()}
+
+          {/* ── Bootstrap robustness ─────────────────────────────────────── */}
+          {result.bootstrap_robustness && (() => {
+            const boot = result.bootstrap_robustness;
+            const money = (v: number) => Math.round(v).toLocaleString();
+            return (
+              <div className="card p-4">
+                <p className="section-title mb-2">Bootstrap robustness</p>
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
+                  <MetricCard label="Terminal mean" value={money(boot.terminal_wealth_mean)} tone="accent" />
+                  <MetricCard label="P05" value={money(boot.terminal_wealth_p05)} tone="warn" />
+                  <MetricCard label="P95" value={money(boot.terminal_wealth_p95)} tone="positive" />
+                  <MetricCard label="Prob of loss" value={pct(boot.probability_of_loss, 1)} tone="warn" />
+                  <MetricCard label="Max DD mean" value={pct(boot.max_drawdown_mean)} />
+                  <MetricCard label="Sim CVaR 95" value={pct(boot.simulated_cvar_95)} tone="danger" />
+                </div>
+                <div className="mt-3"><FanChart mc={boot} /></div>
+                <ul className="mt-2 space-y-1 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                  {boot.notes.map((n) => <li key={n}>• {n}</li>)}
+                </ul>
+              </div>
+            );
+          })()}
+
+          {/* ── Assumption sensitivity ───────────────────────────────────── */}
+          {result.assumption_sensitivity.length > 0 && (
+            <div className="card p-4">
+              <p className="section-title mb-2">Assumption sensitivity</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ color: "var(--text-mut)" }}>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Scenario</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Exp return</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Volatility</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Sharpe</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">VaR</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">CVaR</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.assumption_sensitivity.map((s) => (
+                      <tr key={s.id} style={{ borderTop: "1px solid var(--line)" }} title={s.description}>
+                        <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>{s.name}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(s.expected_return)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(s.volatility)}</td>
+                        <td className="mono px-2 py-1.5 text-right font-semibold" style={{ color: "var(--text-hi)" }}>{num(s.sharpe_ratio, 2)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--warn)" }}>{pct(s.historical_var)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--neg)" }}>{pct(s.historical_cvar)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                Illustrative assumption shifts on the current portfolio — not forecasts.
+              </p>
+            </div>
+          )}
+
+          {/* ── Optimization robustness ──────────────────────────────────── */}
+          {result.optimization_robustness.length > 0 && (
+            <div className="card p-4">
+              <p className="section-title mb-2">Optimization robustness</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ color: "var(--text-mut)" }}>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Portfolio</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Base Sharpe</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Worst-case Sharpe</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Sharpe range</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Rank stability</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {result.optimization_robustness.map((r) => (
+                      <tr key={r.portfolio_id} style={{ borderTop: "1px solid var(--line)" }}>
+                        <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>{r.name}</td>
+                        <td className="mono px-2 py-1.5 text-right font-semibold" style={{ color: "var(--text-hi)" }}>{num(r.base_sharpe, 2)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: changeColor(r.worst_case_sharpe) }}>{num(r.worst_case_sharpe, 2)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{num(r.sharpe_range, 2)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(r.rank_stability, 0)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                Sample robustness across the assumption shifts — Sharpe stability, not optimality. Not advice.
+              </p>
+            </div>
+          )}
         </>
       )}
 
@@ -1033,6 +1229,9 @@ export default function PortfolioRiskLabPanel() {
               <li><span className="font-semibold">Mean-variance optimization</span> finds high-return-per-unit-risk portfolios; <span className="font-semibold">max Sharpe</span> maximises excess return ÷ volatility, and box <span className="font-semibold">constraints</span> (long-only, per-asset cap) keep results diversified.</li>
               <li><span className="font-semibold">Black-Litterman</span> starts from market-implied equilibrium returns and tilts them toward your views — blending a prior with opinions instead of trusting raw return estimates.</li>
               <li><span className="font-semibold">Turnover</span> (½·Σ|Δweight|) measures how much trading a rebalance would imply — higher turnover means more cost in practice.</li>
+              <li><span className="font-semibold">Monte Carlo</span> simulates many fixed-seed wealth paths to show a distribution of outcomes (terminal wealth, drawdown, probability of loss) rather than a single point estimate.</li>
+              <li><span className="font-semibold">Bootstrap</span> resamples the sample return series instead of assuming a Gaussian — a non-parametric robustness cross-check.</li>
+              <li><span className="font-semibold">Robustness</span> re-scores portfolios under shifted assumptions (returns, volatility, correlation, rates) — a stable Sharpe across scenarios is more trustworthy than a fragile one.</li>
             </ul>
           </div>
           <div>
@@ -1045,6 +1244,7 @@ export default function PortfolioRiskLabPanel() {
               <li>Factor betas are <span className="font-semibold">deterministic illustrative values</span>, not estimated from data; factors are treated as orthogonal in v1, and specific variance is a floored residual.</li>
               <li>Scenarios are <span className="font-semibold">educational sample shocks</span>, not a current macro view — a simplified factor model, not a production risk model.</li>
               <li>The optimizer is a <span className="font-semibold">deterministic candidate search</span>, not a production optimizer; Black-Litterman views are <span className="font-semibold">illustrative, not forecasts</span>; rebalance deltas are <span className="font-semibold">hypothetical, not trade orders</span> — no buy/sell recommendations.</li>
+              <li>Monte Carlo and bootstrap paths are <span className="font-semibold">fixed-seed simulations on illustrative sample data</span> — distributions of outcomes, <span className="font-semibold">not forecasts</span> or guaranteed probabilities; the bootstrap uses a short monthly sample (wide uncertainty), and this is not a production risk model.</li>
             </ul>
           </div>
         </div>

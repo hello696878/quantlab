@@ -53,6 +53,7 @@ export interface PortfolioAnalysisRequest {
   optimization_constraints?: OptimizationConstraintsInput | null;
   risk_aversion?: number;
   tau?: number;
+  simulation_config?: PortfolioSimulationConfig | null;
 }
 
 export interface FrontierPoint {
@@ -228,6 +229,81 @@ export interface RebalanceAnalysis {
   note: string;
 }
 
+export type SimulationMethod = "parametric_gaussian" | "historical_bootstrap";
+
+export interface PortfolioSimulationConfig {
+  horizon_days?: number;
+  num_paths?: number;
+  initial_value?: number;
+  seed?: number;
+  drawdown_threshold?: number;
+  method?: SimulationMethod;
+}
+
+export interface MonteCarloFanPoint {
+  day: number;
+  p05: number;
+  p25: number;
+  median: number;
+  p75: number;
+  p95: number;
+}
+
+export interface MonteCarloPathPoint {
+  day: number;
+  value: number;
+}
+
+export interface MonteCarloSamplePath {
+  path_id: number;
+  points: MonteCarloPathPoint[];
+}
+
+export interface MonteCarloSummary {
+  method: SimulationMethod;
+  seed: number;
+  horizon_days: number;
+  num_paths: number;
+  initial_value: number;
+  terminal_wealth_mean: number;
+  terminal_wealth_median: number;
+  terminal_wealth_p05: number;
+  terminal_wealth_p95: number;
+  probability_of_loss: number;
+  probability_drawdown_breach: number;
+  drawdown_threshold: number;
+  max_drawdown_mean: number;
+  max_drawdown_p05: number;
+  max_drawdown_p95: number;
+  simulated_var_95: number;
+  simulated_cvar_95: number;
+  fan_chart_points: MonteCarloFanPoint[];
+  sample_paths: MonteCarloSamplePath[];
+  notes: string[];
+}
+
+export interface SensitivityResult {
+  id: string;
+  name: string;
+  description: string;
+  expected_return: number;
+  volatility: number;
+  sharpe_ratio: number;
+  historical_var: number;
+  historical_cvar: number;
+  notes: string[];
+}
+
+export interface OptimizationRobustnessResult {
+  portfolio_id: string;
+  name: string;
+  base_sharpe: number;
+  worst_case_sharpe: number;
+  sharpe_range: number;
+  rank_stability: number;
+  notes: string[];
+}
+
 export interface PortfolioAnalysisResponse {
   asset_order: string[];
   asset_names: Record<string, string>;
@@ -260,6 +336,10 @@ export interface PortfolioAnalysisResponse {
   optimization_results: OptimizationResults;
   black_litterman: BlackLittermanResult;
   rebalance_analysis: RebalanceAnalysis;
+  monte_carlo: MonteCarloSummary;
+  bootstrap_robustness: MonteCarloSummary;
+  assumption_sensitivity: SensitivityResult[];
+  optimization_robustness: OptimizationRobustnessResult[];
   notes: string[];
   data_status: "static_sample";
   disclaimer: string;
@@ -356,4 +436,11 @@ Scenario portfolio P&L Σ_i w_i · asset_impact_i
 Mean-variance opt.     max (wᵀμ − r_f) / sqrt(wᵀΣw),  s.t. long-only box
 BL implied returns     π = δ · Σ · w_market
 BL posterior returns   μ_bl = [ (τΣ)⁻¹ + Pᵀ Ω⁻¹ P ]⁻¹ · [ (τΣ)⁻¹ π + Pᵀ Ω⁻¹ q ]
-Turnover               0.5 · Σ_i |target_w_i − current_w_i|`;
+Turnover               0.5 · Σ_i |target_w_i − current_w_i|
+
+MC daily return        r_t ~ N(μ_p/252, σ_p/√252)   (parametric Gaussian)
+Wealth path            W_t = W_0 · Π_{s≤t} (1 + r_s)
+Drawdown               DD_t = W_t / max(W_0..W_t) − 1
+Max drawdown           min_t DD_t
+Prob of loss           mean( W_T < W_0 )
+Prob DD breach         mean( maxDD ≤ threshold )`;

@@ -227,6 +227,18 @@ Return to the Command Center's **Platform Direction** panel (or open
   rebalance re-compute. Emphasise: deterministic candidate-search optimizer (not a
   production solver), illustrative BL views (not forecasts), hypothetical rebalance
   deltas (not trade orders, no buy/sell) — not investment advice.
+  **Monte Carlo & robustness (21.3):** scroll to **Monte Carlo simulation** — note
+  the terminal-wealth mean/median/P05/P95 cards, probability of loss, drawdown-
+  breach probability, simulated VaR/CVaR, and the **fan chart** (p05–p95 band +
+  median). Change Horizon to `504`, Paths to `1000`, and the **Seed** to a new
+  number to show the simulation re-run (same seed ⇒ identical, the panel says "It
+  is not a forecast."). Then **Bootstrap robustness** (resampled sample series, with
+  a short-sample note), the **Assumption sensitivity** table (±25% returns, ±vol,
+  ±0.20 correlation, ±1% rate → return/vol/Sharpe/VaR/CVaR), and **Optimization
+  robustness** (base vs worst-case Sharpe, range, rank stability across scenarios).
+  Change a weight and watch all four re-compute. Emphasise: deterministic fixed-
+  seed simulations on illustrative sample data — outcome distributions, **not
+  forecasts or guaranteed probabilities**, not a production risk model, not advice.
 - **Cross-Sectional Scanner** — the *second engine*. Use the defaults (reversal,
   50 assets, 2022-01-01 → 2024-12-31, lookback 5, long/short quantile 0.2, daily,
   gross 1.0, cost 5 bps, seed 42) → **Run Scanner** → metric cards (total /

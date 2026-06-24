@@ -64,6 +64,8 @@ class PortfolioAnalysisRequest(PortfolioModel):
     black_litterman_views: Optional[List["BlackLittermanView"]] = None
     risk_aversion: Annotated[FiniteFloat, Field(gt=0.0, le=100.0)] = 2.5
     tau: Annotated[FiniteFloat, Field(gt=0.0, le=1.0)] = 0.05
+    # Monte Carlo simulation config (Phase 21.3).
+    simulation_config: Optional["PortfolioSimulationConfig"] = None
 
     @model_validator(mode="after")
     def _validate(self) -> "PortfolioAnalysisRequest":
@@ -289,6 +291,85 @@ class RebalanceAnalysis(PortfolioModel):
     note: NonEmptyStr
 
 
+# --------------------------------------------------------------------------- #
+# Monte Carlo & robustness (Phase 21.3)
+# --------------------------------------------------------------------------- #
+SimulationMethod = Literal["parametric_gaussian", "historical_bootstrap"]
+
+
+class PortfolioSimulationConfig(PortfolioModel):
+    horizon_days: Annotated[int, Field(gt=0, le=2520)] = 252
+    num_paths: Annotated[int, Field(gt=0, le=5000)] = 500
+    initial_value: PositiveFloat = 100000.0
+    seed: int = 42
+    drawdown_threshold: Annotated[FiniteFloat, Field(gt=-1.0, lt=0.0)] = -0.20
+    method: SimulationMethod = "parametric_gaussian"
+
+
+class MonteCarloFanPoint(PortfolioModel):
+    day: int
+    p05: FiniteFloat
+    p25: FiniteFloat
+    median: FiniteFloat
+    p75: FiniteFloat
+    p95: FiniteFloat
+
+
+class MonteCarloPathPoint(PortfolioModel):
+    day: int
+    value: FiniteFloat
+
+
+class MonteCarloSamplePath(PortfolioModel):
+    path_id: int
+    points: List[MonteCarloPathPoint]
+
+
+class MonteCarloSummary(PortfolioModel):
+    method: SimulationMethod
+    seed: int
+    horizon_days: int
+    num_paths: int
+    initial_value: FiniteFloat
+    terminal_wealth_mean: FiniteFloat
+    terminal_wealth_median: FiniteFloat
+    terminal_wealth_p05: FiniteFloat
+    terminal_wealth_p95: FiniteFloat
+    probability_of_loss: FiniteFloat
+    probability_drawdown_breach: FiniteFloat
+    drawdown_threshold: FiniteFloat
+    max_drawdown_mean: FiniteFloat
+    max_drawdown_p05: FiniteFloat
+    max_drawdown_p95: FiniteFloat
+    simulated_var_95: FiniteFloat
+    simulated_cvar_95: FiniteFloat
+    fan_chart_points: List[MonteCarloFanPoint]
+    sample_paths: List[MonteCarloSamplePath]
+    notes: List[NonEmptyStr]
+
+
+class SensitivityResult(PortfolioModel):
+    id: NonEmptyStr
+    name: NonEmptyStr
+    description: NonEmptyStr
+    expected_return: FiniteFloat
+    volatility: FiniteFloat
+    sharpe_ratio: FiniteFloat
+    historical_var: FiniteFloat
+    historical_cvar: FiniteFloat
+    notes: List[NonEmptyStr]
+
+
+class OptimizationRobustnessResult(PortfolioModel):
+    portfolio_id: NonEmptyStr
+    name: NonEmptyStr
+    base_sharpe: FiniteFloat
+    worst_case_sharpe: FiniteFloat
+    sharpe_range: FiniteFloat
+    rank_stability: FiniteFloat
+    notes: List[NonEmptyStr]
+
+
 class PortfolioAnalysisResponse(PortfolioModel):
     asset_order: List[NonEmptyStr]
     asset_names: Dict[str, NonEmptyStr]
@@ -323,6 +404,11 @@ class PortfolioAnalysisResponse(PortfolioModel):
     optimization_results: OptimizationResults
     black_litterman: BlackLittermanResult
     rebalance_analysis: RebalanceAnalysis
+    # Monte Carlo & robustness (Phase 21.3).
+    monte_carlo: MonteCarloSummary
+    bootstrap_robustness: MonteCarloSummary
+    assumption_sensitivity: List[SensitivityResult]
+    optimization_robustness: List[OptimizationRobustnessResult]
     notes: List[NonEmptyStr]
     data_status: Literal["static_sample"] = "static_sample"
     disclaimer: NonEmptyStr

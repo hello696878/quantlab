@@ -39,7 +39,8 @@
       "Bash(git --no-pager diff -- docs/AI_QUANT_ARCHITECTURE.md)",
       "Read(//c/quantlab-phase2-features/backend/**)",
       "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_futures_features.py -v)",
-      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py)"
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_futures_features.py -q)"
     ]
   }
 }

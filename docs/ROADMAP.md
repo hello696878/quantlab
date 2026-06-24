@@ -1550,6 +1550,40 @@ single-asset Backtest + Strategy Comparison:
   optimizer (not production), illustrative BL views (not forecasts), hypothetical
   rebalance (no trade orders) — not investment advice.**
 
+### Phase 21.3 — Portfolio Monte Carlo & Robustness Lab v1 ✅
+
+- **Additive extension of Portfolio Risk Lab** — all existing fields/behaviour
+  preserved. Deterministic, **fixed-seed** sample data only; no live data, no
+  trading, no brokerage, simulations are **not forecasts**, not advice.
+  Backtest/AFML/scanner untouched.
+- Backend: new `app/portfolio_risk/simulate.py` — **Monte Carlo** (parametric
+  Gaussian: daily portfolio returns ~ N(μ_p/252, σ_p/√252), cumulative wealth
+  paths) and **historical bootstrap** (resampled daily-equivalent returns from the
+  monthly sample series), each summarised to terminal-wealth mean/median/p05/p95,
+  probability of loss, drawdown-breach probability, mean/p05/p95 max drawdown,
+  simulated VaR/CVaR, a downsampled **fan chart** (p05/p25/median/p75/p95) and ≤20
+  sample paths; **assumption sensitivity** (8 deterministic ±return/vol/
+  correlation/rate shifts → return/vol/Sharpe/VaR/CVaR) and **optimization
+  robustness** (base vs worst-case Sharpe, range, rank stability across the
+  shifts). New models in `models.py`; `analyze_portfolio` now also returns
+  `monte_carlo`, `bootstrap_robustness`, `assumption_sensitivity`,
+  `optimization_robustness`; request gains optional `simulation_config`
+  (validated: horizon 1–2520, paths 1–5000, initial>0, drawdown_threshold in
+  (−1,0), method enum).
+- Frontend: `PortfolioRiskLabPanel` extended with a **Monte Carlo** section
+  (config controls + metric cards + dependency-free SVG fan chart), a **Bootstrap
+  robustness** section, an **Assumption sensitivity** table, and an **Optimization
+  robustness** table; `lib/portfolioRisk.ts` types + formulas extended. Dashboard
+  badge → "Portfolio analytics + robustness"; palette adds Portfolio Monte Carlo
+  Lab, Portfolio Robustness Lab, Portfolio Drawdown Simulation, Portfolio
+  Bootstrap Stress.
+- 13 new backend tests (the portfolio-risk file now has 61) — full suite green
+  (**1883 passed**); `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`, `PROJECT_OVERVIEW.md`,
+  `LIMITATIONS.md`, `DEMO_SCRIPT.md`, `frontend/README.md`. **Fixed-seed
+  simulations (not forecasts), illustrative robustness shifts — not a production
+  risk model, not investment advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

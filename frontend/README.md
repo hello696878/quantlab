@@ -103,10 +103,15 @@ squeeze, commodity rally, credit stress), plus (Phase 21.2) an **Optimization
 Lab** (constrained max-Sharpe / min-variance / target-return / target-volatility
 candidate search), a **current-vs-optimized weight comparison** with a
 hypothetical-rebalance/turnover summary, and a **Black-Litterman** panel
-(implied/posterior returns + illustrative sample views). All data is static
-illustrative sample data with deterministic illustrative factor betas and views —
-long-only v1, educational, a candidate-search optimizer (not production), no trade
-orders, not a production risk model, not investment advice.
+(implied/posterior returns + illustrative sample views), plus (Phase 21.3) a
+**Monte Carlo** section (fixed-seed parametric-Gaussian wealth paths with a fan
+chart, terminal-wealth distribution, probability of loss/drawdown breach,
+simulated VaR/CVaR), a **bootstrap robustness** section, an **assumption
+sensitivity** table, and an **optimization robustness** table. All data is static
+illustrative sample data with deterministic illustrative factor betas and views,
+and fixed-seed simulations — long-only v1, educational, a candidate-search
+optimizer (not production), simulations are not forecasts, no trade orders, not a
+production risk model, not investment advice.
 
 The Globe renders bundled static sample data immediately, then uses the validated
 backend dataset when available. The parser requires exact FRED field/date

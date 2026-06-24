@@ -42,11 +42,22 @@ from app.portfolio_risk.models import (
     StressResult,
     StressScenario,
 )
+from app.portfolio_risk.models import (
+    MonteCarloSummary,
+    OptimizationRobustnessResult,
+    PortfolioSimulationConfig,
+    SensitivityResult,
+)
 from app.portfolio_risk.optimize import (
     build_black_litterman,
     build_optimization,
     build_rebalance,
     sample_bl_views,
+)
+from app.portfolio_risk.simulate import (
+    build_optimization_robustness,
+    build_sensitivity,
+    build_simulations,
 )
 from app.portfolio_risk.sample import build_sample_response, sample_assets
 from app.portfolio_risk.service import DISCLAIMER, analyze_portfolio

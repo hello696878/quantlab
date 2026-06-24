@@ -502,6 +502,122 @@ def test_no_buy_sell_recommendation_wording():
     assert "recommendation" in note  # phrased as "not a ... recommendation"
 
 
+# --------------------------------------------------------------------------- #
+# Phase 21.3 — Monte Carlo & robustness
+# --------------------------------------------------------------------------- #
+_SMALL_SIM = {"num_paths": 120, "horizon_days": 60, "seed": 42}
+
+
+def test_monte_carlo_exists():
+    out = _analyze(simulation_config=_SMALL_SIM)
+    mc = out.monte_carlo
+    assert mc.method == "parametric_gaussian"
+    assert mc.num_paths == 120 and mc.horizon_days == 60
+    assert out.bootstrap_robustness.method == "historical_bootstrap"
+
+
+def test_monte_carlo_deterministic_same_seed():
+    a = _analyze(simulation_config=_SMALL_SIM)
+    b = _analyze(simulation_config=_SMALL_SIM)
+    assert a.monte_carlo.terminal_wealth_mean == b.monte_carlo.terminal_wealth_mean
+    assert a.monte_carlo.simulated_var_95 == b.monte_carlo.simulated_var_95
+    assert a.bootstrap_robustness.terminal_wealth_mean == b.bootstrap_robustness.terminal_wealth_mean
+
+
+def test_monte_carlo_different_seed_changes_output():
+    a = _analyze(simulation_config={**_SMALL_SIM, "seed": 42})
+    b = _analyze(simulation_config={**_SMALL_SIM, "seed": 7})
+    assert a.monte_carlo.terminal_wealth_mean != b.monte_carlo.terminal_wealth_mean
+
+
+def test_fan_chart_days_increasing():
+    out = _analyze(simulation_config=_SMALL_SIM)
+    for mc in (out.monte_carlo, out.bootstrap_robustness):
+        days = [pt.day for pt in mc.fan_chart_points]
+        assert days == sorted(days)
+        assert len(set(days)) == len(days)
+
+
+def test_fan_chart_percentile_ordering():
+    out = _analyze(simulation_config=_SMALL_SIM)
+    for mc in (out.monte_carlo, out.bootstrap_robustness):
+        for pt in mc.fan_chart_points:
+            assert pt.p05 <= pt.p25 + 1e-6 <= pt.median + 1e-6 <= pt.p75 + 1e-6 <= pt.p95 + 1e-6
+
+
+def test_terminal_wealth_finite():
+    out = _analyze(simulation_config=_SMALL_SIM)
+    for mc in (out.monte_carlo, out.bootstrap_robustness):
+        for v in (mc.terminal_wealth_mean, mc.terminal_wealth_median, mc.terminal_wealth_p05, mc.terminal_wealth_p95):
+            assert math.isfinite(v)
+
+
+def test_probabilities_in_unit_interval():
+    out = _analyze(simulation_config=_SMALL_SIM)
+    for mc in (out.monte_carlo, out.bootstrap_robustness):
+        assert 0.0 <= mc.probability_of_loss <= 1.0
+        assert 0.0 <= mc.probability_drawdown_breach <= 1.0
+
+
+def test_max_drawdowns_non_positive():
+    out = _analyze(simulation_config=_SMALL_SIM)
+    for mc in (out.monte_carlo, out.bootstrap_robustness):
+        assert mc.max_drawdown_mean <= 1e-9
+        assert mc.max_drawdown_p05 <= 1e-9
+        assert mc.max_drawdown_p95 <= 1e-9
+
+
+def test_simulated_var_cvar_finite():
+    out = _analyze(simulation_config=_SMALL_SIM)
+    for mc in (out.monte_carlo, out.bootstrap_robustness):
+        assert math.isfinite(mc.simulated_var_95) and math.isfinite(mc.simulated_cvar_95)
+
+
+def test_bootstrap_deterministic():
+    a = _analyze(simulation_config=_SMALL_SIM)
+    b = _analyze(simulation_config=_SMALL_SIM)
+    assert a.bootstrap_robustness.simulated_cvar_95 == b.bootstrap_robustness.simulated_cvar_95
+    assert len(a.bootstrap_robustness.sample_paths) <= 20
+
+
+def test_invalid_simulation_config_rejected():
+    for bad in (
+        {"num_paths": 0},
+        {"horizon_days": 0},
+        {"horizon_days": 999999},
+        {"drawdown_threshold": 0.0},
+        {"drawdown_threshold": -1.5},
+        {"initial_value": 0.0},
+        {"method": "not_a_method"},
+    ):
+        with pytest.raises(ValidationError):
+            _request(simulation_config={**_SMALL_SIM, **bad})
+
+
+def test_sensitivity_scenarios_exist_and_finite():
+    out = _analyze(simulation_config=_SMALL_SIM)
+    s = out.assumption_sensitivity
+    assert len(s) == 8
+    ids = {x.id for x in s}
+    assert {"ret_down_25", "ret_up_25", "vol_up_25", "corr_up_20", "rf_up_1"} <= ids
+    for x in s:
+        for v in (x.expected_return, x.volatility, x.sharpe_ratio, x.historical_var, x.historical_cvar):
+            assert math.isfinite(v)
+        assert x.volatility >= 0.0
+
+
+def test_optimization_robustness_exists_and_finite():
+    out = _analyze(simulation_config=_SMALL_SIM)
+    r = out.optimization_robustness
+    assert len(r) == 5
+    for x in r:
+        for v in (x.base_sharpe, x.worst_case_sharpe, x.sharpe_range, x.rank_stability):
+            assert math.isfinite(v)
+        assert x.worst_case_sharpe <= x.base_sharpe + 1e-9
+        assert x.sharpe_range >= -1e-9
+        assert 0.0 <= x.rank_stability <= 1.0
+
+
 def test_single_asset_portfolio_does_not_crash():
     # A 1-asset portfolio is valid input (min_length=1); np.corrcoef collapses a
     # single series to a 0-d scalar, so the covariance path must stay well-shaped.

@@ -1246,6 +1246,10 @@ export default function HomePage() {
         ["Black-Litterman Lab", "black litterman bl implied equilibrium returns posterior views prior tau risk aversion tilt blend"],
         ["Max Sharpe Portfolio", "max sharpe portfolio optimization tangency best risk adjusted return constrained long only"],
         ["Portfolio Rebalance Analysis", "portfolio rebalance turnover hypothetical delta weight change current target largest increase decrease"],
+        ["Portfolio Monte Carlo Lab", "portfolio monte carlo simulation fixed seed paths terminal wealth distribution fan chart parametric gaussian probability of loss"],
+        ["Portfolio Robustness Lab", "portfolio robustness assumption sensitivity scenarios return volatility correlation rate shifts sharpe stability optimization robustness"],
+        ["Portfolio Drawdown Simulation", "portfolio drawdown simulation max drawdown distribution breach probability threshold underwater monte carlo"],
+        ["Portfolio Bootstrap Stress", "portfolio bootstrap resampling historical returns stress robustness non parametric simulation distribution"],
       ] as const
     ).map(([title, keywords]) => ({
       id: `risklab-${title}`,

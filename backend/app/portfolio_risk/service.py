@@ -33,6 +33,7 @@ from app.portfolio_risk.factors import (
     compute_scenarios,
     scenario_library,
 )
+from app.portfolio_risk.models import PortfolioSimulationConfig
 from app.portfolio_risk.optimize import (
     build_black_litterman,
     build_optimization,
@@ -40,6 +41,11 @@ from app.portfolio_risk.optimize import (
     sample_bl_views,
 )
 from app.portfolio_risk.sample import DISCLAIMER
+from app.portfolio_risk.simulate import (
+    build_optimization_robustness,
+    build_sensitivity,
+    build_simulations,
+)
 
 _MIN_VOL = 1e-12
 # Deterministic candidate cloud for the efficient frontier.
@@ -255,6 +261,26 @@ def analyze_portfolio(req: PortfolioAnalysisRequest) -> PortfolioAnalysisRespons
         optimization_results.max_sharpe_portfolio, ids, names, w, prev_weights
     )
 
+    # Monte Carlo simulation, bootstrap robustness, and assumption sensitivity.
+    sim_config = req.simulation_config or PortfolioSimulationConfig()
+    monte_carlo, bootstrap_robustness = build_simulations(w, mu, cov, series, sim_config)
+    confidence = float(req.confidence_level)
+    assumption_sensitivity = build_sensitivity(w, mu, cov, vols, corr, rf, series, confidence)
+
+    def _weights(p) -> np.ndarray:
+        return np.array([p.weights[i] for i in ids], dtype=float)
+
+    robustness_portfolios = [
+        ("current", "Current", w),
+        ("max_sharpe", "Max Sharpe", _weights(optimization_results.max_sharpe_portfolio)),
+        ("min_variance", "Minimum variance", _weights(optimization_results.min_variance_portfolio)),
+        ("risk_parity", "Risk parity", _weights(optimization_results.risk_parity_portfolio)),
+        ("black_litterman", "Black-Litterman", _weights(black_litterman.bl_optimized_portfolio)),
+    ]
+    optimization_robustness = build_optimization_robustness(
+        robustness_portfolios, mu, cov, vols, corr, rf, series, confidence
+    )
+
     return PortfolioAnalysisResponse(
         asset_order=ids,
         asset_names=names,
@@ -287,6 +313,10 @@ def analyze_portfolio(req: PortfolioAnalysisRequest) -> PortfolioAnalysisRespons
         optimization_results=optimization_results,
         black_litterman=black_litterman,
         rebalance_analysis=rebalance_analysis,
+        monte_carlo=monte_carlo,
+        bootstrap_robustness=bootstrap_robustness,
+        assumption_sensitivity=assumption_sensitivity,
+        optimization_robustness=optimization_robustness,
         notes=[
             "Weights are normalised to sum to 1 before analysis.",
             "Covariance is annualised: it ties each asset's stated annual "
@@ -305,6 +335,10 @@ def analyze_portfolio(req: PortfolioAnalysisRequest) -> PortfolioAnalysisRespons
             "optimiser and not advice.",
             "Black-Litterman views are illustrative only and are not forecasts; "
             "rebalance deltas are hypothetical, not trade orders.",
+            "Monte Carlo and bootstrap paths use a fixed seed on illustrative sample "
+            "data — simulated outcomes are educational, not forecasts.",
+            "Assumption-sensitivity and optimization-robustness scenarios are "
+            "deterministic illustrative shifts, not predictions.",
         ],
         disclaimer=DISCLAIMER,
     )
