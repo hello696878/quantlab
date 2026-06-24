@@ -135,10 +135,10 @@ quantlab/
 │       │   ├── futures.py            #   futures-specific (expiry, rollover rules)
 │       │   ├── cfd.py                #   CFD wrapper over an underlying (financing/spread)
 │       │   └── options_chain.py      #   chain model (expiries, strikes, quotes, IV)
-│       ├── data/                     # REFACTOR existing data.py/market_data.py into a pkg
-│       │   ├── providers/            #   yfinance, csv, (future) paid feeds
-│       │   ├── futures_continuous.py # NEW — Panama / ratio adjustment, roll calendar
-│       │   └── store.py              #   parquet/sqlite cache; raw + adjusted separation
+│       ├── datastore/                # NEW — futures data layer (named to avoid app/data.py)
+│       │   ├── store.py              #   raw schema validation + parquet/CSV storage
+│       │   └── futures_continuous.py #   roll calendar + ratio/Panama stitching
+│       ├── data.py, market_data.py   # EXISTS — provider modules (yfinance/CSV)
 │       ├── features/                 # NEW — declarative, leakage-safe feature specs
 │       │   ├── spec.py               #   FeatureSpec + transform contract
 │       │   └── library.py            #   momentum, vol, carry, term-structure features
@@ -371,19 +371,19 @@ adding NQ/CL/GC/6E a one-file change. Reference values to encode:
 | GC | 100 | 0.10 | $10.00 |
 | 6E | 125,000 | 0.00005 | $6.25 |
 
-### A.3 `data/futures_continuous.py` — the hard part
+### A.3 `datastore/futures_continuous.py` — the hard part
 Responsibilities, in order:
 1. **Ingest** individual contract OHLCV+volume+OI (raw, never mutated).
 2. **Roll calendar**: pick roll dates by volume/OI crossover (front loses
    leadership to next) with a fallback calendar rule; persist roll dates.
 3. **Stitch** a continuous series two ways: **ratio-adjusted** (multiplicative,
    safe for returns) and **Panama/back-adjusted** (additive, for charting only).
-4. **Store both** raw and each adjusted series via `data/store.py`, tagged with a
+4. **Store both** raw and each adjusted series via `datastore/store.py`, tagged with a
    data-version hash.
 5. **Return-correctness contract**: returns are computed within the *held*
    contract, never across the roll seam.
 
-### A.4 `data/store.py` — cache
+### A.4 `datastore/store.py` — cache
 Responsibilities: parquet read/write for raw + adjusted series; sqlite metadata
 (roll dates, data-version hash, provider, fetch timestamp). Reuse `db.py`.
 
