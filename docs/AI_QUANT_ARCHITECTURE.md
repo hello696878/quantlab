@@ -432,3 +432,177 @@ existing `app.data` provider module).
 > integration, no AI report, no CFD/options, no real-data download. Data is
 > synthetic/illustrative; correctness (lookahead-free, seam-correct, reproducible)
 > comes before breadth.
+
+---
+
+## Appendix C — Phase 2 Futures Feature Engineering Plan
+
+Phase 2 builds the **feature engineering layer** on top of the Phase 1 ES
+continuous pipeline: it turns a **ratio-adjusted** continuous frame into a
+**leakage-safe feature matrix** for later ML and backtesting. This appendix is a
+plan — not yet implemented.
+
+### C.1 Scope
+
+**In scope:** a `backend/app/features/` package that consumes the Phase 1
+`CONTINUOUS_COLUMNS` frame and produces a deterministic, trailing-window-only
+feature matrix with explicit warmup handling and a feature config hash chained to
+Phase 1's `continuous_config_hash`. Synthetic-only tests.
+
+**Explicitly NOT in scope:** **ML training/inference, target labels** (features
+only — no future-return columns of any kind), **backtest integration**, AI report
+generation, **CFD, options**, **frontend**, and **real-data download / network**.
+ES only; no cross-sectional/multi-instrument features; no feature scaling or
+one-hot encoding (the ML layer owns those).
+
+### C.2 Feature engineering principles
+
+1. **Trailing-window only** — every window is `[t-w+1, t]`; no centered windows,
+   no negative shifts, no peeking `min_periods`.
+2. **No future data** — a value at `t` uses rows `≤ t` only (proven by the
+   truncation-invariance test, §C.6).
+3. **No same-bar execution leakage** — features may use `close_t`; the consuming
+   backtest executes at `t+1`'s open (Phase 1 rule). The feature layer emits no
+   labels and never assumes same-bar fills.
+4. **Ratio-adjusted series for return-based features** — return / volatility /
+   level / indicator features read `*_adjusted` and the builder **requires
+   `adjustment_method == "ratio"`** (ratio preserves held-contract % returns
+   across seams).
+5. **Panama-adjusted series is rejected for percentage-return features** — a
+   Panama continuous frame passed to a ratio-required feature raises
+   `FeatureError`. Panama distorts % returns (preserves point changes only).
+6. **`*_raw` prices remain execution/reference prices, not the default input for
+   return features** — raw held-contract prices are available only via an
+   explicit `price_space = RAW`; the default input for return-based features is
+   the ratio-adjusted series.
+7. **Deterministic computation** — pure pandas/numpy, no RNG, no wall-clock; same
+   input + config ⇒ identical matrix.
+8. **Feature config hash** — SHA-256 over canonical JSON of the `FeatureSpec`
+   set, **chained with the upstream `continuous_config_hash`** (raw → continuous
+   → features provenance).
+9. **No network calls in tests; synthetic fixtures first.**
+
+### C.3 Proposed module structure (no naming collisions; `app/features` is free)
+
+| File | Responsibility |
+|---|---|
+| `backend/app/features/__init__.py` | Public exports. |
+| `backend/app/features/spec.py` | `FeatureSpec` model + enums (`TransformType`, `PriceSpace`), `DEFAULT_ES_FEATURES` registry, `feature_config_hash`. Pure config, no math. |
+| `backend/app/features/futures_features.py` | `build_feature_matrix(continuous_df, specs)` + per-transform pure functions. |
+| `backend/app/features/validation.py` | Input/spec validation + leakage helpers (`validate_continuous_input`, `validate_feature_specs`, `mark_warmup`, `assert_causal`). |
+| `backend/tests/test_futures_features.py` | All Phase 2 tests (synthetic). |
+
+Dependency direction: `features/` → `datastore/` + `instruments/` (never the reverse).
+
+### C.4 `FeatureSpec` design
+
+Frozen, strict (Pydantic v2, `frozen=True, extra="forbid"`), fields:
+
+| Field | Meaning |
+|---|---|
+| `name` | unique feature id (default output column name) |
+| `transform` | `RETURN, REALIZED_VOL, ROLLING_MAX, ROLLING_MIN, RATIO_TO_ROLLING_MAX, RATIO_TO_ROLLING_MIN, MA_GAP, RSI, ATR, ZSCORE, CALENDAR_DOW, PASSTHROUGH, DAYS_SINCE_FLAG` |
+| `input_columns` | continuous columns consumed (e.g. `["close_adjusted"]`; ATR → high/low/close) |
+| `windows` | trailing windows (`[20]`, `[10,50]`, or `[]` for pointwise) |
+| `price_space` | `ADJUSTED` (default, requires ratio), `RAW` (execution ref), `NONE` (calendar/volume/roll) |
+| `required_adjustment` | `RATIO` for return/level/indicator features; `None` for calendar/roll/volume |
+| `params` | transform-specific (e.g. `{"period": 14}`) |
+| `warmup` | computed leading-invalid row count |
+| `output_name` | defaults to `name` |
+| `description` | intent + adjustment rationale |
+
+Validation: unique names; positive windows; required `params` present; `price_space`
+consistent with `required_adjustment` (ADJUSTED ⇒ a method; NONE ⇒ None).
+
+### C.5 Initial ES feature set
+
+All trailing; all read `*_adjusted` (ratio) unless noted.
+
+| Feature | Formula | Warmup | Adj. | Notes |
+|---|---|---|---|---|
+| `return_1` | `close_t/close_{t-1} − 1` | 1 | ratio | scale-invariant |
+| `return_5` | `close_t/close_{t-5} − 1` | 5 | ratio | |
+| `return_20` | `close_t/close_{t-20} − 1` | 20 | ratio | |
+| `realized_vol_20` | std of `return_1` over 20, **annualized ×√252** | ~21 | ratio | **annualized by default — see assumption below** |
+| `rolling_high_20` | rolling max of high, 20 | 20 | ratio | absolute level is in back-adjusted space |
+| `rolling_low_20` | rolling min of low, 20 | 20 | ratio | back-adjusted level |
+| `close_to_rolling_high_20` | `close/rolling_high − 1` | 20 | ratio | scale-invariant (preferred) |
+| `close_to_rolling_low_20` | `close/rolling_low − 1` | 20 | ratio | scale-invariant |
+| `moving_average_gap_10_50` | `(MA10 − MA50)/MA50` | 50 | ratio | relative, scale-invariant |
+| `RSI_14` | Wilder RSI of close | 14 (+recursive tail) | ratio | scale-invariant |
+| `ATR_14` | Wilder ATR (true range) | 14 (+tail) | ratio | points in adjusted space |
+| `ATR_14_pct` | `ATR_14 / close` | 14 (+tail) | ratio | **preferred over `ATR_14` for ML — scale-relative** |
+| `volume_zscore_20` | `(vol − roll_mean20)/roll_std20` | 20 | none | volume has a contract-level discontinuity at rolls (documented) |
+| `day_of_week` | weekday of session date (0–4) | 0 | none | numeric; ML layer may one-hot |
+| `roll_flag` | passthrough | 0 | none | known at `t` |
+| `days_since_roll` | sessions since last `roll_flag ≤ t` | 0 | none | NaN before the first roll in the frame (explicit) |
+
+**Annualization assumption (`realized_vol_20`):** the default output is the
+standard deviation of daily ratio-adjusted returns over a 20-session trailing
+window, **multiplied by √252** (252 trading days/year). This is a convention, not
+a measured value; the un-annualized daily σ is `realized_vol_20 / √252`.
+
+**`ATR_14_pct` is preferred over `ATR_14` for ML** because it is scale-relative
+(comparable across time and price levels), whereas raw `ATR_14` is expressed in
+back-adjusted points whose absolute scale is fictitious for history. The same
+preference applies to `close_to_rolling_*` over the absolute `rolling_high/low`.
+
+### C.6 Leakage checks (tests)
+
+| Test | Method |
+|---|---|
+| features at `t` use only data ≤ `t` | **Truncation-invariance:** matrix on full frame vs on `frame[:t+1]` must give identical row `t` (incl. across a roll seam). |
+| no future returns | structural (no negative lag/window) + invariance test |
+| rolling windows trailing only | manual recompute of a rolling value + invariance |
+| input continuous frame not mutated | `assert_frame_equal(input, before)` |
+| deterministic output | build twice → `assert_frame_equal` |
+| feature hash changes on config change | change a window → hash differs |
+| feature hash stable for same input/config | same specs + same `continuous_config_hash` → same hash |
+| warmup handled explicitly | `is_warmup` marks exactly the invalid rows; NaNs confined to warmup; **no fill/interpolation** |
+| Panama rejected for returns | Panama frame → `FeatureError` |
+| seam uses adjusted, not raw gap | `return_1` at a roll = held ratio return, not the raw inter-contract gap |
+
+### C.7 Output feature-matrix schema
+
+| Column | Meaning |
+|---|---|
+| `timestamp` | tz-aware UTC, unique, monotonic |
+| `root_symbol` | `ES` |
+| `active_contract` | held contract |
+| `<feature columns…>` | the features above |
+| `is_warmup` | bool — True until all trailing-window features are valid |
+| `source_adjustment_method` | `ratio` (the space features were built on) |
+| `feature_config_hash` | constant per build; chains `continuous_config_hash` + spec-set hash |
+
+Metadata columns are constant per build (provenance). The feature layer never
+drops or fills silently — `is_warmup` lets the ML layer drop warmup rows
+explicitly (`drop_warmup=False` default).
+
+### C.8 Commit plan
+
+| Commit | Objective | Files | Tests | Acceptance |
+|---|---|---|---|---|
+| **1 — FeatureSpec + validation** | config + input/spec validation, no math | `features/__init__.py`, `spec.py`, `validation.py`, `tests/test_futures_features.py` | spec validation, ratio-input guard, hash stability | specs validate; non-ratio input rejected; hash deterministic |
+| **2 — Price/return/vol features** | `build_feature_matrix` + `return_*`, `realized_vol_20`, `rolling_high/low_20`, `close_to_rolling_*` | `futures_features.py`, `spec.py`, tests | truncation-invariance, not-mutated, determinism, manual rolling, seam-uses-adjusted, warmup | features match hand-computed values; invariance holds across seam |
+| **3 — Indicators (RSI/ATR/MA gap)** | `moving_average_gap_10_50`, `RSI_14`, `ATR_14`, `ATR_14_pct` | `futures_features.py`, `spec.py`, tests | RSI/ATR vs reference; Wilder warmup documented; invariance | indicators match reference within tolerance; trailing-only |
+| **4 — Roll metadata features** | `volume_zscore_20`, `day_of_week`, `roll_flag`, `days_since_roll` | `futures_features.py`, `spec.py`, tests | `days_since_roll` resets per roll & NaN before first roll; weekday/passthrough correct | roll/calendar features correct and causal |
+| **5 — Hash chaining + e2e + docs** | finalize `feature_config_hash` chaining, full e2e, docs | `spec.py`/`futures_features.py`, tests, this doc | e2e raw→continuous→features; hash changes on either config change | matrix reproducible by hash; all leakage/determinism tests green |
+
+### C.9 Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Look-ahead bias | trailing-only windows + truncation-invariance test |
+| Using raw continuous gaps for returns | return/level features read `*_adjusted`; seam test asserts held return, not raw gap |
+| Using Panama for % returns | builder rejects Panama for ratio-required features (`FeatureError`) |
+| Bad warmup handling | explicit `is_warmup`; NaNs confined to warmup; no fill/interpolation |
+| Accidental mutation | build on a copy; `assert_frame_equal(input, before)` test |
+| Mixing raw/adjusted incorrectly | per-spec `price_space` + `required_adjustment`, validated against the frame's `adjustment_method` |
+| Volume contract discontinuity at rolls | documented on `volume_zscore_20`; per-contract normalization is future work |
+| RSI/ATR recursive tail | Wilder stabilization documented; ~3×period treated as low-confidence |
+
+> Scope note: Phase 2 is feature engineering only — **no ML training, no target
+> labels, no backtest integration, no CFD/options, no frontend, no real-data
+> download.** Ratio-adjusted continuous futures are the input for return-based
+> features; Panama is rejected for percentage returns; `*_raw` stays as
+> execution/reference prices.
