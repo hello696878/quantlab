@@ -27,6 +27,18 @@ from app.ml_signal.splits import (
     purged_kfold_splits,
     walk_forward_splits,
 )
+from app.ml_signal.models import (
+    BaseModel,
+    DummyBaseline,
+    LogisticRegression,
+    RidgeRegression,
+    build_model,
+)
+from app.ml_signal.training import (
+    TrainedModel,
+    select_design_matrix,
+    train_model,
+)
 
 __all__ = [
     # spec + enums
@@ -49,4 +61,14 @@ __all__ = [
     "chronological_holdout_split",
     "walk_forward_splits",
     "purged_kfold_splits",
+    # models
+    "BaseModel",
+    "DummyBaseline",
+    "RidgeRegression",
+    "LogisticRegression",
+    "build_model",
+    # training
+    "TrainedModel",
+    "train_model",
+    "select_design_matrix",
 ]

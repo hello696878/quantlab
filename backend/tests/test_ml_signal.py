@@ -14,17 +14,26 @@ import pytest
 from pydantic import ValidationError
 
 from app.ml_signal import (
+    BaseModel,
+    DummyBaseline,
+    LogisticRegression,
     MlSignalError,
     ModelSpec,
     ModelType,
+    RidgeRegression,
     SignalMode,
+    Split,
     SplitType,
     TaskType,
     ThresholdRule,
+    TrainedModel,
+    build_model,
     chronological_holdout_split,
     dataset_config_hash,
     model_config_hash,
     purged_kfold_splits,
+    select_design_matrix,
+    train_model,
     train_run_hash,
     walk_forward_splits,
 )
@@ -326,11 +335,266 @@ def test_splits_deterministic():
 def test_no_network_or_sklearn_imports_in_sources():
     import app.ml_signal.spec as spec_mod
     import app.ml_signal.splits as splits_mod
+    import app.ml_signal.models as models_mod
+    import app.ml_signal.training as training_mod
 
-    for mod in (spec_mod, splits_mod):
+    for mod in (spec_mod, splits_mod, models_mod, training_mod):
         src = inspect.getsource(mod)
         # no network client imports, and no ML-framework imports (the words may
         # appear in prose saying we deliberately avoid them, so match imports only)
         assert not re.search(r"\bimport (requests|urllib|http|socket|aiohttp|httpx)\b", src)
         assert not re.search(r"\b(import|from)\s+sklearn\b", src)
         assert not re.search(r"\b(import|from)\s+(xgboost|lightgbm|torch|tensorflow)\b", src)
+
+
+# --------------------------------------------------------------------------- #
+# Commit 2 — models + training
+# --------------------------------------------------------------------------- #
+
+
+def _ds(n: int = 200, seed: int = 0) -> pd.DataFrame:
+    """Synthetic supervised-dataset-like frame (no pipeline / no network)."""
+    rng = np.random.default_rng(seed)
+    ts = pd.date_range("2024-01-01", periods=n, freq="B")
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    y_reg = 2.0 * x1 - 1.0 * x2 + 0.5                     # exact linear (ridge target)
+    y_dir = np.where(3.0 * x1 - 2.0 * x2 > 0, 1.0, -1.0)  # separable binary (logistic target)
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "root_symbol": "ES",
+            "active_contract": "ESH24",
+            "feature__x1": x1,
+            "feature__x2": x2,
+            "label__forward_return_1": y_reg,
+            "label__direction_1": y_dir,
+            "is_warmup": False,
+            "is_label_valid": True,
+            "is_trainable": True,
+        }
+    )
+
+
+def _reg_spec(**over) -> ModelSpec:
+    base = dict(
+        model_name="ridge_reg",
+        model_type=ModelType.RIDGE_REGRESSION,
+        task_type=TaskType.REGRESSION,
+        feature_columns=("feature__x1", "feature__x2"),
+        label_column="label__forward_return_1",
+        train_start=date(2024, 1, 1),
+        train_end=date(2024, 6, 30),
+        validation_start=date(2024, 7, 1),
+        validation_end=date(2024, 12, 31),
+        prediction_horizon=1,
+        random_seed=0,
+        hyperparameters={"alpha": 1e-8},
+    )
+    base.update(over)
+    return ModelSpec(**base)
+
+
+def _clf_spec(**over) -> ModelSpec:
+    base = dict(
+        model_name="logit_dir",
+        model_type=ModelType.LOGISTIC_REGRESSION,
+        task_type=TaskType.CLASSIFICATION,
+        feature_columns=("feature__x1", "feature__x2"),
+        label_column="label__direction_1",
+        train_start=date(2024, 1, 1),
+        train_end=date(2024, 6, 30),
+        validation_start=date(2024, 7, 1),
+        validation_end=date(2024, 12, 31),
+        prediction_horizon=1,
+        random_seed=0,
+        hyperparameters={"C": 1.0},
+    )
+    base.update(over)
+    return ModelSpec(**base)
+
+
+def _holdout(n_train: int, n: int) -> Split:
+    return Split(SplitType.CHRONOLOGICAL_HOLDOUT, np.arange(n_train), np.arange(n_train, n))
+
+
+_HASHES = dict(continuous_config_hash="C", feature_config_hash="F", label_config_hash="L")
+
+
+# --- models (unit) ---
+
+
+def test_dummy_classification_predicts_majority_class():
+    y = np.array([1.0, 1.0, 1.0, -1.0, -1.0])     # majority +1
+    m = DummyBaseline(TaskType.CLASSIFICATION).fit(np.zeros((5, 2)), y)
+    assert np.all(m.predict(np.zeros((3, 2))) == 1.0)
+    assert isinstance(m, BaseModel)
+
+
+def test_dummy_regression_predicts_train_mean():
+    y = np.array([1.0, 2.0, 3.0, 4.0])
+    m = DummyBaseline(TaskType.REGRESSION).fit(np.zeros((4, 1)), y)
+    assert np.allclose(m.predict(np.zeros((2, 1))), 2.5)
+
+
+def test_ridge_recovers_linear_relationship():
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(400, 2))
+    y = 2.0 * X[:, 0] - 1.0 * X[:, 1] + 0.5
+    m = RidgeRegression(alpha=1e-8).fit(X, y)
+    assert np.allclose(m.params["coef_"], [2.0, -1.0], atol=1e-3)
+    assert np.isclose(m.params["intercept_"], 0.5, atol=1e-3)
+
+
+def test_ridge_deterministic():
+    rng = np.random.default_rng(1)
+    X = rng.normal(size=(100, 3))
+    y = rng.normal(size=100)
+    a = RidgeRegression(alpha=1.0).fit(X, y)
+    b = RidgeRegression(alpha=1.0).fit(X, y)
+    assert np.allclose(a.params["coef_"], b.params["coef_"])
+    assert np.allclose(a.predict(X), b.predict(X))
+
+
+def test_logistic_fits_separable_binary():
+    rng = np.random.default_rng(0)
+    X = rng.normal(size=(300, 2))
+    y = np.where(3.0 * X[:, 0] - 2.0 * X[:, 1] > 0, 1.0, -1.0)
+    m = LogisticRegression(C=1.0).fit(X, y)
+    acc = (m.predict(X) == (y == 1.0)).mean()
+    assert acc > 0.9
+    assert m.params["coef_"][0] > 0 and m.params["coef_"][1] < 0    # sign of [3, -2]
+
+
+def test_logistic_deterministic():
+    rng = np.random.default_rng(3)
+    X = rng.normal(size=(120, 2))
+    y = (X[:, 0] - X[:, 1] > 0).astype(float)
+    a = LogisticRegression(C=0.5).fit(X, y)
+    b = LogisticRegression(C=0.5).fit(X, y)
+    assert np.allclose(a.params["coef_"], b.params["coef_"])
+    assert np.allclose(a.predict_proba(X), b.predict_proba(X))
+
+
+def test_logistic_predict_proba_in_unit_interval():
+    rng = np.random.default_rng(2)
+    X = rng.normal(size=(50, 2))
+    y = (X[:, 0] > 0).astype(float)
+    p = LogisticRegression().fit(X, y).predict_proba(X)
+    assert p.shape == (50,)
+    assert np.all(p >= 0.0) and np.all(p <= 1.0)
+
+
+def test_logistic_maps_directional_labels_up_vs_rest():
+    rng = np.random.default_rng(4)
+    X = rng.normal(size=(200, 2))
+    y = np.where(X[:, 0] > 0.3, 1.0, np.where(X[:, 0] < -0.3, -1.0, 0.0))  # {-1, 0, 1}
+    m = LogisticRegression().fit(X, y)        # accepted: up(+1) vs rest, no raise
+    p = m.predict_proba(X)
+    assert np.all((p >= 0.0) & (p <= 1.0))
+
+
+def test_logistic_rejects_non_directional_labels():
+    X = np.zeros((6, 2))
+    y = np.array([0.0, 1.0, 2.0, 0.0, 1.0, 2.0])   # contains 2 -> not in {-1, 0, 1}
+    with pytest.raises(MlSignalError):
+        LogisticRegression().fit(X, y)
+
+
+def test_build_model_maps_each_type():
+    assert isinstance(build_model(_reg_spec()), RidgeRegression)
+    assert isinstance(build_model(_clf_spec()), LogisticRegression)
+    assert isinstance(
+        build_model(_reg_spec(model_type=ModelType.DUMMY_BASELINE)), DummyBaseline
+    )
+
+
+# --- training (integration) ---
+
+
+def test_select_design_matrix_rejects_label_feature():
+    df = _ds(20)
+    with pytest.raises(MlSignalError):
+        select_design_matrix(df, ("feature__x1", "label__direction_1"), "label__forward_return_1")
+
+
+def test_train_model_selects_only_feature_columns():
+    df = _ds(120)
+    df["feature__unused"] = 999.0      # extra columns the spec does not name
+    df["label__other"] = 123.0
+    tm = train_model(df, _reg_spec(), _holdout(80, 120), **_HASHES)
+    assert tm.feature_columns == ("feature__x1", "feature__x2")
+    assert tm.metadata["n_features"] == 2
+    assert tm.model.params["coef_"].shape == (2,)
+    assert isinstance(tm, TrainedModel)
+
+
+def test_train_model_uses_only_train_split_rows():
+    df = _ds(200)
+    split = _holdout(150, 200)
+    tm1 = train_model(df, _reg_spec(), split, **_HASHES)
+    poisoned = df.copy()
+    poisoned.loc[150:, "label__forward_return_1"] = 999.0   # rows OUTSIDE the train split
+    poisoned.loc[150:, "feature__x1"] = -777.0
+    tm2 = train_model(poisoned, _reg_spec(), split, **_HASHES)
+    assert np.allclose(tm1.model.params["coef_"], tm2.model.params["coef_"])
+    assert np.isclose(tm1.model.params["intercept_"], tm2.model.params["intercept_"])
+
+
+def test_train_model_rejects_untrainable_train_rows():
+    df = _ds(200)
+    df.loc[10, "is_trainable"] = False     # an untrainable row inside the train split
+    with pytest.raises(MlSignalError):
+        train_model(df, _reg_spec(), _holdout(150, 200), **_HASHES)
+
+
+def test_train_model_rejects_nan_in_training():
+    df = _ds(120)
+    df.loc[5, "feature__x1"] = np.nan      # NaN in a train row
+    with pytest.raises(MlSignalError):
+        train_model(df, _reg_spec(), _holdout(80, 120), **_HASHES)
+
+
+def test_train_model_does_not_mutate_dataset():
+    df = _ds(120)
+    before = df.copy(deep=True)
+    train_model(df, _reg_spec(), _holdout(80, 120), **_HASHES)
+    pd.testing.assert_frame_equal(df, before)
+
+
+def test_train_model_metadata_contains_all_hashes():
+    tm = train_model(_ds(120), _reg_spec(), _holdout(80, 120), **_HASHES)
+    md = tm.metadata
+    for key in (
+        "continuous_config_hash", "feature_config_hash", "label_config_hash",
+        "dataset_config_hash", "model_config_hash", "train_run_hash",
+        "model_type", "random_seed", "train_start", "train_end",
+        "n_train_rows", "n_features",
+    ):
+        assert key in md
+    assert md["n_train_rows"] == 80
+    assert md["n_features"] == 2
+    assert md["model_type"] == "ridge_regression"
+    assert tm.train_run_hash == md["train_run_hash"]
+    assert tm.model_config_hash == md["model_config_hash"]
+
+
+def test_train_run_hash_changes_when_upstream_changes():
+    df = _ds(120)
+    split = _holdout(80, 120)
+    a = train_model(df, _reg_spec(), split, **_HASHES)
+    b = train_model(df, _reg_spec(), split,
+                    continuous_config_hash="C2", feature_config_hash="F", label_config_hash="L")
+    assert a.train_run_hash != b.train_run_hash
+
+
+def test_train_model_deterministic_params_and_predictions():
+    df = _ds(160)
+    split = _holdout(110, 160)
+    for spec in (_reg_spec(), _clf_spec()):
+        a = train_model(df, spec, split, **_HASHES)
+        b = train_model(df, spec, split, **_HASHES)
+        assert a.train_run_hash == b.train_run_hash
+        x_test = df.loc[split.test_index, list(spec.feature_columns)].to_numpy(dtype=float)
+        assert np.allclose(a.model.predict(x_test), b.model.predict(x_test))
+        assert np.allclose(a.fitted_params["coef_"], b.fitted_params["coef_"])
