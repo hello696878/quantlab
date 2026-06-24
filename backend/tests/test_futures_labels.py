@@ -366,3 +366,28 @@ def test_dataset_missing_required_columns_raises():
         build_supervised_dataset(feat.drop(columns=["active_contract"]), lab)
     with pytest.raises(DatasetError):
         build_supervised_dataset(feat, lab.drop(columns=["label_config_hash"]))
+
+
+# --- full Phase 1 -> 2 -> 3 provenance chain ---
+
+
+def test_full_provenance_chain_flows_continuous_to_label_hash():
+    """A change in the upstream continuous hash must propagate through the feature
+    hash into the label hash (the full Phase 1->2->3 reproducibility chain), and
+    identical upstream inputs must reproduce an identical label hash."""
+    df = _continuous(80)
+    feat_a = build_feature_matrix(df, upstream_continuous_hash="continuous_A")
+    feat_b = build_feature_matrix(df, upstream_continuous_hash="continuous_B")
+    fh_a = feat_a["feature_config_hash"].iloc[0]
+    fh_b = feat_b["feature_config_hash"].iloc[0]
+    assert fh_a != fh_b  # continuous hash flows into the feature hash
+
+    lab_a = build_label_matrix(df, feature_df=feat_a, upstream_feature_hash=fh_a)
+    lab_b = build_label_matrix(df, feature_df=feat_b, upstream_feature_hash=fh_b)
+    assert lab_a["label_config_hash"].iloc[0] != lab_b["label_config_hash"].iloc[0]
+
+    feat_a2 = build_feature_matrix(df, upstream_continuous_hash="continuous_A")
+    lab_a2 = build_label_matrix(
+        df, feature_df=feat_a2, upstream_feature_hash=feat_a2["feature_config_hash"].iloc[0]
+    )
+    assert lab_a2["label_config_hash"].iloc[0] == lab_a["label_config_hash"].iloc[0]

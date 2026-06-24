@@ -664,12 +664,14 @@ column in the matrix alongside `source_adjustment_method`.
 
 ---
 
-## Appendix D — Phase 3 Futures Labels, Signal Timing, and Backtest Integration Plan
+## Appendix D — Phase 3 Futures Labels, Signal Timing, and Backtest Integration
 
 Phase 3 turns the Phase 1 continuous data + Phase 2 feature matrix into
 **supervised-learning-ready datasets** and a **deterministic rule-based baseline**
 run through a **futures-aware vectorized backtest** — all leakage-safe and
-reproducible by hash. This appendix is a plan — not yet implemented.
+reproducible by hash. **Implemented** in `backend/app/labels/`,
+`backend/app/signals/`, and `backend/app/futures_backtest/`. Sections D.1–D.11
+describe the design; **§D.12 records the as-built status.**
 
 **Locked design decisions:**
 
@@ -895,3 +897,84 @@ commission_per_contract=None, roll_buffer_cost=True)`:
 > real-data download.** Ratio-adjusted prices drive return labels and strategy
 > returns; raw held-contract prices are the execution/PnL reference; signals
 > execute at `t+1` via `signal.shift(1)`.
+
+### D.12 As-built status (Phase 3 complete)
+
+Implemented across five commits; tests are synthetic only, no network. The full
+pipeline is **raw → continuous → features → labels → supervised dataset →
+baseline signal → futures backtest**, and is exercised end-to-end by a single
+synthetic test.
+
+**Implemented modules:**
+- `backend/app/labels/` — `LabelSpec` + enums + `DEFAULT_ES_LABELS`
+  (`forward_return_1`, `forward_return_5`, `direction_1`, `direction_5`,
+  `volatility_adjusted_return_5`), `label_config_hash`, `build_label_matrix`,
+  and `build_supervised_dataset` (with `DatasetError`).
+- `backend/app/signals/` — `BaselineSignalConfig`, `SignalMode`,
+  `momentum_baseline_signal`.
+- `backend/app/futures_backtest/` — `run_futures_backtest`,
+  `FuturesBacktestResult`, `FuturesBacktestError` (named `futures_backtest` to
+  avoid colliding with the existing `app/backtest.py`; it **reuses
+  `app.backtest.run_backtest`** internally).
+
+**Label alignment (`L = execution_lag`, default 1):**
+`forward_return_h(t) = close_adjusted[t+L+h] / close_adjusted[t+L] − 1`. The last
+`L + h` rows have no forward window and are left NaN. `direction_h` is the signed
+forward return with a `threshold` deadband; `volatility_adjusted_return_5` divides
+the forward return by the **trailing** `realized_vol_20` feature at `t` (only the
+numerator is forward). Return labels require ratio adjustment (Panama rejected).
+
+**Supervised dataset:** `build_supervised_dataset` joins features + labels on
+`(timestamp, root_symbol, active_contract)` into disjoint `feature__*` / `label__*`
+namespaces, carries `is_warmup` and the provenance hashes, and computes
+`is_label_valid` (all labels non-null) and `is_trainable = ~is_warmup &
+is_label_valid`. `days_since_roll` NaN-before-first-roll does **not** by itself
+make a row untrainable.
+
+**Baseline signal:** `momentum_baseline_signal` is a pure per-row function —
+long when `return_20 > min_ret` **and** `moving_average_gap_10_50 > min_gap`,
+gated by optional `realized_vol_20` / `ATR_14_pct` caps and a roll-avoidance
+window (`roll_flag` / `days_since_roll`); flat on warmup / non-trainable rows;
+symmetric short in `long_short` mode. It emits `target_position` at `t` and does
+**not** shift (the backtest owns the shift).
+
+**Backtest (`run_futures_backtest`):**
+- **t+1 execution:** `effective_position = target_position.shift(1).fillna(0)` —
+  first row flat, no same-bar fill.
+- **Returns/equity** from `close_adjusted` (ratio, seam-safe); a roll's raw
+  inter-contract gap cannot create fake PnL. Raw prices (`open_raw`, `close_raw`)
+  are **execution/reference only** (fill reference, tick rounding, dollar notional).
+- **Transaction cost** charged only when `effective_position` changes; resolved
+  from an explicit bps or derived from `commission_per_contract_per_side +
+  slippage_ticks_per_side × tick_value` over a `close_raw × contract_multiplier`
+  notional. The effective bps / source / `zero_cost` flag are recorded in
+  `cost_metadata` — never a silent zero.
+- **Roll cost (V1 approximation):** when `include_roll_cost` and a non-zero
+  position is held across a `roll_flag` bar, an extra `cost_rate × |position|`
+  drag is applied; flat-across-roll incurs none.
+- Output `FuturesBacktestResult` carries the per-bar `frame`, the `run_backtest`
+  trade log, the buy-and-hold `benchmark_equity`, `cost_metadata`, and `metrics`.
+
+**Provenance:** `continuous_config_hash` (Phase 1) → `feature_config_hash`
+(Phase 2, chains the continuous hash) → `label_config_hash` (Phase 3, chains the
+feature hash). The dataset carries `feature_config_hash` and `label_config_hash`
+as columns; `continuous_config_hash` is **not** a dataset column (not invented) —
+the chain is preserved through the feature and label hashes.
+
+**Leakage guarantees (test-proven):** feature truncation-invariance is unchanged
+by labels; labels read the future only via the `t+L` window; the dataset never
+shifts features/labels; `effective_position == target_position.shift(1)`;
+`target_position[t]` is never used for the same-bar return; warmup and
+NaN-label-tail rows are not trainable; a synthetic roll seam with a held position
+produces the adjusted held return, not the raw gap.
+
+**Limitations (as-built):**
+- **No ML training/inference** — Phase 3 is labels + baseline + backtest only.
+- **No triple-barrier labels yet** (the AFML `finml.triple_barrier_labels` wrap is
+  deferred); only the five return-based labels are built.
+- **No full contract-dollar sizing** — positions are `∈ {−1, 0, +1}` in
+  return-space; `contract_multiplier` / `tick_value` feed only the cost notional.
+- **No tick-rounded fill engine** — `raw_execution_price` is carried as a
+  reference; fills are not snapped to tick and the return math uses adjusted
+  close-to-close.
+- **Synthetic tests only**; single-instrument (ES), ratio adjustment.

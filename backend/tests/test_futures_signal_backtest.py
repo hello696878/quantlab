@@ -11,7 +11,12 @@ import pytest
 from pydantic import ValidationError
 
 from app.instruments import get_instrument
-from app.datastore.store import CONTINUOUS_COLUMNS
+from app.datastore.store import CONTINUOUS_COLUMNS, validate_raw_futures
+from app.datastore.futures_continuous import (
+    build_continuous_futures,
+    compute_roll_schedule,
+    continuous_config_hash,
+)
 from app.features import build_feature_matrix
 from app.labels import build_label_matrix, build_supervised_dataset
 from app.signals import (
@@ -388,7 +393,7 @@ def test_backtest_deterministic():
     pd.testing.assert_frame_equal(r1.frame, r2.frame)
 
 
-def test_output_has_required_columns():
+def test_backtest_output_has_required_columns():
     df = _cont([100, 101, 102])
     res = run_futures_backtest(df, _signal(df, [1, 1, 1]), ES)
     required = {
@@ -426,3 +431,210 @@ def test_integration_with_baseline_signal_and_continuous():
     assert len(res.frame) == n
     assert {"equity", "net_strategy_return", "effective_position"}.issubset(res.frame.columns)
     assert res.frame["effective_position"].iloc[0] == 0.0
+
+
+# --------------------------------------------------------------------------- #
+# Commit 5 — full synthetic pipeline end-to-end
+# raw -> continuous -> features -> labels -> supervised dataset -> baseline
+# signal -> futures backtest.  Synthetic data only; no network; no ML training.
+# --------------------------------------------------------------------------- #
+
+
+def _raw_rows(symbol, dates, expiry, base_price):
+    """Raw rows for one contract; close drifts +0.3/session from ``base_price``.
+
+    ``open_interest`` is left ``None`` so the roll schedule falls back to the
+    deterministic days-before-expiry rule (no volume/OI crossover modelling)."""
+    rows = []
+    for i, d in enumerate(dates):
+        open_ = base_price + 0.3 * i
+        close = open_ + 1.0
+        rows.append(
+            {
+                "timestamp": pd.Timestamp(d),
+                "open": open_,
+                "high": max(open_, close) + 1.0,
+                "low": min(open_, close) - 1.0,
+                "close": close,
+                "volume": 1000 + i,
+                "open_interest": None,
+                "root_symbol": "ES",
+                "contract_symbol": symbol,
+                "expiry": pd.Timestamp(expiry),
+                "source": "synthetic",
+                "timezone": "America/Chicago",
+            }
+        )
+    return rows
+
+
+def _e2e_raw_df():
+    """Three consecutive ES contracts (~188 sessions, two fallback rolls).
+
+    Raw price levels step ~100pts between contracts, so ``close_raw`` gaps at each
+    seam while the ratio-adjusted ``close_adjusted`` stays smooth (held return)."""
+    rows = []
+    rows += _raw_rows("ESH24", pd.date_range("2024-01-02", "2024-03-15", freq="B"), "2024-03-15", 5000.0)
+    rows += _raw_rows("ESM24", pd.date_range("2024-01-02", "2024-06-21", freq="B"), "2024-06-21", 5100.0)
+    rows += _raw_rows("ESU24", pd.date_range("2024-04-01", "2024-09-20", freq="B"), "2024-09-20", 5200.0)
+    return pd.DataFrame(rows)
+
+
+def _run_full_pipeline(raw):
+    """raw -> continuous -> features -> labels -> dataset -> signal -> backtest,
+    threading the provenance hash chain.  Returns every stage for assertions."""
+    validate_raw_futures(raw)
+    cont = build_continuous_futures(raw, ES, "ratio")
+    ch = continuous_config_hash(raw, ES, "ratio")
+    feat = build_feature_matrix(cont, upstream_continuous_hash=ch)
+    fh = feat["feature_config_hash"].iloc[0]
+    lab = build_label_matrix(cont, feature_df=feat, upstream_feature_hash=fh)
+    ds = build_supervised_dataset(feat, lab)
+    sig = momentum_baseline_signal(ds, BaselineSignalConfig(mode="long_short"))
+    res = run_futures_backtest(cont, sig, ES)
+    return {"cont": cont, "ch": ch, "feat": feat, "fh": fh, "lab": lab,
+            "ds": ds, "sig": sig, "res": res}
+
+
+def _forced_signal(cont, value):
+    """Constant target on every continuous bar; keys copied from the continuous
+    frame so the backtest merge is exact across roll seams."""
+    return pd.DataFrame(
+        {
+            "timestamp": cont["timestamp"].to_numpy(),
+            "root_symbol": cont["root_symbol"].to_numpy(),
+            "active_contract": cont["active_contract"].to_numpy(),
+            "target_position": float(value),
+        }
+    )
+
+
+def test_e2e_pipeline_runs_and_has_expected_output():
+    raw = _e2e_raw_df()
+    out = _run_full_pipeline(raw)
+    cont, res = out["cont"], out["res"]
+    # two fallback rolls were detected and stitched into the continuous series
+    assert len(compute_roll_schedule(raw, ES)) == 2
+    assert int(cont["roll_flag"].astype(bool).sum()) == 2
+    # backtest frame shape + columns + metrics
+    required = {
+        "timestamp", "root_symbol", "active_contract", "target_position",
+        "effective_position", "close_adjusted", "raw_execution_price",
+        "roll_flag", "strategy_return", "transaction_cost",
+        "net_strategy_return", "equity",
+    }
+    assert required.issubset(res.frame.columns)
+    assert len(res.frame) == len(cont)
+    for key in ("final_equity", "total_return", "total_transaction_cost", "num_trades"):
+        assert key in res.metrics
+    # cost is derived (commission+slippage), documented, never a silent zero
+    assert res.cost_metadata["zero_cost"] is False
+
+
+def test_e2e_timing_and_leakage():
+    out = _run_full_pipeline(_e2e_raw_df())
+    res, ds, sig = out["res"], out["ds"], out["sig"]
+    # the signal generator does NOT shift: its t-aligned target maps straight
+    # through to the backtest frame (the only shift happens inside the backtest).
+    np.testing.assert_array_equal(
+        sig["target_position"].to_numpy().astype(float),
+        res.frame["target_position"].to_numpy(),
+    )
+    # t+1 execution: first bar flat, effective_position == target_position.shift(1)
+    assert res.frame["effective_position"].iloc[0] == 0.0
+    np.testing.assert_array_equal(
+        res.frame["effective_position"].to_numpy(),
+        res.frame["target_position"].shift(1).fillna(0.0).to_numpy(),
+    )
+    # strategy return is booked on the EXECUTED (shifted) position, not target[t]
+    mret = res.frame["close_adjusted"].pct_change().fillna(0.0)
+    np.testing.assert_allclose(
+        res.frame["strategy_return"].to_numpy(),
+        (res.frame["effective_position"] * mret).to_numpy(),
+    )
+    # warmup rows and the NaN-label tail are never trainable; the middle is usable
+    assert not (ds["is_warmup"] & ds["is_trainable"]).any()
+    assert not ds["is_label_valid"].iloc[-6:].any()   # forward_return_5 (lag1 + h5)
+    assert not ds["is_trainable"].iloc[-6:].any()
+    assert ds["is_trainable"].any()
+
+
+def test_e2e_no_same_bar_execution_forced():
+    cont = build_continuous_futures(_e2e_raw_df(), ES, "ratio")
+    n = len(cont)
+    k = n // 2
+    positions = np.zeros(n)
+    positions[k:] = 1.0
+    sig = pd.DataFrame(
+        {
+            "timestamp": cont["timestamp"].to_numpy(),
+            "root_symbol": cont["root_symbol"].to_numpy(),
+            "active_contract": cont["active_contract"].to_numpy(),
+            "target_position": positions,
+        }
+    )
+    res = run_futures_backtest(cont, sig, ES, transaction_cost_bps=0)
+    # target flips to long at k, but the fill (and its PnL) only land at k+1
+    assert res.frame["target_position"].iloc[k] == 1.0
+    assert res.frame["effective_position"].iloc[k] == 0.0
+    assert res.frame["effective_position"].iloc[k + 1] == 1.0
+    assert res.frame["strategy_return"].iloc[k] == 0.0
+
+
+def test_e2e_provenance_chain():
+    out = _run_full_pipeline(_e2e_raw_df())
+    ds, feat, lab = out["ds"], out["feat"], out["lab"]
+    # feature + label hashes are present and single-valued where expected
+    assert "feature_config_hash" in ds.columns and "label_config_hash" in ds.columns
+    assert ds["feature_config_hash"].nunique() == 1
+    assert ds["label_config_hash"].nunique() == 1
+    assert ds["feature_config_hash"].iloc[0] == out["fh"]
+    assert ds["label_config_hash"].iloc[0] == lab["label_config_hash"].iloc[0]
+    # continuous_config_hash is NOT invented as a dataset column; the chain is
+    # preserved through feature_config_hash (chains continuous) and label_config_hash.
+    assert "continuous_config_hash" not in ds.columns
+    # changing the upstream continuous hash flows into BOTH downstream hashes
+    feat2 = build_feature_matrix(out["cont"], upstream_continuous_hash=out["ch"] + "X")
+    fh2 = feat2["feature_config_hash"].iloc[0]
+    assert fh2 != out["fh"]
+    lab2 = build_label_matrix(out["cont"], feature_df=feat2, upstream_feature_hash=fh2)
+    assert lab2["label_config_hash"].iloc[0] != lab["label_config_hash"].iloc[0]
+
+
+def test_e2e_deterministic():
+    raw = _e2e_raw_df()
+    a = _run_full_pipeline(raw)
+    b = _run_full_pipeline(raw)
+    pd.testing.assert_frame_equal(a["ds"], b["ds"])
+    pd.testing.assert_frame_equal(a["res"].frame, b["res"].frame)
+    assert a["res"].metrics == b["res"].metrics
+
+
+def test_e2e_roll_seam_and_roll_cost():
+    cont = build_continuous_futures(_e2e_raw_df(), ES, "ratio")
+    roll_idx = list(np.where(cont["roll_flag"].astype(bool).to_numpy())[0])
+    assert len(roll_idx) == 2
+
+    # raw close gaps ~2% at each seam; ratio close_adjusted is the held return (~0)
+    cr = cont["close_raw"].to_numpy()
+    ca = cont["close_adjusted"].to_numpy()
+    for r in roll_idx:
+        assert abs(cr[r] / cr[r - 1] - 1.0) > 0.01     # genuine inter-contract gap
+        assert abs(ca[r] / ca[r - 1] - 1.0) < 0.005    # held-contract return
+
+    held = run_futures_backtest(cont, _forced_signal(cont, 1.0), ES,
+                                transaction_cost_bps=50, include_roll_cost=True)
+    no_roll = run_futures_backtest(cont, _forced_signal(cont, 1.0), ES,
+                                   transaction_cost_bps=50, include_roll_cost=False)
+    flat = run_futures_backtest(cont, _forced_signal(cont, 0.0), ES,
+                                transaction_cost_bps=50, include_roll_cost=True)
+    for r in roll_idx:
+        # PnL at the seam follows close_adjusted, never the raw inter-contract gap
+        assert abs(held.frame["strategy_return"].iloc[r]) < 0.005
+        # held across the roll -> roll cost appears only when include_roll_cost
+        assert held.frame["transaction_cost"].iloc[r] > no_roll.frame["transaction_cost"].iloc[r]
+        assert no_roll.frame["transaction_cost"].iloc[r] == pytest.approx(0.0, abs=1e-12)
+        # flat across the roll -> no roll cost at all
+        assert flat.frame["transaction_cost"].iloc[r] == pytest.approx(0.0, abs=1e-12)
+    # roll_flag is carried all the way into the backtest frame
+    assert int(held.frame["roll_flag"].astype(bool).sum()) == 2
