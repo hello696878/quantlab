@@ -1,8 +1,9 @@
 """Futures feature engineering layer (Phase 2).
 
-Commit 1 ships the declarative config + validation only: ``FeatureSpec``, the
-enums, the default ES feature registry (specs, no math), the feature config
-hash, and input/spec validation. Feature computation lands in later commits.
+Declarative config + validation (``FeatureSpec``, enums, the default ES feature
+registry, the feature config hash) plus the leakage-safe ``build_feature_matrix``
+builder. Commit 2 implements the basic price/return/volatility/rolling features;
+the remaining transforms land in later commits.
 """
 
 from app.features.spec import (
@@ -17,6 +18,7 @@ from app.features.validation import (
     validate_continuous_input,
     validate_feature_specs,
 )
+from app.features.futures_features import build_feature_matrix
 
 __all__ = [
     "FeatureSpec",
@@ -27,4 +29,5 @@ __all__ = [
     "feature_config_hash",
     "validate_continuous_input",
     "validate_feature_specs",
+    "build_feature_matrix",
 ]
