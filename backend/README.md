@@ -18,7 +18,7 @@ backend/
 │   ├── metrics.py          Sharpe, Sortino, CAGR, drawdown, Calmar, win-rate, …
 │   ├── globe/              typed dossiers + optional FRED/delayed quote adapters
 │   ├── globe_routes.py     read-only Global Markets Globe API routes
-│   ├── portfolio_risk/     static-sample portfolio analytics (models/sample/service/factors)
+│   ├── portfolio_risk/     static-sample portfolio analytics (models/sample/service/factors/optimize)
 │   ├── portfolio_risk_routes.py  Portfolio Risk Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
@@ -113,12 +113,16 @@ network calls, long-only by default, educational only — not investment advice.
 | Endpoint | Description |
 |---|---|
 | `GET /portfolio-risk/sample` | Deterministic 8-asset sample portfolio (fixed-seed monthly return series, default risk-free rate, confidence, and stress scenario) |
-| `POST /portfolio-risk/analyze` | Full analytics: normalized weights, expected return, volatility, Sharpe, covariance/correlation, marginal/component/percent risk contributions, historical VaR/CVaR (monthly), optional stress P&L, deterministic efficient frontier, minimum-variance and risk-parity portfolios, **factor exposure & risk decomposition** (9 illustrative factors, beta matrix, portfolio β=Bᵀw, factor + specific risk contributions), and **deterministic scenario stress** (5 sample scenarios → asset/factor impact, worst/best asset; optional `custom_scenarios`) |
+| `POST /portfolio-risk/analyze` | Full analytics: normalized weights, expected return, volatility, Sharpe, covariance/correlation, marginal/component/percent risk contributions, historical VaR/CVaR (monthly), optional stress P&L, deterministic efficient frontier, minimum-variance and risk-parity portfolios, **factor exposure & risk decomposition** (9 illustrative factors, beta matrix, portfolio β=Bᵀw, factor + specific risk contributions), **deterministic scenario stress** (5 sample scenarios → asset/factor impact, worst/best asset; optional `custom_scenarios`), **constrained optimization** (`optimization_results`: long-only box-capped candidate search → max-Sharpe / min-variance / target-return / target-volatility / current / equal / risk-parity, optional `optimization_constraints`), **Black-Litterman** (`black_litterman`: implied equilibrium π=δΣw, sample views, posterior returns, BL-optimized portfolio), and a **hypothetical rebalance** (`rebalance_analysis`: deltas + ½Σ\|Δ\| turnover) |
 
 Factor betas are deterministic illustrative values (Phase 21.1) — not estimated
 from live data; factors are treated as orthogonal in v1. Scenarios are
 educational sample shocks. Factor and specific percent risk contributions use the
-variance-share convention and sum to 1.
+variance-share convention and sum to 1. The optimizer (Phase 21.2) is a
+deterministic long-only candidate search (no production solver); Black-Litterman
+views are illustrative, not forecasts; rebalance deltas are hypothetical, not
+trade orders. Infeasible target return/volatility returns a friendly note (no
+crash).
 
 Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): weights are
 normalized, negative weights are rejected in long-only mode, volatility must be

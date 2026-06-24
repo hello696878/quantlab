@@ -33,6 +33,12 @@ from app.portfolio_risk.factors import (
     compute_scenarios,
     scenario_library,
 )
+from app.portfolio_risk.optimize import (
+    build_black_litterman,
+    build_optimization,
+    build_rebalance,
+    sample_bl_views,
+)
 from app.portfolio_risk.sample import DISCLAIMER
 
 _MIN_VOL = 1e-12
@@ -230,6 +236,25 @@ def analyze_portfolio(req: PortfolioAnalysisRequest) -> PortfolioAnalysisRespons
     scenarios = scenario_library() + list(req.custom_scenarios)
     scenario_results = compute_scenarios(w, ids, names, scenarios)
 
+    # Constrained optimization, Black-Litterman, and hypothetical rebalance.
+    rp_w = np.array([risk_parity.weights[i] for i in ids], dtype=float)
+    optimization_results, _pool = build_optimization(
+        mu, cov, ids, w, rp_w, rf, req.optimization_constraints
+    )
+    bl_views = req.black_litterman_views if req.black_litterman_views is not None else sample_bl_views()
+    black_litterman = build_black_litterman(
+        mu, cov, ids, names, w, rp_w, rf,
+        float(req.risk_aversion), float(req.tau), bl_views, req.optimization_constraints,
+    )
+    prev_weights = (
+        req.optimization_constraints.previous_weights
+        if req.optimization_constraints
+        else None
+    )
+    rebalance_analysis = build_rebalance(
+        optimization_results.max_sharpe_portfolio, ids, names, w, prev_weights
+    )
+
     return PortfolioAnalysisResponse(
         asset_order=ids,
         asset_names=names,
@@ -259,6 +284,9 @@ def analyze_portfolio(req: PortfolioAnalysisRequest) -> PortfolioAnalysisRespons
         factor_model=factor_block["factor_model"],
         scenario_library=scenarios,
         scenario_results=scenario_results,
+        optimization_results=optimization_results,
+        black_litterman=black_litterman,
+        rebalance_analysis=rebalance_analysis,
         notes=[
             "Weights are normalised to sum to 1 before analysis.",
             "Covariance is annualised: it ties each asset's stated annual "
@@ -272,6 +300,11 @@ def analyze_portfolio(req: PortfolioAnalysisRequest) -> PortfolioAnalysisRespons
             "Factor and specific percent risk contributions use the variance-share "
             "convention and sum to 1.",
             "Scenario shocks are illustrative educational examples — not a forecast.",
+            "Optimisation uses a deterministic long-only candidate search under box "
+            "constraints — an educational construction exercise, not a production "
+            "optimiser and not advice.",
+            "Black-Litterman views are illustrative only and are not forecasts; "
+            "rebalance deltas are hypothetical, not trade orders.",
         ],
         disclaimer=DISCLAIMER,
     )

@@ -99,9 +99,14 @@ deterministic sample portfolio, lets you edit weights, and re-analyses live via
 contributions, the efficient frontier, and (Phase 21.1) **factor exposure**, a
 **factor risk decomposition** (factor + specific/idiosyncratic), and a
 **deterministic scenario-stress** panel (equity selloff, rates shock, USD
-squeeze, commodity rally, credit stress). All data is static illustrative sample
-data with deterministic illustrative factor betas — long-only v1, educational,
-not a production risk model, not investment advice.
+squeeze, commodity rally, credit stress), plus (Phase 21.2) an **Optimization
+Lab** (constrained max-Sharpe / min-variance / target-return / target-volatility
+candidate search), a **current-vs-optimized weight comparison** with a
+hypothetical-rebalance/turnover summary, and a **Black-Litterman** panel
+(implied/posterior returns + illustrative sample views). All data is static
+illustrative sample data with deterministic illustrative factor betas and views —
+long-only v1, educational, a candidate-search optimizer (not production), no trade
+orders, not a production risk model, not investment advice.
 
 The Globe renders bundled static sample data immediately, then uses the validated
 backend dataset when available. The parser requires exact FRED field/date

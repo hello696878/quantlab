@@ -36,12 +36,23 @@ export interface SamplePortfolioResponse {
   notes: string[];
 }
 
+export interface OptimizationConstraintsInput {
+  min_weight?: number;
+  max_weight?: number;
+  target_return?: number | null;
+  target_volatility?: number | null;
+  previous_weights?: Record<string, number> | null;
+}
+
 export interface PortfolioAnalysisRequest {
   assets: PortfolioAsset[];
   risk_free_rate: number;
   confidence_level: number;
   stress_scenario?: StressScenario | null;
   allow_short?: boolean;
+  optimization_constraints?: OptimizationConstraintsInput | null;
+  risk_aversion?: number;
+  tau?: number;
 }
 
 export interface FrontierPoint {
@@ -140,6 +151,83 @@ export interface ScenarioResult {
   notes: string[];
 }
 
+export interface OptimizedPortfolio {
+  id: string;
+  name: string;
+  objective: string;
+  weights: Record<string, number>;
+  expected_return: number;
+  volatility: number;
+  sharpe_ratio: number;
+  turnover: number;
+  notes: string[];
+  feasible: boolean;
+}
+
+export interface EffectiveConstraints {
+  min_weight: number;
+  max_weight: number;
+  target_return?: number | null;
+  target_volatility?: number | null;
+  turnover_penalty?: number | null;
+}
+
+export interface OptimizationResults {
+  current_portfolio: OptimizedPortfolio;
+  equal_weight_portfolio: OptimizedPortfolio;
+  max_sharpe_portfolio: OptimizedPortfolio;
+  min_variance_portfolio: OptimizedPortfolio;
+  risk_parity_portfolio: OptimizedPortfolio;
+  target_return_portfolio?: OptimizedPortfolio | null;
+  target_volatility_portfolio?: OptimizedPortfolio | null;
+  candidate_count: number;
+  constraints: EffectiveConstraints;
+  notes: string[];
+}
+
+export interface BlackLittermanView {
+  id: string;
+  description: string;
+  asset_weights: Record<string, number>;
+  view_return: number;
+  confidence: number;
+  is_sample: boolean;
+}
+
+export interface AssetReturnView {
+  asset_id: string;
+  name: string;
+  implied_return: number;
+  posterior_return: number;
+  prior_return: number;
+}
+
+export interface BlackLittermanResult {
+  risk_aversion: number;
+  tau: number;
+  returns: AssetReturnView[];
+  views: BlackLittermanView[];
+  bl_optimized_portfolio: OptimizedPortfolio;
+  notes: string[];
+}
+
+export interface RebalanceAssetDelta {
+  asset_id: string;
+  name: string;
+  current_weight: number;
+  target_weight: number;
+  delta: number;
+}
+
+export interface RebalanceAnalysis {
+  target_portfolio_id: string;
+  asset_deltas: RebalanceAssetDelta[];
+  absolute_turnover: number;
+  largest_increase: string;
+  largest_decrease: string;
+  note: string;
+}
+
 export interface PortfolioAnalysisResponse {
   asset_order: string[];
   asset_names: Record<string, string>;
@@ -169,6 +257,9 @@ export interface PortfolioAnalysisResponse {
   factor_model: FactorModelSummary;
   scenario_library: ScenarioDefinition[];
   scenario_results: ScenarioResult[];
+  optimization_results: OptimizationResults;
+  black_litterman: BlackLittermanResult;
+  rebalance_analysis: RebalanceAnalysis;
   notes: string[];
   data_status: "static_sample";
   disclaimer: string;
@@ -260,4 +351,9 @@ Model variance         factor_variance + specific_variance
 Factor % risk          (β_p,f · (F β_p)_f) / model_variance
 Specific % risk        specific_variance / model_variance
 Scenario asset impact  Σ_f beta_i,f · shock_f + asset_specific_shock_i
-Scenario portfolio P&L Σ_i w_i · asset_impact_i`;
+Scenario portfolio P&L Σ_i w_i · asset_impact_i
+
+Mean-variance opt.     max (wᵀμ − r_f) / sqrt(wᵀΣw),  s.t. long-only box
+BL implied returns     π = δ · Σ · w_market
+BL posterior returns   μ_bl = [ (τΣ)⁻¹ + Pᵀ Ω⁻¹ P ]⁻¹ · [ (τΣ)⁻¹ π + Pᵀ Ω⁻¹ q ]
+Turnover               0.5 · Σ_i |target_w_i − current_w_i|`;

@@ -35,7 +35,8 @@
       "Bash(ls docs/AI_QUANT_ARCHITECTURE.md)",
       "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_futures_continuous.py -v)",
       "Bash(git --no-pager log --oneline -10)",
-      "Bash(./venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py -v)"
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py -v)",
+      "Bash(git --no-pager diff -- docs/AI_QUANT_ARCHITECTURE.md)"
     ]
   }
 }

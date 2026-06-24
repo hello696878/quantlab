@@ -141,6 +141,10 @@ export default function PortfolioRiskLabPanel() {
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [scenarioId, setScenarioId] = useState("equity_selloff");
+  const [maxWeightStr, setMaxWeightStr] = useState("0.40");
+  const [targetReturnStr, setTargetReturnStr] = useState("");
+  const [targetVolStr, setTargetVolStr] = useState("");
+  const [compareId, setCompareId] = useState("max_sharpe");
 
   // Load the deterministic sample portfolio on mount.
   useEffect(() => {
@@ -173,8 +177,22 @@ export default function PortfolioRiskLabPanel() {
     return { out, sum };
   }, [assets, weightStr]);
 
-  // Auto-run analysis (debounced) whenever weights / rf / confidence change.
-  const reqKey = `${JSON.stringify(parsedWeights.out)}|${riskFree}|${confidence}`;
+  // Optimization constraints (long-only box + optional targets).
+  const maxWeightNum = (() => {
+    const v = Number.parseFloat(maxWeightStr);
+    return Number.isFinite(v) && v > 0 && v <= 1 ? v : 0.4;
+  })();
+  const targetReturnNum = (() => {
+    const v = Number.parseFloat(targetReturnStr);
+    return Number.isFinite(v) ? v : undefined;
+  })();
+  const targetVolNum = (() => {
+    const v = Number.parseFloat(targetVolStr);
+    return Number.isFinite(v) && v > 0 ? v : undefined;
+  })();
+
+  // Auto-run analysis (debounced) whenever inputs change.
+  const reqKey = `${JSON.stringify(parsedWeights.out)}|${riskFree}|${confidence}|${maxWeightNum}|${targetReturnNum}|${targetVolNum}`;
   useEffect(() => {
     if (!sample || assets.length === 0) return;
     if (parsedWeights.sum <= 0) {
@@ -190,6 +208,11 @@ export default function PortfolioRiskLabPanel() {
           risk_free_rate: riskFree,
           confidence_level: confidence,
           stress_scenario: sample.stress_scenario,
+          optimization_constraints: {
+            max_weight: maxWeightNum,
+            target_return: targetReturnNum ?? null,
+            target_volatility: targetVolNum ?? null,
+          },
         },
         ctrl.signal,
       )
@@ -250,6 +273,37 @@ export default function PortfolioRiskLabPanel() {
     result?.scenario_results.find((s) => s.scenario_id === scenarioId) ??
     result?.scenario_results[0] ??
     null;
+
+  // Optimization / Black-Litterman derived views.
+  const opt = result?.optimization_results ?? null;
+  const bl = result?.black_litterman ?? null;
+  const optRows = opt
+    ? [
+        opt.current_portfolio,
+        opt.max_sharpe_portfolio,
+        opt.min_variance_portfolio,
+        opt.risk_parity_portfolio,
+        opt.equal_weight_portfolio,
+        ...(opt.target_return_portfolio ? [opt.target_return_portfolio] : []),
+        ...(opt.target_volatility_portfolio ? [opt.target_volatility_portfolio] : []),
+      ]
+    : [];
+  const compareTargets =
+    opt && bl
+      ? [
+          { id: "max_sharpe", label: "Max Sharpe", weights: opt.max_sharpe_portfolio.weights },
+          { id: "min_variance", label: "Min variance", weights: opt.min_variance_portfolio.weights },
+          { id: "risk_parity", label: "Risk parity", weights: opt.risk_parity_portfolio.weights },
+          { id: "black_litterman", label: "Black-Litterman", weights: bl.bl_optimized_portfolio.weights },
+        ]
+      : [];
+  const selectedCompare = compareTargets.find((c) => c.id === compareId) ?? compareTargets[0] ?? null;
+  const largestWeight = (weights: Record<string, number>): string => {
+    const entries = Object.entries(weights);
+    if (entries.length === 0) return "—";
+    const [id, v] = entries.reduce((a, b) => (b[1] > a[1] ? b : a));
+    return `${tickerOf(id)} ${pct(v, 0)}`;
+  };
 
   if (loadError) {
     return (
@@ -746,6 +800,205 @@ export default function PortfolioRiskLabPanel() {
               </>
             )}
           </div>
+
+          {/* ── Optimization Lab ─────────────────────────────────────────── */}
+          {opt && (
+            <div className="card p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="section-title">Optimization Lab</p>
+                <span className="mono text-[11px]" style={{ color: "var(--text-faint)" }}>
+                  {opt.candidate_count} candidates · long-only · weights in [{pct(opt.constraints.min_weight, 0)}, {pct(opt.constraints.max_weight, 0)}]
+                </span>
+              </div>
+              <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                <label className="block">
+                  <span className="section-title">Max weight</span>
+                  <input type="number" step="0.05" inputMode="decimal" aria-label="Maximum weight per asset"
+                    value={maxWeightStr} onChange={(e) => setMaxWeightStr(e.target.value)}
+                    className="ql-input mt-1 w-full px-2 py-1 text-sm" />
+                </label>
+                <label className="block">
+                  <span className="section-title">Target return (optional)</span>
+                  <input type="number" step="0.01" inputMode="decimal" aria-label="Target return (decimal, optional)"
+                    placeholder="e.g. 0.06" value={targetReturnStr} onChange={(e) => setTargetReturnStr(e.target.value)}
+                    className="ql-input mt-1 w-full px-2 py-1 text-sm" />
+                </label>
+                <label className="block">
+                  <span className="section-title">Target volatility (optional)</span>
+                  <input type="number" step="0.01" inputMode="decimal" aria-label="Target volatility (decimal, optional)"
+                    placeholder="e.g. 0.12" value={targetVolStr} onChange={(e) => setTargetVolStr(e.target.value)}
+                    className="ql-input mt-1 w-full px-2 py-1 text-sm" />
+                </label>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ color: "var(--text-mut)" }}>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Portfolio</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Exp return</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Volatility</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Sharpe</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Turnover</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Largest weight</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {optRows.map((p) => (
+                      <tr key={p.id} style={{ borderTop: "1px solid var(--line)" }}>
+                        <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>
+                          {p.name}
+                          {!p.feasible && <span className="ml-1.5 text-[10px]" style={{ color: "var(--warn)" }}>(exceeds cap)</span>}
+                        </td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(p.expected_return)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(p.volatility)}</td>
+                        <td className="mono px-2 py-1.5 text-right font-semibold" style={{ color: "var(--text-hi)" }}>{num(p.sharpe_ratio, 2)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(p.turnover, 1)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{largestWeight(p.weights)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {opt.notes.filter((n) => /not achievable|below the minimum/i.test(n)).map((n) => (
+                <p key={n} role="status" className="mt-2 rounded-lg px-2.5 py-1.5 text-[11px]" style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}>{n}</p>
+              ))}
+              <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                Deterministic candidate search, not a production optimiser. Educational construction only — not investment advice.
+              </p>
+            </div>
+          )}
+
+          {/* ── Weight comparison + hypothetical rebalance ───────────────── */}
+          {selectedCompare && (
+            <div className="card p-4">
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <p className="section-title">Current vs optimized weights</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {compareTargets.map((c) => (
+                    <button key={c.id} type="button" onClick={() => setCompareId(c.id)}
+                      aria-pressed={selectedCompare.id === c.id}
+                      className="rounded-md px-2.5 py-1 text-[11px] font-semibold transition-colors"
+                      style={{
+                        background: selectedCompare.id === c.id ? "var(--accent-softer)" : "var(--glass)",
+                        border: `1px solid ${selectedCompare.id === c.id ? "var(--accent-line)" : "var(--line)"}`,
+                        color: selectedCompare.id === c.id ? "var(--accent-text)" : "var(--text-hi)",
+                      }}>
+                      {c.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              {(() => {
+                const cur = result.normalized_weights;
+                const tgt = selectedCompare.weights;
+                const deltas = order.map((id) => ({ id, cur: cur[id] ?? 0, tgt: tgt[id] ?? 0, d: (tgt[id] ?? 0) - (cur[id] ?? 0) }));
+                const turnover = 0.5 * deltas.reduce((s, x) => s + Math.abs(x.d), 0);
+                const inc = deltas.reduce((a, b) => (b.d > a.d ? b : a));
+                const dec = deltas.reduce((a, b) => (b.d < a.d ? b : a));
+                return (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm">
+                        <thead>
+                          <tr style={{ color: "var(--text-mut)" }}>
+                            <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Asset</th>
+                            <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Current</th>
+                            <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Target</th>
+                            <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Hypothetical Δ</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {deltas.map((x) => (
+                            <tr key={x.id} style={{ borderTop: "1px solid var(--line)" }}>
+                              <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>{tickerOf(x.id)}</td>
+                              <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(x.cur)}</td>
+                              <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(x.tgt)}</td>
+                              <td className="mono px-2 py-1.5 text-right font-semibold" style={{ color: changeColor(x.d) }}>{x.d >= 0 ? "+" : ""}{pct(x.d)}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                    <div className="mt-3 flex flex-wrap items-center gap-3">
+                      <div className="rounded-lg px-3 py-2" style={{ background: "var(--glass)", border: "1px solid var(--line)" }}>
+                        <span className="text-[10px] uppercase tracking-wide" style={{ color: "var(--text-mut)" }}>Absolute turnover</span>
+                        <p className="mono text-base font-bold" style={{ color: "var(--text-hi)" }}>{pct(turnover, 1)}</p>
+                      </div>
+                      <span className="text-xs" style={{ color: "var(--text-mut)" }}>
+                        Largest hypothetical increase: <span className="font-semibold" style={{ color: "var(--pos)" }}>{tickerOf(inc.id)} {inc.d >= 0 ? "+" : ""}{pct(inc.d)}</span>
+                        {"  ·  "}decrease: <span className="font-semibold" style={{ color: "var(--neg)" }}>{tickerOf(dec.id)} {pct(dec.d)}</span>
+                      </span>
+                    </div>
+                    <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                      Hypothetical rebalance delta (target − current). Illustrative only — not a trade order or buy/sell recommendation.
+                    </p>
+                  </>
+                );
+              })()}
+            </div>
+          )}
+
+          {/* ── Black-Litterman ──────────────────────────────────────────── */}
+          {bl && (
+            <div className="card p-4">
+              <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+                <p className="section-title">Black-Litterman</p>
+                <span className="mono text-[11px]" style={{ color: "var(--text-faint)" }}>δ = {num(bl.risk_aversion, 2)} · τ = {num(bl.tau, 2)}</span>
+              </div>
+              <p className="mb-2 text-[11px]" style={{ color: "var(--warn)" }}>Sample views are illustrative only and are not forecasts.</p>
+              <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+                <div>
+                  <p className="section-title mb-1">Returns (annual)</p>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr style={{ color: "var(--text-mut)" }}>
+                          <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Asset</th>
+                          <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Prior</th>
+                          <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Implied</th>
+                          <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Posterior</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {bl.returns.map((r) => (
+                          <tr key={r.asset_id} style={{ borderTop: "1px solid var(--line)" }}>
+                            <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>{tickerOf(r.asset_id)}</td>
+                            <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(r.prior_return)}</td>
+                            <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{pct(r.implied_return)}</td>
+                            <td className="mono px-2 py-1.5 text-right font-semibold" style={{ color: changeColor(r.posterior_return - r.prior_return) }}>{pct(r.posterior_return)}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                <div>
+                  <p className="section-title mb-1">Sample views</p>
+                  <div className="space-y-1.5">
+                    {bl.views.map((v) => (
+                      <div key={v.id} className="rounded-lg px-3 py-2" style={{ background: "var(--glass)", border: "1px solid var(--line)" }}>
+                        <p className="text-xs" style={{ color: "var(--text-hi)" }}>{v.description}</p>
+                        <p className="mono mt-0.5 text-[10px]" style={{ color: "var(--text-mut)" }}>view = {pct(v.view_return)} · confidence {pct(v.confidence, 0)}{v.is_sample ? " · illustrative" : ""}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-2 rounded-lg px-3 py-2" style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)" }}>
+                    <p className="text-xs font-semibold" style={{ color: "var(--accent-text)" }}>{bl.bl_optimized_portfolio.name}</p>
+                    <p className="mono mt-0.5 text-[11px]" style={{ color: "var(--text-mut)" }}>
+                      μ {pct(bl.bl_optimized_portfolio.expected_return)} · σ {pct(bl.bl_optimized_portfolio.volatility)} · Sharpe {num(bl.bl_optimized_portfolio.sharpe_ratio, 2)} · turnover {pct(bl.bl_optimized_portfolio.turnover, 1)}
+                    </p>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {order.map((id) => (
+                        <span key={id} className="mono rounded px-1.5 py-0.5 text-[10px]" style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}>
+                          {tickerOf(id)} {pct(bl.bl_optimized_portfolio.weights[id] ?? 0, 0)}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -777,6 +1030,9 @@ export default function PortfolioRiskLabPanel() {
               <li><span className="font-semibold">Factor exposure</span> (portfolio β = Bᵀw) shows which systematic risks the portfolio carries; factor covariance turns those betas into a risk view.</li>
               <li><span className="font-semibold">Specific risk</span> is the idiosyncratic part not explained by the factors; with the variance-share convention factor % + specific % = 100%.</li>
               <li><span className="font-semibold">Scenario shocks</span> translate factor moves into asset and portfolio P&amp;L — a transparent “what if this factor moves” lens.</li>
+              <li><span className="font-semibold">Mean-variance optimization</span> finds high-return-per-unit-risk portfolios; <span className="font-semibold">max Sharpe</span> maximises excess return ÷ volatility, and box <span className="font-semibold">constraints</span> (long-only, per-asset cap) keep results diversified.</li>
+              <li><span className="font-semibold">Black-Litterman</span> starts from market-implied equilibrium returns and tilts them toward your views — blending a prior with opinions instead of trusting raw return estimates.</li>
+              <li><span className="font-semibold">Turnover</span> (½·Σ|Δweight|) measures how much trading a rebalance would imply — higher turnover means more cost in practice.</li>
             </ul>
           </div>
           <div>
@@ -788,6 +1044,7 @@ export default function PortfolioRiskLabPanel() {
               <li>The efficient frontier is a deterministic sample demonstration, not an optimiser guarantee.</li>
               <li>Factor betas are <span className="font-semibold">deterministic illustrative values</span>, not estimated from data; factors are treated as orthogonal in v1, and specific variance is a floored residual.</li>
               <li>Scenarios are <span className="font-semibold">educational sample shocks</span>, not a current macro view — a simplified factor model, not a production risk model.</li>
+              <li>The optimizer is a <span className="font-semibold">deterministic candidate search</span>, not a production optimizer; Black-Litterman views are <span className="font-semibold">illustrative, not forecasts</span>; rebalance deltas are <span className="font-semibold">hypothetical, not trade orders</span> — no buy/sell recommendations.</li>
             </ul>
           </div>
         </div>

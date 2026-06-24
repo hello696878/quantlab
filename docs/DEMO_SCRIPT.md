@@ -212,6 +212,21 @@ Return to the Command Center's **Platform Direction** panel (or open
   deterministic illustrative values (not estimated), factors are orthogonal in
   v1, scenarios are educational sample shocks — a simplified factor model, not a
   production risk model, not investment advice.
+  **Optimization & Black-Litterman (21.2):** scroll to **Optimization Lab** — the
+  table compares Current / Max Sharpe / Min variance / Risk parity / Equal weight
+  (expected return, volatility, Sharpe, turnover, largest weight). Type a **Target
+  return** of `0.06` and a **Target volatility** of `0.12` to see those rows
+  appear, then a target return of `0.50` to see the friendly "not achievable"
+  message (no crash). In **Current vs optimized weights**, switch the target
+  between Max Sharpe / Min variance / Risk parity / Black-Litterman and watch the
+  Δ column and the **absolute turnover** + largest hypothetical increase/decrease
+  update. In **Black-Litterman**, point out the prior → implied → posterior return
+  columns, the three sample views (Taiwan>Japan, Gold>Cash, US Treasury absolute),
+  and the BL-optimized portfolio; the panel states "Sample views are illustrative
+  only and are not forecasts." Change a weight and watch the optimization and
+  rebalance re-compute. Emphasise: deterministic candidate-search optimizer (not a
+  production solver), illustrative BL views (not forecasts), hypothetical rebalance
+  deltas (not trade orders, no buy/sell) — not investment advice.
 - **Cross-Sectional Scanner** — the *second engine*. Use the defaults (reversal,
   50 assets, 2022-01-01 → 2024-12-31, lookback 5, long/short quantile 0.2, daily,
   gross 1.0, cost 5 bps, seed 42) → **Run Scanner** → metric cards (total /

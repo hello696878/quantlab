@@ -21,20 +21,32 @@ from app.portfolio_risk.factors import (
 )
 from app.portfolio_risk.models import (
     AssetRiskContribution,
+    BlackLittermanResult,
+    BlackLittermanView,
     FactorDefinition,
     FactorModelSummary,
     FrontierPoint,
     NamedPortfolio,
+    OptimizationConstraints,
+    OptimizationResults,
+    OptimizedPortfolio,
     PortfolioAnalysisRequest,
     PortfolioAnalysisResponse,
     PortfolioAsset,
     PortfolioFactorExposure,
+    RebalanceAnalysis,
     SamplePortfolioResponse,
     ScenarioDefinition,
     ScenarioResult,
     SpecificRiskContribution,
     StressResult,
     StressScenario,
+)
+from app.portfolio_risk.optimize import (
+    build_black_litterman,
+    build_optimization,
+    build_rebalance,
+    sample_bl_views,
 )
 from app.portfolio_risk.sample import build_sample_response, sample_assets
 from app.portfolio_risk.service import DISCLAIMER, analyze_portfolio

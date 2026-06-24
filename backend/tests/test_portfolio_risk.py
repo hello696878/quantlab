@@ -372,6 +372,136 @@ def test_custom_scenario_appended():
     assert "my_custom" in ids
 
 
+# --------------------------------------------------------------------------- #
+# Phase 21.2 — Optimization & Black-Litterman
+# --------------------------------------------------------------------------- #
+def _named_portfolios(out):
+    o = out.optimization_results
+    pfs = [
+        o.current_portfolio,
+        o.equal_weight_portfolio,
+        o.max_sharpe_portfolio,
+        o.min_variance_portfolio,
+        o.risk_parity_portfolio,
+    ]
+    if o.target_return_portfolio:
+        pfs.append(o.target_return_portfolio)
+    if o.target_volatility_portfolio:
+        pfs.append(o.target_volatility_portfolio)
+    return pfs
+
+
+def test_optimization_results_exist():
+    out = _analyze()
+    o = out.optimization_results
+    assert o.candidate_count > 10
+    assert o.max_sharpe_portfolio and o.min_variance_portfolio and o.risk_parity_portfolio
+
+
+def test_optimized_weights_sum_to_one():
+    out = _analyze()
+    for p in _named_portfolios(out):
+        assert math.isclose(sum(p.weights.values()), 1.0, abs_tol=1e-6)
+
+
+def test_optimized_portfolios_long_only():
+    out = _analyze()
+    for p in _named_portfolios(out):
+        assert all(v >= -1e-6 for v in p.weights.values())
+
+
+def test_constructed_portfolios_respect_max_weight():
+    out = _analyze()
+    o = out.optimization_results
+    cap = o.constraints.max_weight
+    for p in (o.max_sharpe_portfolio, o.min_variance_portfolio, o.equal_weight_portfolio):
+        assert all(v <= cap + 1e-6 for v in p.weights.values())
+        assert p.feasible
+
+
+def test_max_sharpe_highest_among_feasible_named():
+    out = _analyze()
+    ms = out.optimization_results.max_sharpe_portfolio
+    for p in _named_portfolios(out):
+        if p.feasible:
+            assert ms.sharpe_ratio >= p.sharpe_ratio - 1e-9
+
+
+def test_min_variance_lowest_among_feasible_named():
+    out = _analyze()
+    mv = out.optimization_results.min_variance_portfolio
+    for p in _named_portfolios(out):
+        if p.feasible:
+            assert mv.volatility <= p.volatility + 1e-9
+
+
+def test_target_return_feasible():
+    out = _analyze(optimization_constraints={"target_return": 0.05})
+    pf = out.optimization_results.target_return_portfolio
+    assert pf is not None
+    assert pf.expected_return >= 0.05 - 1e-6
+
+
+def test_target_return_infeasible_is_friendly():
+    out = _analyze(optimization_constraints={"target_return": 0.50})
+    assert out.optimization_results.target_return_portfolio is None
+    assert any("not achievable" in n.lower() for n in out.optimization_results.notes)
+
+
+def test_target_volatility_feasible():
+    out = _analyze(optimization_constraints={"target_volatility": 0.15})
+    pf = out.optimization_results.target_volatility_portfolio
+    assert pf is not None
+    assert pf.volatility <= 0.15 + 1e-6
+
+
+def test_rebalance_turnover_and_deltas():
+    out = _analyze()
+    reb = out.rebalance_analysis
+    total = sum(abs(d.delta) for d in reb.asset_deltas)
+    assert math.isclose(reb.absolute_turnover, 0.5 * total, abs_tol=1e-12)
+    for d in reb.asset_deltas:
+        assert math.isclose(d.delta, d.target_weight - d.current_weight, abs_tol=1e-12)
+    assert reb.largest_increase in {d.asset_id for d in reb.asset_deltas}
+    assert reb.largest_decrease in {d.asset_id for d in reb.asset_deltas}
+
+
+def test_black_litterman_implied_returns():
+    import numpy as np
+
+    out = _analyze()
+    bl = out.black_litterman
+    cov = np.array(out.covariance_matrix)
+    w_mkt = np.array([out.normalized_weights[a] for a in out.asset_order])
+    pi = bl.risk_aversion * (cov @ w_mkt)
+    for i, r in enumerate(bl.returns):
+        assert r.asset_id == out.asset_order[i]
+        assert math.isclose(r.implied_return, float(pi[i]), abs_tol=1e-9)
+
+
+def test_black_litterman_posterior_finite_and_views():
+    out = _analyze()
+    bl = out.black_litterman
+    assert len(bl.views) == 3
+    assert all(v.is_sample for v in bl.views)
+    for r in bl.returns:
+        assert math.isfinite(r.posterior_return) and math.isfinite(r.prior_return)
+    assert math.isclose(sum(bl.bl_optimized_portfolio.weights.values()), 1.0, abs_tol=1e-6)
+
+
+def test_black_litterman_views_marked_illustrative():
+    out = _analyze()
+    text = " ".join(n.lower() for n in out.black_litterman.notes)
+    assert "illustrative" in text and "not" in text and "forecast" in text
+
+
+def test_no_buy_sell_recommendation_wording():
+    out = _analyze()
+    note = out.rebalance_analysis.note.lower()
+    assert "not a trade order" in note
+    assert "recommendation" in note  # phrased as "not a ... recommendation"
+
+
 def test_single_asset_portfolio_does_not_crash():
     # A 1-asset portfolio is valid input (min_length=1); np.corrcoef collapses a
     # single series to a 0-d scalar, so the covariance path must stay well-shaped.

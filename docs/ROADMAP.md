@@ -1517,6 +1517,39 @@ single-asset Backtest + Strategy Comparison:
   `frontend/README.md`. **Illustrative betas (not estimated), educational sample
   scenarios, simplified factor model — not a production risk model, not advice.**
 
+### Phase 21.2 — Portfolio Optimization & Black-Litterman Lab v1 ✅
+
+- **Additive extension of Portfolio Risk Lab** — all existing fields/behaviour
+  preserved. Deterministic static-sample data only; no live data, no trading, no
+  brokerage, no trade orders, not advice. Backtest/AFML/scanner untouched.
+- Backend: new `app/portfolio_risk/optimize.py` — long-only **constrained
+  candidate search** (current/equal/inverse-vol/risk-parity/single-asset-capped/
+  blends + fixed-seed Dirichlet cloud, each projected onto the box-constrained
+  simplex via bisection) selecting **max-Sharpe**, **min-variance**,
+  **target-return** (lowest-vol meeting the target), and **target-volatility**
+  (highest-return within the budget; infeasible → friendly note, no crash);
+  simplified **Black-Litterman** (π = δΣw_market, posterior
+  μ_bl = [(τΣ)⁻¹ + PᵀΩ⁻¹P]⁻¹[(τΣ)⁻¹π + PᵀΩ⁻¹q] with pinv fallback, 3 sample
+  views, BL-optimized portfolio); **hypothetical rebalance** (Δ = target−current,
+  ½Σ|Δ| turnover, largest increase/decrease). New models added to `models.py`;
+  `analyze_portfolio` now also returns `optimization_results`, `black_litterman`,
+  `rebalance_analysis`; request gains optional `optimization_constraints`,
+  `black_litterman_views`, `risk_aversion`, `tau`.
+- Frontend: `PortfolioRiskLabPanel` extended with an **Optimization Lab** table
+  (+ max-weight / target-return / target-volatility controls), **Current vs
+  optimized weights** comparison with a hypothetical-rebalance summary, and a
+  **Black-Litterman** panel (prior/implied/posterior returns, sample views,
+  BL-optimized portfolio); `lib/portfolioRisk.ts` types + formulas extended.
+  Dashboard badge → "Portfolio analytics + optimization"; palette adds Portfolio
+  Optimization Lab, Black-Litterman Lab, Max Sharpe Portfolio, Portfolio Rebalance
+  Analysis.
+- 14 new backend tests (the portfolio-risk file now has 48) — full suite green
+  (**1870 passed**); `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`, `PROJECT_OVERVIEW.md`,
+  `LIMITATIONS.md`, `DEMO_SCRIPT.md`, `frontend/README.md`. **Candidate-search
+  optimizer (not production), illustrative BL views (not forecasts), hypothetical
+  rebalance (no trade orders) — not investment advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

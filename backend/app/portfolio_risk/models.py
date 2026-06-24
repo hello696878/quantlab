@@ -59,6 +59,11 @@ class PortfolioAnalysisRequest(PortfolioModel):
     allow_short: bool = False
     # Optional extra factor-shock scenarios appended to the sample library.
     custom_scenarios: List["ScenarioDefinition"] = Field(default_factory=list)
+    # Optimization & Black-Litterman inputs (Phase 21.2).
+    optimization_constraints: Optional["OptimizationConstraints"] = None
+    black_litterman_views: Optional[List["BlackLittermanView"]] = None
+    risk_aversion: Annotated[FiniteFloat, Field(gt=0.0, le=100.0)] = 2.5
+    tau: Annotated[FiniteFloat, Field(gt=0.0, le=1.0)] = 0.05
 
     @model_validator(mode="after")
     def _validate(self) -> "PortfolioAnalysisRequest":
@@ -189,6 +194,101 @@ class ScenarioResult(PortfolioModel):
     notes: List[NonEmptyStr]
 
 
+# --------------------------------------------------------------------------- #
+# Optimization & Black-Litterman (Phase 21.2)
+# --------------------------------------------------------------------------- #
+class OptimizationConstraints(PortfolioModel):
+    min_weight: Annotated[FiniteFloat, Field(ge=0.0, le=1.0)] = 0.0
+    max_weight: Annotated[FiniteFloat, Field(gt=0.0, le=1.0)] = 0.40
+    target_return: Optional[FiniteFloat] = None
+    target_volatility: Optional[PositiveFloat] = None
+    turnover_penalty: Optional[Annotated[FiniteFloat, Field(ge=0.0)]] = None
+    previous_weights: Optional[Dict[str, FiniteFloat]] = None
+
+    @model_validator(mode="after")
+    def _check(self) -> "OptimizationConstraints":
+        if self.min_weight > self.max_weight:
+            raise ValueError("min_weight must be <= max_weight")
+        return self
+
+
+class OptimizedPortfolio(PortfolioModel):
+    id: NonEmptyStr
+    name: NonEmptyStr
+    objective: NonEmptyStr
+    weights: Dict[str, FiniteFloat]
+    expected_return: FiniteFloat
+    volatility: FiniteFloat
+    sharpe_ratio: FiniteFloat
+    turnover: FiniteFloat
+    notes: List[NonEmptyStr]
+    feasible: bool
+
+
+class EffectiveConstraints(PortfolioModel):
+    min_weight: FiniteFloat
+    max_weight: FiniteFloat
+    target_return: Optional[FiniteFloat] = None
+    target_volatility: Optional[FiniteFloat] = None
+    turnover_penalty: Optional[FiniteFloat] = None
+
+
+class OptimizationResults(PortfolioModel):
+    current_portfolio: OptimizedPortfolio
+    equal_weight_portfolio: OptimizedPortfolio
+    max_sharpe_portfolio: OptimizedPortfolio
+    min_variance_portfolio: OptimizedPortfolio
+    risk_parity_portfolio: OptimizedPortfolio
+    target_return_portfolio: Optional[OptimizedPortfolio] = None
+    target_volatility_portfolio: Optional[OptimizedPortfolio] = None
+    candidate_count: int
+    constraints: EffectiveConstraints
+    notes: List[NonEmptyStr]
+
+
+class BlackLittermanView(PortfolioModel):
+    id: NonEmptyStr
+    description: NonEmptyStr
+    asset_weights: Dict[str, FiniteFloat]  # P-matrix row
+    view_return: FiniteFloat  # q
+    confidence: Annotated[FiniteFloat, Field(gt=0.0, le=1.0)]
+    is_sample: bool = True
+
+
+class AssetReturnView(PortfolioModel):
+    asset_id: NonEmptyStr
+    name: NonEmptyStr
+    implied_return: FiniteFloat
+    posterior_return: FiniteFloat
+    prior_return: FiniteFloat
+
+
+class BlackLittermanResult(PortfolioModel):
+    risk_aversion: FiniteFloat
+    tau: FiniteFloat
+    returns: List[AssetReturnView]
+    views: List[BlackLittermanView]
+    bl_optimized_portfolio: OptimizedPortfolio
+    notes: List[NonEmptyStr]
+
+
+class RebalanceAssetDelta(PortfolioModel):
+    asset_id: NonEmptyStr
+    name: NonEmptyStr
+    current_weight: FiniteFloat
+    target_weight: FiniteFloat
+    delta: FiniteFloat
+
+
+class RebalanceAnalysis(PortfolioModel):
+    target_portfolio_id: NonEmptyStr
+    asset_deltas: List[RebalanceAssetDelta]
+    absolute_turnover: FiniteFloat
+    largest_increase: NonEmptyStr
+    largest_decrease: NonEmptyStr
+    note: NonEmptyStr
+
+
 class PortfolioAnalysisResponse(PortfolioModel):
     asset_order: List[NonEmptyStr]
     asset_names: Dict[str, NonEmptyStr]
@@ -219,6 +319,10 @@ class PortfolioAnalysisResponse(PortfolioModel):
     factor_model: FactorModelSummary
     scenario_library: List[ScenarioDefinition]
     scenario_results: List[ScenarioResult]
+    # Optimization & Black-Litterman (Phase 21.2).
+    optimization_results: OptimizationResults
+    black_litterman: BlackLittermanResult
+    rebalance_analysis: RebalanceAnalysis
     notes: List[NonEmptyStr]
     data_status: Literal["static_sample"] = "static_sample"
     disclaimer: NonEmptyStr

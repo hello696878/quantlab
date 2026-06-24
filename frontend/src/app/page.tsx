@@ -1242,6 +1242,10 @@ export default function HomePage() {
         ["Portfolio Factor Exposure", "portfolio factor exposure beta equity market size value momentum rates credit fx dollar commodity volatility loadings"],
         ["Portfolio Scenario Stress", "portfolio scenario stress test equity selloff rates shock usd squeeze commodity rally credit stress shock factor impact worst best asset"],
         ["Factor Risk Decomposition", "portfolio factor risk decomposition specific idiosyncratic risk contribution factor covariance variance share"],
+        ["Portfolio Optimization Lab", "portfolio optimization mean variance constrained long only max sharpe min variance target return target volatility candidate search construction"],
+        ["Black-Litterman Lab", "black litterman bl implied equilibrium returns posterior views prior tau risk aversion tilt blend"],
+        ["Max Sharpe Portfolio", "max sharpe portfolio optimization tangency best risk adjusted return constrained long only"],
+        ["Portfolio Rebalance Analysis", "portfolio rebalance turnover hypothetical delta weight change current target largest increase decrease"],
       ] as const
     ).map(([title, keywords]) => ({
       id: `risklab-${title}`,
