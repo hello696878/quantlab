@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "katex/dist/katex.min.css";
 import AppErrorBoundary from "@/components/AppErrorBoundary";
 import ToastProvider from "@/components/ToastProvider";
 

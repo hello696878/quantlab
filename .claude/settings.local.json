@@ -40,7 +40,16 @@
       "Read(//c/quantlab-phase2-features/backend/**)",
       "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_futures_features.py -v)",
       "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py)",
-      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_futures_features.py -q)"
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_futures_features.py -q)",
+      "Read(//c/quantlab-phase3-labels-backtest/backend/**)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_futures_labels.py -v)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py tests/test_futures_labels.py)",
+      "Bash(npm install *)",
+      "Bash(node -e ' *)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_futures_signal_backtest.py -v)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py tests/test_futures_labels.py tests/test_futures_signal_backtest.py)",
+      "Read(//c/quantlab-phase3-labels-backtest/**)",
+      "Bash(/c/quantlab/backend/venv/Scripts/python.exe -c ' *)"
     ]
   }
 }

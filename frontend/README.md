@@ -111,7 +111,11 @@ sensitivity** table, and an **optimization robustness** table. All data is stati
 illustrative sample data with deterministic illustrative factor betas and views,
 and fixed-seed simulations — long-only v1, educational, a candidate-search
 optimizer (not production), simulations are not forecasts, no trade orders, not a
-production risk model, not investment advice.
+production risk model, not investment advice. The lab's **Formulas & notes**
+reference renders LaTeX locally with KaTeX (`components/math/FormulaReference.tsx`,
+`katex` package + local CSS — no CDN, no external render API); the **Copy LaTeX**
+button copies the grouped LaTeX source, and any formula that fails to render falls
+back to a styled raw-LaTeX code block.
 
 The Globe renders bundled static sample data immediately, then uses the validated
 backend dataset when available. The parser requires exact FRED field/date

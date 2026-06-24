@@ -762,3 +762,19 @@ button.bg-blue-700:hover {
   }
   .report-html thead { display: table-header-group; }
 }
+
+/* KaTeX formula reference (Portfolio Risk Lab) — left-aligned, dark-mode
+   readable, with horizontal scroll for long equations and no page overflow. */
+.ql-math .katex-display {
+  margin: 0.3rem 0;
+  text-align: left;
+  overflow-x: auto;
+  overflow-y: hidden;
+  max-width: 100%;
+  padding-bottom: 2px;
+}
+.ql-math .katex {
+  font-size: 1.08em;
+  color: var(--text-hi);
+  white-space: nowrap;
+}
