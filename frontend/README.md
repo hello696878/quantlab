@@ -92,6 +92,15 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `GET /api/globe/regions` | `GET /globe/regions` |
 | `GET /api/portfolio-risk/sample` | `GET /portfolio-risk/sample` |
 | `POST /api/portfolio-risk/analyze` | `POST /portfolio-risk/analyze` |
+| `GET /api/real-estate/sample` | `GET /real-estate/sample` |
+| `POST /api/real-estate/analyze` | `POST /real-estate/analyze` |
+
+The **Real Estate Lab** (`RealEstateLabPanel`, view `realestate`) loads the
+deterministic sample property/debt/REIT, lets you edit the assumptions, and
+re-analyses live via `/api/real-estate/analyze` (NOI, cap rate, mortgage/DSCR,
+cash-on-cash, IRR, equity multiple, stress scenarios, REIT NAV). Static
+illustrative sample data — not live property/REIT prices, not a production
+appraisal/underwriting tool, not investment / tax / legal / lending advice.
 
 The **Portfolio Risk Lab** (`PortfolioRiskLabPanel`, view `risklab`) loads the
 deterministic sample portfolio, lets you edit weights, and re-analyses live via

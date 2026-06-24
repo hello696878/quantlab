@@ -20,6 +20,8 @@ backend/
 │   ├── globe_routes.py     read-only Global Markets Globe API routes
 │   ├── portfolio_risk/     static-sample portfolio analytics (models/sample/service/factors/optimize/simulate)
 │   ├── portfolio_risk_routes.py  Portfolio Risk Lab API routes
+│   ├── real_estate/        static-sample real-estate analytics (models/sample/service)
+│   ├── real_estate_routes.py     Real Estate Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -35,7 +37,8 @@ backend/
 │   ├── test_sma_train_test.py    SMA Train/Test Validation research tests
 │   ├── test_sma_walk_forward.py  SMA Walk-Forward Optimization research tests
 │   ├── test_globe.py             dossier API/schema/FRED/quote adapter tests
-│   └── test_portfolio_risk.py    Portfolio Risk Lab analytics/API/validation tests
+│   ├── test_portfolio_risk.py    Portfolio Risk Lab analytics/API/validation tests
+│   └── test_real_estate.py       Real Estate Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -133,6 +136,24 @@ normalized, negative weights are rejected in long-only mode, volatility must be
 > 0, confidence must be in `[0.5, 0.999]`, and no NaN/Infinity can enter or
 leave. Every response carries `data_status = "static_sample"` and an educational
 disclaimer.
+
+---
+
+### Real Estate Lab Endpoints
+
+Deterministic static-sample income-property + REIT analytics (Phase 22.0). No live
+property or REIT data, no network calls, educational only — not investment / tax /
+legal / lending advice.
+
+| Endpoint | Description |
+|---|---|
+| `GET /real-estate/sample` | Deterministic sample property + mortgage + REIT inputs |
+| `POST /real-estate/analyze` | Full analytics: income statement (EGI/NOI), valuation (cap rate), mortgage amortization, LTV/DSCR, levered returns (cash-on-cash, IRR, equity multiple), six stress scenarios, and a simple REIT NAV discount/premium |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): purchase price
+> 0, rent ≥ 0, vacancy ∈ [0,1], cap rate > 0, holding period > 0, no NaN/Infinity.
+IRR is solved deterministically (sign-change bracketing + bisection) and returns
+`null` with a note when it cannot be bracketed.
 
 ---
 

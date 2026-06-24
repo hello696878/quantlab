@@ -1584,6 +1584,37 @@ single-asset Backtest + Strategy Comparison:
   simulations (not forecasts), illustrative robustness shifts — not a production
   risk model, not investment advice.**
 
+### Phase 22.0 — Real Estate Lab v1 ✅
+
+- **New deterministic educational real-estate analytics lab.** Static sample data
+  only; no live property/REIT data, no broker/trading, no API keys, no scraping,
+  not investment / tax / legal / lending advice. Existing backtest/AFML/scanner/
+  Portfolio Risk Lab logic untouched (separate package + view).
+- Backend: new `app/real_estate/` package (`models.py` strict Pydantic v2 with
+  `extra="forbid"` + `FiniteFloat`; `sample.py` deterministic urban-apartment +
+  mortgage + REIT sample; `service.py` pure analytics) + `app/real_estate_routes.py`
+  (`GET /real-estate/sample`, `POST /real-estate/analyze`), wired via
+  `include_router`.
+- Analytics: EGI/NOI, in-place & exit cap-rate valuation, monthly mortgage payment
+  (zero-rate handled) + month-by-month amortization (optional interest-only), LTV,
+  DSCR, initial equity, before-tax cash flow, cash-on-cash, levered cash-flow
+  projection, deterministic **IRR** (bracket + bisection; `null` + note if
+  unsolvable), equity multiple, six stress scenarios, and a simple **REIT NAV**
+  (NAV/share, premium/discount, P/FFO, dividend yield). Validation rejects
+  negative price/rent, vacancy > 1, cap rate ≤ 0, non-finite values; no NaN/Inf.
+- Frontend: new `RealEstateLabPanel` (view `realestate`) — hero + editable
+  property/debt/REIT assumptions (live re-analyze), key-metric cards, income
+  statement, debt & amortization table, scenario-stress table, REIT NAV panel,
+  and a formula/explanation panel; new `lib/realEstate.ts` types + API client.
+  Wired into Sidebar, Dashboard card ("Real estate analytics" badge), and Command
+  Palette (Open Real Estate Lab, Cap Rate Calculator, Mortgage DSCR Lab, REIT NAV
+  Lab, Real Estate Scenario Stress).
+- 28 new backend tests (deterministic, no network) — full suite green
+  (**1960 passed**); `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`, `frontend/README.md`,
+  `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample,
+  educational — not a production appraisal/underwriting tool, not advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

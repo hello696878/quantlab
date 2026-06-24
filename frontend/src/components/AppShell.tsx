@@ -20,6 +20,7 @@ export type View =
   | "scanner"
   | "finml"
   | "risklab"
+  | "realestate"
   | "csv"
   | "builder"
   | "portfolio"

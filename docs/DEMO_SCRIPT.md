@@ -357,6 +357,18 @@ Return to the Command Center's **Platform Direction** panel (or open
   backend and reopen `/globe?tour=asia` — the tour still works on bundled
   fallback. Palette: *Start Global/Asia/Macro Regime/Risk Lens Tour*, *Open Globe
   Presentation Mode*. Educational tours only — no live data, no signals, not advice.
+- **Real Estate Lab (22.0)** — open from the sidebar (or Ctrl/Cmd+K → "Open Real
+  Estate Lab"). The deterministic Urban Apartment sample loads and analyses
+  automatically: key-metric cards (NOI, in-place cap rate, value @ exit cap, LTV,
+  DSCR, cash-on-cash, IRR, equity multiple), the year-1 income statement, the debt
+  & amortization table (first 12 months), the scenario-stress table (base / rent
+  upside / vacancy shock / cap-rate expansion / interest-rate shock / downside
+  combo), and the REIT NAV panel (NAV/share 25 vs price 22 → ~12% discount, P/FFO,
+  dividend yield). Edit assumptions (e.g. raise vacancy or the interest rate, lower
+  the exit cap) and watch every metric and scenario re-compute; **Reset sample**
+  restores defaults. Emphasise: static illustrative sample data, a simplified
+  deterministic model — not live property/REIT prices, not a production appraisal
+  or underwriting tool, not investment / tax / legal / lending advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

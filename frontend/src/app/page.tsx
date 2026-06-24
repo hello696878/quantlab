@@ -45,6 +45,7 @@ import CreditLabPanel from "@/components/CreditLabPanel";
 import ScannerLabPanel from "@/components/ScannerLabPanel";
 import AfmlLabPanel from "@/components/AfmlLabPanel";
 import PortfolioRiskLabPanel from "@/components/PortfolioRiskLabPanel";
+import RealEstateLabPanel from "@/components/RealEstateLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -388,6 +389,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Portfolio Risk Lab",
     subtitle:
       "Portfolio return, volatility, Sharpe, covariance/correlation, marginal & component risk contributions, historical VaR/CVaR, stress P&L, efficient frontier, min-variance and risk-parity portfolios — deterministic static sample data, not investment advice.",
+  },
+  realestate: {
+    title: "Real Estate Lab",
+    subtitle:
+      "Income-property NOI, cap rate, valuation, mortgage amortization, LTV/DSCR, cash-on-cash, IRR, equity multiple, rent/vacancy/cap/rate stress scenarios, and a simple REIT NAV discount/premium — deterministic static sample data, not investment, tax, legal, or lending advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -960,6 +966,7 @@ export default function HomePage() {
     { view: "scanner", title: "Open Cross-Sectional Scanner", keywords: "scanner cross-sectional rank long short universe equity scanner factor ranking mean reversion momentum dollar neutral scanner lab second engine" },
     { view: "finml", title: "Open AFML Methodology Lab", keywords: "afml financial ml machine learning triple barrier cusum event sampling sample uniqueness concurrency labeling meta-labeling purged k-fold embargo cross validation leakage label overlap sequential bootstrap fractional differentiation fracdiff stationarity cpcv lopez de prado" },
     { view: "risklab", title: "Open Portfolio Risk Lab", keywords: "portfolio risk lab analytics expected return volatility sharpe covariance correlation marginal component risk contribution value at risk var cvar expected shortfall stress scenario efficient frontier minimum variance risk parity allocation weights" },
+    { view: "realestate", title: "Open Real Estate Lab", keywords: "real estate property reit noi net operating income cap rate valuation mortgage amortization ltv loan to value dscr debt service coverage cash on cash irr equity multiple rent vacancy stress nav premium discount ffo dividend yield" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1257,6 +1264,20 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("risklab"),
+    })),
+    ...(
+      [
+        ["Cap Rate Calculator", "real estate cap rate noi net operating income property valuation value income capitalization"],
+        ["Mortgage DSCR Lab", "real estate mortgage amortization dscr debt service coverage ratio ltv loan to value monthly payment interest"],
+        ["REIT NAV Lab", "real estate reit nav net asset value per share premium discount p ffo funds from operations dividend yield"],
+        ["Real Estate Scenario Stress", "real estate scenario stress rent growth vacancy shock cap rate expansion interest rate shock downside combo cash on cash irr equity multiple"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `realestate-${title}`,
+      group: "Real Estate Lab",
+      title,
+      keywords,
+      run: () => handleNav("realestate"),
     })),
     {
       id: "globe-open",
@@ -1778,6 +1799,9 @@ export default function HomePage() {
 
         {/* ── Portfolio Risk Lab ───────────────────────────────────────── */}
         {view === "risklab" && <PortfolioRiskLabPanel />}
+
+        {/* ── Real Estate Lab ──────────────────────────────────────────── */}
+        {view === "realestate" && <RealEstateLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (
