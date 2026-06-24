@@ -10,10 +10,15 @@ from __future__ import annotations
 
 from app.real_estate.models import (
     DebtInput,
+    MbsSampleResponse,
+    MortgageMbsRequest,
+    MortgagePoolInput,
+    PrepaymentInput,
     PropertyInput,
     RealEstateAnalysisRequest,
     ReitInput,
     SampleResponse,
+    ValuationInput,
 )
 
 DISCLAIMER = (
@@ -79,5 +84,43 @@ def build_sample_response() -> SampleResponse:
             "static hand-authored values.",
             "Edit the assumptions in the lab to explore the analytics.",
             "Not live property or REIT data, and not investment advice.",
+        ],
+    )
+
+
+MBS_DISCLAIMER = (
+    "Static illustrative sample data. Mortgage and MBS analytics are educational "
+    "and not investment, lending, legal, tax, or valuation advice."
+)
+
+
+def sample_mbs_request() -> MortgageMbsRequest:
+    return MortgageMbsRequest(
+        pool=MortgagePoolInput(
+            pool_name="Agency MBS Sample Pool",
+            original_balance=100_000_000.0,
+            current_balance=92_000_000.0,
+            coupon_rate=0.055,
+            servicing_fee_rate=0.0025,
+            remaining_term_months=330,
+            seasoning_months=30,
+            wam_months=330,
+            wala_months=30,
+        ),
+        prepayment=PrepaymentInput(
+            model="psa", cpr=None, psa_speed=100.0, prepayment_lag_months=0
+        ),
+        valuation=ValuationInput(discount_rate=0.052),
+    )
+
+
+def build_mbs_sample_response() -> MbsSampleResponse:
+    return MbsSampleResponse(
+        request=sample_mbs_request(),
+        disclaimer=MBS_DISCLAIMER,
+        notes=[
+            "Illustrative agency MBS pool — static hand-authored values.",
+            "Edit the pool, prepayment, and valuation assumptions to explore the analytics.",
+            "Not live mortgage rates or MBS prices, and not investment or lending advice.",
         ],
     )

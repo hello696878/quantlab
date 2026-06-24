@@ -14,6 +14,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
+import MbsSection from "@/components/real_estate/MbsSection";
 import {
   analyzeRealEstate,
   fetchRealEstateSample,
@@ -421,6 +422,9 @@ export default function RealEstateLabPanel() {
           </ul>
         )}
       </div>
+
+      {/* ── Mortgage & MBS Prepayment (Phase 22.1) ───────────────────────── */}
+      <MbsSection />
     </div>
   );
 }

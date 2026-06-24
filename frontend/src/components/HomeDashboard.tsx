@@ -1267,13 +1267,13 @@ export default function HomeDashboard({
                 className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
-                Real estate analytics
+                Real estate + MBS analytics
               </span>
             </span>
             <span className="text-xs text-slate-400">
-              Analyze deterministic sample property NOI, cap rates, mortgage debt service,
-              DSCR, cash-on-cash returns, IRR, equity multiples, REIT NAV discount/premium,
-              and rent/vacancy stress scenarios — not investment advice.
+              Analyze deterministic sample property NOI, mortgage debt, DSCR, REIT NAV,
+              and mortgage/MBS prepayment cash flows with CPR, PSA, WAL, duration, and
+              convexity — not investment advice.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Real Estate Lab →

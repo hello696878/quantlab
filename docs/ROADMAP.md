@@ -1615,6 +1615,35 @@ single-asset Backtest + Strategy Comparison:
   `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample,
   educational — not a production appraisal/underwriting tool, not advice.**
 
+### Phase 22.1 — Mortgage & MBS Prepayment Lab v1 ✅
+
+- **Additive extension of the Real Estate Lab** — existing property/REIT
+  endpoints and behaviour preserved. Deterministic static-sample data only; no
+  live mortgage rates, no live MBS prices, no broker/trading, not investment or
+  lending advice. Backtest/AFML/scanner/Portfolio Risk Lab logic untouched.
+- Backend: new `app/real_estate/mbs.py` (CPR→SMM `1−(1−CPR)^{1/12}`, simplified
+  100-PSA ramp scaled by speed + pool age, month-by-month mortgage/MBS cash-flow
+  projection on the net pass-through coupon, price from a discount rate, WAL,
+  modified-duration/convexity approximations, optional yield-to-price solve, and
+  seven rate/prepayment-speed scenarios). New MBS models added to `models.py`;
+  sample pool added to `sample.py`; two new routes
+  (`GET /real-estate/mbs/sample`, `POST /real-estate/mbs/analyze`). Validation
+  rejects negative/over-original balance, CPR > 1, negative discount rate, and
+  servicing > coupon; no NaN/Inf.
+- Frontend: new `components/real_estate/MbsSection.tsx` rendered inside the Real
+  Estate Lab (`RealEstateLabPanel`) — editable pool/prepayment/valuation
+  assumptions (live re-analyze), key-metric cards (price/100, WAL, duration,
+  convexity, totals), MBS cash-flow table, PSA/CPR path, scenario-stress table,
+  and a formula/notes panel; `lib/realEstate.ts` extended with MBS types + API.
+  Dashboard badge → "Real estate + MBS analytics"; palette adds Mortgage
+  Prepayment Lab, MBS PSA Model, MBS WAL and Duration, CPR to SMM Calculator.
+- 22 new backend tests (`tests/test_mbs.py`) — full suite green (**2053 passed**);
+  `npx tsc --noEmit` clean; no frontend build run (per instructions). Docs:
+  `README.md`, `backend/README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`,
+  `DEMO_SCRIPT.md`, `frontend/README.md`. **Simplified CPR/SMM/PSA + educational
+  WAL/duration/convexity approximations — no live mortgage/MBS data, not a
+  production valuation, not investment or lending advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

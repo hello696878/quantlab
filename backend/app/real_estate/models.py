@@ -10,7 +10,14 @@ from __future__ import annotations
 
 from typing import Annotated, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, StringConstraints
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    FiniteFloat,
+    StringConstraints,
+    model_validator,
+)
 
 NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 PositiveFloat = Annotated[FiniteFloat, Field(gt=0)]
@@ -190,6 +197,153 @@ class RealEstateAnalysisResponse(RealEstateModel):
 
 class SampleResponse(RealEstateModel):
     request: RealEstateAnalysisRequest
+    data_status: Literal["static_sample"] = "static_sample"
+    disclaimer: NonEmptyStr
+    notes: List[NonEmptyStr]
+
+
+# --------------------------------------------------------------------------- #
+# Mortgage & MBS prepayment (Phase 22.1)
+# --------------------------------------------------------------------------- #
+PrepaymentModel = Literal["constant_cpr", "psa"]
+
+
+class MortgagePoolInput(RealEstateModel):
+    pool_name: NonEmptyStr
+    original_balance: PositiveFloat
+    current_balance: PositiveFloat
+    coupon_rate: Rate
+    servicing_fee_rate: NonNegFloat = 0.0
+    remaining_term_months: Annotated[int, Field(gt=0, le=480)]
+    seasoning_months: Annotated[int, Field(ge=0, le=480)] = 0
+    wam_months: Optional[Annotated[int, Field(gt=0, le=600)]] = None
+    wala_months: Optional[Annotated[int, Field(ge=0, le=600)]] = None
+
+    @model_validator(mode="after")
+    def _check(self) -> "MortgagePoolInput":
+        if self.current_balance > self.original_balance + 1e-6:
+            raise ValueError("current_balance must be <= original_balance")
+        if self.servicing_fee_rate > self.coupon_rate + 1e-12:
+            raise ValueError("servicing_fee_rate must be <= coupon_rate")
+        return self
+
+
+class PrepaymentInput(RealEstateModel):
+    model: PrepaymentModel = "psa"
+    cpr: Optional[Rate] = None
+    psa_speed: Optional[Annotated[FiniteFloat, Field(gt=0.0, le=2000.0)]] = None
+    prepayment_lag_months: Annotated[int, Field(ge=0, le=60)] = 0
+
+
+class ValuationInput(RealEstateModel):
+    discount_rate: NonNegFloat
+    price: Optional[PositiveFloat] = None
+    rate_shock_bps: FiniteFloat = 0.0
+    prepayment_stress_multiplier: Annotated[FiniteFloat, Field(gt=0.0, le=20.0)] = 1.0
+
+
+class MortgageMbsRequest(RealEstateModel):
+    pool: MortgagePoolInput
+    prepayment: PrepaymentInput
+    valuation: ValuationInput
+
+
+class PoolSummary(RealEstateModel):
+    pool_name: NonEmptyStr
+    original_balance: FiniteFloat
+    current_balance: FiniteFloat
+    pool_factor: FiniteFloat
+    coupon_rate: FiniteFloat
+    servicing_fee_rate: FiniteFloat
+    net_coupon: FiniteFloat
+    remaining_term_months: int
+    seasoning_months: int
+
+
+class PrepaymentAssumption(RealEstateModel):
+    model: PrepaymentModel
+    cpr: Optional[FiniteFloat] = None
+    psa_speed: Optional[FiniteFloat] = None
+    prepayment_lag_months: int
+    prepayment_stress_multiplier: FiniteFloat
+
+
+class ValuationAssumption(RealEstateModel):
+    discount_rate: FiniteFloat
+    net_coupon: FiniteFloat
+    price: Optional[FiniteFloat] = None
+
+
+class MbsCashFlowSummary(RealEstateModel):
+    num_months: int
+    total_interest: FiniteFloat
+    total_scheduled_principal: FiniteFloat
+    total_prepayment: FiniteFloat
+    total_principal: FiniteFloat
+    total_cash_flow: FiniteFloat
+    final_balance: FiniteFloat
+
+
+class MbsCashFlowRow(RealEstateModel):
+    month: int
+    beginning_balance: FiniteFloat
+    scheduled_principal: FiniteFloat
+    prepayment_principal: FiniteFloat
+    interest: FiniteFloat
+    total_cash_flow: FiniteFloat
+    ending_balance: FiniteFloat
+
+
+class PsaPathPoint(RealEstateModel):
+    month: int
+    pool_age_month: int
+    cpr: FiniteFloat
+    smm: FiniteFloat
+
+
+class DurationConvexity(RealEstateModel):
+    shock_bps: FiniteFloat
+    price_base: FiniteFloat
+    price_up: FiniteFloat
+    price_down: FiniteFloat
+    duration: FiniteFloat
+    convexity: FiniteFloat
+    yield_estimate: Optional[FiniteFloat] = None
+
+
+class MbsScenarioResult(RealEstateModel):
+    id: NonEmptyStr
+    name: NonEmptyStr
+    description: NonEmptyStr
+    price_100: FiniteFloat
+    wal: FiniteFloat
+    duration: FiniteFloat
+    convexity: FiniteFloat
+    total_interest: FiniteFloat
+    total_principal: FiniteFloat
+    final_balance: FiniteFloat
+    notes: List[NonEmptyStr]
+
+
+class MortgageMbsAnalysisResponse(RealEstateModel):
+    data_status: Literal["static_sample"] = "static_sample"
+    pool_summary: PoolSummary
+    prepayment_assumption: PrepaymentAssumption
+    valuation_assumption: ValuationAssumption
+    price: FiniteFloat
+    price_100: FiniteFloat
+    wal: FiniteFloat
+    cash_flow_summary: MbsCashFlowSummary
+    cash_flow_schedule: List[MbsCashFlowRow]
+    psa_path: List[PsaPathPoint]
+    duration_convexity: DurationConvexity
+    scenario_results: List[MbsScenarioResult]
+    notes: List[NonEmptyStr]
+    disclaimer: NonEmptyStr
+
+
+class MbsSampleResponse(RealEstateModel):
+    request: MortgageMbsRequest
     data_status: Literal["static_sample"] = "static_sample"
     disclaimer: NonEmptyStr
     notes: List[NonEmptyStr]

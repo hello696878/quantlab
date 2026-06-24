@@ -1271,6 +1271,10 @@ export default function HomePage() {
         ["Mortgage DSCR Lab", "real estate mortgage amortization dscr debt service coverage ratio ltv loan to value monthly payment interest"],
         ["REIT NAV Lab", "real estate reit nav net asset value per share premium discount p ffo funds from operations dividend yield"],
         ["Real Estate Scenario Stress", "real estate scenario stress rent growth vacancy shock cap rate expansion interest rate shock downside combo cash on cash irr equity multiple"],
+        ["Mortgage Prepayment Lab", "mortgage mbs prepayment cpr smm psa cash flow amortization pool agency pass through speed"],
+        ["MBS PSA Model", "mbs psa prepayment standard model ramp speed 100 cpr pool age seasoning"],
+        ["MBS WAL and Duration", "mbs weighted average life wal duration convexity price discount yield mortgage backed security"],
+        ["CPR to SMM Calculator", "cpr smm single monthly mortality conditional prepayment rate conversion mortgage mbs"],
       ] as const
     ).map(([title, keywords]) => ({
       id: `realestate-${title}`,

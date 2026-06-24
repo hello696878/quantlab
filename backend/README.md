@@ -20,7 +20,7 @@ backend/
 │   ├── globe_routes.py     read-only Global Markets Globe API routes
 │   ├── portfolio_risk/     static-sample portfolio analytics (models/sample/service/factors/optimize/simulate)
 │   ├── portfolio_risk_routes.py  Portfolio Risk Lab API routes
-│   ├── real_estate/        static-sample real-estate analytics (models/sample/service)
+│   ├── real_estate/        static-sample real-estate analytics (models/sample/service/mbs)
 │   ├── real_estate_routes.py     Real Estate Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
@@ -38,7 +38,8 @@ backend/
 │   ├── test_sma_walk_forward.py  SMA Walk-Forward Optimization research tests
 │   ├── test_globe.py             dossier API/schema/FRED/quote adapter tests
 │   ├── test_portfolio_risk.py    Portfolio Risk Lab analytics/API/validation tests
-│   └── test_real_estate.py       Real Estate Lab analytics/API/validation tests
+│   ├── test_real_estate.py       Real Estate Lab analytics/API/validation tests
+│   └── test_mbs.py               Mortgage & MBS prepayment analytics/API tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -149,11 +150,16 @@ legal / lending advice.
 |---|---|
 | `GET /real-estate/sample` | Deterministic sample property + mortgage + REIT inputs |
 | `POST /real-estate/analyze` | Full analytics: income statement (EGI/NOI), valuation (cap rate), mortgage amortization, LTV/DSCR, levered returns (cash-on-cash, IRR, equity multiple), six stress scenarios, and a simple REIT NAV discount/premium |
+| `GET /real-estate/mbs/sample` | Deterministic sample agency MBS pool + prepayment + valuation inputs |
+| `POST /real-estate/mbs/analyze` | Mortgage/MBS analytics: cash flows with CPR/SMM/PSA prepayments, MBS cash-flow decomposition, price, WAL, modified-duration/convexity approximations, and rate / prepayment-speed stress scenarios |
 
 Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): purchase price
 > 0, rent ≥ 0, vacancy ∈ [0,1], cap rate > 0, holding period > 0, no NaN/Infinity.
 IRR is solved deterministically (sign-change bracketing + bisection) and returns
-`null` with a note when it cannot be bracketed.
+`null` with a note when it cannot be bracketed. The Mortgage & MBS endpoints
+(Phase 22.1) use a simplified educational CPR→SMM and 100-PSA ramp; WAL,
+duration, and convexity are educational approximations (duration/convexity hold
+the projected cash flows fixed). No live mortgage rates or MBS prices.
 
 ---
 

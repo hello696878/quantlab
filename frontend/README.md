@@ -94,13 +94,18 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/portfolio-risk/analyze` | `POST /portfolio-risk/analyze` |
 | `GET /api/real-estate/sample` | `GET /real-estate/sample` |
 | `POST /api/real-estate/analyze` | `POST /real-estate/analyze` |
+| `GET /api/real-estate/mbs/sample` | `GET /real-estate/mbs/sample` |
+| `POST /api/real-estate/mbs/analyze` | `POST /real-estate/mbs/analyze` |
 
 The **Real Estate Lab** (`RealEstateLabPanel`, view `realestate`) loads the
 deterministic sample property/debt/REIT, lets you edit the assumptions, and
 re-analyses live via `/api/real-estate/analyze` (NOI, cap rate, mortgage/DSCR,
-cash-on-cash, IRR, equity multiple, stress scenarios, REIT NAV). Static
-illustrative sample data — not live property/REIT prices, not a production
-appraisal/underwriting tool, not investment / tax / legal / lending advice.
+cash-on-cash, IRR, equity multiple, stress scenarios, REIT NAV). It also embeds a
+**Mortgage & MBS Prepayment** section (`components/real_estate/MbsSection.tsx`,
+Phase 22.1) that uses `/api/real-estate/mbs/analyze` for CPR/SMM/PSA cash flows,
+WAL, price, duration, and convexity. Static illustrative sample data — not live
+property/REIT prices, no live mortgage rates or MBS prices, not a production
+appraisal/underwriting/valuation tool, not investment / tax / legal / lending advice.
 
 The **Portfolio Risk Lab** (`PortfolioRiskLabPanel`, view `risklab`) loads the
 deterministic sample portfolio, lets you edit weights, and re-analyses live via

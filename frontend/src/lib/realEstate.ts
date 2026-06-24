@@ -225,6 +225,176 @@ export async function analyzeRealEstate(
 }
 
 // --------------------------------------------------------------------------- //
+// Mortgage & MBS prepayment (Phase 22.1)
+// --------------------------------------------------------------------------- //
+export type PrepaymentModel = "constant_cpr" | "psa";
+
+export interface MortgagePoolInput {
+  pool_name: string;
+  original_balance: number;
+  current_balance: number;
+  coupon_rate: number;
+  servicing_fee_rate: number;
+  remaining_term_months: number;
+  seasoning_months: number;
+  wam_months?: number | null;
+  wala_months?: number | null;
+}
+
+export interface PrepaymentInput {
+  model: PrepaymentModel;
+  cpr?: number | null;
+  psa_speed?: number | null;
+  prepayment_lag_months: number;
+}
+
+export interface ValuationInput {
+  discount_rate: number;
+  price?: number | null;
+  rate_shock_bps: number;
+  prepayment_stress_multiplier: number;
+}
+
+export interface MortgageMbsRequest {
+  pool: MortgagePoolInput;
+  prepayment: PrepaymentInput;
+  valuation: ValuationInput;
+}
+
+export interface MbsSampleResponse {
+  request: MortgageMbsRequest;
+  data_status: "static_sample";
+  disclaimer: string;
+  notes: string[];
+}
+
+export interface PoolSummary {
+  pool_name: string;
+  original_balance: number;
+  current_balance: number;
+  pool_factor: number;
+  coupon_rate: number;
+  servicing_fee_rate: number;
+  net_coupon: number;
+  remaining_term_months: number;
+  seasoning_months: number;
+}
+
+export interface PrepaymentAssumption {
+  model: PrepaymentModel;
+  cpr?: number | null;
+  psa_speed?: number | null;
+  prepayment_lag_months: number;
+  prepayment_stress_multiplier: number;
+}
+
+export interface ValuationAssumption {
+  discount_rate: number;
+  net_coupon: number;
+  price?: number | null;
+}
+
+export interface MbsCashFlowSummary {
+  num_months: number;
+  total_interest: number;
+  total_scheduled_principal: number;
+  total_prepayment: number;
+  total_principal: number;
+  total_cash_flow: number;
+  final_balance: number;
+}
+
+export interface MbsCashFlowRow {
+  month: number;
+  beginning_balance: number;
+  scheduled_principal: number;
+  prepayment_principal: number;
+  interest: number;
+  total_cash_flow: number;
+  ending_balance: number;
+}
+
+export interface PsaPathPoint {
+  month: number;
+  pool_age_month: number;
+  cpr: number;
+  smm: number;
+}
+
+export interface DurationConvexity {
+  shock_bps: number;
+  price_base: number;
+  price_up: number;
+  price_down: number;
+  duration: number;
+  convexity: number;
+  yield_estimate?: number | null;
+}
+
+export interface MbsScenarioResult {
+  id: string;
+  name: string;
+  description: string;
+  price_100: number;
+  wal: number;
+  duration: number;
+  convexity: number;
+  total_interest: number;
+  total_principal: number;
+  final_balance: number;
+  notes: string[];
+}
+
+export interface MortgageMbsAnalysisResponse {
+  data_status: "static_sample";
+  pool_summary: PoolSummary;
+  prepayment_assumption: PrepaymentAssumption;
+  valuation_assumption: ValuationAssumption;
+  price: number;
+  price_100: number;
+  wal: number;
+  cash_flow_summary: MbsCashFlowSummary;
+  cash_flow_schedule: MbsCashFlowRow[];
+  psa_path: PsaPathPoint[];
+  duration_convexity: DurationConvexity;
+  scenario_results: MbsScenarioResult[];
+  notes: string[];
+  disclaimer: string;
+}
+
+/** GET /api/real-estate/mbs/sample */
+export async function fetchMbsSample(signal?: AbortSignal): Promise<MbsSampleResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/real-estate/mbs/sample", { signal, headers: { Accept: "application/json" } });
+  } catch {
+    throw backendUnavailable();
+  }
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<MbsSampleResponse>;
+}
+
+/** POST /api/real-estate/mbs/analyze */
+export async function analyzeMbs(
+  request: MortgageMbsRequest,
+  signal?: AbortSignal,
+): Promise<MortgageMbsAnalysisResponse> {
+  let res: Response;
+  try {
+    res = await fetch("/api/real-estate/mbs/analyze", {
+      method: "POST",
+      signal,
+      headers: { "Content-Type": "application/json", Accept: "application/json" },
+      body: JSON.stringify(request),
+    });
+  } catch {
+    throw backendUnavailable();
+  }
+  if (!res.ok) throw new Error(await readError(res));
+  return res.json() as Promise<MortgageMbsAnalysisResponse>;
+}
+
+// --------------------------------------------------------------------------- //
 // Formatting helpers
 // --------------------------------------------------------------------------- //
 export function money(value: number): string {

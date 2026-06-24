@@ -369,6 +369,18 @@ Return to the Command Center's **Platform Direction** panel (or open
   restores defaults. Emphasise: static illustrative sample data, a simplified
   deterministic model — not live property/REIT prices, not a production appraisal
   or underwriting tool, not investment / tax / legal / lending advice.
+  **Mortgage & MBS Prepayment (22.1):** scroll to the appended section — the
+  Agency MBS Sample Pool loads and analyses automatically. Show the key-metric
+  cards (price/100, WAL, duration, convexity, total interest, final balance), the
+  month-1 CPR→SMM line, the MBS cash-flow table (scheduled vs prepayment
+  principal), the PSA/CPR path (ramp to 6% by pool age 30 at 100 PSA), and the
+  scenario-stress table. Raise the **PSA speed** to 200 (faster prepay → shorter
+  WAL), drop it to 50 (slower → longer WAL), and move the **discount rate** up/down
+  (price falls/rises). Point out the scenario rows: Fast prepayment shortens WAL,
+  Slow/Extension extends it, Rate up lowers price, Refinance wave shortens WAL.
+  Emphasise: simplified CPR/SMM/PSA and educational WAL/duration/convexity
+  approximations — no live mortgage rates or MBS prices, not a production
+  valuation, not investment or lending advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).
