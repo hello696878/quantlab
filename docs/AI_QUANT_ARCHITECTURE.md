@@ -978,3 +978,275 @@ produces the adjusted held return, not the raw gap.
   reference; fills are not snapped to tick and the return math uses adjusted
   close-to-close.
 - **Synthetic tests only**; single-instrument (ES), ratio adjustment.
+
+---
+
+## Appendix E — Phase 4 ML Signal Lab
+
+Phase 4 adds a **leakage-safe ML layer** on top of the Phase 1–3 futures pipeline:
+train simple, deterministic models on the Phase 3 supervised dataset, turn their
+**out-of-sample** predictions into a `target_position` signal, and run it through
+the **existing** Phase 3 backtest (which already enforces t+1 execution).
+**Implemented** in `backend/app/ml_signal/`. Sections E.1–E.12 describe the
+design; **§E.13 records the as-built status.**
+
+**Locked design decisions:**
+
+1. New package **`backend/app/ml_signal/`** (distinct from the Phase 3
+   `app.signals` baseline package and the `app.finml` methodology toolkit it
+   reuses; no collision with `app.backtest` / `app.futures_backtest`).
+2. **Reuse `app.finml.cv`** purged K-fold + embargo utilities
+   (`make_purged_kfold_splits`, `purge_train_indices`, `apply_embargo`,
+   `count_overlaps`, `summarize_cv_splits`) rather than reimplementing CV.
+3. **Reuse Phase 3 `run_futures_backtest`** for every prediction backtest — no
+   new backtest engine.
+4. **Do not add scikit-learn** (the repo ships only numpy/pandas/scipy).
+5. **Pure numpy/scipy models only for V1:** `dummy_baseline`,
+   `logistic_regression`, `ridge_regression`.
+6. **No random forest / gradient boosting in V1** (deferred behind a future
+   optional `scikit-learn` extra; admitting them would only add a `ModelType`).
+7. **Prediction at timestamp `t` emits `target_position(t)`, unshifted.**
+8. **The backtest owns execution timing:** `effective_position =
+   target_position.shift(1)` (first bar flat; no same-bar fill).
+9. **Feature columns must start with `feature__`.**
+10. **Label columns must never appear inside `feature_columns`** (validator-enforced).
+11. **No random train/test split** — splits are timestamp-ordered, shuffle-free.
+12. **Splits:** chronological holdout, walk-forward, and purged K-fold + embargo.
+
+### E.1 Scope
+
+**In scope:** `ModelSpec` + provenance hashes; time-series splits; three
+numpy/scipy estimators; prediction→signal adapter; evaluation (classification /
+regression / backtest) with baseline comparisons; an end-to-end synthetic ML
+pipeline; the hash chain extended to `dataset_config_hash → model_config_hash →
+train_run_hash`. Synthetic tests only.
+
+**Explicitly NOT in scope:** scikit-learn / XGBoost / LightGBM / torch / TF or
+**any new dependency**; random forest / gradient boosting; triple-barrier /
+meta-labeling; hyperparameter search / AutoML; live trading, real data, network
+calls; CFD / options; frontend; on-disk model registries; Combinatorial Purged CV.
+
+### E.2 ML principles (enforced)
+
+| Principle | Mechanism |
+|---|---|
+| No random split | Splits are timestamp-ordered only; no shuffle, no RNG in fold assignment. |
+| Walk-forward | Expanding/rolling (train → gap → test) folds; test always strictly after train. |
+| Purged CV | `finml.cv.make_purged_kfold_splits` over per-row label intervals `[i+L, i+L+h]`. |
+| Embargo | `embargo_bars` after each test fold (`finml.cv.apply_embargo`). |
+| No label leakage | `X` built only from `feature__*`; a guard rejects any `label__*` in `feature_columns`. |
+| No future feature leakage | Features are already trailing-only (Phase 2); Phase 4 adds none. |
+| No same-bar execution leakage | Prediction emits `target_position` at `t`, unshifted; backtest shifts to `t+1`. |
+| Predict@t → execute@t+1 | Reuse `run_futures_backtest` verbatim. |
+| Reproducible | Fixed `random_seed`; deterministic solvers; `model_config_hash` + `train_run_hash`. |
+| Artifact provenance | Metadata carries all five upstream hashes + seed + train window + lib versions. |
+
+### E.3 Proposed module structure
+
+```
+backend/app/ml_signal/
+├── __init__.py        # exports: ModelSpec, hashes, splits, (later) train/predict/evaluate
+├── spec.py            # ModelSpec + enums + dataset_config_hash / model_config_hash / train_run_hash + MlSignalError
+├── splits.py          # chronological_holdout_split, walk_forward_splits, purged_kfold_splits (wraps finml.cv)
+├── models.py          # pure-numpy DummyBaseline / LogisticRegression / RidgeRegression (common fit/predict API)
+├── training.py        # assemble X/y from dataset, fit on TRAIN only -> TrainedModel + metadata/hashes
+├── prediction.py      # predictions -> target_position signal_df (threshold + filters + mode); NO shift
+└── evaluation.py      # classification/regression + backtest metrics (reuse app.metrics, run_futures_backtest); baselines
+backend/tests/test_ml_signal.py
+```
+
+Reuse (imports, not copies): `app.labels.build_supervised_dataset`,
+`app.finml.cv`, `app.finml.uniqueness`, `app.reproducibility`,
+`app.metrics.compute_metrics`, `app.futures_backtest.run_futures_backtest`,
+`app.signals` (baseline comparison + shared vol/roll filter fields).
+
+### E.4 `ModelSpec` design
+
+Strict, frozen Pydantic v2 (`frozen=True`, `extra="forbid"`,
+`protected_namespaces=()` so `model_name` / `model_type` are allowed). Fields:
+`model_name`, `model_type` (`ModelType`: dummy/logistic/ridge), `task_type`
+(classification/regression), `feature_columns` (tuple, all `feature__`,
+reject `label__`, reject duplicates), `label_column` (`label__*`),
+`train_start`/`train_end`/`validation_start`/`validation_end`,
+`prediction_horizon (>0)`, `random_seed`, `hyperparameters`, `class_weight`
+(none/balanced), `sample_weight` (none/uniqueness), `threshold_rule`
+(prob/return), `long_threshold`/`short_threshold`, `signal_mode` (reuse Phase 3
+`SignalMode`), `output_signal_col`, `schema_version`. Validators:
+non-empty name; feature/label namespace rules; strictly ordered dates
+(`train_start < train_end < validation_start < validation_end`); horizon > 0;
+unknown fields forbidden; **no sklearn model types** (the enum simply omits them).
+
+### E.5 Split design
+
+All splits operate on a time-sorted view and return integer positions into the
+input frame (never shuffle):
+
+1. **Chronological holdout** — train on `[train_start, train_end]`, validate on
+   `[validation_start, validation_end]`; optional embargo drops the latest train
+   rows.
+2. **Walk-forward** — ordered expanding/rolling folds, each with `max(train) +
+   embargo < min(test)` and non-overlapping test blocks.
+3. **Purged K-fold + embargo** — one label interval per event row
+   `[i+L, i+L+h]`, delegated to `finml.cv.make_purged_kfold_splits`; purge
+   removes train events overlapping a test fold, embargo removes events starting
+   within `embargo_bars` after it; finml leakage diagnostics surfaced.
+
+### E.6 Training workflow
+
+`build_supervised_dataset → filter is_trainable → select X(feature__ only),
+y(one label__) → split (train window) → fit on TRAIN only → predict OOS →
+prediction_to_signal → run_futures_backtest (shift to t+1) → evaluate`.
+Guardrails: train rows = `is_trainable & train-window`; `X` excludes labels;
+warmup/untrainable rows never enter `fit`; signal generation needs features only
+(non-warmup), while scoring needs `is_label_valid`.
+
+### E.7 Prediction-to-signal rules
+
+- **Classification:** model emits `P(up)`; long if `P ≥ long_threshold`, short if
+  `P ≤ short_threshold` (long_short) else flat.
+- **Regression:** emits `r̂`; long if `r̂ ≥ +τ`, short if `r̂ ≤ −τ`.
+- **Modes:** `long_flat` / `long_short` (reuse Phase 3 `SignalMode`).
+- **Filters:** optional vol/roll gating reused from the Phase 3 baseline config.
+- **Output:** `timestamp, root_symbol, active_contract, target_position` at `t`,
+  **unshifted** — exactly what `run_futures_backtest` consumes (it owns the t+1
+  shift).
+
+### E.8 Evaluation metrics
+
+- **Classification** (direction labels): accuracy, precision/recall/F1, hit rate,
+  ROC-AUC / IC where probabilities exist.
+- **Regression** (forward-return labels): MSE, MAE, R², information coefficient,
+  sign accuracy.
+- **Backtest** (via `app.metrics.compute_metrics` on equity + backtest frame):
+  total return, Sharpe, max drawdown, turnover, transaction cost, hit rate,
+  avg return per trade.
+- **Comparisons — on the identical OOS window:** vs a no-trade baseline and vs the
+  Phase 3 `momentum_baseline_signal`.
+
+### E.9 Reproducibility hashes
+
+Using the same canonical-JSON + SHA-256 convention as Phase 1–3:
+
+- **`dataset_config_hash`** = hash of `{label_config_hash, sorted(feature_columns),
+  label_column, drop_warmup, trainable_only, schema_version}`.
+- **`model_config_hash`** = hash of the full `ModelSpec`.
+- **`train_run_hash`** = chains `continuous_config_hash → feature_config_hash →
+  label_config_hash → dataset_config_hash → model_config_hash` (one id per
+  trained artifact).
+
+Determinism: a seeded local RNG, deterministic solvers, and closed-form ridge;
+training twice yields identical params, predictions, and `train_run_hash`.
+
+### E.10 Tests
+
+Namespace guard (`label__` in features fails); `X ⊆ feature__`; chronological
+ordering; train ∩ test disjoint (all split types); purged K-fold has no
+label-window overlap after purge; embargo removes adjacent events; hash
+stability/sensitivity incl. upstream propagation; deterministic training; predictions
+align at `t`; signal executes at `t+1` (no same-bar fill/PnL); model cannot train
+on warmup/untrainable rows; same-OOS-window baseline comparison; no network /
+synthetic only; end-to-end pipeline.
+
+### E.11 Commit plan
+
+| Commit | Objective | Key files |
+|---|---|---|
+| 1 | ModelSpec + split utilities | `spec.py`, `splits.py`, `__init__.py`, tests |
+| 2 | Baseline numpy/scipy models + training | `models.py`, `training.py`, tests |
+| 3 | Prediction-to-signal adapter | `prediction.py`, tests |
+| 4 | ML backtest evaluation | `evaluation.py`, tests |
+| 5 | End-to-end synthetic ML pipeline + docs (Appendix E as-built) | tests, this doc |
+
+Each commit: isolated worktree, manual commit, scoped `git add`, no merge,
+synthetic data, no network.
+
+### E.12 Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Random-split leakage | No shuffle; timestamp-ordered splits; chronology asserted. |
+| Feature/label namespace leakage | `X` from `feature__*` only; validator rejects `label__`. |
+| Training on warmup/untrainable rows | Train mask = `is_trainable & train-window`; poison test. |
+| Using the test period for selection | V1 ships fixed configs; OOS touched only for final scoring. |
+| Prediction/execution misalignment | Predict at `t` (unshifted); backtest shifts to `t+1`; forced-step test. |
+| Overfitting synthetic data | Deliberately simple models; numbers treated as plumbing checks, not performance. |
+| Non-deterministic training | Seeded RNG, deterministic solvers, closed-form ridge; determinism test. |
+| In-sample vs OOS comparison bug | ML and baselines scored on the **same** OOS window. |
+| No sklearn (repo reality) | numpy/scipy models only; RF/GB behind a future opt-in extra. |
+| Purge-interval miscomputation | Reuse audited `finml.cv`; assert post-purge overlap count == 0. |
+
+> Scope note: Phase 4 is the ML Signal Lab on top of the futures pipeline —
+> **no new dependencies, no random forest / gradient boosting, no triple-barrier,
+> no live trading, no real-data download, synthetic tests only.** Predictions are
+> emitted at `t` and executed at `t+1` by the Phase 3 backtest.
+
+### E.13 As-built status (Phase 4 complete)
+
+Implemented across five commits; tests are synthetic only, no network, no
+scikit-learn. The full pipeline is **raw → continuous → features → labels →
+supervised dataset → split → train → predict → signal → backtest → evaluation**,
+exercised end-to-end by a single synthetic test.
+
+**Implemented modules** (`backend/app/ml_signal/`):
+- `spec.py` — `ModelSpec` (frozen, `extra="forbid"`, `protected_namespaces=()`),
+  enums (`ModelType`, `TaskType`, `ThresholdRule`, `ClassWeight`, `SampleWeight`,
+  `SplitType`), and the provenance hashes `dataset_config_hash` /
+  `model_config_hash` / `train_run_hash`.
+- `splits.py` — `chronological_holdout_split`, `walk_forward_splits`, and
+  `purged_kfold_splits` (delegating purge + embargo to `app.finml.cv`).
+- `models.py` — pure numpy/scipy `DummyBaseline`, `RidgeRegression` (closed-form,
+  unpenalized intercept), `LogisticRegression` (scipy L-BFGS-B, analytic
+  gradient, deterministic), behind a `BaseModel` `fit`/`predict`/`predict_proba`
+  interface; `build_model` dispatch.
+- `training.py` — `select_features` (the leakage guard), `select_design_matrix`,
+  and `train_model` → `TrainedModel`.
+- `prediction.py` — `predict_model` and `prediction_to_signal` (+
+  `PredictionSignalConfig`).
+- `evaluation.py` — `classification_metrics`, `regression_metrics`,
+  `backtest_metrics_from_result`, and `evaluate_ml_signal` →
+  `MlEvaluationResult`.
+
+**Implemented models (V1):** `dummy_baseline`, `ridge_regression`,
+`logistic_regression` — all numpy/scipy, deterministic, **no scikit-learn**.
+Classification is binary *up(+1)-vs-rest*; labels outside `{-1, 0, +1}` are
+rejected. Random forest / gradient boosting are **not** implemented (deferred
+behind a future optional `scikit-learn` extra; `ModelType` admits only the three
+numpy/scipy estimators).
+
+**Splits:** chronological holdout, walk-forward (expanding/rolling with embargo),
+and purged K-fold + embargo via `app.finml.cv.make_purged_kfold_splits` over each
+event's `[t + execution_lag, t + execution_lag + horizon]` label window. All
+splits are timestamp-ordered and shuffle-free; **no random train/test split**.
+
+**Timing / leakage (test-proven):** `X` is built from `feature__*` only (any
+`label__` is rejected); training uses train-split rows that are `is_trainable`
+(warmup / NaN-label-tail rows are excluded, and NaN X/y is rejected);
+`prediction_to_signal` emits `target_position(t)` **unshifted**; the Phase 3
+`run_futures_backtest` owns execution timing via `effective_position =
+target_position.shift(1)` (first bar flat, no same-bar fill); labels read the
+future only through the `t + execution_lag` window; returns/PnL use
+`close_adjusted` (ratio, seam-safe) so a raw inter-contract gap cannot create
+fake PnL, and `roll_flag` carries through to the backtest frame.
+
+**Same-window evaluation:** ML, the no-trade baseline (zero positions), and the
+Phase 3 `momentum_baseline_signal` are all backtested on the **same** windowed
+continuous frame with the **same** settings; classification/regression metrics
+are scored on valid-label OOS rows only. Backtest metrics include final equity,
+total return, total transaction cost, turnover, max drawdown, and Sharpe.
+
+**Provenance chain (extends Phase 1–3):**
+`continuous_config_hash → feature_config_hash → label_config_hash →
+dataset_config_hash → model_config_hash → train_run_hash`. The `TrainedModel`
+metadata carries all six; `train_run_hash` changes whenever any upstream hash
+changes, and the whole synthetic pipeline reproduces identical hashes,
+predictions, signals, backtest frame, and evaluation metrics.
+
+**Limitations (as-built):**
+- **Synthetic tests only**; single-instrument (ES), ratio adjustment.
+- **No random forest / gradient boosting**, and **no scikit-learn** dependency.
+- **No triple-barrier ML wiring yet** (the `app.finml.labeling` triple-barrier
+  path is not connected to the ML labels).
+- **No model-persistence registry yet** — `TrainedModel` is in-memory; no on-disk
+  artifact store.
+- **No real-data training yet**; `sample_weight="uniqueness"` is recognised but
+  not wired into `train_model` (raises a clear error if requested).
