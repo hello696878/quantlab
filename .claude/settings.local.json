@@ -61,7 +61,8 @@
       "Bash(./venv/Scripts/python.exe -c \"import importlib; print\\('pyarrow:', bool\\(importlib.util.find_spec\\('pyarrow'\\)\\), '| fastparquet:', bool\\(importlib.util.find_spec\\('fastparquet'\\)\\)\\)\")",
       "Bash(./venv/Scripts/python.exe -m pytest tests/test_volatility.py -q)",
       "Bash(cd /c/quantlab-phase5-experiments/backend *)",
-      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_experiments.py -q)"
+      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_experiments.py -q)",
+      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py tests/test_futures_labels.py tests/test_futures_signal_backtest.py tests/test_ml_signal.py tests/test_experiments.py)"
     ]
   }
 }
