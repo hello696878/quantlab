@@ -1250,3 +1250,207 @@ predictions, signals, backtest frame, and evaluation metrics.
   artifact store.
 - **No real-data training yet**; `sample_weight="uniqueness"` is recognised but
   not wired into `train_model` (raises a clear error if requested).
+
+---
+
+## Appendix F — Phase 5 Experiment Tracking and Model Registry Plan
+
+Phase 5 makes Phase 4 ML runs **reproducible, comparable, and auditable**: every
+`train_model` + `evaluate_ml_signal` run is persisted (config, hashes, metrics,
+frames) under a gitignored artifacts directory keyed by its `train_run_hash`, and
+a small file-based registry lists, loads, compares, and ranks runs. This appendix
+is a plan — implementation lands in commits 1–5.
+
+**Locked design decisions:**
+
+1. New package **`backend/app/experiments/`** (distinct from `saved_backtests.py`,
+   `saved_reports.py`, `db.py`, and `datastore/`; no collision).
+2. **File-based registry, not SQLite/DB for V1** — one directory per run; simple,
+   diff-free, consistent with `app.datastore` storage.
+3. Artifacts live under **`artifacts/experiments/<train_run_hash>/`**.
+4. **`artifacts/` is already gitignored** (`.gitignore` line: `artifacts/`, which
+   matches both `artifacts/` and `backend/artifacts/`); **do not modify
+   `.gitignore`** unless inspection proves it necessary.
+5. **Tests use `tmp_path` / temporary directories only** — never the repo tree.
+6. **Model params stored as JSON**, never pickle/joblib.
+7. **`metadata.json` uses deterministic canonical JSON** (`app.reproducibility.
+   canonical_json`: sorted keys, compact separators).
+8. Predictions/signal/backtest frames stored as **parquet if an engine is
+   available, otherwise CSV fallback** (mirroring `app.datastore.store`, which
+   currently has no parquet engine → CSV).
+9. Metadata stores **relative artifact paths only**, never absolute
+   `C:\quantlab` paths.
+10. **Every experiment is keyed by `train_run_hash`** (the Phase 4 run id and the
+    run directory name).
+11. **`compare_experiments` rejects different OOS windows** unless explicitly
+    allowed.
+12. **No new model types** in Phase 5.
+13. **No scikit-learn / random forest / gradient boosting.**
+14. **No real-data download.**
+15. **No artifacts are ever committed to git.**
+
+### F.1 Scope
+
+**In scope:** an `ExperimentRun` metadata schema; a local artifact store
+(parquet-if-available / CSV fallback) under `artifacts/experiments/`; a registry
+API (`save_experiment_run`, `load_experiment_run`, `list_experiments`,
+`compare_experiments`, `get_best_experiment`); reproducibility metadata (all six
+upstream hashes + best-effort git commit + timestamps) with load-time
+hash-consistency verification; a same-OOS-window comparison guard; an adapter from
+a Phase 4 `(TrainedModel, MlEvaluationResult)` to a saved run. Synthetic tests
+only.
+
+**Explicitly NOT in scope:** new model types; RF/GB; scikit-learn or any new
+dependency; a SQL/DB registry (`db.py`/SQLite stays for the web app — DB-backed
+registry is a future option); remote/cloud tracking (MLflow, W&B); model serving;
+web/API/frontend; hyperparameter search / AutoML; real-data download; live
+trading; committing artifacts; a cross-machine shared registry.
+
+### F.2 Experiment-tracking principles (enforced)
+
+| Principle | Mechanism |
+|---|---|
+| Every run has a unique id | The Phase 4 `train_run_hash` is the run id and the directory name. |
+| Store config + hashes + metrics + timestamps | `metadata.json` via `app.reproducibility.canonical_json` (deterministic). |
+| No artifacts committed to git | Write only under `artifacts/` (already gitignored); a test asserts `git ls-files artifacts/` is empty and `git check-ignore` covers the run dir. |
+| Artifacts under ignored dirs | `artifacts/experiments/<train_run_hash>/…` only. |
+| Reproducible from saved metadata | Metadata carries the full `ModelSpec` config + all six hashes → `ModelSpec` is rebuildable; rerun yields the same `train_run_hash`. |
+| Comparison uses the same OOS window | `compare_experiments` raises unless `(validation_start, validation_end, label_column, dataset_config_hash)` match, or `allow_different_windows=True`. |
+
+### F.3 Proposed module structure
+
+```
+backend/app/experiments/
+├── __init__.py     # exports: ExperimentRun, ExperimentStore, registry fns, ExperimentError
+├── spec.py         # ExperimentRun (frozen pydantic) + from_evaluation() + git_commit() helper
+├── store.py        # ExperimentStore(base_dir, prefer_parquet) — mirrors RawFuturesStore
+├── registry.py     # save/load/list/compare/get_best on top of the store
+└── reports.py      # human-readable comparison table / summary (text/markdown; no frontend)
+backend/tests/test_experiments.py
+```
+Reuse (imports, not copies): `app.reproducibility.canonical_json`;
+`app.datastore.store._parquet_available` + its parquet/CSV write-read fallback
+idiom; `app.ml_signal` (`TrainedModel`, `MlEvaluationResult`, `ModelSpec`,
+`model_config_hash`).
+
+### F.4 `ExperimentRun` schema
+
+Strict frozen Pydantic v2 (`frozen=True`, `extra="forbid"`,
+`protected_namespaces=()`). Fields: `train_run_hash`; the six lineage hashes
+(`continuous_config_hash`, `feature_config_hash`, `label_config_hash`,
+`dataset_config_hash`, `model_config_hash`); `model_type`; `feature_columns`
+(tuple of `feature__*`); `label_column` (`label__*`); `task_type`;
+`train_start` / `train_end`; `validation_start` / `validation_end` (the OOS
+window — the comparison-guard key); `metrics` (classification **or** regression,
+on valid-label rows); `backtest_metrics` (final_equity, total_return,
+total_transaction_cost, turnover, max_drawdown, sharpe); `baseline_metrics`
+(`{"no_trade": {...}, "momentum": {...}}`); `created_at` (ISO-8601 UTC);
+`git_commit` (Optional[str], best-effort); `code_version` (Optional[str]);
+`artifact_paths` (dict of **relative** filenames); `n_oos_rows` / `n_scored_rows`;
+`schema_version`.
+
+`ExperimentRun.from_evaluation(trained_model, eval_result, *, git_commit=None,
+code_version=None)` builds the run from Phase 4 outputs (no recomputation).
+`git_commit()` is a tiny best-effort `git rev-parse HEAD` helper (swallows errors
+→ `None`; **local only, never a network call**).
+
+### F.5 Storage design
+
+```
+artifacts/experiments/<train_run_hash>/
+├── metadata.json        # the ExperimentRun (canonical JSON)
+├── model_params.json    # coef_/intercept_/hyperparameters (ridge/logistic) or majority_/mean_ (dummy)
+├── predictions.csv      # timestamp, prediction[, prediction_proba]   (parquet if engine present)
+├── signal.csv           # timestamp, root_symbol, active_contract, target_position, signal_state
+├── backtest.csv         # the ml_backtest frame
+└── metrics.json         # metrics + backtest_metrics + baseline_metrics (flat, quick reads)
+```
+`ExperimentStore(base_dir, prefer_parquet=True)` mirrors `RawFuturesStore`:
+explicit `base_dir` (tests pass `tmp_path`; prod default `artifacts/experiments/`,
+overridable via `QUANTLAB_ARTIFACTS_DIR`), `_parquet_available()` gate, and
+`try df.to_parquet(...) except → to_csv(..., index=False, lineterminator="\n")`.
+
+**Rules:** everything lives **under `artifacts/`** → ignored by the *directory*
+rule (so even `.csv`, which is **not** extension-ignored, is safe); **relative**
+filenames only in metadata; deterministic writes (sorted-key JSON,
+`lineterminator="\n"`, `index=False`); model params as **JSON** (small linear
+arrays → auditable, reconstructable; no pickle); tests use temp dirs only; no
+real data.
+
+### F.6 Registry API
+
+```python
+save_experiment_run(run, trained_model, eval_result, *, store, overwrite=False) -> Path
+load_experiment_run(train_run_hash, *, store, load_frames=False) -> LoadedExperiment
+list_experiments(*, store, filters=None) -> list[ExperimentRun]
+compare_experiments(hashes_or_runs, *, store, metrics=(...), allow_different_windows=False) -> pd.DataFrame
+get_best_experiment(*, store, metric="sharpe", maximize=True, allow_different_windows=False) -> ExperimentRun
+```
+- **Comparison metrics:** `total_return`, `sharpe`, `max_drawdown`,
+  `total_transaction_cost`, plus task metrics (accuracy/F1 or R²/IC). Per-metric
+  direction (maximize return/Sharpe; minimize drawdown/cost); deterministic
+  tie-break by `train_run_hash`.
+- **Same-OOS guard:** `compare_experiments` / `get_best_experiment` raise
+  `ExperimentError` unless candidate runs share `(validation_start,
+  validation_end, label_column, dataset_config_hash)`, unless
+  `allow_different_windows=True`.
+
+### F.7 Reproducibility checks
+
+- **Completeness:** save refuses if any of the six hashes is missing/empty.
+- **Load-time consistency:** `load_experiment_run` verifies (a) directory name
+  equals `metadata.train_run_hash`, (b) `model_config_hash` recomputed from the
+  saved `ModelSpec` config equals the stored one, and (c) every `artifact_paths`
+  entry exists — else `ExperimentError` with a clear message.
+- **Rerun determinism:** a test rebuilds the `ModelSpec` from metadata, retrains
+  on the same synthetic dataset, and asserts the `train_run_hash` and predictions
+  match the saved run.
+- **Code version:** `git_commit` captured best-effort at save; `None` is
+  acceptable and never fails the save.
+- **Missing files:** explicit `ExperimentError` naming the absent artifact (no
+  silent empty reads).
+
+### F.8 Tests
+
+`ExperimentRun` schema validation; save→load roundtrip; artifacts written **only**
+under the temp `base_dir`; metadata contains all six hashes + created_at +
+artifact_paths; `compare_experiments` rejects different OOS windows unless
+allowed; `get_best_experiment` selects correctly for maximize (Sharpe) and
+minimize (drawdown); missing artifact → clear error; duplicate `train_run_hash`
+is deterministic; **no git-tracked artifacts** (`git ls-files artifacts/` empty);
+load-time hash-consistency verification raises on tampered metadata; relative
+paths only (no `C:\quantlab`); no network / synthetic only.
+
+### F.9 Commit plan
+
+A doc-only Appendix F plan lands first (this commit). Then:
+
+| Commit | Objective | Key files |
+|---|---|---|
+| 1 | `ExperimentRun` spec + hash/metadata schema + `git_commit()` | `experiments/__init__.py`, `spec.py`, tests |
+| 2 | Local artifact store (parquet/CSV fallback) | `store.py`, tests |
+| 3 | Registry list/load/compare/best + same-OOS guard | `registry.py`, tests |
+| 4 | Integrate Phase 4 evaluation saving | `registry.py`, `reports.py`, tests |
+| 5 | End-to-end synthetic experiment tracking + docs (Appendix F as-built) | tests, this doc |
+
+Each commit: isolated worktree, manual commit, scoped `git add`, no merge,
+synthetic data, no network.
+
+### F.10 Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Committing artifacts to git | Write only under `artifacts/` (already gitignored); test asserts `git ls-files artifacts/` empty + `git check-ignore` passes. |
+| Comparing different OOS windows | Guard on `(validation_start, validation_end, label_column, dataset_config_hash)`; opt-out is explicit. |
+| Stale metadata | Load verifies dir-name == `train_run_hash` and recomputes `model_config_hash` from saved config; mismatch raises. |
+| Hash mismatch | All six hashes stored; consistency checked on load; rerun-determinism test. |
+| Model params not reproducible | JSON params (no pickle); deterministic ridge/logistic; reload-and-predict reproduces saved predictions. |
+| Accidental real-data dependency | Synthetic-only tests + source-scan for network/external reads; store takes explicit `base_dir`. |
+| Registry tied to absolute paths | Metadata stores **relative** filenames; `base_dir` injected by caller/env, never hardcoded. |
+| Metrics from different windows | `metrics`/`backtest_metrics`/`baseline_metrics` carry `n_oos_rows` / `n_scored_rows` and the OOS window; comparison guard enforces equality. |
+
+> Scope note: Phase 5 is experiment tracking + model registry + artifact
+> management only — **no new model types, no scikit-learn / RF / GB, no real-data
+> download, no DB registry, file-based and synthetic-only.** Artifacts live under
+> the gitignored `artifacts/experiments/<train_run_hash>/` and are never
+> committed.
