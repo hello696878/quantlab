@@ -47,6 +47,7 @@ import AfmlLabPanel from "@/components/AfmlLabPanel";
 import PortfolioRiskLabPanel from "@/components/PortfolioRiskLabPanel";
 import RealEstateLabPanel from "@/components/RealEstateLabPanel";
 import FuturesLabPanel from "@/components/FuturesLabPanel";
+import VolatilityLabPanel from "@/components/VolatilityLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -400,6 +401,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Futures & Commodities Lab",
     subtitle:
       "Cost-of-carry futures pricing, implied convenience yield, futures-curve shape (contango/backwardation/mixed), roll yield, calendar spreads, contract notional / margin / leverage P&L, and commodity scenario stress — deterministic static sample data, not investment or trading advice.",
+  },
+  volatility: {
+    title: "Volatility Surface & Variance Swap Lab",
+    subtitle:
+      "Implied-vol inversion, volatility smile / skew / term structure, a 2-D volatility surface, realized-vol comparison, a simplified variance-swap fair strike, vega exposure, and volatility scenario stress — deterministic static sample data, not official VIX methodology, not investment or trading advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -974,6 +980,7 @@ export default function HomePage() {
     { view: "risklab", title: "Open Portfolio Risk Lab", keywords: "portfolio risk lab analytics expected return volatility sharpe covariance correlation marginal component risk contribution value at risk var cvar expected shortfall stress scenario efficient frontier minimum variance risk parity allocation weights" },
     { view: "realestate", title: "Open Real Estate Lab", keywords: "real estate property reit noi net operating income cap rate valuation mortgage amortization ltv loan to value dscr debt service coverage cash on cash irr equity multiple rent vacancy stress nav premium discount ffo dividend yield" },
     { view: "futures", title: "Open Futures and Commodities Lab", keywords: "futures commodities commodity cost of carry convenience yield contango backwardation curve roll yield calendar spread margin leverage notional crude oil gold natural gas wheat basis scenario stress" },
+    { view: "volatility", title: "Open Volatility Lab", keywords: "volatility surface variance swap implied vol iv smile skew term structure realized vol vega black scholes option chain fair strike vix scenario stress derivatives" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1271,6 +1278,20 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("risklab"),
+    })),
+    ...(
+      [
+        ["Volatility Surface Lab", "volatility surface implied vol iv smile skew term structure 2d grid moneyness maturity option chain"],
+        ["Implied Volatility Solver", "implied volatility solver iv inversion bisection black scholes recover sigma option price"],
+        ["Variance Swap Lab", "variance swap fair strike volatility strike option strip approximation log contract replication"],
+        ["Vega Exposure Lab", "vega exposure portfolio vega by maturity moneyness bucket option greeks volatility risk"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `volatility-${title}`,
+      group: "Volatility Lab",
+      title,
+      keywords,
+      run: () => handleNav("volatility"),
     })),
     ...(
       [
@@ -1830,6 +1851,9 @@ export default function HomePage() {
 
         {/* ── Futures & Commodities Lab ────────────────────────────────── */}
         {view === "futures" && <FuturesLabPanel />}
+
+        {/* ── Volatility Surface & Variance Swap Lab ───────────────────── */}
+        {view === "volatility" && <VolatilityLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

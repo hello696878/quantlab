@@ -98,6 +98,16 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/real-estate/mbs/analyze` | `POST /real-estate/mbs/analyze` |
 | `GET /api/futures/sample` | `GET /futures/sample` |
 | `POST /api/futures/analyze` | `POST /futures/analyze` |
+| `GET /api/volatility/sample` | `GET /volatility/sample` |
+| `POST /api/volatility/analyze` | `POST /volatility/analyze` |
+
+The **Volatility Surface & Variance Swap Lab** (`VolatilityLabPanel`, view
+`volatility`) loads a deterministic sample option chain, lets you edit the
+underlying assumptions, and re-analyses live via `/api/volatility/analyze`
+(implied-vol surface, smile/skew, term structure, realized vol, variance-swap
+fair strike, vega exposure, scenario stress). Static illustrative sample data —
+no live option chains, not official VIX methodology, not a production risk engine,
+not investment / trading advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract

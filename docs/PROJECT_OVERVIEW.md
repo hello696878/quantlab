@@ -66,6 +66,8 @@ FastAPI Backend
   ├── real_estate_routes.py         Real Estate Lab API router: GET /real-estate/sample, POST /real-estate/analyze, GET /real-estate/mbs/sample, POST /real-estate/mbs/analyze — static sample data only
   ├── futures/                      Futures & Commodities Lab v1 (23.0): models.py (typed contract/curve/position schema), sample.py (4 deterministic commodities), service.py (cost-of-carry pricing, implied convenience yield, curve shape contango/backwardation/mixed, basis, roll yield, calendar spread, notional/margin/leverage P&L, 8 commodity stress scenarios) — static sample, educational, no live futures/commodity data, not investment/trading advice
   ├── futures_routes.py             Futures & Commodities Lab API router: GET /futures/sample, POST /futures/analyze — static sample data only
+  ├── volatility/                   Volatility Surface & Variance Swap Lab v1 (24.0): models.py (typed underlying/quote/position schema), sample.py (deterministic SPX-like BS-priced chain + fixed-seed realized returns), service.py (implied-vol inversion reusing app/options BS, smile/skew/term structure, 2-D surface, realized-vol comparison, simplified variance-swap fair strike, vega exposure, 8 vol scenarios) — static sample, educational, no live option chains, not official VIX methodology, not investment/trading advice
+  ├── volatility_routes.py          Volatility Lab API router: GET /volatility/sample, POST /volatility/analyze — static sample data only
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD

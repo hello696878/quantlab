@@ -70,6 +70,7 @@ from app.globe_routes import router as globe_router
 from app.portfolio_risk_routes import router as portfolio_risk_router
 from app.real_estate_routes import router as real_estate_router
 from app.futures_routes import router as futures_router
+from app.volatility_routes import router as volatility_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -384,6 +385,9 @@ app.include_router(real_estate_router)
 
 # Futures & Commodities Lab (Phase 23.0) — static sample futures analytics API.
 app.include_router(futures_router)
+
+# Volatility Surface & Variance Swap Lab (Phase 24.0) — static sample vol API.
+app.include_router(volatility_router)
 
 
 # ---------------------------------------------------------------------------

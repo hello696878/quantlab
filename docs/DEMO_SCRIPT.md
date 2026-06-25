@@ -397,6 +397,21 @@ Return to the Command Center's **Platform Direction** panel (or open
   cost-of-carry and curve analytics — no live futures/commodity prices, not a
   production risk engine, no exchange/broker integration, not investment or
   trading advice.
+- **Volatility Surface & Variance Swap Lab (24.0)** — open from the sidebar (or
+  Ctrl/Cmd+K → "Open Volatility Lab"). The SPX-like sample chain loads and
+  analyses automatically (implied vols are recovered from Black-Scholes-generated
+  mids). Show the key-metric cards (ATM 30d/90d/1Y IV, realized vol, implied−realized
+  spread, variance-swap vol strike, total vega, term slope), the **smile** table
+  (switch the maturity selector — note downside puts trade richer than upside
+  calls, the equity skew), the **term-structure/skew** table, the 2-D **surface
+  grid** (maturity × strike), the **variance-swap** panel with the option strip,
+  and the **vega-exposure** panel (by maturity & moneyness). Edit the underlying
+  spot/rate/dividend and watch everything re-compute. Walk the scenario-stress
+  table (parallel vol up/down, skew steepening/flattening, short-/long-dated
+  repricing, spot-selloff-with-vol-up). Emphasise: static illustrative sample data,
+  a simplified educational variance-swap approximation — **not** a live option
+  chain, **not** official VIX methodology, not a production risk engine, not
+  investment or trading advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

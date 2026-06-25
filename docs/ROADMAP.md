@@ -1677,6 +1677,41 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 24.0 — Volatility Surface & Variance Swap Lab v1 ✅
+
+- **New deterministic educational derivatives-volatility lab.** Static sample
+  data only; no live option chains or market data, no broker/trading, no API
+  keys, no scraping, not investment/trading advice, not official VIX methodology.
+  Existing backtest/AFML/scanner/Portfolio Risk/Options Lab logic untouched
+  (separate package + view; **reuses** the Options Lab Black-Scholes).
+- Backend: new `app/volatility/` package (`models.py` strict Pydantic v2 with
+  `extra="forbid"` + `FiniteFloat`; `sample.py` deterministic SPX-like chain —
+  parametric IV pattern priced with BS to coherent mids, plus a fixed-seed daily
+  return series; `service.py` pure analytics **reusing `app.options`
+  `black_scholes_price`/`greeks`/`implied_volatility`**) + `app/volatility_routes.py`
+  (`GET /volatility/sample`, `POST /volatility/analyze`), wired via `include_router`.
+- Analytics: implied-vol inversion (null + note on impossible prices), smile
+  points, term structure (ATM IV per maturity), skew metrics (90% put / ATM /
+  110% call, skew slope), surface summary, realized vol (20/60/120d + annual),
+  implied−realized spread, a simplified variance-swap fair strike (option-strip
+  `K²≈(2e^{rT}/T)Σ ΔK/K²·Q(K)`), vega exposure (by maturity & moneyness), and
+  eight volatility scenarios. Validation rejects negative spot/strike, maturity ≤ 0,
+  and non-finite values; no NaN/Inf.
+- Frontend: new `VolatilityLabPanel` (view `volatility`) — hero + editable
+  underlying assumptions (live re-analyze), key-metric cards, smile table with a
+  maturity selector, term-structure/skew table, 2-D surface grid, variance-swap
+  panel with the strip, vega-exposure panel, scenario-stress table, and a
+  formula/explanation panel; new `lib/volatility.ts` types + API client. Wired
+  into Sidebar, Dashboard card ("Volatility analytics" badge), and Command
+  Palette (Open Volatility Lab, Volatility Surface Lab, Implied Volatility Solver,
+  Variance Swap Lab, Vega Exposure Lab).
+- 21 new backend tests (deterministic, no network) — full suite green
+  (**2177 passed**); `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`, `frontend/README.md`,
+  `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample,
+  educational — no live option chains, simplified variance-swap (not official
+  VIX), not a production risk engine, not investment or trading advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

@@ -22,6 +22,7 @@ export type View =
   | "risklab"
   | "realestate"
   | "futures"
+  | "volatility"
   | "csv"
   | "builder"
   | "portfolio"

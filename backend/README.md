@@ -24,6 +24,8 @@ backend/
 │   ├── real_estate_routes.py     Real Estate Lab API routes
 │   ├── futures/            static-sample futures/commodities analytics (models/sample/service)
 │   ├── futures_routes.py         Futures & Commodities Lab API routes
+│   ├── volatility/         static-sample vol-surface/variance-swap analytics (models/sample/service)
+│   ├── volatility_routes.py      Volatility Lab API routes (reuses app/options BS)
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -42,7 +44,8 @@ backend/
 │   ├── test_portfolio_risk.py    Portfolio Risk Lab analytics/API/validation tests
 │   ├── test_real_estate.py       Real Estate Lab analytics/API/validation tests
 │   ├── test_mbs.py               Mortgage & MBS prepayment analytics/API tests
-│   └── test_futures.py           Futures & Commodities Lab analytics/API tests
+│   ├── test_futures.py           Futures & Commodities Lab analytics/API tests
+│   └── test_volatility.py        Volatility Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -181,6 +184,26 @@ Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): spot > 0, futur
 > 0, maturity > 0, multiplier > 0, margin rates ∈ [0,1] with initial ≥ maintenance,
 no NaN/Infinity. Curve shape is classified deterministically from consecutive
 observed futures.
+
+---
+
+### Volatility Surface & Variance Swap Lab Endpoints
+
+Deterministic static-sample derivatives-volatility analytics (Phase 24.0). No live
+option chains or market data, no network calls, educational only — not investment,
+trading, legal, tax, or risk-management advice, and not official VIX / exchange
+methodology.
+
+| Endpoint | Description |
+|---|---|
+| `GET /volatility/sample` | Deterministic SPX-like sample option chain (Black-Scholes-generated mid prices) + sample positions |
+| `POST /volatility/analyze` | Implied-vol inversion, smile / skew / term structure, 2-D surface, realized-vol comparison, simplified variance-swap fair strike, vega exposure, and eight volatility scenarios |
+
+Reuses the Options Lab Black-Scholes (price / greeks / bisection IV solver). Inputs
+are strictly validated (`extra="forbid"`, `FiniteFloat`): spot > 0, strike > 0,
+maturity > 0, mid price > 0, no NaN/Infinity. The variance-swap fair strike is a
+simplified educational option-strip approximation, **not** official VIX methodology;
+an impossible/out-of-bounds price returns a null IV with a note (no crash).
 
 ---
 
