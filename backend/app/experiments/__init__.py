@@ -10,9 +10,11 @@ from app.experiments.spec import (
     ExperimentRun,
     best_effort_git_commit,
 )
+from app.experiments.store import ExperimentStore
 
 __all__ = [
     "ExperimentRun",
     "ExperimentError",
     "best_effort_git_commit",
+    "ExperimentStore",
 ]

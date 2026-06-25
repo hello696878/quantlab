@@ -13,7 +13,14 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
-from app.experiments import ExperimentError, ExperimentRun, best_effort_git_commit
+from pathlib import Path
+
+from app.experiments import (
+    ExperimentError,
+    ExperimentRun,
+    ExperimentStore,
+    best_effort_git_commit,
+)
 from app.ml_signal import (
     MlEvaluationResult,
     ModelSpec,
@@ -295,3 +302,174 @@ def test_spec_module_does_no_io_or_network():
     assert not re.search(r"\.mkdir\(", src)
     # no network client imports (subprocess for local git is allowed)
     assert not re.search(r"\b(import|from)\s+(requests|urllib|httpx|socket|aiohttp)\b", src)
+
+
+# --------------------------------------------------------------------------- #
+# Commit 2 — local artifact store (ExperimentStore)
+# --------------------------------------------------------------------------- #
+
+_H = "a" * 64  # a synthetic train_run_hash for store tests
+
+
+def _frame(n: int = 5) -> pd.DataFrame:
+    ts = pd.date_range("2024-07-01", periods=n, freq="B", tz="UTC")
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "root_symbol": "ES",
+            "active_contract": "ESH24",
+            "prediction": np.arange(n, dtype=float),
+            "target_position": np.array([1.0, 0.0, -1.0, 1.0, 0.0])[:n],
+            "signal_state": "long",
+        }
+    )
+
+
+def test_store_creates_run_dir_under_tmp(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = _run()
+    path = store.write_metadata(run)
+    assert path == tmp_path / run.train_run_hash / "metadata.json"
+    assert path.exists()
+    assert path.is_relative_to(tmp_path)
+
+
+def test_metadata_roundtrip(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = _run()
+    store.write_metadata(run)
+    loaded = store.read_metadata(run.train_run_hash)
+    assert isinstance(loaded, ExperimentRun)
+    assert loaded.train_run_hash == run.train_run_hash
+    assert loaded.to_canonical_json() == run.to_canonical_json()
+    assert loaded.artifact_paths == run.artifact_paths
+
+
+def test_read_metadata_rejects_dir_name_mismatch(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = _run(train_run_hash="b" * 64)
+    # write metadata for run b under directory "a"*64 by hand-placing it
+    target = tmp_path / ("a" * 64)
+    target.mkdir(parents=True)
+    (target / "metadata.json").write_text(run.to_canonical_json(), encoding="utf-8")
+    with pytest.raises(ExperimentError):
+        store.read_metadata("a" * 64)
+
+
+def test_model_params_roundtrip(tmp_path):
+    store = ExperimentStore(tmp_path)
+    params = {"coef_": [2.0, -1.0], "intercept_": 0.5, "alpha": 1.0}
+    store.write_model_params(_H, params)
+    loaded = store.read_model_params(_H)
+    assert loaded["coef_"] == [2.0, -1.0]      # 2 == 2.0 in Python
+    assert loaded["intercept_"] == 0.5
+    assert loaded["alpha"] == 1.0
+
+
+def test_metrics_roundtrip(tmp_path):
+    store = ExperimentStore(tmp_path)
+    metrics = {"backtest": {"sharpe": 1.2, "total_return": 0.05}, "regression": {"r2": 0.2}}
+    store.write_metrics(_H, metrics)
+    loaded = store.read_metrics(_H)
+    assert loaded["backtest"]["sharpe"] == 1.2
+    assert loaded["regression"]["r2"] == 0.2
+
+
+def test_frame_roundtrip(tmp_path):
+    store = ExperimentStore(tmp_path)
+    df = _frame()
+    for name in ("predictions", "signal", "backtest"):
+        path = store.write_frame(_H, name, df)
+        assert path.is_relative_to(tmp_path)
+        back = store.read_frame(_H, name)
+        assert list(back.columns) == list(df.columns)
+        assert len(back) == len(df)
+        assert back["prediction"].tolist() == df["prediction"].tolist()
+
+
+def test_csv_fallback_when_parquet_unavailable(tmp_path):
+    store = ExperimentStore(tmp_path, prefer_parquet=False)
+    assert store.storage_format == "csv"
+    path = store.write_frame(_H, "predictions", _frame())
+    assert path.suffix == ".csv"
+    back = store.read_frame(_H, "predictions")
+    assert len(back) == 5
+
+
+def test_missing_metadata_raises(tmp_path):
+    store = ExperimentStore(tmp_path)
+    with pytest.raises(ExperimentError):
+        store.read_metadata("c" * 64)
+
+
+def test_missing_frame_raises(tmp_path):
+    store = ExperimentStore(tmp_path)
+    with pytest.raises(ExperimentError):
+        store.read_frame(_H, "predictions")          # never written
+    with pytest.raises(ExperimentError):
+        store.read_frame(_H, "bogus")                # unknown name
+
+
+def test_no_writes_outside_base_dir(tmp_path):
+    base = tmp_path / "artifacts" / "experiments"
+    store = ExperimentStore(base)
+    run = _run()
+    written = [
+        store.write_metadata(run),
+        store.write_model_params(run.train_run_hash, {"coef_": [1.0]}),
+        store.write_metrics(run.train_run_hash, {"sharpe": 1.0}),
+        *[store.write_frame(run.train_run_hash, n, _frame()) for n in ("predictions", "signal", "backtest")],
+    ]
+    for path in written:
+        assert path.is_relative_to(base)
+    # every file anywhere under tmp_path lives under base
+    all_files = [q for q in tmp_path.rglob("*") if q.is_file()]
+    assert all_files and all(q.is_relative_to(base) for q in all_files)
+
+
+def test_metadata_artifact_paths_remain_relative(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = _run(artifact_paths={"metadata": "metadata.json", "predictions": "sub/predictions.csv"})
+    store.write_metadata(run)
+    loaded = store.read_metadata(run.train_run_hash)
+    for value in loaded.artifact_paths.values():
+        assert not value.startswith(("/", "\\"))
+        assert not re.match(r"^[A-Za-z]:", value)
+
+
+def test_deterministic_json_bytes(tmp_path):
+    s1 = ExperimentStore(tmp_path / "a")
+    s2 = ExperimentStore(tmp_path / "b")
+    run = _run()
+    assert s1.write_metadata(run).read_bytes() == s2.write_metadata(run).read_bytes()
+    p = {"coef_": [2.0, -1.0], "intercept_": 0.5}
+    assert (s1.write_model_params(_H, p).read_bytes()
+            == s2.write_model_params(_H, p).read_bytes())
+    m = {"sharpe": 1.0, "total_return": 0.03}
+    assert s1.write_metrics(_H, m).read_bytes() == s2.write_metrics(_H, m).read_bytes()
+
+
+def test_no_pickle_or_joblib_artifacts(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = _run()
+    store.write_metadata(run)
+    store.write_model_params(run.train_run_hash, {"coef_": [1.0]})
+    store.write_metrics(run.train_run_hash, {"sharpe": 1.0})
+    for name in ("predictions", "signal", "backtest"):
+        store.write_frame(run.train_run_hash, name, _frame())
+    names = [q.name for q in tmp_path.rglob("*") if q.is_file()]
+    assert names and not any(n.endswith((".pkl", ".pickle", ".joblib")) for n in names)
+
+    import app.experiments.store as store_mod
+    src = inspect.getsource(store_mod)
+    assert not re.search(r"\b(import|from)\s+(pickle|joblib|cloudpickle)\b", src)
+    assert not re.search(r"\b(import|from)\s+(requests|urllib|httpx|socket|aiohttp)\b", src)
+
+
+def test_tests_create_no_repo_artifacts_dir(tmp_path):
+    store = ExperimentStore(tmp_path)
+    store.write_metadata(_run())
+    backend_dir = Path(__file__).resolve().parents[1]   # backend/
+    repo_root = backend_dir.parent                       # worktree root
+    assert not (repo_root / "artifacts").exists()
+    assert not (backend_dir / "artifacts").exists()
