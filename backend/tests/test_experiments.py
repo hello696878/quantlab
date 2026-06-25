@@ -19,7 +19,12 @@ from app.experiments import (
     ExperimentError,
     ExperimentRun,
     ExperimentStore,
+    LoadedExperiment,
     best_effort_git_commit,
+    compare_experiments,
+    get_best_experiment,
+    list_experiments,
+    load_experiment_run,
 )
 from app.ml_signal import (
     MlEvaluationResult,
@@ -473,3 +478,179 @@ def test_tests_create_no_repo_artifacts_dir(tmp_path):
     repo_root = backend_dir.parent                       # worktree root
     assert not (repo_root / "artifacts").exists()
     assert not (backend_dir / "artifacts").exists()
+
+
+# --------------------------------------------------------------------------- #
+# Commit 3 — registry (load / list / compare / best)
+# --------------------------------------------------------------------------- #
+
+
+def _reg_run(h, *, sharpe=1.0, cost=0.01, created_at="2026-06-25T00:00:00+00:00",
+             artifact_paths=None, **over) -> ExperimentRun:
+    return _run(
+        train_run_hash=h,
+        artifact_paths=artifact_paths if artifact_paths is not None else {"metadata": "metadata.json"},
+        backtest_metrics={"sharpe": sharpe, "total_return": 0.05, "max_drawdown": -0.1,
+                          "turnover": 3.0, "total_transaction_cost": cost},
+        created_at=created_at,
+        **over,
+    )
+
+
+def test_load_experiment_run_metadata_only(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = _reg_run("a" * 64)
+    store.write_metadata(run)
+    loaded = load_experiment_run("a" * 64, store=store)
+    assert isinstance(loaded, LoadedExperiment)
+    assert loaded.run.train_run_hash == "a" * 64
+    assert loaded.frames == {}
+
+
+def test_load_experiment_run_with_frames(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = _reg_run("a" * 64)
+    store.write_metadata(run)
+    for name in ("predictions", "signal", "backtest"):
+        store.write_frame("a" * 64, name, _frame())
+    loaded = load_experiment_run("a" * 64, store=store, load_frames=True)
+    assert set(loaded.frames) == {"predictions", "signal", "backtest"}
+    assert len(loaded.frames["predictions"]) == 5
+
+
+def test_load_experiment_run_missing_artifact_raises(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = _reg_run("a" * 64, artifact_paths={"metadata": "metadata.json", "predictions": "predictions.csv"})
+    store.write_metadata(run)  # predictions.csv is referenced but never written
+    with pytest.raises(ExperimentError):
+        load_experiment_run("a" * 64, store=store)
+
+
+def test_load_experiment_run_tampered_dir_name_raises(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = _reg_run("b" * 64)
+    target = tmp_path / ("a" * 64)
+    target.mkdir(parents=True)
+    (target / "metadata.json").write_text(run.to_canonical_json(), encoding="utf-8")
+    with pytest.raises(ExperimentError):
+        load_experiment_run("a" * 64, store=store)
+
+
+def test_list_experiments_sorted_and_skips_non_runs(tmp_path):
+    store = ExperimentStore(tmp_path)
+    store.write_metadata(_reg_run("a" * 64, created_at="2026-06-25T01:00:00+00:00"))
+    store.write_metadata(_reg_run("b" * 64, created_at="2026-06-25T00:00:00+00:00"))
+    store.write_metadata(_reg_run("c" * 64, created_at="2026-06-25T02:00:00+00:00"))
+    (tmp_path / "not_a_run").mkdir()  # no metadata.json -> skipped
+    runs = list_experiments(store=store)
+    assert [r.train_run_hash for r in runs] == ["b" * 64, "a" * 64, "c" * 64]  # by created_at
+
+
+def test_list_experiments_filters(tmp_path):
+    store = ExperimentStore(tmp_path)
+    store.write_metadata(_reg_run("a" * 64, model_type="ridge_regression"))
+    store.write_metadata(_reg_run("b" * 64, model_type="logistic_regression",
+                                  task_type="classification", label_column="label__direction_1"))
+    only_ridge = list_experiments(store=store, filters={"model_type": "ridge_regression"})
+    assert [r.train_run_hash for r in only_ridge] == ["a" * 64]
+    only_dir = list_experiments(store=store, filters={"label_column": "label__direction_1"})
+    assert [r.train_run_hash for r in only_dir] == ["b" * 64]
+    with pytest.raises(ExperimentError):
+        list_experiments(store=store, filters={"bogus": 1})
+
+
+def test_compare_experiments_columns_and_values(tmp_path):
+    store = ExperimentStore(tmp_path)
+    a = _reg_run("a" * 64, sharpe=1.2)
+    b = _reg_run("b" * 64, sharpe=0.8)
+    store.write_metadata(a)
+    store.write_metadata(b)
+    df = compare_experiments(["a" * 64, "b" * 64], store=store)
+    for col in ("train_run_hash", "model_type", "label_column",
+                "validation_start", "validation_end", "sharpe", "total_return",
+                "max_drawdown", "total_transaction_cost"):
+        assert col in df.columns
+    assert len(df) == 2
+    sharpe_by_hash = dict(zip(df["train_run_hash"], df["sharpe"]))
+    assert sharpe_by_hash["a" * 64] == 1.2 and sharpe_by_hash["b" * 64] == 0.8
+
+
+def test_compare_experiments_same_window_guard(tmp_path):
+    store = ExperimentStore(tmp_path)
+    a = _reg_run("a" * 64)
+    b = _reg_run("b" * 64, validation_end=date(2024, 11, 30))   # different OOS window
+    store.write_metadata(a)
+    store.write_metadata(b)
+    with pytest.raises(ExperimentError):
+        compare_experiments([a, b], store=store)
+
+
+def test_compare_experiments_label_and_dataset_guard(tmp_path):
+    store = ExperimentStore(tmp_path)
+    a = _reg_run("a" * 64)
+    b_label = _reg_run("b" * 64, label_column="label__direction_1")
+    b_dataset = _reg_run("c" * 64, dataset_config_hash="z" * 64)
+    for r in (a, b_label, b_dataset):
+        store.write_metadata(r)
+    with pytest.raises(ExperimentError):
+        compare_experiments([a, b_label], store=store)
+    with pytest.raises(ExperimentError):
+        compare_experiments([a, b_dataset], store=store)
+
+
+def test_compare_experiments_allow_different_windows(tmp_path):
+    store = ExperimentStore(tmp_path)
+    a = _reg_run("a" * 64)
+    b = _reg_run("b" * 64, validation_end=date(2024, 11, 30))
+    df = compare_experiments([a, b], store=store, allow_different_windows=True)
+    assert "same_window" in df.columns
+    flags = dict(zip(df["train_run_hash"], df["same_window"]))
+    assert flags["a" * 64] is True or flags["a" * 64] == True   # reference matches itself
+    assert not flags["b" * 64]
+
+
+def test_get_best_experiment_maximize(tmp_path):
+    store = ExperimentStore(tmp_path)
+    store.write_metadata(_reg_run("a" * 64, sharpe=0.5))
+    store.write_metadata(_reg_run("b" * 64, sharpe=2.0))
+    store.write_metadata(_reg_run("c" * 64, sharpe=1.0))
+    best = get_best_experiment(store=store, metric="sharpe", maximize=True)
+    assert best.train_run_hash == "b" * 64
+
+
+def test_get_best_experiment_minimize(tmp_path):
+    store = ExperimentStore(tmp_path)
+    store.write_metadata(_reg_run("a" * 64, cost=0.05))
+    store.write_metadata(_reg_run("b" * 64, cost=0.01))
+    store.write_metadata(_reg_run("c" * 64, cost=0.03))
+    best = get_best_experiment(store=store, metric="total_transaction_cost", maximize=False)
+    assert best.train_run_hash == "b" * 64
+
+
+def test_get_best_experiment_deterministic_tie_break(tmp_path):
+    store = ExperimentStore(tmp_path)
+    store.write_metadata(_reg_run("b" * 64, sharpe=1.0))
+    store.write_metadata(_reg_run("a" * 64, sharpe=1.0))   # tie -> smaller hash wins
+    best = get_best_experiment(store=store, metric="sharpe", maximize=True)
+    assert best.train_run_hash == "a" * 64
+
+
+def test_get_best_experiment_no_runs_raises(tmp_path):
+    store = ExperimentStore(tmp_path)
+    with pytest.raises(ExperimentError):
+        get_best_experiment(store=store, metric="sharpe")
+
+
+def test_get_best_experiment_missing_metric_raises(tmp_path):
+    store = ExperimentStore(tmp_path)
+    store.write_metadata(_reg_run("a" * 64))
+    with pytest.raises(ExperimentError):
+        get_best_experiment(store=store, metric="does_not_exist")
+
+
+def test_registry_module_no_network():
+    import app.experiments.registry as registry_mod
+
+    src = inspect.getsource(registry_mod)
+    assert not re.search(r"\b(import|from)\s+(requests|urllib|httpx|socket|aiohttp)\b", src)
+    assert not re.search(r"\b(import|from)\s+(pickle|joblib|cloudpickle)\b", src)
