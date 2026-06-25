@@ -15,6 +15,8 @@ from pydantic import ValidationError
 
 from pathlib import Path
 
+import types
+
 from app.experiments import (
     ExperimentError,
     ExperimentRun,
@@ -25,6 +27,8 @@ from app.experiments import (
     get_best_experiment,
     list_experiments,
     load_experiment_run,
+    save_experiment_run,
+    summarize_experiment,
 )
 from app.ml_signal import (
     MlEvaluationResult,
@@ -654,3 +658,224 @@ def test_registry_module_no_network():
     src = inspect.getsource(registry_mod)
     assert not re.search(r"\b(import|from)\s+(requests|urllib|httpx|socket|aiohttp)\b", src)
     assert not re.search(r"\b(import|from)\s+(pickle|joblib|cloudpickle)\b", src)
+
+
+# --------------------------------------------------------------------------- #
+# Commit 4 — save_experiment_run (Phase 4 evaluation -> persisted run)
+# --------------------------------------------------------------------------- #
+
+
+def _trained_full(h: str = "a" * 64) -> TrainedModel:
+    spec = _model_spec()
+    md = {
+        "continuous_config_hash": "c" * 64,
+        "feature_config_hash": "f" * 64,
+        "label_config_hash": "l" * 64,
+        "dataset_config_hash": "d" * 64,
+        "model_config_hash": "m" * 64,
+        "train_run_hash": h,
+        "model_type": "ridge_regression",
+        "task_type": "regression",
+    }
+    return TrainedModel(
+        model=None,
+        spec=spec,
+        feature_columns=tuple(spec.feature_columns),
+        label_column=spec.label_column,
+        train_index=np.array([], dtype=int),
+        fitted_params={"coef_": np.array([2.0, -1.0]), "intercept_": 0.5, "alpha": 1.0},
+        model_config_hash="m" * 64,
+        dataset_config_hash="d" * 64,
+        train_run_hash=h,
+        metadata=md,
+    )
+
+
+def _signals_df(n: int = 5) -> pd.DataFrame:
+    ts = pd.date_range("2024-07-01", periods=n, freq="B", tz="UTC")
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "root_symbol": "ES",
+            "active_contract": "ESH24",
+            "prediction": np.arange(n, dtype=float),
+            "prediction_proba": np.linspace(0.4, 0.6, n),
+            "target_position": np.array([1.0, 0.0, -1.0, 1.0, 0.0])[:n],
+            "signal_state": "long",
+        }
+    )
+
+
+def _bt_frame(n: int = 5) -> pd.DataFrame:
+    ts = pd.date_range("2024-07-01", periods=n, freq="B", tz="UTC")
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "target_position": np.array([0.0, 1.0, 1.0, -1.0, 0.0])[:n],
+            "effective_position": np.array([0.0, 0.0, 1.0, 1.0, -1.0])[:n],
+            "strategy_return": np.array([0.0, 0.0, 0.01, -0.005, 0.0])[:n],
+            "net_strategy_return": np.array([0.0, 0.0, 0.009, -0.006, 0.0])[:n],
+            "equity": np.array([10000.0, 10000.0, 10090.0, 10030.0, 10030.0])[:n],
+            "roll_flag": False,
+        }
+    )
+
+
+def _eval_full() -> MlEvaluationResult:
+    return MlEvaluationResult(
+        signals=_signals_df(),
+        ml_backtest=types.SimpleNamespace(frame=_bt_frame()),
+        backtest_metrics={"sharpe": 1.0, "total_return": 0.03, "max_drawdown": -0.05,
+                          "turnover": 2.0, "total_transaction_cost": 0.01, "final_equity": 10030.0},
+        classification_metrics=None,
+        regression_metrics={"r2": 0.2, "mse": 0.001, "information_coefficient": 0.15, "n_scored": 4},
+        no_trade_baseline={"backtest_metrics": {"total_return": 0.0, "sharpe": 0.0}},
+        momentum_baseline={"backtest_metrics": {"total_return": 0.01, "sharpe": 0.3}},
+        metadata={"n_oos_rows": 5, "n_scored_rows": 4},
+    )
+
+
+_AT = "2026-06-25T00:00:00+00:00"
+
+
+def test_save_experiment_run_writes_all_files(tmp_path):
+    store = ExperimentStore(tmp_path)
+    run = save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    rd = tmp_path / ("a" * 64)
+    for fn in ("metadata.json", "model_params.json", "metrics.json",
+               "predictions.csv", "signal.csv", "backtest.csv"):
+        assert (rd / fn).exists()
+    assert isinstance(run, ExperimentRun)
+
+
+def test_saved_metadata_artifact_paths_relative(tmp_path):
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    loaded = load_experiment_run("a" * 64, store=store).run
+    assert set(loaded.artifact_paths) >= {"metadata", "model_params", "metrics",
+                                          "predictions", "signal", "backtest"}
+    for value in loaded.artifact_paths.values():
+        assert not value.startswith(("/", "\\"))
+        assert not re.match(r"^[A-Za-z]:", value)
+
+
+def test_saved_model_params_is_json_no_pickle(tmp_path):
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    mp = store.read_model_params("a" * 64)
+    assert mp["model_type"] == "ridge_regression"
+    assert mp["feature_columns"] == ["feature__return_20", "feature__moving_average_gap_10_50"]
+    assert mp["params"]["coef_"] == [2.0, -1.0]        # numpy array -> JSON list
+    assert mp["params"]["intercept_"] == 0.5
+    text = (tmp_path / ("a" * 64) / "model_params.json").read_text(encoding="utf-8")
+    assert text.strip().startswith("{")
+    names = [q.name for q in tmp_path.rglob("*") if q.is_file()]
+    assert not any(n.endswith((".pkl", ".pickle", ".joblib")) for n in names)
+
+
+def test_saved_metrics_contains_task_backtest_baseline(tmp_path):
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    m = store.read_metrics("a" * 64)
+    assert m["task_metrics"]["r2"] == 0.2
+    assert m["backtest_metrics"]["sharpe"] == 1.0
+    assert m["baseline_metrics"]["no_trade"]["total_return"] == 0.0
+    assert m["baseline_metrics"]["momentum"]["sharpe"] == 0.3
+    assert m["metadata"]["train_run_hash"] == "a" * 64
+    assert m["metadata"]["model_config_hash"] == "m" * 64
+    assert m["metadata"]["dataset_config_hash"] == "d" * 64
+    assert m["metadata"]["n_oos_rows"] == 5 and m["metadata"]["n_scored_rows"] == 4
+
+
+def test_save_then_load_roundtrips_frames(tmp_path):
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    loaded = load_experiment_run("a" * 64, store=store, load_frames=True)
+    assert set(loaded.frames) == {"predictions", "signal", "backtest"}
+    assert "prediction" in loaded.frames["predictions"].columns
+    assert "target_position" in loaded.frames["signal"].columns
+    assert "equity" in loaded.frames["backtest"].columns
+    assert len(loaded.frames["predictions"]) == 5
+
+
+def test_overwrite_false_rejects_duplicate(tmp_path):
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    with pytest.raises(ExperimentError):
+        save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+
+
+def test_overwrite_true_rewrites_deterministically(tmp_path):
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    before = (tmp_path / ("a" * 64) / "metadata.json").read_bytes()
+    run2 = save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store,
+                               overwrite=True, created_at=_AT)
+    after = (tmp_path / ("a" * 64) / "metadata.json").read_bytes()
+    assert before == after        # deterministic for the same inputs + created_at
+    assert isinstance(run2, ExperimentRun)
+
+
+def test_save_writes_only_under_base_dir(tmp_path):
+    base = tmp_path / "artifacts" / "experiments"
+    store = ExperimentStore(base)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    files = [q for q in tmp_path.rglob("*") if q.is_file()]
+    assert files and all(q.is_relative_to(base) for q in files)
+
+
+def test_save_creates_no_repo_artifacts_dir(tmp_path):
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    backend_dir = Path(__file__).resolve().parents[1]
+    repo_root = backend_dir.parent
+    assert not (repo_root / "artifacts").exists()
+    assert not (backend_dir / "artifacts").exists()
+
+
+def test_missing_artifact_after_save_raises(tmp_path):
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    (tmp_path / ("a" * 64) / "predictions.csv").unlink()   # remove a referenced artifact
+    with pytest.raises(ExperimentError):
+        load_experiment_run("a" * 64, store=store)
+
+
+def test_saved_metadata_hashes_match_trained_model(tmp_path):
+    store = ExperimentStore(tmp_path)
+    tm = _trained_full("a" * 64)
+    run = save_experiment_run(tm, _eval_full(), store=store, created_at=_AT)
+    assert run.train_run_hash == tm.train_run_hash
+    assert run.model_config_hash == tm.model_config_hash
+    assert run.dataset_config_hash == tm.dataset_config_hash
+    assert run.continuous_config_hash == tm.metadata["continuous_config_hash"]
+    assert run.feature_config_hash == tm.metadata["feature_config_hash"]
+    assert run.label_config_hash == tm.metadata["label_config_hash"]
+
+
+def test_no_absolute_paths_in_saved_metadata(tmp_path):
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    text = (tmp_path / ("a" * 64) / "metadata.json").read_text(encoding="utf-8")
+    assert "C:\\quantlab" not in text
+    assert "C:/quantlab" not in text
+    assert str(tmp_path) not in text      # no absolute base path leaked into metadata
+
+
+def test_summarize_experiment(tmp_path):
+    run = _reg_run("a" * 64, sharpe=1.5)
+    summary = summarize_experiment(run)
+    assert summary["train_run_hash"] == "a" * 64
+    assert summary["sharpe"] == 1.5
+    text = summarize_experiment(run, as_text=True)
+    assert isinstance(text, str) and "experiment" in text
+
+
+def test_save_and_reports_modules_no_network():
+    import app.experiments.registry as registry_mod
+    import app.experiments.reports as reports_mod
+
+    for mod in (registry_mod, reports_mod):
+        src = inspect.getsource(mod)
+        assert not re.search(r"\b(import|from)\s+(requests|urllib|httpx|socket|aiohttp)\b", src)
+        assert not re.search(r"\b(import|from)\s+(pickle|joblib|cloudpickle)\b", src)

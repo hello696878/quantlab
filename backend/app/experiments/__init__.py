@@ -17,7 +17,9 @@ from app.experiments.registry import (
     get_best_experiment,
     list_experiments,
     load_experiment_run,
+    save_experiment_run,
 )
+from app.experiments.reports import summarize_experiment
 
 __all__ = [
     "ExperimentRun",
@@ -30,4 +32,7 @@ __all__ = [
     "list_experiments",
     "compare_experiments",
     "get_best_experiment",
+    "save_experiment_run",
+    # reports
+    "summarize_experiment",
 ]

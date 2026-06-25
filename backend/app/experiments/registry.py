@@ -9,12 +9,16 @@ window**, and pick the best run by a metric.  No saving / Phase 4 integration he
 
 from __future__ import annotations
 
+import shutil
 from dataclasses import dataclass, field
 
 import pandas as pd
 
 from app.experiments.spec import ExperimentError, ExperimentRun
 from app.experiments.store import ExperimentStore, _FRAME_NAMES
+
+_PREDICTION_COLUMNS = ("timestamp", "root_symbol", "active_contract", "prediction", "prediction_proba")
+_SIGNAL_COLUMNS = ("timestamp", "root_symbol", "active_contract", "target_position", "signal_state")
 
 # Default columns for compare_experiments: backtest metrics + task metrics
 # (only those present per run are filled; the rest are NaN).
@@ -204,3 +208,120 @@ def get_best_experiment(
     )
     best_hash = ranked.iloc[0]["train_run_hash"]
     return next(r for r in runs if r.train_run_hash == best_hash)
+
+
+# --------------------------------------------------------------------------- #
+# Save (Phase 4 evaluation -> persisted experiment run)
+# --------------------------------------------------------------------------- #
+
+
+def _select_columns(df: pd.DataFrame, columns) -> pd.DataFrame:
+    return df.loc[:, [c for c in columns if c in df.columns]].copy()
+
+
+def _model_params_payload(trained_model) -> dict:
+    """JSON-safe model params (numpy arrays are converted by the store)."""
+    params = dict(trained_model.fitted_params) if getattr(trained_model, "fitted_params", None) else {}
+    if not params and getattr(trained_model, "model", None) is not None:
+        candidate = getattr(trained_model.model, "params", None)
+        if isinstance(candidate, dict):
+            params = dict(candidate)
+    spec = trained_model.spec
+    return {
+        "model_type": spec.model_type.value,
+        "feature_columns": list(spec.feature_columns),
+        "label_column": spec.label_column,
+        "params": params,
+    }
+
+
+def _metrics_payload(trained_model, evaluation_result) -> dict:
+    task_metrics = (
+        evaluation_result.classification_metrics
+        or evaluation_result.regression_metrics
+        or {}
+    )
+    baselines: dict = {}
+    if getattr(evaluation_result, "no_trade_baseline", None):
+        baselines["no_trade"] = dict(evaluation_result.no_trade_baseline.get("backtest_metrics", {}))
+    if getattr(evaluation_result, "momentum_baseline", None):
+        baselines["momentum"] = dict(evaluation_result.momentum_baseline.get("backtest_metrics", {}))
+    eval_md = dict(getattr(evaluation_result, "metadata", {}) or {})
+    return {
+        "task_metrics": dict(task_metrics),
+        "backtest_metrics": dict(evaluation_result.backtest_metrics),
+        "baseline_metrics": baselines,
+        "metadata": {
+            "train_run_hash": trained_model.train_run_hash,
+            "model_config_hash": trained_model.model_config_hash,
+            "dataset_config_hash": trained_model.dataset_config_hash,
+            "n_oos_rows": int(eval_md.get("n_oos_rows", 0)),
+            "n_scored_rows": int(eval_md.get("n_scored_rows", 0)),
+        },
+    }
+
+
+def _backtest_frame(evaluation_result) -> pd.DataFrame:
+    backtest = getattr(evaluation_result, "ml_backtest", None)
+    frame = getattr(backtest, "frame", None) if backtest is not None else None
+    if frame is None:
+        raise ExperimentError("evaluation_result.ml_backtest.frame is required to save the backtest frame")
+    return frame.copy()
+
+
+def save_experiment_run(
+    trained_model,
+    evaluation_result,
+    *,
+    store: ExperimentStore,
+    overwrite: bool = False,
+    git_commit: str | None = None,
+    code_version: str | None = None,
+    created_at: str | None = None,
+) -> ExperimentRun:
+    """Persist a Phase 4 ``(TrainedModel, MlEvaluationResult)`` as an experiment run.
+
+    Writes the frames first (capturing their actual parquet/CSV filenames), builds
+    relative ``artifact_paths`` from those names, then writes model_params,
+    metrics, and metadata.  Raises :class:`ExperimentError` if the run already
+    exists and ``overwrite`` is False; with ``overwrite=True`` the run directory is
+    replaced cleanly.  Returns the saved :class:`ExperimentRun`."""
+    train_run_hash = trained_model.train_run_hash
+    run_dir = store.run_dir(train_run_hash)
+    if run_dir.exists():
+        if not overwrite:
+            raise ExperimentError(
+                f"experiment run {train_run_hash!r} already exists at {run_dir}; "
+                "pass overwrite=True to replace it"
+            )
+        shutil.rmtree(run_dir)  # clean rewrite (run_dir is always under base_dir)
+
+    # Frames first, so artifact_paths reflect the real (parquet|csv) filenames.
+    predictions_path = store.write_frame(
+        train_run_hash, "predictions", _select_columns(evaluation_result.signals, _PREDICTION_COLUMNS)
+    )
+    signal_path = store.write_frame(
+        train_run_hash, "signal", _select_columns(evaluation_result.signals, _SIGNAL_COLUMNS)
+    )
+    backtest_path = store.write_frame(train_run_hash, "backtest", _backtest_frame(evaluation_result))
+    model_params_path = store.write_model_params(train_run_hash, _model_params_payload(trained_model))
+    metrics_path = store.write_metrics(train_run_hash, _metrics_payload(trained_model, evaluation_result))
+
+    artifact_paths = {
+        "metadata": "metadata.json",
+        "model_params": model_params_path.name,
+        "metrics": metrics_path.name,
+        "predictions": predictions_path.name,
+        "signal": signal_path.name,
+        "backtest": backtest_path.name,
+    }
+    run = ExperimentRun.from_evaluation(
+        trained_model,
+        evaluation_result,
+        artifact_paths=artifact_paths,
+        git_commit=git_commit,
+        code_version=code_version,
+        created_at=created_at,
+    )
+    store.write_metadata(run)
+    return run
