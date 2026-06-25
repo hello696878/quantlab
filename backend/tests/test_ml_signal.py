@@ -20,6 +20,7 @@ from app.ml_signal import (
     MlSignalError,
     ModelSpec,
     ModelType,
+    PredictionSignalConfig,
     RidgeRegression,
     SignalMode,
     Split,
@@ -31,6 +32,8 @@ from app.ml_signal import (
     chronological_holdout_split,
     dataset_config_hash,
     model_config_hash,
+    predict_model,
+    prediction_to_signal,
     purged_kfold_splits,
     select_design_matrix,
     train_model,
@@ -337,8 +340,9 @@ def test_no_network_or_sklearn_imports_in_sources():
     import app.ml_signal.splits as splits_mod
     import app.ml_signal.models as models_mod
     import app.ml_signal.training as training_mod
+    import app.ml_signal.prediction as prediction_mod
 
-    for mod in (spec_mod, splits_mod, models_mod, training_mod):
+    for mod in (spec_mod, splits_mod, models_mod, training_mod, prediction_mod):
         src = inspect.getsource(mod)
         # no network client imports, and no ML-framework imports (the words may
         # appear in prose saying we deliberately avoid them, so match imports only)
@@ -598,3 +602,233 @@ def test_train_model_deterministic_params_and_predictions():
         x_test = df.loc[split.test_index, list(spec.feature_columns)].to_numpy(dtype=float)
         assert np.allclose(a.model.predict(x_test), b.model.predict(x_test))
         assert np.allclose(a.fitted_params["coef_"], b.fitted_params["coef_"])
+
+
+# --------------------------------------------------------------------------- #
+# Commit 3 — prediction-to-signal adapter
+# --------------------------------------------------------------------------- #
+
+
+class _StubModel:
+    """A model whose predictions are prescribed, for exact threshold-mapping tests."""
+
+    def __init__(self, *, pred, proba=None, is_classifier=False):
+        self._pred = np.asarray(pred, dtype=float)
+        self._proba = None if proba is None else np.asarray(proba, dtype=float)
+        self.is_classifier = is_classifier
+
+    def predict(self, X):
+        return self._pred[: len(X)]
+
+    def predict_proba(self, X):
+        if self._proba is None:
+            raise NotImplementedError
+        return self._proba[: len(X)]
+
+
+def _trained(model, spec: ModelSpec) -> TrainedModel:
+    return TrainedModel(
+        model=model,
+        spec=spec,
+        feature_columns=tuple(spec.feature_columns),
+        label_column=spec.label_column,
+        train_index=np.array([], dtype=int),
+        fitted_params={},
+        model_config_hash="m",
+        dataset_config_hash="d",
+        train_run_hash="t",
+        metadata={},
+    )
+
+
+def _pred_ds(n: int = 4, start: str = "2024-07-01") -> pd.DataFrame:
+    ts = pd.date_range(start, periods=n, freq="B")
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "root_symbol": "ES",
+            "active_contract": "ESH24",
+            "feature__x1": np.zeros(n),
+            "feature__x2": np.zeros(n),
+            "is_warmup": False,
+            "is_trainable": True,
+        }
+    )
+
+
+def _all_long_tm(n: int) -> TrainedModel:
+    spec = _clf_spec(
+        threshold_rule=ThresholdRule.PROB_THRESHOLD,
+        long_threshold=0.5,
+        signal_mode=SignalMode.LONG_FLAT,
+    )
+    return _trained(_StubModel(pred=np.ones(n), proba=np.ones(n), is_classifier=True), spec)
+
+
+# --- threshold rules ---
+
+
+def test_classification_long_flat_threshold():
+    df = _pred_ds(4)
+    proba = [0.7, 0.5, 0.9, 0.55]
+    spec = _clf_spec(threshold_rule=ThresholdRule.PROB_THRESHOLD,
+                     long_threshold=0.6, signal_mode=SignalMode.LONG_FLAT)
+    tm = _trained(_StubModel(pred=(np.array(proba) >= 0.5).astype(float),
+                             proba=proba, is_classifier=True), spec)
+    sig = prediction_to_signal(tm, df)
+    assert sig["target_position"].tolist() == [1.0, 0.0, 1.0, 0.0]
+    assert sig["signal_state"].tolist() == ["long", "flat", "long", "flat"]
+    assert "prediction_proba" in sig.columns
+
+
+def test_classification_long_short_threshold():
+    df = _pred_ds(4)
+    proba = [0.7, 0.5, 0.3, 0.6]
+    spec = _clf_spec(threshold_rule=ThresholdRule.PROB_THRESHOLD,
+                     long_threshold=0.6, short_threshold=0.4, signal_mode=SignalMode.LONG_SHORT)
+    tm = _trained(_StubModel(pred=(np.array(proba) >= 0.5).astype(float),
+                             proba=proba, is_classifier=True), spec)
+    sig = prediction_to_signal(tm, df)
+    assert sig["target_position"].tolist() == [1.0, 0.0, -1.0, 1.0]
+
+
+def test_regression_long_flat_threshold():
+    df = _pred_ds(4)
+    spec = _reg_spec(threshold_rule=ThresholdRule.RETURN_THRESHOLD,
+                     long_threshold=0.5, signal_mode=SignalMode.LONG_FLAT)
+    tm = _trained(_StubModel(pred=[0.6, 0.4, 1.0, -0.5], is_classifier=False), spec)
+    sig = prediction_to_signal(tm, df)
+    assert sig["target_position"].tolist() == [1.0, 0.0, 1.0, 0.0]
+    assert "prediction_proba" not in sig.columns
+
+
+def test_regression_long_short_threshold():
+    df = _pred_ds(4)
+    spec = _reg_spec(threshold_rule=ThresholdRule.RETURN_THRESHOLD,
+                     long_threshold=0.5, short_threshold=0.5, signal_mode=SignalMode.LONG_SHORT)
+    tm = _trained(_StubModel(pred=[0.6, -0.6, 0.0, -0.5], is_classifier=False), spec)
+    sig = prediction_to_signal(tm, df)
+    assert sig["target_position"].tolist() == [1.0, -1.0, 0.0, -1.0]
+
+
+# --- filters (row-t only) ---
+
+
+def test_warmup_rows_are_flat():
+    df = _pred_ds(4)
+    df.loc[1, "is_warmup"] = True
+    sig = prediction_to_signal(_all_long_tm(4), df)
+    assert sig["target_position"].tolist() == [1.0, 0.0, 1.0, 1.0]
+    assert sig.loc[1, "signal_state"] == "warmup"
+
+
+def test_non_trainable_rows_are_flat():
+    df = _pred_ds(4)
+    df.loc[2, "is_trainable"] = False
+    sig = prediction_to_signal(_all_long_tm(4), df)
+    assert sig["target_position"].tolist() == [1.0, 1.0, 0.0, 1.0]
+    assert sig.loc[2, "signal_state"] == "not_trainable"
+
+
+def test_roll_flag_rows_are_flat_when_enabled():
+    df = _pred_ds(4)
+    df["feature__roll_flag"] = [False, True, False, False]
+    df["feature__days_since_roll"] = [10.0, 0.0, 1.0, 2.0]
+    cfg = PredictionSignalConfig(enable_roll_filter=True, roll_avoidance_days=0)
+    sig = prediction_to_signal(_all_long_tm(4), df, config=cfg)
+    assert sig["target_position"].tolist() == [1.0, 0.0, 1.0, 1.0]
+    assert sig.loc[1, "signal_state"] == "roll_avoidance"
+
+
+def test_days_since_roll_window_is_flat_when_enabled():
+    df = _pred_ds(5)
+    df["feature__roll_flag"] = [False] * 5
+    df["feature__days_since_roll"] = [10.0, 1.0, 2.0, 3.0, 8.0]
+    cfg = PredictionSignalConfig(enable_roll_filter=True, roll_avoidance_days=2)
+    sig = prediction_to_signal(_all_long_tm(5), df, config=cfg)
+    assert sig["target_position"].tolist() == [1.0, 0.0, 0.0, 1.0, 1.0]
+
+
+def test_volatility_filter_blocks_trades():
+    df = _pred_ds(4)
+    df["feature__realized_vol_20"] = [0.1, 0.5, 0.15, 0.3]
+    cfg = PredictionSignalConfig(max_realized_vol=0.2)
+    sig = prediction_to_signal(_all_long_tm(4), df, config=cfg)
+    assert sig["target_position"].tolist() == [1.0, 0.0, 1.0, 0.0]
+    assert sig.loc[1, "signal_state"] == "vol_filter"
+
+
+def test_vol_filter_requires_column():
+    df = _pred_ds(4)  # no realized_vol column
+    cfg = PredictionSignalConfig(max_realized_vol=0.2)
+    with pytest.raises(MlSignalError):
+        prediction_to_signal(_all_long_tm(4), df, config=cfg)
+
+
+# --- alignment / hygiene ---
+
+
+def test_predict_model_aligns_with_input_timestamps():
+    df = _pred_ds(10)
+    tm = _trained(_StubModel(pred=np.arange(10.0), is_classifier=False), _reg_spec())
+    out = predict_model(tm, df)
+    assert out["timestamp"].tolist() == df["timestamp"].tolist()
+    assert out["prediction"].tolist() == list(np.arange(10.0))
+    assert out["root_symbol"].tolist() == ["ES"] * 10
+
+
+def test_predict_model_respects_window():
+    df = _pred_ds(10)
+    tm = _trained(_StubModel(pred=np.arange(10.0), is_classifier=False), _reg_spec())
+    out = predict_model(tm, df, start=date(2024, 7, 3), end=date(2024, 7, 9))
+    days = pd.to_datetime(out["timestamp"]).dt.normalize()
+    assert (days >= pd.Timestamp("2024-07-03")).all()
+    assert (days <= pd.Timestamp("2024-07-09")).all()
+    assert len(out) < len(df)
+
+
+def test_predict_model_missing_feature_raises():
+    df = _pred_ds(4).drop(columns=["feature__x2"])
+    with pytest.raises(MlSignalError):
+        predict_model(_trained(_StubModel(pred=np.ones(4)), _reg_spec()), df)
+
+
+def test_prediction_to_signal_does_not_mutate_dataset():
+    df = _pred_ds(6)
+    before = df.copy(deep=True)
+    prediction_to_signal(_all_long_tm(6), df)
+    pd.testing.assert_frame_equal(df, before)
+
+
+def test_no_position_shift_applied():
+    df = _pred_ds(4)
+    spec = _reg_spec(threshold_rule=ThresholdRule.RETURN_THRESHOLD,
+                     long_threshold=0.5, signal_mode=SignalMode.LONG_FLAT)
+    tm = _trained(_StubModel(pred=[1.0, 0.0, 0.0, 0.0], is_classifier=False), spec)
+    sig = prediction_to_signal(tm, df)
+    # row 0's prediction (1.0 -> long) maps to row 0's target, not row 1 (no shift)
+    assert sig.loc[0, "target_position"] == 1.0
+    assert sig.loc[1, "target_position"] == 0.0
+
+
+def test_no_pnl_or_backtest_columns():
+    df = _pred_ds(4)
+    sig = prediction_to_signal(_all_long_tm(4), df)
+    forbidden = {"equity", "strategy_return", "net_strategy_return",
+                 "transaction_cost", "pnl", "benchmark_equity", "effective_position"}
+    assert forbidden.isdisjoint(set(sig.columns))
+    assert {"timestamp", "root_symbol", "active_contract", "prediction",
+            "target_position", "signal_state"}.issubset(sig.columns)
+
+
+def test_prediction_to_signal_deterministic_real_model():
+    df = _ds(160)
+    split = _holdout(110, 160)
+    spec = _clf_spec(threshold_rule=ThresholdRule.PROB_THRESHOLD,
+                     long_threshold=0.55, short_threshold=0.45, signal_mode=SignalMode.LONG_SHORT)
+    tm = train_model(df, spec, split, **_HASHES)
+    a = prediction_to_signal(tm, df)
+    b = prediction_to_signal(tm, df)
+    pd.testing.assert_frame_equal(a, b)
+    assert ((a["prediction_proba"] >= 0.0) & (a["prediction_proba"] <= 1.0)).all()
+    assert set(a["target_position"].unique()).issubset({-1.0, 0.0, 1.0})

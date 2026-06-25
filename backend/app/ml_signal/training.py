@@ -51,25 +51,33 @@ class TrainedModel:
     metadata: dict
 
 
-def select_design_matrix(
-    frame: pd.DataFrame,
-    feature_columns,
-    label_column: str,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Build ``(X, y)`` from ``frame`` using ``feature_columns`` / ``label_column``.
+def select_features(frame: pd.DataFrame, feature_columns) -> np.ndarray:
+    """Build the feature matrix ``X`` from ``feature_columns``.
 
-    Rejects any feature column that is not ``feature__*`` (in particular any
-    ``label__`` column) so labels can never leak into the design matrix.
+    Rejects any column that is not ``feature__*`` (in particular any ``label__``
+    column) so labels can never leak into the design matrix.  Used by both
+    training and prediction so the leakage guard has a single source of truth.
     """
     for c in feature_columns:
         if c.startswith("label__"):
             raise MlSignalError(f"feature_columns must not contain a label column: {c!r}")
         if not c.startswith("feature__"):
             raise MlSignalError(f"feature column must start with 'feature__': {c!r}")
-    missing = [c for c in (*feature_columns, label_column) if c not in frame.columns]
+    missing = [c for c in feature_columns if c not in frame.columns]
     if missing:
-        raise MlSignalError(f"frame is missing required columns: {missing}")
-    X = frame.loc[:, list(feature_columns)].to_numpy(dtype=float)
+        raise MlSignalError(f"frame is missing required feature columns: {missing}")
+    return frame.loc[:, list(feature_columns)].to_numpy(dtype=float)
+
+
+def select_design_matrix(
+    frame: pd.DataFrame,
+    feature_columns,
+    label_column: str,
+) -> tuple[np.ndarray, np.ndarray]:
+    """Build ``(X, y)`` from ``frame`` using ``feature_columns`` / ``label_column``."""
+    X = select_features(frame, feature_columns)
+    if label_column not in frame.columns:
+        raise MlSignalError(f"frame is missing the label column: {label_column!r}")
     y = frame.loc[:, label_column].to_numpy(dtype=float)
     return X, y
 

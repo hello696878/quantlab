@@ -37,7 +37,13 @@ from app.ml_signal.models import (
 from app.ml_signal.training import (
     TrainedModel,
     select_design_matrix,
+    select_features,
     train_model,
+)
+from app.ml_signal.prediction import (
+    PredictionSignalConfig,
+    predict_model,
+    prediction_to_signal,
 )
 
 __all__ = [
@@ -71,4 +77,9 @@ __all__ = [
     "TrainedModel",
     "train_model",
     "select_design_matrix",
+    "select_features",
+    # prediction -> signal
+    "PredictionSignalConfig",
+    "predict_model",
+    "prediction_to_signal",
 ]
