@@ -14,6 +14,15 @@ import pytest
 from pydantic import ValidationError
 
 from app.instruments import get_instrument
+from app.datastore.store import validate_raw_futures
+from app.datastore.futures_continuous import (
+    build_continuous_futures,
+    compute_roll_schedule,
+    continuous_config_hash,
+)
+from app.features import build_feature_matrix
+from app.labels import build_label_matrix, build_supervised_dataset
+from app.futures_backtest import run_futures_backtest
 from app.ml_signal import (
     BaseModel,
     DummyBaseline,
@@ -1058,3 +1067,235 @@ def test_evaluate_deterministic():
     pd.testing.assert_frame_equal(a.ml_backtest.frame, b.ml_backtest.frame)
     assert a.backtest_metrics == b.backtest_metrics
     assert a.classification_metrics == b.classification_metrics
+
+
+# --------------------------------------------------------------------------- #
+# Commit 5 — full end-to-end synthetic ML pipeline
+# raw -> continuous -> features -> labels -> dataset -> split -> train ->
+# predict -> signal -> backtest -> evaluation.  Synthetic only; no network.
+# --------------------------------------------------------------------------- #
+
+
+def _naive_norm(ts_like) -> pd.Series:
+    """tz-naive, date-normalized timestamps for window comparisons in tests."""
+    s = pd.to_datetime(pd.Series(np.asarray(ts_like)))
+    if getattr(s.dt, "tz", None) is not None:
+        s = s.dt.tz_convert("UTC").dt.tz_localize(None)
+    return s.dt.normalize()
+
+
+def _pipeline_raw_df() -> pd.DataFrame:
+    """Three consecutive ES contracts (~189 sessions, two fallback rolls).
+
+    Raw price levels step ~100pts between contracts so close_raw gaps at each seam
+    while the ratio-adjusted close_adjusted stays smooth (held return)."""
+    rows = []
+    contracts = [
+        ("ESH24", 5000.0, "2024-03-15", pd.date_range("2024-01-02", "2024-03-15", freq="B")),
+        ("ESM24", 5100.0, "2024-06-21", pd.date_range("2024-01-02", "2024-06-21", freq="B")),
+        ("ESU24", 5200.0, "2024-09-20", pd.date_range("2024-04-01", "2024-09-20", freq="B")),
+    ]
+    for symbol, base, expiry, dates in contracts:
+        for i, d in enumerate(dates):
+            open_ = base + 0.3 * i
+            close = open_ + 1.0
+            rows.append(
+                {
+                    "timestamp": pd.Timestamp(d),
+                    "open": open_,
+                    "high": max(open_, close) + 1.0,
+                    "low": min(open_, close) - 1.0,
+                    "close": close,
+                    "volume": 1000 + i,
+                    "open_interest": None,  # force deterministic fallback rolls
+                    "root_symbol": "ES",
+                    "contract_symbol": symbol,
+                    "expiry": pd.Timestamp(expiry),
+                    "source": "synthetic",
+                    "timezone": "America/Chicago",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _e2e_spec() -> ModelSpec:
+    # train window is past the warmup (~mid-March) and before the label tail;
+    # validation window contains the second roll (~2024-06-13).
+    return ModelSpec(
+        model_name="es_ridge_e2e",
+        model_type=ModelType.RIDGE_REGRESSION,
+        task_type=TaskType.REGRESSION,
+        feature_columns=("feature__return_20", "feature__moving_average_gap_10_50"),
+        label_column="label__forward_return_1",
+        train_start=date(2024, 4, 1),
+        train_end=date(2024, 6, 5),
+        validation_start=date(2024, 6, 6),
+        validation_end=date(2024, 9, 15),
+        prediction_horizon=1,
+        random_seed=0,
+        hyperparameters={"alpha": 1.0},
+        threshold_rule=ThresholdRule.RETURN_THRESHOLD,  # regression -> predicted forward return
+        long_threshold=0.0,
+        short_threshold=0.0,
+        signal_mode=SignalMode.LONG_SHORT,
+    )
+
+
+def _run_full_pipeline() -> dict:
+    raw = _pipeline_raw_df()
+    validate_raw_futures(raw)
+    events = compute_roll_schedule(raw, ES)
+    cont = build_continuous_futures(raw, ES, "ratio")
+    ch = continuous_config_hash(raw, ES, "ratio")
+    feat = build_feature_matrix(cont, upstream_continuous_hash=ch)
+    fh = feat["feature_config_hash"].iloc[0]
+    lab = build_label_matrix(cont, feature_df=feat, upstream_feature_hash=fh)
+    lh = lab["label_config_hash"].iloc[0]
+    ds = build_supervised_dataset(feat, lab)
+
+    spec = _e2e_spec()
+    split = chronological_holdout_split(
+        ds,
+        train_start=spec.train_start,
+        train_end=spec.train_end,
+        validation_start=spec.validation_start,
+        validation_end=spec.validation_end,
+    )
+    ds_ch = dataset_config_hash(
+        label_config_hash=lh, feature_columns=spec.feature_columns, label_column=spec.label_column
+    )
+    tm = train_model(ds, spec, split, continuous_config_hash=ch, feature_config_hash=fh,
+                     label_config_hash=lh, dataset_config_hash_value=ds_ch)
+    sig = prediction_to_signal(tm, ds, start=spec.validation_start, end=spec.validation_end)
+    res = evaluate_ml_signal(tm, ds, cont, ES, start=spec.validation_start, end=spec.validation_end)
+    return {"raw": raw, "events": events, "cont": cont, "ch": ch, "feat": feat, "fh": fh,
+            "lab": lab, "lh": lh, "ds": ds, "ds_ch": ds_ch, "spec": spec, "split": split,
+            "tm": tm, "sig": sig, "res": res}
+
+
+def test_phase4_end_to_end_pipeline():
+    p = _run_full_pipeline()
+    assert len(p["events"]) == 2
+    assert int(p["cont"]["roll_flag"].astype(bool).sum()) == 2
+
+    ds = p["ds"]
+    assert any(c.startswith("feature__") for c in ds.columns)
+    assert any(c.startswith("label__") for c in ds.columns)
+    assert "feature_config_hash" in ds.columns and "label_config_hash" in ds.columns
+
+    res = p["res"]
+    assert isinstance(res, MlEvaluationResult)
+    assert res.regression_metrics is not None and res.classification_metrics is None
+    for key in ("final_equity", "total_return", "total_transaction_cost",
+                "turnover", "max_drawdown", "sharpe"):
+        assert key in res.backtest_metrics
+    assert res.no_trade_baseline is not None and res.momentum_baseline is not None
+
+    # OOS fairness: ML, no-trade, momentum share the same OOS timestamps
+    ml_ts = res.signals["timestamp"].tolist()
+    assert res.no_trade_baseline["signal"]["timestamp"].tolist() == ml_ts
+    assert res.momentum_baseline["signal"]["timestamp"].tolist() == ml_ts
+    # momentum is only evaluated on the OOS window (no in-sample rows)
+    assert (_naive_norm(res.momentum_baseline["signal"]["timestamp"])
+            >= pd.Timestamp(p["spec"].validation_start)).all()
+    # metrics scored on valid-label rows only
+    assert res.metadata["n_scored_rows"] <= res.metadata["n_oos_rows"]
+
+    # t+1 execution lives in the backtest; the signal is unshifted
+    frame = res.ml_backtest.frame
+    assert frame["effective_position"].iloc[0] == 0.0
+    np.testing.assert_array_equal(
+        frame["effective_position"].to_numpy(),
+        frame["target_position"].shift(1).fillna(0.0).to_numpy(),
+    )
+    # roll_flag carries through; the OOS window contains the second roll
+    assert "roll_flag" in frame.columns
+    assert int(frame["roll_flag"].astype(bool).sum()) >= 1
+    # no-trade baseline is flat with no trades
+    assert (res.no_trade_baseline["signal"]["target_position"] == 0.0).all()
+    assert res.no_trade_baseline["backtest_metrics"]["num_trades"] == 0
+
+
+def test_phase4_no_random_split_and_training_excludes_validation_and_warmup():
+    p = _run_full_pipeline()
+    ds, split, spec = p["ds"], p["split"], p["spec"]
+    ts = ds["timestamp"].to_numpy()
+
+    # chronological (no shuffle): every train timestamp strictly before validation
+    assert ts[split.train_index].max() < ts[split.test_index].min()
+    # feature columns exclude labels
+    assert all(c.startswith("feature__") for c in spec.feature_columns)
+    assert not any(c.startswith("label__") for c in spec.feature_columns)
+    # training uses only is_trainable rows (warmup / NaN-label tail excluded)
+    assert bool(ds.iloc[split.train_index]["is_trainable"].all())
+    # training never touches validation-window rows
+    val_positions = set(np.where(
+        (_naive_norm(ds["timestamp"]) >= pd.Timestamp(spec.validation_start)).to_numpy()
+    )[0])
+    assert set(split.train_index.tolist()).isdisjoint(val_positions)
+    assert p["tm"].metadata["n_train_rows"] == len(split.train_index)
+    assert len(split.train_index) < len(ds)
+
+
+def test_phase4_provenance_chain_and_determinism():
+    p = _run_full_pipeline()
+    md = p["tm"].metadata
+    for key in ("continuous_config_hash", "feature_config_hash", "label_config_hash",
+                "dataset_config_hash", "model_config_hash", "train_run_hash"):
+        assert key in md and md[key]
+    assert md["model_config_hash"] == model_config_hash(p["spec"])
+    assert md["dataset_config_hash"] == p["ds_ch"]
+
+    # changing an upstream hash changes train_run_hash
+    tm2 = train_model(p["ds"], p["spec"], p["split"],
+                      continuous_config_hash=p["ch"] + "X", feature_config_hash=p["fh"],
+                      label_config_hash=p["lh"], dataset_config_hash_value=p["ds_ch"])
+    assert tm2.train_run_hash != p["tm"].train_run_hash
+
+    # identical synthetic inputs reproduce identical hash / predictions / signals /
+    # backtest frame / evaluation metrics
+    q = _run_full_pipeline()
+    assert p["tm"].train_run_hash == q["tm"].train_run_hash
+    pd.testing.assert_frame_equal(p["sig"], q["sig"])
+    pd.testing.assert_frame_equal(p["res"].ml_backtest.frame, q["res"].ml_backtest.frame)
+    assert p["res"].backtest_metrics == q["res"].backtest_metrics
+    assert p["res"].regression_metrics == q["res"].regression_metrics
+
+
+def test_phase4_label_execution_lag_alignment():
+    p = _run_full_pipeline()
+    cont_s = p["cont"].sort_values("timestamp").reset_index(drop=True)
+    lab_s = p["lab"].sort_values("timestamp").reset_index(drop=True)
+    ca = cont_s["close_adjusted"]
+    # forward_return_1 with execution_lag L=1, horizon h=1: close_adj[t+2]/close_adj[t+1]-1
+    expected = (ca.shift(-2) / ca.shift(-1) - 1.0).to_numpy()
+    actual = lab_s["forward_return_1"].to_numpy()
+    mask = ~np.isnan(expected) & ~np.isnan(actual)
+    assert mask.sum() > 0
+    np.testing.assert_allclose(actual[mask], expected[mask], rtol=1e-9, atol=1e-9)
+
+
+def test_phase4_roll_seam_and_roll_cost_end_to_end():
+    raw = _pipeline_raw_df()
+    validate_raw_futures(raw)
+    cont = build_continuous_futures(raw, ES, "ratio").sort_values("timestamp").reset_index(drop=True)
+    roll_idx = list(np.where(cont["roll_flag"].astype(bool).to_numpy())[0])
+    assert len(roll_idx) == 2
+
+    forced = pd.DataFrame(
+        {
+            "timestamp": cont["timestamp"].to_numpy(),
+            "root_symbol": cont["root_symbol"].to_numpy(),
+            "active_contract": cont["active_contract"].to_numpy(),
+            "target_position": 1.0,
+        }
+    )
+    held = run_futures_backtest(cont, forced, ES, transaction_cost_bps=50, include_roll_cost=True)
+    no_roll = run_futures_backtest(cont, forced, ES, transaction_cost_bps=50, include_roll_cost=False)
+
+    cr = cont["close_raw"].to_numpy()
+    for r in roll_idx:
+        assert abs(cr[r] / cr[r - 1] - 1.0) > 0.01                       # genuine raw inter-contract gap
+        assert abs(held.frame["strategy_return"].iloc[r]) < 0.01         # PnL tracks close_adjusted, not the gap
+        assert held.frame["transaction_cost"].iloc[r] > no_roll.frame["transaction_cost"].iloc[r]  # roll cost when held
+    assert int(held.frame["roll_flag"].astype(bool).sum()) == 2          # roll_flag carried into the backtest frame
