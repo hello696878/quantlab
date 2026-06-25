@@ -21,6 +21,7 @@ export type View =
   | "finml"
   | "risklab"
   | "realestate"
+  | "futures"
   | "csv"
   | "builder"
   | "portfolio"

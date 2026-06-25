@@ -1644,6 +1644,39 @@ single-asset Backtest + Strategy Comparison:
   WAL/duration/convexity approximations — no live mortgage/MBS data, not a
   production valuation, not investment or lending advice.**
 
+### Phase 23.0 — Futures & Commodities Lab v1 ✅
+
+- **New deterministic educational futures / commodities analytics lab.** Static
+  sample data only; no live futures/commodity prices, no broker/trading, no API
+  keys, no scraping, not investment or trading advice. Existing backtest/AFML/
+  scanner/Portfolio Risk/Real Estate logic untouched (separate package + view).
+- Backend: new `app/futures/` package (`models.py` strict Pydantic v2 with
+  `extra="forbid"` + `FiniteFloat`; `sample.py` four deterministic commodities —
+  crude/gold/natural gas/wheat — with futures curves + sample positions;
+  `service.py` pure analytics) + `app/futures_routes.py`
+  (`GET /futures/sample`, `POST /futures/analyze`), wired via `include_router`.
+- Analytics: cost-of-carry `F = S·e^{(r+u−y)T}`, implied convenience yield
+  `y = r + u − ln(F/S)/T`, basis & annualized basis, deterministic curve-shape
+  classification (contango/backwardation/mixed), roll yield `(F_near−F_next)/F_near`,
+  calendar spread, contract notional / initial & maintenance margin / leverage,
+  long/short P&L and return on margin, and eight commodity stress scenarios.
+  Validation rejects negative spot, maturity ≤ 0, margin rates outside [0,1] or
+  initial < maintenance, and non-finite values; no NaN/Inf.
+- Frontend: new `FuturesLabPanel` (view `futures`) — hero + commodity selector
+  (crude/gold/gas/wheat) + editable contract assumptions (live re-analyze),
+  key-metric cards, futures-curve table, curve-shape panel, position-P&L/margin
+  panel, scenario-stress table, and a formula/explanation panel; new
+  `lib/futures.ts` types + API client. Wired into Sidebar, Dashboard card
+  ("Futures analytics" badge), and Command Palette (Open Futures and Commodities
+  Lab, Cost of Carry Lab, Futures Curve Lab, Roll Yield Calculator, Commodity
+  Scenario Stress).
+- 23 new backend tests (deterministic, no network) — full suite green
+  (**2076 passed**); `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`, `frontend/README.md`,
+  `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample,
+  educational — no live futures/commodity prices, not a production risk engine,
+  no exchange/broker integration, not investment or trading advice.**
+
 ### Phase 13.4 — Showcase Demo Script & Screenshot Refresh ✅
 
 - README: Trust Layer + Content Engine feature rows; honest "screenshots

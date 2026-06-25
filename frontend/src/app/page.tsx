@@ -46,6 +46,7 @@ import ScannerLabPanel from "@/components/ScannerLabPanel";
 import AfmlLabPanel from "@/components/AfmlLabPanel";
 import PortfolioRiskLabPanel from "@/components/PortfolioRiskLabPanel";
 import RealEstateLabPanel from "@/components/RealEstateLabPanel";
+import FuturesLabPanel from "@/components/FuturesLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -394,6 +395,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Real Estate Lab",
     subtitle:
       "Income-property NOI, cap rate, valuation, mortgage amortization, LTV/DSCR, cash-on-cash, IRR, equity multiple, rent/vacancy/cap/rate stress scenarios, and a simple REIT NAV discount/premium — deterministic static sample data, not investment, tax, legal, or lending advice.",
+  },
+  futures: {
+    title: "Futures & Commodities Lab",
+    subtitle:
+      "Cost-of-carry futures pricing, implied convenience yield, futures-curve shape (contango/backwardation/mixed), roll yield, calendar spreads, contract notional / margin / leverage P&L, and commodity scenario stress — deterministic static sample data, not investment or trading advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -967,6 +973,7 @@ export default function HomePage() {
     { view: "finml", title: "Open AFML Methodology Lab", keywords: "afml financial ml machine learning triple barrier cusum event sampling sample uniqueness concurrency labeling meta-labeling purged k-fold embargo cross validation leakage label overlap sequential bootstrap fractional differentiation fracdiff stationarity cpcv lopez de prado" },
     { view: "risklab", title: "Open Portfolio Risk Lab", keywords: "portfolio risk lab analytics expected return volatility sharpe covariance correlation marginal component risk contribution value at risk var cvar expected shortfall stress scenario efficient frontier minimum variance risk parity allocation weights" },
     { view: "realestate", title: "Open Real Estate Lab", keywords: "real estate property reit noi net operating income cap rate valuation mortgage amortization ltv loan to value dscr debt service coverage cash on cash irr equity multiple rent vacancy stress nav premium discount ffo dividend yield" },
+    { view: "futures", title: "Open Futures and Commodities Lab", keywords: "futures commodities commodity cost of carry convenience yield contango backwardation curve roll yield calendar spread margin leverage notional crude oil gold natural gas wheat basis scenario stress" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1264,6 +1271,20 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("risklab"),
+    })),
+    ...(
+      [
+        ["Cost of Carry Lab", "futures cost of carry pricing spot forward convenience yield storage rate model fair value commodity"],
+        ["Futures Curve Lab", "futures curve contango backwardation mixed term structure maturity basis slope shape commodity"],
+        ["Roll Yield Calculator", "futures roll yield near next contract calendar spread carry contango backwardation"],
+        ["Commodity Scenario Stress", "futures commodity scenario stress spot rally selloff contango steepening backwardation storage convenience margin"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `futures-${title}`,
+      group: "Futures & Commodities Lab",
+      title,
+      keywords,
+      run: () => handleNav("futures"),
     })),
     ...(
       [
@@ -1806,6 +1827,9 @@ export default function HomePage() {
 
         {/* ── Real Estate Lab ──────────────────────────────────────────── */}
         {view === "realestate" && <RealEstateLabPanel />}
+
+        {/* ── Futures & Commodities Lab ────────────────────────────────── */}
+        {view === "futures" && <FuturesLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

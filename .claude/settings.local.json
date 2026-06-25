@@ -54,7 +54,8 @@
       "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py tests/test_futures_labels.py tests/test_futures_signal_backtest.py tests/test_ml_signal.py)",
       "Bash(./venv/Scripts/python.exe -m pytest tests/test_mbs.py -q)",
       "Read(//c/quantlab-phase4-ml-signal/backend/**)",
-      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_ml_signal.py -q)"
+      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_ml_signal.py -q)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_futures.py -q)"
     ]
   }
 }

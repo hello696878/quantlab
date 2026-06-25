@@ -22,6 +22,8 @@ backend/
 │   ├── portfolio_risk_routes.py  Portfolio Risk Lab API routes
 │   ├── real_estate/        static-sample real-estate analytics (models/sample/service/mbs)
 │   ├── real_estate_routes.py     Real Estate Lab API routes
+│   ├── futures/            static-sample futures/commodities analytics (models/sample/service)
+│   ├── futures_routes.py         Futures & Commodities Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -39,7 +41,8 @@ backend/
 │   ├── test_globe.py             dossier API/schema/FRED/quote adapter tests
 │   ├── test_portfolio_risk.py    Portfolio Risk Lab analytics/API/validation tests
 │   ├── test_real_estate.py       Real Estate Lab analytics/API/validation tests
-│   └── test_mbs.py               Mortgage & MBS prepayment analytics/API tests
+│   ├── test_mbs.py               Mortgage & MBS prepayment analytics/API tests
+│   └── test_futures.py           Futures & Commodities Lab analytics/API tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -160,6 +163,24 @@ IRR is solved deterministically (sign-change bracketing + bisection) and returns
 (Phase 22.1) use a simplified educational CPR→SMM and 100-PSA ramp; WAL,
 duration, and convexity are educational approximations (duration/convexity hold
 the projected cash flows fixed). No live mortgage rates or MBS prices.
+
+---
+
+### Futures & Commodities Lab Endpoints
+
+Deterministic static-sample futures / commodities analytics (Phase 23.0). No live
+futures or commodity prices, no network calls, educational only — not investment,
+trading, legal, tax, or risk-management advice.
+
+| Endpoint | Description |
+|---|---|
+| `GET /futures/sample` | Four deterministic sample commodities (crude oil, gold, natural gas, wheat) with futures curves + a sample position |
+| `POST /futures/analyze` | Full analytics: cost-of-carry pricing, implied convenience yield, curve shape (contango/backwardation/mixed), basis, roll yield, calendar spread, notional / margin / leverage P&L, and eight commodity stress scenarios |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): spot > 0, futures
+> 0, maturity > 0, multiplier > 0, margin rates ∈ [0,1] with initial ≥ maintenance,
+no NaN/Infinity. Curve shape is classified deterministically from consecutive
+observed futures.
 
 ---
 

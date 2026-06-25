@@ -381,6 +381,22 @@ Return to the Command Center's **Platform Direction** panel (or open
   Emphasise: simplified CPR/SMM/PSA and educational WAL/duration/convexity
   approximations — no live mortgage rates or MBS prices, not a production
   valuation, not investment or lending advice.
+- **Futures & Commodities Lab (23.0)** — open from the sidebar (or Ctrl/Cmd+K →
+  "Open Futures and Commodities Lab"). The Crude Oil sample loads and analyses
+  automatically. Show the key-metric cards (model 12M future, curve shape, near
+  basis, implied convenience yield, roll yield, calendar spread, initial margin,
+  return on margin) and the futures-curve table (observed vs cost-of-carry model,
+  basis, implied convenience yield, roll yield). Switch commodities: **Crude** and
+  **Gold** are contango, **Natural Gas** is backwardation (near above far),
+  **Wheat** is mixed — point out the curve-shape panel and roll-yield
+  interpretation. Edit assumptions (raise the convenience yield → curve drifts
+  toward backwardation; raise storage → more contango; change spot/margin rates)
+  and watch every metric and scenario re-compute. Walk the scenario-stress table
+  (base, spot rally/selloff, contango steepening, backwardation/storage/convenience
+  shocks, margin stress). Emphasise: static illustrative sample data, simplified
+  cost-of-carry and curve analytics — no live futures/commodity prices, not a
+  production risk engine, no exchange/broker integration, not investment or
+  trading advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

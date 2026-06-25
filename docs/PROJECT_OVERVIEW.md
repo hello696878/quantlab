@@ -64,6 +64,8 @@ FastAPI Backend
   ├── portfolio_risk_routes.py      Portfolio Risk Lab API router: GET /portfolio-risk/sample, POST /portfolio-risk/analyze — static sample data only
   ├── real_estate/                  Real Estate Lab (22.0 + 22.1): models.py (typed property/debt/REIT + MBS pool/prepayment/valuation schema), sample.py (deterministic property + MBS samples), service.py (EGI/NOI, cap-rate valuation, mortgage amortization, LTV/DSCR, levered cash flow with deterministic IRR + equity multiple, 6 stress scenarios, simple REIT NAV), mbs.py (22.1: CPR→SMM, simplified PSA ramp, MBS cash-flow decomposition, WAL, price, duration/convexity approximations, rate/prepay-speed scenarios) — static sample, educational, no live mortgage/MBS data, not investment/tax/legal/lending advice
   ├── real_estate_routes.py         Real Estate Lab API router: GET /real-estate/sample, POST /real-estate/analyze, GET /real-estate/mbs/sample, POST /real-estate/mbs/analyze — static sample data only
+  ├── futures/                      Futures & Commodities Lab v1 (23.0): models.py (typed contract/curve/position schema), sample.py (4 deterministic commodities), service.py (cost-of-carry pricing, implied convenience yield, curve shape contango/backwardation/mixed, basis, roll yield, calendar spread, notional/margin/leverage P&L, 8 commodity stress scenarios) — static sample, educational, no live futures/commodity data, not investment/trading advice
+  ├── futures_routes.py             Futures & Commodities Lab API router: GET /futures/sample, POST /futures/analyze — static sample data only
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD

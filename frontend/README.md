@@ -96,6 +96,16 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/real-estate/analyze` | `POST /real-estate/analyze` |
 | `GET /api/real-estate/mbs/sample` | `GET /real-estate/mbs/sample` |
 | `POST /api/real-estate/mbs/analyze` | `POST /real-estate/mbs/analyze` |
+| `GET /api/futures/sample` | `GET /futures/sample` |
+| `POST /api/futures/analyze` | `POST /futures/analyze` |
+
+The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
+deterministic sample commodities, lets you pick one and edit the contract
+assumptions, and re-analyses live via `/api/futures/analyze` (cost-of-carry
+pricing, convenience yield, curve shape, roll yield, calendar spread, margin/P&L,
+scenario stress). Static illustrative sample data — no live futures/commodity
+prices, not a production risk engine, no exchange/broker integration, not
+investment / trading advice.
 
 The **Real Estate Lab** (`RealEstateLabPanel`, view `realestate`) loads the
 deterministic sample property/debt/REIT, lets you edit the assumptions, and
