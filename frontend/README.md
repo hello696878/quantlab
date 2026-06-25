@@ -100,6 +100,8 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/futures/analyze` | `POST /futures/analyze` |
 | `GET /api/volatility/sample` | `GET /volatility/sample` |
 | `POST /api/volatility/analyze` | `POST /volatility/analyze` |
+| `GET /api/microstructure/sample` | `GET /microstructure/sample` |
+| `POST /api/microstructure/analyze` | `POST /microstructure/analyze` |
 
 The **Volatility Surface & Variance Swap Lab** (`VolatilityLabPanel`, view
 `volatility`) loads a deterministic sample option chain, lets you edit the
@@ -108,6 +110,17 @@ underlying assumptions, and re-analyses live via `/api/volatility/analyze`
 fair strike, vega exposure, scenario stress). Static illustrative sample data —
 no live option chains, not official VIX methodology, not a production risk engine,
 not investment / trading advice.
+
+The **Market Microstructure & Execution Lab** (`MicrostructureLabPanel`, view
+`microstructure`) loads four deterministic sample instruments (BTCUSDT, SPY, CL
+futures, TSM equity), lets you select one and edit the parent-order / ADV /
+volatility / impact assumptions, and re-analyses live via
+`/api/microstructure/analyze` (order-book spread / depth ladder / imbalance /
+microprice, trade-tape VWAP/TWAP/imbalance, implementation shortfall, slippage,
+participation, square-root market impact, a four-schedule execution comparison,
+and eight liquidity stress scenarios). Static illustrative sample data — no live
+order books or trades, no broker / exchange integration, not a production
+execution / TCA system, not investment / trading / order-routing advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract

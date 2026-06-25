@@ -117,7 +117,7 @@ const ROADMAP_STATUS: { label: string; status: "Built" | "Planned" | "Future" }[
   { label: "Options & Volatility Lab", status: "Built" },
   { label: "Event-Driven / Arbitrage Module", status: "Planned" },
   { label: "Portfolio Ensemble Builder", status: "Planned" },
-  { label: "Microstructure & HFT Lab", status: "Future" },
+  { label: "Microstructure & Execution Lab", status: "Built" },
   { label: "AI Explainer Copilot", status: "Future" },
   { label: "3D Visualization Engine", status: "Future" },
   { label: "Platform / Launch Layer", status: "Future" },
@@ -1327,6 +1327,32 @@ export default function HomeDashboard({
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Volatility Surface Lab →
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => onNav("microstructure")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                Market Microstructure Lab
+              </span>
+              <span
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+              >
+                Execution analytics
+              </span>
+            </span>
+            <span className="text-xs text-slate-400">
+              Explore a deterministic sample limit order book, bid/ask spread, depth, order-book
+              imbalance and microprice, trade-tape VWAP/TWAP, implementation shortfall, slippage,
+              market impact, an execution-schedule comparison, and liquidity stress — not investment
+              or order-routing advice.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Market Microstructure Lab →
             </span>
           </button>
           <button

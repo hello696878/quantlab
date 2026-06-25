@@ -23,6 +23,7 @@ export type View =
   | "realestate"
   | "futures"
   | "volatility"
+  | "microstructure"
   | "csv"
   | "builder"
   | "portfolio"

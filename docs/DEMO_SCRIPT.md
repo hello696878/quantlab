@@ -412,6 +412,22 @@ Return to the Command Center's **Platform Direction** panel (or open
   a simplified educational variance-swap approximation — **not** a live option
   chain, **not** official VIX methodology, not a production risk engine, not
   investment or trading advice.
+- **Market Microstructure & Execution Lab (25.0)** — open from the sidebar (or
+  Ctrl/Cmd+K → "Open Market Microstructure Lab"). Pick an instrument tab (BTCUSDT,
+  SPY, CL, TSM); the sample order book, trade tape, parent order, and fills load and
+  analyse automatically. Show the key-metric cards (mid, spread_bps, microprice Δ,
+  top imbalance, VWAP, implementation shortfall, participation, market impact), the
+  **order-book depth ladder**, the **imbalance & microprice** panel (note the
+  bid-heavy book pushes microprice above mid), the **trade-tape** panel (VWAP vs
+  TWAP, signed trade imbalance), and the **execution summary** (avg fill vs arrival →
+  positive shortfall is a cost). Walk the **execution-schedule comparison** (Immediate
+  front-loads impact vs TWAP/VWAP/POV) and the **liquidity-stress** table (spread
+  doubles, depth halves, volatility spike, volume drought, combo shock, bid-/ask-side
+  pressure). Edit the parent quantity / ADV / volatility / impact and watch everything
+  re-compute. Emphasise: static illustrative sample data, simplified educational
+  impact/schedule models — **not** a live order book or trade feed, no broker/exchange
+  integration, **not** a production execution / TCA system, no schedule is recommended,
+  not investment / trading / order-routing advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

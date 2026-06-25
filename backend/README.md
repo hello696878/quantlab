@@ -26,6 +26,8 @@ backend/
 │   ├── futures_routes.py         Futures & Commodities Lab API routes
 │   ├── volatility/         static-sample vol-surface/variance-swap analytics (models/sample/service)
 │   ├── volatility_routes.py      Volatility Lab API routes (reuses app/options BS)
+│   ├── microstructure/     static-sample order-book/execution analytics (models/sample/service)
+│   ├── microstructure_routes.py  Market Microstructure & Execution Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -45,7 +47,8 @@ backend/
 │   ├── test_real_estate.py       Real Estate Lab analytics/API/validation tests
 │   ├── test_mbs.py               Mortgage & MBS prepayment analytics/API tests
 │   ├── test_futures.py           Futures & Commodities Lab analytics/API tests
-│   └── test_volatility.py        Volatility Lab analytics/API/validation tests
+│   ├── test_volatility.py        Volatility Lab analytics/API/validation tests
+│   └── test_microstructure.py    Market Microstructure & Execution Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -204,6 +207,29 @@ are strictly validated (`extra="forbid"`, `FiniteFloat`): spot > 0, strike > 0,
 maturity > 0, mid price > 0, no NaN/Infinity. The variance-swap fair strike is a
 simplified educational option-strip approximation, **not** official VIX methodology;
 an impossible/out-of-bounds price returns a null IV with a note (no crash).
+
+---
+
+### Market Microstructure & Execution Lab Endpoints
+
+Deterministic static-sample market-microstructure / execution analytics (Phase 25.0).
+No live order books or trades, no broker / exchange integration, no network calls,
+educational only — not investment, trading, order-routing, legal, tax, or
+risk-management advice, and not a production execution / TCA system.
+
+| Endpoint | Description |
+|---|---|
+| `GET /microstructure/sample` | Four deterministic sample instruments (BTCUSDT, SPY, CL futures, TSM equity), each with a limit order book, trade tape, parent order, sample fills, and an intraday volume curve |
+| `POST /microstructure/analyze` | Order-book summary (spread, depth ladder, top-of-book & 5-level imbalance, microprice), trade-tape VWAP / TWAP / trade imbalance, execution analytics (implementation shortfall, slippage, participation, square-root market impact), a four-schedule execution comparison (Immediate / TWAP / VWAP-style / participation-of-volume), and eight liquidity stress scenarios |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): prices and sizes
+> 0, no NaN/Infinity, a **crossed/locked book is rejected** (best_bid must be <
+best_ask), and the trade side must be `buy`/`sell`. Implementation shortfall and
+slippage are signed by side (a positive value is an execution cost); market impact
+uses a square-root model with educational parameters. The schedule comparison and
+liquidity scenarios are hypothetical educational examples — no schedule is
+recommended, and nothing is order-routing advice. Every division is guarded so all
+outputs are finite.
 
 ---
 

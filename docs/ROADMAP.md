@@ -1677,6 +1677,47 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 25.0 — Market Microstructure & Execution Lab v1 ✅
+
+- **New deterministic educational market-microstructure / execution lab.** Static
+  sample data only; no live order books or trades, no broker/exchange integration,
+  no order submission, no trading, no API keys, no scraping, not investment /
+  trading / order-routing advice, not a production execution / TCA system.
+  Existing backtest/AFML/scanner/Portfolio Risk/Options/Volatility Lab logic
+  untouched (separate package + view).
+- Backend: new `app/microstructure/` package (`models.py` strict Pydantic v2 with
+  `extra="forbid"` + `FiniteFloat`, **crossed/locked-book rejection**; `sample.py`
+  four deterministic instruments — BTCUSDT, SPY, CL futures, TSM equity — each with
+  a limit order book, deterministic trade tape, parent order, sample fills, and an
+  intraday volume curve; `service.py` pure analytics) + `app/microstructure_routes.py`
+  (`GET /microstructure/sample`, `POST /microstructure/analyze`), wired via
+  `include_router`.
+- Analytics: order-book summary (best bid/ask, mid, spread & spread_bps,
+  top-of-book and 5-level depth imbalance, microprice & microprice-vs-mid), depth
+  ladder, trade-tape VWAP / TWAP / signed trade imbalance / buy-sell volume,
+  execution analytics (average fill price, fill ratio, implementation shortfall,
+  slippage vs benchmark, participation rate, square-root market impact
+  `coeff·√(qty/ADV)·vol_bps`), a four-schedule execution comparison (Immediate /
+  TWAP / VWAP-style / participation-of-volume), and eight liquidity stress
+  scenarios. Validation rejects negative price/size, a crossed book, invalid side,
+  and non-finite values; every division guarded → no NaN/Inf.
+- Frontend: new `MicrostructureLabPanel` (view `microstructure`) — hero + instrument
+  selector + editable execution assumptions (live re-analyze), key-metric cards,
+  order-book depth ladder, imbalance/microprice panel, trade-tape & execution-summary
+  panels, execution-schedule comparison table, liquidity-stress table, and a
+  formula/explanation panel; new `lib/microstructure.ts` types + API client. Wired
+  into Sidebar, Dashboard card ("Execution analytics" badge, roadmap chip flipped to
+  Built), and Command Palette (Open Market Microstructure Lab, Order Book Imbalance
+  Lab, VWAP and TWAP Lab, Implementation Shortfall Lab, Execution Schedule Lab,
+  Liquidity Stress Lab).
+- 24 new backend tests (deterministic, no network) — full suite green
+  (**2201 passed**); `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`, `frontend/README.md`,
+  `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample,
+  educational — no live order books or trades, no broker/exchange integration,
+  simplified impact/schedule models, not a production execution / TCA system, not
+  investment / trading / order-routing advice.**
+
 ### Phase 24.0 — Volatility Surface & Variance Swap Lab v1 ✅
 
 - **New deterministic educational derivatives-volatility lab.** Static sample

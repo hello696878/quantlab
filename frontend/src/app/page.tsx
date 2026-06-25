@@ -48,6 +48,7 @@ import PortfolioRiskLabPanel from "@/components/PortfolioRiskLabPanel";
 import RealEstateLabPanel from "@/components/RealEstateLabPanel";
 import FuturesLabPanel from "@/components/FuturesLabPanel";
 import VolatilityLabPanel from "@/components/VolatilityLabPanel";
+import MicrostructureLabPanel from "@/components/MicrostructureLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -406,6 +407,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Volatility Surface & Variance Swap Lab",
     subtitle:
       "Implied-vol inversion, volatility smile / skew / term structure, a 2-D volatility surface, realized-vol comparison, a simplified variance-swap fair strike, vega exposure, and volatility scenario stress — deterministic static sample data, not official VIX methodology, not investment or trading advice.",
+  },
+  microstructure: {
+    title: "Market Microstructure & Execution Lab",
+    subtitle:
+      "Limit order-book summary (spread, depth ladder, imbalance, microprice), trade-tape VWAP/TWAP/imbalance, execution implementation shortfall, slippage, participation, a square-root market-impact approximation, an execution-schedule comparison, and liquidity stress scenarios — deterministic static sample data, no live order books, not investment, trading, or order-routing advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -981,6 +987,7 @@ export default function HomePage() {
     { view: "realestate", title: "Open Real Estate Lab", keywords: "real estate property reit noi net operating income cap rate valuation mortgage amortization ltv loan to value dscr debt service coverage cash on cash irr equity multiple rent vacancy stress nav premium discount ffo dividend yield" },
     { view: "futures", title: "Open Futures and Commodities Lab", keywords: "futures commodities commodity cost of carry convenience yield contango backwardation curve roll yield calendar spread margin leverage notional crude oil gold natural gas wheat basis scenario stress" },
     { view: "volatility", title: "Open Volatility Lab", keywords: "volatility surface variance swap implied vol iv smile skew term structure realized vol vega black scholes option chain fair strike vix scenario stress derivatives" },
+    { view: "microstructure", title: "Open Market Microstructure Lab", keywords: "microstructure execution order book limit order book bid ask spread depth imbalance microprice vwap twap implementation shortfall slippage market impact participation rate liquidity stress execution schedule transaction cost analysis tca" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1292,6 +1299,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("volatility"),
+    })),
+    ...(
+      [
+        ["Open Market Microstructure Lab", "microstructure execution lab order book trade tape vwap twap implementation shortfall slippage market impact liquidity"],
+        ["Order Book Imbalance Lab", "order book imbalance depth ladder bid ask spread microprice top of book level book pressure"],
+        ["VWAP and TWAP Lab", "vwap twap volume weighted average price time weighted average price trade tape benchmark execution"],
+        ["Implementation Shortfall Lab", "implementation shortfall slippage arrival price benchmark execution cost market impact participation transaction cost analysis tca"],
+        ["Execution Schedule Lab", "execution schedule immediate twap vwap participation of volume pov child orders impact spread cost completion"],
+        ["Liquidity Stress Lab", "liquidity stress spread widening depth halving volatility spike volume drought scenario microprice imbalance"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `microstructure-${title}`,
+      group: "Market Microstructure Lab",
+      title,
+      keywords,
+      run: () => handleNav("microstructure"),
     })),
     ...(
       [
@@ -1854,6 +1877,9 @@ export default function HomePage() {
 
         {/* ── Volatility Surface & Variance Swap Lab ───────────────────── */}
         {view === "volatility" && <VolatilityLabPanel />}
+
+        {/* ── Market Microstructure & Execution Lab ────────────────────── */}
+        {view === "microstructure" && <MicrostructureLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (
