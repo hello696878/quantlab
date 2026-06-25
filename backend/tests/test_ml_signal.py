@@ -13,10 +13,12 @@ import pandas as pd
 import pytest
 from pydantic import ValidationError
 
+from app.instruments import get_instrument
 from app.ml_signal import (
     BaseModel,
     DummyBaseline,
     LogisticRegression,
+    MlEvaluationResult,
     MlSignalError,
     ModelSpec,
     ModelType,
@@ -30,16 +32,21 @@ from app.ml_signal import (
     TrainedModel,
     build_model,
     chronological_holdout_split,
+    classification_metrics,
     dataset_config_hash,
+    evaluate_ml_signal,
     model_config_hash,
     predict_model,
     prediction_to_signal,
     purged_kfold_splits,
+    regression_metrics,
     select_design_matrix,
     train_model,
     train_run_hash,
     walk_forward_splits,
 )
+
+ES = get_instrument("ES")
 
 
 def _spec(**over) -> ModelSpec:
@@ -341,8 +348,9 @@ def test_no_network_or_sklearn_imports_in_sources():
     import app.ml_signal.models as models_mod
     import app.ml_signal.training as training_mod
     import app.ml_signal.prediction as prediction_mod
+    import app.ml_signal.evaluation as evaluation_mod
 
-    for mod in (spec_mod, splits_mod, models_mod, training_mod, prediction_mod):
+    for mod in (spec_mod, splits_mod, models_mod, training_mod, prediction_mod, evaluation_mod):
         src = inspect.getsource(mod)
         # no network client imports, and no ML-framework imports (the words may
         # appear in prose saying we deliberately avoid them, so match imports only)
@@ -832,3 +840,221 @@ def test_prediction_to_signal_deterministic_real_model():
     pd.testing.assert_frame_equal(a, b)
     assert ((a["prediction_proba"] >= 0.0) & (a["prediction_proba"] <= 1.0)).all()
     assert set(a["target_position"].unique()).issubset({-1.0, 0.0, 1.0})
+
+
+# --------------------------------------------------------------------------- #
+# Commit 4 — ML backtest evaluation
+# --------------------------------------------------------------------------- #
+
+
+def _eval_ds(n: int = 60, start: str = "2024-07-01", seed: int = 0) -> pd.DataFrame:
+    """Synthetic supervised-dataset window with both ML and momentum feature cols."""
+    rng = np.random.default_rng(seed)
+    ts = pd.date_range(start, periods=n, freq="B")
+    x1 = rng.normal(size=n)
+    x2 = rng.normal(size=n)
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "root_symbol": "ES",
+            "active_contract": "ESH24",
+            "feature__x1": x1,
+            "feature__x2": x2,
+            "feature__return_20": x1 * 0.01,
+            "feature__moving_average_gap_10_50": x2 * 0.01,
+            "feature__roll_flag": False,
+            "feature__days_since_roll": 50.0,
+            "label__direction_1": np.where(3.0 * x1 - 2.0 * x2 > 0, 1.0, -1.0),
+            "label__forward_return_1": 2.0 * x1 - 1.0 * x2,
+            "is_warmup": False,
+            "is_label_valid": True,
+            "is_trainable": True,
+        }
+    )
+
+
+def _eval_continuous(n: int = 60, start: str = "2024-07-01") -> pd.DataFrame:
+    """Minimal ratio continuous frame aligned to the eval dataset timestamps."""
+    ts = pd.date_range(start, periods=n, freq="B")
+    close = 5000.0 + np.arange(n, dtype=float)
+    return pd.DataFrame(
+        {
+            "timestamp": ts,
+            "root_symbol": "ES",
+            "active_contract": "ESH24",
+            "close_adjusted": close,
+            "open_raw": close,
+            "close_raw": close,
+            "roll_flag": False,
+            "adjustment_method": "ratio",
+        }
+    )
+
+
+def _trained_clf(**over) -> TrainedModel:
+    spec = _clf_spec(signal_mode=SignalMode.LONG_SHORT, threshold_rule=ThresholdRule.PROB_THRESHOLD,
+                     long_threshold=0.55, short_threshold=0.45, **over)
+    return train_model(_ds(200), spec, _holdout(150, 200), **_HASHES)
+
+
+def _trained_reg(**over) -> TrainedModel:
+    spec = _reg_spec(signal_mode=SignalMode.LONG_SHORT, threshold_rule=ThresholdRule.RETURN_THRESHOLD,
+                     long_threshold=0.5, short_threshold=0.5, **over)
+    return train_model(_ds(200), spec, _holdout(150, 200), **_HASHES)
+
+
+# --- metrics (unit) ---
+
+
+def test_classification_metrics_correct():
+    y_true = np.array([1.0, 1.0, -1.0, -1.0, 1.0, -1.0])   # pos = [T,T,F,F,T,F]
+    y_pred = np.array([1.0, 0.0, 0.0, 1.0, 1.0, 0.0])      # pos = [T,F,F,T,T,F]
+    m = classification_metrics(y_true, y_pred)
+    assert m["accuracy"] == pytest.approx(4 / 6)
+    assert m["precision"] == pytest.approx(2 / 3)          # TP=2, FP=1
+    assert m["recall"] == pytest.approx(2 / 3)             # TP=2, FN=1
+    assert m["f1"] == pytest.approx(2 / 3)
+    assert m["hit_rate"] == pytest.approx(4 / 6)
+    assert m["n_scored"] == 6
+
+
+def test_regression_metrics_correct_on_perfect_fit():
+    y = np.array([1.0, 2.0, 3.0, 4.0])
+    m = regression_metrics(y, y)
+    assert m["mse"] == 0.0 and m["mae"] == 0.0
+    assert m["r2"] == pytest.approx(1.0)
+    assert m["sign_accuracy"] == 1.0
+    assert m["information_coefficient"] == pytest.approx(1.0)
+    assert m["n_scored"] == 4
+
+
+def test_regression_metrics_with_error():
+    y = np.array([1.0, -1.0, 2.0, -2.0])
+    p = np.array([0.5, -0.5, 1.0, -1.0])
+    m = regression_metrics(y, p)
+    assert m["mse"] == pytest.approx(np.mean((p - y) ** 2))
+    assert m["mae"] == pytest.approx(np.mean(np.abs(p - y)))
+    assert m["sign_accuracy"] == 1.0
+    assert m["information_coefficient"] > 0.9
+
+
+# --- evaluate_ml_signal (integration) ---
+
+
+def test_evaluate_returns_expected_fields():
+    tm = _trained_clf()
+    res = evaluate_ml_signal(tm, _eval_ds(60), _eval_continuous(60), ES)
+    assert isinstance(res, MlEvaluationResult)
+    assert res.classification_metrics is not None
+    assert res.regression_metrics is None
+    assert {"final_equity", "total_return", "total_transaction_cost", "turnover"}.issubset(
+        res.backtest_metrics
+    )
+    assert res.no_trade_baseline is not None and res.momentum_baseline is not None
+    assert res.metadata["train_run_hash"] == tm.train_run_hash
+    assert len(res.signals) == 60
+
+
+def test_evaluate_regression_model_produces_regression_metrics():
+    tm = _trained_reg()
+    res = evaluate_ml_signal(tm, _eval_ds(60), _eval_continuous(60), ES, include_momentum_baseline=False)
+    assert res.regression_metrics is not None
+    assert res.classification_metrics is None
+    assert res.regression_metrics["n_scored"] == 60
+
+
+def test_nan_labels_excluded_from_scoring():
+    tm = _trained_reg()
+    eds = _eval_ds(40)
+    eds.loc[0:9, "label__forward_return_1"] = np.nan
+    eds.loc[0:9, "is_label_valid"] = False
+    res = evaluate_ml_signal(tm, eds, _eval_continuous(40), ES, include_momentum_baseline=False)
+    assert res.regression_metrics["n_scored"] == 30
+    assert res.metadata["n_scored_rows"] == 30
+
+
+def test_ml_backtest_uses_t_plus_1_execution():
+    tm = _trained_clf()
+    res = evaluate_ml_signal(tm, _eval_ds(50), _eval_continuous(50), ES, include_momentum_baseline=False)
+    frame = res.ml_backtest.frame
+    assert frame["effective_position"].iloc[0] == 0.0
+    np.testing.assert_array_equal(
+        frame["effective_position"].to_numpy(),
+        frame["target_position"].shift(1).fillna(0.0).to_numpy(),
+    )
+
+
+def test_evaluate_does_not_mutate_inputs():
+    tm = _trained_clf()
+    eds, cont = _eval_ds(50), _eval_continuous(50)
+    eds_before, cont_before = eds.copy(deep=True), cont.copy(deep=True)
+    evaluate_ml_signal(tm, eds, cont, ES)
+    pd.testing.assert_frame_equal(eds, eds_before)
+    pd.testing.assert_frame_equal(cont, cont_before)
+
+
+def test_no_trade_baseline_has_zero_positions_and_no_trades():
+    tm = _trained_clf()
+    res = evaluate_ml_signal(tm, _eval_ds(50), _eval_continuous(50), ES, include_momentum_baseline=False)
+    nt = res.no_trade_baseline
+    assert (nt["signal"]["target_position"] == 0.0).all()
+    assert nt["backtest_metrics"]["num_trades"] == 0
+    assert nt["backtest_metrics"]["turnover"] == pytest.approx(0.0)
+    assert nt["backtest_metrics"]["total_transaction_cost"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_baselines_use_same_oos_window_and_timestamps():
+    tm = _trained_clf()
+    res = evaluate_ml_signal(tm, _eval_ds(60), _eval_continuous(60), ES)
+    ml_ts = res.signals["timestamp"].tolist()
+    nt_ts = res.no_trade_baseline["signal"]["timestamp"].tolist()
+    mom_ts = res.momentum_baseline["signal"]["timestamp"].tolist()
+    assert ml_ts == nt_ts == mom_ts
+    assert (res.ml_backtest.frame["timestamp"].tolist()
+            == res.no_trade_baseline["result"].frame["timestamp"].tolist()
+            == res.momentum_baseline["result"].frame["timestamp"].tolist())
+
+
+def test_evaluation_window_restricts_all_three():
+    tm = _trained_clf()
+    eds, cont = _eval_ds(60, start="2024-07-01"), _eval_continuous(60, start="2024-07-01")
+    res = evaluate_ml_signal(tm, eds, cont, ES, start=date(2024, 7, 15), end=date(2024, 8, 15))
+    days = pd.to_datetime(res.signals["timestamp"]).dt.normalize()
+    assert (days >= pd.Timestamp("2024-07-15")).all()
+    assert (days <= pd.Timestamp("2024-08-15")).all()
+    assert len(res.signals) < 60
+    assert res.momentum_baseline["signal"]["timestamp"].tolist() == res.signals["timestamp"].tolist()
+    assert res.ml_backtest.frame["timestamp"].tolist() == res.signals["timestamp"].tolist()
+
+
+def test_backtest_metrics_include_required_keys():
+    tm = _trained_clf()
+    res = evaluate_ml_signal(tm, _eval_ds(50), _eval_continuous(50), ES, include_momentum_baseline=False)
+    for key in ("final_equity", "total_return", "total_transaction_cost", "turnover",
+                "num_trades", "n_position_changes", "max_drawdown", "sharpe"):
+        assert key in res.backtest_metrics
+
+
+def test_no_pnl_from_raw_close_gap():
+    n = 40
+    cont = _eval_continuous(n)
+    cont.loc[20:, "close_raw"] = cont.loc[20:, "close_raw"] + 2000.0  # raw gap, adjusted stays smooth
+    spec = _reg_spec(threshold_rule=ThresholdRule.RETURN_THRESHOLD,
+                     long_threshold=-1e9, signal_mode=SignalMode.LONG_FLAT)  # always long
+    tm = _trained(_StubModel(pred=np.ones(n), is_classifier=False), spec)
+    res = evaluate_ml_signal(tm, _eval_ds(n), cont, ES,
+                             include_momentum_baseline=False, backtest_kwargs={"transaction_cost_bps": 0})
+    frame = res.ml_backtest.frame
+    # held long across the raw gap -> return tracks close_adjusted (~1/5000), not the 2000-pt raw jump
+    assert abs(frame["strategy_return"].iloc[20]) < 0.01
+
+
+def test_evaluate_deterministic():
+    tm = _trained_clf()
+    eds, cont = _eval_ds(50), _eval_continuous(50)
+    a = evaluate_ml_signal(tm, eds, cont, ES)
+    b = evaluate_ml_signal(tm, eds, cont, ES)
+    pd.testing.assert_frame_equal(a.signals, b.signals)
+    pd.testing.assert_frame_equal(a.ml_backtest.frame, b.ml_backtest.frame)
+    assert a.backtest_metrics == b.backtest_metrics
+    assert a.classification_metrics == b.classification_metrics

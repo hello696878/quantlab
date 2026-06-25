@@ -45,6 +45,13 @@ from app.ml_signal.prediction import (
     predict_model,
     prediction_to_signal,
 )
+from app.ml_signal.evaluation import (
+    MlEvaluationResult,
+    backtest_metrics_from_result,
+    classification_metrics,
+    evaluate_ml_signal,
+    regression_metrics,
+)
 
 __all__ = [
     # spec + enums
@@ -82,4 +89,10 @@ __all__ = [
     "PredictionSignalConfig",
     "predict_model",
     "prediction_to_signal",
+    # evaluation
+    "MlEvaluationResult",
+    "evaluate_ml_signal",
+    "classification_metrics",
+    "regression_metrics",
+    "backtest_metrics_from_result",
 ]
