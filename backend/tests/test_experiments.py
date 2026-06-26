@@ -34,10 +34,26 @@ from app.ml_signal import (
     MlEvaluationResult,
     ModelSpec,
     ModelType,
+    SignalMode,
     TaskType,
     ThresholdRule,
     TrainedModel,
+    chronological_holdout_split,
+    dataset_config_hash,
+    evaluate_ml_signal,
+    train_model,
 )
+from app.instruments import get_instrument
+from app.datastore.store import validate_raw_futures
+from app.datastore.futures_continuous import (
+    build_continuous_futures,
+    compute_roll_schedule,
+    continuous_config_hash,
+)
+from app.features import build_feature_matrix
+from app.labels import build_label_matrix, build_supervised_dataset
+
+_ES = get_instrument("ES")
 
 
 def _run(**over) -> ExperimentRun:
@@ -879,3 +895,206 @@ def test_save_and_reports_modules_no_network():
         src = inspect.getsource(mod)
         assert not re.search(r"\b(import|from)\s+(requests|urllib|httpx|socket|aiohttp)\b", src)
         assert not re.search(r"\b(import|from)\s+(pickle|joblib|cloudpickle)\b", src)
+
+
+# --------------------------------------------------------------------------- #
+# Commit 5 — full end-to-end synthetic experiment tracking
+# raw -> continuous -> features -> labels -> dataset -> split -> train ->
+# evaluate -> save -> load -> list -> compare -> best.  Synthetic; tmp_path only.
+# --------------------------------------------------------------------------- #
+
+
+def _pipeline_raw_df() -> pd.DataFrame:
+    """Three consecutive ES contracts (~189 sessions, two fallback rolls)."""
+    rows = []
+    contracts = [
+        ("ESH24", 5000.0, "2024-03-15", pd.date_range("2024-01-02", "2024-03-15", freq="B")),
+        ("ESM24", 5100.0, "2024-06-21", pd.date_range("2024-01-02", "2024-06-21", freq="B")),
+        ("ESU24", 5200.0, "2024-09-20", pd.date_range("2024-04-01", "2024-09-20", freq="B")),
+    ]
+    for symbol, base, expiry, dates in contracts:
+        for i, d in enumerate(dates):
+            open_ = base + 0.3 * i
+            close = open_ + 1.0
+            rows.append(
+                {
+                    "timestamp": pd.Timestamp(d), "open": open_,
+                    "high": max(open_, close) + 1.0, "low": min(open_, close) - 1.0,
+                    "close": close, "volume": 1000 + i, "open_interest": None,
+                    "root_symbol": "ES", "contract_symbol": symbol,
+                    "expiry": pd.Timestamp(expiry), "source": "synthetic",
+                    "timezone": "America/Chicago",
+                }
+            )
+    return pd.DataFrame(rows)
+
+
+def _e2e_spec(alpha: float = 1.0) -> ModelSpec:
+    return ModelSpec(
+        model_name="es_ridge_e2e",
+        model_type=ModelType.RIDGE_REGRESSION,
+        task_type=TaskType.REGRESSION,
+        feature_columns=("feature__return_20", "feature__moving_average_gap_10_50"),
+        label_column="label__forward_return_1",
+        train_start=date(2024, 4, 1), train_end=date(2024, 6, 5),
+        validation_start=date(2024, 6, 6), validation_end=date(2024, 9, 15),
+        prediction_horizon=1, random_seed=0, hyperparameters={"alpha": alpha},
+        threshold_rule=ThresholdRule.RETURN_THRESHOLD,
+        long_threshold=0.0, short_threshold=0.0, signal_mode=SignalMode.LONG_SHORT,
+    )
+
+
+def _pipeline(alpha: float = 1.0):
+    """Run the real Phase 1->4 pipeline and return (trained_model, eval_result)."""
+    raw = _pipeline_raw_df()
+    validate_raw_futures(raw)
+    assert len(compute_roll_schedule(raw, _ES)) == 2
+    cont = build_continuous_futures(raw, _ES, "ratio")
+    ch = continuous_config_hash(raw, _ES, "ratio")
+    feat = build_feature_matrix(cont, upstream_continuous_hash=ch)
+    fh = feat["feature_config_hash"].iloc[0]
+    lab = build_label_matrix(cont, feature_df=feat, upstream_feature_hash=fh)
+    lh = lab["label_config_hash"].iloc[0]
+    ds = build_supervised_dataset(feat, lab)
+    spec = _e2e_spec(alpha)
+    split = chronological_holdout_split(
+        ds, train_start=spec.train_start, train_end=spec.train_end,
+        validation_start=spec.validation_start, validation_end=spec.validation_end,
+    )
+    ds_ch = dataset_config_hash(
+        label_config_hash=lh, feature_columns=spec.feature_columns, label_column=spec.label_column
+    )
+    tm = train_model(ds, spec, split, continuous_config_hash=ch, feature_config_hash=fh,
+                     label_config_hash=lh, dataset_config_hash_value=ds_ch)
+    res = evaluate_ml_signal(tm, ds, cont, _ES, start=spec.validation_start, end=spec.validation_end)
+    return tm, res
+
+
+def _same_window_run(h, *, label_column="label__forward_return_1", dataset_config_hash="d" * 64,
+                     validation_end=date(2024, 9, 15)) -> ExperimentRun:
+    """A lightweight run sharing the e2e train/validation window (overridable)."""
+    return _run(
+        train_run_hash=h,
+        train_start=date(2024, 4, 1), train_end=date(2024, 6, 5),
+        validation_start=date(2024, 6, 6), validation_end=validation_end,
+        label_column=label_column, dataset_config_hash=dataset_config_hash,
+        artifact_paths={"metadata": "metadata.json"},
+    )
+
+
+def test_phase5_end_to_end_experiment_tracking(tmp_path):
+    base = tmp_path / "artifacts" / "experiments"
+    store = ExperimentStore(base)
+
+    tm_a, res_a = _pipeline(alpha=1.0)
+    run_a = save_experiment_run(tm_a, res_a, store=store, created_at=_AT, code_version="phase5")
+
+    # all six hashes present and matching the trained model
+    for attr in ("continuous_config_hash", "feature_config_hash", "label_config_hash",
+                 "dataset_config_hash", "model_config_hash", "train_run_hash"):
+        assert getattr(run_a, attr)
+    assert run_a.train_run_hash == tm_a.train_run_hash
+    assert run_a.model_config_hash == tm_a.model_config_hash
+    assert run_a.dataset_config_hash == tm_a.dataset_config_hash
+    assert run_a.continuous_config_hash == tm_a.metadata["continuous_config_hash"]
+    assert run_a.feature_config_hash == tm_a.metadata["feature_config_hash"]
+    assert run_a.label_config_hash == tm_a.metadata["label_config_hash"]
+
+    # artifacts on disk
+    rd = base / run_a.train_run_hash
+    for fn in ("metadata.json", "model_params.json", "metrics.json",
+               "predictions.csv", "signal.csv", "backtest.csv"):
+        assert (rd / fn).exists()
+    # load back with frames
+    loaded = load_experiment_run(run_a.train_run_hash, store=store, load_frames=True)
+    assert set(loaded.frames) == {"predictions", "signal", "backtest"}
+    assert loaded.run.to_canonical_json() == run_a.to_canonical_json()  # reloads identically
+
+    # artifact paths relative; no absolute paths in metadata; no pickle; under base
+    for value in run_a.artifact_paths.values():
+        assert not value.startswith(("/", "\\")) and not re.match(r"^[A-Za-z]:", value)
+    text = (rd / "metadata.json").read_text(encoding="utf-8")
+    assert "C:\\quantlab" not in text and "C:/quantlab" not in text and str(tmp_path) not in text
+    files = [q for q in tmp_path.rglob("*") if q.is_file()]
+    assert files and all(q.is_relative_to(base) for q in files)
+    assert not any(q.name.endswith((".pkl", ".pickle", ".joblib")) for q in files)
+    backend_dir = Path(__file__).resolve().parents[1]
+    assert not (backend_dir.parent / "artifacts").exists()
+    assert not (backend_dir / "artifacts").exists()
+
+    # second comparable run (different alpha -> different model/hash, same window/dataset/label)
+    tm_b, res_b = _pipeline(alpha=1e-6)
+    run_b = save_experiment_run(tm_b, res_b, store=store, created_at=_AT)
+    assert run_b.train_run_hash != run_a.train_run_hash
+    assert run_b.dataset_config_hash == run_a.dataset_config_hash
+
+    # registry: list / compare / best
+    listed = {r.train_run_hash for r in list_experiments(store=store)}
+    assert {run_a.train_run_hash, run_b.train_run_hash} <= listed
+
+    df = compare_experiments([run_a.train_run_hash, run_b.train_run_hash], store=store)
+    for col in ("train_run_hash", "model_type", "label_column",
+                "validation_start", "validation_end", "sharpe", "total_return", "r2"):
+        assert col in df.columns
+    assert len(df) == 2
+
+    expected_best = df.sort_values(["sharpe", "train_run_hash"], ascending=[False, True]).iloc[0]["train_run_hash"]
+    best = get_best_experiment(store=store, metric="sharpe", maximize=True)
+    assert best.train_run_hash == expected_best
+
+
+def test_phase5_reproducible_train_run_hash_and_metadata(tmp_path):
+    tm1, _ = _pipeline(alpha=1.0)
+    tm2, _ = _pipeline(alpha=1.0)
+    assert tm1.train_run_hash == tm2.train_run_hash    # deterministic pipeline
+
+    store = ExperimentStore(tmp_path)
+    tm, res = _pipeline(alpha=1.0)
+    save_experiment_run(tm, res, store=store, created_at=_AT)
+    before = (store.run_dir(tm.train_run_hash) / "metadata.json").read_bytes()
+    save_experiment_run(tm, res, store=store, overwrite=True, created_at=_AT)
+    after = (store.run_dir(tm.train_run_hash) / "metadata.json").read_bytes()
+    assert before == after                              # deterministic metadata bytes
+
+
+def test_phase5_same_window_guard_in_registry(tmp_path):
+    store = ExperimentStore(tmp_path)
+    tm_a, res_a = _pipeline(alpha=1.0)
+    run_a = save_experiment_run(tm_a, res_a, store=store, created_at=_AT)
+
+    # different OOS window
+    run_w = _same_window_run("f" * 64, dataset_config_hash=run_a.dataset_config_hash,
+                             validation_end=date(2024, 10, 31))
+    # different dataset_config_hash (same window/label)
+    run_d = _same_window_run("d" * 64, dataset_config_hash="z" * 64)
+    # different label_column (same window/dataset)
+    run_e = _same_window_run("e" * 64, dataset_config_hash=run_a.dataset_config_hash,
+                             label_column="label__direction_1")
+    for r in (run_w, run_d, run_e):
+        store.write_metadata(r)
+
+    for other in (run_w, run_d, run_e):
+        with pytest.raises(ExperimentError):
+            compare_experiments([run_a.train_run_hash, other.train_run_hash], store=store)
+
+    # allow_different_windows -> proceeds and flags the mismatch
+    df = compare_experiments([run_a.train_run_hash, run_w.train_run_hash],
+                             store=store, allow_different_windows=True)
+    flags = dict(zip(df["train_run_hash"], df["same_window"]))
+    assert flags[run_a.train_run_hash] in (True, 1, True)
+    assert not flags[run_w.train_run_hash]
+
+
+def test_phase5_get_best_min_max_and_tie_break(tmp_path):
+    store = ExperimentStore(tmp_path)
+    # same-window lightweight runs with controlled metrics
+    store.write_metadata(_same_window_run("a" * 64).model_copy(
+        update={"backtest_metrics": {"sharpe": 1.0, "total_transaction_cost": 0.05}}))
+    store.write_metadata(_same_window_run("b" * 64).model_copy(
+        update={"backtest_metrics": {"sharpe": 2.0, "total_transaction_cost": 0.01}}))
+    store.write_metadata(_same_window_run("c" * 64).model_copy(
+        update={"backtest_metrics": {"sharpe": 2.0, "total_transaction_cost": 0.03}}))
+    # maximize sharpe -> 2.0 tie between b and c -> smaller hash (b) wins
+    assert get_best_experiment(store=store, metric="sharpe", maximize=True).train_run_hash == "b" * 64
+    # minimize cost -> b (0.01)
+    assert get_best_experiment(store=store, metric="total_transaction_cost", maximize=False).train_run_hash == "b" * 64

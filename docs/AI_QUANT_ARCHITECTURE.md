@@ -1253,13 +1253,14 @@ predictions, signals, backtest frame, and evaluation metrics.
 
 ---
 
-## Appendix F — Phase 5 Experiment Tracking and Model Registry Plan
+## Appendix F — Phase 5 Experiment Tracking and Model Registry
 
 Phase 5 makes Phase 4 ML runs **reproducible, comparable, and auditable**: every
 `train_model` + `evaluate_ml_signal` run is persisted (config, hashes, metrics,
 frames) under a gitignored artifacts directory keyed by its `train_run_hash`, and
-a small file-based registry lists, loads, compares, and ranks runs. This appendix
-is a plan — implementation lands in commits 1–5.
+a small file-based registry lists, loads, compares, and ranks runs.
+**Implemented** in `backend/app/experiments/`. Sections F.1–F.10 describe the
+design; **§F.11 records the as-built status.**
 
 **Locked design decisions:**
 
@@ -1454,3 +1455,95 @@ synthetic data, no network.
 > download, no DB registry, file-based and synthetic-only.** Artifacts live under
 > the gitignored `artifacts/experiments/<train_run_hash>/` and are never
 > committed.
+
+### F.11 As-built status (Phase 5 complete)
+
+Implemented across five commits; tests are synthetic only, write **only** under
+`tmp_path`, and never touch the network. The full flow is **raw → continuous →
+features → labels → supervised dataset → split → train → predict → evaluate →
+save → load → list → compare → best**, exercised end-to-end by a single
+synthetic test.
+
+**Implemented modules** (`backend/app/experiments/`):
+- `spec.py` — `ExperimentRun` (frozen, `extra="forbid"`, `protected_namespaces=()`),
+  `ExperimentError`, `best_effort_git_commit()`, and
+  `ExperimentRun.from_evaluation(...)` / `to_canonical_json()`.
+- `store.py` — `ExperimentStore(base_dir, prefer_parquet=True)` mirroring
+  `app.datastore.store.RawFuturesStore`.
+- `registry.py` — `save_experiment_run`, `load_experiment_run`,
+  `list_experiments`, `compare_experiments`, `get_best_experiment`.
+- `reports.py` — `summarize_experiment(run, *, as_text=False)`.
+
+**`ExperimentRun` schema:** `train_run_hash` + the five upstream hashes
+(`continuous_config_hash` → `feature_config_hash` → `label_config_hash` →
+`dataset_config_hash` → `model_config_hash`), `model_type`, `feature_columns`
+(`feature__*`), `label_column` (`label__*`), `task_type`, the train/validation
+window, `metrics` / `backtest_metrics` / `baseline_metrics`, `created_at`,
+`git_commit`, `code_version`, **relative** `artifact_paths`, `schema_version`, and
+`n_oos_rows` / `n_scored_rows`. Validators enforce non-empty hashes, the
+feature/label namespaces, strict date ordering, and relative-paths-only
+(absolute/UNC/`..` rejected). `to_canonical_json()` uses
+`app.reproducibility.canonical_json` (sorted keys, deterministic bytes).
+
+**`ExperimentStore` file layout** — one directory per run under an explicit
+`base_dir`:
+```
+<base_dir>/<train_run_hash>/
+├── metadata.json        # ExperimentRun.to_canonical_json()
+├── model_params.json    # JSON, no pickle/joblib (numpy -> lists)
+├── metrics.json         # task + backtest + baseline metrics + hash metadata
+├── predictions.{parquet|csv}
+├── signal.{parquet|csv}
+└── backtest.{parquet|csv}
+```
+Frames are parquet **if an engine is available, otherwise CSV fallback**
+(`index=False`, `lineterminator="\n"`); the repo currently has no parquet engine,
+so CSV is the live path. The artifact root is
+`artifacts/experiments/<train_run_hash>/` (overridable via
+`QUANTLAB_ARTIFACTS_DIR`); tests use `tmp_path` only.
+
+**Registry API (as-built):**
+- `save_experiment_run(trained_model, evaluation_result, *, store, overwrite=False,
+  git_commit=None, code_version=None, created_at=None)` — writes the frames first
+  (capturing their real parquet/CSV names), builds relative `artifact_paths` from
+  them, then writes `model_params.json` (from `fitted_params`), `metrics.json`,
+  and `metadata.json`. `overwrite=False` raises on a duplicate `train_run_hash`;
+  `overwrite=True` does a clean rewrite (deterministic bytes for fixed inputs +
+  `created_at`).
+- `load_experiment_run(train_run_hash, *, store, load_frames=False)` — reads
+  metadata (store verifies dir-name == hash + relative paths), asserts every
+  `artifact_paths` entry exists, and optionally loads the frames.
+- `list_experiments(*, store, filters=None)` — scans `base_dir`, skips dirs
+  without `metadata.json`, applies optional `model_type` / `label_column` /
+  `task_type` / `dataset_config_hash` / `validation_*` filters, sorts by
+  `(created_at, train_run_hash)`.
+- `compare_experiments(runs_or_hashes, *, store, metrics=None,
+  allow_different_windows=False)` — one DataFrame row per run; **raises unless all
+  runs share `(validation_start, validation_end, label_column,
+  dataset_config_hash)`**, or `allow_different_windows=True` adds a `same_window`
+  flag.
+- `get_best_experiment(*, store, metric="sharpe", maximize=True,
+  allow_different_windows=False)` — ranks by metric with a deterministic
+  `train_run_hash` tie-break; clear errors for no-runs / metric-absent.
+- `summarize_experiment(run, *, as_text=False)` — compact dict or short text.
+
+**Provenance / reproducibility (test-proven):** an `ExperimentRun` carries all six
+hashes; `train_run_hash` and the upstream hashes equal the `TrainedModel`'s;
+saved metadata reloads identically; rebuilding the synthetic pipeline reproduces
+the same `train_run_hash`; and `save(..., overwrite=True)` with a fixed
+`created_at` produces byte-identical `metadata.json`.
+
+**Discipline:** **no artifacts are committed** (`artifacts/` is gitignored; tests
+write only under `tmp_path` and assert no repo-root `artifacts/` appears);
+**model params are JSON, never pickle/joblib**; **artifact paths are relative
+only** (no absolute / `C:\quantlab` paths in metadata).
+
+**Limitations (as-built):**
+- **Local file-based registry only** — no DB registry (`db.py` stays for the web
+  app).
+- **No remote experiment tracking** (no MLflow / Weights & Biases).
+- **No model serving.**
+- **No real-data experiment tracking yet** — synthetic, single-instrument (ES),
+  ratio adjustment.
+- Frames currently persist as CSV (no parquet engine installed), so tz-aware
+  `timestamp` columns round-trip as strings.
