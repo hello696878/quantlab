@@ -1547,3 +1547,292 @@ only** (no absolute / `C:\quantlab` paths in metadata).
   ratio adjustment.
 - Frames currently persist as CSV (no parquet engine installed), so tz-aware
   `timestamp` columns round-trip as strings.
+
+---
+
+## Appendix G — Phase 6 Research CLI and Demo Runner
+
+Phase 6 makes the whole Phase 1→5 synthetic ES ML pipeline runnable from **one
+command** and saved through the Phase 5 registry: generate synthetic raw futures
+→ continuous → features → labels → supervised dataset → split → train → evaluate
+→ save → (list / compare / best). No new models, no scikit-learn, no real-data
+download, no network. **Implemented** in `backend/app/research_cli/` +
+`backend/scripts/`. Sections G.1–G.12 describe the design; **§G.13 records the
+as-built status.**
+
+**Locked design decisions:**
+
+1. New package **`backend/app/research_cli/`**.
+2. Thin convenience wrappers under **`backend/scripts/`**.
+3. **Do not** create a top-level `scripts/` at the repo root.
+4. **Canonical command:** `python -m app.research_cli.cli <cmd>`, run from the
+   `backend/` directory (where `app` is importable, same as pytest's rootdir).
+5. **Stdlib `argparse` only.**
+6. **No new dependencies** — no click, typer, rich, or YAML.
+7. Optional JSON config input is acceptable (stdlib `json`); YAML is not (it would
+   add a dependency).
+8. **No real-data download.**
+9. **No network calls.**
+10. **No new model types.**
+11. **No scikit-learn / random forest / gradient boosting.**
+12. **Default mode is the synthetic ES demo only.**
+13. **Every run prints a `SYNTHETIC DEMO` warning.**
+14. Artifacts are saved **only** under ignored artifact directories
+    (`artifacts/experiments/<train_run_hash>/`, already gitignored).
+15. **Tests use `tmp_path` only.**
+16. The CLI **prints `train_run_hash` and the artifact path**.
+17. **Same config + same seed → same `train_run_hash`.**
+18. `overwrite=False` **rejects** a duplicate experiment.
+19. `overwrite=True` **rewrites deterministically** when `created_at` is fixed.
+20. The CLI **never commits artifacts to git.**
+
+### G.1 Scope
+
+**In scope:** an `ExperimentConfig` that fully determines a run (incl. synthetic
+data params + seed) and maps to a Phase 4 `ModelSpec`; a deterministic synthetic
+ES raw-futures generator (promoted from the Phase 4/5 e2e tests); a
+`run_es_ml_experiment(config)` pipeline that chains Phases 1–5 and persists the
+run; and four `argparse` subcommands (`run`, `list`, `compare`, `best`) with
+human-readable **and** `--json` output, plus reproduction guarantees.
+
+**Explicitly NOT in scope:** new model types; scikit-learn / RF / GB; real-data
+download / network; a web/API/frontend surface (the FastAPI app is untouched); a
+new CLI dependency (click/typer/rich) or YAML; a config DB or remote tracking;
+hyperparameter sweeps / AutoML / parallel runs; multi-instrument; committing
+artifacts.
+
+### G.2 CLI principles (enforced)
+
+| Principle | Mechanism |
+|---|---|
+| One command runs a complete synthetic ES experiment | `run` subcommand → `run_es_ml_experiment(config)`. |
+| No network / no real data | Synthetic generator only; a source-scan test forbids network/external reads. |
+| Deterministic with fixed seed | `config.random_seed` → synthetic generator + `ModelSpec.random_seed`; Phase 4 models are deterministic. |
+| Artifacts only under ignored dirs | Default `artifacts/experiments/` (gitignored); `--artifacts-dir` override; tests use `tmp_path`. |
+| Print `train_run_hash` + artifact path | `render.py` always prints both. |
+| Easy comparison | `compare` / `best` subcommands over the registry. |
+| Never commits artifacts | Writes only under `artifacts/` (gitignored); a test asserts `git ls-files artifacts/` stays empty. |
+| Synthetic ≠ real | Every run prints a **"SYNTHETIC DEMO — not real market performance"** banner. |
+
+### G.3 Proposed module / script structure
+
+```
+backend/app/research_cli/
+├── __init__.py     # exports: ExperimentConfig, run_es_ml_experiment, ExperimentResult, main
+├── config.py       # ExperimentConfig (frozen pydantic) + to_model_spec() + artifacts-dir resolution
+├── synthetic.py    # generate_synthetic_es_raw(config) -> raw DataFrame (deterministic, seedable)
+├── pipeline.py     # run_es_ml_experiment(config, *, store=None) -> ExperimentResult
+├── render.py       # render_run_summary(result, *, as_json), render_experiment_table(df), banner
+└── cli.py          # argparse dispatch: run / list / compare / best ; main(argv=None) -> int
+backend/scripts/
+├── run_es_ml_experiment.py   # thin wrapper -> app.research_cli.cli main(["run", ...])
+├── list_experiments.py       # -> main(["list", ...])
+├── compare_experiments.py    # -> main(["compare", ...])
+└── show_best_experiment.py   # -> main(["best", ...])
+backend/tests/test_research_cli.py
+```
+**Canonical entry:** `python -m app.research_cli.cli run …` (run from `backend/`).
+The `backend/scripts/*.py` are convenience wrappers that call `main([...])`.
+Reuse (imports, not copies): all Phase 1–5 public APIs (`datastore`, `features`,
+`labels`, `ml_signal`, `futures_backtest`, `instruments`, `experiments`,
+including `best_effort_git_commit`).
+
+### G.4 `ExperimentConfig` design
+
+Strict frozen Pydantic (`frozen=True`, `extra="forbid"`, `protected_namespaces=()`)
+with a nested `SyntheticDataConfig`. Fields: `root_symbol` (default `"ES"`,
+validated against the instrument registry); `synthetic` (`n_contracts ≥ 2`, start
+/ expiry schedule, `base_price`, `price_drift`, `seed`); `train_start` /
+`train_end` / `validation_start` / `validation_end` (strict ordering);
+`feature_columns` (`feature__*`); `label_column` (`label__*`); `model_type`
+(the three numpy/scipy models only); `task_type`; `prediction_horizon (>0)`;
+`hyperparameters`; `threshold_rule` / `long_threshold` / `short_threshold` /
+`signal_mode`; `transaction_cost_bps`; `adjustment_method` (`"ratio"`);
+`artifact_base_dir` (optional → resolve `QUANTLAB_ARTIFACTS_DIR` env, else
+`artifacts/experiments/`); `overwrite`; `random_seed (≥0)`; `created_at`
+(optional ISO; pinned in tests for byte-determinism, else `now(UTC)`);
+`code_version`.
+
+`config.to_model_spec()` is the **single mapping** from config → Phase 4
+`ModelSpec`, so there is no config drift; a test asserts it produces the intended
+spec and a stable `model_config_hash`.
+
+### G.5 Synthetic data generator design
+
+`generate_synthetic_es_raw(config) -> pd.DataFrame` — a deterministic,
+seedable multi-contract raw-futures generator (promoted from the e2e tests):
+≥2 consecutive ES contracts with stepped price levels (so `close_raw` gaps at
+seams while ratio `close_adjusted` stays smooth), `open_interest=None` to force
+the deterministic days-before-expiry fallback rolls, and the canonical raw schema
+(`timestamp, open, high, low, close, volume, open_interest, root_symbol,
+contract_symbol, expiry, source="synthetic", timezone`). It is **synthetic, not a
+download**; tests assert it is deterministic and yields ≥1 roll.
+
+### G.6 `run_es_ml_experiment` pipeline function
+
+```python
+run_es_ml_experiment(config: ExperimentConfig, *, store: ExperimentStore | None = None) -> ExperimentResult
+```
+Steps (each a Phase 1–5 call): `generate_synthetic_es_raw` → `validate_raw_futures`
+→ `compute_roll_schedule` → `build_continuous_futures` + `continuous_config_hash`
+→ `build_feature_matrix` (+ feature hash) → `build_label_matrix` (+ label hash) →
+`build_supervised_dataset` → `chronological_holdout_split` (from config windows) →
+`dataset_config_hash` → `train_model(config.to_model_spec(), …)` →
+`evaluate_ml_signal(…, backtest_kwargs={"transaction_cost_bps": …})` →
+`store = store or ExperimentStore(config.resolved_artifact_dir())` →
+`save_experiment_run(…, overwrite=config.overwrite,
+git_commit=best_effort_git_commit(), code_version=config.code_version,
+created_at=config.created_at)`. Returns
+`ExperimentResult(config, run, evaluation, trained_model, artifact_dir,
+train_run_hash)`.
+
+### G.7 CLI commands (`cli.py`, argparse)
+
+`main(argv=None) -> int` dispatches subcommands; all default to **safe synthetic
+mode**; `--json` emits parseable JSON; exit 0 on success, non-zero on
+`ExperimentError` / validation error with a clear message.
+- **`run`** — `--seed`, `--model-type {dummy_baseline,ridge_regression,logistic_regression}`,
+  `--label-column`, `--feature-columns`, `--train-start/--train-end/--validation-start/--validation-end`,
+  hyperparameters (`--alpha` / `--C`), `--threshold-rule`, `--cost-bps`,
+  `--artifacts-dir`, `--overwrite`, `--json`, optional `--config-json <file>`.
+- **`list`** — `--artifacts-dir`, filters (`--model-type`, `--label-column`), `--json`.
+- **`compare`** — `train_run_hash …` (2+), `--metrics`, `--allow-different-windows`, `--json`.
+- **`best`** — `--metric sharpe`, `--maximize/--minimize`, `--allow-different-windows`,
+  `--artifacts-dir`, `--json`.
+
+### G.8 Reproduction behavior
+
+- **Determinism:** same `ExperimentConfig` (incl. `seed`) → same `train_run_hash`
+  (synthetic data + features + labels + dataset + model are all deterministic).
+- **Overwrite:** `overwrite=False` → `save_experiment_run` raises `ExperimentError`
+  on a duplicate; `overwrite=True` → clean deterministic rewrite (byte-identical
+  `metadata.json` for a pinned `created_at`).
+- **"How to reproduce":** the `run` summary prints a one-line reproduction command
+  plus the `train_run_hash`.
+- **No absolute paths in metadata:** guaranteed by the Phase 5 store (relative
+  `artifact_paths` only); the CLI prints the absolute artifact dir to the console,
+  never into metadata.
+
+### G.9 Output / report design (`render.py`)
+
+The `run` summary prints, in order: a **SYNTHETIC DEMO** banner; `train_run_hash`,
+`model_type`, `task_type`, `label_column`; train window and validation (OOS)
+window; **ML metrics** (classification or regression); **backtest metrics**
+(total_return, sharpe, max_drawdown, turnover, total_transaction_cost);
+**no-trade** and **momentum** baseline backtest metrics; the **artifact directory**
+(absolute, console-only); a **reproduce** line; and (with `--compare-best`) a
+one-line best-experiment comparison. `--json` emits the same content as one
+parseable JSON object carrying `"data_source": "synthetic"`.
+
+### G.10 Tests
+
+`ExperimentConfig` validation (+ `to_model_spec` mapping); pipeline deterministic
+with a fixed seed; pipeline writes **only** under `tmp_path`; no repo-root
+`artifacts/` created; `train_run_hash` stable for the same config; `overwrite=False`
+rejects a duplicate and `overwrite=True` rewrites deterministically; CLI `run`
+exits 0 and the run loads back; CLI `list` shows the saved run; CLI `compare`
+compares same-window experiments and **rejects different-window** by default
+(`--allow-different-windows` proceeds); CLI `best` returns the expected winner;
+the printed summary contains `train_run_hash` **and** the artifact path; `--json`
+is `json.loads`-parseable; source-scan: no network / sklearn / pickle / mlflow
+imports; synthetic only.
+
+### G.11 Commit plan
+
+A doc-only Appendix G plan lands first (this commit). Then:
+
+| Commit | Objective | Key files |
+|---|---|---|
+| 1 | `ExperimentConfig` + synthetic generator + `to_model_spec()` | `research_cli/__init__.py`, `config.py`, `synthetic.py`, tests |
+| 2 | `run_es_ml_experiment` pipeline | `pipeline.py`, tests |
+| 3 | CLI scripts (run / list / compare / best) | `cli.py`, `render.py`, `backend/scripts/*.py`, tests |
+| 4 | Reproducibility + overwrite tests | tests (+ tiny pipeline/cli fixes if needed) |
+| 5 | End-to-end CLI test + docs (Appendix G as-built) | tests, this doc |
+
+Each commit: isolated worktree, manual commit, scoped `git add`, no merge,
+synthetic data, no network.
+
+### G.12 Risks & mitigations
+
+| Risk | Mitigation |
+|---|---|
+| CLI writes artifacts into repo root during tests | Tests always pass `--artifacts-dir tmp_path`; a test asserts no repo-root `artifacts/`; default base is the gitignored `artifacts/`. |
+| Hidden nondeterminism | Seeded synthetic generator + deterministic Phase 4 models; determinism test on `train_run_hash` / predictions; no wall-clock in the hash (only in `created_at`, pinned in tests). |
+| Config drift from `ModelSpec` | Single mapping `config.to_model_spec()`; a test asserts the intended spec + stable `model_config_hash`. |
+| Comparing different OOS windows | `compare` / `best` reuse the Phase 5 same-window guard; opt-out is explicit (`--allow-different-windows`). |
+| Absolute paths leaking into metadata | Phase 5 store stores **relative** `artifact_paths` only; CLI prints the absolute dir to console, never into metadata; test scans metadata for absolute / `C:\quantlab` paths. |
+| CLI silently overwriting experiments | `overwrite=False` is the default and **raises** on a duplicate; `--overwrite` is required and prints what it replaced. |
+| Synthetic demo mistaken for real performance | Mandatory **SYNTHETIC DEMO** banner on every run; docs + JSON carry `"data_source": "synthetic"`. |
+| External automation modifying `main` during work | Phase 6 done in an isolated `phase6-research-cli` worktree; merge only after a review. |
+
+> Scope note: Phase 6 is a research CLI / demo runner / experiment reproduction
+> layer only — **stdlib argparse, no new dependencies, no new model types, no
+> scikit-learn / RF / GB, no real-data download, no network, synthetic ES demo
+> only.** Every run prints a `SYNTHETIC DEMO` warning, artifacts live under the
+> gitignored `artifacts/experiments/<train_run_hash>/`, and the CLI never commits
+> artifacts.
+
+### G.13 As-built status (Phase 6 complete)
+
+Implemented across five commits; tests are synthetic only, write **only** under
+`tmp_path`, and never touch the network. One command runs the whole flow and a
+final end-to-end test drives it through the actual CLI: **run → load → list →
+compare → best**.
+
+**Implemented modules** (`backend/app/research_cli/`):
+- `config.py` — `SyntheticDataConfig`, `ExperimentConfig` (frozen,
+  `extra="forbid"`; `feature__`/`label__` namespaces, strict date ordering,
+  `ratio`-only, ModelType-enum rejects sklearn types, `root_symbol` ==
+  `synthetic.root_symbol`), `ExperimentConfig.to_model_spec()` (the single
+  config→`ModelSpec` mapping), and `resolve_artifact_base_dir()`.
+- `synthetic.py` — `generate_synthetic_es_raw(config)`: deterministic,
+  seedable, ≥2 in-cycle ES contracts with stepped prices and `open_interest=None`
+  (fallback rolls); full Phase 1 raw schema.
+- `pipeline.py` — `run_es_ml_experiment(config, *, store=None)` →
+  `ExperimentResult` (the Phase 1→5 chain, saved via `save_experiment_run`).
+- `render.py` — `render_run_summary` / `render_experiment_table` /
+  `render_compare_table` / `render_best_experiment` (human str or
+  `json.loads`-parseable JSON).
+- `cli.py` — `main(argv) -> int`, stdlib `argparse`, subcommands `run` / `list`
+  / `compare` / `best`.
+
+**Wrapper scripts** (`backend/scripts/`, thin — call
+`app.research_cli.cli.main(["<cmd>", *sys.argv[1:]])` with no business logic):
+`run_es_ml_experiment.py`, `list_experiments.py`, `compare_experiments.py`,
+`show_best_experiment.py`.
+
+**Canonical command** (from `backend/`):
+`python -m app.research_cli.cli run|list|compare|best`.
+
+**Artifact behavior:** default base `artifacts/experiments/` (gitignored;
+overridable via `--artifacts-dir` or `QUANTLAB_ARTIFACTS_DIR`); tests use
+`tmp_path` only; metadata stores **relative** `artifact_paths` only (no absolute /
+`C:\quantlab` paths); no repo-root `artifacts/` is created.
+
+**Reproduction behavior (test-proven):** same `ExperimentConfig` + same synthetic
+seed + same model seed + fixed `created_at` → identical six hashes,
+`train_run_hash`, and `metadata.json` bytes; changing only ridge `alpha` flips
+`model_config_hash`/`train_run_hash` (data hashes unchanged); changing only the
+synthetic seed (with noise) flips `dataset_config_hash`/`train_run_hash`;
+`overwrite=False` rejects a duplicate (CLI exits non-zero); `overwrite=True`
+rewrites deterministically and leaves no stale artifacts.
+
+**Output:** the `run` summary prints a `SYNTHETIC DEMO` banner, `train_run_hash`,
+the OOS/train windows, ML + backtest metrics, no-trade + momentum baselines, the
+absolute `artifact_dir` (console-only), and a `reproduce:` line; `--json` emits a
+single parseable object carrying `data_source: "synthetic"`, `train_run_hash`,
+`artifact_dir`, `model_type`, `label_column`, `validation_start`/`validation_end`,
+and `backtest_metrics`.
+
+**Safety (test-proven):** synthetic ES demo only; no network; no real-data
+download; no new model types / sklearn / RF / GB; no click / typer / rich / yaml;
+no pickle / joblib; no DB registry / MLflow / W&B.
+
+**Limitations (as-built):**
+- **ES synthetic only**; no real-data experiments yet.
+- **No YAML config** (a future `--config-json` stdlib-JSON file input is noted but
+  not implemented).
+- **No subprocess wrapper e2e** — the wrappers are verified to be thin and to call
+  `main([...])`; the e2e test drives `main([...])` in-process (not via a shell).
+- **Local file-based registry only** (no DB / remote tracking); CSV frames (no
+  parquet engine installed).
