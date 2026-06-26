@@ -17,14 +17,25 @@ from app.datastore.store import REQUIRED_COLUMNS, validate_raw_futures
 from app.datastore.futures_continuous import compute_roll_schedule
 from app.instruments import get_instrument
 from app.ml_signal import ModelSpec, ModelType, SignalMode, TaskType, ThresholdRule, model_config_hash
+from app.experiments import (
+    ExperimentError,
+    ExperimentStore,
+    compare_experiments,
+    get_best_experiment,
+    list_experiments,
+    load_experiment_run,
+)
 from app.research_cli import (
     ExperimentConfig,
+    ExperimentResult,
     SyntheticDataConfig,
     generate_synthetic_es_raw,
     resolve_artifact_base_dir,
+    run_es_ml_experiment,
 )
 
 _ES = get_instrument("ES")
+_AT = "2026-06-25T00:00:00+00:00"
 
 
 def _exp_config(**over) -> ExperimentConfig:
@@ -236,3 +247,125 @@ def test_config_and_synthetic_modules_no_io_or_network():
         assert not re.search(r"\b(import|from)\s+(requests|urllib|httpx|socket|aiohttp)\b", src)
         assert not re.search(r"\b(import|from)\s+(sklearn|xgboost|lightgbm|torch|tensorflow)\b", src)
         assert not re.search(r"read_csv|read_parquet", src)
+
+
+# --------------------------------------------------------------------------- #
+# Commit 2 — run_es_ml_experiment (full synthetic Phase 1->5 pipeline)
+# --------------------------------------------------------------------------- #
+
+
+def _store(tmp_path, name="experiments") -> ExperimentStore:
+    return ExperimentStore(tmp_path / name)
+
+
+def test_run_returns_valid_result(tmp_path):
+    result = run_es_ml_experiment(_exp_config(created_at=_AT), store=_store(tmp_path))
+    assert isinstance(result, ExperimentResult)
+    assert (result.train_run_hash
+            == result.experiment_run.train_run_hash
+            == result.trained_model.train_run_hash)
+    for h in (result.continuous_config_hash, result.feature_config_hash, result.label_config_hash,
+              result.dataset_config_hash, result.model_config_hash, result.train_run_hash):
+        assert h
+    assert "sharpe" in result.backtest_metrics
+    assert set(result.baseline_metrics) == {"no_trade", "momentum"}
+
+
+def test_pipeline_writes_only_under_base_dir(tmp_path):
+    base = tmp_path / "artifacts" / "experiments"
+    run_es_ml_experiment(_exp_config(created_at=_AT), store=ExperimentStore(base))
+    files = [q for q in tmp_path.rglob("*") if q.is_file()]
+    assert files and all(q.is_relative_to(base) for q in files)
+
+
+def test_pipeline_saves_all_files_relative_no_pickle(tmp_path):
+    result = run_es_ml_experiment(_exp_config(created_at=_AT), store=_store(tmp_path))
+    rd = result.artifact_dir
+    for fn in ("metadata.json", "model_params.json", "metrics.json",
+               "predictions.csv", "signal.csv", "backtest.csv"):
+        assert (rd / fn).exists()
+    text = (rd / "metadata.json").read_text(encoding="utf-8")
+    assert "C:\\quantlab" not in text and "C:/quantlab" not in text and str(tmp_path) not in text
+    for value in result.experiment_run.artifact_paths.values():
+        assert not value.startswith(("/", "\\")) and not re.match(r"^[A-Za-z]:", value)
+    names = [q.name for q in tmp_path.rglob("*") if q.is_file()]
+    assert not any(n.endswith((".pkl", ".pickle", ".joblib")) for n in names)
+
+
+def test_pipeline_output_loadable_with_frames(tmp_path):
+    store = _store(tmp_path)
+    result = run_es_ml_experiment(_exp_config(created_at=_AT), store=store)
+    loaded = load_experiment_run(result.train_run_hash, store=store, load_frames=True)
+    assert set(loaded.frames) == {"predictions", "signal", "backtest"}
+    assert loaded.run.train_run_hash == result.train_run_hash
+
+
+def test_pipeline_deterministic_train_run_hash(tmp_path):
+    cfg = _exp_config(created_at=_AT)
+    r1 = run_es_ml_experiment(cfg, store=_store(tmp_path, "a"))
+    r2 = run_es_ml_experiment(cfg, store=_store(tmp_path, "b"))
+    assert r1.train_run_hash == r2.train_run_hash
+
+
+def test_overwrite_false_rejects_duplicate(tmp_path):
+    store = _store(tmp_path)
+    cfg = _exp_config(created_at=_AT)
+    run_es_ml_experiment(cfg, store=store)
+    with pytest.raises(ExperimentError):
+        run_es_ml_experiment(cfg, store=store)
+
+
+def test_overwrite_true_deterministic_rewrite(tmp_path):
+    store = _store(tmp_path)
+    r1 = run_es_ml_experiment(_exp_config(created_at=_AT), store=store)
+    before = (r1.artifact_dir / "metadata.json").read_bytes()
+    r2 = run_es_ml_experiment(_exp_config(created_at=_AT, overwrite=True), store=store)
+    after = (r2.artifact_dir / "metadata.json").read_bytes()
+    assert r1.train_run_hash == r2.train_run_hash
+    assert before == after
+
+
+def test_hyperparameter_changes_hash(tmp_path):
+    a = run_es_ml_experiment(_exp_config(created_at=_AT, hyperparameters={"alpha": 1.0}),
+                             store=_store(tmp_path, "a"))
+    b = run_es_ml_experiment(_exp_config(created_at=_AT, hyperparameters={"alpha": 0.01}),
+                             store=_store(tmp_path, "b"))
+    assert a.model_config_hash != b.model_config_hash
+    assert a.train_run_hash != b.train_run_hash
+    assert a.dataset_config_hash == b.dataset_config_hash   # same window / label / features
+
+
+def test_compare_and_best_same_window(tmp_path):
+    store = _store(tmp_path)
+    a = run_es_ml_experiment(_exp_config(created_at=_AT, hyperparameters={"alpha": 1.0}), store=store)
+    b = run_es_ml_experiment(_exp_config(created_at=_AT, hyperparameters={"alpha": 0.01}), store=store)
+    listed = {r.train_run_hash for r in list_experiments(store=store)}
+    assert {a.train_run_hash, b.train_run_hash} <= listed
+    df = compare_experiments([a.train_run_hash, b.train_run_hash], store=store)
+    assert len(df) == 2 and "sharpe" in df.columns
+    best = get_best_experiment(store=store, metric="sharpe", maximize=True)
+    assert best.train_run_hash in (a.train_run_hash, b.train_run_hash)
+
+
+def test_missing_artifact_after_save_raises(tmp_path):
+    store = _store(tmp_path)
+    result = run_es_ml_experiment(_exp_config(created_at=_AT), store=store)
+    (result.artifact_dir / "predictions.csv").unlink()
+    with pytest.raises(ExperimentError):
+        load_experiment_run(result.train_run_hash, store=store)
+
+
+def test_pipeline_creates_no_repo_artifacts_dir(tmp_path):
+    run_es_ml_experiment(_exp_config(created_at=_AT), store=_store(tmp_path))
+    backend_dir = Path(__file__).resolve().parents[1]
+    assert not (backend_dir.parent / "artifacts").exists()
+    assert not (backend_dir / "artifacts").exists()
+
+
+def test_pipeline_module_no_network():
+    import app.research_cli.pipeline as pipeline_mod
+
+    src = inspect.getsource(pipeline_mod)
+    assert not re.search(r"\b(import|from)\s+(requests|urllib|httpx|socket|aiohttp)\b", src)
+    assert not re.search(r"\b(import|from)\s+(sklearn|xgboost|lightgbm|torch|tensorflow)\b", src)
+    assert not re.search(r"read_csv|read_parquet", src)

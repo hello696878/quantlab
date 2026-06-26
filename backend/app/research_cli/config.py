@@ -80,10 +80,12 @@ class ExperimentConfig(BaseModel):
     prediction_horizon: int = Field(default=1, gt=0)
     hyperparameters: dict[str, Any] = Field(default_factory=dict)
 
-    threshold_rule: ThresholdRule = ThresholdRule.PROB_THRESHOLD
-    long_threshold: float = 0.5
-    short_threshold: float = 0.5
-    signal_mode: SignalMode = SignalMode.LONG_FLAT
+    # Defaults pair with the default ridge-regression model: a return-threshold
+    # long/short rule, so a bare ``ExperimentConfig()`` is a runnable regression demo.
+    threshold_rule: ThresholdRule = ThresholdRule.RETURN_THRESHOLD
+    long_threshold: float = 0.0
+    short_threshold: float = 0.0
+    signal_mode: SignalMode = SignalMode.LONG_SHORT
 
     transaction_cost_bps: float = Field(default=1.0, ge=0.0)
     adjustment_method: str = "ratio"

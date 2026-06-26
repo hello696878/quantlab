@@ -11,10 +11,13 @@ from app.research_cli.config import (
     resolve_artifact_base_dir,
 )
 from app.research_cli.synthetic import generate_synthetic_es_raw
+from app.research_cli.pipeline import ExperimentResult, run_es_ml_experiment
 
 __all__ = [
     "SyntheticDataConfig",
     "ExperimentConfig",
     "resolve_artifact_base_dir",
     "generate_synthetic_es_raw",
+    "ExperimentResult",
+    "run_es_ml_experiment",
 ]
