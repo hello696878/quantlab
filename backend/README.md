@@ -28,6 +28,8 @@ backend/
 │   ├── volatility_routes.py      Volatility Lab API routes (reuses app/options BS)
 │   ├── microstructure/     static-sample order-book/execution analytics (models/sample/service)
 │   ├── microstructure_routes.py  Market Microstructure & Execution Lab API routes
+│   ├── crypto_derivatives/  static-sample crypto perp funding/basis analytics (models/sample/service)
+│   ├── crypto_derivatives_routes.py  Crypto Perpetual Funding & Basis Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -48,7 +50,8 @@ backend/
 │   ├── test_mbs.py               Mortgage & MBS prepayment analytics/API tests
 │   ├── test_futures.py           Futures & Commodities Lab analytics/API tests
 │   ├── test_volatility.py        Volatility Lab analytics/API/validation tests
-│   └── test_microstructure.py    Market Microstructure & Execution Lab analytics/API/validation tests
+│   ├── test_microstructure.py    Market Microstructure & Execution Lab analytics/API/validation tests
+│   └── test_crypto_derivatives.py  Crypto Perpetual Funding & Basis Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -241,6 +244,31 @@ metric over equal-volume buckets (not exchange VPIN), a Kyle-lambda regression
 liquidity-regime classification, and eight toxic-flow scenarios; when `quotes` /
 `signed_trades` / `toxicity_config` are omitted a deterministic sequence is
 derived. Every division is guarded so all outputs are finite.
+
+---
+
+### Crypto Perpetual Futures Funding & Basis Lab Endpoints
+
+Deterministic static-sample crypto-derivatives analytics (Phase 26.0). No live
+exchange data, no live crypto prices, no broker/exchange integration, no order
+submission, no network calls, educational only — not investment, trading,
+liquidation, legal, tax, or risk-management advice, and not a production risk
+engine.
+
+| Endpoint | Description |
+|---|---|
+| `GET /crypto-derivatives/sample` | Four deterministic sample markets (BTCUSDT perp, ETHUSDT perp, SOLUSDT perp, BTC quarterly futures), each with a spot / index / perp-mark snapshot, a dated futures curve, a funding rate, and a sample leveraged position |
+| `POST /crypto-derivatives/analyze` | Perp / dated-futures basis (& annualized basis, curve shape), funding mechanics (8h, compound `(1+f)^{3·365}−1` + simple annualized, long/short funding P&L), position risk (P&L, initial/maintenance margin, margin ratio, approximate liquidation price + distance), a cash-and-carry example, a funding-regime classification, and ten funding/basis stress scenarios |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): all prices /
+notional / leverage > 0, margin rates in [0, 1] with **`initial_margin_rate` ≥
+`maintenance_margin_rate`**, no NaN/Infinity, and trade side ∈ {long, short}.
+Funding P&L is signed by side (longs pay positive funding, shorts receive it);
+the compound annualized-funding exponent is clamped so it stays finite; the
+liquidation price / margin / carry figures are simplified educational
+approximations, not an exchange's actual liquidation engine. Scenarios are
+hypothetical deterministic shocks — not forecasts and not advice. Every division
+is guarded so all outputs are finite.
 
 ---
 

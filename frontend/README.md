@@ -102,6 +102,8 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/volatility/analyze` | `POST /volatility/analyze` |
 | `GET /api/microstructure/sample` | `GET /microstructure/sample` |
 | `POST /api/microstructure/analyze` | `POST /microstructure/analyze` |
+| `GET /api/crypto-derivatives/sample` | `GET /crypto-derivatives/sample` |
+| `POST /api/crypto-derivatives/analyze` | `POST /crypto-derivatives/analyze` |
 
 The **Volatility Surface & Variance Swap Lab** (`VolatilityLabPanel`, view
 `volatility`) loads a deterministic sample option chain, lets you edit the
@@ -129,6 +131,20 @@ note below). Static illustrative sample data — no live order books or trades, 
 broker / exchange integration, the VPIN-style metric is a simplified educational
 approximation (not exchange VPIN), not real-time toxicity detection, not a
 production execution / TCA system, not investment / trading / order-routing advice.
+
+The **Crypto Perpetual Funding & Basis Lab** (`CryptoDerivativesLabPanel`, view
+`cryptoderivatives`) loads four deterministic sample markets (BTCUSDT perp,
+ETHUSDT perp, SOLUSDT perp, BTC quarterly futures), lets you select one and edit
+the spot / index / perp-mark / funding / leverage / notional / margin assumptions,
+and re-analyses live via `/api/crypto-derivatives/analyze` (perp & dated-futures
+basis, annualized basis, curve shape, funding compound/simple annualized + long/
+short funding P&L, position margin / approximate liquidation price + distance, a
+cash-and-carry example, a funding-regime pill, and ten funding/basis stress
+scenarios). Its formulas render as local LaTeX (see the shared formula note
+below). Static illustrative sample data — no live exchange data or crypto prices,
+no broker / exchange integration, funding / carry / liquidation are simplified
+educational approximations, not a production risk engine, not real-time funding
+analytics, not investment / trading / liquidation advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract

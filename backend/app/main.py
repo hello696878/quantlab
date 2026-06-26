@@ -72,6 +72,7 @@ from app.real_estate_routes import router as real_estate_router
 from app.futures_routes import router as futures_router
 from app.volatility_routes import router as volatility_router
 from app.microstructure_routes import router as microstructure_router
+from app.crypto_derivatives_routes import router as crypto_derivatives_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -392,6 +393,9 @@ app.include_router(volatility_router)
 
 # Market Microstructure & Execution Lab (Phase 25.0) — static sample exec API.
 app.include_router(microstructure_router)
+
+# Crypto Perpetual Futures Funding & Basis Lab (Phase 26.0) — static sample API.
+app.include_router(crypto_derivatives_router)
 
 
 # ---------------------------------------------------------------------------

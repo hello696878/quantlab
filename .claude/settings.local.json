@@ -71,7 +71,17 @@
       "Bash(cd /c/quantlab-phase6-research-cli/backend *)",
       "Bash(C:/quantlab/backend/venv/Scripts/python.exe -c ' *)",
       "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_research_cli.py -q)",
-      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py tests/test_futures_labels.py tests/test_futures_signal_backtest.py tests/test_ml_signal.py tests/test_experiments.py tests/test_research_cli.py)"
+      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py tests/test_futures_labels.py tests/test_futures_signal_backtest.py tests/test_ml_signal.py tests/test_experiments.py tests/test_research_cli.py)",
+      "Bash(cd /c/quantlab-cli-hygiene *)",
+      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_crypto_derivatives.py -q)",
+      "Bash(grep -qE \"passed|failed|error\" /c/Users/jimli/AppData/Local/Temp/claude/C--quantlab/9423b0b8-06b7-4fd2-a555-ea0dc8dcdbb4/tasks/b7nhqfnka.output)",
+      "Bash(break)",
+      "Read(//c/Users/jimli/AppData/Local/Temp/claude/C--quantlab/9423b0b8-06b7-4fd2-a555-ea0dc8dcdbb4/tasks/**)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_research_cli.py -q)",
+      "Bash(./backend/venv/Scripts/python.exe -m pytest backend/tests/test_research_cli.py -q)",
+      "Bash(grep -n \"/api/microstructure/analyze\\\\|MicrostructureLabPanel\\\\`, view\" frontend/README.md)",
+      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_research_cli.py -v)"
     ]
   }
 }

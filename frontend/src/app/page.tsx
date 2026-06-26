@@ -49,6 +49,7 @@ import RealEstateLabPanel from "@/components/RealEstateLabPanel";
 import FuturesLabPanel from "@/components/FuturesLabPanel";
 import VolatilityLabPanel from "@/components/VolatilityLabPanel";
 import MicrostructureLabPanel from "@/components/MicrostructureLabPanel";
+import CryptoDerivativesLabPanel from "@/components/CryptoDerivativesLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -412,6 +413,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Market Microstructure & Execution Lab",
     subtitle:
       "Limit order-book summary (spread, depth ladder, imbalance, microprice), trade-tape VWAP/TWAP/imbalance, execution implementation shortfall, slippage, participation, a square-root market-impact approximation, an execution-schedule comparison, and liquidity stress scenarios — deterministic static sample data, no live order books, not investment, trading, or order-routing advice.",
+  },
+  cryptoderivatives: {
+    title: "Crypto Perpetual Funding & Basis Lab",
+    subtitle:
+      "Spot / perpetual / dated-futures basis, funding-rate mechanics and annualized funding yield, long/short funding P&L, a cash-and-carry example, position margin / liquidation approximation, a funding-regime read, and funding/basis stress scenarios — deterministic static sample data, no live exchange data or crypto prices, not investment, trading, or liquidation advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -988,6 +994,7 @@ export default function HomePage() {
     { view: "futures", title: "Open Futures and Commodities Lab", keywords: "futures commodities commodity cost of carry convenience yield contango backwardation curve roll yield calendar spread margin leverage notional crude oil gold natural gas wheat basis scenario stress" },
     { view: "volatility", title: "Open Volatility Lab", keywords: "volatility surface variance swap implied vol iv smile skew term structure realized vol vega black scholes option chain fair strike vix scenario stress derivatives" },
     { view: "microstructure", title: "Open Market Microstructure Lab", keywords: "microstructure execution order book limit order book bid ask spread depth imbalance microprice vwap twap implementation shortfall slippage market impact participation rate liquidity stress execution schedule transaction cost analysis tca" },
+    { view: "cryptoderivatives", title: "Open Crypto Derivatives Lab", keywords: "crypto derivatives perpetual perp futures funding rate basis annualized carry cash and carry liquidation margin leverage btc eth sol bitcoin ethereum solana contango backwardation funding pnl" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1323,6 +1330,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("microstructure"),
+    })),
+    ...(
+      [
+        ["Open Crypto Derivatives Lab", "crypto derivatives perpetual perp futures funding basis lab btc eth sol bitcoin ethereum solana annualized carry liquidation margin leverage"],
+        ["Perpetual Funding Lab", "perpetual funding rate 8h annualized funding yield long short funding pnl perp mark index premium discount"],
+        ["Crypto Basis Lab", "crypto basis perp basis dated futures basis annualized basis contango backwardation curve shape spot perp futures"],
+        ["Funding Rate Carry Lab", "funding carry cash and carry annualized basis expected gross carry costs best contract spot futures convergence"],
+        ["Liquidation Distance Lab", "liquidation distance price approximation margin ratio initial maintenance margin leverage liquidation buffer"],
+        ["Crypto Basis Scenario Stress", "crypto scenario stress funding spike negative perp premium blowout discount spot selloff rally basis convergence margin stress volatility shock"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `cryptoderivatives-${title}`,
+      group: "Crypto Derivatives Lab",
+      title,
+      keywords,
+      run: () => handleNav("cryptoderivatives"),
     })),
     ...(
       [
@@ -1888,6 +1911,9 @@ export default function HomePage() {
 
         {/* ── Market Microstructure & Execution Lab ────────────────────── */}
         {view === "microstructure" && <MicrostructureLabPanel />}
+
+        {/* ── Crypto Perpetual Funding & Basis Lab ─────────────────────── */}
+        {view === "cryptoderivatives" && <CryptoDerivativesLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

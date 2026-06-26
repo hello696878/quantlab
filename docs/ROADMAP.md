@@ -1677,6 +1677,48 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 26.0 — Crypto Perpetual Futures Funding & Basis Lab v1 ✅
+
+- **New deterministic educational crypto-derivatives lab.** Static sample data
+  only; no live exchange data, no live crypto prices, no broker/exchange
+  integration, no order submission, no trading, no API keys, no scraping, not
+  investment / trading / liquidation advice, not a production risk engine. No
+  existing module changed (separate package + view).
+- Backend: new `app/crypto_derivatives/` package (`models.py` strict Pydantic v2
+  with `extra="forbid"` + `FiniteFloat`, cross-field `initial_margin_rate ≥
+  maintenance_margin_rate` check; `sample.py` four deterministic markets —
+  BTCUSDT perp, ETHUSDT perp, SOLUSDT perp, BTC quarterly futures — each with a
+  spot/index/perp-mark snapshot, dated futures curve, funding rate, and sample
+  leveraged position; `service.py` pure analytics) + `app/crypto_derivatives_routes.py`
+  (`GET /crypto-derivatives/sample`, `POST /crypto-derivatives/analyze`), wired via
+  `include_router`.
+- Analytics: perp basis (& bps), dated-futures basis, annualized basis
+  `(F/S−1)·365/T`, curve shape (contango/backwardation/mixed/flat), funding
+  annualized (compound `(1+f)^{3·365}−1` clamped + simple), long/short funding
+  P&L, position P&L / initial & maintenance margin / margin ratio / approximate
+  liquidation price + distance, a cash-and-carry example, a funding-regime
+  classification (neutral / positive / negative funding / overheated long perp /
+  short-squeeze risk / basis carry rich / basis compressed), and ten funding/basis
+  stress scenarios (funding spike+/−, perp premium blowout, perp discount, spot
+  selloff/rally, basis convergence, margin stress, volatility shock). Every
+  division guarded → no NaN/Inf.
+- Frontend: new `CryptoDerivativesLabPanel` (view `cryptoderivatives`) — hero,
+  market selector + editable market/position assumptions (live re-analyze),
+  key-metric cards + regime pill, futures curve/basis table, funding-analysis
+  panel, position-risk panel, cash-and-carry panel, scenario-stress table, and a
+  shared `FormulaReference` (Basis / Funding / Position risk / Carry groups); new
+  `lib/cryptoDerivatives.ts` types + API client. Wired into Sidebar, Dashboard
+  card ("Crypto derivatives" badge), and Command Palette (Open Crypto Derivatives
+  Lab, Perpetual Funding Lab, Crypto Basis Lab, Funding Rate Carry Lab,
+  Liquidation Distance Lab, Crypto Basis Scenario Stress).
+- 29 new backend tests (deterministic, no network) — `npx tsc --noEmit` clean; no
+  frontend build run (per instructions). Docs: `README.md`, `backend/README.md`,
+  `frontend/README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`.
+  **Static sample, educational — no live exchange data or crypto prices, funding
+  annualization / carry / liquidation are simplified approximations, not a
+  production risk engine, not exchange/broker integrated, not investment /
+  trading / liquidation advice.**
+
 ### Phase 25.2 — Order Flow Toxicity & Liquidity Metrics Lab v1 ✅
 
 - **Extends the Market Microstructure Lab** with deterministic educational
