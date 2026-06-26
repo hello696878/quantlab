@@ -16,6 +16,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
 import {
   analyzeMicrostructure,
   bps,
@@ -34,6 +36,50 @@ const REQUEST_FIELDS = [
   { key: "average_daily_volume", label: "ADV", step: "1000", scope: "root" as const },
   { key: "volatility_bps", label: "Volatility (bps)", step: "10", scope: "root" as const },
   { key: "impact_coefficient", label: "Impact coeff.", step: "0.05", scope: "root" as const },
+];
+
+const MICROSTRUCTURE_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Order book",
+    formulas: [
+      { label: "Mid price", latex: "m = \\frac{b_{\\mathrm{best}} + a_{\\mathrm{best}}}{2}" },
+      { label: "Spread", latex: "s = a_{\\mathrm{best}} - b_{\\mathrm{best}}" },
+      { label: "Spread (bps)", latex: "s_{\\mathrm{bps}} = \\frac{a_{\\mathrm{best}} - b_{\\mathrm{best}}}{m} \\times 10{,}000" },
+      { label: "Top-of-book imbalance", latex: "I_1 = \\frac{Q_b^{(1)} - Q_a^{(1)}}{Q_b^{(1)} + Q_a^{(1)}}" },
+      { label: "Depth imbalance", latex: "I_K = \\frac{\\sum_{i=1}^{K} Q_b^{(i)} - \\sum_{i=1}^{K} Q_a^{(i)}}{\\sum_{i=1}^{K} Q_b^{(i)} + \\sum_{i=1}^{K} Q_a^{(i)}}" },
+      { label: "Microprice", latex: "p_{\\mathrm{micro}} = \\frac{a_{\\mathrm{best}} Q_b^{(1)} + b_{\\mathrm{best}} Q_a^{(1)}}{Q_b^{(1)} + Q_a^{(1)}}" },
+    ],
+  },
+  {
+    title: "Trade tape",
+    formulas: [
+      { label: "VWAP", latex: "\\mathrm{VWAP} = \\frac{\\sum_i p_i q_i}{\\sum_i q_i}" },
+      { label: "TWAP", latex: "\\mathrm{TWAP} = \\frac{1}{N}\\sum_i p_i" },
+      { label: "Signed volume", latex: "\\tilde{q}_i = \\begin{cases} q_i, & \\text{buyer initiated} \\\\ -q_i, & \\text{seller initiated} \\end{cases}" },
+      { label: "Trade imbalance", latex: "I_{\\mathrm{trade}} = \\frac{\\sum_i \\tilde{q}_i}{\\sum_i q_i}" },
+    ],
+  },
+  {
+    title: "Execution",
+    formulas: [
+      { label: "Average execution price", latex: "\\bar{p}_{\\mathrm{exec}} = \\frac{\\sum_i p_i q_i}{\\sum_i q_i}" },
+      { label: "Fill ratio", latex: "\\mathrm{FillRatio} = \\frac{\\sum_i q_i}{Q}" },
+      { label: "Implementation shortfall (buy)", latex: "\\mathrm{IS}_{\\mathrm{buy}} = \\frac{\\bar{p}_{\\mathrm{exec}} - p_{\\mathrm{arrival}}}{p_{\\mathrm{arrival}}}" },
+      { label: "Implementation shortfall (sell)", latex: "\\mathrm{IS}_{\\mathrm{sell}} = \\frac{p_{\\mathrm{arrival}} - \\bar{p}_{\\mathrm{exec}}}{p_{\\mathrm{arrival}}}" },
+      { label: "Participation rate", latex: "\\mathrm{POV} = \\frac{Q_{\\mathrm{executed}}}{V_{\\mathrm{market}}}" },
+      { label: "Square-root market impact", latex: "\\mathrm{Impact}_{\\mathrm{bps}} = \\lambda \\sqrt{\\frac{Q}{\\mathrm{ADV}}}\\, \\sigma_{\\mathrm{bps}}" },
+    ],
+  },
+  {
+    title: "TCA / cost attribution",
+    formulas: [
+      { label: "Total execution cost", latex: "C_{\\mathrm{total}} = C_{\\mathrm{spread}} + C_{\\mathrm{impact}} + C_{\\mathrm{timing}} + C_{\\mathrm{fees}} + C_{\\mathrm{residual}}" },
+      { label: "Spread cost", latex: "C_{\\mathrm{spread}} = \\tfrac{1}{2}\\, s_{\\mathrm{bps}}" },
+      { label: "Timing cost (buy)", latex: "C_{\\mathrm{timing,buy}} = \\frac{p_{\\mathrm{benchmark}} - p_{\\mathrm{arrival}}}{p_{\\mathrm{arrival}}} \\times 10{,}000" },
+      { label: "Timing cost (sell)", latex: "C_{\\mathrm{timing,sell}} = \\frac{p_{\\mathrm{arrival}} - p_{\\mathrm{benchmark}}}{p_{\\mathrm{arrival}}} \\times 10{,}000" },
+      { label: "Fees", latex: "C_{\\mathrm{fees}} = \\frac{\\mathrm{fees}}{\\mathrm{notional}} \\times 10{,}000" },
+    ],
+  },
 ];
 
 function imbColor(v: number): string {
@@ -409,23 +455,54 @@ export default function MicrostructureLabPanel() {
         </div>
       )}
 
+      {/* ── TCA / Execution Cost Attribution ─────────────────────────────── */}
+      {r && (
+        <div className="card p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="section-title">TCA / Execution Cost Attribution</p>
+            <span className="mono text-[11px]" style={{ color: "var(--text-faint)" }}>
+              total {signedBps(r.tca.total_cost_bps)}
+            </span>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+            <MetricCard label="Arrival shortfall" value={signedBps(r.tca.benchmark_arrival_bps)} tone={r.tca.benchmark_arrival_bps > 0 ? "danger" : "positive"} />
+            <MetricCard label="VWAP shortfall" value={signedBps(r.tca.benchmark_vwap_bps)} tone={r.tca.benchmark_vwap_bps > 0 ? "danger" : "positive"} />
+            <MetricCard label="TWAP shortfall" value={signedBps(r.tca.benchmark_twap_bps)} tone={r.tca.benchmark_twap_bps > 0 ? "danger" : "positive"} />
+            <MetricCard label="Spread cost" value={bps(r.tca.spread_cost_bps)} />
+            <MetricCard label="Impact cost" value={bps(r.tca.impact_cost_bps)} tone="warn" />
+            <MetricCard label="Timing cost" value={signedBps(r.tca.timing_cost_bps)} />
+            <MetricCard label="Fees" value={bps(r.tca.fees_bps)} />
+            <MetricCard label="Total cost" value={signedBps(r.tca.total_cost_bps)} tone="accent" />
+          </div>
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{ color: "var(--text-mut)" }}>
+                  <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Component</th>
+                  <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Cost</th>
+                  <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Share</th>
+                </tr>
+              </thead>
+              <tbody>
+                {r.tca.attribution_rows.map((row) => (
+                  <tr key={row.component} style={{ borderTop: "1px solid var(--line)" }}>
+                    <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>{row.component}</td>
+                    <td className="mono px-2 py-1.5 text-right font-semibold" style={{ color: costColor(row.cost_bps) }}>{signedBps(row.cost_bps)}</td>
+                    <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{(row.share * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+            Deterministic educational TCA attribution. Not execution, routing, or trading advice.
+          </p>
+        </div>
+      )}
+
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <p className="section-title mb-2">Formulas &amp; notes</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <ul className="mono space-y-1 text-[11px]" style={{ color: "var(--text-hi)" }}>
-            <li>mid = (best_bid + best_ask) / 2</li>
-            <li>spread_bps = (ask − bid) / mid · 10⁴</li>
-            <li>imbalance = (bidSize − askSize) / (bidSize + askSize)</li>
-            <li>microprice = (ask·bidSize + bid·askSize) / (bidSize + askSize)</li>
-          </ul>
-          <ul className="mono space-y-1 text-[11px]" style={{ color: "var(--text-hi)" }}>
-            <li>VWAP = Σ(p·q) / Σq · TWAP = mean(p)</li>
-            <li>IS = side · (avg_exec − arrival) / arrival</li>
-            <li>slippage = side · (avg_exec − benchmark) / benchmark</li>
-            <li>impact_bps = coeff · √(qty / ADV) · vol_bps</li>
-          </ul>
-        </div>
+        <FormulaReference title="Formulas & notes" groups={MICROSTRUCTURE_FORMULA_GROUPS} />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — not a live order book or trade feed.</li>
           <li>The market-impact and schedule models are simplified educational approximations, not a production execution / cost model.</li>

@@ -60,6 +60,7 @@ export interface MarketMicrostructureAnalysisRequest {
   average_daily_volume: number;
   volatility_bps: number;
   impact_coefficient: number;
+  commission_per_unit: number;
 }
 
 export interface MicrostructureSampleResponse {
@@ -150,6 +151,25 @@ export interface LiquidityScenarioResult {
   notes: string[];
 }
 
+export interface TCAAttributionRow {
+  component: string;
+  cost_bps: number;
+  share: number;
+}
+
+export interface TCAResult {
+  benchmark_arrival_bps: number;
+  benchmark_vwap_bps: number;
+  benchmark_twap_bps: number;
+  spread_cost_bps: number;
+  impact_cost_bps: number;
+  timing_cost_bps: number;
+  fees_bps: number;
+  total_cost_bps: number;
+  attribution_rows: TCAAttributionRow[];
+  notes: string[];
+}
+
 export interface MarketMicrostructureAnalysisResponse {
   data_status: "static_sample";
   instrument_summary: InstrumentSummary;
@@ -159,6 +179,7 @@ export interface MarketMicrostructureAnalysisResponse {
   execution_summary: ExecutionSummary;
   schedule_comparison: ScheduleComparisonResult[];
   liquidity_scenarios: LiquidityScenarioResult[];
+  tca: TCAResult;
   notes: string[];
   disclaimer: string;
 }

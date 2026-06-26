@@ -220,7 +220,7 @@ risk-management advice, and not a production execution / TCA system.
 | Endpoint | Description |
 |---|---|
 | `GET /microstructure/sample` | Four deterministic sample instruments (BTCUSDT, SPY, CL futures, TSM equity), each with a limit order book, trade tape, parent order, sample fills, and an intraday volume curve |
-| `POST /microstructure/analyze` | Order-book summary (spread, depth ladder, top-of-book & 5-level imbalance, microprice), trade-tape VWAP / TWAP / trade imbalance, execution analytics (implementation shortfall, slippage, participation, square-root market impact), a four-schedule execution comparison (Immediate / TWAP / VWAP-style / participation-of-volume), and eight liquidity stress scenarios |
+| `POST /microstructure/analyze` | Order-book summary (spread, depth ladder, top-of-book & 5-level imbalance, microprice), trade-tape VWAP / TWAP / trade imbalance, execution analytics (implementation shortfall, slippage, participation, square-root market impact), a four-schedule execution comparison (Immediate / TWAP / VWAP-style / participation-of-volume), eight liquidity stress scenarios, and **TCA / execution-cost attribution** (arrival/VWAP/TWAP benchmark shortfalls + spread / impact / timing / fees / residual decomposition reconciling to the realised arrival shortfall; optional `commission_per_unit`) |
 
 Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): prices and sizes
 > 0, no NaN/Infinity, a **crossed/locked book is rejected** (best_bid must be <
@@ -228,8 +228,11 @@ best_ask), and the trade side must be `buy`/`sell`. Implementation shortfall and
 slippage are signed by side (a positive value is an execution cost); market impact
 uses a square-root model with educational parameters. The schedule comparison and
 liquidity scenarios are hypothetical educational examples — no schedule is
-recommended, and nothing is order-routing advice. Every division is guarded so all
-outputs are finite.
+recommended, and nothing is order-routing advice. The **TCA attribution** splits
+the realised arrival shortfall into spread / impact / timing / fees / residual
+components that sum to the total by construction (deterministic, educational — not
+execution, routing, or trading advice). Every division is guarded so all outputs
+are finite.
 
 ---
 

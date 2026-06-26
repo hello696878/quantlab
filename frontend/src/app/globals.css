@@ -763,8 +763,9 @@ button.bg-blue-700:hover {
   .report-html thead { display: table-header-group; }
 }
 
-/* KaTeX formula reference (Portfolio Risk Lab) — left-aligned, dark-mode
-   readable, with horizontal scroll for long equations and no page overflow. */
+/* KaTeX formula reference (QuantLab-wide shared FormulaReference / SafeMath) —
+   left-aligned, dark-mode readable, with horizontal scroll for long equations
+   contained inside their own row so there is no full-page horizontal overflow. */
 .ql-math .katex-display {
   margin: 0.3rem 0;
   text-align: left;

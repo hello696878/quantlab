@@ -62,6 +62,29 @@ import {
   getOptionsScenario,
   type OptionsScenarioPreset,
 } from "@/lib/optionsScenarioRegistry";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
+
+const OPTIONS_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Black-Scholes pricing",
+    formulas: [
+      { label: "Call price", latex: "C = S e^{-qT} N(d_1) - K e^{-rT} N(d_2)" },
+      { label: "Put price", latex: "P = K e^{-rT} N(-d_2) - S e^{-qT} N(-d_1)" },
+      { label: "d₁, d₂", latex: "d_1 = \\frac{\\ln(S/K) + (r - q + \\tfrac{1}{2}\\sigma^2)T}{\\sigma\\sqrt{T}}, \\quad d_2 = d_1 - \\sigma\\sqrt{T}" },
+    ],
+  },
+  {
+    title: "Greeks",
+    formulas: [
+      { label: "Delta (call)", latex: "\\Delta = e^{-qT} N(d_1)" },
+      { label: "Gamma", latex: "\\Gamma = \\frac{e^{-qT}\\varphi(d_1)}{S\\sigma\\sqrt{T}}" },
+      { label: "Vega", latex: "\\nu = S e^{-qT}\\varphi(d_1)\\sqrt{T}" },
+      { label: "Theta (call)", latex: "\\Theta = -\\frac{S e^{-qT}\\varphi(d_1)\\sigma}{2\\sqrt{T}} - rKe^{-rT}N(d_2) + qSe^{-qT}N(d_1)" },
+      { label: "Rho (call)", latex: "\\rho = KTe^{-rT}N(d_2)" },
+    ],
+  },
+];
 
 /** Props every model tab accepts so an applied scenario preset can seed it. */
 interface TabProps {
@@ -2397,6 +2420,7 @@ function EducationTab() {
   return (
     <div className="card space-y-3 p-5 text-sm text-slate-600">
       <p className="section-title">How to read the Options Lab</p>
+      <FormulaReference title="Key formulas" groups={OPTIONS_FORMULA_GROUPS} />
       <p>
         <span className="font-semibold text-slate-700">Black–Scholes</span> prices
         a European option assuming lognormal prices with constant volatility and

@@ -15,6 +15,8 @@
 import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
 import MbsSection from "@/components/real_estate/MbsSection";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
 import {
   analyzeRealEstate,
   fetchRealEstateSample,
@@ -27,6 +29,36 @@ import {
   type ReitInput,
   type SampleResponse,
 } from "@/lib/realEstate";
+
+const REAL_ESTATE_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Income & valuation",
+    formulas: [
+      { label: "Effective gross income", latex: "\\mathrm{EGI} = R_{\\mathrm{gross}}(1 - v) + R_{\\mathrm{other}}", note: "v = vacancy rate." },
+      { label: "Net operating income", latex: "\\mathrm{NOI} = \\mathrm{EGI} - \\mathrm{OpEx}" },
+      { label: "Cap rate", latex: "\\mathrm{CapRate} = \\frac{\\mathrm{NOI}}{V}" },
+      { label: "Value from cap rate", latex: "V = \\frac{\\mathrm{NOI}}{\\mathrm{CapRate}}" },
+    ],
+  },
+  {
+    title: "Financing & returns",
+    formulas: [
+      { label: "Loan-to-value", latex: "\\mathrm{LTV} = \\frac{L}{P}", note: "L = loan, P = purchase price." },
+      { label: "Mortgage payment", latex: "A = \\frac{P\\, r_m}{1 - (1 + r_m)^{-n}}", note: "rₘ = monthly rate, n = months." },
+      { label: "Debt-service coverage", latex: "\\mathrm{DSCR} = \\frac{\\mathrm{NOI}}{\\mathrm{AnnualDebtService}}" },
+      { label: "Cash-on-cash", latex: "\\mathrm{CoC} = \\frac{\\mathrm{CF}_{\\mathrm{before\\ tax}}}{E_0}", note: "E₀ = initial equity." },
+      { label: "Equity multiple", latex: "\\mathrm{EM} = \\frac{\\sum \\mathrm{Distributions}}{E_0}" },
+      { label: "IRR", latex: "\\sum_{t=0}^{T} \\frac{\\mathrm{CF}_t}{(1 + \\mathrm{IRR})^t} = 0", note: "Rate where NPV of cash flows is zero." },
+    ],
+  },
+  {
+    title: "REIT NAV",
+    formulas: [
+      { label: "NAV per share", latex: "\\mathrm{NAV}_{\\mathrm{share}} = \\frac{\\mathrm{NAV}_{\\mathrm{property}} - D_{\\mathrm{net}}}{N_{\\mathrm{shares}}}" },
+      { label: "Premium / discount", latex: "\\frac{p_{\\mathrm{share}}}{\\mathrm{NAV}_{\\mathrm{share}}} - 1" },
+    ],
+  },
+];
 
 type FieldKind = "money" | "rate" | "int";
 interface FieldDef {
@@ -377,25 +409,7 @@ export default function RealEstateLabPanel() {
 
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <p className="section-title mb-2">Formulas &amp; notes</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <ul className="mono space-y-1 text-[11px]" style={{ color: "var(--text-hi)" }}>
-            <li>EGI = gross_rent · (1 − vacancy) + other_income</li>
-            <li>NOI = EGI − operating_expenses</li>
-            <li>cap_rate = NOI ÷ property_value</li>
-            <li>value = NOI ÷ cap_rate</li>
-            <li>LTV = loan_amount ÷ purchase_price</li>
-            <li>payment = P·rₘ ÷ (1 − (1+rₘ)⁻ⁿ)</li>
-          </ul>
-          <ul className="mono space-y-1 text-[11px]" style={{ color: "var(--text-hi)" }}>
-            <li>DSCR = NOI ÷ annual_debt_service</li>
-            <li>cash-on-cash = before-tax CF ÷ initial_equity</li>
-            <li>equity_multiple = total_distributions ÷ initial_equity</li>
-            <li>IRR: rate where NPV(cash_flows) = 0</li>
-            <li>NAV/share = (property_NAV − net_debt) ÷ shares</li>
-            <li>premium/discount = price ÷ NAV/share − 1</li>
-          </ul>
-        </div>
+        <FormulaReference title="Formulas & notes" groups={REAL_ESTATE_FORMULA_GROUPS} />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <p className="text-xs font-semibold" style={{ color: "var(--text-hi)" }}>Why this matters</p>

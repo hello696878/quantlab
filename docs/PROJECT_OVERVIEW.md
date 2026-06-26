@@ -68,7 +68,7 @@ FastAPI Backend
   ├── futures_routes.py             Futures & Commodities Lab API router: GET /futures/sample, POST /futures/analyze — static sample data only
   ├── volatility/                   Volatility Surface & Variance Swap Lab v1 (24.0): models.py (typed underlying/quote/position schema), sample.py (deterministic SPX-like BS-priced chain + fixed-seed realized returns), service.py (implied-vol inversion reusing app/options BS, smile/skew/term structure, 2-D surface, realized-vol comparison, simplified variance-swap fair strike, vega exposure, 8 vol scenarios) — static sample, educational, no live option chains, not official VIX methodology, not investment/trading advice
   ├── volatility_routes.py          Volatility Lab API router: GET /volatility/sample, POST /volatility/analyze — static sample data only
-  ├── microstructure/               Market Microstructure & Execution Lab v1 (25.0): models.py (typed order-book/trade/execution schema, crossed-book rejection), sample.py (4 deterministic instruments — BTCUSDT/SPY/CL/TSM — each with a limit book, trade tape, parent order, fills, volume curve), service.py (order-book spread/depth/imbalance/microprice, trade-tape VWAP/TWAP/imbalance, execution implementation shortfall/slippage/participation/√-impact, 4-schedule comparison, 8 liquidity stress scenarios) — static sample, educational, no live order books/trades, no broker/exchange integration, not investment/trading/order-routing advice
+  ├── microstructure/               Market Microstructure & Execution Lab v1 (25.0; TCA in 25.1): models.py (typed order-book/trade/execution schema, crossed-book rejection, TCAResult/TCAAttributionRow, optional commission_per_unit), sample.py (4 deterministic instruments — BTCUSDT/SPY/CL/TSM — each with a limit book, trade tape, parent order, fills, volume curve), service.py (order-book spread/depth/imbalance/microprice, trade-tape VWAP/TWAP/imbalance, execution implementation shortfall/slippage/participation/√-impact, 4-schedule comparison, 8 liquidity stress scenarios, TCA spread/impact/timing/fees/residual attribution) — static sample, educational, no live order books/trades, no broker/exchange integration, not investment/trading/order-routing advice
   ├── microstructure_routes.py      Market Microstructure & Execution Lab API router: GET /microstructure/sample, POST /microstructure/analyze — static sample data only
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
@@ -279,6 +279,25 @@ Strategy and parameter selection form. Renders different parameter fields per st
 - `DrawdownChart` — drawdown area chart
 - `MetricsGrid` — performance metrics table
 - `TradeTable` — sortable trade log
+
+### `src/components/math/` — shared LaTeX formula reference (25.1)
+
+Every lab's "Formulas & notes" / "Key formulas" section renders through one shared,
+prop-driven system so formulas display as **locally-rendered KaTeX** (no math CDN,
+no MathJax, no remote script — `katex` is a local dependency with its CSS imported
+in `layout.tsx`):
+
+- `FormulaReference.tsx` — grouped formula block with a built-in "📋 Copy LaTeX"
+  button (copies clean grouped LaTeX **source**, success/failure status), optional
+  title / subtitle / disclaimer; lives inside each lab's existing card.
+- `SafeMath.tsx` — renders one LaTeX string with `katex.renderToString({ throwOnError:
+  false })` wrapped in try/catch → styled raw-LaTeX fallback, so a malformed formula
+  can never crash the page; long equations scroll horizontally inside their own row.
+- `formulaTypes.ts` / `formulaUtils.ts` — shared types + `buildFormulaLatexText`.
+- `portfolioRiskFormulas.ts` — the Portfolio Risk Lab formula groups (others define
+  their groups co-located in their panels). Consumed by Portfolio Risk, Microstructure
+  (incl. TCA), Futures, Real Estate, MBS, Volatility, Options, Credit, FX, Yield
+  Curve / Short Rate, and Event labs.
 
 ---
 

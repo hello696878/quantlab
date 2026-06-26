@@ -34,6 +34,26 @@ import {
   CHART_REF_LINE,
 } from "@/components/charts/chartTheme";
 import { seriesColor } from "@/lib/chartPalette";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
+
+const EVENT_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Event study",
+    formulas: [
+      { label: "Abnormal return", latex: "\\mathrm{AR}_{i,t} = R_{i,t} - \\mathbb{E}[R_{i,t}]", note: "Actual minus model-expected return." },
+      { label: "Cumulative abnormal return", latex: "\\mathrm{CAR}_i = \\sum_{t \\in W} \\mathrm{AR}_{i,t}" },
+      { label: "Cumulative average abnormal return", latex: "\\mathrm{CAAR} = \\frac{1}{N}\\sum_{i=1}^{N} \\mathrm{CAR}_i" },
+    ],
+  },
+  {
+    title: "Merger arbitrage",
+    formulas: [
+      { label: "Deal spread", latex: "\\mathrm{Spread} = \\frac{P_{\\mathrm{offer}} - P_{\\mathrm{current}}}{P_{\\mathrm{current}}}" },
+      { label: "Breakeven probability", latex: "p^{*} = \\frac{P_{\\mathrm{current}} - P_{\\mathrm{break}}}{P_{\\mathrm{offer}} - P_{\\mathrm{break}}}", note: "P(close) that makes the bet fair." },
+    ],
+  },
+];
 
 type Tab = "study" | "multi" | "merger" | "education";
 
@@ -708,6 +728,7 @@ function EducationTab() {
         stock earned around an event beyond what its benchmark/model predicted (the abnormal
         return), then accumulates it (CAR). Across many events, averaging gives the CAAR.
       </p>
+      <FormulaReference title="Key formulas" groups={EVENT_FORMULA_GROUPS} />
       <ul className="space-y-2">
         {items.map(([title, body]) => (
           <li key={title}>

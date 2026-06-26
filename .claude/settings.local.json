@@ -65,7 +65,13 @@
       "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py tests/test_futures_labels.py tests/test_futures_signal_backtest.py tests/test_ml_signal.py tests/test_experiments.py)",
       "Bash(./venv/Scripts/python.exe -m pytest tests/test_microstructure.py -q)",
       "Read(//c/c/quantlab/**)",
-      "Read(//c/c/quantlab/frontend/**)"
+      "Read(//c/c/quantlab/frontend/**)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py tests/test_futures_labels.py tests/test_futures_signal_backtest.py tests/test_ml_signal.py tests/test_experiments.py)",
+      "Bash(./venv/Scripts/python.exe -m pytest tests/test_microstructure.py tests/test_portfolio_risk.py -q)",
+      "Bash(cd /c/quantlab-phase6-research-cli/backend *)",
+      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -c ' *)",
+      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_research_cli.py -q)",
+      "Bash(C:/quantlab/backend/venv/Scripts/python.exe -m pytest tests/test_instruments_registry.py tests/test_store.py tests/test_futures_continuous.py tests/test_futures_features.py tests/test_futures_labels.py tests/test_futures_signal_backtest.py tests/test_ml_signal.py tests/test_experiments.py tests/test_research_cli.py)"
     ]
   }
 }

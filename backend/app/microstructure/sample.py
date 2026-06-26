@@ -93,6 +93,9 @@ def _build(
     # U-shaped intraday volume curve (10 buckets).
     volume_curve = [round(1.0 + 0.8 * (abs(b - 4.5) / 4.5), 4) for b in range(10)]
 
+    # Deterministic per-unit commission (~0.5 bps of mid) for TCA fee attribution.
+    commission_per_unit = round(mid * 0.00005, 6)
+
     return MarketMicrostructureAnalysisRequest(
         order_book=OrderBookSnapshotInput(symbol=symbol, timestamp="2025-01-02T15:30:00Z", bids=bids, asks=asks),
         trades=trades,
@@ -109,6 +112,7 @@ def _build(
         average_daily_volume=adv,
         volatility_bps=vol_bps,
         impact_coefficient=0.1,
+        commission_per_unit=commission_per_unit,
     )
 
 

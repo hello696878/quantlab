@@ -12,6 +12,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
 import {
   analyzeMbs,
   fetchMbsSample,
@@ -23,6 +25,28 @@ import {
   type MortgageMbsRequest,
   type PrepaymentModel,
 } from "@/lib/realEstate";
+
+const MBS_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Prepayment",
+    formulas: [
+      { label: "CPR → SMM", latex: "\\mathrm{SMM} = 1 - (1 - \\mathrm{CPR})^{1/12}", note: "Single monthly mortality from annual CPR." },
+      { label: "PSA ramp", latex: "\\mathrm{CPR}_{\\mathrm{PSA}} = \\frac{\\mathrm{PSA}}{100}\\cdot 6\\%\\cdot \\frac{\\min(\\mathrm{age},\\,30)}{30}" },
+      { label: "Scheduled principal", latex: "P_{\\mathrm{sched}} = A - B_t\\cdot \\frac{c}{12}", note: "A = payment, B = balance, c = coupon." },
+      { label: "Prepayment principal", latex: "P_{\\mathrm{prepay}} = \\mathrm{SMM}\\,(B_t - P_{\\mathrm{sched}})" },
+    ],
+  },
+  {
+    title: "Cash flow & valuation",
+    formulas: [
+      { label: "MBS cash flow", latex: "\\mathrm{CF}_t = B_t\\cdot \\frac{c_{\\mathrm{net}}}{12} + P_{\\mathrm{sched}} + P_{\\mathrm{prepay}}" },
+      { label: "Weighted average life", latex: "\\mathrm{WAL} = \\frac{\\sum_t (t/12)\\, P_t}{\\sum_t P_t}" },
+      { label: "Price", latex: "\\mathrm{Price} = \\sum_t \\frac{\\mathrm{CF}_t}{(1 + y/12)^t}" },
+      { label: "Effective duration", latex: "D \\approx \\frac{P_- - P_+}{2 P_0\\, \\Delta y}" },
+      { label: "Effective convexity", latex: "C \\approx \\frac{P_- + P_+ - 2 P_0}{P_0\\, \\Delta y^2}" },
+    ],
+  },
+];
 
 interface NumField {
   key: string;
@@ -340,17 +364,7 @@ export default function MbsSection() {
 
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <p className="section-title mb-2">Formulas &amp; notes</p>
-        <ul className="mono space-y-1 text-[11px]" style={{ color: "var(--text-hi)" }}>
-          <li>SMM = 1 − (1 − CPR)^(1/12)</li>
-          <li>PSA CPR = (PSA_speed / 100) · 6% · min(age, 30) / 30</li>
-          <li>scheduled_principal = payment − balance · coupon/12</li>
-          <li>prepay = SMM · (balance − scheduled_principal)</li>
-          <li>MBS interest = balance · net_coupon/12; cash_flow = interest + principal</li>
-          <li>WAL = Σ (t/12)·principal_t ÷ Σ principal_t</li>
-          <li>price = Σ cash_flow_t ÷ (1 + y/12)^t</li>
-          <li>duration ≈ (P₋ − P₊) ÷ (2·P₀·Δy); convexity ≈ (P₋ + P₊ − 2P₀) ÷ (P₀·Δy²)</li>
-        </ul>
+        <FormulaReference title="Formulas & notes" groups={MBS_FORMULA_GROUPS} />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — not live mortgage rates or MBS prices.</li>
           <li>Simplified CPR/SMM/PSA model; WAL, duration, and convexity are educational approximations.</li>

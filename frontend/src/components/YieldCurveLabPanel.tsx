@@ -43,6 +43,31 @@ import {
   DANGER,
 } from "@/components/charts/chartTheme";
 import { seriesColor } from "@/lib/chartPalette";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
+
+const YIELD_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Curve & bond",
+    formulas: [
+      { label: "Discount factor (continuous)", latex: "\\mathrm{DF}(T) = e^{-z(T)\\,T}", note: "z(T) = continuously-compounded zero rate." },
+      { label: "Zero rate from DF", latex: "z(T) = -\\frac{\\ln \\mathrm{DF}(T)}{T}" },
+      { label: "Forward rate", latex: "f(T_1, T_2) = \\frac{\\ln \\mathrm{DF}(T_1) - \\ln \\mathrm{DF}(T_2)}{T_2 - T_1}" },
+      { label: "Macaulay duration", latex: "D = \\frac{1}{P}\\sum_t t\\, \\frac{\\mathrm{CF}_t}{(1 + y)^t}" },
+      { label: "Convexity", latex: "C = \\frac{1}{P}\\sum_t t(t+1)\\, \\frac{\\mathrm{CF}_t}{(1 + y)^{t+2}}" },
+      { label: "DV01", latex: "\\mathrm{DV01} \\approx D_{\\mathrm{mod}}\\cdot P\\cdot 0.0001" },
+    ],
+  },
+  {
+    title: "Short-rate models",
+    formulas: [
+      { label: "Vasicek", latex: "dr = \\kappa(\\theta - r)\\,dt + \\sigma\\, dW", note: "Gaussian; can go negative." },
+      { label: "CIR", latex: "dr = \\kappa(\\theta - r)\\,dt + \\sigma\\sqrt{r}\\, dW", note: "Square-root; non-negative rates." },
+      { label: "Feller condition", latex: "2\\kappa\\theta \\ge \\sigma^2", note: "Keeps CIR rates away from zero." },
+      { label: "Zero-coupon bond (affine)", latex: "P(t, T) = A(t, T)\\, e^{-B(t, T)\\, r_t}" },
+    ],
+  },
+];
 
 type Tab = "builder" | "shocks" | "bond" | "shortrate" | "education";
 
@@ -965,6 +990,7 @@ function EducationTab() {
   return (
     <div className="card space-y-3 p-5 text-sm text-slate-400">
       <p className="section-title">How to read the Yield Curve Lab</p>
+      <FormulaReference title="Key formulas" groups={YIELD_FORMULA_GROUPS} />
       <ul className="space-y-2">
         {items.map(([title, body]) => (
           <li key={title}>

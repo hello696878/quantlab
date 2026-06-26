@@ -25,6 +25,8 @@ from app.microstructure.models import (
     MarketMicrostructureAnalysisResponse,
     OrderBookSummary,
     ScheduleComparisonResult,
+    TCAAttributionRow,
+    TCAResult,
     TradeTapeSummary,
 )
 from app.microstructure.sample import DISCLAIMER
@@ -175,6 +177,12 @@ def analyze_microstructure(
         order, mid, best_bid, best_ask, b1, a1, half_spread_bps, base_impact_bps, total_depth,
     )
 
+    # ── TCA / execution-cost attribution ───────────────────────────────────
+    tca = _tca(
+        order, sign, avg_exec, arrival, vwap, twap, spread_bps,
+        base_impact_bps, filled, req.commission_per_unit,
+    )
+
     return MarketMicrostructureAnalysisResponse(
         instrument_summary=InstrumentSummary(
             symbol=book.symbol, timestamp=book.timestamp,
@@ -186,6 +194,7 @@ def analyze_microstructure(
         execution_summary=execution_summary,
         schedule_comparison=schedule_comparison,
         liquidity_scenarios=liquidity,
+        tca=tca,
         notes=[
             "Order-book metrics: mid = (bid+ask)/2, microprice weights the touch by "
             "the opposite size; imbalance uses level-1 and top-5 depth.",
@@ -291,3 +300,69 @@ def _scenarios(
             )
         )
     return results
+
+
+def _tca(
+    order, sign, avg_exec, arrival, vwap, twap, spread_bps,
+    impact_bps, filled, commission_per_unit,
+) -> TCAResult:
+    """Deterministic, educational execution-cost attribution (signed by side).
+
+    Benchmark shortfalls vs arrival / VWAP / TWAP, plus a spread / impact /
+    timing / fees / residual decomposition where the components sum to the
+    realised arrival shortfall by construction (residual absorbs the remainder).
+    """
+    def bench_bps(reference: float) -> float:
+        return sign * (avg_exec - reference) / reference * 10000.0 if reference > _EPS else 0.0
+
+    arrival_bps = bench_bps(arrival)
+    vwap_bps = bench_bps(vwap)
+    twap_bps = bench_bps(twap)
+
+    spread_cost_bps = spread_bps / 2.0
+    impact_cost_bps = impact_bps
+    benchmark = order.benchmark_price if order.benchmark_price is not None else vwap
+    timing_cost_bps = sign * (benchmark - arrival) / arrival * 10000.0 if arrival > _EPS else 0.0
+
+    notional = avg_exec * filled
+    fees = commission_per_unit * filled
+    fees_bps = fees / notional * 10000.0 if notional > _EPS else 0.0
+
+    # Total realised cost is the arrival implementation shortfall; residual
+    # reconciles the transparent components to that total.
+    total_cost_bps = arrival_bps
+    residual_bps = total_cost_bps - (spread_cost_bps + impact_cost_bps + timing_cost_bps + fees_bps)
+
+    rows = [
+        ("Spread cost", spread_cost_bps),
+        ("Market impact", impact_cost_bps),
+        ("Timing / drift", timing_cost_bps),
+        ("Fees", fees_bps),
+        ("Residual", residual_bps),
+    ]
+    attribution = [
+        TCAAttributionRow(
+            component=name,
+            cost_bps=value,
+            share=(value / total_cost_bps if abs(total_cost_bps) > _EPS else 0.0),
+        )
+        for name, value in rows
+    ]
+
+    return TCAResult(
+        benchmark_arrival_bps=arrival_bps,
+        benchmark_vwap_bps=vwap_bps,
+        benchmark_twap_bps=twap_bps,
+        spread_cost_bps=spread_cost_bps,
+        impact_cost_bps=impact_cost_bps,
+        timing_cost_bps=timing_cost_bps,
+        fees_bps=fees_bps,
+        total_cost_bps=total_cost_bps,
+        attribution_rows=attribution,
+        notes=[
+            "Arrival / VWAP / TWAP shortfalls are signed by side (positive = cost).",
+            "Components (spread, impact, timing, fees, residual) sum to the arrival "
+            "shortfall by construction; residual captures the unattributed remainder.",
+            "Deterministic educational attribution — not execution, routing, or trading advice.",
+        ],
+    )

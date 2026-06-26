@@ -287,6 +287,50 @@ def test_all_sample_instruments_analyze():
 
 
 # --------------------------------------------------------------------------- #
+# TCA / execution-cost attribution (Phase 25.1)
+# --------------------------------------------------------------------------- #
+def test_tca_section_present(client):
+    res = client.post("/microstructure/analyze", json=_btc().model_dump())
+    assert res.status_code == 200
+    tca = res.json()["tca"]
+    components = {r["component"] for r in tca["attribution_rows"]}
+    assert components == {"Spread cost", "Market impact", "Timing / drift", "Fees", "Residual"}
+
+
+def test_tca_total_equals_component_sum():
+    for req in sample_requests():
+        tca = analyze_microstructure(req).tca
+        comp_sum = sum(r.cost_bps for r in tca.attribution_rows)
+        assert math.isclose(comp_sum, tca.total_cost_bps, abs_tol=1e-9)
+        # And the named components reconcile to the same total.
+        named = tca.spread_cost_bps + tca.impact_cost_bps + tca.timing_cost_bps + tca.fees_bps
+        residual = next(r.cost_bps for r in tca.attribution_rows if r.component == "Residual")
+        assert math.isclose(named + residual, tca.total_cost_bps, abs_tol=1e-9)
+
+
+def test_tca_total_equals_arrival_shortfall():
+    out = _analyze()
+    assert math.isclose(out.tca.total_cost_bps, out.execution_summary.shortfall_bps, abs_tol=1e-9)
+    assert math.isclose(out.tca.benchmark_arrival_bps, out.execution_summary.shortfall_bps, abs_tol=1e-9)
+
+
+def test_tca_components_finite():
+    for req in sample_requests():
+        tca = analyze_microstructure(req).tca
+        for v in (
+            tca.benchmark_arrival_bps, tca.benchmark_vwap_bps, tca.benchmark_twap_bps,
+            tca.spread_cost_bps, tca.impact_cost_bps, tca.timing_cost_bps,
+            tca.fees_bps, tca.total_cost_bps,
+        ):
+            assert math.isfinite(v)
+        assert tca.spread_cost_bps >= 0.0  # half-spread cost is non-negative
+        assert tca.impact_cost_bps >= 0.0  # square-root impact is non-negative
+        assert tca.fees_bps >= 0.0
+        for r in tca.attribution_rows:
+            assert math.isfinite(r.cost_bps) and math.isfinite(r.share)
+
+
+# --------------------------------------------------------------------------- #
 # 30. JSON-safety
 # --------------------------------------------------------------------------- #
 def test_no_nan_or_infinity(client):

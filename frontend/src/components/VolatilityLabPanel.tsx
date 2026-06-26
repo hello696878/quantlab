@@ -14,6 +14,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
 import {
   analyzeVolatility,
   compact,
@@ -25,6 +27,28 @@ import {
   type VolatilityAnalysisResponse,
   type VolatilitySampleResponse,
 } from "@/lib/volatility";
+
+const VOLATILITY_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Black-Scholes & Greeks",
+    formulas: [
+      { label: "Call price", latex: "C = S e^{-qT} N(d_1) - K e^{-rT} N(d_2)" },
+      { label: "Put price", latex: "P = K e^{-rT} N(-d_2) - S e^{-qT} N(-d_1)" },
+      { label: "d₁, d₂", latex: "d_1 = \\frac{\\ln(S/K) + (r - q + \\tfrac{1}{2}\\sigma^2)T}{\\sigma\\sqrt{T}}, \\quad d_2 = d_1 - \\sigma\\sqrt{T}" },
+      { label: "Vega", latex: "\\nu = S e^{-qT} \\varphi(d_1)\\sqrt{T}" },
+      { label: "Implied volatility", latex: "\\text{solve } C_{\\mathrm{BS}}(\\sigma) = C_{\\mathrm{mid}} \\;\\text{ (bisection)}" },
+    ],
+  },
+  {
+    title: "Realized vol & variance swap",
+    formulas: [
+      { label: "Realized volatility", latex: "\\sigma_{\\mathrm{realized}} = \\mathrm{stdev}(r_t)\\sqrt{252}" },
+      { label: "Variance swap fair strike", latex: "K_{\\mathrm{var}}^2 \\approx \\frac{2 e^{rT}}{T}\\sum_i \\frac{\\Delta K_i}{K_i^2} Q(K_i)", note: "Simplified option-strip approximation — not official VIX methodology." },
+      { label: "Skew slope", latex: "\\mathrm{Skew} = \\frac{\\mathrm{IV}_{110\\%} - \\mathrm{IV}_{90\\%}}{0.2}" },
+      { label: "Vega exposure", latex: "\\mathcal{V}_p = \\sum_i \\nu_i\\, n_i", note: "Position-weighted vega by maturity / moneyness." },
+    ],
+  },
+];
 
 const UNDERLYING_FIELDS = [
   { key: "spot_price", label: "Spot price", step: "10" },
@@ -428,21 +452,7 @@ export default function VolatilityLabPanel() {
 
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <p className="section-title mb-2">Formulas &amp; notes</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <ul className="mono space-y-1 text-[11px]" style={{ color: "var(--text-hi)" }}>
-            <li>Call: C = S·e^(−qT)·N(d₁) − K·e^(−rT)·N(d₂)</li>
-            <li>Put: P = K·e^(−rT)·N(−d₂) − S·e^(−qT)·N(−d₁)</li>
-            <li>d₁ = [ln(S/K) + (r−q+½σ²)T] / (σ√T); d₂ = d₁ − σ√T</li>
-            <li>Vega: ν = S·e^(−qT)·φ(d₁)·√T</li>
-          </ul>
-          <ul className="mono space-y-1 text-[11px]" style={{ color: "var(--text-hi)" }}>
-            <li>Implied vol: solve C_BS(σ) = mid (bisection)</li>
-            <li>Realized vol: stdev(rₜ)·√252</li>
-            <li>Variance strike: K²_var ≈ (2·e^(rT)/T)·Σ ΔK/K²·Q(K)</li>
-            <li>Skew slope = (110% IV − 90% IV) / 0.2</li>
-          </ul>
-        </div>
+        <FormulaReference title="Formulas & notes" groups={VOLATILITY_FORMULA_GROUPS} />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — not a live option chain.</li>
           <li>The implied-vol solver and variance-swap fair strike are simplified educational models — NOT official VIX / exchange methodology.</li>

@@ -24,9 +24,8 @@ import {
   type PortfolioAsset,
   type SamplePortfolioResponse,
 } from "@/lib/portfolioRisk";
-import FormulaReference, {
-  FORMULA_LATEX_TEXT,
-} from "@/components/math/FormulaReference";
+import FormulaReference from "@/components/math/FormulaReference";
+import { PORTFOLIO_RISK_FORMULA_GROUPS } from "@/components/math/portfolioRiskFormulas";
 
 const CONFIDENCE_OPTIONS = [0.9, 0.95, 0.99];
 
@@ -182,8 +181,6 @@ export default function PortfolioRiskLabPanel() {
   const [result, setResult] = useState<PortfolioAnalysisResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
-  const [copyFailed, setCopyFailed] = useState(false);
   const [scenarioId, setScenarioId] = useState("equity_selloff");
   const [maxWeightStr, setMaxWeightStr] = useState("0.40");
   const [targetReturnStr, setTargetReturnStr] = useState("");
@@ -295,22 +292,6 @@ export default function PortfolioRiskLabPanel() {
     setWeightStr(Object.fromEntries(sample.assets.map((a) => [a.id, String(a.weight)])));
     setRiskFree(sample.risk_free_rate);
     setConfidence(sample.confidence_level);
-  }
-
-  async function copyFormulas() {
-    setCopyFailed(false);
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(FORMULA_LATEX_TEXT);
-        setCopied(true);
-        window.setTimeout(() => setCopied(false), 2500);
-        return;
-      }
-    } catch {
-      // fall through to the failure state
-    }
-    setCopyFailed(true);
-    window.setTimeout(() => setCopyFailed(false), 3000);
   }
 
   const order = result?.asset_order ?? assets.map((a) => a.id);
@@ -1207,31 +1188,7 @@ export default function PortfolioRiskLabPanel() {
 
       {/* ── Explanation ──────────────────────────────────────────────────── */}
       <div className="card p-4">
-        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-          <p className="section-title">Formulas &amp; notes</p>
-          <div className="flex items-center gap-2">
-            {copied && (
-              <span role="status" aria-live="polite" className="text-[11px]" style={{ color: "var(--accent-text)" }}>
-                Copied LaTeX formulas.
-              </span>
-            )}
-            {copyFailed && (
-              <span role="status" aria-live="polite" className="text-[11px]" style={{ color: "var(--warn)" }}>
-                Could not copy formulas automatically.
-              </span>
-            )}
-            <button
-              type="button"
-              onClick={copyFormulas}
-              aria-label="Copy the LaTeX formula reference"
-              className="rounded-md px-2.5 py-1 text-xs font-semibold transition-colors"
-              style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
-            >
-              {copied ? "Copied ✓" : "📋 Copy LaTeX"}
-            </button>
-          </div>
-        </div>
-        <FormulaReference />
+        <FormulaReference title="Formulas & notes" groups={PORTFOLIO_RISK_FORMULA_GROUPS} />
         <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <p className="text-xs font-semibold" style={{ color: "var(--text-hi)" }}>Why this matters</p>

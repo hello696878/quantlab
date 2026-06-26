@@ -29,6 +29,29 @@ import MetricCard from "@/components/MetricCard";
 import NeonTooltip from "@/components/charts/NeonTooltip";
 import { CHART_AXIS, CHART_AXIS_LINE, CHART_GRID, DANGER } from "@/components/charts/chartTheme";
 import { seriesColor } from "@/lib/chartPalette";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
+
+const CREDIT_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Structural (Merton)",
+    formulas: [
+      { label: "Equity as a call on assets", latex: "E = V N(d_1) - D e^{-rT} N(d_2)" },
+      { label: "Distance to default", latex: "\\mathrm{DD} = \\frac{\\ln(V/D) + (\\mu - \\tfrac{1}{2}\\sigma_V^2)T}{\\sigma_V \\sqrt{T}}" },
+      { label: "Risk-neutral default probability", latex: "\\mathrm{PD} = N(-\\mathrm{DD})", note: "With drift μ = r, DD = d₂." },
+    ],
+  },
+  {
+    title: "Reduced-form & loss",
+    formulas: [
+      { label: "Survival probability", latex: "Q(t) = e^{-\\lambda t}" },
+      { label: "Cumulative default", latex: "F(t) = 1 - e^{-\\lambda t}" },
+      { label: "Loss given default", latex: "\\mathrm{LGD} = 1 - R", note: "R = recovery rate." },
+      { label: "Expected loss", latex: "\\mathrm{EL} = \\mathrm{PD}\\cdot \\mathrm{LGD}\\cdot \\mathrm{EAD}" },
+      { label: "CDS par spread (credit triangle)", latex: "s \\approx \\lambda\\,(1 - R)" },
+    ],
+  },
+];
 
 type Tab = "merton" | "hazard" | "cds" | "bond" | "education";
 
@@ -628,6 +651,7 @@ function CreditEducationTab() {
   return (
     <div className="card space-y-3 p-5 text-sm text-slate-400">
       <p className="section-title">How to read the Credit Risk Lab</p>
+      <FormulaReference title="Key formulas" groups={CREDIT_FORMULA_GROUPS} />
       <ul className="space-y-2">
         {items.map(([title, body]) => (
           <li key={title}>

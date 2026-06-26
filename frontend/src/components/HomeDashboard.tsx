@@ -1347,9 +1347,9 @@ export default function HomeDashboard({
             </span>
             <span className="text-xs text-slate-400">
               Explore a deterministic sample limit order book, bid/ask spread, depth, order-book
-              imbalance and microprice, trade-tape VWAP/TWAP, implementation shortfall, slippage,
-              market impact, an execution-schedule comparison, and liquidity stress — not investment
-              or order-routing advice.
+              imbalance and microprice, trade-tape VWAP/TWAP, implementation shortfall, TCA
+              attribution, market impact, an execution-schedule comparison, and liquidity stress —
+              not investment or order-routing advice.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Market Microstructure Lab →

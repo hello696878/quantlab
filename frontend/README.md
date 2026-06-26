@@ -118,9 +118,12 @@ volatility / impact assumptions, and re-analyses live via
 `/api/microstructure/analyze` (order-book spread / depth ladder / imbalance /
 microprice, trade-tape VWAP/TWAP/imbalance, implementation shortfall, slippage,
 participation, square-root market impact, a four-schedule execution comparison,
-and eight liquidity stress scenarios). Static illustrative sample data — no live
-order books or trades, no broker / exchange integration, not a production
-execution / TCA system, not investment / trading / order-routing advice.
+eight liquidity stress scenarios, and a **TCA / execution-cost attribution** card —
+arrival/VWAP/TWAP benchmark shortfalls plus a spread / impact / timing / fees /
+residual decomposition). Its formulas (incl. TCA) render as local LaTeX (see the
+shared formula note below). Static illustrative sample data — no live order books
+or trades, no broker / exchange integration, not a production execution / TCA
+system, not investment / trading / order-routing advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract
@@ -158,11 +161,21 @@ sensitivity** table, and an **optimization robustness** table. All data is stati
 illustrative sample data with deterministic illustrative factor betas and views,
 and fixed-seed simulations — long-only v1, educational, a candidate-search
 optimizer (not production), simulations are not forecasts, no trade orders, not a
-production risk model, not investment advice. The lab's **Formulas & notes**
-reference renders LaTeX locally with KaTeX (`components/math/FormulaReference.tsx`,
-`katex` package + local CSS — no CDN, no external render API); the **Copy LaTeX**
-button copies the grouped LaTeX source, and any formula that fails to render falls
-back to a styled raw-LaTeX code block.
+production risk model, not investment advice.
+
+**Shared LaTeX formula reference (Phase 25.1).** Every lab's "Formulas & notes" /
+"Key formulas" section renders LaTeX locally with KaTeX through one shared,
+prop-driven system in `components/math/` — `FormulaReference.tsx` (grouped
+formulas + a **📋 Copy LaTeX** button that copies clean grouped LaTeX **source**,
+with "Copied LaTeX formulas." / "Could not copy formulas automatically." status),
+`SafeMath.tsx` (renders one formula with `katex.renderToString({ throwOnError:
+false })` in a try/catch → styled raw-LaTeX code-block fallback so a bad formula
+never crashes the page), plus `formulaTypes.ts` / `formulaUtils.ts`. The `katex`
+package + its CSS (imported once in `app/layout.tsx`) are **local** — no CDN, no
+MathJax, no external render API. Consumed by Portfolio Risk, Microstructure (incl.
+TCA), Futures, Real Estate, MBS, Volatility, Options, Credit, FX, Yield Curve /
+Short Rate, and Event labs. Long equations scroll horizontally inside their own
+row (`.ql-math` in `globals.css`) — no full-page horizontal overflow.
 
 The Globe renders bundled static sample data immediately, then uses the validated
 backend dataset when available. The parser requires exact FRED field/date

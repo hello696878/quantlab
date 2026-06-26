@@ -18,6 +18,8 @@ from app.microstructure.models import (
     MarketMicrostructureAnalysisResponse,
     OrderBookLevelInput,
     OrderBookSnapshotInput,
+    TCAAttributionRow,
+    TCAResult,
     TradePrintInput,
 )
 from app.microstructure.sample import build_sample_response, sample_requests
@@ -29,6 +31,8 @@ __all__ = [
     "MarketMicrostructureAnalysisResponse",
     "OrderBookLevelInput",
     "OrderBookSnapshotInput",
+    "TCAAttributionRow",
+    "TCAResult",
     "TradePrintInput",
     "build_sample_response",
     "sample_requests",

@@ -1677,6 +1677,55 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 25.1 — QuantLab-wide LaTeX Formula Polish + Microstructure TCA Extension v1 ✅
+
+- **Two changes in one pass.** (1) A QuantLab-wide LaTeX formula polish: every
+  lab's "Formulas & notes" / "Key formulas" section now renders as locally-rendered
+  **KaTeX** (no CDN, no MathJax, no remote script) instead of raw monospaced text.
+  (2) A small deterministic **TCA / execution-cost attribution** extension to the
+  Market Microstructure Lab. No existing module logic changed; static sample data
+  only; no live order books/trades, no broker/exchange integration, no trading or
+  order-routing advice.
+- **Shared formula system** (`frontend/src/components/math/`): generalized the
+  Portfolio Risk Lab renderer into a reusable, prop-driven `FormulaReference`
+  (title, subtitle, groups, copy button, disclaimer), a `SafeMath` component
+  (KaTeX with `throwOnError: false` + try/catch → styled raw-LaTeX fallback so a
+  bad formula can never crash the page), `formulaTypes.ts`, and `formulaUtils.ts`
+  (`buildFormulaLatexText` → clean grouped LaTeX **source** for copy). KaTeX was
+  **already a dependency** (`katex` + `@types/katex`) with its CSS imported in
+  `layout.tsx` — nothing added to `package.json`/lockfile, no CDN.
+- **Copy behaviour:** "📋 Copy LaTeX" copies grouped LaTeX source (not rendered
+  HTML); success "Copied LaTeX formulas.", failure "Could not copy formulas
+  automatically.", no external clipboard package. Long equations scroll
+  horizontally inside their own row (`.ql-math`) — no full-page overflow.
+- **Pages converted to LaTeX:** Portfolio Risk Lab (migrated to the shared
+  component), Market Microstructure Lab, Futures & Commodities Lab, Real Estate
+  Lab, Mortgage/MBS section, Volatility Surface Lab, Options Lab, Credit Risk Lab,
+  FX Lab, Yield Curve + Short Rate Lab, and Event Lab. Explanations, disclaimers,
+  and notes were all preserved. Scanner / AFML are methodology prose with no
+  formula-dump block and were intentionally left unchanged (per instructions).
+- **Microstructure TCA (backend):** added `TCAAttributionRow` + `TCAResult` and a
+  `tca` field on `MarketMicrostructureAnalysisResponse`; new optional
+  `commission_per_unit` request field (deterministic ~0.5 bps in the sample).
+  `_tca` computes arrival/VWAP/TWAP benchmark shortfalls (signed by side) and a
+  spread / impact / timing / fees / residual decomposition where the components
+  sum to the realised arrival shortfall by construction. Every division guarded →
+  no NaN/Inf.
+- **Microstructure TCA (frontend):** new "TCA / Execution Cost Attribution" card
+  (benchmark shortfalls, cost cards, attribution table) with the copy line
+  "Deterministic educational TCA attribution. Not execution, routing, or trading
+  advice." Microstructure formulas (order book / trade tape / execution / TCA)
+  render via the shared component. Command Palette gained Execution Cost
+  Attribution, TCA Lab, Market Impact Attribution; the dashboard card now mentions
+  TCA attribution.
+- 4 new backend TCA tests (28 microstructure tests total) — full suite green
+  (**2275 passed**); `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`, `frontend/README.md`,
+  `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample,
+  educational — no live order books or trades, no broker/exchange integration,
+  deterministic TCA attribution, not a production execution / TCA system, not
+  investment / trading / order-routing advice.**
+
 ### Phase 25.0 — Market Microstructure & Execution Lab v1 ✅
 
 - **New deterministic educational market-microstructure / execution lab.** Static

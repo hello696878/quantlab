@@ -34,6 +34,27 @@ import MetricCard from "@/components/MetricCard";
 import NeonTooltip from "@/components/charts/NeonTooltip";
 import { CHART_AXIS, CHART_AXIS_LINE, CHART_GRID, CHART_REF_LINE, DANGER } from "@/components/charts/chartTheme";
 import { seriesColor } from "@/lib/chartPalette";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
+
+const FX_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Parity & forwards",
+    formulas: [
+      { label: "Covered interest rate parity", latex: "F = S\\, e^{(r_d - r_f)T}", note: "S = domestic per 1 unit foreign." },
+      { label: "Forward points", latex: "\\mathrm{Points} = F - S" },
+      { label: "Cross rate", latex: "S_{A/C} = S_{A/B}\\cdot S_{B/C}" },
+    ],
+  },
+  {
+    title: "Carry, PPP & options",
+    formulas: [
+      { label: "FX carry", latex: "\\mathrm{Carry} \\approx (r_{\\mathrm{high}} - r_{\\mathrm{low}})\\,T + \\frac{\\Delta S}{S}", note: "Differential plus spot move; not free profit." },
+      { label: "Relative PPP", latex: "S_{\\mathrm{PPP}} = S_{\\mathrm{base}}\\cdot \\frac{I_d}{I_f}", note: "I = price-level index." },
+      { label: "Garman-Kohlhagen call", latex: "C = S e^{-r_f T} N(d_1) - K e^{-r_d T} N(d_2)", note: "Foreign rate acts like a dividend yield." },
+    ],
+  },
+];
 
 type Tab = "forward" | "carry" | "ppp" | "exposure" | "options" | "education";
 
@@ -730,6 +751,7 @@ function FxEducationTab() {
   return (
     <div className="card space-y-3 p-5 text-sm text-slate-400">
       <p className="section-title">How to read the FX Lab</p>
+      <FormulaReference title="Key formulas" groups={FX_FORMULA_GROUPS} />
       <ul className="space-y-2">
         {items.map(([title, body]) => (
           <li key={title}>

@@ -93,6 +93,8 @@ class MarketMicrostructureAnalysisRequest(MsModel):
     average_daily_volume: PositiveFloat
     volatility_bps: NonNegFloat = 100.0
     impact_coefficient: NonNegFloat = 0.1
+    # Deterministic, educational per-unit commission used for TCA fee attribution.
+    commission_per_unit: NonNegFloat = 0.0
 
 
 # --------------------------------------------------------------------------- #
@@ -179,6 +181,25 @@ class LiquidityScenarioResult(MsModel):
     notes: List[NonEmptyStr]
 
 
+class TCAAttributionRow(MsModel):
+    component: NonEmptyStr
+    cost_bps: FiniteFloat
+    share: FiniteFloat
+
+
+class TCAResult(MsModel):
+    benchmark_arrival_bps: FiniteFloat
+    benchmark_vwap_bps: FiniteFloat
+    benchmark_twap_bps: FiniteFloat
+    spread_cost_bps: FiniteFloat
+    impact_cost_bps: FiniteFloat
+    timing_cost_bps: FiniteFloat
+    fees_bps: FiniteFloat
+    total_cost_bps: FiniteFloat
+    attribution_rows: List[TCAAttributionRow]
+    notes: List[NonEmptyStr]
+
+
 class MarketMicrostructureAnalysisResponse(MsModel):
     data_status: Literal["static_sample"] = "static_sample"
     instrument_summary: InstrumentSummary
@@ -188,6 +209,7 @@ class MarketMicrostructureAnalysisResponse(MsModel):
     execution_summary: ExecutionSummary
     schedule_comparison: List[ScheduleComparisonResult]
     liquidity_scenarios: List[LiquidityScenarioResult]
+    tca: TCAResult
     notes: List[NonEmptyStr]
     disclaimer: NonEmptyStr
 

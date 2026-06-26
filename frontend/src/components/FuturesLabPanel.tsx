@@ -14,6 +14,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
+import FormulaReference from "@/components/math/FormulaReference";
+import type { FormulaGroup } from "@/components/math/formulaTypes";
 import {
   analyzeFutures,
   fetchFuturesSample,
@@ -24,6 +26,29 @@ import {
   type FuturesAnalysisResponse,
   type FuturesContractInput,
 } from "@/lib/futures";
+
+const FUTURES_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Pricing & curve",
+    formulas: [
+      { label: "Cost of carry", latex: "F = S\\, e^{(r + u - y)\\,T}", note: "Forward price from spot, financing r, storage u, convenience yield y." },
+      { label: "Implied convenience yield", latex: "y = r + u - \\frac{\\ln(F/S)}{T}" },
+      { label: "Basis", latex: "\\mathrm{Basis} = F - S" },
+      { label: "Annualised basis", latex: "\\mathrm{Basis}_{\\mathrm{ann}} = \\frac{F/S - 1}{T}" },
+      { label: "Roll yield", latex: "\\mathrm{RollYield} = \\frac{F_{\\mathrm{near}} - F_{\\mathrm{next}}}{F_{\\mathrm{near}}}" },
+      { label: "Calendar spread", latex: "\\mathrm{CalSpread} = F_{\\mathrm{deferred}} - F_{\\mathrm{near}}" },
+    ],
+  },
+  {
+    title: "Contract P&L & margin",
+    formulas: [
+      { label: "Long P&L", latex: "\\mathrm{PnL}_{\\mathrm{long}} = (p_{\\mathrm{exit}} - p_{\\mathrm{entry}})\\, \\kappa\\, n", note: "κ = contract multiplier, n = contracts." },
+      { label: "Short P&L", latex: "\\mathrm{PnL}_{\\mathrm{short}} = (p_{\\mathrm{entry}} - p_{\\mathrm{exit}})\\, \\kappa\\, n" },
+      { label: "Notional & margin", latex: "\\mathrm{Margin} = \\mathrm{Notional} \\cdot m_{\\mathrm{rate}}" },
+      { label: "Return on margin", latex: "\\mathrm{ROM} = \\frac{\\mathrm{PnL}}{\\mathrm{Margin}_{\\mathrm{initial}}}" },
+    ],
+  },
+];
 
 interface NumField {
   key: string;
@@ -339,21 +364,7 @@ export default function FuturesLabPanel() {
 
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <p className="section-title mb-2">Formulas &amp; notes</p>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <ul className="mono space-y-1 text-[11px]" style={{ color: "var(--text-hi)" }}>
-            <li>Cost of carry: F = S · e^((r + u − y)·T)</li>
-            <li>Implied conv. yield: y = r + u − ln(F/S)/T</li>
-            <li>Basis = F − S; ann. basis = (F/S − 1)/T</li>
-            <li>Roll yield = (F_near − F_next) / F_near</li>
-          </ul>
-          <ul className="mono space-y-1 text-[11px]" style={{ color: "var(--text-hi)" }}>
-            <li>Calendar spread = F_deferred − F_near</li>
-            <li>Long P&L = (exit − entry) · mult · contracts</li>
-            <li>Short P&L = (entry − exit) · mult · contracts</li>
-            <li>Margin = notional · margin_rate; ROM = P&L / initial_margin</li>
-          </ul>
-        </div>
+        <FormulaReference title="Formulas & notes" groups={FUTURES_FORMULA_GROUPS} />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — not live futures or commodity prices.</li>
           <li>Cost-of-carry and curve analytics are simplified educational models, not a production risk engine.</li>

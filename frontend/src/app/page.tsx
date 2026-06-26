@@ -1308,6 +1308,9 @@ export default function HomePage() {
         ["Implementation Shortfall Lab", "implementation shortfall slippage arrival price benchmark execution cost market impact participation transaction cost analysis tca"],
         ["Execution Schedule Lab", "execution schedule immediate twap vwap participation of volume pov child orders impact spread cost completion"],
         ["Liquidity Stress Lab", "liquidity stress spread widening depth halving volatility spike volume drought scenario microprice imbalance"],
+        ["Execution Cost Attribution", "execution cost attribution tca spread impact timing fees residual implementation shortfall benchmark arrival vwap twap"],
+        ["TCA Lab", "tca transaction cost analysis execution cost attribution benchmark shortfall spread impact timing fees"],
+        ["Market Impact Attribution", "market impact attribution square root impact cost participation execution cost tca spread timing"],
       ] as const
     ).map(([title, keywords]) => ({
       id: `microstructure-${title}`,
