@@ -25,6 +25,8 @@ from app.experiments import (
     list_experiments,
     load_experiment_run,
 )
+import json
+
 from app.research_cli import (
     ExperimentConfig,
     ExperimentResult,
@@ -33,6 +35,7 @@ from app.research_cli import (
     resolve_artifact_base_dir,
     run_es_ml_experiment,
 )
+from app.research_cli.cli import main as cli_main
 
 _ES = get_instrument("ES")
 _AT = "2026-06-25T00:00:00+00:00"
@@ -369,3 +372,133 @@ def test_pipeline_module_no_network():
     assert not re.search(r"\b(import|from)\s+(requests|urllib|httpx|socket|aiohttp)\b", src)
     assert not re.search(r"\b(import|from)\s+(sklearn|xgboost|lightgbm|torch|tensorflow)\b", src)
     assert not re.search(r"read_csv|read_parquet", src)
+
+
+# --------------------------------------------------------------------------- #
+# Commit 3 — argparse CLI (run / list / compare / best) + scripts
+# --------------------------------------------------------------------------- #
+
+
+def _saved_run(base, **over):
+    return run_es_ml_experiment(_exp_config(created_at=_AT, artifact_base_dir=str(base), **over))
+
+
+def test_cli_run_exits_zero_and_human_output(tmp_path, capsys):
+    rc = cli_main(["run", "--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "SYNTHETIC DEMO" in out
+    assert "train_run_hash:" in out
+    assert str(tmp_path / "exp") in out          # artifact directory printed (console-only)
+
+
+def test_cli_run_json_parses(tmp_path, capsys):
+    rc = cli_main(["run", "--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT, "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["data_source"] == "synthetic"
+    assert payload["train_run_hash"] and payload["artifact_dir"]
+
+
+def test_cli_list_shows_run(tmp_path, capsys):
+    base = tmp_path / "exp"
+    result = _saved_run(base)
+    rc = cli_main(["list", "--artifacts-dir", str(base)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert result.train_run_hash[:12] in out
+
+
+def test_cli_list_json_parses(tmp_path, capsys):
+    base = tmp_path / "exp"
+    _saved_run(base)
+    rc = cli_main(["list", "--artifacts-dir", str(base), "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert isinstance(payload, list) and len(payload) >= 1
+
+
+def test_cli_compare_same_window(tmp_path, capsys):
+    base = tmp_path / "exp"
+    a = _saved_run(base, hyperparameters={"alpha": 1.0})
+    b = _saved_run(base, hyperparameters={"alpha": 0.01})
+    rc = cli_main(["compare", a.train_run_hash, b.train_run_hash, "--artifacts-dir", str(base)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert a.train_run_hash in out and b.train_run_hash in out
+
+
+def test_cli_compare_json_parses(tmp_path, capsys):
+    base = tmp_path / "exp"
+    a = _saved_run(base, hyperparameters={"alpha": 1.0})
+    b = _saved_run(base, hyperparameters={"alpha": 0.01})
+    rc = cli_main(["compare", a.train_run_hash, b.train_run_hash,
+                   "--artifacts-dir", str(base), "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert isinstance(payload, list) and len(payload) == 2
+
+
+def test_cli_compare_rejects_different_window(tmp_path, capsys):
+    base = tmp_path / "exp"
+    a = _saved_run(base)
+    b = _saved_run(base, validation_end=date(2024, 8, 30))   # different OOS window
+    rc = cli_main(["compare", a.train_run_hash, b.train_run_hash, "--artifacts-dir", str(base)])
+    assert rc == 1
+    assert "error" in capsys.readouterr().err.lower()
+
+
+def test_cli_best(tmp_path, capsys):
+    base = tmp_path / "exp"
+    _saved_run(base, hyperparameters={"alpha": 1.0})
+    _saved_run(base, hyperparameters={"alpha": 0.01})
+    rc = cli_main(["best", "--artifacts-dir", str(base), "--metric", "sharpe"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "sharpe" in out
+
+
+def test_cli_best_json_parses(tmp_path, capsys):
+    base = tmp_path / "exp"
+    _saved_run(base, hyperparameters={"alpha": 1.0})
+    _saved_run(base, hyperparameters={"alpha": 0.01})
+    rc = cli_main(["best", "--artifacts-dir", str(base), "--metric", "sharpe", "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert payload["metric"] == "sharpe" and payload["train_run_hash"]
+
+
+def test_wrapper_scripts_exist_and_are_thin():
+    scripts_dir = Path(__file__).resolve().parents[1] / "scripts"
+    mapping = {
+        "run_es_ml_experiment.py": '"run"',
+        "list_experiments.py": '"list"',
+        "compare_experiments.py": '"compare"',
+        "show_best_experiment.py": '"best"',
+    }
+    for filename, subcommand in mapping.items():
+        path = scripts_dir / filename
+        assert path.exists()
+        text = path.read_text(encoding="utf-8")
+        assert "from app.research_cli.cli import main" in text
+        assert subcommand in text
+        assert len(text.splitlines()) <= 15        # thin wrapper
+
+
+def test_cli_creates_no_repo_artifacts_dir(tmp_path):
+    cli_main(["run", "--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT])
+    backend_dir = Path(__file__).resolve().parents[1]
+    assert not (backend_dir.parent / "artifacts").exists()
+    assert not (backend_dir / "artifacts").exists()
+
+
+def test_cli_render_modules_no_forbidden_imports():
+    import app.research_cli.cli as cli_mod
+    import app.research_cli.render as render_mod
+
+    for mod in (cli_mod, render_mod):
+        src = inspect.getsource(mod)
+        assert not re.search(
+            r"\b(import|from)\s+(click|typer|rich|yaml|requests|urllib|httpx|socket|sklearn|xgboost)\b",
+            src,
+        )

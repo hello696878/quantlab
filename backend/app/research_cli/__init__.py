@@ -12,6 +12,7 @@ from app.research_cli.config import (
 )
 from app.research_cli.synthetic import generate_synthetic_es_raw
 from app.research_cli.pipeline import ExperimentResult, run_es_ml_experiment
+from app.research_cli.cli import main
 
 __all__ = [
     "SyntheticDataConfig",
@@ -20,4 +21,5 @@ __all__ = [
     "generate_synthetic_es_raw",
     "ExperimentResult",
     "run_es_ml_experiment",
+    "main",
 ]
