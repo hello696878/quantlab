@@ -1550,14 +1550,15 @@ only** (no absolute / `C:\quantlab` paths in metadata).
 
 ---
 
-## Appendix G — Phase 6 Research CLI and Demo Runner Plan
+## Appendix G — Phase 6 Research CLI and Demo Runner
 
 Phase 6 makes the whole Phase 1→5 synthetic ES ML pipeline runnable from **one
 command** and saved through the Phase 5 registry: generate synthetic raw futures
 → continuous → features → labels → supervised dataset → split → train → evaluate
 → save → (list / compare / best). No new models, no scikit-learn, no real-data
-download, no network. This appendix is a plan — implementation lands in
-commits 1–5.
+download, no network. **Implemented** in `backend/app/research_cli/` +
+`backend/scripts/`. Sections G.1–G.12 describe the design; **§G.13 records the
+as-built status.**
 
 **Locked design decisions:**
 
@@ -1770,3 +1771,68 @@ synthetic data, no network.
 > only.** Every run prints a `SYNTHETIC DEMO` warning, artifacts live under the
 > gitignored `artifacts/experiments/<train_run_hash>/`, and the CLI never commits
 > artifacts.
+
+### G.13 As-built status (Phase 6 complete)
+
+Implemented across five commits; tests are synthetic only, write **only** under
+`tmp_path`, and never touch the network. One command runs the whole flow and a
+final end-to-end test drives it through the actual CLI: **run → load → list →
+compare → best**.
+
+**Implemented modules** (`backend/app/research_cli/`):
+- `config.py` — `SyntheticDataConfig`, `ExperimentConfig` (frozen,
+  `extra="forbid"`; `feature__`/`label__` namespaces, strict date ordering,
+  `ratio`-only, ModelType-enum rejects sklearn types, `root_symbol` ==
+  `synthetic.root_symbol`), `ExperimentConfig.to_model_spec()` (the single
+  config→`ModelSpec` mapping), and `resolve_artifact_base_dir()`.
+- `synthetic.py` — `generate_synthetic_es_raw(config)`: deterministic,
+  seedable, ≥2 in-cycle ES contracts with stepped prices and `open_interest=None`
+  (fallback rolls); full Phase 1 raw schema.
+- `pipeline.py` — `run_es_ml_experiment(config, *, store=None)` →
+  `ExperimentResult` (the Phase 1→5 chain, saved via `save_experiment_run`).
+- `render.py` — `render_run_summary` / `render_experiment_table` /
+  `render_compare_table` / `render_best_experiment` (human str or
+  `json.loads`-parseable JSON).
+- `cli.py` — `main(argv) -> int`, stdlib `argparse`, subcommands `run` / `list`
+  / `compare` / `best`.
+
+**Wrapper scripts** (`backend/scripts/`, thin — call
+`app.research_cli.cli.main(["<cmd>", *sys.argv[1:]])` with no business logic):
+`run_es_ml_experiment.py`, `list_experiments.py`, `compare_experiments.py`,
+`show_best_experiment.py`.
+
+**Canonical command** (from `backend/`):
+`python -m app.research_cli.cli run|list|compare|best`.
+
+**Artifact behavior:** default base `artifacts/experiments/` (gitignored;
+overridable via `--artifacts-dir` or `QUANTLAB_ARTIFACTS_DIR`); tests use
+`tmp_path` only; metadata stores **relative** `artifact_paths` only (no absolute /
+`C:\quantlab` paths); no repo-root `artifacts/` is created.
+
+**Reproduction behavior (test-proven):** same `ExperimentConfig` + same synthetic
+seed + same model seed + fixed `created_at` → identical six hashes,
+`train_run_hash`, and `metadata.json` bytes; changing only ridge `alpha` flips
+`model_config_hash`/`train_run_hash` (data hashes unchanged); changing only the
+synthetic seed (with noise) flips `dataset_config_hash`/`train_run_hash`;
+`overwrite=False` rejects a duplicate (CLI exits non-zero); `overwrite=True`
+rewrites deterministically and leaves no stale artifacts.
+
+**Output:** the `run` summary prints a `SYNTHETIC DEMO` banner, `train_run_hash`,
+the OOS/train windows, ML + backtest metrics, no-trade + momentum baselines, the
+absolute `artifact_dir` (console-only), and a `reproduce:` line; `--json` emits a
+single parseable object carrying `data_source: "synthetic"`, `train_run_hash`,
+`artifact_dir`, `model_type`, `label_column`, `validation_start`/`validation_end`,
+and `backtest_metrics`.
+
+**Safety (test-proven):** synthetic ES demo only; no network; no real-data
+download; no new model types / sklearn / RF / GB; no click / typer / rich / yaml;
+no pickle / joblib; no DB registry / MLflow / W&B.
+
+**Limitations (as-built):**
+- **ES synthetic only**; no real-data experiments yet.
+- **No YAML config** (a future `--config-json` stdlib-JSON file input is noted but
+  not implemented).
+- **No subprocess wrapper e2e** — the wrappers are verified to be thin and to call
+  `main([...])`; the e2e test drives `main([...])` in-process (not via a shell).
+- **Local file-based registry only** (no DB / remote tracking); CSV frames (no
+  parquet engine installed).

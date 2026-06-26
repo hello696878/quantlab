@@ -670,3 +670,74 @@ def test_all_research_cli_modules_no_forbidden_imports():
             r"requests|urllib|httpx|socket|aiohttp|sklearn|xgboost|lightgbm|torch|tensorflow)\b",
             src,
         )
+
+
+# --------------------------------------------------------------------------- #
+# Commit 5 — final one-command CLI end-to-end: run -> load -> list -> compare -> best
+# --------------------------------------------------------------------------- #
+
+
+def _cli_capture(capsys, args, expect_rc=0) -> str:
+    rc = cli_main(args)
+    assert rc == expect_rc
+    return capsys.readouterr().out
+
+
+def test_cli_end_to_end_run_load_list_compare_best(tmp_path, capsys):
+    base = tmp_path / "exp"
+
+    # two same-window runs via the actual CLI (different ridge alpha)
+    p1 = json.loads(_cli_capture(
+        capsys, ["run", "--artifacts-dir", str(base), "--created-at", _AT, "--alpha", "1.0", "--json"]))
+    p2 = json.loads(_cli_capture(
+        capsys, ["run", "--artifacts-dir", str(base), "--created-at", _AT, "--alpha", "0.01", "--json"]))
+    for payload in (p1, p2):
+        assert payload["data_source"] == "synthetic"
+        assert payload["train_run_hash"] and payload["artifact_dir"]
+    h1, h2 = p1["train_run_hash"], p2["train_run_hash"]
+    assert h1 != h2
+
+    # load both back through Phase 5 with frames; verify relative artifact paths
+    store = ExperimentStore(base)
+    for h in (h1, h2):
+        loaded = load_experiment_run(h, store=store, load_frames=True)
+        assert set(loaded.frames) == {"predictions", "signal", "backtest"}
+        for value in loaded.run.artifact_paths.values():
+            assert not value.startswith(("/", "\\")) and not re.match(r"^[A-Za-z]:", value)
+        text = (base / h / "metadata.json").read_text(encoding="utf-8")
+        assert "C:\\quantlab" not in text and "C:/quantlab" not in text and str(tmp_path) not in text
+
+    # list --json shows both
+    listed = json.loads(_cli_capture(capsys, ["list", "--artifacts-dir", str(base), "--json"]))
+    assert {r["train_run_hash"] for r in listed} >= {h1, h2}
+
+    # compare --json returns two rows (same-window guard satisfied)
+    compared = json.loads(_cli_capture(
+        capsys, ["compare", h1, h2, "--artifacts-dir", str(base), "--json"]))
+    assert isinstance(compared, list) and len(compared) == 2
+
+    # best --json returns one of the saved hashes
+    best = json.loads(_cli_capture(
+        capsys, ["best", "--artifacts-dir", str(base), "--metric", "sharpe", "--json"]))
+    assert best["metric"] == "sharpe" and best["train_run_hash"] in {h1, h2}
+
+    # every artifact under tmp_path; no pickle; no repo-root artifacts dir
+    files = [q for q in tmp_path.rglob("*") if q.is_file()]
+    assert files and all(q.is_relative_to(base) for q in files)
+    assert not any(q.name.endswith((".pkl", ".pickle", ".joblib")) for q in files)
+    backend_dir = Path(__file__).resolve().parents[1]
+    assert not (backend_dir.parent / "artifacts").exists()
+    assert not (backend_dir / "artifacts").exists()
+
+
+def test_wrappers_have_no_business_logic():
+    scripts_dir = Path(__file__).resolve().parents[1] / "scripts"
+    for filename in ("run_es_ml_experiment.py", "list_experiments.py",
+                     "compare_experiments.py", "show_best_experiment.py"):
+        text = (scripts_dir / filename).read_text(encoding="utf-8")
+        assert "from app.research_cli.cli import main" in text
+        # no pipeline / registry / config business logic in the wrappers
+        assert "run_es_ml_experiment(" not in text
+        assert "ExperimentStore" not in text
+        assert "ExperimentConfig" not in text
+        assert "save_experiment_run" not in text
