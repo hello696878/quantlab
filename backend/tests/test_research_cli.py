@@ -502,3 +502,171 @@ def test_cli_render_modules_no_forbidden_imports():
             r"\b(import|from)\s+(click|typer|rich|yaml|requests|urllib|httpx|socket|sklearn|xgboost)\b",
             src,
         )
+
+
+# --------------------------------------------------------------------------- #
+# Commit 4 — reproducibility / overwrite / compare-guard / output expansion
+# --------------------------------------------------------------------------- #
+
+
+def _cli_run_json(capsys, *extra) -> dict:
+    rc = cli_main(["run", "--json", *extra])
+    assert rc == 0
+    return json.loads(capsys.readouterr().out)
+
+
+# --- reproducibility ---
+
+
+def test_full_config_reproducible_all_hashes(tmp_path):
+    cfg = _exp_config(created_at=_AT, random_seed=7,
+                      synthetic=SyntheticDataConfig(noise_scale=2.0, random_seed=7))
+    a = run_es_ml_experiment(cfg, store=ExperimentStore(tmp_path / "a"))
+    b = run_es_ml_experiment(cfg, store=ExperimentStore(tmp_path / "b"))
+    for attr in ("continuous_config_hash", "feature_config_hash", "label_config_hash",
+                 "dataset_config_hash", "model_config_hash", "train_run_hash"):
+        assert getattr(a, attr) == getattr(b, attr)
+    assert (a.artifact_dir / "metadata.json").read_bytes() == (b.artifact_dir / "metadata.json").read_bytes()
+
+
+def test_synthetic_seed_changes_hash(tmp_path):
+    a = run_es_ml_experiment(
+        _exp_config(created_at=_AT, synthetic=SyntheticDataConfig(noise_scale=5.0, random_seed=1)),
+        store=ExperimentStore(tmp_path / "a"),
+    )
+    b = run_es_ml_experiment(
+        _exp_config(created_at=_AT, synthetic=SyntheticDataConfig(noise_scale=5.0, random_seed=2)),
+        store=ExperimentStore(tmp_path / "b"),
+    )
+    assert a.dataset_config_hash != b.dataset_config_hash   # via the raw->continuous->label chain
+    assert a.train_run_hash != b.train_run_hash
+
+
+def test_alpha_changes_model_hash_only(tmp_path):
+    a = run_es_ml_experiment(_exp_config(created_at=_AT, hyperparameters={"alpha": 1.0}),
+                             store=ExperimentStore(tmp_path / "a"))
+    b = run_es_ml_experiment(_exp_config(created_at=_AT, hyperparameters={"alpha": 0.01}),
+                             store=ExperimentStore(tmp_path / "b"))
+    assert a.model_config_hash != b.model_config_hash
+    assert a.train_run_hash != b.train_run_hash
+    assert a.continuous_config_hash == b.continuous_config_hash   # data unchanged
+    assert a.dataset_config_hash == b.dataset_config_hash
+
+
+def test_cli_run_overwrite_deterministic(tmp_path, capsys):
+    args = ["--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT, "--overwrite"]
+    p1 = _cli_run_json(capsys, *args)
+    meta1 = (Path(p1["artifact_dir"]) / "metadata.json").read_bytes()
+    p2 = _cli_run_json(capsys, *args)
+    meta2 = (Path(p2["artifact_dir"]) / "metadata.json").read_bytes()
+    assert p1["train_run_hash"] == p2["train_run_hash"]
+    assert meta1 == meta2
+
+
+# --- overwrite behavior via CLI ---
+
+
+def test_cli_run_duplicate_rejected(tmp_path, capsys):
+    args = ["--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT]
+    assert cli_main(["run", *args]) == 0
+    capsys.readouterr()
+    rc = cli_main(["run", *args])   # duplicate, no --overwrite
+    assert rc == 1
+    assert "error" in capsys.readouterr().err.lower()
+
+
+def test_cli_run_duplicate_with_overwrite_succeeds(tmp_path, capsys):
+    args = ["--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT]
+    assert cli_main(["run", *args]) == 0
+    capsys.readouterr()
+    assert cli_main(["run", *args, "--overwrite"]) == 0
+
+
+def test_overwrite_removes_stale_artifacts(tmp_path):
+    store = ExperimentStore(tmp_path / "exp")
+    result = run_es_ml_experiment(_exp_config(created_at=_AT), store=store)
+    stale = result.artifact_dir / "stale.txt"
+    stale.write_text("leftover", encoding="utf-8")
+    assert stale.exists()
+    run_es_ml_experiment(_exp_config(created_at=_AT, overwrite=True), store=store)
+    assert not stale.exists()
+    names = sorted(p.name for p in result.artifact_dir.iterdir())
+    assert names == sorted(
+        ["metadata.json", "model_params.json", "metrics.json",
+         "predictions.csv", "signal.csv", "backtest.csv"]
+    )
+
+
+# --- compare guard via CLI ---
+
+
+def test_cli_compare_different_dataset_rejected(tmp_path, capsys):
+    base = tmp_path / "exp"
+    a = _saved_run(base, feature_columns=("feature__return_20", "feature__moving_average_gap_10_50"))
+    b = _saved_run(base, feature_columns=("feature__return_20", "feature__realized_vol_20"))
+    assert a.dataset_config_hash != b.dataset_config_hash
+    rc = cli_main(["compare", a.train_run_hash, b.train_run_hash, "--artifacts-dir", str(base)])
+    assert rc == 1
+    assert "error" in capsys.readouterr().err.lower()
+
+
+def test_cli_compare_different_label_rejected(tmp_path, capsys):
+    base = tmp_path / "exp"
+    a = _saved_run(base, label_column="label__forward_return_1")
+    b = _saved_run(base, label_column="label__forward_return_5")
+    rc = cli_main(["compare", a.train_run_hash, b.train_run_hash, "--artifacts-dir", str(base)])
+    assert rc == 1
+    assert "error" in capsys.readouterr().err.lower()
+
+
+def test_cli_compare_allow_different_windows_json_marks_same_window(tmp_path, capsys):
+    base = tmp_path / "exp"
+    a = _saved_run(base)
+    b = _saved_run(base, validation_end=date(2024, 8, 30))   # different OOS window
+    rc = cli_main(["compare", a.train_run_hash, b.train_run_hash,
+                   "--artifacts-dir", str(base), "--allow-different-windows", "--json"])
+    assert rc == 0
+    payload = json.loads(capsys.readouterr().out)
+    assert isinstance(payload, list) and len(payload) == 2
+    assert all("same_window" in record for record in payload)
+
+
+# --- output behavior ---
+
+
+def test_cli_run_human_output_sections(tmp_path, capsys):
+    rc = cli_main(["run", "--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT])
+    out = capsys.readouterr().out
+    assert rc == 0
+    for token in ("SYNTHETIC DEMO", "train_run_hash:", "artifact_dir:", "reproduce:"):
+        assert token in out
+
+
+def test_cli_run_json_full_fields(tmp_path, capsys):
+    payload = _cli_run_json(capsys, "--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT)
+    for key in ("data_source", "train_run_hash", "artifact_dir", "model_type",
+                "label_column", "validation_start", "validation_end", "backtest_metrics"):
+        assert key in payload
+    assert payload["data_source"] == "synthetic"
+    assert payload["model_type"] == "ridge_regression"
+    assert payload["label_column"] == "label__forward_return_1"
+    assert "sharpe" in payload["backtest_metrics"]
+
+
+# --- safety: consolidated source scan over all research_cli modules ---
+
+
+def test_all_research_cli_modules_no_forbidden_imports():
+    import app.research_cli.config as config_mod
+    import app.research_cli.synthetic as synthetic_mod
+    import app.research_cli.pipeline as pipeline_mod
+    import app.research_cli.cli as cli_mod
+    import app.research_cli.render as render_mod
+
+    for mod in (config_mod, synthetic_mod, pipeline_mod, cli_mod, render_mod):
+        src = inspect.getsource(mod)
+        assert not re.search(
+            r"\b(import|from)\s+(pickle|joblib|cloudpickle|click|typer|rich|yaml|"
+            r"requests|urllib|httpx|socket|aiohttp|sklearn|xgboost|lightgbm|torch|tensorflow)\b",
+            src,
+        )
