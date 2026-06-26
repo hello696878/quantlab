@@ -9,8 +9,26 @@ extra dependencies.  The run summary always carries the SYNTHETIC DEMO banner.
 from __future__ import annotations
 
 import json
+import math
 
 SYNTHETIC_BANNER = "SYNTHETIC DEMO — not real market performance"
+
+
+def _json_sanitize(obj):
+    """Recursively map non-finite floats (NaN / ±inf) to ``None`` so the output is
+    strict JSON.  Other values are left for ``json.dumps(default=str)``."""
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else None
+    if isinstance(obj, dict):
+        return {k: _json_sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_json_sanitize(v) for v in obj]
+    return obj
+
+
+def _json_dumps(obj) -> str:
+    """Strict JSON: NaN/inf become ``null``; dates/paths serialize as strings."""
+    return json.dumps(_json_sanitize(obj), default=str)
 
 
 def _fmt(value) -> str:
@@ -54,7 +72,7 @@ def render_run_summary(result, as_json: bool = False) -> str:
         },
     }
     if as_json:
-        return json.dumps(payload, default=str)
+        return _json_dumps(payload)
 
     reproduce = (
         f"python -m app.research_cli.cli run --seed {cfg.random_seed} "
@@ -94,7 +112,7 @@ def render_experiment_table(runs, as_json: bool = False) -> str:
         for r in runs
     ]
     if as_json:
-        return json.dumps(records, default=str)
+        return _json_dumps(records)
     if not records:
         return "(no experiments)"
     header = (f"{'hash':<14} {'model':<20} {'label':<28} "
@@ -112,7 +130,7 @@ def render_experiment_table(runs, as_json: bool = False) -> str:
 def render_compare_table(df, as_json: bool = False) -> str:
     """Render a ``compare_experiments`` DataFrame."""
     if as_json:
-        return json.dumps(df.to_dict(orient="records"), default=str)
+        return _json_dumps(df.to_dict(orient="records"))
     return df.to_string(index=False)
 
 
@@ -127,7 +145,7 @@ def render_best_experiment(run, metric: str, as_json: bool = False) -> str:
         "validation_window": [run.validation_start.isoformat(), run.validation_end.isoformat()],
     }
     if as_json:
-        return json.dumps(payload, default=str)
+        return _json_dumps(payload)
     return "\n".join(
         [
             f"=== {SYNTHETIC_BANNER} ===",

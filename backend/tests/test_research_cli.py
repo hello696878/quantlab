@@ -741,3 +741,87 @@ def test_wrappers_have_no_business_logic():
         assert "ExperimentStore" not in text
         assert "ExperimentConfig" not in text
         assert "save_experiment_run" not in text
+
+
+# --------------------------------------------------------------------------- #
+# CLI hygiene fixes: sys.modules RuntimeWarning / direct wrappers / strict JSON
+# --------------------------------------------------------------------------- #
+
+
+def test_package_init_does_not_import_cli():
+    # The package __init__ must NOT import app.research_cli.cli (eager import puts it
+    # in sys.modules before `python -m app.research_cli.cli` runs -> RuntimeWarning).
+    init_src = (Path(__file__).resolve().parents[1] / "app" / "research_cli" / "__init__.py").read_text(
+        encoding="utf-8"
+    )
+    assert not re.search(r"(?m)^\s*from app\.research_cli\.cli import", init_src)
+    assert not re.search(r"(?m)^\s*import app\.research_cli\.cli", init_src)
+
+
+def test_python_m_cli_run_no_sys_modules_runtimewarning(tmp_path):
+    import subprocess
+    import sys
+
+    backend = Path(__file__).resolve().parents[1]
+    result = subprocess.run(
+        [sys.executable, "-m", "app.research_cli.cli", "run",
+         "--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT, "--json"],
+        cwd=str(backend), capture_output=True, text=True, timeout=180,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "found in sys.modules" not in result.stderr   # the specific RuntimeWarning
+    payload = json.loads(result.stdout)
+    assert payload["train_run_hash"]
+    assert not (backend / "artifacts").exists()           # no repo-root artifacts
+
+
+def test_wrapper_scripts_run_directly(tmp_path):
+    import subprocess
+    import sys
+
+    backend = Path(__file__).resolve().parents[1]
+    base = tmp_path / "exp"
+
+    run_result = subprocess.run(
+        [sys.executable, str(backend / "scripts" / "run_es_ml_experiment.py"),
+         "--artifacts-dir", str(base), "--created-at", _AT, "--json"],
+        cwd=str(backend), capture_output=True, text=True, timeout=180,
+    )
+    assert run_result.returncode == 0, run_result.stderr
+    train_run_hash = json.loads(run_result.stdout)["train_run_hash"]
+
+    list_result = subprocess.run(
+        [sys.executable, str(backend / "scripts" / "list_experiments.py"),
+         "--artifacts-dir", str(base), "--json"],
+        cwd=str(backend), capture_output=True, text=True, timeout=180,
+    )
+    assert list_result.returncode == 0, list_result.stderr
+    listed = json.loads(list_result.stdout)
+    assert any(record["train_run_hash"] == train_run_hash for record in listed)
+    assert not (backend / "artifacts").exists()
+
+
+def test_render_json_dumps_is_strict():
+    from app.research_cli.render import _json_dumps
+
+    text = _json_dumps({"a": float("nan"), "b": float("inf"), "c": float("-inf"),
+                        "d": 1.5, "e": [float("nan"), 2.0]})
+    assert "NaN" not in text and "Infinity" not in text
+    parsed = json.loads(text)
+    assert parsed["a"] is None and parsed["b"] is None and parsed["c"] is None
+    assert parsed["d"] == 1.5 and parsed["e"] == [None, 2.0]
+
+
+def test_cli_compare_json_is_strict_null_not_nan(tmp_path, capsys):
+    base = tmp_path / "exp"
+    a = _saved_run(base, hyperparameters={"alpha": 1.0})
+    b = _saved_run(base, hyperparameters={"alpha": 0.01})
+    rc = cli_main(["compare", a.train_run_hash, b.train_run_hash, "--artifacts-dir", str(base), "--json"])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "NaN" not in out and "Infinity" not in out          # strict JSON literals
+    payload = json.loads(out)
+    assert len(payload) == 2
+    # regression runs have no classification metric -> null (None), never NaN
+    assert all("accuracy" in record for record in payload)
+    assert all(record["accuracy"] is None for record in payload)

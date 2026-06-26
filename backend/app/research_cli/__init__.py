@@ -12,7 +12,11 @@ from app.research_cli.config import (
 )
 from app.research_cli.synthetic import generate_synthetic_es_raw
 from app.research_cli.pipeline import ExperimentResult, run_es_ml_experiment
-from app.research_cli.cli import main
+
+# NOTE: ``app.research_cli.cli`` is intentionally **not** imported here.  Eagerly
+# importing it would put the module in ``sys.modules`` before ``python -m
+# app.research_cli.cli`` executes it, triggering a RuntimeWarning.  Import ``main``
+# directly from ``app.research_cli.cli`` when you need it.
 
 __all__ = [
     "SyntheticDataConfig",
@@ -21,5 +25,4 @@ __all__ = [
     "generate_synthetic_es_raw",
     "ExperimentResult",
     "run_es_ml_experiment",
-    "main",
 ]
