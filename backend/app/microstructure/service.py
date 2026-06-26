@@ -30,6 +30,7 @@ from app.microstructure.models import (
     TradeTapeSummary,
 )
 from app.microstructure.sample import DISCLAIMER
+from app.microstructure.toxicity import analyze_order_flow_toxicity
 
 _EPS = 1e-12
 
@@ -183,6 +184,9 @@ def analyze_microstructure(
         base_impact_bps, filled, req.commission_per_unit,
     )
 
+    # ── Order-flow toxicity & liquidity metrics (Phase 25.2) ────────────────
+    order_flow_toxicity = analyze_order_flow_toxicity(req)
+
     return MarketMicrostructureAnalysisResponse(
         instrument_summary=InstrumentSummary(
             symbol=book.symbol, timestamp=book.timestamp,
@@ -195,6 +199,7 @@ def analyze_microstructure(
         schedule_comparison=schedule_comparison,
         liquidity_scenarios=liquidity,
         tca=tca,
+        order_flow_toxicity=order_flow_toxicity,
         notes=[
             "Order-book metrics: mid = (bid+ask)/2, microprice weights the touch by "
             "the opposite size; imbalance uses level-1 and top-5 depth.",

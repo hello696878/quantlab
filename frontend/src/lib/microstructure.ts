@@ -51,6 +51,35 @@ export interface ExecutionFillInput {
   liquidity_flag?: LiquidityFlag | null;
 }
 
+export interface QuoteUpdateInput {
+  timestamp: string;
+  bid: number;
+  ask: number;
+  bid_size: number;
+  ask_size: number;
+  mid_price?: number | null;
+}
+
+export interface SignedTradeInput {
+  timestamp: string;
+  price: number;
+  size: number;
+  side: Side;
+  mid_before: number;
+  mid_after_5s?: number | null;
+  mid_after_30s?: number | null;
+  volume_bucket?: number | null;
+}
+
+export interface ToxicityConfig {
+  bucket_volume: number;
+  realized_spread_horizon_seconds: number;
+  vpin_window_buckets: number;
+  lambda_window_trades: number;
+  regime_threshold_low: number;
+  regime_threshold_high: number;
+}
+
 export interface MarketMicrostructureAnalysisRequest {
   order_book: OrderBookSnapshotInput;
   trades: TradePrintInput[];
@@ -61,6 +90,9 @@ export interface MarketMicrostructureAnalysisRequest {
   volatility_bps: number;
   impact_coefficient: number;
   commission_per_unit: number;
+  quotes?: QuoteUpdateInput[] | null;
+  signed_trades?: SignedTradeInput[] | null;
+  toxicity_config?: ToxicityConfig | null;
 }
 
 export interface MicrostructureSampleResponse {
@@ -170,6 +202,68 @@ export interface TCAResult {
   notes: string[];
 }
 
+export interface OrderFlowSummary {
+  trade_count: number;
+  buy_volume: number;
+  sell_volume: number;
+  total_volume: number;
+  signed_volume: number;
+  order_flow_imbalance: number;
+  average_queue_imbalance: number;
+}
+
+export interface SpreadQuality {
+  average_effective_spread_bps: number;
+  average_realized_spread_bps: number;
+  average_adverse_selection_bps: number;
+  effective_spread_p95_bps: number;
+  adverse_selection_p95_bps: number;
+}
+
+export interface ToxicityMetrics {
+  vpin: number;
+  vpin_bucket_count: number;
+  kyle_lambda?: number | null;
+  amihud_illiquidity: number;
+  toxicity_score: number;
+  notes: string[];
+}
+
+export interface LiquidityRegime {
+  regime_id: string;
+  regime_label: string;
+  score: number;
+  drivers: string[];
+  explanation: string;
+}
+
+export interface ToxicityScenarioResult {
+  id: string;
+  name: string;
+  description: string;
+  order_flow_imbalance: number;
+  queue_imbalance: number;
+  vpin: number;
+  effective_spread_bps: number;
+  realized_spread_bps: number;
+  adverse_selection_bps: number;
+  kyle_lambda?: number | null;
+  amihud_illiquidity: number;
+  regime_label: string;
+  notes: string[];
+}
+
+export interface OrderFlowToxicityResult {
+  data_status: "static_sample";
+  order_flow_summary: OrderFlowSummary;
+  spread_quality: SpreadQuality;
+  toxicity_metrics: ToxicityMetrics;
+  liquidity_regime: LiquidityRegime;
+  toxicity_scenarios: ToxicityScenarioResult[];
+  formula_notes: string[];
+  disclaimer: string;
+}
+
 export interface MarketMicrostructureAnalysisResponse {
   data_status: "static_sample";
   instrument_summary: InstrumentSummary;
@@ -180,6 +274,7 @@ export interface MarketMicrostructureAnalysisResponse {
   schedule_comparison: ScheduleComparisonResult[];
   liquidity_scenarios: LiquidityScenarioResult[];
   tca: TCAResult;
+  order_flow_toxicity: OrderFlowToxicityResult;
   notes: string[];
   disclaimer: string;
 }
@@ -254,4 +349,18 @@ export function compact(value: number): string {
   if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
   if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
   return value.toLocaleString("en-US", { maximumFractionDigits: 2 });
+}
+
+/** Compact scientific notation for very small/large magnitudes (e.g. Amihud). */
+export function sci(value: number, digits = 2): string {
+  if (value === 0) return "0";
+  if (Math.abs(value) < 1e-3 || Math.abs(value) >= 1e6) return value.toExponential(digits);
+  return value.toFixed(Math.max(digits, 4));
+}
+
+/** Kyle lambda or "—" when undefined (null on zero signed-volume variance). */
+export function lambdaFmt(value: number | null | undefined): string {
+  if (value == null) return "—";
+  if (value === 0) return "0";
+  return Math.abs(value) >= 0.001 ? value.toFixed(4) : value.toExponential(2);
 }

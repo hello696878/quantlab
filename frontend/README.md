@@ -118,12 +118,17 @@ volatility / impact assumptions, and re-analyses live via
 `/api/microstructure/analyze` (order-book spread / depth ladder / imbalance /
 microprice, trade-tape VWAP/TWAP/imbalance, implementation shortfall, slippage,
 participation, square-root market impact, a four-schedule execution comparison,
-eight liquidity stress scenarios, and a **TCA / execution-cost attribution** card —
+eight liquidity stress scenarios, a **TCA / execution-cost attribution** card —
 arrival/VWAP/TWAP benchmark shortfalls plus a spread / impact / timing / fees /
-residual decomposition). Its formulas (incl. TCA) render as local LaTeX (see the
-shared formula note below). Static illustrative sample data — no live order books
-or trades, no broker / exchange integration, not a production execution / TCA
-system, not investment / trading / order-routing advice.
+residual decomposition — and an **Order Flow Toxicity & Liquidity** section:
+order-flow imbalance, queue imbalance, effective / realized spread, adverse
+selection, a simplified VPIN-style toxicity metric, Kyle lambda, Amihud
+illiquidity, a liquidity-regime pill, and eight toxic-flow stress scenarios). Its
+formulas (incl. TCA and toxicity) render as local LaTeX (see the shared formula
+note below). Static illustrative sample data — no live order books or trades, no
+broker / exchange integration, the VPIN-style metric is a simplified educational
+approximation (not exchange VPIN), not real-time toxicity detection, not a
+production execution / TCA system, not investment / trading / order-routing advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract

@@ -425,13 +425,20 @@ Return to the Command Center's **Platform Direction** panel (or open
   the **liquidity-stress** table (spread doubles, depth halves, volatility spike,
   volume drought, combo shock, bid-/ask-side pressure), and the new **TCA / Execution
   Cost Attribution** card (arrival/VWAP/TWAP benchmark shortfalls + a spread / impact /
-  timing / fees / residual table that sums to the realised shortfall). Note the
-  **Formulas & notes** now render as crisp **LaTeX** (KaTeX, local — no CDN) with a
-  **📋 Copy LaTeX** button. Edit the parent quantity / ADV / volatility / impact and
-  watch everything re-compute. Emphasise: static illustrative sample data, simplified
-  educational impact/schedule/TCA models — **not** a live order book or trade feed, no
-  broker/exchange integration, **not** a production execution / TCA system, no schedule
-  is recommended, not investment / trading / order-routing advice.
+  timing / fees / residual table that sums to the realised shortfall). Then scroll to
+  the new **Order Flow Toxicity & Liquidity** section (Phase 25.2): key cards (order-flow
+  imbalance, queue imbalance, **VPIN**, effective / realized spread, **adverse selection**,
+  **Kyle λ**, **Amihud**), a **liquidity-regime** pill, a **spread-quality** table, and the
+  **toxic-flow scenarios** table — point out that buy/sell pressure waves move OFI, spread
+  widening raises effective spread, toxic informed flow raises adverse selection, and
+  volume drought raises Amihud illiquidity. Note the **Formulas & notes** now render as
+  crisp **LaTeX** (KaTeX, local — no CDN) with a **📋 Copy LaTeX** button. Edit the parent
+  quantity / ADV / volatility / impact and watch everything re-compute. Emphasise: static
+  illustrative sample data, simplified educational impact/schedule/TCA/toxicity models —
+  the **VPIN-style metric is a simplified approximation, not exchange VPIN**, **not**
+  real-time toxicity detection, **not** a live order book or trade feed, no broker/exchange
+  integration, **not** a production execution / TCA system, no schedule is recommended, not
+  investment / trading / order-routing advice.
 - **LaTeX formula polish (25.1)** — across the labs (Portfolio Risk, Options,
   Volatility, Futures, Real Estate, MBS, Credit, FX, Yield Curve / Short Rate, Event,
   Microstructure), open each "Formulas & notes" / "Key formulas" section to show

@@ -23,7 +23,9 @@ import {
   bps,
   compact,
   fetchMicrostructureSample,
+  lambdaFmt,
   num,
+  sci,
   signedBps,
   type MarketMicrostructureAnalysisRequest,
   type MarketMicrostructureAnalysisResponse,
@@ -82,12 +84,59 @@ const MICROSTRUCTURE_FORMULA_GROUPS: FormulaGroup[] = [
   },
 ];
 
+const TOXICITY_FORMULA_GROUPS: FormulaGroup[] = [
+  {
+    title: "Signed flow",
+    formulas: [
+      { label: "Signed direction", latex: "\\epsilon_i = \\begin{cases} +1, & \\text{buyer initiated} \\\\ -1, & \\text{seller initiated} \\end{cases}" },
+      { label: "Signed volume", latex: "x_i = \\epsilon_i q_i" },
+      { label: "Order flow imbalance", latex: "\\mathrm{OFI} = \\frac{\\sum_i \\epsilon_i q_i}{\\sum_i q_i}" },
+      { label: "Queue imbalance", latex: "\\mathrm{QI} = \\frac{Q_b - Q_a}{Q_b + Q_a}" },
+    ],
+  },
+  {
+    title: "Spread quality",
+    formulas: [
+      { label: "Effective spread", latex: "\\mathrm{EffSpread}_i = 2\\epsilon_i \\frac{p_i - m_i}{m_i} \\times 10{,}000" },
+      { label: "Realized spread", latex: "\\mathrm{RealizedSpread}_i = 2\\epsilon_i \\frac{p_i - m_{i+h}}{m_i} \\times 10{,}000" },
+      { label: "Adverse selection", latex: "\\mathrm{AdverseSelection}_i = \\mathrm{EffSpread}_i - \\mathrm{RealizedSpread}_i" },
+    ],
+  },
+  {
+    title: "Toxicity metrics",
+    formulas: [
+      { label: "VPIN-style metric", latex: "\\mathrm{VPIN} = \\frac{1}{B}\\sum_{b=1}^{B} \\frac{\\lvert V_b^{\\mathrm{buy}} - V_b^{\\mathrm{sell}}\\rvert}{V_b^{\\mathrm{buy}} + V_b^{\\mathrm{sell}}}", note: "Simplified educational VPIN-style metric — not exchange VPIN." },
+      { label: "Kyle lambda", latex: "\\lambda \\approx \\frac{\\mathrm{Cov}(\\Delta p_t, x_t)}{\\mathrm{Var}(x_t)}", note: "Null when signed-volume variance is zero." },
+      { label: "Amihud illiquidity", latex: "\\mathrm{ILLIQ} = \\frac{1}{N}\\sum_t \\frac{\\lvert r_t\\rvert}{\\mathrm{DollarVolume}_t}" },
+    ],
+  },
+  {
+    title: "Liquidity regime",
+    formulas: [
+      { label: "Toxicity score", latex: "T = \\tfrac{1}{2}\\,\\mathrm{VPIN} + \\tfrac{1}{2}\\,\\frac{\\mathrm{AdverseSelection}}{\\mathrm{EffSpread}}", note: "Bounded to [0, 1]." },
+      { label: "Classification", latex: "\\text{regime} = f(\\mathrm{VPIN},\\, s_{\\mathrm{bps}},\\, \\mathrm{AdverseSelection},\\, \\mathrm{OFI})", note: "calm · balanced · one-sided · toxic · stressed." },
+    ],
+  },
+];
+
 function imbColor(v: number): string {
   return v > 0.02 ? "var(--pos)" : v < -0.02 ? "var(--neg)" : "var(--text-hi)";
 }
 
 function costColor(v: number): string {
   return v > 0 ? "var(--neg)" : v < 0 ? "var(--pos)" : "var(--text-mut)";
+}
+
+const REGIME_TONE: Record<string, { color: string; bg: string }> = {
+  calm_liquid: { color: "var(--emerald)", bg: "var(--accent-softer)" },
+  balanced: { color: "var(--text-hi)", bg: "var(--glass)" },
+  one_sided_flow: { color: "var(--warn)", bg: "var(--warn-soft)" },
+  toxic_flow: { color: "var(--risk)", bg: "var(--warn-soft)" },
+  stressed_illiquid: { color: "var(--risk)", bg: "var(--warn-soft)" },
+};
+
+function regimeTone(id: string): { color: string; bg: string } {
+  return REGIME_TONE[id] ?? { color: "var(--text-hi)", bg: "var(--glass)" };
 }
 
 export default function MicrostructureLabPanel() {
@@ -192,6 +241,7 @@ export default function MicrostructureLabPanel() {
   const ob = r?.order_book_summary;
   const ex = r?.execution_summary;
   const tape = r?.trade_tape_summary;
+  const tox = r?.order_flow_toxicity;
 
   return (
     <div className="space-y-5">
@@ -500,9 +550,109 @@ export default function MicrostructureLabPanel() {
         </div>
       )}
 
+      {/* ── Order Flow Toxicity & Liquidity ──────────────────────────────── */}
+      {r && tox && (
+        <div className="card p-4">
+          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+            <p className="section-title">Order Flow Toxicity &amp; Liquidity</p>
+            <span
+              className="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide"
+              style={{
+                background: regimeTone(tox.liquidity_regime.regime_id).bg,
+                border: "1px solid var(--line)",
+                color: regimeTone(tox.liquidity_regime.regime_id).color,
+              }}
+              title={tox.liquidity_regime.explanation}
+            >
+              {tox.liquidity_regime.regime_label}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+            <MetricCard label="Order flow imb." value={num(tox.order_flow_summary.order_flow_imbalance, 3)} tone={tox.order_flow_summary.order_flow_imbalance >= 0 ? "positive" : "warn"} />
+            <MetricCard label="Queue imb." value={num(tox.order_flow_summary.average_queue_imbalance, 3)} />
+            <MetricCard label="VPIN" value={num(tox.toxicity_metrics.vpin, 3)} tone={tox.toxicity_metrics.vpin >= 0.4 ? "danger" : tox.toxicity_metrics.vpin <= 0.2 ? "positive" : "warn"} />
+            <MetricCard label="Eff. spread" value={bps(tox.spread_quality.average_effective_spread_bps)} />
+            <MetricCard label="Realized spread" value={bps(tox.spread_quality.average_realized_spread_bps)} />
+            <MetricCard label="Adverse sel." value={bps(tox.spread_quality.average_adverse_selection_bps)} tone="warn" />
+            <MetricCard label="Kyle λ" value={lambdaFmt(tox.toxicity_metrics.kyle_lambda)} />
+            <MetricCard label="Amihud" value={sci(tox.toxicity_metrics.amihud_illiquidity)} />
+          </div>
+
+          <div className="mt-3 grid grid-cols-1 gap-5 lg:grid-cols-3">
+            {/* Spread quality */}
+            <div className="lg:col-span-1">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-mut)" }}>Spread quality</p>
+              <table className="w-full text-sm">
+                <tbody>
+                  {[
+                    ["Avg effective spread", bps(tox.spread_quality.average_effective_spread_bps)],
+                    ["Avg realized spread", bps(tox.spread_quality.average_realized_spread_bps)],
+                    ["Avg adverse selection", bps(tox.spread_quality.average_adverse_selection_bps)],
+                    ["P95 effective spread", bps(tox.spread_quality.effective_spread_p95_bps)],
+                    ["P95 adverse selection", bps(tox.spread_quality.adverse_selection_p95_bps)],
+                  ].map(([label, value]) => (
+                    <tr key={label} style={{ borderTop: "1px solid var(--line)" }}>
+                      <td className="py-1.5 pr-2" style={{ color: "var(--text-mut)" }}>{label}</td>
+                      <td className="mono py-1.5 text-right font-semibold" style={{ color: "var(--text-hi)" }}>{value}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+                Regime drivers: {tox.liquidity_regime.drivers.join(" · ")}.
+              </p>
+            </div>
+
+            {/* Toxicity scenarios */}
+            <div className="lg:col-span-2">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-mut)" }}>Toxic flow scenarios</p>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr style={{ color: "var(--text-mut)" }}>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Scenario</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">OFI</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">QI</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">VPIN</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Eff sprd</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Adv sel</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Kyle λ</th>
+                      <th className="px-2 py-1 text-right text-[11px] font-medium uppercase tracking-wide">Amihud</th>
+                      <th className="px-2 py-1 text-left text-[11px] font-medium uppercase tracking-wide">Regime</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tox.toxicity_scenarios.map((s) => (
+                      <tr key={s.id} style={{ borderTop: "1px solid var(--line)" }} title={s.description}>
+                        <td className="px-2 py-1.5" style={{ color: "var(--text-hi)" }}>{s.name}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: imbColor(s.order_flow_imbalance) }}>{num(s.order_flow_imbalance, 3)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{num(s.queue_imbalance, 3)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: s.vpin >= 0.4 ? "var(--neg)" : "var(--text-mut)" }}>{num(s.vpin, 3)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{bps(s.effective_spread_bps)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{bps(s.adverse_selection_bps)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{lambdaFmt(s.kyle_lambda)}</td>
+                        <td className="mono px-2 py-1.5 text-right" style={{ color: "var(--text-mut)" }}>{sci(s.amihud_illiquidity)}</td>
+                        <td className="px-2 py-1.5 text-[11px]" style={{ color: "var(--text-mut)" }}>{s.regime_label}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+          <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+            Deterministic educational order-flow toxicity &amp; liquidity diagnostics on static sample
+            data. The VPIN-style metric is a simplified educational approximation — not exchange VPIN,
+            not real-time toxicity detection, and not investment, trading, or order-routing advice.
+          </p>
+        </div>
+      )}
+
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <FormulaReference title="Formulas & notes" groups={MICROSTRUCTURE_FORMULA_GROUPS} />
+        <FormulaReference title="Formulas & notes" groups={[...MICROSTRUCTURE_FORMULA_GROUPS, ...TOXICITY_FORMULA_GROUPS]} />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — not a live order book or trade feed.</li>
           <li>The market-impact and schedule models are simplified educational approximations, not a production execution / cost model.</li>

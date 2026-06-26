@@ -1677,6 +1677,48 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 25.2 — Order Flow Toxicity & Liquidity Metrics Lab v1 ✅
+
+- **Extends the Market Microstructure Lab** with deterministic educational
+  order-flow toxicity and liquidity diagnostics. Static sample data only; no live
+  order books/trades/market data, no broker/exchange integration, no order
+  submission, no trading, no API keys, no scraping, not investment / trading /
+  order-routing advice, not a production execution system. Existing microstructure
+  fields (order book, tape, execution, schedules, liquidity stress, TCA) unchanged.
+- Backend: new `app/microstructure/toxicity.py` (pure, deterministic) +
+  `OrderFlowToxicityResult` (and `OrderFlowSummary`, `SpreadQuality`,
+  `ToxicityMetrics`, `LiquidityRegime`, `ToxicityScenarioResult`) on the response;
+  new optional request inputs `quotes` (`QuoteUpdateInput`), `signed_trades`
+  (`SignedTradeInput`), and `toxicity_config` (`ToxicityConfig`). The four sample
+  instruments now carry deterministic signed trade tapes (60 trades), quote
+  sequences (30 updates), and a config; when the inputs are omitted the service
+  derives a deterministic sequence so the section is always present.
+- Analytics: order-flow imbalance (OFI, bounded ±1), queue imbalance (QI),
+  effective spread, realized spread, adverse selection (= effective − realized),
+  a simplified VPIN-style metric over equal-volume buckets, a Kyle-lambda
+  regression approximation (null + note on zero signed-volume variance), an Amihud
+  illiquidity approximation, a deterministic liquidity-regime classifier (calm /
+  balanced / one-sided / toxic / stressed), and eight toxic-flow stress scenarios
+  (base, buy/sell pressure waves, spread widening, depth evaporation, toxic
+  informed flow, volume drought, liquidity recovery). Every division guarded → no
+  NaN/Inf.
+- Frontend: new "Order Flow Toxicity & Liquidity" card in `MicrostructureLabPanel`
+  (key cards, regime pill, spread-quality table, scenario table) with the toxicity
+  formulas rendered via the shared `FormulaReference` (signed flow / spread quality
+  / toxicity metrics / liquidity regime groups). Command Palette gained Order Flow
+  Toxicity Lab, VPIN Liquidity Lab, Effective Spread Lab, Adverse Selection Lab,
+  Liquidity Regime Lab; the dashboard card now reads "Execution + liquidity
+  analytics" and mentions order-flow toxicity / VPIN-style metrics / adverse
+  selection.
+- 15 new backend tests (43 microstructure tests total) — full suite green
+  (**2290 passed**); `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`, `frontend/README.md`,
+  `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample,
+  educational — VPIN-style metric is a simplified approximation (not exchange
+  VPIN), no live order books or trades, no broker/exchange integration, not
+  real-time toxicity detection, not a production execution system, not investment /
+  trading / order-routing advice.**
+
 ### Phase 25.1 — QuantLab-wide LaTeX Formula Polish + Microstructure TCA Extension v1 ✅
 
 - **Two changes in one pass.** (1) A QuantLab-wide LaTeX formula polish: every

@@ -220,19 +220,27 @@ risk-management advice, and not a production execution / TCA system.
 | Endpoint | Description |
 |---|---|
 | `GET /microstructure/sample` | Four deterministic sample instruments (BTCUSDT, SPY, CL futures, TSM equity), each with a limit order book, trade tape, parent order, sample fills, and an intraday volume curve |
-| `POST /microstructure/analyze` | Order-book summary (spread, depth ladder, top-of-book & 5-level imbalance, microprice), trade-tape VWAP / TWAP / trade imbalance, execution analytics (implementation shortfall, slippage, participation, square-root market impact), a four-schedule execution comparison (Immediate / TWAP / VWAP-style / participation-of-volume), eight liquidity stress scenarios, and **TCA / execution-cost attribution** (arrival/VWAP/TWAP benchmark shortfalls + spread / impact / timing / fees / residual decomposition reconciling to the realised arrival shortfall; optional `commission_per_unit`) |
+| `POST /microstructure/analyze` | Order-book summary (spread, depth ladder, top-of-book & 5-level imbalance, microprice), trade-tape VWAP / TWAP / trade imbalance, execution analytics (implementation shortfall, slippage, participation, square-root market impact), a four-schedule execution comparison (Immediate / TWAP / VWAP-style / participation-of-volume), eight liquidity stress scenarios, **TCA / execution-cost attribution** (arrival/VWAP/TWAP benchmark shortfalls + spread / impact / timing / fees / residual decomposition reconciling to the realised arrival shortfall; optional `commission_per_unit`), and **order-flow toxicity & liquidity metrics** (OFI, queue imbalance, effective / realized spread, adverse selection, simplified VPIN-style toxicity, Kyle lambda, Amihud illiquidity, liquidity-regime classification, eight toxic-flow scenarios; optional `quotes`, `signed_trades`, `toxicity_config`) |
 
 Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): prices and sizes
 > 0, no NaN/Infinity, a **crossed/locked book is rejected** (best_bid must be <
-best_ask), and the trade side must be `buy`/`sell`. Implementation shortfall and
+best_ask), a **crossed quote is rejected** (`bid` < `ask`), trade sides must be
+`buy`/`sell`, and `toxicity_config` thresholds must be ordered
+(`regime_threshold_low` < `regime_threshold_high`). Implementation shortfall and
 slippage are signed by side (a positive value is an execution cost); market impact
 uses a square-root model with educational parameters. The schedule comparison and
 liquidity scenarios are hypothetical educational examples — no schedule is
 recommended, and nothing is order-routing advice. The **TCA attribution** splits
 the realised arrival shortfall into spread / impact / timing / fees / residual
 components that sum to the total by construction (deterministic, educational — not
-execution, routing, or trading advice). Every division is guarded so all outputs
-are finite.
+execution, routing, or trading advice). The **order-flow toxicity** section
+(`app/microstructure/toxicity.py`) computes OFI/QI (bounded ±1), effective/realized
+spread, adverse selection (= effective − realized), a **simplified VPIN-style**
+metric over equal-volume buckets (not exchange VPIN), a Kyle-lambda regression
+(null + note on zero signed-volume variance), Amihud illiquidity, a deterministic
+liquidity-regime classification, and eight toxic-flow scenarios; when `quotes` /
+`signed_trades` / `toxicity_config` are omitted a deterministic sequence is
+derived. Every division is guarded so all outputs are finite.
 
 ---
 

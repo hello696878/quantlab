@@ -331,7 +331,145 @@ def test_tca_components_finite():
 
 
 # --------------------------------------------------------------------------- #
-# 30. JSON-safety
+# Order Flow Toxicity & Liquidity Metrics (Phase 25.2)
+# --------------------------------------------------------------------------- #
+def _tox(out=None):
+    return (out or _analyze()).order_flow_toxicity
+
+
+def _tox_scenario(tox, sid):
+    return next(s for s in tox.toxicity_scenarios if s.id == sid)
+
+
+def test_toxicity_section_present(client):
+    res = client.post("/microstructure/analyze", json=_btc().model_dump())
+    assert res.status_code == 200
+    body = res.json()
+    assert "order_flow_toxicity" in body
+    tox = body["order_flow_toxicity"]
+    assert tox["data_status"] == "static_sample"
+    assert "order-routing" in tox["disclaimer"].lower()
+    _assert_all_finite(tox)
+
+
+def test_toxicity_ofi_and_qi_bounded():
+    for req in sample_requests():
+        tox = _tox(analyze_microstructure(req))
+        assert -1.0 <= tox.order_flow_summary.order_flow_imbalance <= 1.0
+        assert -1.0 <= tox.order_flow_summary.average_queue_imbalance <= 1.0
+
+
+def test_toxicity_spread_quality_finite_and_consistent():
+    for req in sample_requests():
+        sq = _tox(analyze_microstructure(req)).spread_quality
+        assert math.isfinite(sq.average_effective_spread_bps)
+        assert math.isfinite(sq.average_realized_spread_bps)
+        # adverse selection = effective − realized (averages of a linear relation).
+        assert math.isclose(
+            sq.average_adverse_selection_bps,
+            sq.average_effective_spread_bps - sq.average_realized_spread_bps,
+            abs_tol=1e-6,
+        )
+        assert math.isfinite(sq.effective_spread_p95_bps)
+        assert math.isfinite(sq.adverse_selection_p95_bps)
+
+
+def test_toxicity_vpin_bounded_and_buckets_positive():
+    for req in sample_requests():
+        tm = _tox(analyze_microstructure(req)).toxicity_metrics
+        assert 0.0 <= tm.vpin <= 1.0
+        assert tm.vpin_bucket_count > 0
+
+
+def test_toxicity_kyle_lambda_finite_or_null():
+    tm = _tox().toxicity_metrics
+    assert tm.kyle_lambda is None or math.isfinite(tm.kyle_lambda)
+
+
+def test_toxicity_kyle_lambda_null_on_zero_variance():
+    from app.microstructure.toxicity import _kyle_lambda
+    # Identical signed volume on every trade → zero variance → null + note.
+    trades = [{"eps": 1.0, "size": 2.0, "m_before": 100.0, "m_after": 100.1}] * 4
+    value, note = _kyle_lambda(trades, 50)
+    assert value is None and note
+
+
+def test_toxicity_amihud_finite_non_negative():
+    for req in sample_requests():
+        tm = _tox(analyze_microstructure(req)).toxicity_metrics
+        assert math.isfinite(tm.amihud_illiquidity) and tm.amihud_illiquidity >= 0.0
+
+
+def test_toxicity_regime_exists():
+    reg = _tox().liquidity_regime
+    assert reg.regime_id and reg.regime_label and reg.explanation
+    assert math.isfinite(reg.score)
+
+
+def test_toxicity_scenarios_present():
+    tox = _tox()
+    ids = {s.id for s in tox.toxicity_scenarios}
+    assert {
+        "base", "buy_pressure_wave", "sell_pressure_wave", "spread_widening",
+        "depth_evaporation", "toxic_informed_flow", "volume_drought", "liquidity_recovery",
+    } == ids
+
+
+def test_toxicity_scenario_intuitions():
+    for req in sample_requests():
+        tox = _tox(analyze_microstructure(req))
+        base = _tox_scenario(tox, "base")
+        assert _tox_scenario(tox, "buy_pressure_wave").order_flow_imbalance > base.order_flow_imbalance
+        assert _tox_scenario(tox, "sell_pressure_wave").order_flow_imbalance < base.order_flow_imbalance
+        assert _tox_scenario(tox, "spread_widening").effective_spread_bps > base.effective_spread_bps
+        assert _tox_scenario(tox, "toxic_informed_flow").adverse_selection_bps > base.adverse_selection_bps
+        assert _tox_scenario(tox, "volume_drought").amihud_illiquidity > base.amihud_illiquidity
+
+
+def test_toxicity_reject_crossed_quote():
+    base = _btc().model_dump()
+    q = base["quotes"][0]
+    q["bid"] = q["ask"] + 5.0
+    with pytest.raises(ValidationError):
+        MarketMicrostructureAnalysisRequest(**base)
+
+
+def test_toxicity_reject_bad_signed_trade():
+    base = _btc().model_dump()
+    base["signed_trades"][0]["side"] = "hold"
+    with pytest.raises(ValidationError):
+        MarketMicrostructureAnalysisRequest(**base)
+
+
+def test_toxicity_reject_negative_trade_price():
+    base = _btc().model_dump()
+    base["signed_trades"][0]["price"] = -1.0
+    with pytest.raises(ValidationError):
+        MarketMicrostructureAnalysisRequest(**base)
+
+
+def test_toxicity_reject_bad_config_thresholds():
+    base = _btc().model_dump()
+    base["toxicity_config"]["regime_threshold_low"] = 0.6
+    base["toxicity_config"]["regime_threshold_high"] = 0.4
+    with pytest.raises(ValidationError):
+        MarketMicrostructureAnalysisRequest(**base)
+
+
+def test_toxicity_present_without_optional_inputs():
+    # When signed_trades / quotes / config are omitted, the section is still derived.
+    base = _btc().model_dump()
+    base.pop("signed_trades", None)
+    base.pop("quotes", None)
+    base.pop("toxicity_config", None)
+    req = MarketMicrostructureAnalysisRequest(**base)
+    tox = analyze_microstructure(req).order_flow_toxicity
+    assert tox.toxicity_metrics.vpin_bucket_count > 0
+    assert len(tox.toxicity_scenarios) == 8
+
+
+# --------------------------------------------------------------------------- #
+# JSON-safety
 # --------------------------------------------------------------------------- #
 def test_no_nan_or_infinity(client):
     for req in sample_requests():

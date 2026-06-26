@@ -1311,6 +1311,11 @@ export default function HomePage() {
         ["Execution Cost Attribution", "execution cost attribution tca spread impact timing fees residual implementation shortfall benchmark arrival vwap twap"],
         ["TCA Lab", "tca transaction cost analysis execution cost attribution benchmark shortfall spread impact timing fees"],
         ["Market Impact Attribution", "market impact attribution square root impact cost participation execution cost tca spread timing"],
+        ["Order Flow Toxicity Lab", "order flow toxicity ofi order flow imbalance queue imbalance signed volume informed flow liquidity diagnostics"],
+        ["VPIN Liquidity Lab", "vpin volume synchronized probability informed trading toxicity bucket imbalance liquidity metric flow toxicity"],
+        ["Effective Spread Lab", "effective spread realized spread bps trade price mid quoted spread quality execution quality"],
+        ["Adverse Selection Lab", "adverse selection cost effective minus realized spread informed flow markout post trade drift"],
+        ["Liquidity Regime Lab", "liquidity regime classification calm balanced one sided toxic flow stressed illiquid kyle lambda amihud illiquidity"],
       ] as const
     ).map(([title, keywords]) => ({
       id: `microstructure-${title}`,

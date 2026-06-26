@@ -23,6 +23,8 @@ NonEmptyStr = Annotated[str, StringConstraints(strip_whitespace=True, min_length
 PositiveFloat = Annotated[FiniteFloat, Field(gt=0)]
 NonNegFloat = Annotated[FiniteFloat, Field(ge=0)]
 PositiveMult = Annotated[FiniteFloat, Field(gt=0, le=100)]
+PositiveInt = Annotated[int, Field(gt=0)]
+UnitFloat = Annotated[FiniteFloat, Field(ge=0.0, le=1.0)]
 Side = Literal["buy", "sell"]
 LiquidityFlag = Literal["maker", "taker"]
 
@@ -84,6 +86,51 @@ class ExecutionFillInput(MsModel):
     liquidity_flag: Optional[LiquidityFlag] = None
 
 
+# ── Order-flow toxicity inputs (Phase 25.2) ───────────────────────────────────
+class QuoteUpdateInput(MsModel):
+    timestamp: NonEmptyStr
+    bid: PositiveFloat
+    ask: PositiveFloat
+    bid_size: PositiveFloat
+    ask_size: PositiveFloat
+    mid_price: Optional[PositiveFloat] = None
+
+    @model_validator(mode="after")
+    def _check(self) -> "QuoteUpdateInput":
+        if self.bid >= self.ask:
+            raise ValueError(f"crossed/locked quote: bid {self.bid} must be < ask {self.ask}")
+        return self
+
+
+class SignedTradeInput(MsModel):
+    timestamp: NonEmptyStr
+    price: PositiveFloat
+    size: PositiveFloat
+    side: Side
+    mid_before: PositiveFloat
+    mid_after_5s: Optional[PositiveFloat] = None
+    mid_after_30s: Optional[PositiveFloat] = None
+    volume_bucket: Optional[Annotated[int, Field(ge=0)]] = None
+
+
+class ToxicityConfig(MsModel):
+    bucket_volume: PositiveFloat
+    realized_spread_horizon_seconds: PositiveFloat = 30.0
+    vpin_window_buckets: PositiveInt = 10
+    lambda_window_trades: PositiveInt = 50
+    regime_threshold_low: UnitFloat = 0.2
+    regime_threshold_high: UnitFloat = 0.4
+
+    @model_validator(mode="after")
+    def _check(self) -> "ToxicityConfig":
+        if self.regime_threshold_low >= self.regime_threshold_high:
+            raise ValueError(
+                "regime_threshold_low must be < regime_threshold_high "
+                f"({self.regime_threshold_low} >= {self.regime_threshold_high})"
+            )
+        return self
+
+
 class MarketMicrostructureAnalysisRequest(MsModel):
     order_book: OrderBookSnapshotInput
     trades: List[TradePrintInput] = Field(min_length=1)
@@ -95,6 +142,12 @@ class MarketMicrostructureAnalysisRequest(MsModel):
     impact_coefficient: NonNegFloat = 0.1
     # Deterministic, educational per-unit commission used for TCA fee attribution.
     commission_per_unit: NonNegFloat = 0.0
+    # Optional order-flow toxicity inputs (Phase 25.2). When absent the service
+    # derives a deterministic sequence from `trades` + `order_book` so the
+    # toxicity section is always present.
+    quotes: Optional[List[QuoteUpdateInput]] = None
+    signed_trades: Optional[List[SignedTradeInput]] = None
+    toxicity_config: Optional[ToxicityConfig] = None
 
 
 # --------------------------------------------------------------------------- #
@@ -200,6 +253,69 @@ class TCAResult(MsModel):
     notes: List[NonEmptyStr]
 
 
+# ── Order-flow toxicity outputs (Phase 25.2) ──────────────────────────────────
+class OrderFlowSummary(MsModel):
+    trade_count: int
+    buy_volume: FiniteFloat
+    sell_volume: FiniteFloat
+    total_volume: FiniteFloat
+    signed_volume: FiniteFloat
+    order_flow_imbalance: FiniteFloat
+    average_queue_imbalance: FiniteFloat
+
+
+class SpreadQuality(MsModel):
+    average_effective_spread_bps: FiniteFloat
+    average_realized_spread_bps: FiniteFloat
+    average_adverse_selection_bps: FiniteFloat
+    effective_spread_p95_bps: FiniteFloat
+    adverse_selection_p95_bps: FiniteFloat
+
+
+class ToxicityMetrics(MsModel):
+    vpin: FiniteFloat
+    vpin_bucket_count: int
+    kyle_lambda: Optional[FiniteFloat] = None
+    amihud_illiquidity: FiniteFloat
+    toxicity_score: FiniteFloat
+    notes: List[NonEmptyStr]
+
+
+class LiquidityRegime(MsModel):
+    regime_id: NonEmptyStr
+    regime_label: NonEmptyStr
+    score: FiniteFloat
+    drivers: List[NonEmptyStr]
+    explanation: NonEmptyStr
+
+
+class ToxicityScenarioResult(MsModel):
+    id: NonEmptyStr
+    name: NonEmptyStr
+    description: NonEmptyStr
+    order_flow_imbalance: FiniteFloat
+    queue_imbalance: FiniteFloat
+    vpin: FiniteFloat
+    effective_spread_bps: FiniteFloat
+    realized_spread_bps: FiniteFloat
+    adverse_selection_bps: FiniteFloat
+    kyle_lambda: Optional[FiniteFloat] = None
+    amihud_illiquidity: FiniteFloat
+    regime_label: NonEmptyStr
+    notes: List[NonEmptyStr]
+
+
+class OrderFlowToxicityResult(MsModel):
+    data_status: Literal["static_sample"] = "static_sample"
+    order_flow_summary: OrderFlowSummary
+    spread_quality: SpreadQuality
+    toxicity_metrics: ToxicityMetrics
+    liquidity_regime: LiquidityRegime
+    toxicity_scenarios: List[ToxicityScenarioResult]
+    formula_notes: List[NonEmptyStr]
+    disclaimer: NonEmptyStr
+
+
 class MarketMicrostructureAnalysisResponse(MsModel):
     data_status: Literal["static_sample"] = "static_sample"
     instrument_summary: InstrumentSummary
@@ -210,6 +326,7 @@ class MarketMicrostructureAnalysisResponse(MsModel):
     schedule_comparison: List[ScheduleComparisonResult]
     liquidity_scenarios: List[LiquidityScenarioResult]
     tca: TCAResult
+    order_flow_toxicity: OrderFlowToxicityResult
     notes: List[NonEmptyStr]
     disclaimer: NonEmptyStr
 

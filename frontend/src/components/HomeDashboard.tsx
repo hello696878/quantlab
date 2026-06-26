@@ -1342,14 +1342,13 @@ export default function HomeDashboard({
                 className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
-                Execution analytics
+                Execution + liquidity analytics
               </span>
             </span>
             <span className="text-xs text-slate-400">
-              Explore a deterministic sample limit order book, bid/ask spread, depth, order-book
-              imbalance and microprice, trade-tape VWAP/TWAP, implementation shortfall, TCA
-              attribution, market impact, an execution-schedule comparison, and liquidity stress —
-              not investment or order-routing advice.
+              Analyze deterministic sample order books, VWAP/TWAP, implementation shortfall, TCA
+              attribution, order-flow toxicity, VPIN-style liquidity metrics, adverse selection,
+              execution schedules, and liquidity stress — not investment or order-routing advice.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Market Microstructure Lab →

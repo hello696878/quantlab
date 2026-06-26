@@ -19,6 +19,9 @@ from app.microstructure.models import (
     MicrostructureSampleResponse,
     OrderBookLevelInput,
     OrderBookSnapshotInput,
+    QuoteUpdateInput,
+    SignedTradeInput,
+    ToxicityConfig,
     TradePrintInput,
 )
 
@@ -27,6 +30,80 @@ DISCLAIMER = (
     "are educational and not investment, trading, order-routing, legal, tax, or "
     "risk-management advice."
 )
+
+
+def _toxicity_inputs(
+    symbol: str,
+    mid: float,
+    tick: float,
+    bid_base: float,
+    ask_base: float,
+    parent_side: str,
+    eff_spread_bps: float,
+    adverse_frac: float,
+    n_signed: int = 60,
+    n_quotes: int = 30,
+):
+    """Deterministic signed trade tape + quote sequence + config (Phase 25.2).
+
+    Buys execute above the prevailing mid and sells below it (positive effective
+    spread); the post-trade mid drifts in the trade direction by ``adverse_frac``
+    of the half-spread (positive adverse selection). Identical every run.
+    """
+    half_spread = mid * eff_spread_bps / 2.0 / 10000.0  # price units
+    adverse = adverse_frac * half_spread
+    buy_heavy = parent_side == "buy"
+
+    signed_trades = []
+    for i in range(n_signed):
+        m_before = mid + tick * 0.5 * math.sin(i * 0.25) + tick * 0.02 * i
+        is_buy_slot = (i * 7) % 12 < 7  # ~58% of slots
+        is_buy = is_buy_slot if buy_heavy else not is_buy_slot
+        eps = 1.0 if is_buy else -1.0
+        price = m_before + eps * half_spread
+        m_after_30 = m_before + eps * adverse
+        m_after_5 = m_before + eps * adverse * 0.6
+        size = round(0.8 + 0.5 * ((i * 3) % 4) + 0.3 * ((i * 5) % 3), 4)
+        signed_trades.append(
+            SignedTradeInput(
+                timestamp=f"S+{i:03d}",
+                price=round(max(price, tick), 6),
+                size=size,
+                side="buy" if is_buy else "sell",
+                mid_before=round(max(m_before, tick), 6),
+                mid_after_5s=round(max(m_after_5, tick), 6),
+                mid_after_30s=round(max(m_after_30, tick), 6),
+            )
+        )
+
+    quotes = []
+    for j in range(n_quotes):
+        mq = mid + tick * 0.5 * math.sin(j * 0.3) + tick * 0.03 * j
+        bid = mq - tick / 2.0
+        ask = mq + tick / 2.0
+        bid_size = round(bid_base * (1.0 + 0.3 * math.sin(j * 0.4)), 4)
+        ask_size = round(ask_base * (1.0 + 0.3 * math.cos(j * 0.4)), 4)
+        quotes.append(
+            QuoteUpdateInput(
+                timestamp=f"Q+{j:03d}",
+                bid=round(max(bid, tick), 6),
+                ask=round(max(ask, bid + tick), 6),
+                bid_size=max(bid_size, 0.01),
+                ask_size=max(ask_size, 0.01),
+                mid_price=round(max(mq, tick), 6),
+            )
+        )
+
+    total_size = sum(t.size for t in signed_trades)
+    config = ToxicityConfig(
+        bucket_volume=round(max(total_size / 12.0, 0.01), 6),
+        realized_spread_horizon_seconds=30.0,
+        vpin_window_buckets=10,
+        lambda_window_trades=50,
+        regime_threshold_low=0.2,
+        regime_threshold_high=0.4,
+    )
+    return signed_trades, quotes, config
 
 
 def _build(
@@ -43,6 +120,8 @@ def _build(
     adv: float,
     vol_bps: float,
     n_trades: int = 30,
+    eff_spread_bps: float = 4.0,
+    adverse_frac: float = 0.4,
 ) -> MarketMicrostructureAnalysisRequest:
     best_bid = mid - tick / 2.0
     best_ask = mid + tick / 2.0
@@ -96,6 +175,11 @@ def _build(
     # Deterministic per-unit commission (~0.5 bps of mid) for TCA fee attribution.
     commission_per_unit = round(mid * 0.00005, 6)
 
+    # Deterministic order-flow toxicity inputs (Phase 25.2).
+    signed_trades, quotes, toxicity_config = _toxicity_inputs(
+        symbol, mid, tick, bid_base, ask_base, parent_side, eff_spread_bps, adverse_frac,
+    )
+
     return MarketMicrostructureAnalysisRequest(
         order_book=OrderBookSnapshotInput(symbol=symbol, timestamp="2025-01-02T15:30:00Z", bids=bids, asks=asks),
         trades=trades,
@@ -113,19 +197,26 @@ def _build(
         volatility_bps=vol_bps,
         impact_coefficient=0.1,
         commission_per_unit=commission_per_unit,
+        signed_trades=signed_trades,
+        quotes=quotes,
+        toxicity_config=toxicity_config,
     )
 
 
 def sample_requests() -> List[MarketMicrostructureAnalysisRequest]:
     return [
-        # BTCUSDT — wide-ish tick, bid-heavy book.
-        _build("BTCUSDT_SAMPLE", 65000.0, 1.0, 10, 1.2, 1.0, 0.3, 0.25, "buy", 10.0, 25000.0, 220.0),
-        # SPY — penny tick, balanced book.
-        _build("SPY_SAMPLE", 500.0, 0.01, 10, 1800.0, 1750.0, 250.0, 250.0, "buy", 50000.0, 70_000_000.0, 90.0),
-        # CL futures — bigger tick, ask-heavy book.
-        _build("CL_SAMPLE", 75.0, 0.01, 10, 40.0, 55.0, 8.0, 12.0, "sell", 2000.0, 300_000.0, 180.0),
+        # BTCUSDT — wide-ish tick, bid-heavy book, buy-heavy toxic-ish flow.
+        _build("BTCUSDT_SAMPLE", 65000.0, 1.0, 10, 1.2, 1.0, 0.3, 0.25, "buy", 10.0, 25000.0, 220.0,
+               eff_spread_bps=4.0, adverse_frac=0.45),
+        # SPY — penny tick, balanced book, tight spreads.
+        _build("SPY_SAMPLE", 500.0, 0.01, 10, 1800.0, 1750.0, 250.0, 250.0, "buy", 50000.0, 70_000_000.0, 90.0,
+               eff_spread_bps=1.5, adverse_frac=0.35),
+        # CL futures — bigger tick, ask-heavy book, sell-heavy flow.
+        _build("CL_SAMPLE", 75.0, 0.01, 10, 40.0, 55.0, 8.0, 12.0, "sell", 2000.0, 300_000.0, 180.0,
+               eff_spread_bps=6.0, adverse_frac=0.5),
         # TSM equity — penny tick, bid-heavy book.
-        _build("TSM_SAMPLE", 180.0, 0.01, 10, 900.0, 800.0, 120.0, 110.0, "buy", 30000.0, 25_000_000.0, 130.0),
+        _build("TSM_SAMPLE", 180.0, 0.01, 10, 900.0, 800.0, 120.0, 110.0, "buy", 30000.0, 25_000_000.0, 130.0,
+               eff_spread_bps=2.5, adverse_frac=0.4),
     ]
 
 
