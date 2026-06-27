@@ -87,6 +87,22 @@ def test_frozen_spec_is_immutable():
         es.tick_size = 0.5
 
 
+@pytest.mark.parametrize("blank", ["", "   "])
+@pytest.mark.parametrize("field", ["exchange", "currency", "name", "price_quotation"])
+def test_blank_identity_field_fails_validation(field, blank):
+    data = _es_dict()
+    data[field] = blank
+    with pytest.raises(ValidationError):
+        FuturesSpec(**data)
+
+
+def test_identity_field_whitespace_is_stripped():
+    data = _es_dict()
+    data["currency"] = "  USD  "
+    es = FuturesSpec(**data)
+    assert es.currency == "USD"
+
+
 # --- symbol parsing / generation / expiry ---
 
 

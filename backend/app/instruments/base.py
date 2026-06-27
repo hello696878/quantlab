@@ -17,7 +17,14 @@ import math
 from enum import Enum
 from typing import Optional
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 
 class AssetClass(str, Enum):
@@ -82,6 +89,18 @@ class InstrumentSpec(BaseModel):
         if v != v.upper():
             raise ValueError(f"root_symbol must be uppercase: {v!r}")
         return v
+
+    @field_validator("exchange", "currency", "name", "price_quotation")
+    @classmethod
+    def _identity_str_non_empty(cls, v: str, info: ValidationInfo) -> str:
+        """Reject blank/whitespace-only identity strings; normalise surrounding
+        whitespace.  Mirrors ``root_symbol`` but imposes no case rule (these are
+        free-text/label fields).  ``currency``/``exchange`` are required, so a
+        clearly-invalid empty value should fail loudly rather than load."""
+        stripped = v.strip()
+        if not stripped:
+            raise ValueError(f"{info.field_name} must be non-empty")
+        return stripped
 
     @model_validator(mode="after")
     def _check_tick_value(self) -> "InstrumentSpec":
