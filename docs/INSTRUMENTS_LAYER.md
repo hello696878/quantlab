@@ -188,7 +188,10 @@ registered spec and re-checks the tick-value invariant (exit 0 = all pass):
 script, `scripts\check_futures_metadata.py`, validates one synthetic daily
 bar for each default root (ES, NQ, YM, RTY) and prints the linked spec
 metadata (point/tick dollar values, expiry cross-check); extend its
-`DEFAULT_ROOTS` when adding instruments.
+`DEFAULT_ROOTS` when adding instruments. A third,
+`scripts\run_synthetic_futures_report.py`, runs a tiny synthetic long-trade
+P&L report for ES and NQ via `app.reports` (direct vs tick-based P&L must
+agree) — a demo path, not a backtest engine.
 
 ## 6. Checklist — adding a new futures instrument later
 
