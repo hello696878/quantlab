@@ -1,84 +1,54 @@
-\# STOP POINT - QuantLab
+# STOP POINT - QuantLab
 
+Date: 2026-07-03
 
-
-Date: 2026-06-26
-
-
-
-\## Project Goal
+## Project Goal
 
 QuantLab is a long-term multi-market AI quant research platform.
 
-
-
 The current direction is:
 
-\- futures-first
+- futures-first
+- preserve existing crypto QuantLab code
+- upgrade in-place
+- do not start a parallel repo
 
-\- preserve existing crypto QuantLab code
+## Current Phase
 
-\- upgrade in-place
+QuantLab v0.1 foundation (Phase 1: futures-first).
 
-\- do not start a parallel repo
+## Current Known Completed Work
 
+- ES futures instrument layer reviewed.
+- Instrument validation hardened (commit 35c3255).
+- Relevant files:
+  - backend/app/instruments/* (base.py, futures.py, registry.py)
+  - configs/instruments/es.yaml
+  - backend/tests/test_instruments_registry.py
+- Latest test result:
+  - test_instruments_registry.py: 22 passed.
 
-
-\## Current Phase
-
-Phase 1: futures-first foundation.
-
-
-
-\## Current Known Completed Work
-
-\- ES futures instrument spec layer added.
-
-\- Relevant files include:
-
-&#x20; - backend/app/instruments/\*
-
-&#x20; - configs/instruments/es.yaml
-
-&#x20; - backend/tests/test\_instruments\_registry.py
-
-\- Previous test result:
-
-&#x20; - 13 tests passed.
-
-
-
-\## Important Rule
+## Important Rule
 
 Do not implement these yet:
 
-\- ML
-
-\- CFDs
-
-\- options
-
-\- futures\_continuous
-
-\- major backtest engine rewrite
-
-
+- ML
+- CFDs
+- options
+- futures_continuous
+- major backtest engine rewrite
 
 Proceed one tiny commit at a time.
 
+## Next Safe Step
 
+Either of these tiny documentation-only steps:
 
-\## Next Safe Step
+- Write a short architecture note for the instruments layer.
+- Add docs explaining how to add a new futures instrument later.
 
-Review current repository state and make sure the futures instrument registry layer is clean, documented, and tested.
+## Risks
 
-
-
-\## Risks
-
-\- Jumping too quickly into ML before data/instrument layer is stable.
-
-\- Rewriting existing crypto code instead of preserving and integrating it.
-
-\- Making the platform too broad too early.
-
+- Jumping too quickly into ML before data/instrument layer is stable.
+- Rewriting existing crypto code instead of preserving and integrating it.
+- Making the platform too broad too early.
