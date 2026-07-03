@@ -16,6 +16,8 @@ The instruments layer is the **single source of truth for contract metadata**.
 It loads YAML spec files into validated, immutable Pydantic models so that
 every downstream layer (data pipeline, backtester, reports) reads contract
 economics from one place instead of hard-coding multipliers and tick sizes.
+The per-record daily-bar schema (`backend/app/datastore/daily_bar.py`)
+validates its `root_symbol` / `contract_symbol` against this registry.
 
 It is deliberately **pure**: no market-data access, no pandas, no caching.
 Spec files are tiny, so the registry re-reads them on every lookup — obvious
