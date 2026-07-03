@@ -1,5 +1,6 @@
 """
-Tests for the instrument spec layer (ES, plus the NQ/YM config-only additions).
+Tests for the instrument spec layer (ES, plus the NQ/YM/RTY config-only
+additions).
 
 Covers: spec loading, the tick-value invariant, validation failures (invalid
 tick value, missing field, bad month code, unknown field, immutability),
@@ -201,3 +202,30 @@ def test_ym_expiry_is_third_friday():
     ym = get_instrument("YM")
     assert ym.build_contract_symbol("Z", 2025) == "YMZ25"
     assert ym.expiry_for_symbol("YMZ25") == datetime.date(2025, 12, 19)
+
+
+# --- RTY (fourth instrument; config-only addition) ---
+
+
+def test_rty_spec_loads_correctly():
+    rty = get_instrument("RTY")
+    assert isinstance(rty, FuturesSpec)
+    assert rty.root_symbol == "RTY"
+    assert rty.exchange == "CME"
+    assert rty.currency == "USD"
+    assert rty.contract_multiplier == 50
+    assert rty.tick_size == 0.1
+    assert rty.contract_months == ["H", "M", "U", "Z"]
+    assert "RTY" in list_instruments()
+
+
+def test_rty_tick_value_invariant():
+    rty = get_instrument("RTY")
+    assert rty.tick_value == pytest.approx(rty.contract_multiplier * rty.tick_size)
+    assert rty.tick_value == pytest.approx(5.0)
+
+
+def test_rty_expiry_is_third_friday():
+    rty = get_instrument("RTY")
+    assert rty.build_contract_symbol("Z", 2025) == "RTYZ25"
+    assert rty.expiry_for_symbol("RTYZ25") == datetime.date(2025, 12, 19)

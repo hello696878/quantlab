@@ -49,7 +49,7 @@ es.expiry_for_symbol("ESZ24")      # datetime.date(2024, 12, 20)
 ## 2. Where instrument configs live
 
 - Directory: **`configs/instruments/`** at the repo root (currently `es.yaml`,
-  `nq.yaml`, and `ym.yaml`).
+  `nq.yaml`, `ym.yaml`, and `rty.yaml`).
 - **Filename = lowercase root symbol** + `.yaml`: `get_instrument("ES")` reads
   `configs/instruments/es.yaml` and `get_instrument("NQ")` reads `nq.yaml`.
   `list_instruments()` is just the sorted uppercase stems of `*.yaml` files in
@@ -147,7 +147,7 @@ root doesn't match the spec.
 
 ## 5. How tests verify the registry
 
-Suite: `backend/tests/test_instruments_registry.py` (28 cases). Run it with
+Suite: `backend/tests/test_instruments_registry.py` (31 cases). Run it with
 the backend venv from the repo root:
 
 ```powershell
@@ -168,10 +168,11 @@ What it covers:
 - **Registry lookup** — `get_instrument("ES")` works and `"ES"` appears in
   `list_instruments()`; an unknown root raises `UnknownInstrumentError`
   naming the symbol.
-- **Additional instruments (NQ, YM)** — each loads as a `FuturesSpec` with
-  its documented economics (NQ: multiplier 20 / tick 0.25 / `tick_value` 5.0;
-  YM: multiplier 5 / tick 1.0 / `tick_value` 5.0); `NQZ25` / `YMZ25` expiry
-  is the third Friday of Dec 2025 (2025-12-19).
+- **Additional instruments (NQ, YM, RTY)** — each loads as a `FuturesSpec`
+  with its documented economics (NQ: multiplier 20 / tick 0.25; YM:
+  multiplier 5 / tick 1.0; RTY: multiplier 50 / tick 0.1 — all `tick_value`
+  5.0); `NQZ25` / `YMZ25` / `RTYZ25` expiry is the third Friday of Dec 2025
+  (2025-12-19).
 
 A key pattern: failure tests mutate a **valid baseline dict loaded from the
 real `es.yaml`** (`_es_dict()` helper), so they can never drift out of sync
@@ -183,17 +184,17 @@ registered spec and re-checks the tick-value invariant (exit 0 = all pass):
 
 ## 6. Checklist — adding a new futures instrument later
 
-> Applies to RTY, CL, GC, etc. **Do not add these yet** — this is the
-> procedure for when we do. (NQ and YM were already added this way; use
-> `configs/instruments/nq.yaml` / `ym.yaml` as further references.)
+> Applies to CL, GC, etc. **Do not add these yet** — this is the procedure
+> for when we do. (NQ, YM, and RTY were already added this way; use their
+> yamls in `configs/instruments/` as further references.)
 
 **First, check the expiry rule.** `ExpiryRule` currently supports only
 `third_friday`, and `FuturesSpec.expiry_date()` raises `NotImplementedError`
 for anything else. Consequences:
 
-- **RTY** (equity index, quarterly H/M/U/Z, third-Friday SOQ like ES):
-  **config-only addition** — no code change needed (NQ and YM were added
-  exactly this way).
+- **Equity index futures** (quarterly H/M/U/Z, third-Friday SOQ like ES):
+  **config-only addition** — no code change needed. NQ, YM, and RTY were all
+  added exactly this way.
 - **CL / GC** (energy/metals): expiry is *not* a third Friday (CL expires
   ~3 business days before the 25th of the month preceding delivery; GC on the
   third-last business day of the delivery month). These need a **small code
