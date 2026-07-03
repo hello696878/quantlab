@@ -1,5 +1,5 @@
 """
-Tests for the ES instrument spec layer (Commit 1).
+Tests for the instrument spec layer (ES, plus the NQ config-only addition).
 
 Covers: spec loading, the tick-value invariant, validation failures (invalid
 tick value, missing field, bad month code, unknown field, immutability),
@@ -147,3 +147,30 @@ def test_unknown_instrument_raises_clear_error():
     with pytest.raises(UnknownInstrumentError) as exc:
         get_instrument("NOPE")
     assert "NOPE" in str(exc.value)
+
+
+# --- NQ (second instrument; config-only addition) ---
+
+
+def test_nq_spec_loads_correctly():
+    nq = get_instrument("NQ")
+    assert isinstance(nq, FuturesSpec)
+    assert nq.root_symbol == "NQ"
+    assert nq.exchange == "CME"
+    assert nq.currency == "USD"
+    assert nq.contract_multiplier == 20
+    assert nq.tick_size == 0.25
+    assert nq.contract_months == ["H", "M", "U", "Z"]
+    assert "NQ" in list_instruments()
+
+
+def test_nq_tick_value_invariant():
+    nq = get_instrument("NQ")
+    assert nq.tick_value == pytest.approx(nq.contract_multiplier * nq.tick_size)
+    assert nq.tick_value == pytest.approx(5.0)
+
+
+def test_nq_expiry_is_third_friday():
+    nq = get_instrument("NQ")
+    assert nq.build_contract_symbol("Z", 2025) == "NQZ25"
+    assert nq.expiry_for_symbol("NQZ25") == datetime.date(2025, 12, 19)
