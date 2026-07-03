@@ -176,6 +176,10 @@ A key pattern: failure tests mutate a **valid baseline dict loaded from the
 real `es.yaml`** (`_es_dict()` helper), so they can never drift out of sync
 with the actual config file. When adding an instrument, keep this pattern.
 
+For a quick manual check outside pytest, a read-only smoke script loads every
+registered spec and re-checks the tick-value invariant (exit 0 = all pass):
+`backend\venv\Scripts\python.exe scripts\check_instruments.py`.
+
 ## 6. Checklist — adding a new futures instrument later
 
 > Applies to YM, RTY, CL, GC, etc. **Do not add these yet** — this is the
