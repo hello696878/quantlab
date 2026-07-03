@@ -1,5 +1,5 @@
 """
-Tests for the instrument spec layer (ES, plus the NQ config-only addition).
+Tests for the instrument spec layer (ES, plus the NQ/YM config-only additions).
 
 Covers: spec loading, the tick-value invariant, validation failures (invalid
 tick value, missing field, bad month code, unknown field, immutability),
@@ -174,3 +174,30 @@ def test_nq_expiry_is_third_friday():
     nq = get_instrument("NQ")
     assert nq.build_contract_symbol("Z", 2025) == "NQZ25"
     assert nq.expiry_for_symbol("NQZ25") == datetime.date(2025, 12, 19)
+
+
+# --- YM (third instrument; config-only addition) ---
+
+
+def test_ym_spec_loads_correctly():
+    ym = get_instrument("YM")
+    assert isinstance(ym, FuturesSpec)
+    assert ym.root_symbol == "YM"
+    assert ym.exchange == "CBOT"
+    assert ym.currency == "USD"
+    assert ym.contract_multiplier == 5
+    assert ym.tick_size == 1.0
+    assert ym.contract_months == ["H", "M", "U", "Z"]
+    assert "YM" in list_instruments()
+
+
+def test_ym_tick_value_invariant():
+    ym = get_instrument("YM")
+    assert ym.tick_value == pytest.approx(ym.contract_multiplier * ym.tick_size)
+    assert ym.tick_value == pytest.approx(5.0)
+
+
+def test_ym_expiry_is_third_friday():
+    ym = get_instrument("YM")
+    assert ym.build_contract_symbol("Z", 2025) == "YMZ25"
+    assert ym.expiry_for_symbol("YMZ25") == datetime.date(2025, 12, 19)
