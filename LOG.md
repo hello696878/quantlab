@@ -1,5 +1,46 @@
 # LOG - QuantLab
 
+## 2026-07-03 (foundation stable checkpoint)
+
+### Status
+
+QuantLab foundation is stable. The foundation optimization round is complete
+and committed through `72d9c82` (futures metadata smoke report).
+
+### Completed this round
+
+- Instruments layer architecture note (docs/INSTRUMENTS_LAYER.md, commit f91920f).
+- NQ futures instrument config + tests (c12af58).
+- Instrument registry smoke check, scripts/check_instruments.py (40f5d6a).
+- YM futures instrument config + tests (3fe6bde).
+- RTY futures instrument config + tests (76f381a).
+- Per-record futures daily bar schema + synthetic tests (9dfd60c).
+- Futures metadata smoke report, scripts/check_futures_metadata.py (72d9c82).
+- Instruments supported: ES, NQ, YM, RTY.
+
+### Verification (all green, 2026-07-03)
+
+- `backend\venv\Scripts\python.exe scripts\check_instruments.py` -> exit 0
+  (RESULT: OK, 4/4 instruments passed).
+- `backend\venv\Scripts\python.exe scripts\check_futures_metadata.py` -> exit 0
+  (RESULT: OK, 4/4 samples validated and linked).
+- `backend\venv\Scripts\python.exe -m pytest backend/tests -q` -> 2416 passed.
+
+### Still not allowed yet
+
+- ML
+- CFDs
+- options
+- futures_continuous
+- real data download
+- major backtest engine rewrite
+
+### Next
+
+Pick one tiny step: connect synthetic futures data into a tiny
+backtest/report path, or design the futures data ingestion plan before
+touching real data.
+
 ## 2026-07-03
 
 ### Status

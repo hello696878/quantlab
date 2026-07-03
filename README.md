@@ -9,15 +9,22 @@ QuantLab v0.1 foundation (Phase 1: futures-first).
 
 ## Status (2026-07-03)
 
-- ES futures instrument spec layer reviewed.
-- Instrument validation hardened.
-- `backend/tests/test_instruments_registry.py`: 22 tests passed.
+**QuantLab foundation is stable.** The futures foundation round is complete:
 
-Key files for the instruments layer:
+- Instruments supported: **ES, NQ, YM, RTY** (validated, immutable YAML specs).
+- Instrument validation hardened; registry test suite passes (31 tests).
+- Per-record futures daily bar schema with synthetic tests (11 tests).
+- Read-only smoke checks pass: instrument registry and futures metadata.
+- Full backend suite green: 2416 passed.
+
+Key files for the foundation:
 
 - `backend/app/instruments/` — spec, futures contract, and registry code
-- `configs/instruments/es.yaml` — ES instrument definition
+- `configs/instruments/` — `es.yaml`, `nq.yaml`, `ym.yaml`, `rty.yaml`
+- `backend/app/datastore/daily_bar.py` — per-record futures daily bar schema
 - `backend/tests/test_instruments_registry.py` — registry test suite
+- `backend/tests/test_futures_daily_bar.py` — daily bar schema tests
+- `docs/INSTRUMENTS_LAYER.md` — instruments layer architecture note
 
 ## Not Allowed Yet
 
@@ -27,12 +34,15 @@ Deliberately out of scope for now:
 - CFDs
 - options
 - futures_continuous
+- real data download
 - major backtest engine rewrite
 
-## Running Tests
+## Verification
 
 ```powershell
-backend\venv\Scripts\python.exe -m pytest backend\tests\test_instruments_registry.py
+backend\venv\Scripts\python.exe scripts\check_instruments.py
+backend\venv\Scripts\python.exe scripts\check_futures_metadata.py
+backend\venv\Scripts\python.exe -m pytest backend/tests -q
 ```
 
 ## Project Docs

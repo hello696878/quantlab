@@ -1,8 +1,10 @@
 # Instruments Layer — Architecture Note
 
-> **Status:** documents the *implemented* Phase 1 instrument spec layer
-> (commits `f695a90`, `35c3255`). For the long-term plan this layer belongs to,
-> see [AI_QUANT_ARCHITECTURE.md](AI_QUANT_ARCHITECTURE.md).
+> **Status:** documents the *implemented* instrument spec layer. Foundation
+> declared **stable** 2026-07-03 with four instruments (ES, NQ, YM, RTY), the
+> per-record daily-bar schema, and both smoke checks green. For the long-term
+> plan this layer belongs to, see
+> [AI_QUANT_ARCHITECTURE.md](AI_QUANT_ARCHITECTURE.md).
 >
 > **Scope guard:** this layer is futures-only. It contains no ML, CFD,
 > options, or continuous-contract-stitching (`futures_continuous`) code —
