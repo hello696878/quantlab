@@ -182,7 +182,11 @@ with the actual config file. When adding an instrument, keep this pattern.
 
 For a quick manual check outside pytest, a read-only smoke script loads every
 registered spec and re-checks the tick-value invariant (exit 0 = all pass):
-`backend\venv\Scripts\python.exe scripts\check_instruments.py`.
+`backend\venv\Scripts\python.exe scripts\check_instruments.py`. A second
+script, `scripts\check_futures_metadata.py`, validates one synthetic daily
+bar for each default root (ES, NQ, YM, RTY) and prints the linked spec
+metadata (point/tick dollar values, expiry cross-check); extend its
+`DEFAULT_ROOTS` when adding instruments.
 
 ## 6. Checklist — adding a new futures instrument later
 

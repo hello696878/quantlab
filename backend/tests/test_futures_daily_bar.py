@@ -12,6 +12,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.datastore import FuturesDailyBar
+from app.instruments import get_instrument
 
 
 def _es_bar(**overrides) -> dict:
@@ -93,6 +94,18 @@ def test_valid_nq_bar_passes():
 def test_invalid_ohlc_fails(overrides):
     with pytest.raises(ValidationError):
         FuturesDailyBar(**_es_bar(**overrides))
+
+
+# --- metadata linking (bar -> instrument spec) ---
+
+
+def test_metadata_lookup_links_bar_to_spec():
+    bar = FuturesDailyBar(**_es_bar())
+    spec = get_instrument(bar.root_symbol)
+    assert spec.root_symbol == bar.root_symbol
+    assert spec.currency == "USD"
+    assert spec.tick_value == pytest.approx(spec.contract_multiplier * spec.tick_size)
+    assert bar.expiry == spec.expiry_for_symbol(bar.contract_symbol)
 
 
 # --- registry-aware rules ---
