@@ -25,6 +25,7 @@ Key files for the foundation:
 - `backend/tests/test_instruments_registry.py` — registry test suite
 - `backend/tests/test_futures_daily_bar.py` — daily bar schema tests
 - `docs/INSTRUMENTS_LAYER.md` — instruments layer architecture note
+- `docs/FUTURES_DATA_INGESTION_PLAN.md` — how real futures data will enter later (design only)
 
 ## Not Allowed Yet
 

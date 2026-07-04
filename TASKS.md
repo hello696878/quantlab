@@ -16,6 +16,11 @@
 - [x] Add read-only futures metadata smoke report (scripts/check_futures_metadata.py).
 - [x] Confirm tests pass (registry: 31; daily bar: 11; full suite: 2416 passed).
 
+## Done (2026-07-04)
+
+- [x] Design the futures data ingestion plan before touching real data
+      (docs/FUTURES_DATA_INGESTION_PLAN.md — design only, no code).
+
 ## Now
 
 - (foundation stable — no task in flight)
@@ -23,7 +28,8 @@
 ## Next (pick one tiny step)
 
 - [ ] Connect synthetic futures data into a tiny backtest/report path.
-- [ ] Or: design the futures data ingestion plan before touching real data.
+- [ ] Or: Ingestion Phase 1, commit 1 — synthetic per-contract CSV fixtures +
+      fixture-loader function + tests (see docs/FUTURES_DATA_INGESTION_PLAN.md §9/§12).
 
 ## Later
 

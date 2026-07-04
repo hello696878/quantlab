@@ -1,5 +1,31 @@
 # LOG - QuantLab
 
+## 2026-07-04 (futures data ingestion plan — design only)
+
+### Status
+
+Wrote docs/FUTURES_DATA_INGESTION_PLAN.md: how real futures data should enter
+the system later (per-contract first, continuous deferred, ingestion phases
+I1–I5, validation layers, storage layout under C:\quantlab\data\). No code
+changes, no downloads, no new dependencies.
+
+### Files changed
+
+- docs/FUTURES_DATA_INGESTION_PLAN.md (new)
+- README.md (pointer under key files)
+- TASKS.md (design task done; next tiny step = Ingestion Phase 1 commit 1)
+- LOG.md (this entry)
+
+### Still not allowed yet
+
+- ML / CFDs / options / futures_continuous / real data download /
+  major backtest engine rewrite (unchanged)
+
+### Next
+
+Ingestion Phase 1, commit 1: synthetic per-contract CSV fixtures +
+fixture-loader function + tests (plan §9/§12).
+
 ## 2026-07-03 (foundation stable checkpoint)
 
 ### Status
