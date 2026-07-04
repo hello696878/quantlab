@@ -65,6 +65,36 @@ The two CSV commands write only to `backend\tests\_tmp_normalized_futures`, a
 throwaway folder that is not committed; delete it afterward
 (`Remove-Item -Recurse -Force backend\tests\_tmp_normalized_futures`).
 
+## Research CLI Quickstart
+
+Run the synthetic ES ML experiment demo from Windows PowerShell. **This is a
+synthetic ES demo, not real market performance.** It runs the full Phase 1→6
+pipeline — raw synthetic futures → continuous futures → features → labels → ML
+evaluation → experiment registry — and prints `train_run_hash`, metrics,
+`artifact_dir`, and a reproduce command.
+
+```powershell
+cd C:\quantlab\backend
+
+.\venv\Scripts\python.exe -m app.research_cli.cli run --artifacts-dir ..\artifacts\experiments --overwrite
+.\venv\Scripts\python.exe -m app.research_cli.cli list --artifacts-dir ..\artifacts\experiments
+.\venv\Scripts\python.exe -m app.research_cli.cli best --artifacts-dir ..\artifacts\experiments --metric sharpe
+```
+
+The `run` and `list` subcommands have equivalent direct wrapper scripts:
+
+```powershell
+.\venv\Scripts\python.exe .\scripts\run_es_ml_experiment.py --artifacts-dir ..\artifacts\experiments --overwrite
+.\venv\Scripts\python.exe .\scripts\list_experiments.py --artifacts-dir ..\artifacts\experiments
+```
+
+Artifacts are written under `artifacts/experiments/` and are gitignored. To
+compare runs, pass real `train_run_hash` values taken from the `list` output:
+
+```powershell
+.\venv\Scripts\python.exe -m app.research_cli.cli compare <train_run_hash_a> <train_run_hash_b> --artifacts-dir ..\artifacts\experiments
+```
+
 ## Project Docs
 
 - [TASKS.md](TASKS.md) — current task list
