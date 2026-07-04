@@ -311,7 +311,11 @@ Prove the whole path with data we invent, so no download questions arise.
 > `scripts/check_local_futures_csv.py` validates local CSVs (default
 > `data\raw\futures_daily\`, `--path` override) through the I1 loader and
 > prints per-file summaries + per-symbol economics without writing anything.
-> The write-once ingest CLI and ingestion log below remain open.
+> Also landed 2026-07-04: `scripts/normalize_local_futures_csv.py` — validates
+> local CSVs through the same loader and, only if ALL inputs pass, writes one
+> canonical-column CSV per root (sorted, round-trips through the loader) to
+> `data\processed\futures_daily\` (or `--output-dir`). CSV only for now; the
+> parquet-backed store ingest CLI and ingestion log below remain open.
 
 Same loader generalized to files a human places under
 `C:\quantlab\data\incoming\futures\csv_local\`, plus operational trimmings:
