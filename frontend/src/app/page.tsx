@@ -50,6 +50,7 @@ import FuturesLabPanel from "@/components/FuturesLabPanel";
 import VolatilityLabPanel from "@/components/VolatilityLabPanel";
 import MicrostructureLabPanel from "@/components/MicrostructureLabPanel";
 import CryptoDerivativesLabPanel from "@/components/CryptoDerivativesLabPanel";
+import DefiRiskLabPanel from "@/components/DefiRiskLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -418,6 +419,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Crypto Perpetual Funding & Basis Lab",
     subtitle:
       "Spot / perpetual / dated-futures basis, funding-rate mechanics and annualized funding yield, long/short funding P&L, a cash-and-carry example, position margin / liquidation approximation, a funding-regime read, and funding/basis stress scenarios — deterministic static sample data, no live exchange data or crypto prices, not investment, trading, or liquidation advice.",
+  },
+  defirisk: {
+    title: "DeFi Yield, Stablecoin Peg & Lending Risk Lab",
+    subtitle:
+      "Stablecoin peg deviation, lending/borrow APY with a kinked utilization rate model, collateral value / debt / LTV / health factor, an approximate liquidation price, net APY carry, a risk-regime read, and protocol stress scenarios — deterministic static sample data, no live protocol data or crypto prices, no wallets or smart-contract calls, not investment, lending, borrowing, or liquidation advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -995,6 +1001,7 @@ export default function HomePage() {
     { view: "volatility", title: "Open Volatility Lab", keywords: "volatility surface variance swap implied vol iv smile skew term structure realized vol vega black scholes option chain fair strike vix scenario stress derivatives" },
     { view: "microstructure", title: "Open Market Microstructure Lab", keywords: "microstructure execution order book limit order book bid ask spread depth imbalance microprice vwap twap implementation shortfall slippage market impact participation rate liquidity stress execution schedule transaction cost analysis tca" },
     { view: "cryptoderivatives", title: "Open Crypto Derivatives Lab", keywords: "crypto derivatives perpetual perp futures funding rate basis annualized carry cash and carry liquidation margin leverage btc eth sol bitcoin ethereum solana contango backwardation funding pnl" },
+    { view: "defirisk", title: "Open DeFi Risk Lab", keywords: "defi decentralized finance stablecoin peg depeg lending borrow apy utilization kink interest rate model collateral health factor ltv loan to value liquidation threshold net apy carry usdc usdt dai aave protocol stress" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1346,6 +1353,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("cryptoderivatives"),
+    })),
+    ...(
+      [
+        ["Open DeFi Risk Lab", "defi risk lab stablecoin peg lending borrow apy utilization health factor liquidation net apy protocol stress usdc usdt dai eth wbtc"],
+        ["Stablecoin Peg Lab", "stablecoin peg deviation depeg bps target peg market price reserve quality usdc usdt dai"],
+        ["DeFi Lending APY Lab", "defi lending apy borrow apy utilization kink interest rate model slope reserve factor supply rate"],
+        ["Health Factor Lab", "health factor collateral value debt value ltv loan to value liquidation threshold collateral factor"],
+        ["Liquidation Distance Lab", "defi liquidation price approximation liquidation distance collateral drawdown health factor buffer"],
+        ["DeFi Stress Scenario Lab", "defi stress scenario depeg collateral drawdown utilization spike liquidity drought borrow rate shock threshold cut protocol stress combo"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `defirisk-${title}`,
+      group: "DeFi Risk Lab",
+      title,
+      keywords,
+      run: () => handleNav("defirisk"),
     })),
     ...(
       [
@@ -1914,6 +1937,9 @@ export default function HomePage() {
 
         {/* ── Crypto Perpetual Funding & Basis Lab ─────────────────────── */}
         {view === "cryptoderivatives" && <CryptoDerivativesLabPanel />}
+
+        {/* ── DeFi Yield, Stablecoin Peg & Lending Risk Lab ────────────── */}
+        {view === "defirisk" && <DefiRiskLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

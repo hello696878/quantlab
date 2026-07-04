@@ -104,6 +104,8 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/microstructure/analyze` | `POST /microstructure/analyze` |
 | `GET /api/crypto-derivatives/sample` | `GET /crypto-derivatives/sample` |
 | `POST /api/crypto-derivatives/analyze` | `POST /crypto-derivatives/analyze` |
+| `GET /api/defi-risk/sample` | `GET /defi-risk/sample` |
+| `POST /api/defi-risk/analyze` | `POST /defi-risk/analyze` |
 
 The **Volatility Surface & Variance Swap Lab** (`VolatilityLabPanel`, view
 `volatility`) loads a deterministic sample option chain, lets you edit the
@@ -145,6 +147,21 @@ below). Static illustrative sample data — no live exchange data or crypto pric
 no broker / exchange integration, funding / carry / liquidation are simplified
 educational approximations, not a production risk engine, not real-time funding
 analytics, not investment / trading / liquidation advice.
+
+The **DeFi Yield, Stablecoin Peg & Lending Risk Lab** (`DefiRiskLabPanel`, view
+`defirisk`) loads five deterministic samples (USDC lending, USDT peg stress, DAI
+collateralized debt, ETH collateral borrowing, WBTC collateral stress), lets you
+select one and edit the stablecoin price / collateral / debt / threshold / APY
+assumptions, and re-analyses live via `/api/defi-risk/analyze` (stablecoin peg
+deviation + status, utilization + kinked interest-rate model borrow/supply APY,
+collateral / debt / LTV / health factor, approximate liquidation price +
+distance, net APY, a risk-regime pill, and ten protocol stress scenarios). Its
+formulas render as local LaTeX (see the shared formula note below). Static
+illustrative sample data — no live protocol data or crypto prices, no wallets,
+no blockchain RPC or smart-contract calls, the rate model / health factor /
+liquidation price are simplified educational approximations, not a production
+DeFi risk engine, not real-time DeFi analytics, not investment / trading /
+lending / borrowing / liquidation advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract

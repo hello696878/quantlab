@@ -1381,6 +1381,31 @@ export default function HomeDashboard({
           </button>
           <button
             type="button"
+            onClick={() => onNav("defirisk")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                DeFi Risk Lab
+              </span>
+              <span
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+              >
+                DeFi risk
+              </span>
+            </span>
+            <span className="text-xs text-slate-400">
+              Analyze deterministic sample stablecoin peg deviation, lending/borrow APY,
+              utilization, collateral health factor, liquidation distance, net carry, and protocol
+              stress scenarios — not investment, lending, borrowing, or liquidation advice.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open DeFi Risk Lab →
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => onNav("scanner")}
             className="card flex flex-col gap-1 p-4 text-left"
           >

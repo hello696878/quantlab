@@ -25,6 +25,7 @@ export type View =
   | "volatility"
   | "microstructure"
   | "cryptoderivatives"
+  | "defirisk"
   | "csv"
   | "builder"
   | "portfolio"

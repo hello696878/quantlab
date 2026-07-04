@@ -1677,6 +1677,54 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 27.0 — DeFi Yield, Stablecoin Peg & Lending Risk Lab v1 ✅
+
+- **New deterministic educational DeFi analytics lab.** Static sample data only;
+  no live protocol data, no live crypto prices, no wallets, no blockchain RPC or
+  smart-contract calls, no broker/exchange integration, no trading, no API keys,
+  no scraping, not investment / trading / lending / borrowing / liquidation
+  advice, not a production DeFi risk engine. No existing module changed (separate
+  package + view).
+- Backend: new `app/defi_risk/` package (`models.py` strict Pydantic v2 with
+  `extra="forbid"` + `FiniteFloat`, cross-field checks `total_borrowed ≤
+  total_supplied` and `liquidation_threshold ≥ collateral_factor`; `sample.py`
+  five deterministic samples — USDC lending, USDT peg stress, DAI collateralized
+  debt, ETH collateral borrowing, WBTC collateral stress — each with a stablecoin
+  peg snapshot, an Aave-like kinked rate-model market, and a collateralized
+  position; `service.py` pure analytics) + `app/defi_risk_routes.py`
+  (`GET /defi-risk/sample`, `POST /defi-risk/analyze`), wired via `include_router`.
+- Analytics: stablecoin peg deviation (& bps, on-peg/minor/depegged status),
+  utilization `U = B/S` + kinked borrow rate (base + slope₁ to the kink, slope₂
+  beyond) and supply rate `r_b·U·(1−ρ)`, collateral/debt value, LTV, health
+  factor `V_c·θ/V_d` (capped finite when debt is zero), approximate liquidation
+  price `V_d/(Q_c·θ)` + distance, net APY `supply − borrow − fees`, a
+  deterministic risk-regime classification (healthy / elevated utilization / peg
+  stress / liquidation watch / protocol stress / severe stress), and ten protocol
+  stress scenarios (mild/severe depeg, collateral drawdown, borrow asset rally,
+  utilization spike, liquidity drought, borrow rate shock, liquidation threshold
+  cut, protocol stress combo). Every division guarded → no NaN/Inf.
+- Frontend: new `DefiRiskLabPanel` (view `defirisk`) — hero, sample selector +
+  editable assumptions (live re-analyze; threshold clamped ≥ collateral factor),
+  key-metric cards + regime pill, stablecoin-peg panel, utilization/rate-model
+  panel, collateral-risk panel, net-APY panel, scenario-stress table, and a
+  shared `FormulaReference` (Stablecoin peg / Utilization & rates / Collateral
+  risk / Net APY groups); new `lib/defiRisk.ts` types + API client. Wired into
+  Sidebar, Dashboard card ("DeFi risk" badge), and Command Palette (Open DeFi
+  Risk Lab, Stablecoin Peg Lab, DeFi Lending APY Lab, Health Factor Lab,
+  Liquidation Distance Lab, DeFi Stress Scenario Lab).
+- Also fixed (honest test repair, not a behaviour change): three research-CLI
+  guard tests asserted the repo-root `artifacts/` dir *never exists*, which
+  false-failed once the documented Research CLI quickstart legitimately created
+  `artifacts/experiments/`; they now snapshot pre-existence and assert the run
+  does not *create* the dir.
+- 30 new backend tests (deterministic, no network) — `npx tsc --noEmit` clean; no
+  frontend build run (per instructions). Docs: `README.md`, `backend/README.md`,
+  `frontend/README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`.
+  **Static sample, educational — no live protocol data or crypto prices, no
+  wallets/RPC/contract calls, kinked-rate/health-factor/liquidation are simplified
+  approximations, not a production DeFi risk engine, not investment / trading /
+  lending / borrowing / liquidation advice.**
+
 ### Phase 26.0 — Crypto Perpetual Futures Funding & Basis Lab v1 ✅
 
 - **New deterministic educational crypto-derivatives lab.** Static sample data

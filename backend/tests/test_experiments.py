@@ -492,11 +492,16 @@ def test_no_pickle_or_joblib_artifacts(tmp_path):
 
 
 def test_tests_create_no_repo_artifacts_dir(tmp_path):
-    store = ExperimentStore(tmp_path)
-    store.write_metadata(_run())
+    # The repo-root artifacts/ dir may legitimately pre-exist (the documented
+    # Research CLI quickstart writes to ..\artifacts\experiments); the guard is
+    # that *this write* must not create it.
     backend_dir = Path(__file__).resolve().parents[1]   # backend/
     repo_root = backend_dir.parent                       # worktree root
-    assert not (repo_root / "artifacts").exists()
+    repo_artifacts_existed = (repo_root / "artifacts").exists()
+    store = ExperimentStore(tmp_path)
+    store.write_metadata(_run())
+    if not repo_artifacts_existed:
+        assert not (repo_root / "artifacts").exists()
     assert not (backend_dir / "artifacts").exists()
 
 
@@ -841,11 +846,15 @@ def test_save_writes_only_under_base_dir(tmp_path):
 
 
 def test_save_creates_no_repo_artifacts_dir(tmp_path):
-    store = ExperimentStore(tmp_path)
-    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    # Repo-root artifacts/ may pre-exist from the documented CLI quickstart;
+    # the guard is that a tmp-store save must not create it.
     backend_dir = Path(__file__).resolve().parents[1]
     repo_root = backend_dir.parent
-    assert not (repo_root / "artifacts").exists()
+    repo_artifacts_existed = (repo_root / "artifacts").exists()
+    store = ExperimentStore(tmp_path)
+    save_experiment_run(_trained_full("a" * 64), _eval_full(), store=store, created_at=_AT)
+    if not repo_artifacts_existed:
+        assert not (repo_root / "artifacts").exists()
     assert not (backend_dir / "artifacts").exists()
 
 
@@ -985,6 +994,8 @@ def _same_window_run(h, *, label_column="label__forward_return_1", dataset_confi
 def test_phase5_end_to_end_experiment_tracking(tmp_path):
     base = tmp_path / "artifacts" / "experiments"
     store = ExperimentStore(base)
+    _backend_dir = Path(__file__).resolve().parents[1]
+    _repo_artifacts_existed = (_backend_dir.parent / "artifacts").exists()
 
     tm_a, res_a = _pipeline(alpha=1.0)
     run_a = save_experiment_run(tm_a, res_a, store=store, created_at=_AT, code_version="phase5")
@@ -1018,9 +1029,9 @@ def test_phase5_end_to_end_experiment_tracking(tmp_path):
     files = [q for q in tmp_path.rglob("*") if q.is_file()]
     assert files and all(q.is_relative_to(base) for q in files)
     assert not any(q.name.endswith((".pkl", ".pickle", ".joblib")) for q in files)
-    backend_dir = Path(__file__).resolve().parents[1]
-    assert not (backend_dir.parent / "artifacts").exists()
-    assert not (backend_dir / "artifacts").exists()
+    if not _repo_artifacts_existed:
+        assert not (_backend_dir.parent / "artifacts").exists()
+    assert not (_backend_dir / "artifacts").exists()
 
     # second comparable run (different alpha -> different model/hash, same window/dataset/label)
     tm_b, res_b = _pipeline(alpha=1e-6)

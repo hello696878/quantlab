@@ -359,9 +359,14 @@ def test_missing_artifact_after_save_raises(tmp_path):
 
 
 def test_pipeline_creates_no_repo_artifacts_dir(tmp_path):
-    run_es_ml_experiment(_exp_config(created_at=_AT), store=_store(tmp_path))
+    # The repo-root artifacts/ dir may legitimately pre-exist (the documented
+    # Research CLI quickstart writes to ..\artifacts\experiments); the guard is
+    # that *this run* must not create it.
     backend_dir = Path(__file__).resolve().parents[1]
-    assert not (backend_dir.parent / "artifacts").exists()
+    repo_artifacts_existed = (backend_dir.parent / "artifacts").exists()
+    run_es_ml_experiment(_exp_config(created_at=_AT), store=_store(tmp_path))
+    if not repo_artifacts_existed:
+        assert not (backend_dir.parent / "artifacts").exists()
     assert not (backend_dir / "artifacts").exists()
 
 
@@ -486,9 +491,13 @@ def test_wrapper_scripts_exist_and_are_thin():
 
 
 def test_cli_creates_no_repo_artifacts_dir(tmp_path):
-    cli_main(["run", "--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT])
+    # Repo-root artifacts/ may pre-exist from the documented CLI quickstart;
+    # the guard is that a tmp-dir run must not create it.
     backend_dir = Path(__file__).resolve().parents[1]
-    assert not (backend_dir.parent / "artifacts").exists()
+    repo_artifacts_existed = (backend_dir.parent / "artifacts").exists()
+    cli_main(["run", "--artifacts-dir", str(tmp_path / "exp"), "--created-at", _AT])
+    if not repo_artifacts_existed:
+        assert not (backend_dir.parent / "artifacts").exists()
     assert not (backend_dir / "artifacts").exists()
 
 
@@ -685,6 +694,8 @@ def _cli_capture(capsys, args, expect_rc=0) -> str:
 
 def test_cli_end_to_end_run_load_list_compare_best(tmp_path, capsys):
     base = tmp_path / "exp"
+    backend_dir = Path(__file__).resolve().parents[1]
+    repo_artifacts_existed = (backend_dir.parent / "artifacts").exists()
 
     # two same-window runs via the actual CLI (different ridge alpha)
     p1 = json.loads(_cli_capture(
@@ -725,8 +736,8 @@ def test_cli_end_to_end_run_load_list_compare_best(tmp_path, capsys):
     files = [q for q in tmp_path.rglob("*") if q.is_file()]
     assert files and all(q.is_relative_to(base) for q in files)
     assert not any(q.name.endswith((".pkl", ".pickle", ".joblib")) for q in files)
-    backend_dir = Path(__file__).resolve().parents[1]
-    assert not (backend_dir.parent / "artifacts").exists()
+    if not repo_artifacts_existed:
+        assert not (backend_dir.parent / "artifacts").exists()
     assert not (backend_dir / "artifacts").exists()
 
 

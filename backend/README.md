@@ -30,6 +30,8 @@ backend/
 │   ├── microstructure_routes.py  Market Microstructure & Execution Lab API routes
 │   ├── crypto_derivatives/  static-sample crypto perp funding/basis analytics (models/sample/service)
 │   ├── crypto_derivatives_routes.py  Crypto Perpetual Funding & Basis Lab API routes
+│   ├── defi_risk/          static-sample DeFi peg/lending/collateral analytics (models/sample/service)
+│   ├── defi_risk_routes.py       DeFi Yield, Stablecoin Peg & Lending Risk Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -51,7 +53,8 @@ backend/
 │   ├── test_futures.py           Futures & Commodities Lab analytics/API tests
 │   ├── test_volatility.py        Volatility Lab analytics/API/validation tests
 │   ├── test_microstructure.py    Market Microstructure & Execution Lab analytics/API/validation tests
-│   └── test_crypto_derivatives.py  Crypto Perpetual Funding & Basis Lab analytics/API/validation tests
+│   ├── test_crypto_derivatives.py  Crypto Perpetual Funding & Basis Lab analytics/API/validation tests
+│   └── test_defi_risk.py         DeFi Yield, Stablecoin Peg & Lending Risk Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -269,6 +272,31 @@ liquidation price / margin / carry figures are simplified educational
 approximations, not an exchange's actual liquidation engine. Scenarios are
 hypothetical deterministic shocks — not forecasts and not advice. Every division
 is guarded so all outputs are finite.
+
+---
+
+### DeFi Yield, Stablecoin Peg & Lending Risk Lab Endpoints
+
+Deterministic static-sample DeFi analytics (Phase 27.0). No live protocol data,
+no live crypto prices, no wallets, no blockchain RPC or smart-contract calls, no
+network calls, educational only — not investment, trading, lending, borrowing,
+liquidation, legal, tax, or risk-management advice, and not a production DeFi
+risk engine.
+
+| Endpoint | Description |
+|---|---|
+| `GET /defi-risk/sample` | Five deterministic samples (USDC lending, USDT peg stress, DAI collateralized debt, ETH collateral borrowing, WBTC collateral stress), each with a stablecoin peg snapshot, an Aave-like kinked rate-model market, and a collateralized position |
+| `POST /defi-risk/analyze` | Stablecoin peg deviation (& bps, status), utilization + kinked interest-rate model (borrow / supply APY), collateral / debt / LTV / health factor, approximate liquidation price + distance, net APY, a risk-regime classification (healthy / elevated utilization / peg stress / liquidation watch / protocol stress / severe stress), and ten protocol stress scenarios |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): prices and
+amounts positive (debt may be zero), `total_borrowed ≤ total_supplied`,
+`kink_utilization` and `reserve_factor` in (0, 1) / [0, 1], and
+**`liquidation_threshold` ≥ `collateral_factor`**; no NaN/Infinity. The health
+factor is capped finite when debt is zero; the kinked-rate model, health factor,
+and liquidation price are simplified educational approximations, not a protocol's
+actual rate or liquidation logic. Scenarios are hypothetical deterministic shocks
+— not forecasts and not advice. Every division is guarded so all outputs are
+finite.
 
 ---
 

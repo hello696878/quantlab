@@ -464,6 +464,25 @@ Return to the Command Center's **Platform Direction** panel (or open
   prices, no broker/exchange integration, funding/carry/liquidation are simplified
   educational approximations, **not** a production risk engine, **not** real-time funding
   analytics, not investment / trading / liquidation advice.
+- **DeFi Yield, Stablecoin Peg & Lending Risk Lab (27.0)** — open from the sidebar
+  (or Ctrl/Cmd+K → "Open DeFi Risk Lab" / "Health Factor Lab"). Switch samples (USDC
+  lending, USDT peg stress, DAI collateralized debt, ETH collateral, WBTC stress); the
+  peg snapshot, kinked rate-model market, and collateralized position load and analyse
+  automatically. Show the key-metric cards (peg deviation, utilization, model borrow /
+  supply APY, LTV, health factor, liquidation distance, net APY) and the **risk-regime**
+  pill (USDT reads "Peg stress", DAI "Elevated utilization", WBTC "Liquidation watch").
+  Walk the **stablecoin peg** panel (deviation + status), the **utilization & rate
+  model** panel (past the kink, rates climb the steep slope), the **collateral risk**
+  panel (HF = collateral × threshold ÷ debt; approximate liquidation price + distance),
+  the **net APY** panel, and the **protocol stress scenarios** (mild/severe depeg,
+  collateral drawdown, borrow asset rally, utilization spike, liquidity drought, borrow
+  rate shock, threshold cut, stress combo). Edit the stablecoin price / collateral /
+  debt / threshold / APYs and watch everything re-compute. The **Formulas & notes**
+  render as **LaTeX** (KaTeX, local — no CDN). Emphasise: static illustrative sample
+  data — **not** live protocol data or crypto prices, no wallets / RPC / smart-contract
+  calls, the rate model / health factor / liquidation price are simplified educational
+  approximations, **not** a production DeFi risk engine, **not** real-time DeFi
+  analytics, not investment / trading / lending / borrowing / liquidation advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

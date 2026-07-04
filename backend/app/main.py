@@ -73,6 +73,7 @@ from app.futures_routes import router as futures_router
 from app.volatility_routes import router as volatility_router
 from app.microstructure_routes import router as microstructure_router
 from app.crypto_derivatives_routes import router as crypto_derivatives_router
+from app.defi_risk_routes import router as defi_risk_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -396,6 +397,9 @@ app.include_router(microstructure_router)
 
 # Crypto Perpetual Futures Funding & Basis Lab (Phase 26.0) — static sample API.
 app.include_router(crypto_derivatives_router)
+
+# DeFi Yield, Stablecoin Peg & Lending Risk Lab (Phase 27.0) — static sample API.
+app.include_router(defi_risk_router)
 
 
 # ---------------------------------------------------------------------------
