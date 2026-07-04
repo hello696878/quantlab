@@ -7,23 +7,33 @@ in-place: futures-first, while preserving the existing crypto code.
 
 QuantLab v0.1 foundation (Phase 1: futures-first).
 
-## Status (2026-07-03)
+## Status (2026-07-05)
 
-**QuantLab foundation is stable.** The futures foundation round is complete:
+**QuantLab local futures data path v0.1 is stable.** The local, synthetic-only
+futures data foundation is complete end to end:
 
 - Instruments supported: **ES, NQ, YM, RTY** (validated, immutable YAML specs).
-- Instrument validation hardened; registry test suite passes (31 tests).
-- Per-record futures daily bar schema with synthetic tests (11 tests).
-- Read-only smoke checks pass: instrument registry and futures metadata.
-- Full backend suite green: 2416 passed.
+- Per-record futures daily bar schema with registry-aware validation.
+- A read-only local CSV workflow, synthetic data only, no network:
 
-Key files for the foundation:
+  ```
+  local CSV -> validate -> normalize -> processed CSV -> metadata lookup -> tiny futures report
+  ```
+
+- Read-only smoke checks and reports all exit 0; full backend suite green
+  (2469 passed).
+
+Key files for the local futures data path:
 
 - `backend/app/instruments/` — spec, futures contract, and registry code
 - `configs/instruments/` — `es.yaml`, `nq.yaml`, `ym.yaml`, `rty.yaml`
 - `backend/app/datastore/daily_bar.py` — per-record futures daily bar schema
-- `backend/tests/test_instruments_registry.py` — registry test suite
-- `backend/tests/test_futures_daily_bar.py` — daily bar schema tests
+- `backend/app/datastore/csv_fixtures.py` — local CSV loader (`load_futures_bars_csv`)
+- `scripts/check_instruments.py`, `scripts/check_futures_metadata.py` — registry / metadata smoke checks
+- `scripts/check_local_futures_csv.py` — validate local CSVs, read-only
+- `scripts/normalize_local_futures_csv.py` — validate + write one normalized CSV per root
+- `scripts/report_local_futures_csv.py` — per-root summary of normalized CSV output
+- `scripts/run_synthetic_futures_report.py` — synthetic mini trade report
 - `docs/INSTRUMENTS_LAYER.md` — instruments layer architecture note
 - `docs/FUTURES_DATA_INGESTION_PLAN.md` — how real futures data will enter later (design only)
 
@@ -35,7 +45,8 @@ Deliberately out of scope for now:
 - CFDs
 - options
 - futures_continuous
-- real data download
+- real data download (no yfinance, no IBKR)
+- production trading
 - major backtest engine rewrite
 
 ## Verification
@@ -43,8 +54,16 @@ Deliberately out of scope for now:
 ```powershell
 backend\venv\Scripts\python.exe scripts\check_instruments.py
 backend\venv\Scripts\python.exe scripts\check_futures_metadata.py
+backend\venv\Scripts\python.exe scripts\run_synthetic_futures_report.py
+backend\venv\Scripts\python.exe scripts\check_local_futures_csv.py --path backend\tests\fixtures
+backend\venv\Scripts\python.exe scripts\normalize_local_futures_csv.py --input backend\tests\fixtures --output-dir backend\tests\_tmp_normalized_futures
+backend\venv\Scripts\python.exe scripts\report_local_futures_csv.py --input backend\tests\_tmp_normalized_futures
 backend\venv\Scripts\python.exe -m pytest backend/tests -q
 ```
+
+The two CSV commands write only to `backend\tests\_tmp_normalized_futures`, a
+throwaway folder that is not committed; delete it afterward
+(`Remove-Item -Recurse -Force backend\tests\_tmp_normalized_futures`).
 
 ## Project Docs
 

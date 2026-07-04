@@ -316,6 +316,10 @@ Prove the whole path with data we invent, so no download questions arise.
 > canonical-column CSV per root (sorted, round-trips through the loader) to
 > `data\processed\futures_daily\` (or `--output-dir`). CSV only for now; the
 > parquet-backed store ingest CLI and ingestion log below remain open.
+> Also landed 2026-07-05: `scripts/report_local_futures_csv.py` — read-only
+> per-root summary of the normalized output (metadata lookup + one-contract
+> first-close→last-close P&L, direct == tick-based). This closes the local,
+> synthetic-only workflow (validate → normalize → report) as **v0.1 stable**.
 
 Same loader generalized to files a human places under
 `C:\quantlab\data\incoming\futures\csv_local\`, plus operational trimmings:

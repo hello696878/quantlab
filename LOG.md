@@ -1,5 +1,85 @@
 # LOG - QuantLab
 
+## 2026-07-05 (local futures data path v0.1 — stable)
+
+### Status
+
+QuantLab local futures data path v0.1 is stable. The local, synthetic-only
+futures data workflow is complete end to end:
+
+    local CSV -> validate -> normalize -> processed CSV -> metadata lookup -> tiny futures report
+
+Landed since the fixture loader: a read-only local CSV smoke check
+(scripts/check_local_futures_csv.py), a validate-then-write-once normalizer
+(scripts/normalize_local_futures_csv.py, one canonical CSV per root), and a
+read-only per-root report (scripts/report_local_futures_csv.py) that looks up
+instrument metadata and prints a one-contract first-close->last-close P&L two
+ways (direct == tick-based). All scripts read local files only; the smoke
+check and report write nothing, the normalizer writes once to its output dir
+and never mutates inputs. No network, no yfinance, no IBKR, no new
+dependencies, no continuous-futures stitching. An adversarial review pass (8
+agents) on the report flagged a test-coverage gap (no multi-contract root
+case) and one dead variable; both fixed (multi-contract test added, variable
+removed).
+
+### Files changed (docs only, this entry)
+
+- README.md (status -> v0.1 stable, local workflow, verification commands)
+- STOP_POINT.md (checkpoint -> v0.1 stable, next safe step)
+- TASKS.md (Done 2026-07-05 section; Now/Next/Do-Not-Do-Yet updated)
+- LOG.md (this entry)
+- docs/FUTURES_DATA_INGESTION_PLAN.md (tiny I2 status note: report landed)
+
+### Verification (all green, 2026-07-05)
+
+- `...\check_instruments.py` -> RESULT: OK (4/4).
+- `...\check_futures_metadata.py` -> RESULT: OK (4/4).
+- `...\run_synthetic_futures_report.py` -> RESULT: OK (2/2).
+- `...\check_local_futures_csv.py --path backend\tests\fixtures` -> RESULT: OK (2/2).
+- `...\normalize_local_futures_csv.py --input backend\tests\fixtures --output-dir backend\tests\_tmp_normalized_futures` -> RESULT: OK (2 -> 2).
+- `...\report_local_futures_csv.py --input backend\tests\_tmp_normalized_futures` -> RESULT: OK (2 roots).
+- `...\-m pytest backend/tests -q` -> 2469 passed.
+
+### Next
+
+Design a tiny strategy/report interface over local normalized CSV only, or
+settle the real data source plan before any ingestion implementation.
+
+## 2026-07-04 (I1 commit 1: synthetic CSV fixture loader)
+
+### Status
+
+First safe CSV ingestion path, synthetic data only (ingestion plan §9 I1).
+`load_futures_bars_csv` reads a local CSV (12 canonical columns) and returns
+validated `FuturesDailyBar` records; registry link and root/contract match
+enforced per row, plus the plan-§6 cross-checks (contract month in cycle,
+expiry == spec-derived, timezone == spec session tz); blank open_interest
+allowed; BOM tolerated; ragged rows, non-ISO timestamp/expiry cells,
+duplicates, and empty files rejected; input files never modified. No
+network, no new dependencies. An adversarial review pass (6 agents) found 4
+issues (BOM, ragged rows, epoch-second timestamp misparse, missing §6
+cross-checks); all fixed and covered by tests.
+
+### Files changed
+
+- backend/app/datastore/csv_fixtures.py (new loader)
+- backend/app/datastore/__init__.py (exports)
+- backend/tests/fixtures/futures_csv/esm25.csv, nqm25.csv (new fixtures)
+- backend/tests/test_futures_csv_fixtures.py (new, 14 tests)
+- docs/FUTURES_DATA_INGESTION_PLAN.md (I1 status note), TASKS.md, LOG.md
+
+### Verification (all green, 2026-07-04)
+
+- `backend\venv\Scripts\python.exe -m pytest backend/tests -q` -> 2441 passed.
+- `backend\venv\Scripts\python.exe scripts\check_instruments.py` -> RESULT: OK (4/4).
+- `backend\venv\Scripts\python.exe scripts\check_futures_metadata.py` -> RESULT: OK (4/4).
+- `backend\venv\Scripts\python.exe scripts\run_synthetic_futures_report.py` -> RESULT: OK (2/2).
+
+### Next
+
+I1 commit 2: round-trip fixture bars through RawFuturesStore (temp dir,
+read-back equality, stable version hash).
+
 ## 2026-07-04 (futures data ingestion plan — design only)
 
 ### Status
