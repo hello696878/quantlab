@@ -287,6 +287,13 @@ commits; a phase starts only when the previous one is green.
 
 ### Ingestion Phase 1 (I1) — synthetic CSV fixture loader
 
+> Status: commit 1 landed 2026-07-04 — `backend/app/datastore/csv_fixtures.py`
+> (`load_futures_bars_csv` returns validated `FuturesDailyBar` records; the
+> fixtures carry all 12 columns rather than loader-attached metadata, so the
+> loader enforces the §6 cross-checks — month-in-cycle, expiry == spec,
+> timezone == spec session — against the file's values). The store
+> round-trip below is I1 commit 2, still open.
+
 Prove the whole path with data we invent, so no download questions arise.
 
 - Check in 2–3 tiny synthetic per-contract CSVs as **test fixtures** (e.g.

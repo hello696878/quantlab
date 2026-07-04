@@ -4,6 +4,7 @@ Named ``datastore`` (not ``data``) to avoid colliding with the existing
 ``app.data`` provider module; a later refactor can consolidate them.
 """
 
+from app.datastore.csv_fixtures import FixtureFormatError, load_futures_bars_csv
 from app.datastore.daily_bar import FuturesDailyBar
 from app.datastore.store import (
     CONTINUOUS_SUBDIR,
@@ -16,7 +17,9 @@ from app.datastore.store import (
 )
 
 __all__ = [
+    "FixtureFormatError",
     "FuturesDailyBar",
+    "load_futures_bars_csv",
     "REQUIRED_COLUMNS",
     "RAW_SUBDIR",
     "CONTINUOUS_SUBDIR",
