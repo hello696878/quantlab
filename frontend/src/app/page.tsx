@@ -53,6 +53,7 @@ import CryptoDerivativesLabPanel from "@/components/CryptoDerivativesLabPanel";
 import DefiRiskLabPanel from "@/components/DefiRiskLabPanel";
 import TokenomicsLabPanel from "@/components/TokenomicsLabPanel";
 import OnChainAnalyticsLabPanel from "@/components/OnChainAnalyticsLabPanel";
+import AlternativeDataLabPanel from "@/components/AlternativeDataLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -436,6 +437,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "On-Chain Flow, Exchange Reserve & Whale Concentration Lab",
     subtitle:
       "Exchange inflows/outflows and reserve ratios, active addresses, transfer volume, token velocity, an NVT-style valuation ratio, holder cohorts with a Gini-style concentration approximation, whale flows, an on-chain risk-regime read, and on-chain stress scenarios — deterministic static sample data, no live on-chain data or token prices, no wallets, RPC, or explorer APIs, not investment, trading, or token advice.",
+  },
+  altdata: {
+    title: "Alternative Data, News Sentiment & Signal Decay Lab",
+    subtitle:
+      "Sample news/social/earnings/macro/supply-chain events with weighted sentiment, novelty, freshness decay, a leakage guard, event-study horizons, information coefficient, hit rate, a signal-decay curve, an alpha composite, a research risk-regime read, and scenario stresses — deterministic static sample data, no live news or social media, no scraping, no LLM or provider APIs, not investment, trading, or signal advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1016,6 +1022,7 @@ export default function HomePage() {
     { view: "defirisk", title: "Open DeFi Risk Lab", keywords: "defi decentralized finance stablecoin peg depeg lending borrow apy utilization kink interest rate model collateral health factor ltv loan to value liquidation threshold net apy carry usdc usdt dai aave protocol stress" },
     { view: "tokenomics", title: "Open Tokenomics Risk Lab", keywords: "tokenomics token unlock schedule vesting cliff dilution fdv fully diluted valuation market cap float ratio emission inflation staking real yield treasury runway burn holder concentration crypto fundamentals" },
     { view: "onchain", title: "Open On-Chain Analytics Lab", keywords: "on-chain onchain exchange inflow outflow net flow exchange reserve active addresses transfer volume transaction count token velocity nvt whale concentration gini holder cohort crypto analytics" },
+    { view: "altdata", title: "Open Alternative Data Lab", keywords: "alternative data alt data news sentiment social sentiment earnings macro supply chain events novelty freshness leakage guard information coefficient ic hit rate signal decay alpha score event study" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1416,6 +1423,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("onchain"),
+    })),
+    ...(
+      [
+        ["Open Alternative Data Lab", "alternative data alt data lab news sentiment social earnings macro supply chain signal decay leakage alpha"],
+        ["News Sentiment Lab", "news sentiment score weighted sentiment intensity relevance reliability positive negative neutral events"],
+        ["Signal Decay Lab", "signal decay curve horizon correlation half life information coefficient decay 1d 5d 20d"],
+        ["Leakage Guard Lab", "leakage guard look ahead bias timestamp alignment feature available event time point in time"],
+        ["Event Study Signal Lab", "event study forward return horizon average signal ic information coefficient hit rate"],
+        ["Alternative Data Stress Scenario Lab", "alternative data stress scenario news burst noise spike reliability downgrade lag increase novelty collapse crowded leakage severe combo"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `altdata-${title}`,
+      group: "Alternative Data Lab",
+      title,
+      keywords,
+      run: () => handleNav("altdata"),
     })),
     ...(
       [
@@ -1993,6 +2016,9 @@ export default function HomePage() {
 
         {/* ── On-Chain Flow, Exchange Reserve & Whale Concentration Lab ── */}
         {view === "onchain" && <OnChainAnalyticsLabPanel />}
+
+        {/* ── Alternative Data, News Sentiment & Signal Decay Lab ──────── */}
+        {view === "altdata" && <AlternativeDataLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

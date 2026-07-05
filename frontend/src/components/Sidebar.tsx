@@ -40,6 +40,7 @@ const ICONS: Record<string, string> = {
   defirisk: "M12 3 4 7v5c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V7l-8-4ZM9 12l2 2 4-4",
   tokenomics: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7v10M9.5 9.5h3.75a1.75 1.75 0 0 1 0 3.5H9.5h4.25a1.75 1.75 0 0 1 0 3.5H9",
   onchain: "M7 7h4v4H7V7Zm6 6h4v4h-4v-4ZM4 4h4v4H4zm12 0h4v4h-4zM4 16h4v4H4zm12 0h4v4h-4zM8 6h8M6 8v8M18 8v8M8 18h8",
+  altdata: "M4 6h16M4 6v12h16V6M4 10h16M8 6v12M7 14l2.5-2 2 1.5L15 10l2 3",
   scanner: "M4 14h3v6H4zM10.5 9h3v11h-3zM17 4h3v16h-3z",
   finml: "M4 18 9 9l4 5 3-6 4 7M4 4v16h16",
   globe:
@@ -135,6 +136,7 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "defirisk", label: "DeFi Risk Lab", icon: "defirisk" },
   { id: "tokenomics", label: "Tokenomics Risk Lab", icon: "tokenomics" },
   { id: "onchain", label: "On-Chain Analytics Lab", icon: "onchain" },
+  { id: "altdata", label: "Alternative Data Lab", icon: "altdata" },
   { id: "scanner", label: "Cross-Sectional Scanner", icon: "scanner" },
   { id: "finml", label: "AFML Methodology Lab", icon: "finml" },
   { id: "csv", label: "CSV Backtest", icon: "upload" },

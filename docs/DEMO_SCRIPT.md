@@ -526,6 +526,29 @@ Return to the Command Center's **Platform Direction** panel (or open
   data — **not** live on-chain data or token prices, no wallets / RPC / explorer /
   exchange APIs, documented heuristic scores, **not** live whale tracking, **not** a
   production due-diligence engine, not investment / trading / token advice.
+- **Alternative Data, News Sentiment & Signal Decay Lab (30.0)** — open from the
+  sidebar (or Ctrl/Cmd+K → "Open Alternative Data Lab" / "Signal Decay Lab").
+  Switch samples (Mega Cap Equity News, Crypto Sentiment Stress, Earnings
+  Surprise, Macro Shock News, Supply Chain Alt Data); the hand-written event set
+  loads and analyses automatically. Show the key-metric cards (avg sentiment,
+  alpha score, IC(5d), hit rate, freshness, leakage, signal/noise,
+  reliability-weighted quality) and the **regime** pill — the five samples land on
+  five different regimes (Clean positive signal, Low-reliability signal, Clean
+  negative signal, Noisy signal — the macro sample's returns are built orthogonal
+  to its signals — and Stale signal for the slow supply-chain data). Walk the
+  **event table** (per-event weighted sentiment → novelty → freshness → signal,
+  hover for the sample return path), the **sentiment** and **freshness / leakage
+  guard** panels, the **signal quality** panel (IC/hit by horizon), the **event
+  study & signal decay** table (with the half-life note), and the **stress
+  scenarios** (positive/negative news, social noise spike, reliability downgrade,
+  lag increase, novelty collapse, crowded cluster, the synthetic leakage
+  violation, severe combo). Nudge the **λ / γ** model knobs and watch everything
+  re-compute. The **Formulas & notes** render as **LaTeX** (KaTeX, local — no
+  CDN). Emphasise: static illustrative sample data with hand-written scores and
+  returns — **no** live news or social media, **no** scraping, **no** LLM or
+  provider APIs, the IC/decay figures illustrate the workflow (**not** evidence
+  of alpha), **not** a production alpha engine, not investment / trading / signal
+  advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

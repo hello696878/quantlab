@@ -1457,6 +1457,32 @@ export default function HomeDashboard({
           </button>
           <button
             type="button"
+            onClick={() => onNav("altdata")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                Alternative Data Lab
+              </span>
+              <span
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+              >
+                Alternative data
+              </span>
+            </span>
+            <span className="text-xs text-slate-400">
+              Analyze deterministic sample news, social, earnings, macro, and supply-chain events
+              with sentiment scores, novelty, freshness decay, leakage checks, information
+              coefficient, hit rate, and signal decay scenarios — not investment, trading, or
+              signal advice.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Alternative Data Lab →
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => onNav("scanner")}
             className="card flex flex-col gap-1 p-4 text-left"
           >

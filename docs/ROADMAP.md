@@ -1677,6 +1677,57 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 30.0 — Alternative Data, News Sentiment & Signal Decay Lab v1 ✅
+
+- **New deterministic educational alternative-data research lab.** Static sample
+  data only; no live news, social media, or market data, no scraping, no LLM or
+  provider APIs, no API keys, no broker/exchange integration, no trading, not
+  investment / trading / signal advice, not a production alpha engine. No
+  existing module changed (separate package + view).
+- Backend: new `app/alternative_data/` package (`models.py` strict Pydantic v2
+  with `extra="forbid"` + `FiniteFloat`, sentiment in [−1, 1], scores in [0, 1],
+  a source-type enum, and a cross-field **leakage-ordering check**
+  (`feature_available_timestamp ≥ timestamp` on ISO sample timestamps);
+  `sample.py` five deterministic event sets — mega-cap equity news, crypto
+  sentiment stress, earnings surprise, macro shock news, supply-chain alt data —
+  on a static January-2026 timeline with hand-written scores and observed return
+  paths; `service.py` pure analytics) + `app/alternative_data_routes.py`
+  (`GET /alternative-data/sample`, `POST /alternative-data/analyze`), wired via
+  `include_router`.
+- Analytics: weighted sentiment `s·I·R·Q`, novelty adjustment `×(1+λN)`,
+  exponential freshness decay `exp(−γ·lag)` (λ, γ are documented editable
+  assumptions), lag-adjusted signals and a composite **alpha score** (plain
+  average), a **leakage guard** (zero flags on valid inputs; leaks only appear in
+  the synthetic leakage scenario), event-study horizons (1/5/20d) with average
+  forward return and per-horizon IC, **information coefficient** (Pearson, null +
+  note on zero variance), **hit rate** (sign match), a **signal-decay curve**
+  with a linearly interpolated half-life estimate, signal-to-noise and
+  reliability-weighted quality scores, a deterministic research **risk-regime
+  classification** (clean positive/negative, noisy, stale, leakage, low
+  reliability, crowded, severe with ≥3 triggers), and ten scenario stresses. The
+  five samples land on five distinct regimes; the macro sample's returns were
+  constructed orthogonal to its signals (IC ≈ 0) to demonstrate the noisy regime.
+  Every division guarded → no NaN/Inf.
+- Frontend: new `AlternativeDataLabPanel` (view `altdata`) — hero, sample
+  selector + editable λ/γ model knobs (live re-analyze), key-metric cards +
+  regime pill, event table (with per-row return-path tooltips and leakage
+  column), sentiment and freshness/leakage panels, signal-quality panel,
+  event-study + decay tables with the half-life note, regime panel,
+  scenario-stress table, and a shared `FormulaReference` (Weighted sentiment /
+  Signal quality / Leakage guard groups); new `lib/alternativeData.ts` types +
+  API client. Wired into Sidebar, Dashboard card ("Alternative data" badge), and
+  Command Palette (Open Alternative Data Lab, News Sentiment Lab, Signal Decay
+  Lab, Leakage Guard Lab, Event Study Signal Lab, Alternative Data Stress
+  Scenario Lab).
+- 30 new backend tests (deterministic, no network) — full suite green
+  (**2599 passed**, and the repo-root `artifacts/` dir does not exist after the
+  run); `npx tsc --noEmit` clean; no frontend build run (per instructions). Docs:
+  `backend/README.md`, `frontend/README.md`, `PROJECT_OVERVIEW.md`,
+  `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample, educational — no live
+  news/social/market data, no scraping or LLM/provider APIs, hand-written sample
+  scores and returns (workflow illustration, not evidence of alpha), not a
+  production alpha engine, not investment / trading / signal advice.**
+
 ### Phase 29.0 — On-Chain Flow, Exchange Reserve & Whale Concentration Lab v1 ✅
 
 - **New deterministic educational crypto on-chain analytics lab.** Static sample

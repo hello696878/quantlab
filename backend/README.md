@@ -36,6 +36,8 @@ backend/
 │   ├── tokenomics_routes.py      Tokenomics, Unlock Schedule & Treasury Risk Lab API routes
 │   ├── onchain_analytics/  static-sample on-chain flow/reserve/whale analytics (models/sample/service)
 │   ├── onchain_analytics_routes.py  On-Chain Flow, Exchange Reserve & Whale Concentration Lab API routes
+│   ├── alternative_data/   static-sample news/sentiment/signal-decay analytics (models/sample/service)
+│   ├── alternative_data_routes.py  Alternative Data, News Sentiment & Signal Decay Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -60,7 +62,8 @@ backend/
 │   ├── test_crypto_derivatives.py  Crypto Perpetual Funding & Basis Lab analytics/API/validation tests
 │   ├── test_defi_risk.py         DeFi Yield, Stablecoin Peg & Lending Risk Lab analytics/API/validation tests
 │   ├── test_tokenomics.py        Tokenomics, Unlock Schedule & Treasury Risk Lab analytics/API/validation tests
-│   └── test_onchain_analytics.py On-Chain Flow, Exchange Reserve & Whale Concentration Lab analytics/API/validation tests
+│   ├── test_onchain_analytics.py On-Chain Flow, Exchange Reserve & Whale Concentration Lab analytics/API/validation tests
+│   └── test_alternative_data.py  Alternative Data, News Sentiment & Signal Decay Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -354,6 +357,32 @@ Gini-style score (cohort-level Lorenz-curve approximation that understates
 wallet-level inequality) are documented deterministic heuristics. Scenarios are
 hypothetical deterministic shocks — not forecasts and not advice. Every division
 is guarded so all outputs are finite.
+
+---
+
+### Alternative Data, News Sentiment & Signal Decay Lab Endpoints
+
+Deterministic static-sample alternative-data research analytics (Phase 30.0). No
+live news, social media, or market data, no scraping, no LLM or data-provider
+APIs, no API keys, no network calls, educational only — not investment, trading,
+legal, tax, or risk-management advice, and not a production alpha engine.
+
+| Endpoint | Description |
+|---|---|
+| `GET /alternative-data/sample` | Five deterministic event sets (mega-cap equity news, crypto sentiment stress, earnings surprise, macro shock news, supply-chain alt data) on a static January-2026 timeline with hand-written sentiment / intensity / novelty / reliability / relevance scores, observed return paths, and publication-lag data |
+| `POST /alternative-data/analyze` | Weighted sentiment `s·I·R·Q` → novelty adjustment `×(1+λN)` → freshness decay `×exp(−γ·lag)` → lag-adjusted signals and a composite alpha score; a leakage guard on feature-availability timestamps; event-study horizons (1/5/20d); information coefficient (null + note on zero variance), hit rate, signal-to-noise, reliability-weighted quality; a signal-decay curve with a half-life estimate; a research risk-regime classification (clean positive/negative, noisy, stale, leakage, low reliability, crowded, severe); and ten scenario stresses |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): sentiment in
+[−1, 1]; intensity / novelty / reliability / relevance in [0, 1]; publication
+lag ≥ 0; a **source-type enum** (news / social / earnings / macro / product /
+regulatory / supply_chain); and a **leakage-ordering check**
+(`feature_available_timestamp ≥ timestamp` on the ISO sample timeline) — so
+valid inputs carry zero leakage flags and leaks only appear in the synthetic
+leakage scenario. λ (novelty weight) and γ (freshness decay per hour) are
+documented editable assumptions. Observed returns are hand-written sample paths
+— the IC / hit-rate / decay figures illustrate the research workflow, not
+evidence of alpha. Scenarios are hypothetical deterministic shocks — not
+forecasts and not advice. Every division is guarded so all outputs are finite.
 
 ---
 

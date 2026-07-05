@@ -110,6 +110,8 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/tokenomics/analyze` | `POST /tokenomics/analyze` |
 | `GET /api/onchain-analytics/sample` | `GET /onchain-analytics/sample` |
 | `POST /api/onchain-analytics/analyze` | `POST /onchain-analytics/analyze` |
+| `GET /api/alternative-data/sample` | `GET /alternative-data/sample` |
+| `POST /api/alternative-data/analyze` | `POST /alternative-data/analyze` |
 
 The **Volatility Surface & Variance Swap Lab** (`VolatilityLabPanel`, view
 `volatility`) loads a deterministic sample option chain, lets you edit the
@@ -196,6 +198,22 @@ below). Static illustrative sample data — no live on-chain data or token price
 no wallets, no blockchain RPC, smart-contract, explorer, or exchange APIs,
 documented heuristic scores, not a production due-diligence engine, not
 real-time on-chain analytics, not investment / trading / token advice.
+
+The **Alternative Data, News Sentiment & Signal Decay Lab**
+(`AlternativeDataLabPanel`, view `altdata`) loads five deterministic sample
+event sets (mega-cap equity news, crypto sentiment stress, earnings surprise,
+macro shock news, supply-chain alt data), lets you select one and edit the λ
+(novelty weight) / γ (freshness decay) model assumptions, and re-analyses live
+via `/api/alternative-data/analyze` (weighted sentiment → novelty adjustment →
+freshness decay → lag-adjusted signals and an alpha composite; a leakage guard;
+event-study horizons; information coefficient, hit rate, signal-to-noise and
+reliability-weighted quality; a signal-decay curve with a half-life estimate; a
+research risk-regime pill; and ten scenario stresses). Its formulas render as
+local LaTeX (see the shared formula note below). Static illustrative sample data
+— no live news, social media, or market data, no scraping, no LLM or provider
+APIs, hand-written sample scores and returns (workflow illustration, not
+evidence of alpha), not a production alpha engine, not real-time sentiment
+analytics, not investment / trading / signal advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract
