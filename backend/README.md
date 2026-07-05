@@ -38,6 +38,8 @@ backend/
 │   ├── onchain_analytics_routes.py  On-Chain Flow, Exchange Reserve & Whale Concentration Lab API routes
 │   ├── alternative_data/   static-sample news/sentiment/signal-decay analytics (models/sample/service)
 │   ├── alternative_data_routes.py  Alternative Data, News Sentiment & Signal Decay Lab API routes
+│   ├── macro_regime/       static-sample macro-regime/cross-asset analytics (models/sample/service)
+│   ├── macro_regime_routes.py    Macro Regime & Cross-Asset Allocation Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -63,7 +65,8 @@ backend/
 │   ├── test_defi_risk.py         DeFi Yield, Stablecoin Peg & Lending Risk Lab analytics/API/validation tests
 │   ├── test_tokenomics.py        Tokenomics, Unlock Schedule & Treasury Risk Lab analytics/API/validation tests
 │   ├── test_onchain_analytics.py On-Chain Flow, Exchange Reserve & Whale Concentration Lab analytics/API/validation tests
-│   └── test_alternative_data.py  Alternative Data, News Sentiment & Signal Decay Lab analytics/API/validation tests
+│   ├── test_alternative_data.py  Alternative Data, News Sentiment & Signal Decay Lab analytics/API/validation tests
+│   └── test_macro_regime.py      Macro Regime & Cross-Asset Allocation Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -383,6 +386,34 @@ documented editable assumptions. Observed returns are hand-written sample paths
 — the IC / hit-rate / decay figures illustrate the research workflow, not
 evidence of alpha. Scenarios are hypothetical deterministic shocks — not
 forecasts and not advice. Every division is guarded so all outputs are finite.
+
+---
+
+### Macro Regime & Cross-Asset Allocation Lab Endpoints
+
+Deterministic static-sample macro-regime analytics (Phase 31.0). No live macro
+or market data (no FRED, no yfinance, no scraping in this lab), no API keys, no
+network calls, educational only — not investment, trading, asset-allocation,
+legal, tax, or risk-management advice, and not a production allocation engine.
+
+| Endpoint | Description |
+|---|---|
+| `GET /macro-regime/sample` | Six deterministic macro states (goldilocks growth, inflation shock, recession/credit stress, stagflation, liquidity easing, strong-USD tightening), each with twelve hand-written indicators placed at chosen z-scores plus a shared eleven-asset cross-asset assumption set |
+| `POST /macro-regime/analyze` | Indicator z-scores and direction-adjusted category scores (growth, inflation, policy, liquidity, credit stress, USD pressure), a composite macro score, a deterministic regime classification, regime-adjusted expected returns, a simplified category-based correlation matrix, inverse-volatility / risk-parity-style / regime-tilted educational allocations with risk contributions and portfolio μ/σ, and ten macro stress scenarios |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): required
+strings non-empty, `long_run_std` and volatilities > 0, weights ≥ 0, liquidity
+scores in [0, 1], category/direction/asset-category enums, correlation stress in
+[0, 1]; no NaN/Infinity. The direction flag is a sign convention that orients
+each indicator so a higher category score always means stronger growth / hotter
+inflation / tighter policy / easier liquidity / more credit stress / stronger
+USD. The correlation matrix is a documented category-based construction (same
+category 0.75, cross 0.25, cash 0.0; stress blends toward 1); the regime-tilted
+weights (`T = μ' − λσ + ηL`, positive-normalised) fall back to inverse-vol with
+a note when all scores are non-positive; λ/η are editable request assumptions.
+All allocations are educational constructions — never recommendations. Scenarios
+are hypothetical additive score shocks — not forecasts and not advice. Every
+division is guarded so all outputs are finite.
 
 ---
 

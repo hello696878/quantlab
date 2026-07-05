@@ -95,6 +95,17 @@ compare runs, pass real `train_run_hash` values taken from the `list` output:
 .\venv\Scripts\python.exe -m app.research_cli.cli compare <train_run_hash_a> <train_run_hash_b> --artifacts-dir ..\artifacts\experiments
 ```
 
+## Web App Labs
+
+The Next.js frontend (`frontend/`) ships a set of educational research labs on
+deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
+`docs/LIMITATIONS.md`). The five recent labs — Crypto Derivatives, DeFi Risk,
+Tokenomics, On-Chain Analytics, and Alternative Data — include **interactive
+scenario-shock sliders, horizon selectors, and local recharts panels** (31.5):
+every control is a deterministic client-side transform of the static sample
+re-sent to the existing analyze endpoints — no live data, no trading, not
+investment advice.
+
 ## Project Docs
 
 - [TASKS.md](TASKS.md) — current task list

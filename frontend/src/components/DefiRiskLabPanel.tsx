@@ -19,6 +19,9 @@ import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
 import FormulaReference from "@/components/math/FormulaReference";
 import type { FormulaGroup } from "@/components/math/formulaTypes";
+import ShockSlider from "@/components/controls/ShockSlider";
+import { GroupedBarChart, ScenarioBarChart, SimpleLineChart } from "@/components/charts/LabCharts";
+import { seriesColor } from "@/lib/chartPalette";
 import {
   analyzeDefiRisk,
   bps,
@@ -33,6 +36,32 @@ import {
   type DeFiRiskAnalysisResponse,
   type DeFiRiskSampleResponse,
 } from "@/lib/defiRisk";
+
+// Deterministic scenario-shock sliders (client-side transforms of the sample
+// request before re-analysis — no live protocol data, not advice).
+const DEFAULT_SHOCKS = {
+  collateral_shock: 0,  // ±% collateral price
+  debt_shock: 0,        // ±% debt asset price
+  depeg_shock: 0,       // ±% stablecoin market price
+  util_shock: 0,        // ± utilization points
+  liquidity_mult: 1,    // × available pool liquidity
+  rate_shock: 0,        // ± borrow APY points
+  threshold_shock: 0,   // ± liquidation-threshold points
+};
+type ShockKey = keyof typeof DEFAULT_SHOCKS;
+
+const SCENARIO_SHORT: Record<string, string> = {
+  base: "Base",
+  stable_mild_depeg: "Depeg −1%",
+  stable_severe_depeg: "Depeg −6%",
+  collateral_drawdown: "Coll −30%",
+  borrow_asset_rally: "Debt +20%",
+  utilization_spike: "Util +",
+  liquidity_drought: "Liq drought",
+  borrow_rate_shock: "Rate +",
+  liquidation_threshold_cut: "Thresh −",
+  protocol_stress_combo: "Combo",
+};
 
 const FIELDS = [
   { key: "market_price", label: "Stable price", step: "0.001", scope: "stable" as const },
@@ -121,6 +150,9 @@ export default function DefiRiskLabPanel() {
   const [result, setResult] = useState<DeFiRiskAnalysisResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [shock, setShock] = useState({ ...DEFAULT_SHOCKS });
+  const setShockValue = (k: ShockKey) => (v: number) => setShock((s) => ({ ...s, [k]: v }));
+  const shocksActive = (Object.keys(DEFAULT_SHOCKS) as ShockKey[]).some((k) => shock[k] !== DEFAULT_SHOCKS[k]);
 
   function fieldsFrom(req: DeFiRiskAnalysisRequest): Record<string, string> {
     const out: Record<string, string> = {};
@@ -153,6 +185,7 @@ export default function DefiRiskLabPanel() {
     if (!sample) return;
     setSelected(idx);
     setFieldStr(fieldsFrom(sample.samples[idx]));
+    setShock({ ...DEFAULT_SHOCKS });
   }
 
   const request = useMemo<DeFiRiskAnalysisRequest | null>(() => {
@@ -173,17 +206,39 @@ export default function DefiRiskLabPanel() {
     });
     // Keep the threshold within (collateral_factor, 1] so the backend never 422s.
     const thr = Math.min(
-      Math.max(posOverrides["liquidation_threshold"] ?? base.position.liquidation_threshold, base.position.collateral_factor),
+      Math.max(
+        (posOverrides["liquidation_threshold"] ?? base.position.liquidation_threshold) + shock.threshold_shock,
+        base.position.collateral_factor,
+      ),
       1.0,
     );
-    return {
-      ...base,
-      stablecoin: { ...base.stablecoin, ...stableOverrides },
-      position: { ...base.position, ...posOverrides, liquidation_threshold: thr },
-    };
-  }, [base, fieldStr]);
 
-  const reqKey = request ? JSON.stringify([request.sample_id, request.stablecoin, request.position, request.fees_apy]) : "";
+    // Apply the deterministic scenario-shock sliders (client-side, sample-only).
+    const stablecoin = {
+      ...base.stablecoin,
+      ...stableOverrides,
+      market_price: Math.max((stableOverrides["market_price"] ?? base.stablecoin.market_price) * (1 + shock.depeg_shock), 1e-9),
+    };
+    const position = {
+      ...base.position,
+      ...posOverrides,
+      liquidation_threshold: thr,
+      collateral_price: Math.max((posOverrides["collateral_price"] ?? base.position.collateral_price) * (1 + shock.collateral_shock), 1e-9),
+      debt_price: Math.max(base.position.debt_price * (1 + shock.debt_shock), 1e-9),
+      borrow_apy: Math.max((posOverrides["borrow_apy"] ?? base.position.borrow_apy) + shock.rate_shock, 0),
+    };
+    const baseUtil = base.market.total_supplied > 0 ? base.market.total_borrowed / base.market.total_supplied : 0;
+    const market = {
+      ...base.market,
+      total_borrowed: Math.min(Math.max((baseUtil + shock.util_shock) * base.market.total_supplied, 0), base.market.total_supplied),
+      liquidity: Math.max(base.market.liquidity * shock.liquidity_mult, 0),
+    };
+    return { ...base, stablecoin, market, position };
+  }, [base, fieldStr, shock]);
+
+  const reqKey = request
+    ? JSON.stringify([request.sample_id, request.stablecoin, request.market, request.position, request.fees_apy])
+    : "";
   useEffect(() => {
     if (!request) return;
     const ctrl = new AbortController();
@@ -205,6 +260,23 @@ export default function DefiRiskLabPanel() {
   }, [reqKey]);
 
   const r = result;
+
+  // Kinked interest-rate curve replotted client-side from the model parameters
+  // (the documented formula from the panel below) across utilization 0..100%.
+  const rateCurve = useMemo(() => {
+    const irmR = result?.interest_rate_model;
+    if (!irmR || irmR.kink_utilization <= 0 || irmR.kink_utilization >= 1) return [];
+    const pts: Array<{ x: number; borrow: number; supply: number }> = [];
+    for (let i = 0; i <= 20; i++) {
+      const u = i / 20;
+      const rb =
+        u <= irmR.kink_utilization
+          ? irmR.base_rate + (u / irmR.kink_utilization) * irmR.slope_1
+          : irmR.base_rate + irmR.slope_1 + ((u - irmR.kink_utilization) / (1 - irmR.kink_utilization)) * irmR.slope_2;
+      pts.push({ x: u, borrow: rb, supply: rb * u * (1 - irmR.reserve_factor) });
+    }
+    return pts;
+  }, [result]);
 
   if (loadError) {
     return (
@@ -289,6 +361,40 @@ export default function DefiRiskLabPanel() {
         </div>
       </div>
 
+      {/* ── Interactive scenario shocks ──────────────────────────────────── */}
+      <div className="card p-4">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="section-title">Interactive scenario shocks</p>
+          {shocksActive && (
+            <button type="button" onClick={() => setShock({ ...DEFAULT_SHOCKS })}
+              className="rounded-md px-2.5 py-1 text-xs font-semibold"
+              style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}>
+              Reset shocks
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ShockSlider label="Collateral price shock" value={shock.collateral_shock} min={-0.6} max={0.6} step={0.02}
+            format={(v) => signedPct(v, 0)} onChange={setShockValue("collateral_shock")} />
+          <ShockSlider label="Debt price shock" value={shock.debt_shock} min={-0.4} max={0.4} step={0.02}
+            format={(v) => signedPct(v, 0)} onChange={setShockValue("debt_shock")} />
+          <ShockSlider label="Stablecoin depeg shock" value={shock.depeg_shock} min={-0.1} max={0.05} step={0.005}
+            format={(v) => signedPct(v, 1)} onChange={setShockValue("depeg_shock")} />
+          <ShockSlider label="Utilization shock" value={shock.util_shock} min={-0.4} max={0.4} step={0.02}
+            format={(v) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)} pts`} onChange={setShockValue("util_shock")} />
+          <ShockSlider label="Pool liquidity ×" value={shock.liquidity_mult} min={0} max={2} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("liquidity_mult")} />
+          <ShockSlider label="Borrow rate shock" value={shock.rate_shock} min={0} max={0.1} step={0.005}
+            format={(v) => `+${(v * 100).toFixed(1)} pts`} onChange={setShockValue("rate_shock")} />
+          <ShockSlider label="Liq. threshold shock" value={shock.threshold_shock} min={-0.15} max={0.1} step={0.01}
+            format={(v) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)} pts`} onChange={setShockValue("threshold_shock")} />
+        </div>
+        <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
+          Deterministic shocks applied to the static sample before re-analysis — hypothetical
+          what-ifs, not forecasts, not lending, borrowing, or liquidation advice.
+        </p>
+      </div>
+
       {/* ── Key metrics ──────────────────────────────────────────────────── */}
       {r && peg && ua && cr && na && (
         <div className="card p-4">
@@ -352,9 +458,23 @@ export default function DefiRiskLabPanel() {
               <MetricCard label="Model borrow APY" value={pct(irm.borrow_apy_model)} />
               <MetricCard label="Model supply APY" value={pct(irm.supply_apy_model)} />
             </div>
-            <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
+            <div className="mt-3">
+              <SimpleLineChart
+                data={rateCurve}
+                series={[
+                  { key: "borrow", label: "Borrow APY", color: seriesColor(4) },
+                  { key: "supply", label: "Supply APY", color: seriesColor(0) },
+                ]}
+                format={(v) => pct(v, 0)}
+                formatX={(v) => pct(Number(v), 0)}
+                xLabel="utilization"
+                height={160}
+              />
+            </div>
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
               Kinked model: base {pct(irm.base_rate)} · slope₁ {pct(irm.slope_1)} · slope₂ {pct(irm.slope_2)} ·
-              reserve factor {pct(irm.reserve_factor, 0)}. Past the kink, rates climb the steep slope.
+              reserve factor {pct(irm.reserve_factor, 0)}. Past the kink ({pct(irm.kink_utilization, 0)}),
+              rates climb the steep slope; current utilization {pct(ua?.utilization ?? 0, 0)}.
             </p>
           </div>
         </div>
@@ -399,6 +519,65 @@ export default function DefiRiskLabPanel() {
                 Regime drivers: {r.risk_regime.drivers.join(" · ")} — {r.risk_regime.explanation}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Scenario charts ──────────────────────────────────────────────── */}
+      {r && (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div className="card p-4">
+            <p className="section-title mb-2">Health factor stress</p>
+            <ScenarioBarChart
+              data={r.scenario_results
+                .filter((s) => ["base", "collateral_drawdown", "borrow_asset_rally", "liquidation_threshold_cut", "protocol_stress_combo"].includes(s.id))
+                .map((s) => ({
+                  label: s.name,
+                  value: Math.min(s.health_factor, 10),
+                  color: s.health_factor < 1 ? "var(--risk)" : s.health_factor < 1.15 ? "var(--warn)" : seriesColor(0),
+                }))}
+              format={(v) => v.toFixed(2)}
+              height={180}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              HF below 1.0 means liquidatable in this simplified model (chart capped at 10;
+              a no-debt position shows the capped safe value).
+            </p>
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">Peg deviation stress</p>
+            <ScenarioBarChart
+              data={r.scenario_results
+                .filter((s) => ["base", "stable_mild_depeg", "stable_severe_depeg"].includes(s.id))
+                .map((s) => ({
+                  label: s.name,
+                  value: s.peg_deviation_bps,
+                  color: Math.abs(s.peg_deviation_bps) >= 100 ? "var(--risk)" : seriesColor(0),
+                }))}
+              format={(v) => signedBps(v)}
+              height={130}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Peg deviation in bps vs the target peg for the depeg scenarios.
+            </p>
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">Net APY by scenario</p>
+            <GroupedBarChart
+              data={r.scenario_results.map((s) => ({
+                label: SCENARIO_SHORT[s.id] ?? s.name,
+                supply: s.supply_apy,
+                borrow: s.borrow_apy,
+                net: s.net_apy,
+              }))}
+              series={[
+                { key: "supply", label: "Supply APY", color: seriesColor(0) },
+                { key: "borrow", label: "Borrow APY", color: seriesColor(4) },
+                { key: "net", label: "Net APY", color: seriesColor(2) },
+              ]}
+              format={(v) => pct(v, 1)}
+              height={200}
+            />
           </div>
         </div>
       )}
@@ -448,7 +627,7 @@ export default function DefiRiskLabPanel() {
 
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <FormulaReference title="Formulas & notes" groups={DEFI_FORMULA_GROUPS} />
+        <FormulaReference title="Formulas & notes" groups={DEFI_FORMULA_GROUPS} collapsible />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — not live protocol data, not live crypto prices, no wallets, no blockchain RPC, no smart-contract calls.</li>
           <li>The kinked rate model, health factor, and liquidation price are simplified educational approximations, not a production DeFi risk engine or a protocol's actual liquidation logic.</li>

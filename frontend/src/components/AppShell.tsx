@@ -29,6 +29,7 @@ export type View =
   | "tokenomics"
   | "onchain"
   | "altdata"
+  | "macroregime"
   | "csv"
   | "builder"
   | "portfolio"

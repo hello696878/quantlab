@@ -19,6 +19,9 @@ import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
 import FormulaReference from "@/components/math/FormulaReference";
 import type { FormulaGroup } from "@/components/math/formulaTypes";
+import ShockSlider from "@/components/controls/ShockSlider";
+import { BarLineChart, GroupedBarChart, ScenarioBarChart } from "@/components/charts/LabCharts";
+import { seriesColor } from "@/lib/chartPalette";
 import {
   analyzeTokenomics,
   fetchTokenomicsSample,
@@ -32,6 +35,34 @@ import {
   type TokenomicsAnalysisResponse,
   type TokenomicsSampleResponse,
 } from "@/lib/tokenomics";
+
+// Deterministic scenario-shock sliders (client-side transforms of the sample
+// request before re-analysis — no live token or on-chain data, not advice).
+const DEFAULT_SHOCKS = {
+  price_shock: 0,     // ±% token price
+  unlock_mult: 1,     // × every scheduled unlock
+  emission_mult: 1,   // × annual emission rate
+  burn_mult: 1,       // × monthly burn
+  treasury_shock: 0,  // ±% treasury tokens + stables
+  conc_shock: 0,      // ± points on the top-holder shares
+};
+type ShockKey = keyof typeof DEFAULT_SHOCKS;
+
+const HORIZONS = [30, 90, 180, 365] as const;
+type Horizon = (typeof HORIZONS)[number];
+
+const SCENARIO_SHORT: Record<string, string> = {
+  base: "Base",
+  price_drawdown: "Price −40%",
+  unlock_acceleration: "Unlock ×2",
+  emission_increase: "Emit ×2",
+  treasury_asset_drawdown: "Treas −50%",
+  burn_increase: "Burn +80%",
+  concentration_shock: "Conc +",
+  revenue_decline: "Rev −70%",
+  low_float_repricing: "Reprice",
+  severe_combo: "Severe",
+};
 
 const FIELDS = [
   { key: "price", label: "Price", step: "0.1", allowZero: false },
@@ -112,6 +143,10 @@ export default function TokenomicsLabPanel() {
   const [result, setResult] = useState<TokenomicsAnalysisResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [shock, setShock] = useState({ ...DEFAULT_SHOCKS });
+  const [horizon, setHorizon] = useState<Horizon>(180);
+  const setShockValue = (k: ShockKey) => (v: number) => setShock((s) => ({ ...s, [k]: v }));
+  const shocksActive = (Object.keys(DEFAULT_SHOCKS) as ShockKey[]).some((k) => shock[k] !== DEFAULT_SHOCKS[k]);
 
   function fieldsFrom(req: TokenomicsAnalysisRequest): Record<string, string> {
     const src = req.market as unknown as Record<string, number | null | undefined>;
@@ -138,6 +173,7 @@ export default function TokenomicsLabPanel() {
     if (!sample) return;
     setSelected(idx);
     setFieldStr(fieldsFrom(sample.tokens[idx]));
+    setShock({ ...DEFAULT_SHOCKS });
   }
 
   const request = useMemo<TokenomicsAnalysisRequest | null>(() => {
@@ -151,13 +187,35 @@ export default function TokenomicsLabPanel() {
     });
     // Keep circulating ≤ total supply so the backend cross-field check never 422s.
     const circ = Math.min(overrides["circulating_supply"], base.market.total_supply);
-    return {
-      ...base,
-      market: { ...base.market, ...overrides, circulating_supply: circ },
-    };
-  }, [base, fieldStr]);
 
-  const reqKey = request ? JSON.stringify([request.market, request.holder_concentration]) : "";
+    // Apply the deterministic scenario-shock sliders (client-side, sample-only).
+    const market = {
+      ...base.market,
+      ...overrides,
+      circulating_supply: circ,
+      price: Math.max(overrides["price"] * (1 + shock.price_shock), 1e-9),
+      emission_rate_annual: Math.max(overrides["emission_rate_annual"] * shock.emission_mult, 0),
+      monthly_burn_usd: Math.max(overrides["monthly_burn_usd"] * shock.burn_mult, 0),
+      treasury_tokens: Math.max(overrides["treasury_tokens"] * (1 + shock.treasury_shock), 0),
+      treasury_stables: Math.max(overrides["treasury_stables"] * (1 + shock.treasury_shock), 0),
+    };
+    const unlock_events = base.unlock_events.map((e) => ({
+      ...e,
+      tokens: Math.max(e.tokens * shock.unlock_mult, 0),
+    }));
+    const hc = base.holder_concentration;
+    const holder_concentration = {
+      ...hc,
+      top_1_holder_share: Math.min(Math.max(hc.top_1_holder_share + shock.conc_shock, 0), 1),
+      top_5_holder_share: Math.min(Math.max(hc.top_5_holder_share + shock.conc_shock, 0), 1),
+      top_10_holder_share: Math.min(Math.max(hc.top_10_holder_share + shock.conc_shock, 0), 1),
+    };
+    return { ...base, market, unlock_events, holder_concentration };
+  }, [base, fieldStr, shock]);
+
+  const reqKey = request
+    ? JSON.stringify([request.market, request.unlock_events, request.holder_concentration])
+    : "";
   useEffect(() => {
     if (!request) return;
     const ctrl = new AbortController();
@@ -264,6 +322,38 @@ export default function TokenomicsLabPanel() {
         </div>
       </div>
 
+      {/* ── Interactive scenario shocks ──────────────────────────────────── */}
+      <div className="card p-4">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="section-title">Interactive scenario shocks</p>
+          {shocksActive && (
+            <button type="button" onClick={() => setShock({ ...DEFAULT_SHOCKS })}
+              className="rounded-md px-2.5 py-1 text-xs font-semibold"
+              style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}>
+              Reset shocks
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ShockSlider label="Price shock" value={shock.price_shock} min={-0.7} max={0.7} step={0.05}
+            format={(v) => signedPct(v, 0)} onChange={setShockValue("price_shock")} />
+          <ShockSlider label="Unlock ×" value={shock.unlock_mult} min={0} max={3} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("unlock_mult")} />
+          <ShockSlider label="Emission ×" value={shock.emission_mult} min={0} max={3} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("emission_mult")} />
+          <ShockSlider label="Monthly burn ×" value={shock.burn_mult} min={0} max={3} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("burn_mult")} />
+          <ShockSlider label="Treasury asset shock" value={shock.treasury_shock} min={-0.7} max={0.5} step={0.05}
+            format={(v) => signedPct(v, 0)} onChange={setShockValue("treasury_shock")} />
+          <ShockSlider label="Concentration shock" value={shock.conc_shock} min={-0.1} max={0.25} step={0.01}
+            format={(v) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)} pts`} onChange={setShockValue("conc_shock")} />
+        </div>
+        <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
+          Deterministic shocks applied to the static sample before re-analysis — hypothetical
+          what-ifs, not forecasts, not investment, trading, or token advice.
+        </p>
+      </div>
+
       {/* ── Key metrics ──────────────────────────────────────────────────── */}
       {r && v && up && em && st && tr && hc && (
         <div className="card p-4">
@@ -295,6 +385,18 @@ export default function TokenomicsLabPanel() {
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           <div className="card p-4 xl:col-span-2">
             <p className="section-title mb-2">Unlock schedule</p>
+            <BarLineChart
+              data={r.unlock_schedule.map((row) => ({
+                label: row.date,
+                unlock: row.tokens,
+                cumulative: row.cumulative_unlock_pct_circulating,
+              }))}
+              bar={{ key: "unlock", label: "Unlock (tokens)", color: seriesColor(0) }}
+              line={{ key: "cumulative", label: "Cumulative % circ", color: seriesColor(4) }}
+              formatBar={(v) => tokens(v)}
+              formatLine={(v) => pct(v, 0)}
+              height={190}
+            />
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -327,15 +429,44 @@ export default function TokenomicsLabPanel() {
           </div>
 
           <div className="card p-4">
-            <p className="section-title mb-2">Unlock pressure</p>
+            <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+              <p className="section-title">Unlock pressure</p>
+              <div className="flex gap-1" role="group" aria-label="Unlock horizon">
+                {HORIZONS.map((h) => (
+                  <button key={h} type="button" onClick={() => setHorizon(h)} aria-pressed={horizon === h}
+                    className="rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors"
+                    style={{
+                      background: horizon === h ? "var(--accent-softer)" : "var(--glass)",
+                      border: `1px solid ${horizon === h ? "var(--accent-line)" : "var(--line)"}`,
+                      color: horizon === h ? "var(--accent-text)" : "var(--text-mut)",
+                    }}>{h}d</button>
+                ))}
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-2">
-              <MetricCard label="Next 30d" value={tokens(up.next_30d_tokens)} />
-              <MetricCard label="Next 90d" value={tokens(up.next_90d_tokens)} />
-              <MetricCard label="Next 180d" value={tokens(up.next_180d_tokens)} />
-              <MetricCard label="Next 365d" value={tokens(up.next_365d_tokens)} />
+              <MetricCard label="Next 30d" value={tokens(up.next_30d_tokens)} tone={horizon === 30 ? "accent" : "default"} />
+              <MetricCard label="Next 90d" value={tokens(up.next_90d_tokens)} tone={horizon === 90 ? "accent" : "default"} />
+              <MetricCard label="Next 180d" value={tokens(up.next_180d_tokens)} tone={horizon === 180 ? "accent" : "default"} />
+              <MetricCard label="Next 365d" value={tokens(up.next_365d_tokens)} tone={horizon === 365 ? "accent" : "default"} />
               <MetricCard label="180d % circ" value={pct(up.next_180d_pct_circulating, 1)} tone={up.next_180d_pct_circulating >= 0.15 ? "danger" : "accent"} />
               <MetricCard label="Pressure score" value={num(up.pressure_score, 2)} tone={up.pressure_score >= 0.5 ? "danger" : up.pressure_score >= 0.25 ? "warn" : "positive"} />
             </div>
+            {v && v.circulating_supply > 0 && (
+              <p className="mt-3 text-[11px]" style={{ color: "var(--accent-text)" }}>
+                Selected horizon {horizon}d:{" "}
+                {tokens(
+                  horizon === 30 ? up.next_30d_tokens : horizon === 90 ? up.next_90d_tokens
+                    : horizon === 180 ? up.next_180d_tokens : up.next_365d_tokens,
+                )}{" "}
+                tokens ={" "}
+                {pct(
+                  (horizon === 30 ? up.next_30d_tokens : horizon === 90 ? up.next_90d_tokens
+                    : horizon === 180 ? up.next_180d_tokens : up.next_365d_tokens) / v.circulating_supply,
+                  1,
+                )}{" "}
+                of circulating supply.
+              </p>
+            )}
             <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px]" style={{ color: "var(--text-mut)" }}>
               {up.notes.map((n) => <li key={n}>{n}</li>)}
             </ul>
@@ -426,6 +557,80 @@ export default function TokenomicsLabPanel() {
         </div>
       )}
 
+      {/* ── Scenario charts ──────────────────────────────────────────────── */}
+      {r && v && hc && em && st && (
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2 xl:grid-cols-4">
+          <div className="card p-4">
+            <p className="section-title mb-2">Treasury runway by scenario</p>
+            <ScenarioBarChart
+              data={r.scenario_results.map((s) => ({
+                label: SCENARIO_SHORT[s.id] ?? s.name,
+                value: Math.min(s.runway_months, 240),
+                color: s.runway_months < 12 ? "var(--risk)" : seriesColor(0),
+              }))}
+              format={(v2) => `${v2.toFixed(0)} mo`}
+              height={230}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Gross-burn runway (chart capped at 240 months; ∞ shows as the cap).
+            </p>
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">FDV vs market cap</p>
+            <GroupedBarChart
+              data={r.scenario_results.map((s) => ({
+                label: SCENARIO_SHORT[s.id] ?? s.name,
+                mc: s.market_cap,
+                fdv: s.fully_diluted_valuation,
+              }))}
+              series={[
+                { key: "mc", label: "Market cap", color: seriesColor(0) },
+                { key: "fdv", label: "FDV", color: seriesColor(2) },
+              ]}
+              format={(v2) => money(v2)}
+              height={230}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              FDV / MC ratio: {num(v.fdv_to_market_cap, 2)}× at the current inputs.
+            </p>
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">Holder concentration</p>
+            <ScenarioBarChart
+              data={[
+                { label: "Top 1", value: hc.top_1_holder_share },
+                { label: "Top 5", value: hc.top_5_holder_share },
+                { label: "Top 10", value: hc.top_10_holder_share },
+                ...(hc.insider_share != null ? [{ label: "Insiders", value: hc.insider_share }] : []),
+                ...(hc.foundation_share != null ? [{ label: "Foundation", value: hc.foundation_share }] : []),
+                ...(hc.community_share != null ? [{ label: "Community", value: hc.community_share }] : []),
+              ].map((d) => ({ ...d, color: d.value >= 0.5 ? "var(--warn)" : seriesColor(1) }))}
+              format={(v2) => pct(v2, 0)}
+              height={190}
+            />
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">Real staking yield</p>
+            <GroupedBarChart
+              data={r.scenario_results.map((s) => ({
+                label: SCENARIO_SHORT[s.id] ?? s.name,
+                inflation: s.emission_inflation,
+                real: s.real_yield_approx,
+              }))}
+              series={[
+                { key: "inflation", label: "Emission inflation", color: seriesColor(4) },
+                { key: "real", label: "Real yield ≈", color: seriesColor(0) },
+              ]}
+              format={(v2) => signedPct(v2, 0)}
+              height={230}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Staking yield {pct(st.staking_yield)} − emission inflation = real yield approximation.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Scenario stress ──────────────────────────────────────────────── */}
       {r && (
         <div className="card p-4">
@@ -473,7 +678,7 @@ export default function TokenomicsLabPanel() {
 
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <FormulaReference title="Formulas & notes" groups={TOKENOMICS_FORMULA_GROUPS} />
+        <FormulaReference title="Formulas & notes" groups={TOKENOMICS_FORMULA_GROUPS} collapsible />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — not live token prices, not live on-chain data, no wallets, no blockchain RPC, no smart-contract calls.</li>
           <li>Unlock schedules use deterministic sample day offsets; unlock pressure is potential new float, not a selling forecast.</li>

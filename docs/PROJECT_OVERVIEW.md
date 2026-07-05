@@ -80,6 +80,8 @@ FastAPI Backend
   ├── onchain_analytics_routes.py   On-Chain Analytics Lab API router: GET /onchain-analytics/sample, POST /onchain-analytics/analyze — static sample data only
   ├── alternative_data/             Alternative Data, News Sentiment & Signal Decay Lab v1 (30.0): models.py (typed event/decay/scenario schema, source-type enum, bounded scores, leakage-ordering check), sample.py (5 deterministic event sets — mega-cap news, crypto sentiment, earnings surprise, macro shock, supply-chain — on a static Jan-2026 timeline with hand-written scores + return paths), service.py (weighted sentiment s·I·R·Q, novelty ×(1+λN), freshness exp(−γ·lag), alpha composite, leakage guard, event-study horizons, IC/hit rate/signal-to-noise, decay curve + half-life, risk-regime classification, 10 scenario stresses) — static sample, educational, no live news/social/market data, no scraping or LLM/provider APIs, not investment/trading/signal advice
   ├── alternative_data_routes.py    Alternative Data Lab API router: GET /alternative-data/sample, POST /alternative-data/analyze — static sample data only
+  ├── macro_regime/                 Macro Regime & Cross-Asset Allocation Lab v1 (31.0): models.py (typed indicator/asset/scenario schema, category/direction enums, bounded scores), sample.py (6 deterministic macro states — goldilocks, inflation shock, recession/credit, stagflation, liquidity easing, strong USD — with 12 hand-written indicators each + a shared 11-asset assumption set), service.py (z-scores + category scores, composite macro score, regime classification with prototype fallback, regime-adjusted returns, simplified category correlations, inverse-vol / risk-parity-style / regime-tilted educational allocations + risk contributions, 10 macro stress scenarios) — static sample, educational, no live macro/market data, not investment/trading/allocation advice
+  ├── macro_regime_routes.py        Macro Regime Lab API router: GET /macro-regime/sample, POST /macro-regime/analyze — static sample data only
   ├── db.py                         SQLite connection + schema initialisation
   ├── saved_backtests.py            Saved-backtest CRUD
   ├── saved_reports.py              Saved-report CRUD
@@ -289,6 +291,16 @@ Strategy and parameter selection form. Renders different parameter fields per st
 - `DrawdownChart` — drawdown area chart
 - `MetricsGrid` — performance metrics table
 - `TradeTable` — sortable trade log
+- `components/charts/LabCharts.tsx` (31.5) — shared theme-aware recharts building
+  blocks for the recent labs: `ScenarioBarChart` (horizontal labelled bars),
+  `GroupedBarChart` (multi-series bars), `SimpleLineChart` (numeric-x lines),
+  `BarLineChart` (dual-axis bar + cumulative line); all filter non-finite values
+  to an empty-state and disable animation for deterministic rendering.
+- `components/controls/ShockSlider.tsx` (31.5) — shared labelled range slider used
+  by the interactive "scenario shock" control cards in the Crypto Derivatives,
+  DeFi Risk, Tokenomics, On-Chain, and Alternative Data labs; the shocks are
+  deterministic client-side transforms of the static sample request before
+  re-analysis (no new backend endpoints, no live data).
 
 ### `src/components/math/` — shared LaTeX formula reference (25.1)
 
@@ -299,7 +311,10 @@ in `layout.tsx`):
 
 - `FormulaReference.tsx` — grouped formula block with a built-in "📋 Copy LaTeX"
   button (copies clean grouped LaTeX **source**, success/failure status), optional
-  title / subtitle / disclaimer; lives inside each lab's existing card.
+  title / subtitle / disclaimer; lives inside each lab's existing card. Supports an
+  optional `collapsible` mode (31.5) — used by the five recent crypto/alt-data labs
+  to keep the formula panel compact (collapsed by default, "Show formulas" toggle,
+  all formulas and the copy button preserved when expanded).
 - `SafeMath.tsx` — renders one LaTeX string with `katex.renderToString({ throwOnError:
   false })` wrapped in try/catch → styled raw-LaTeX fallback, so a malformed formula
   can never crash the page; long equations scroll horizontally inside their own row.
