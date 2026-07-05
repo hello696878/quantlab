@@ -13,6 +13,7 @@ Everything stays under `tmp_path`; no network; nothing written outside `tmp_path
 
 from __future__ import annotations
 
+import importlib.util
 import re
 from pathlib import Path
 
@@ -94,6 +95,17 @@ def _ingest_es_roll(tmp_path: Path, source: str = "csv_fixture") -> tuple[RawFut
 
 def _store_files(base: Path) -> set[Path]:
     return {p for p in base.rglob("*") if p.is_file()}
+
+
+_CLI_PATH = _REPO_ROOT / "scripts" / "build_local_continuous_futures.py"
+
+
+def _load_cli():
+    """Import the thin CLI module by path (executes its sys.path bootstrap)."""
+    spec = importlib.util.spec_from_file_location("build_cont_cli", _CLI_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 # --------------------------------------------------------------------------- #
@@ -289,3 +301,137 @@ def test_continuous_build_module_invents_no_new_hash():
     assert "hashlib" not in src and "sha256" not in src
     # reuses the existing hash functions
     assert "raw_data_version_hash" in src and "continuous_config_hash" in src
+
+
+# --------------------------------------------------------------------------- #
+# Commit 2 — thin CLI (report-only default; --write-store / --output-path)
+# --------------------------------------------------------------------------- #
+
+
+def _cli_args(base: Path, *extra: str) -> list[str]:
+    return ["--base-dir", str(base), "--root-symbol", "ES", "--source", "csv_fixture", *extra]
+
+
+def test_cli_report_only_returns_zero_and_writes_nothing(tmp_path, capsys):
+    store, base = _ingest_es_roll(tmp_path)
+    before = _store_files(base)
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base))
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "RESULT: OK" in out
+    assert "continuous_config_hash=" in out
+    assert "root=ES" in out and "adjustment=ratio" in out
+    assert "[WRITE]" not in out                     # report-only prints no write line
+    assert _store_files(base) == before             # nothing written
+    assert not (base / "continuous").exists()
+
+
+def test_cli_write_store_persists_and_round_trips(tmp_path, capsys):
+    store, base = _ingest_es_roll(tmp_path)
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--write-store"))
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "[WRITE] path=continuous/futures/csv_fixture/ES/ratio" in out
+    # the store continuous namespace now round-trips.
+    read_store = RawFuturesStore(base, prefer_parquet=False)
+    cont = read_store.read_continuous("ES", "csv_fixture", "ratio")
+    assert len(cont) > 0
+    assert set(cont["active_contract"]) == {"ESM25", "ESU25"}
+
+
+def test_cli_output_path_writes_csv_only(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    out_csv = tmp_path / "out" / "es_continuous.csv"
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--output-path", str(out_csv)))
+    assert rc == 0
+    assert out_csv.exists()
+    df = pd.read_csv(out_csv)
+    assert len(df) > 0 and "close_adjusted" in df.columns
+    # store continuous namespace NOT written
+    assert not (base / "continuous").exists()
+
+
+def test_cli_write_store_and_output_path_mutually_exclusive(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    cli = _load_cli()
+    with pytest.raises(SystemExit) as exc:  # argparse mutually-exclusive error
+        cli.main(_cli_args(base, "--write-store", "--output-path", str(tmp_path / "x.csv")))
+    assert exc.value.code != 0
+    assert not (base / "continuous").exists()
+
+
+def test_cli_invalid_source_returns_nonzero(tmp_path, capsys):
+    store, base = _ingest_es_roll(tmp_path)
+    cli = _load_cli()
+    rc = cli.main(["--base-dir", str(base), "--root-symbol", "ES", "--source", "nope"])
+    out = capsys.readouterr().out
+    assert rc == 1 and "RESULT: FAIL" in out
+    assert not (base / "continuous").exists()
+
+
+def test_cli_invalid_root_returns_nonzero(tmp_path, capsys):
+    store, base = _ingest_es_roll(tmp_path)
+    cli = _load_cli()
+    rc = cli.main(["--base-dir", str(base), "--root-symbol", "NQ", "--source", "csv_fixture"])
+    out = capsys.readouterr().out
+    assert rc == 1 and "RESULT: FAIL" in out
+
+
+def test_cli_invalid_adjustment_is_argparse_error(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    cli = _load_cli()
+    with pytest.raises(SystemExit) as exc:  # choices= rejects it
+        cli.main(_cli_args(base, "--adjustment-method", "bogus"))
+    assert exc.value.code != 0
+
+
+def test_cli_no_parquet_write_store_works(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--no-parquet", "--write-store"))
+    assert rc == 0
+    read_store = RawFuturesStore(base, prefer_parquet=False)
+    assert len(read_store.read_continuous("ES", "csv_fixture", "ratio")) > 0
+
+
+def test_cli_none_adjustment_report_only(tmp_path, capsys):
+    store, base = _ingest_es_roll(tmp_path)
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--adjustment-method", "none"))
+    out = capsys.readouterr().out
+    assert rc == 0 and "adjustment=none" in out
+    assert not (base / "continuous").exists()
+
+
+def test_cli_writes_only_under_tmp_path(tmp_path, monkeypatch):
+    before_data = (_REPO_ROOT / "data").exists()
+    before_artifacts = (_REPO_ROOT / "artifacts").exists()
+    before_backend_data = (_BACKEND / "data").exists()
+    monkeypatch.chdir(tmp_path)
+    store, base = _ingest_es_roll(tmp_path)
+    cli = _load_cli()
+    assert cli.main(_cli_args(base, "--write-store")) == 0
+    assert all(str(p).startswith(str(tmp_path)) for p in _store_files(base))
+    assert (_REPO_ROOT / "data").exists() == before_data
+    assert (_REPO_ROOT / "artifacts").exists() == before_artifacts
+    assert (_BACKEND / "data").exists() == before_backend_data
+
+
+def test_cli_is_thin_and_clean():
+    src = _CLI_PATH.read_text(encoding="utf-8")
+    # thin: delegates to the adapter, no direct construction/hash logic
+    assert "build_continuous_from_store" in src
+    assert "build_continuous_futures(" not in src   # the raw builder stays in the adapter
+    assert "hashlib" not in src and "sha256" not in src
+    # not yet a report-JSON commit
+    assert "--report-json" not in src and "report_json" not in src
+    # no network / forbidden pipeline imports
+    assert not re.search(
+        r"(?m)^\s*(from|import)\s+\S*\b(requests|urllib|httpx|socket|aiohttp)\b", src
+    )
+    assert not re.search(
+        r"(?m)^\s*(from|import)\s+\S*(features|labels|ml_signal|research_cli)\b", src
+    )
