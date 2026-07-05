@@ -384,6 +384,14 @@ that phase, not here.
 > **real** per-contract data (the original I4 precondition) and **vendor fetch
 > (I5)** remain **not implemented**. See `docs/AI_QUANT_ARCHITECTURE.md`
 > **Appendix I (§I.11 as-built)** for details.
+>
+> **Planned (Phase 9, design approved 2026-07-05):** wiring the Phase 8 local
+> continuous output into the existing feature / label / ML / experiment chain
+> (Phases 2–5) — store-backed continuous → features → labels → dataset → train →
+> evaluate → save, on already-ingested **local/synthetic** data only. It adds **no
+> vendor fetch (I5) and no real-data acquisition** (both remain out of scope and
+> unimplemented). See `docs/AI_QUANT_ARCHITECTURE.md` **Appendix J** for the full
+> plan. No code is implemented yet.
 
 ### Ingestion Phase 5 (I5) — real vendor integration
 
