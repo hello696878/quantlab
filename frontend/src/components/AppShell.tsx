@@ -27,6 +27,7 @@ export type View =
   | "cryptoderivatives"
   | "defirisk"
   | "tokenomics"
+  | "onchain"
   | "csv"
   | "builder"
   | "portfolio"
