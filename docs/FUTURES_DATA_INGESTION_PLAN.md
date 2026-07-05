@@ -320,6 +320,17 @@ Prove the whole path with data we invent, so no download questions arise.
 > per-root summary of the normalized output (metadata lookup + one-contract
 > first-close→last-close P&L, direct == tick-based). This closes the local,
 > synthetic-only workflow (validate → normalize → report) as **v0.1 stable**.
+> **Implemented (Phase 7, 2026-07-05):** the remaining store-backed ingest step
+> now exists — `scripts/ingest_local_futures_csv.py` +
+> `backend/app/datastore/ingest.py` load/validate local CSVs, write them into the
+> `RawFuturesStore` raw namespace (`<base>/raw/futures/<source>/<root>/<contract>`),
+> read each contract back and verify (rows + key columns +
+> `raw_data_version_hash`), and append one line per success to an
+> `<base>/logs/futures_ingest.jsonl` audit log (default; `--log-path` override).
+> Duplicate ingest is rejected unless `--overwrite`. See
+> `docs/AI_QUANT_ARCHITECTURE.md` **Appendix H (§H.13 as-built)** for details.
+> Still open in I2: explicit per-layout vendor column-mapping. Continuous
+> construction (I4) and vendor fetch (I5) remain **not implemented**.
 
 Same loader generalized to files a human places under
 `C:\quantlab\data\incoming\futures\csv_local\`, plus operational trimmings:
