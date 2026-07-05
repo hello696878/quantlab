@@ -59,6 +59,11 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--no-parquet", action="store_true", help="force the CSV storage fallback"
     )
+    parser.add_argument(
+        "--log-path",
+        default=None,
+        help="ingestion-log path (default: <base-dir>/logs/futures_ingest.jsonl)",
+    )
     args = parser.parse_args(argv)
 
     try:
@@ -68,6 +73,7 @@ def main(argv: list[str] | None = None) -> int:
             source=args.source,
             overwrite=args.overwrite,
             prefer_parquet=not args.no_parquet,
+            log_path=args.log_path,
         )
     except (
         FixtureFormatError,
@@ -86,6 +92,7 @@ def main(argv: list[str] | None = None) -> int:
         )
     for w in report.warnings:
         print(f"[WARN] {w}")
+    print(f"[LOG] path={report.log_path}")
     print("RESULT: OK")
     return 0
 

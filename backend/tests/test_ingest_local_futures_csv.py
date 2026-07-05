@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime
 import importlib.util
+import json
 import re
 from pathlib import Path
 
@@ -492,5 +493,186 @@ def test_cli_script_no_network_or_forbidden_imports():
         r"(futures_continuous|features|labels|ml_signal|signals|futures_backtest|research_cli)\b",
         src,
     )
-    # commit 2 must not add the ingestion log yet
-    assert "log_path" not in src and "--log-path" not in src
+
+
+# --------------------------------------------------------------------------- #
+# Commit 3 — append-only JSONL ingestion log
+# --------------------------------------------------------------------------- #
+
+_REQUIRED_LOG_KEYS = {
+    "schema_version", "timestamp", "source", "input_files", "base_dir",
+    "roots", "contracts_written", "rows_written", "contracts", "warnings",
+    "git_commit",
+}
+_REQUIRED_CONTRACT_KEYS = {
+    "root_symbol", "contract_symbol", "source", "rows", "version_hash", "path",
+}
+
+
+def _default_log(base: Path) -> Path:
+    return base / "logs" / "futures_ingest.jsonl"
+
+
+def _read_log(log_path: Path) -> list[dict]:
+    text = log_path.read_text(encoding="utf-8")
+    return [json.loads(line) for line in text.splitlines() if line.strip()]
+
+
+def test_successful_ingest_writes_one_jsonl_line(tmp_path):
+    base = tmp_path / "store"
+    report = ingest_local_futures_csv([ESM25], base_dir=base)
+    log = _default_log(base)
+    assert log.exists() and report.log_written is True
+    lines = _read_log(log)
+    assert len(lines) == 1
+
+
+def test_two_successful_ingests_append_two_lines(tmp_path):
+    base = tmp_path / "store"
+    ingest_local_futures_csv([ESM25], base_dir=base)
+    ingest_local_futures_csv([NQM25], base_dir=base)  # different contract, no dup
+    lines = _read_log(_default_log(base))
+    assert len(lines) == 2
+
+
+def test_log_parent_directory_created(tmp_path):
+    base = tmp_path / "store"
+    assert not (base / "logs").exists()
+    ingest_local_futures_csv([ESM25], base_dir=base)
+    assert (base / "logs").is_dir()
+
+
+def test_default_log_path(tmp_path):
+    base = tmp_path / "store"
+    report = ingest_local_futures_csv([ESM25], base_dir=base)
+    assert Path(report.log_path) == _default_log(base)
+    assert _default_log(base).exists()
+
+
+def test_custom_log_path_works(tmp_path):
+    base = tmp_path / "store"
+    custom = tmp_path / "custom" / "my_ingest.jsonl"
+    report = ingest_local_futures_csv([ESM25], base_dir=base, log_path=custom)
+    assert Path(report.log_path) == custom
+    assert custom.exists() and len(_read_log(custom)) == 1
+    # the default location was NOT used.
+    assert not _default_log(base).exists()
+
+
+def test_failed_duplicate_ingest_does_not_append_log(tmp_path):
+    base = tmp_path / "store"
+    ingest_local_futures_csv([ESM25], base_dir=base)
+    assert len(_read_log(_default_log(base))) == 1
+    with pytest.raises(DuplicateIngestError):
+        ingest_local_futures_csv([ESM25], base_dir=base)
+    assert len(_read_log(_default_log(base))) == 1  # still one line
+
+
+def test_invalid_csv_does_not_append_log(tmp_path):
+    base = tmp_path / "store"
+    bad_header = ",".join(REQUIRED_COLUMNS[:-1])
+    bad_row = ",".join(_ES_ROW.split(",")[:-1])
+    bad = _write_csv(tmp_path / "bad.csv", [bad_row], header=bad_header)
+    with pytest.raises(FixtureFormatError):
+        ingest_local_futures_csv([bad], base_dir=base)
+    assert not _default_log(base).exists()
+
+
+def test_log_json_parses_and_has_required_keys(tmp_path):
+    base = tmp_path / "store"
+    ingest_local_futures_csv([ESM25, NQM25], base_dir=base)
+    record = _read_log(_default_log(base))[0]  # json.loads already succeeded
+    assert _REQUIRED_LOG_KEYS <= set(record)
+    assert record["schema_version"] == 1
+    assert record["contracts_written"] == len(record["contracts"]) == 2
+    assert record["rows_written"] == 10
+    for c in record["contracts"]:
+        assert _REQUIRED_CONTRACT_KEYS <= set(c)
+
+
+def test_log_input_files_are_not_absolute(tmp_path):
+    base = tmp_path / "store"
+    ingest_local_futures_csv([ESM25], base_dir=base)
+    record = _read_log(_default_log(base))[0]
+    assert record["input_files"] == ["esm25.csv"]
+    assert all(not Path(f).is_absolute() for f in record["input_files"])
+
+
+def test_log_contract_paths_are_relative(tmp_path):
+    base = tmp_path / "store"
+    ingest_local_futures_csv([ESM25], base_dir=base)
+    record = _read_log(_default_log(base))[0]
+    for c in record["contracts"]:
+        assert not Path(c["path"]).is_absolute()
+        assert c["path"].startswith("raw/futures/")
+
+
+def test_log_version_hashes_match_report_and_readback(tmp_path):
+    base = tmp_path / "store"
+    report = ingest_local_futures_csv([ESM25], base_dir=base)
+    record = _read_log(_default_log(base))[0]
+    log_hash = record["contracts"][0]["version_hash"]
+    assert log_hash == report.contracts[0].version_hash
+    store = RawFuturesStore(base)
+    assert log_hash == raw_data_version_hash(store.read_raw("ES", "ESM25", "synthetic"))
+
+
+def test_log_git_commit_key_is_str_or_null(tmp_path):
+    base = tmp_path / "store"
+    ingest_local_futures_csv([ESM25], base_dir=base)
+    record = _read_log(_default_log(base))[0]
+    assert "git_commit" in record
+    assert record["git_commit"] is None or isinstance(record["git_commit"], str)
+
+
+def test_log_timestamp_is_parseable_utc_iso(tmp_path):
+    base = tmp_path / "store"
+    ingest_local_futures_csv([ESM25], base_dir=base)
+    record = _read_log(_default_log(base))[0]
+    ts = datetime.datetime.fromisoformat(record["timestamp"])
+    assert ts.tzinfo is not None
+    assert ts.utcoffset() == datetime.timedelta(0)  # UTC
+
+
+def test_log_contains_no_nan_or_infinity_literal(tmp_path):
+    base = tmp_path / "store"
+    ingest_local_futures_csv([ESM25, NQM25], base_dir=base)
+    raw = _default_log(base).read_text(encoding="utf-8")
+    assert "NaN" not in raw and "Infinity" not in raw
+
+
+def test_cli_log_path_returns_zero_and_logs(tmp_path, capsys):
+    base = tmp_path / "store"
+    custom = tmp_path / "cli_log.jsonl"
+    cli = _load_cli()
+    rc = cli.main([str(ESM25), "--base-dir", str(base), "--log-path", str(custom)])
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert f"[LOG] path={custom}" in out
+    assert "RESULT: OK" in out
+    assert len(_read_log(custom)) == 1
+
+
+def test_cli_duplicate_with_log_path_returns_nonzero_and_does_not_append(tmp_path, capsys):
+    base = tmp_path / "store"
+    custom = tmp_path / "cli_log.jsonl"
+    cli = _load_cli()
+    assert cli.main([str(ESM25), "--base-dir", str(base), "--log-path", str(custom)]) == 0
+    assert len(_read_log(custom)) == 1
+    rc = cli.main([str(ESM25), "--base-dir", str(base), "--log-path", str(custom)])
+    assert rc == 1
+    assert len(_read_log(custom)) == 1  # duplicate did not append
+
+
+def test_log_writes_only_under_tmp_path(tmp_path, monkeypatch):
+    base = tmp_path / "store"
+    before_data = (_REPO_ROOT / "data").exists()
+    before_artifacts = (_REPO_ROOT / "artifacts").exists()
+    before_backend_data = (_BACKEND / "data").exists()
+    monkeypatch.chdir(tmp_path)
+    ingest_local_futures_csv([ESM25], base_dir=base)
+    # log + store both live under base_dir / tmp_path
+    assert str(_default_log(base)).startswith(str(tmp_path))
+    assert (_REPO_ROOT / "data").exists() == before_data
+    assert (_REPO_ROOT / "artifacts").exists() == before_artifacts
+    assert (_BACKEND / "data").exists() == before_backend_data

@@ -21,6 +21,9 @@ groups straight to the store.
 
 from __future__ import annotations
 
+import datetime
+import json
+import subprocess
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -44,8 +47,14 @@ GROUP_KEYS: list[str] = ["source", "root_symbol", "contract_symbol"]
 # every column; these give a clearer message if the round-trip ever diverges).
 _VERIFY_KEY_COLUMNS: list[str] = ["timestamp", "root_symbol", "contract_symbol", "close"]
 
+# Ingestion-log schema version + default location (under the store base dir, so
+# it sits beside ``raw/`` and stays gitignored with the rest of ``data/``).
+INGEST_LOG_SCHEMA_VERSION = 1
+DEFAULT_LOG_SUBPATH = ("logs", "futures_ingest.jsonl")
+
 __all__ = [
     "GROUP_KEYS",
+    "INGEST_LOG_SCHEMA_VERSION",
     "ContractIngestResult",
     "IngestReport",
     "DuplicateIngestError",
@@ -95,7 +104,11 @@ class ContractIngestResult:
 
 @dataclass(frozen=True)
 class IngestReport:
-    """Summary of one ingest invocation (no log writing in this commit)."""
+    """Summary of one ingest invocation.
+
+    ``log_path`` / ``log_written`` describe the append-only ingestion log written
+    on success (empty / False if a caller disabled logging in a future commit).
+    """
 
     input_files: list[str]
     base_dir: str
@@ -103,6 +116,8 @@ class IngestReport:
     contracts: list[ContractIngestResult]
     rows_written: int
     warnings: list[str] = field(default_factory=list)
+    log_path: str = ""
+    log_written: bool = False
 
 
 # --------------------------------------------------------------------------- #
@@ -223,6 +238,40 @@ def _rel_path(base_dir: Path, path: Path) -> str:
         return path.name
 
 
+def _git_commit_short() -> str | None:
+    """Best-effort short git commit of this repo; ``None`` if git is unavailable.
+
+    Never raises — a missing ``git`` binary, a non-repo checkout, or a timeout all
+    degrade to ``None`` so ingestion never fails on provenance metadata.
+    """
+    repo_root = Path(__file__).resolve().parents[3]
+    try:
+        result = subprocess.run(
+            ["git", "-C", str(repo_root), "rev-parse", "--short", "HEAD"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if result.returncode != 0:
+        return None
+    return result.stdout.strip() or None
+
+
+def _append_ingest_log(log_path: Path, record: dict) -> None:
+    """Append exactly one strict-JSON object to ``log_path`` (append-only).
+
+    Creates the parent directory if missing; opens with ``"a"`` (never truncates).
+    ``allow_nan=False`` guarantees no ``NaN``/``Infinity`` literal can be written —
+    the record carries only ints/strings/lists, so this can never trip.
+    """
+    log_path.parent.mkdir(parents=True, exist_ok=True)
+    line = json.dumps(record, allow_nan=False)
+    with log_path.open("a", encoding="utf-8") as fh:
+        fh.write(line + "\n")
+
+
 def ingest_local_futures_csv(
     csv_paths: Sequence[str | Path] | str | Path,
     *,
@@ -230,6 +279,7 @@ def ingest_local_futures_csv(
     source: str | None = None,
     overwrite: bool = False,
     prefer_parquet: bool = True,
+    log_path: str | Path | None = None,
 ) -> IngestReport:
     """Ingest local futures CSV(s) into the ``RawFuturesStore`` raw namespace.
 
@@ -327,11 +377,54 @@ def ingest_local_futures_csv(
     if store.storage_format == "csv":
         warnings.append("no parquet engine available; wrote CSV fallback")
 
+    input_files = [p.name for p in paths]
+    roots = sorted({c.root_symbol for c in contracts})
+    rows_written = sum(c.rows for c in contracts)
+    sources = sorted({c.source for c in contracts})
+    # A single top-level summary source (per-contract sources are also in
+    # ``contracts``); join if a run somehow spans multiple file-declared sources.
+    top_source = source if source is not None else (
+        sources[0] if len(sources) == 1 else ",".join(sources)
+    )
+
+    # 5) Append-only ingestion log — written ONLY here, after every write+verify
+    #    succeeded, so a rejected duplicate / invalid input / verify failure
+    #    (all raised above) never appends a line.
+    resolved_log_path = (
+        Path(log_path) if log_path is not None else base_dir.joinpath(*DEFAULT_LOG_SUBPATH)
+    )
+    record = {
+        "schema_version": INGEST_LOG_SCHEMA_VERSION,
+        "timestamp": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+        "source": top_source,
+        "input_files": input_files,          # basenames, never absolute host paths
+        "base_dir": str(base_dir),
+        "roots": roots,
+        "contracts_written": len(contracts),
+        "rows_written": rows_written,
+        "contracts": [
+            {
+                "root_symbol": c.root_symbol,
+                "contract_symbol": c.contract_symbol,
+                "source": c.source,
+                "rows": c.rows,
+                "version_hash": c.version_hash,
+                "path": c.path,              # relative to base_dir, never absolute
+            }
+            for c in contracts
+        ],
+        "warnings": warnings,
+        "git_commit": _git_commit_short(),
+    }
+    _append_ingest_log(resolved_log_path, record)
+
     return IngestReport(
-        input_files=[p.name for p in paths],
+        input_files=input_files,
         base_dir=str(base_dir),
-        roots=sorted({c.root_symbol for c in contracts}),
+        roots=roots,
         contracts=contracts,
-        rows_written=sum(c.rows for c in contracts),
+        rows_written=rows_written,
         warnings=warnings,
+        log_path=str(resolved_log_path),
+        log_written=True,
     )
