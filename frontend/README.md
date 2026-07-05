@@ -112,6 +112,8 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/onchain-analytics/analyze` | `POST /onchain-analytics/analyze` |
 | `GET /api/alternative-data/sample` | `GET /alternative-data/sample` |
 | `POST /api/alternative-data/analyze` | `POST /alternative-data/analyze` |
+| `GET /api/macro-regime/sample` | `GET /macro-regime/sample` |
+| `POST /api/macro-regime/analyze` | `POST /macro-regime/analyze` |
 
 The **Volatility Surface & Variance Swap Lab** (`VolatilityLabPanel`, view
 `volatility`) loads a deterministic sample option chain, lets you edit the
@@ -214,6 +216,21 @@ local LaTeX (see the shared formula note below). Static illustrative sample data
 APIs, hand-written sample scores and returns (workflow illustration, not
 evidence of alpha), not a production alpha engine, not real-time sentiment
 analytics, not investment / trading / signal advice.
+
+The **Macro Regime & Cross-Asset Allocation Lab** (`MacroRegimeLabPanel`, view
+`macroregime`) loads six deterministic macro states (goldilocks growth,
+inflation shock, recession/credit stress, stagflation, liquidity easing,
+strong-USD tightening), lets you select one and edit the λ (risk aversion) / η
+(liquidity preference) model assumptions, and re-analyses live via
+`/api/macro-regime/analyze` (indicator z-scores and category scores, a
+composite macro regime pill, regime-adjusted cross-asset assumptions, an
+inverse-volatility / risk-parity-style / regime-tilted allocation comparison
+with risk contributions and portfolio μ/σ, and ten macro stress scenarios). Its
+formulas render as local LaTeX (see the shared formula note below). Static
+illustrative sample data — no live macro or market data (no FRED or yfinance in
+this lab), illustrative betas/correlations, educational allocation constructions
+(never recommendations), not a production allocation engine, not real-time macro
+regime detection, not investment / trading / asset-allocation advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract

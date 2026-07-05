@@ -1,10 +1,26 @@
 """
 Data layer: fetch OHLCV price data from Yahoo Finance via yfinance.
+
+The live path uses yfinance for any user-supplied ticker.  A small,
+deterministic, **network-free** static sample generator (``sample_pairs_close``)
+is provided so the built-in *demo* pair (KO/PEP) stays reproducible offline —
+this is clearly labelled sample data and never claims to be live.
 """
 from __future__ import annotations
 
+import math
+
 import pandas as pd
 import yfinance as yf
+
+# The built-in demo/default pair for the pairs-trading endpoint.  Only this pair
+# is eligible for the deterministic static fallback below.
+DEMO_PAIR = ("KO", "PEP")
+
+
+def is_demo_pair(ticker_y: str, ticker_x: str) -> bool:
+    """True when the two tickers are the built-in demo pair (order-insensitive)."""
+    return {ticker_y.strip().upper(), ticker_x.strip().upper()} == set(DEMO_PAIR)
 
 
 def fetch_ohlcv(ticker: str, start: str, end: str) -> pd.DataFrame:
@@ -117,4 +133,48 @@ def fetch_pairs_close(
             f"{len(close_y)} common trading day(s) found — need at least 2."
         )
 
+    return close_y, close_x
+
+
+def sample_pairs_close(
+    ticker_y: str,
+    ticker_x: str,
+    start: str,
+    end: str,
+) -> tuple[pd.Series, pd.Series]:
+    """
+    Deterministic, **network-free** static sample close series for the demo pair.
+
+    Two co-moving series (shared trend + phase-shifted idiosyncratic wobble) whose
+    log-ratio spread mean-reverts, so the pairs demo is fully reproducible offline
+    and produces a sensible mean-reversion backtest.  Identical every run.
+
+    This is illustrative sample data — **not** live Yahoo Finance data.  Callers
+    that surface a data source should report it as ``static_sample`` (the returned
+    series carry ``.attrs["data_status"] = "static_sample"``).
+
+    Both series share a business-day ``DatetimeIndex`` over ``[start, end)`` and
+    are named after their (upper-cased) tickers.
+    """
+    idx = pd.date_range(start=start, end=end, freq="B")
+    if len(idx) < 2:  # degenerate/empty range — fall back to a fixed 300-day window
+        idx = pd.date_range(start=start, periods=300, freq="B")
+
+    y_vals: list[float] = []
+    x_vals: list[float] = []
+    price_y = 100.0
+    price_x = 100.0
+    for i in range(len(idx)):
+        # Shared market trend keeps the two legs co-integrated…
+        common = 0.0003 + 0.006 * math.sin(0.05 * i)
+        # …while a small phase-shifted wobble makes the spread mean-revert ±.
+        price_y *= 1.0 + common + 0.004 * math.sin(0.11 * i)
+        price_x *= 1.0 + common + 0.004 * math.sin(0.11 * i + 0.9)
+        y_vals.append(round(price_y, 6))
+        x_vals.append(round(price_x, 6))
+
+    close_y = pd.Series(y_vals, index=idx, name=ticker_y.strip().upper(), dtype=float)
+    close_x = pd.Series(x_vals, index=idx, name=ticker_x.strip().upper(), dtype=float)
+    close_y.attrs["data_status"] = "static_sample"
+    close_x.attrs["data_status"] = "static_sample"
     return close_y, close_x

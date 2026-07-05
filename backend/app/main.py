@@ -77,6 +77,7 @@ from app.defi_risk_routes import router as defi_risk_router
 from app.tokenomics_routes import router as tokenomics_router
 from app.onchain_analytics_routes import router as onchain_analytics_router
 from app.alternative_data_routes import router as alternative_data_router
+from app.macro_regime_routes import router as macro_regime_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -166,7 +167,7 @@ from app.custom_strategy_templates import (
     list_templates as tpl_list,
     update_template as tpl_update,
 )
-from app.data import fetch_ohlcv, fetch_pairs_close
+from app.data import fetch_ohlcv, is_demo_pair, sample_pairs_close
 from app.db import init_db
 from app.portfolio import (
     align_prices,
@@ -413,6 +414,9 @@ app.include_router(onchain_analytics_router)
 # Alternative Data, News Sentiment & Signal Decay Lab (Phase 30.0) — static sample API.
 app.include_router(alternative_data_router)
 
+# Macro Regime & Cross-Asset Allocation Lab (Phase 31.0) — static sample API.
+app.include_router(macro_regime_router)
+
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -438,6 +442,40 @@ def _fetch(ticker: str, start_date: str, end_date: str):
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=f"Data fetch failed: {exc}") from exc
+
+
+def fetch_pairs_close(ticker_y: str, ticker_x: str, start: str, end: str):
+    """Fetch and inner-join adjusted close prices for a pair of assets.
+
+    Both legs go through the module-level ``_fetch`` seam — the same indirection
+    every single-asset endpoint uses — so demo/default runs are deterministic
+    under test (``_fetch`` is monkeypatched) and real user-supplied tickers still
+    use yfinance.  The two series are aligned on their common trading days.
+
+    For the built-in **demo** pair (KO/PEP) only, if the live fetch returns no
+    usable data the function falls back to a deterministic, network-free static
+    sample so the demo stays reproducible offline (clearly labelled sample data
+    via ``.attrs["data_status"] = "static_sample"``; never claimed to be live).
+    Any other ticker propagates the original error unchanged.
+
+    This module-level name is also the monkeypatch seam used by the pairs API and
+    cost-model tests (``monkeypatch.setattr(main, "fetch_pairs_close", ...)``).
+    """
+    try:
+        close_y = _fetch(ticker_y, start, end)["Close"].rename(ticker_y.strip().upper())
+        close_x = _fetch(ticker_x, start, end)["Close"].rename(ticker_x.strip().upper())
+        close_y, close_x = close_y.align(close_x, join="inner")
+        if len(close_y) < 2:
+            raise ValueError(
+                f"After aligning '{ticker_y}' and '{ticker_x}' only "
+                f"{len(close_y)} common trading day(s) found — need at least 2."
+            )
+        return close_y, close_x
+    except (HTTPException, ValueError):
+        # The demo pair must never depend on a live Yahoo response.
+        if is_demo_pair(ticker_y, ticker_x):
+            return sample_pairs_close(ticker_y, ticker_x, start, end)
+        raise
 
 
 def _build_response(
@@ -1178,17 +1216,30 @@ def backtest_pairs(request: PairsBacktestRequest) -> BacktestResponse:
     # Reuse common date/format validation (ticker param is ignored for dates check).
     _validate_common(asset_y, request.start_date, request.end_date)
 
-    # Fetch and align both price series.
+    # Fetch and align both price series (via the shared _fetch seam; the demo
+    # pair falls back to deterministic static sample data when offline).
     try:
         close_y, close_x = fetch_pairs_close(
             asset_y, asset_x, request.start_date, request.end_date
         )
+    except HTTPException:
+        # _fetch already raised the appropriate 404/502 — keep it as-is.
+        raise
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(
             status_code=502, detail=f"Data fetch failed: {exc}"
         ) from exc
+
+    # Honest data-source label: "static_sample" when the offline demo fallback
+    # supplied the series, else the live provider.  (Series may lack .attrs when
+    # a test injects plain series.)
+    data_provider = (
+        "static_sample"
+        if getattr(close_y, "attrs", {}).get("data_status") == "static_sample"
+        else "yfinance"
+    )
 
     min_bars = request.lookback_window + 5
     if len(close_y) < min_bars:
@@ -1278,6 +1329,7 @@ def backtest_pairs(request: PairsBacktestRequest) -> BacktestResponse:
         equity_curve=equity_curve,
         trades=[TradeRecord(**t) for t in trades],
         num_trades=len(trades),
+        data_provider=data_provider,
     )
 
 

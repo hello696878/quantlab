@@ -549,6 +549,26 @@ Return to the Command Center's **Platform Direction** panel (or open
   provider APIs, the IC/decay figures illustrate the workflow (**not** evidence
   of alpha), **not** a production alpha engine, not investment / trading / signal
   advice.
+- **Macro Regime & Cross-Asset Allocation Lab (31.0)** — open from the sidebar (or
+  Ctrl/Cmd+K → "Open Macro Regime Lab" / "Cross-Asset Allocation Lab"). Switch macro
+  states (Goldilocks Growth, Inflation Shock, Recession Credit Stress, Stagflation,
+  Liquidity Easing, Strong USD Tightening); the indicator set and shared 11-asset
+  assumption table load and analyse automatically. Show the **macro score cards**
+  (growth, inflation, policy tightness, liquidity, credit stress, USD pressure,
+  composite) and the **regime** pill — the six samples land on six different regimes.
+  Walk the **indicator table** (values placed at hand-chosen z-scores), the
+  **cross-asset assumptions** (μ vs regime-adjusted μ via illustrative betas), the
+  **allocation comparison** (inverse-vol vs risk-parity-style vs regime-tilted, each
+  with portfolio μ/σ), the **risk-contribution table**, and the **macro stress
+  scenarios** (growth upside/slowdown, inflation spike, disinflation, policy
+  tightening, liquidity easing, credit spread shock, strong USD shock, severe combo —
+  which flips every sample to Severe macro stress). Nudge the **λ / η** knobs (a
+  large λ trips the documented inverse-vol fallback note). The **Formulas & notes**
+  render as **LaTeX** (KaTeX, local — no CDN). Emphasise: static illustrative sample
+  data — **no** live macro or market data (no FRED/yfinance in this lab),
+  illustrative betas/correlations, educational allocation constructions (**never**
+  recommendations), **not** a production allocation engine, not investment / trading /
+  asset-allocation advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

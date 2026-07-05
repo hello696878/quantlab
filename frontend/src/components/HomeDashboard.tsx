@@ -1483,6 +1483,32 @@ export default function HomeDashboard({
           </button>
           <button
             type="button"
+            onClick={() => onNav("macroregime")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                Macro Regime Lab
+              </span>
+              <span
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+              >
+                Macro regime
+              </span>
+            </span>
+            <span className="text-xs text-slate-400">
+              Analyze deterministic sample growth, inflation, policy, liquidity, credit, and USD
+              pressure scores with cross-asset assumptions, inverse-volatility weights, risk
+              contributions, and macro stress scenarios — not investment, trading, or allocation
+              advice.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Macro Regime Lab →
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => onNav("scanner")}
             className="card flex flex-col gap-1 p-4 text-left"
           >

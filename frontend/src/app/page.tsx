@@ -54,6 +54,7 @@ import DefiRiskLabPanel from "@/components/DefiRiskLabPanel";
 import TokenomicsLabPanel from "@/components/TokenomicsLabPanel";
 import OnChainAnalyticsLabPanel from "@/components/OnChainAnalyticsLabPanel";
 import AlternativeDataLabPanel from "@/components/AlternativeDataLabPanel";
+import MacroRegimeLabPanel from "@/components/MacroRegimeLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -442,6 +443,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Alternative Data, News Sentiment & Signal Decay Lab",
     subtitle:
       "Sample news/social/earnings/macro/supply-chain events with weighted sentiment, novelty, freshness decay, a leakage guard, event-study horizons, information coefficient, hit rate, a signal-decay curve, an alpha composite, a research risk-regime read, and scenario stresses — deterministic static sample data, no live news or social media, no scraping, no LLM or provider APIs, not investment, trading, or signal advice.",
+  },
+  macroregime: {
+    title: "Macro Regime & Cross-Asset Allocation Lab",
+    subtitle:
+      "Indicator z-scores and growth / inflation / policy / liquidity / credit / USD category scores, a composite macro regime read, regime-adjusted cross-asset assumptions, inverse-volatility / risk-parity-style / regime-tilted educational allocations with risk contributions, and macro stress scenarios — deterministic static sample data, no live macro or market data, not investment, trading, or asset-allocation advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1023,6 +1029,7 @@ export default function HomePage() {
     { view: "tokenomics", title: "Open Tokenomics Risk Lab", keywords: "tokenomics token unlock schedule vesting cliff dilution fdv fully diluted valuation market cap float ratio emission inflation staking real yield treasury runway burn holder concentration crypto fundamentals" },
     { view: "onchain", title: "Open On-Chain Analytics Lab", keywords: "on-chain onchain exchange inflow outflow net flow exchange reserve active addresses transfer volume transaction count token velocity nvt whale concentration gini holder cohort crypto analytics" },
     { view: "altdata", title: "Open Alternative Data Lab", keywords: "alternative data alt data news sentiment social sentiment earnings macro supply chain events novelty freshness leakage guard information coefficient ic hit rate signal decay alpha score event study" },
+    { view: "macroregime", title: "Open Macro Regime Lab", keywords: "macro regime cross asset allocation growth inflation policy liquidity credit stress usd pressure z-score goldilocks stagflation recession risk parity inverse volatility regime tilt" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1439,6 +1446,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("altdata"),
+    })),
+    ...(
+      [
+        ["Open Macro Regime Lab", "macro regime lab growth inflation policy liquidity credit usd cross asset allocation scores"],
+        ["Cross-Asset Allocation Lab", "cross asset allocation inverse volatility risk parity regime tilted weights portfolio educational"],
+        ["Inflation Shock Lab", "inflation shock macro regime hot cpi tight policy stagflation scenario"],
+        ["Recession Stress Lab", "recession credit stress weak growth credit spreads macro regime scenario"],
+        ["Liquidity Regime Lab", "liquidity easing regime money supply funding spread policy macro"],
+        ["Macro Scenario Stress Lab", "macro scenario stress growth slowdown inflation spike disinflation policy tightening credit shock usd shock severe combo"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `macroregime-${title}`,
+      group: "Macro Regime Lab",
+      title,
+      keywords,
+      run: () => handleNav("macroregime"),
     })),
     ...(
       [
@@ -2019,6 +2042,9 @@ export default function HomePage() {
 
         {/* ── Alternative Data, News Sentiment & Signal Decay Lab ──────── */}
         {view === "altdata" && <AlternativeDataLabPanel />}
+
+        {/* ── Macro Regime & Cross-Asset Allocation Lab ─────────────────── */}
+        {view === "macroregime" && <MacroRegimeLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

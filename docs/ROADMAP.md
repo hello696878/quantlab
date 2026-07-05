@@ -1677,6 +1677,56 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 31.0 — Macro Regime & Cross-Asset Allocation Lab v1 ✅
+
+- **New deterministic educational macro-regime analytics lab.** Static sample
+  data only; no live macro or market data (no FRED, no yfinance, no scraping in
+  this lab), no API keys, no broker/exchange integration, no trading, not
+  investment / trading / asset-allocation advice, not a production allocation
+  engine. No existing module changed (separate package + view).
+- Backend: new `app/macro_regime/` package (`models.py` strict Pydantic v2 with
+  `extra="forbid"` + `FiniteFloat`, category/direction/asset-category enums,
+  bounded liquidity scores; `sample.py` six deterministic macro states —
+  goldilocks growth, inflation shock, recession/credit stress, stagflation,
+  liquidity easing, strong-USD tightening — each with twelve hand-written
+  indicators placed at chosen z-scores plus a shared eleven-asset cross-asset
+  assumption set; `service.py` pure analytics) + `app/macro_regime_routes.py`
+  (`GET /macro-regime/sample`, `POST /macro-regime/analyze`), wired via
+  `include_router`.
+- Analytics: indicator z-scores and direction-adjusted category scores (growth,
+  inflation, policy, liquidity, credit stress, USD pressure), the composite
+  macro score, a deterministic regime classification (threshold rules per the
+  spec + a documented nearest-prototype fallback; severe with ≥3 extreme
+  categories), regime-adjusted expected returns (`μ + Σβ·S`, credit subtracted),
+  a simplified category-based correlation matrix (same category 0.75, cross
+  0.25, cash 0.0; stress blends toward 1), inverse-volatility weights, a
+  fixed-point **risk-parity-style** equal-risk-contribution approximation on the
+  simplified Σ, **regime-tilted** educational weights (`T = μ' − λσ + ηL`,
+  positive-normalised, inverse-vol fallback with a note when all scores are
+  non-positive — λ/η are editable request knobs), simple risk contributions
+  (`wσ/Σwσ`), portfolio μ and √(wᵀΣw), and ten macro stress scenarios (additive
+  score shocks + vol/correlation stress). The six samples land on six distinct
+  regimes; the severe combo classifies as severe from every sample. Every
+  division guarded → no NaN/Inf.
+- Frontend: new `MacroRegimeLabPanel` (view `macroregime`) — hero, sample
+  selector + editable λ/η knobs (live re-analyze), macro score cards + regime
+  pill, indicator table, cross-asset assumption table (μ vs regime-adjusted μ,
+  betas), a three-method allocation comparison with per-method portfolio μ/σ,
+  a risk-contribution table, scenario-stress table, and a shared
+  `FormulaReference` (Macro scoring / Asset assumptions / Allocation groups);
+  new `lib/macroRegime.ts` types + API client. Wired into Sidebar, Dashboard
+  card ("Macro regime" badge), and Command Palette (Open Macro Regime Lab,
+  Cross-Asset Allocation Lab, Inflation Shock Lab, Recession Stress Lab,
+  Liquidity Regime Lab, Macro Scenario Stress Lab).
+- 24 new backend tests (deterministic, no network) — full suite green
+  (**2721 passed**, and the repo-root `artifacts/` dir does not exist after the
+  run); `npx tsc --noEmit` clean; no frontend build run (per instructions).
+  Docs: `backend/README.md`, `frontend/README.md`, `PROJECT_OVERVIEW.md`,
+  `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample, educational — no live
+  macro or market data, illustrative betas/correlations, educational allocation
+  constructions, not a production allocation engine, not investment / trading /
+  asset-allocation advice.**
+
 ### Phase 30.0 — Alternative Data, News Sentiment & Signal Decay Lab v1 ✅
 
 - **New deterministic educational alternative-data research lab.** Static sample
