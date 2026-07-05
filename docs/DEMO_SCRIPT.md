@@ -483,6 +483,27 @@ Return to the Command Center's **Platform Direction** panel (or open
   calls, the rate model / health factor / liquidation price are simplified educational
   approximations, **not** a production DeFi risk engine, **not** real-time DeFi
   analytics, not investment / trading / lending / borrowing / liquidation advice.
+- **Tokenomics, Unlock Schedule & Treasury Risk Lab (28.0)** — open from the sidebar
+  (or Ctrl/Cmd+K → "Open Tokenomics Risk Lab" / "Unlock Schedule Lab"). Switch tokens
+  (L1, DeFi Governance, Gaming Unlock, Stablecoin Governance, Low Float High FDV); the
+  price/supply snapshot, unlock schedule, treasury, and holder concentration load and
+  analyse automatically. Show the key-metric cards (market cap, FDV, FDV/MC, float
+  ratio, 180d unlock, real yield, runway, concentration) and the **regime** pill — the
+  five samples deterministically land on five different regimes (Balanced, Emission
+  pressure, Unlock pressure, Treasury runway risk, Low float / high FDV). Walk the
+  **unlock schedule** table (cumulative dilution), the **unlock pressure** panel
+  (30/90/180/365d buckets + score), the **emissions & staking** panel (real yield ≈
+  staking − emission inflation), the **treasury runway** panel (gross vs
+  revenue-adjusted), the **holder concentration** panel, and the **stress scenarios**
+  (price drawdown, unlock acceleration, emission increase, treasury drawdown, burn
+  increase, concentration shock, revenue decline, low-float repricing, severe combo —
+  the combo flips the regime to Severe tokenomics stress). Edit price / supply /
+  emission / burn / treasury and watch everything re-compute. The **Formulas & notes**
+  render as **LaTeX** (KaTeX, local — no CDN). Emphasise: static illustrative sample
+  data — **not** live token prices or on-chain data, no wallets / RPC / smart-contract
+  calls, documented heuristic scores, **not** a production due-diligence engine,
+  **not** real-time tokenomics analytics, not investment / trading / token / venture
+  advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

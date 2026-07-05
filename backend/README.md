@@ -32,6 +32,8 @@ backend/
 │   ├── crypto_derivatives_routes.py  Crypto Perpetual Funding & Basis Lab API routes
 │   ├── defi_risk/          static-sample DeFi peg/lending/collateral analytics (models/sample/service)
 │   ├── defi_risk_routes.py       DeFi Yield, Stablecoin Peg & Lending Risk Lab API routes
+│   ├── tokenomics/         static-sample tokenomics/unlock/treasury analytics (models/sample/service)
+│   ├── tokenomics_routes.py      Tokenomics, Unlock Schedule & Treasury Risk Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -54,7 +56,8 @@ backend/
 │   ├── test_volatility.py        Volatility Lab analytics/API/validation tests
 │   ├── test_microstructure.py    Market Microstructure & Execution Lab analytics/API/validation tests
 │   ├── test_crypto_derivatives.py  Crypto Perpetual Funding & Basis Lab analytics/API/validation tests
-│   └── test_defi_risk.py         DeFi Yield, Stablecoin Peg & Lending Risk Lab analytics/API/validation tests
+│   ├── test_defi_risk.py         DeFi Yield, Stablecoin Peg & Lending Risk Lab analytics/API/validation tests
+│   └── test_tokenomics.py        Tokenomics, Unlock Schedule & Treasury Risk Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -297,6 +300,31 @@ and liquidation price are simplified educational approximations, not a protocol'
 actual rate or liquidation logic. Scenarios are hypothetical deterministic shocks
 — not forecasts and not advice. Every division is guarded so all outputs are
 finite.
+
+---
+
+### Tokenomics, Unlock Schedule & Treasury Risk Lab Endpoints
+
+Deterministic static-sample crypto fundamental-risk analytics (Phase 28.0). No
+live token prices, no live on-chain data, no wallets, no blockchain RPC or
+smart-contract calls, no network calls, educational only — not investment,
+trading, token, venture, legal, tax, or risk-management advice, and not a
+production due-diligence engine.
+
+| Endpoint | Description |
+|---|---|
+| `GET /tokenomics/sample` | Five deterministic sample tokens (L1, DeFi governance, gaming unlock, stablecoin governance, low-float/high-FDV), each with a price/supply snapshot, an unlock schedule on deterministic day offsets, treasury balances, and a holder-concentration snapshot |
+| `POST /tokenomics/analyze` | Market cap / FDV / FDV ratio / float ratio, the unlock schedule with cumulative dilution, unlock-pressure buckets (30/90/180/365d) + pressure score, emission inflation and a real staking-yield approximation, treasury value with gross-burn and revenue-adjusted runway, a documented holder-concentration score, a tokenomics risk-regime classification (balanced / low-float-high-FDV / unlock / emission / treasury-runway / concentration / severe), and ten unlock/treasury stress scenarios |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): price and
+supplies positive with **`total_supply` ≥ `circulating_supply`** (and
+`max_supply` ≥ `total_supply` when provided), unlock tokens / treasury values /
+burn ≥ 0, holder shares in [0, 1] with **`top_1` ≤ `top_5` ≤ `top_10`**; no
+NaN/Infinity. Runway months are capped finite when the (net) burn is ~zero; the
+pressure and concentration scores are documented deterministic heuristics; unlock
+schedules use deterministic sample day offsets (no live clock). Scenarios are
+hypothetical deterministic shocks — not forecasts and not advice. Every division
+is guarded so all outputs are finite.
 
 ---
 

@@ -1677,6 +1677,53 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 28.0 — Tokenomics, Unlock Schedule & Treasury Risk Lab v1 ✅
+
+- **New deterministic educational crypto fundamental-risk analytics lab.** Static
+  sample data only; no live token prices, no live on-chain data, no wallets, no
+  blockchain RPC or smart-contract calls, no exchange/broker integration, no
+  trading, no API keys, no scraping, not investment / trading / token / venture
+  advice, not a production due-diligence engine. No existing module changed
+  (separate package + view).
+- Backend: new `app/tokenomics/` package (`models.py` strict Pydantic v2 with
+  `extra="forbid"` + `FiniteFloat`, cross-field checks `total_supply ≥
+  circulating_supply`, `max_supply ≥ total_supply`, and `top_1 ≤ top_5 ≤ top_10`
+  holder shares; `sample.py` five deterministic tokens — L1, DeFi governance,
+  gaming unlock, stablecoin governance, low-float/high-FDV — each with a
+  price/supply snapshot, an unlock schedule on deterministic day offsets, treasury
+  balances, and a holder-concentration snapshot; `service.py` pure analytics) +
+  `app/tokenomics_routes.py` (`GET /tokenomics/sample`, `POST /tokenomics/analyze`),
+  wired via `include_router`.
+- Analytics: market cap / FDV / FDV ratio / float ratio, an unlock schedule with
+  per-event value / % of circulating / cumulative dilution, unlock-pressure
+  buckets (30/90/180/365d) with a documented pressure score, emission inflation
+  (`E = S_circ·e`) and a real-yield approximation (`staking − inflation`),
+  treasury value (`P·S_treasury + stables`) with gross-burn and revenue-adjusted
+  runway (capped finite at ~zero burn), a documented holder-concentration score
+  (0.5·top1 + 0.3·top5 + 0.2·top10), a deterministic risk-regime classification
+  (balanced / low_float_high_fdv / unlock_pressure / emission_pressure /
+  treasury_runway_risk / concentration_risk / severe with ≥3 triggers), and ten
+  unlock/treasury stress scenarios. The five samples deterministically land on
+  five distinct regimes. Every division guarded → no NaN/Inf.
+- Frontend: new `TokenomicsLabPanel` (view `tokenomics`) — hero, token selector +
+  editable assumptions (live re-analyze; circulating clamped ≤ total supply),
+  key-metric cards + regime pill, unlock-schedule table, unlock-pressure panel,
+  emissions/staking panel, treasury-runway panel, holder-concentration panel,
+  regime panel, scenario-stress table, and a shared `FormulaReference`
+  (Valuation / Unlocks / Emissions & staking / Treasury groups); new
+  `lib/tokenomics.ts` types + API client. Wired into Sidebar, Dashboard card
+  ("Crypto fundamentals" badge), and Command Palette (Open Tokenomics Risk Lab,
+  Unlock Schedule Lab, FDV Dilution Lab, Treasury Runway Lab, Holder
+  Concentration Lab, Tokenomics Stress Scenario Lab).
+- 32 new backend tests (deterministic, no network) — full suite green
+  (**2537 passed**, and the repo-root `artifacts/` dir does not exist after the
+  run); `npx tsc --noEmit` clean; no frontend build run (per instructions). Docs:
+  `backend/README.md`, `frontend/README.md`, `PROJECT_OVERVIEW.md`,
+  `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample, educational — no live
+  token prices or on-chain data, no wallets/RPC/contract calls, documented
+  heuristic scores, not a production due-diligence engine, not investment /
+  trading / token / venture advice.**
+
 ### Phase 27.0 — DeFi Yield, Stablecoin Peg & Lending Risk Lab v1 ✅
 
 - **New deterministic educational DeFi analytics lab.** Static sample data only;

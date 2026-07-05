@@ -26,6 +26,7 @@ export type View =
   | "microstructure"
   | "cryptoderivatives"
   | "defirisk"
+  | "tokenomics"
   | "csv"
   | "builder"
   | "portfolio"

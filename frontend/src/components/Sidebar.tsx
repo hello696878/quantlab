@@ -38,6 +38,7 @@ const ICONS: Record<string, string> = {
   microstructure: "M3 21V3M3 12h6M3 7h4M3 17h4M21 21V3M21 12h-6M21 7h-4M21 17h-4M12 8v8",
   cryptoderivatives: "M12 3v18M8.5 6.5h5.5a2.5 2.5 0 0 1 0 5H8.5m0 0h6a2.5 2.5 0 0 1 0 5H8M7 8.5h2M7 15.5h2",
   defirisk: "M12 3 4 7v5c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V7l-8-4ZM9 12l2 2 4-4",
+  tokenomics: "M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18ZM12 7v10M9.5 9.5h3.75a1.75 1.75 0 0 1 0 3.5H9.5h4.25a1.75 1.75 0 0 1 0 3.5H9",
   scanner: "M4 14h3v6H4zM10.5 9h3v11h-3zM17 4h3v16h-3z",
   finml: "M4 18 9 9l4 5 3-6 4 7M4 4v16h16",
   globe:
@@ -131,6 +132,7 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "microstructure", label: "Market Microstructure Lab", icon: "microstructure" },
   { id: "cryptoderivatives", label: "Crypto Derivatives Lab", icon: "cryptoderivatives" },
   { id: "defirisk", label: "DeFi Risk Lab", icon: "defirisk" },
+  { id: "tokenomics", label: "Tokenomics Risk Lab", icon: "tokenomics" },
   { id: "scanner", label: "Cross-Sectional Scanner", icon: "scanner" },
   { id: "finml", label: "AFML Methodology Lab", icon: "finml" },
   { id: "csv", label: "CSV Backtest", icon: "upload" },

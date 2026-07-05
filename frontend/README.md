@@ -106,6 +106,8 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/crypto-derivatives/analyze` | `POST /crypto-derivatives/analyze` |
 | `GET /api/defi-risk/sample` | `GET /defi-risk/sample` |
 | `POST /api/defi-risk/analyze` | `POST /defi-risk/analyze` |
+| `GET /api/tokenomics/sample` | `GET /tokenomics/sample` |
+| `POST /api/tokenomics/analyze` | `POST /tokenomics/analyze` |
 
 The **Volatility Surface & Variance Swap Lab** (`VolatilityLabPanel`, view
 `volatility`) loads a deterministic sample option chain, lets you edit the
@@ -162,6 +164,21 @@ no blockchain RPC or smart-contract calls, the rate model / health factor /
 liquidation price are simplified educational approximations, not a production
 DeFi risk engine, not real-time DeFi analytics, not investment / trading /
 lending / borrowing / liquidation advice.
+
+The **Tokenomics, Unlock Schedule & Treasury Risk Lab** (`TokenomicsLabPanel`,
+view `tokenomics`) loads five deterministic sample tokens (L1, DeFi governance,
+gaming unlock, stablecoin governance, low-float/high-FDV), lets you select one
+and edit the price / supply / staking / emission / burn / treasury assumptions,
+and re-analyses live via `/api/tokenomics/analyze` (market cap vs FDV, float
+ratio, the unlock schedule with cumulative dilution, unlock-pressure buckets +
+score, emission inflation and a real staking-yield approximation, treasury
+runway — gross-burn and revenue-adjusted — a holder-concentration score, a
+tokenomics risk-regime pill, and ten unlock/treasury stress scenarios). Its
+formulas render as local LaTeX (see the shared formula note below). Static
+illustrative sample data — no live token prices or on-chain data, no wallets, no
+blockchain RPC or smart-contract calls, documented heuristic scores, not a
+production due-diligence engine, not real-time tokenomics analytics, not
+investment / trading / token / venture advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract

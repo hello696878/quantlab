@@ -51,6 +51,7 @@ import VolatilityLabPanel from "@/components/VolatilityLabPanel";
 import MicrostructureLabPanel from "@/components/MicrostructureLabPanel";
 import CryptoDerivativesLabPanel from "@/components/CryptoDerivativesLabPanel";
 import DefiRiskLabPanel from "@/components/DefiRiskLabPanel";
+import TokenomicsLabPanel from "@/components/TokenomicsLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -424,6 +425,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "DeFi Yield, Stablecoin Peg & Lending Risk Lab",
     subtitle:
       "Stablecoin peg deviation, lending/borrow APY with a kinked utilization rate model, collateral value / debt / LTV / health factor, an approximate liquidation price, net APY carry, a risk-regime read, and protocol stress scenarios — deterministic static sample data, no live protocol data or crypto prices, no wallets or smart-contract calls, not investment, lending, borrowing, or liquidation advice.",
+  },
+  tokenomics: {
+    title: "Tokenomics, Unlock Schedule & Treasury Risk Lab",
+    subtitle:
+      "Market cap vs FDV, float ratio, unlock schedules and dilution pressure, emission inflation and a real staking-yield approximation, treasury runway, holder concentration, a tokenomics risk-regime read, and unlock/treasury stress scenarios — deterministic static sample data, no live token prices or on-chain data, no wallets or smart-contract calls, not investment, trading, token, or venture advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1002,6 +1008,7 @@ export default function HomePage() {
     { view: "microstructure", title: "Open Market Microstructure Lab", keywords: "microstructure execution order book limit order book bid ask spread depth imbalance microprice vwap twap implementation shortfall slippage market impact participation rate liquidity stress execution schedule transaction cost analysis tca" },
     { view: "cryptoderivatives", title: "Open Crypto Derivatives Lab", keywords: "crypto derivatives perpetual perp futures funding rate basis annualized carry cash and carry liquidation margin leverage btc eth sol bitcoin ethereum solana contango backwardation funding pnl" },
     { view: "defirisk", title: "Open DeFi Risk Lab", keywords: "defi decentralized finance stablecoin peg depeg lending borrow apy utilization kink interest rate model collateral health factor ltv loan to value liquidation threshold net apy carry usdc usdt dai aave protocol stress" },
+    { view: "tokenomics", title: "Open Tokenomics Risk Lab", keywords: "tokenomics token unlock schedule vesting cliff dilution fdv fully diluted valuation market cap float ratio emission inflation staking real yield treasury runway burn holder concentration crypto fundamentals" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1369,6 +1376,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("defirisk"),
+    })),
+    ...(
+      [
+        ["Open Tokenomics Risk Lab", "tokenomics risk lab token unlock treasury fdv market cap float emission staking concentration crypto fundamentals"],
+        ["Unlock Schedule Lab", "unlock schedule vesting cliff team investor ecosystem foundation tranche dilution pressure tokens circulating"],
+        ["FDV Dilution Lab", "fdv fully diluted valuation market cap ratio float ratio dilution low float future supply"],
+        ["Treasury Runway Lab", "treasury runway months burn rate stables treasury tokens revenue adjusted protocol treasury"],
+        ["Holder Concentration Lab", "holder concentration top holder share insider foundation community whale concentration score"],
+        ["Tokenomics Stress Scenario Lab", "tokenomics stress scenario price drawdown unlock acceleration emission increase treasury drawdown burn increase concentration shock severe combo"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `tokenomics-${title}`,
+      group: "Tokenomics Risk Lab",
+      title,
+      keywords,
+      run: () => handleNav("tokenomics"),
     })),
     ...(
       [
@@ -1940,6 +1963,9 @@ export default function HomePage() {
 
         {/* ── DeFi Yield, Stablecoin Peg & Lending Risk Lab ────────────── */}
         {view === "defirisk" && <DefiRiskLabPanel />}
+
+        {/* ── Tokenomics, Unlock Schedule & Treasury Risk Lab ──────────── */}
+        {view === "tokenomics" && <TokenomicsLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (
