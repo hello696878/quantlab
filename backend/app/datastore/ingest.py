@@ -21,13 +21,17 @@ groups straight to the store.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from dataclasses import dataclass, field
+from pathlib import Path
 
 import pandas as pd
 
+from app.datastore.csv_fixtures import load_futures_bars_csv
 from app.datastore.daily_bar import FuturesDailyBar
 from app.datastore.store import (
     REQUIRED_COLUMNS,
+    RawFuturesStore,
     raw_data_version_hash,
     validate_raw_futures,
 )
@@ -36,15 +40,35 @@ from app.datastore.store import (
 # ``RawFuturesStore.write_raw``'s ``groupby`` order.
 GROUP_KEYS: list[str] = ["source", "root_symbol", "contract_symbol"]
 
+# Columns the read-back verification compares explicitly (the version hash covers
+# every column; these give a clearer message if the round-trip ever diverges).
+_VERIFY_KEY_COLUMNS: list[str] = ["timestamp", "root_symbol", "contract_symbol", "close"]
+
 __all__ = [
     "GROUP_KEYS",
     "ContractIngestResult",
     "IngestReport",
+    "DuplicateIngestError",
+    "IngestVerificationError",
     "daily_bars_to_frame",
     "contract_group_key",
     "compute_contract_version_hashes",
     "verify_contract_frame_hash",
+    "ingest_local_futures_csv",
 ]
+
+
+class DuplicateIngestError(RuntimeError):
+    """Raised when a target contract file already exists and ``overwrite`` is False.
+
+    Raised **before** anything is written, so an existing store file is never
+    touched by a rejected duplicate ingest.
+    """
+
+
+class IngestVerificationError(RuntimeError):
+    """Raised when store read-back does not match what was written (row count,
+    key columns, or content hash) — the round-trip invariant is broken."""
 
 
 # --------------------------------------------------------------------------- #
@@ -166,6 +190,148 @@ def verify_contract_frame_hash(expected: pd.DataFrame, actual: pd.DataFrame) -> 
 
     Both frames are hashed via :func:`raw_data_version_hash` (which validates and
     canonicalizes first), so this is the read-back invariant the store-backed
-    ingest will assert in a later commit: written content == read-back content.
+    ingest asserts: written content == read-back content.
     """
     return raw_data_version_hash(expected) == raw_data_version_hash(actual)
+
+
+# --------------------------------------------------------------------------- #
+# Store-backed ingest orchestrator (no ingestion log yet — commit 3)
+# --------------------------------------------------------------------------- #
+
+
+def _contract_file_exists(
+    store: RawFuturesStore, root: str, contract: str, source: str
+) -> bool:
+    """True if a stored file for this contract exists in **either** format.
+
+    ``read_raw`` also probes both formats, so checking both here means a CSV
+    file written earlier is still detected as a duplicate by a parquet-mode store.
+    """
+    return any(
+        store.raw_path(root, contract, source, fmt=fmt).exists()
+        for fmt in ("parquet", "csv")
+    )
+
+
+def _rel_path(base_dir: Path, path: Path) -> str:
+    """Store path relative to ``base_dir`` (POSIX) — never an absolute path in
+    the returned report/log."""
+    try:
+        return path.relative_to(base_dir).as_posix()
+    except ValueError:
+        return path.name
+
+
+def ingest_local_futures_csv(
+    csv_paths: Sequence[str | Path] | str | Path,
+    *,
+    base_dir: str | Path,
+    source: str | None = None,
+    overwrite: bool = False,
+    prefer_parquet: bool = True,
+) -> IngestReport:
+    """Ingest local futures CSV(s) into the ``RawFuturesStore`` raw namespace.
+
+    Fail-first: every input CSV is loaded and validated, and the duplicate guard
+    runs, **before** anything is written. On success each contract is written via
+    :meth:`RawFuturesStore.write_raw`, read back via
+    :meth:`RawFuturesStore.read_raw`, and verified (row count + key columns +
+    :func:`raw_data_version_hash`). Local files only; no network; nothing is
+    written outside ``base_dir``. No ingestion log is written by this commit.
+
+    :param source: if given, overrides the ``source`` column on every row (the
+        store namespace); if ``None``, each file's own ``source`` value is kept.
+    :raises FixtureFormatError: an input CSV is invalid / off-cycle / expiry ≠ spec.
+    :raises RawSchemaError: the combined frame violates the raw schema.
+    :raises DuplicateIngestError: a target contract file already exists and
+        ``overwrite`` is False (nothing is written).
+    :raises IngestVerificationError: store read-back does not match what was written.
+    """
+    if isinstance(csv_paths, (str, Path)):
+        csv_paths = [csv_paths]
+    paths = [Path(p) for p in csv_paths]
+    if not paths:
+        raise ValueError("ingest_local_futures_csv: no input CSV paths given")
+    if source is not None and not str(source).strip():
+        raise ValueError("--source must be a non-empty string when provided")
+
+    # 1) Load + validate every input first (loader enforces the §6 cross-checks:
+    #    off-cycle month, expiry == spec, timezone == spec). Any failure aborts
+    #    before a store is even constructed, so nothing is written.
+    bars: list[FuturesDailyBar] = []
+    for path in paths:
+        bars.extend(load_futures_bars_csv(path))
+
+    # 2) Records -> canonical frame; optional source override; normalize.
+    frame = daily_bars_to_frame(bars)
+    if source is not None:
+        frame = frame.copy()
+        frame["source"] = source
+    norm = validate_raw_futures(frame)
+
+    base_dir = Path(base_dir)
+    store = RawFuturesStore(base_dir, prefer_parquet=prefer_parquet)
+
+    # 3) Group, then run the duplicate guard across ALL groups before any write.
+    groups: list[tuple[str, str, str, pd.DataFrame]] = []
+    for (grp_source, root, contract), group in norm.groupby(GROUP_KEYS, sort=True):
+        groups.append((str(grp_source), str(root), str(contract), group.reset_index(drop=True)))
+
+    if not overwrite:
+        existing = [
+            f"{s}/{r}/{c}"
+            for (s, r, c, _g) in groups
+            if _contract_file_exists(store, r, c, s)
+        ]
+        if existing:
+            raise DuplicateIngestError(
+                "refusing to overwrite existing contract file(s): "
+                f"{', '.join(existing)} (pass overwrite=True / --overwrite)"
+            )
+
+    # 4) Write (validates + groups internally), then read back + verify each group.
+    store.write_raw(norm)
+
+    contracts: list[ContractIngestResult] = []
+    for (grp_source, root, contract, group) in groups:
+        read_back = store.read_raw(root, contract, grp_source)
+        if len(read_back) != len(group):
+            raise IngestVerificationError(
+                f"{grp_source}/{root}/{contract}: read-back row count "
+                f"{len(read_back)} != written {len(group)}"
+            )
+        got = read_back.loc[:, _VERIFY_KEY_COLUMNS].reset_index(drop=True)
+        want = group.loc[:, _VERIFY_KEY_COLUMNS].reset_index(drop=True)
+        if not got.equals(want):
+            raise IngestVerificationError(
+                f"{grp_source}/{root}/{contract}: read-back key columns differ from written"
+            )
+        written_hash = raw_data_version_hash(group)
+        if raw_data_version_hash(read_back) != written_hash:
+            raise IngestVerificationError(
+                f"{grp_source}/{root}/{contract}: read-back content hash != written hash"
+            )
+        contracts.append(
+            ContractIngestResult(
+                root_symbol=root,
+                contract_symbol=contract,
+                source=grp_source,
+                rows=int(len(group)),
+                version_hash=written_hash,
+                path=_rel_path(base_dir, store.raw_path(root, contract, grp_source)),
+            )
+        )
+
+    warnings: list[str] = []
+    if store.storage_format == "csv":
+        warnings.append("no parquet engine available; wrote CSV fallback")
+
+    return IngestReport(
+        input_files=[p.name for p in paths],
+        base_dir=str(base_dir),
+        roots=sorted({c.root_symbol for c in contracts}),
+        contracts=contracts,
+        rows_written=sum(c.rows for c in contracts),
+        warnings=warnings,
+    )
