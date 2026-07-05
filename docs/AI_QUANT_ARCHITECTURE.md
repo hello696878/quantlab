@@ -1839,14 +1839,14 @@ no pickle / joblib; no DB registry / MLflow / W&B.
 
 ---
 
-## Appendix H — Phase 7 Local Futures Data Ingestion Plan
+## Appendix H — Phase 7 Local Futures Data Ingestion
 
-> **Status: design only (Commit 0).** Nothing in this appendix is implemented by
-> this appendix. It records the approved Phase 7 plan so implementation lands in
-> tiny, testable commits on top of the storage/validation machinery that already
-> exists. Phase 7 completes the **store-backed** local CSV ingestion step that
+> **Status: as-built (Phase 7 shipped, Commits 0–4).** Sections H.1–H.12 are the
+> approved design; **§H.13 records the shipped result.** Phase 7 completed the
+> **store-backed** local CSV ingestion step that
 > `docs/FUTURES_DATA_INGESTION_PLAN.md` §9 lists as the open remainder of
-> **Ingestion Phase I2**. No code, script, data, or test is created by Commit 0.
+> **Ingestion Phase I2** — continuous construction (I4) and vendor fetch (I5)
+> remain out of scope and unimplemented.
 
 ### H.1 Scope
 
@@ -2183,3 +2183,91 @@ into `tmp_path` (no new committed fixtures required).
 | Jumping early to continuous / ML | hard exclusion: `continuous/futures` untouched; no `features`/`labels`/`ml_signal` imports (a guard test can assert this) |
 | CSV-vs-parquet environment divergence | store has explicit CSV fallback (`storage_format`); tests run **both** paths (`--no-parquet`) |
 | Log growth / partial-write on crash | one line per invocation, append-only; written only **after** successful verify, so a failed ingest leaves no line |
+
+### H.13 As-built (Phase 7 shipped)
+
+Implemented across Commits 1–4 exactly as designed above; tests are synthetic +
+`tmp_path` only, no network, and the full backend suite stays green.
+
+**Shipped components**
+
+- `backend/app/datastore/ingest.py` — `daily_bars_to_frame`, frozen
+  `ContractIngestResult` / `IngestReport` (with `log_path` / `log_written`),
+  `contract_group_key`, `compute_contract_version_hashes`,
+  `verify_contract_frame_hash`, `DuplicateIngestError` /
+  `IngestVerificationError`, and the orchestrator
+  `ingest_local_futures_csv(csv_paths, *, base_dir, source=None, overwrite=False,
+  prefer_parquet=True, log_path=None) -> IngestReport`.
+- `scripts/ingest_local_futures_csv.py` — thin argparse CLI (positional
+  `paths…`, `--base-dir` required, `--source`, `--overwrite`, `--no-parquet`,
+  `--log-path`); no business logic beyond parsing + calling the orchestrator.
+- `backend/tests/test_ingest_local_futures_csv.py` — 53 tests (helpers,
+  store-backed ingest, duplicate guard, CLI, append-only log, and one integrated
+  end-to-end pass over both fixtures).
+
+**CLI usage**
+
+```powershell
+cd C:\quantlab
+.\backend\venv\Scripts\python.exe .\scripts\ingest_local_futures_csv.py `
+  backend\tests\fixtures\futures_csv\esm25.csv `
+  backend\tests\fixtures\futures_csv\nqm25.csv `
+  --base-dir data --source csv_fixture --log-path data\logs\futures_ingest.jsonl
+```
+
+Expected output pattern (one `[WRITE]` line per contract):
+
+```text
+[WRITE] csv_fixture/ES/ESM25 rows=5 hash=<sha256>
+[WRITE] csv_fixture/NQ/NQM25 rows=5 hash=<sha256>
+[LOG] path=data\logs\futures_ingest.jsonl
+RESULT: OK
+```
+
+Exit code is `0` on success and nonzero on invalid CSV / off-cycle contract /
+expiry mismatch / duplicate-without-`--overwrite` / verification failure (with a
+`RESULT: FAIL (...)` line and no log entry appended).
+
+**Store destination** — the canonical `RawFuturesStore` raw namespace, one file
+per contract:
+
+```text
+<base_dir>/raw/futures/<source>/<root_symbol>/<contract_symbol>.<parquet|csv>
+```
+
+Parquet is preferred; with no parquet engine installed the store writes the
+explicit CSV fallback (and the run reports a `warnings` entry). This is
+**distinct** from `normalize_local_futures_csv.py`'s processed-CSV output under
+`data/processed/futures_daily/` — Phase 7 never touches that path.
+
+**Log destination** — append-only JSONL, one object per successful invocation,
+default `<base_dir>/logs/futures_ingest.jsonl` (override with `--log-path` /
+`log_path=`). Each line carries `schema_version` (1), UTC-ISO `timestamp`,
+`source`, basename-only `input_files`, `base_dir`, `roots`, `contracts_written`,
+`rows_written`, a `contracts` array (`root_symbol`, `contract_symbol`, `source`,
+`rows`, `version_hash`, base-relative `path`), `warnings`, and best-effort
+`git_commit`. Strict JSON — no `NaN` / `Infinity` literal.
+
+**Provenance** — per-contract `raw_data_version_hash` (the existing content hash;
+no new hash was introduced), verified equal between the written group and the
+store read-back, recorded in both the `IngestReport` and the log. The log is
+append-only; `git_commit` is best-effort (`null` if git is unavailable).
+
+**Safety (as-built)** — local files only; **no network / vendor / yfinance /
+IBKR / live data**; **no continuous-futures construction** (the
+`continuous/futures` namespace is untouched); **no ML / Research CLI real-data
+mode**; `data/` (and `*.parquet`) stay gitignored; tests write under `tmp_path`
+only and assert no repo-root `data/` / `artifacts/` appear; guard tests assert
+the module and CLI import no network or `futures_continuous` / `features` /
+`labels` / `ml_signal` / `signals` / `futures_backtest` / `research_cli` modules.
+
+**Known limitations**
+
+- A log-write failure can occur **after** the store write already succeeded (the
+  log is the final step); it surfaces loudly rather than being swallowed.
+- Duplicate ingest requires explicit `--overwrite`; there is **no idempotent
+  skip** yet (the guard is existence-based, not content-based).
+- No continuous-futures construction and **no downstream feature / label / ML
+  integration** — raw per-contract bars are the end of this path for now.
+- No vendor downloader — "real data" means local files the user already holds
+  (Ingestion I5 remains future work).

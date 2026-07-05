@@ -676,3 +676,65 @@ def test_log_writes_only_under_tmp_path(tmp_path, monkeypatch):
     assert (_REPO_ROOT / "data").exists() == before_data
     assert (_REPO_ROOT / "artifacts").exists() == before_artifacts
     assert (_BACKEND / "data").exists() == before_backend_data
+
+
+# --------------------------------------------------------------------------- #
+# Commit 4 — integrated end-to-end synthetic ingest (both fixtures + provenance)
+# --------------------------------------------------------------------------- #
+
+
+def test_e2e_ingest_both_fixtures_full_provenance(tmp_path, monkeypatch):
+    """One integrated pass: two synthetic fixtures -> RawFuturesStore (tmp_path)
+    with a custom tmp_path log, then verify the report, store read-back, and the
+    JSONL log all agree, and that nothing was written outside tmp_path."""
+    base = tmp_path / "store"
+    log = tmp_path / "audit" / "ingest.jsonl"
+    before_data = (_REPO_ROOT / "data").exists()
+    before_artifacts = (_REPO_ROOT / "artifacts").exists()
+    before_backend_data = (_BACKEND / "data").exists()
+    monkeypatch.chdir(tmp_path)
+
+    report = ingest_local_futures_csv(
+        [ESM25, NQM25], base_dir=base, source="csv_fixture", log_path=log
+    )
+
+    # --- report shape ---
+    assert len(report.contracts) == 2
+    assert report.roots == ["ES", "NQ"]
+    assert report.log_written is True
+    assert Path(report.log_path) == log
+    assert report.rows_written == 10
+
+    # --- read both contracts back; hashes + rows must match the report ---
+    store = RawFuturesStore(base)
+    readback_rows = 0
+    for c in report.contracts:
+        rb = store.read_raw(c.root_symbol, c.contract_symbol, c.source)
+        assert len(rb) == c.rows
+        assert raw_data_version_hash(rb) == c.version_hash
+        assert not Path(c.path).is_absolute()
+        readback_rows += len(rb)
+    assert report.rows_written == readback_rows
+
+    # --- exactly one JSONL line; log contracts agree with the report + read-back ---
+    lines = _read_log(log)
+    assert len(lines) == 1
+    record = lines[0]
+    assert record["source"] == "csv_fixture"
+    assert record["contracts_written"] == 2 and record["rows_written"] == 10
+    report_by_key = {(c.root_symbol, c.contract_symbol): c for c in report.contracts}
+    for lc in record["contracts"]:
+        rc = report_by_key[(lc["root_symbol"], lc["contract_symbol"])]
+        assert lc["source"] == "csv_fixture"
+        assert lc["rows"] == rc.rows
+        assert lc["version_hash"] == rc.version_hash
+        assert not Path(lc["path"]).is_absolute()
+        rb = store.read_raw(lc["root_symbol"], lc["contract_symbol"], lc["source"])
+        assert lc["version_hash"] == raw_data_version_hash(rb)
+
+    # --- nothing written outside tmp_path ---
+    assert str(Path(report.log_path)).startswith(str(tmp_path))
+    assert all(str(p).startswith(str(base)) for p in _store_files(base))
+    assert (_REPO_ROOT / "data").exists() == before_data
+    assert (_REPO_ROOT / "artifacts").exists() == before_artifacts
+    assert (_BACKEND / "data").exists() == before_backend_data
