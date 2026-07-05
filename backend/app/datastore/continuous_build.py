@@ -37,6 +37,7 @@ __all__ = [
     "list_stored_contracts",
     "read_root_raw_frame",
     "build_continuous_from_store",
+    "serialize_continuous_build_result",
 ]
 
 
@@ -160,6 +161,7 @@ def build_continuous_from_store(
             "decision_date": ev.decision_date.isoformat(),
             "roll_reason": ev.roll_reason,
             "rule_used": _adjustment_str(ev.rule_used),
+            "metadata": dict(ev.metadata),  # JSON-safe (iso strings / ints / bools)
         }
         for ev in events
     ]
@@ -186,3 +188,31 @@ def build_continuous_from_store(
         output_path="",  # no persistence in this commit
     )
     return continuous, result
+
+
+def serialize_continuous_build_result(
+    result: ContinuousBuildResult, *, output_path: str = "", report_only: bool = True
+) -> dict:
+    """Return a plain, JSON-safe dict for a strict-JSON provenance report.
+
+    ``output_path`` / ``report_only`` describe what the caller actually did (the
+    result itself carries no persistence info), so the CLI passes the base-relative
+    (or user) path and whether continuous output was written.  Every value is a
+    string / int / bool / list / dict — no floats — so
+    ``json.dumps(..., allow_nan=False)`` can never emit ``NaN`` / ``Infinity``.
+    """
+    return {
+        "root_symbol": result.root_symbol,
+        "source": result.source,
+        "adjustment_method": result.adjustment_method,
+        "contracts": list(result.contracts),
+        "contract_version_hashes": dict(result.contract_version_hashes),
+        "raw_data_version_hash": result.raw_data_version_hash,
+        "continuous_config_hash": result.continuous_config_hash,
+        "rows": result.rows,
+        "start": result.start,
+        "end": result.end,
+        "roll_events": [dict(ev) for ev in result.roll_events],
+        "output_path": output_path,
+        "report_only": report_only,
+    }

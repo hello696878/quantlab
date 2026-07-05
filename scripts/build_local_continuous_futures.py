@@ -27,6 +27,7 @@ Exit code 0 on success; nonzero on invalid root/source/adjustment/build failure.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
@@ -36,6 +37,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "backend"))
 
 from app.datastore.continuous_build import (  # noqa: E402
     build_continuous_from_store,
+    serialize_continuous_build_result,
 )
 from app.datastore.store import RawFuturesStore  # noqa: E402
 from app.instruments import UnknownInstrumentError  # noqa: E402
@@ -90,6 +92,12 @@ def main(argv: list[str] | None = None) -> int:
     dest.add_argument(
         "--output-path", default=None, help="write the continuous frame to this CSV path"
     )
+    parser.add_argument(
+        "--report-json",
+        default=None,
+        help="write a strict-JSON provenance report to this path (does not itself "
+        "write continuous output)",
+    )
     args = parser.parse_args(argv)
 
     store = RawFuturesStore(args.base_dir, prefer_parquet=not args.no_parquet)
@@ -114,6 +122,10 @@ def main(argv: list[str] | None = None) -> int:
         _write_csv(continuous, out)
         written_path = str(out)
 
+    # report_only reflects whether CONTINUOUS OUTPUT was written — a report is
+    # metadata, not continuous output, so --report-json alone stays report-only.
+    report_only = not (args.write_store or args.output_path)
+
     roll_desc = ""
     if result.roll_events:
         ev = result.roll_events[0]
@@ -128,6 +140,16 @@ def main(argv: list[str] | None = None) -> int:
     print(f"continuous_config_hash={result.continuous_config_hash}")
     if written_path is not None:
         print(f"[WRITE] path={written_path}")
+
+    if args.report_json:
+        payload = serialize_continuous_build_result(
+            result, output_path=written_path or "", report_only=report_only
+        )
+        report_path = Path(args.report_json)
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(payload, allow_nan=False) + "\n", encoding="utf-8")
+        print(f"[REPORT] path={args.report_json}")
+
     print("RESULT: OK")
     return 0
 

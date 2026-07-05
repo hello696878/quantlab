@@ -14,6 +14,7 @@ Everything stays under `tmp_path`; no network; nothing written outside `tmp_path
 from __future__ import annotations
 
 import importlib.util
+import json
 import re
 from pathlib import Path
 
@@ -426,8 +427,6 @@ def test_cli_is_thin_and_clean():
     assert "build_continuous_from_store" in src
     assert "build_continuous_futures(" not in src   # the raw builder stays in the adapter
     assert "hashlib" not in src and "sha256" not in src
-    # not yet a report-JSON commit
-    assert "--report-json" not in src and "report_json" not in src
     # no network / forbidden pipeline imports
     assert not re.search(
         r"(?m)^\s*(from|import)\s+\S*\b(requests|urllib|httpx|socket|aiohttp)\b", src
@@ -435,3 +434,166 @@ def test_cli_is_thin_and_clean():
     assert not re.search(
         r"(?m)^\s*(from|import)\s+\S*(features|labels|ml_signal|research_cli)\b", src
     )
+
+
+# --------------------------------------------------------------------------- #
+# Commit 3 — strict-JSON provenance report (--report-json)
+# --------------------------------------------------------------------------- #
+
+_REQUIRED_REPORT_KEYS = {
+    "root_symbol", "source", "adjustment_method", "contracts",
+    "contract_version_hashes", "raw_data_version_hash", "continuous_config_hash",
+    "rows", "start", "end", "roll_events", "output_path", "report_only",
+}
+
+
+def _read_report(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def test_cli_report_json_report_only_writes_json_no_continuous(tmp_path, capsys):
+    store, base = _ingest_es_roll(tmp_path)
+    report = tmp_path / "reports" / "es.json"
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--report-json", str(report)))
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert f"[REPORT] path={report}" in out
+    assert "[WRITE]" not in out                       # report is not continuous output
+    assert report.exists()                            # parent dir created
+    assert not (base / "continuous").exists()         # no continuous store output
+    rec = _read_report(report)
+    assert rec["report_only"] is True and rec["output_path"] == ""
+
+
+def test_report_json_has_required_keys_and_values(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    report = tmp_path / "es.json"
+    _, result = build_continuous_from_store(store, source="csv_fixture", root="ES")
+    cli = _load_cli()
+    assert cli.main(_cli_args(base, "--report-json", str(report))) == 0
+    rec = _read_report(report)
+    assert _REQUIRED_REPORT_KEYS <= set(rec)
+    assert rec["root_symbol"] == "ES" and rec["source"] == "csv_fixture"
+    assert rec["adjustment_method"] == "ratio"
+    assert rec["contracts"] == ["ESM25", "ESU25"]
+    assert rec["rows"] == result.rows
+    assert rec["start"] == "2025-05-30" and rec["end"] == "2025-06-19"
+    # hashes match the adapter's result exactly
+    assert rec["continuous_config_hash"] == result.continuous_config_hash
+    assert rec["raw_data_version_hash"] == result.raw_data_version_hash
+    assert rec["contract_version_hashes"] == result.contract_version_hashes
+
+
+def test_report_json_roll_events_include_esm_to_esu(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    report = tmp_path / "es.json"
+    cli = _load_cli()
+    assert cli.main(_cli_args(base, "--report-json", str(report))) == 0
+    rec = _read_report(report)
+    assert len(rec["roll_events"]) == 1
+    ev = rec["roll_events"][0]
+    assert ev["from_contract"] == "ESM25" and ev["to_contract"] == "ESU25"
+    assert ev["roll_date"] and ev["rule_used"] and ev["decision_date"]
+    assert isinstance(ev["metadata"], dict)  # JSON-safe metadata present
+
+
+def test_report_json_contract_hashes_match_stored(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    report = tmp_path / "es.json"
+    cli = _load_cli()
+    assert cli.main(_cli_args(base, "--report-json", str(report))) == 0
+    rec = _read_report(report)
+    for contract in ("ESM25", "ESU25"):
+        expected = raw_data_version_hash(store.read_raw("ES", contract, "csv_fixture"))
+        assert rec["contract_version_hashes"][contract] == expected
+
+
+def test_report_json_no_nan_or_infinity_and_no_absolute_contract_paths(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    report = tmp_path / "es.json"
+    cli = _load_cli()
+    assert cli.main(_cli_args(base, "--report-json", str(report))) == 0
+    raw = report.read_text(encoding="utf-8")
+    assert "NaN" not in raw and "Infinity" not in raw
+    # no absolute contract paths anywhere (report has no per-contract paths at all)
+    rec = _read_report(report)
+    assert "raw/futures" not in raw or not Path(rec["output_path"]).is_absolute()
+
+
+def test_report_json_with_write_store_writes_both(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    report = tmp_path / "es.json"
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--write-store", "--report-json", str(report)))
+    assert rc == 0
+    # continuous store output exists AND the report exists
+    read_store = RawFuturesStore(base, prefer_parquet=False)
+    assert len(read_store.read_continuous("ES", "csv_fixture", "ratio")) > 0
+    rec = _read_report(report)
+    assert rec["report_only"] is False
+    assert rec["output_path"] == "continuous/futures/csv_fixture/ES/ratio.csv"
+    assert not Path(rec["output_path"]).is_absolute()
+
+
+def test_report_json_with_output_path_writes_both(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    out_csv = tmp_path / "out" / "cont.csv"
+    report = tmp_path / "es.json"
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--output-path", str(out_csv), "--report-json", str(report)))
+    assert rc == 0
+    assert out_csv.exists() and report.exists()
+    rec = _read_report(report)
+    assert rec["report_only"] is False
+    assert rec["output_path"] == str(out_csv)
+    assert not (base / "continuous").exists()  # output-path does not touch the store
+
+
+def test_report_json_alone_creates_no_continuous_store_output(tmp_path):
+    store, base = _ingest_es_roll(tmp_path)
+    report = tmp_path / "es.json"
+    cli = _load_cli()
+    assert cli.main(_cli_args(base, "--report-json", str(report))) == 0
+    assert not (base / "continuous").exists()
+
+
+def test_report_json_invalid_source_writes_no_report(tmp_path, capsys):
+    store, base = _ingest_es_roll(tmp_path)
+    report = tmp_path / "es.json"
+    cli = _load_cli()
+    rc = cli.main(["--base-dir", str(base), "--root-symbol", "ES", "--source", "nope",
+                   "--report-json", str(report)])
+    out = capsys.readouterr().out
+    assert rc == 1 and "RESULT: FAIL" in out
+    assert not report.exists()  # no report on failure
+
+
+def test_report_json_writes_only_under_tmp_path(tmp_path, monkeypatch):
+    before_data = (_REPO_ROOT / "data").exists()
+    before_artifacts = (_REPO_ROOT / "artifacts").exists()
+    monkeypatch.chdir(tmp_path)
+    store, base = _ingest_es_roll(tmp_path)
+    report = tmp_path / "reports" / "es.json"
+    cli = _load_cli()
+    assert cli.main(_cli_args(base, "--write-store", "--report-json", str(report))) == 0
+    assert str(report).startswith(str(tmp_path))
+    assert all(str(p).startswith(str(tmp_path)) for p in _store_files(base))
+    assert (_REPO_ROOT / "data").exists() == before_data
+    assert (_REPO_ROOT / "artifacts").exists() == before_artifacts
+
+
+def test_serialize_helper_is_strict_json_safe(tmp_path):
+    store, _ = _ingest_es_roll(tmp_path)
+    from app.datastore.continuous_build import serialize_continuous_build_result
+
+    _, result = build_continuous_from_store(store, source="csv_fixture", root="ES")
+    payload = serialize_continuous_build_result(result, output_path="x/y.csv", report_only=False)
+    text = json.dumps(payload, allow_nan=False)  # must not raise
+    assert "NaN" not in text and "Infinity" not in text
+    assert payload["output_path"] == "x/y.csv" and payload["report_only"] is False
+
+
+def test_continuous_build_module_still_invents_no_new_hash_after_serialize():
+    src = (_BACKEND / "app" / "datastore" / "continuous_build.py").read_text(encoding="utf-8")
+    assert "hashlib" not in src and "sha256" not in src
