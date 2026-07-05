@@ -52,6 +52,7 @@ import MicrostructureLabPanel from "@/components/MicrostructureLabPanel";
 import CryptoDerivativesLabPanel from "@/components/CryptoDerivativesLabPanel";
 import DefiRiskLabPanel from "@/components/DefiRiskLabPanel";
 import TokenomicsLabPanel from "@/components/TokenomicsLabPanel";
+import OnChainAnalyticsLabPanel from "@/components/OnChainAnalyticsLabPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -430,6 +431,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Tokenomics, Unlock Schedule & Treasury Risk Lab",
     subtitle:
       "Market cap vs FDV, float ratio, unlock schedules and dilution pressure, emission inflation and a real staking-yield approximation, treasury runway, holder concentration, a tokenomics risk-regime read, and unlock/treasury stress scenarios — deterministic static sample data, no live token prices or on-chain data, no wallets or smart-contract calls, not investment, trading, token, or venture advice.",
+  },
+  onchain: {
+    title: "On-Chain Flow, Exchange Reserve & Whale Concentration Lab",
+    subtitle:
+      "Exchange inflows/outflows and reserve ratios, active addresses, transfer volume, token velocity, an NVT-style valuation ratio, holder cohorts with a Gini-style concentration approximation, whale flows, an on-chain risk-regime read, and on-chain stress scenarios — deterministic static sample data, no live on-chain data or token prices, no wallets, RPC, or explorer APIs, not investment, trading, or token advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1009,6 +1015,7 @@ export default function HomePage() {
     { view: "cryptoderivatives", title: "Open Crypto Derivatives Lab", keywords: "crypto derivatives perpetual perp futures funding rate basis annualized carry cash and carry liquidation margin leverage btc eth sol bitcoin ethereum solana contango backwardation funding pnl" },
     { view: "defirisk", title: "Open DeFi Risk Lab", keywords: "defi decentralized finance stablecoin peg depeg lending borrow apy utilization kink interest rate model collateral health factor ltv loan to value liquidation threshold net apy carry usdc usdt dai aave protocol stress" },
     { view: "tokenomics", title: "Open Tokenomics Risk Lab", keywords: "tokenomics token unlock schedule vesting cliff dilution fdv fully diluted valuation market cap float ratio emission inflation staking real yield treasury runway burn holder concentration crypto fundamentals" },
+    { view: "onchain", title: "Open On-Chain Analytics Lab", keywords: "on-chain onchain exchange inflow outflow net flow exchange reserve active addresses transfer volume transaction count token velocity nvt whale concentration gini holder cohort crypto analytics" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1392,6 +1399,23 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("tokenomics"),
+    })),
+    ...(
+      [
+        ["Open On-Chain Analytics Lab", "onchain on-chain analytics lab exchange flow reserve whale concentration velocity nvt active addresses crypto"],
+        ["Exchange Reserve Lab", "exchange reserve tokens reserve ratio reserve value exchange balance crypto onchain"],
+        ["Net Exchange Flow Lab", "net exchange flow inflow outflow deposits withdrawals sell pressure accumulation exchange netflow"],
+        ["Whale Concentration Lab", "whale concentration top holder share top 10 50 100 whale net flow gini holder cohort distribution"],
+        ["Token Velocity Lab", "token velocity transfer volume circulating supply turnover activity onchain"],
+        ["NVT Activity Lab", "nvt ratio network value to transactions market cap transfer value valuation activity onchain"],
+        ["On-Chain Stress Scenario Lab", "onchain stress scenario inflow spike outflow wave whale deposit accumulation address slowdown transfer collapse velocity burst concentration shock severe combo"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `onchain-${title}`,
+      group: "On-Chain Analytics Lab",
+      title,
+      keywords,
+      run: () => handleNav("onchain"),
     })),
     ...(
       [
@@ -1966,6 +1990,9 @@ export default function HomePage() {
 
         {/* ── Tokenomics, Unlock Schedule & Treasury Risk Lab ──────────── */}
         {view === "tokenomics" && <TokenomicsLabPanel />}
+
+        {/* ── On-Chain Flow, Exchange Reserve & Whale Concentration Lab ── */}
+        {view === "onchain" && <OnChainAnalyticsLabPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

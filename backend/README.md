@@ -34,6 +34,8 @@ backend/
 │   ├── defi_risk_routes.py       DeFi Yield, Stablecoin Peg & Lending Risk Lab API routes
 │   ├── tokenomics/         static-sample tokenomics/unlock/treasury analytics (models/sample/service)
 │   ├── tokenomics_routes.py      Tokenomics, Unlock Schedule & Treasury Risk Lab API routes
+│   ├── onchain_analytics/  static-sample on-chain flow/reserve/whale analytics (models/sample/service)
+│   ├── onchain_analytics_routes.py  On-Chain Flow, Exchange Reserve & Whale Concentration Lab API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -57,7 +59,8 @@ backend/
 │   ├── test_microstructure.py    Market Microstructure & Execution Lab analytics/API/validation tests
 │   ├── test_crypto_derivatives.py  Crypto Perpetual Funding & Basis Lab analytics/API/validation tests
 │   ├── test_defi_risk.py         DeFi Yield, Stablecoin Peg & Lending Risk Lab analytics/API/validation tests
-│   └── test_tokenomics.py        Tokenomics, Unlock Schedule & Treasury Risk Lab analytics/API/validation tests
+│   ├── test_tokenomics.py        Tokenomics, Unlock Schedule & Treasury Risk Lab analytics/API/validation tests
+│   └── test_onchain_analytics.py On-Chain Flow, Exchange Reserve & Whale Concentration Lab analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -323,6 +326,32 @@ burn ≥ 0, holder shares in [0, 1] with **`top_1` ≤ `top_5` ≤ `top_10`**; n
 NaN/Infinity. Runway months are capped finite when the (net) burn is ~zero; the
 pressure and concentration scores are documented deterministic heuristics; unlock
 schedules use deterministic sample day offsets (no live clock). Scenarios are
+hypothetical deterministic shocks — not forecasts and not advice. Every division
+is guarded so all outputs are finite.
+
+---
+
+### On-Chain Flow, Exchange Reserve & Whale Concentration Lab Endpoints
+
+Deterministic static-sample crypto on-chain analytics (Phase 29.0). No live
+on-chain data, no live token prices, no wallets, no blockchain RPC,
+smart-contract, explorer, or exchange API calls, no network calls, educational
+only — not investment, trading, token, legal, tax, or risk-management advice,
+and not a production due-diligence engine.
+
+| Endpoint | Description |
+|---|---|
+| `GET /onchain-analytics/sample` | Five deterministic sample networks/tokens (BTC-like, ETH-like, L1 exchange reserve, DeFi governance whale, exchange-inflow stress), each with an exchange-flow snapshot, 24h activity metrics, six holder cohorts, and a whale-flow snapshot |
+| `POST /onchain-analytics/analyze` | Net exchange flow (& % of circulating) and reserve ratio / 24h reserve change, activity metrics (active addresses, transfer volume/value, tx count, average tx value, token velocity), an NVT-style ratio with a low/moderate/elevated/high status, holder-cohort distribution, whale net flow, a documented concentration score + Gini-style cohort approximation, an on-chain risk-regime classification (balanced / inflow pressure / outflow accumulation / whale concentration / low-activity-high-valuation / high-velocity / severe), and ten on-chain stress scenarios |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): price and
+circulating supply positive, reserves / flows / activity counts / cohort values
+≥ 0, holder shares in [0, 1] with **`top_10` ≤ `top_50` ≤ `top_100`**; no
+NaN/Infinity. The NVT-style ratio is capped finite when 24h transfer value is
+~zero; whale inflow means whale deposits onto exchanges (potential sell-side
+pressure); the concentration score (0.5·top10 + 0.3·top50 + 0.2·top100) and the
+Gini-style score (cohort-level Lorenz-curve approximation that understates
+wallet-level inequality) are documented deterministic heuristics. Scenarios are
 hypothetical deterministic shocks — not forecasts and not advice. Every division
 is guarded so all outputs are finite.
 

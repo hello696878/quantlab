@@ -108,6 +108,8 @@ The frontend calls relative URLs; Next.js rewrites them to the backend transpare
 | `POST /api/defi-risk/analyze` | `POST /defi-risk/analyze` |
 | `GET /api/tokenomics/sample` | `GET /tokenomics/sample` |
 | `POST /api/tokenomics/analyze` | `POST /tokenomics/analyze` |
+| `GET /api/onchain-analytics/sample` | `GET /onchain-analytics/sample` |
+| `POST /api/onchain-analytics/analyze` | `POST /onchain-analytics/analyze` |
 
 The **Volatility Surface & Variance Swap Lab** (`VolatilityLabPanel`, view
 `volatility`) loads a deterministic sample option chain, lets you edit the
@@ -179,6 +181,21 @@ illustrative sample data — no live token prices or on-chain data, no wallets, 
 blockchain RPC or smart-contract calls, documented heuristic scores, not a
 production due-diligence engine, not real-time tokenomics analytics, not
 investment / trading / token / venture advice.
+
+The **On-Chain Flow, Exchange Reserve & Whale Concentration Lab**
+(`OnChainAnalyticsLabPanel`, view `onchain`) loads five deterministic sample
+networks/tokens (BTC-like, ETH-like, L1 exchange reserve, DeFi governance whale,
+exchange-inflow stress), lets you select one and edit the price / supply /
+reserve / flow / activity assumptions, and re-analyses live via
+`/api/onchain-analytics/analyze` (net exchange flow and reserve ratio, active
+addresses, transfer volume, token velocity, an NVT-style ratio with status,
+holder-cohort distribution, whale net flow, a concentration score + Gini-style
+cohort approximation, an on-chain risk-regime pill, and ten on-chain stress
+scenarios). Its formulas render as local LaTeX (see the shared formula note
+below). Static illustrative sample data — no live on-chain data or token prices,
+no wallets, no blockchain RPC, smart-contract, explorer, or exchange APIs,
+documented heuristic scores, not a production due-diligence engine, not
+real-time on-chain analytics, not investment / trading / token advice.
 
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract

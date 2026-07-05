@@ -75,6 +75,7 @@ from app.microstructure_routes import router as microstructure_router
 from app.crypto_derivatives_routes import router as crypto_derivatives_router
 from app.defi_risk_routes import router as defi_risk_router
 from app.tokenomics_routes import router as tokenomics_router
+from app.onchain_analytics_routes import router as onchain_analytics_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -404,6 +405,9 @@ app.include_router(defi_risk_router)
 
 # Tokenomics, Unlock Schedule & Treasury Risk Lab (Phase 28.0) — static sample API.
 app.include_router(tokenomics_router)
+
+# On-Chain Flow, Exchange Reserve & Whale Concentration Lab (Phase 29.0) — static sample API.
+app.include_router(onchain_analytics_router)
 
 
 # ---------------------------------------------------------------------------

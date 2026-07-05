@@ -1677,6 +1677,53 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 29.0 — On-Chain Flow, Exchange Reserve & Whale Concentration Lab v1 ✅
+
+- **New deterministic educational crypto on-chain analytics lab.** Static sample
+  data only; no live on-chain data, no live token prices, no wallets, no
+  blockchain RPC, smart-contract, explorer, or exchange API calls, no
+  exchange/broker integration, no trading, no API keys, no scraping, not
+  investment / trading / token advice, not a production due-diligence engine. No
+  existing module changed (separate package + view).
+- Backend: new `app/onchain_analytics/` package (`models.py` strict Pydantic v2
+  with `extra="forbid"` + `FiniteFloat`, cross-field `top_10 ≤ top_50 ≤ top_100`
+  holder-share check; `sample.py` five deterministic networks/tokens — BTC-like,
+  ETH-like, L1 exchange reserve, DeFi governance whale, exchange-inflow stress —
+  each with an exchange-flow snapshot, 24h activity metrics, six holder cohorts,
+  and a whale-flow snapshot; `service.py` pure analytics) +
+  `app/onchain_analytics_routes.py` (`GET /onchain-analytics/sample`,
+  `POST /onchain-analytics/analyze`), wired via `include_router`.
+- Analytics: market cap, net exchange flow (& % of circulating), exchange reserve
+  ratio and 24h reserve-change approximation, active addresses / transfer volume /
+  transaction count / average tx value, token velocity (`volume/S_circ`),
+  NVT-style ratio (`MC / (P·volume)`, capped finite at ~zero transfer value with a
+  low/moderate/elevated/high status), holder-cohort distribution (balance shares,
+  average balances), whale net flow (whale inflow = deposits onto exchanges), a
+  documented concentration score (0.5·top10 + 0.3·top50 + 0.2·top100), a
+  **Gini-style cohort-level Lorenz approximation** (bounded [0,1), documented as
+  understating wallet-level inequality), a deterministic risk-regime
+  classification (balanced / exchange inflow pressure / outflow accumulation /
+  whale concentration / low-activity-high-valuation / high-velocity / severe with
+  ≥3 triggers), and ten on-chain stress scenarios. The five samples land on five
+  distinct regimes. Every division guarded → no NaN/Inf.
+- Frontend: new `OnChainAnalyticsLabPanel` (view `onchain`) — hero, sample
+  selector + editable assumptions (live re-analyze), key-metric cards + regime
+  pill, exchange-flow and activity/valuation panels, holder-distribution table,
+  whale/concentration panel, regime panel, scenario-stress table, and a shared
+  `FormulaReference` (Exchange flow / Activity & valuation / Whale concentration
+  groups); new `lib/onchainAnalytics.ts` types + API client. Wired into Sidebar,
+  Dashboard card ("On-chain analytics" badge), and Command Palette (Open On-Chain
+  Analytics Lab, Exchange Reserve Lab, Net Exchange Flow Lab, Whale Concentration
+  Lab, Token Velocity Lab, NVT Activity Lab, On-Chain Stress Scenario Lab).
+- 32 new backend tests (deterministic, no network) — full suite green
+  (**2569 passed**, and the repo-root `artifacts/` dir does not exist after the
+  run); `npx tsc --noEmit` clean; no frontend build run (per instructions). Docs:
+  `backend/README.md`, `frontend/README.md`, `PROJECT_OVERVIEW.md`,
+  `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static sample, educational — no live
+  on-chain data or token prices, no wallets/RPC/explorer/exchange APIs,
+  documented heuristic scores, not a production due-diligence engine, not
+  investment / trading / token advice.**
+
 ### Phase 28.0 — Tokenomics, Unlock Schedule & Treasury Risk Lab v1 ✅
 
 - **New deterministic educational crypto fundamental-risk analytics lab.** Static

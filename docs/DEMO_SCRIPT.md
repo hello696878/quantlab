@@ -504,6 +504,28 @@ Return to the Command Center's **Platform Direction** panel (or open
   calls, documented heuristic scores, **not** a production due-diligence engine,
   **not** real-time tokenomics analytics, not investment / trading / token / venture
   advice.
+- **On-Chain Flow, Exchange Reserve & Whale Concentration Lab (29.0)** — open from
+  the sidebar (or Ctrl/Cmd+K → "Open On-Chain Analytics Lab" / "Whale Concentration
+  Lab"). Switch samples (BTC On-Chain, ETH On-Chain, L1 Exchange Reserve, DeFi
+  Governance Whale, Exchange Inflow Stress); the exchange-flow snapshot, activity
+  metrics, holder cohorts, and whale flows load and analyse automatically. Show the
+  key-metric cards (reserve ratio, net exchange flow & % of circulating, active
+  addresses, velocity, NVT, whale net flow, concentration) and the **regime** pill —
+  the five samples land on five different regimes (Balanced activity, High-velocity
+  activity, Exchange outflow / accumulation, Whale concentration risk, Exchange
+  inflow pressure). Walk the **exchange flow** panel (positive net flow = tokens
+  moving onto exchanges), the **activity & valuation** panel (velocity, NVT-style
+  ratio + status), the **holder distribution** table (cohort shares, average
+  balances), the **whale & concentration** panel (whale net flow, top-10/50/100
+  shares, concentration + Gini-style scores), and the **stress scenarios** (inflow
+  spike, outflow wave, whale deposit pressure, whale accumulation, address slowdown,
+  transfer collapse — watch NVT jump and the regime flip to Low activity / high
+  valuation — velocity burst, concentration shock, severe combo). Edit price /
+  supply / reserve / flows and watch everything re-compute. The **Formulas & notes**
+  render as **LaTeX** (KaTeX, local — no CDN). Emphasise: static illustrative sample
+  data — **not** live on-chain data or token prices, no wallets / RPC / explorer /
+  exchange APIs, documented heuristic scores, **not** live whale tracking, **not** a
+  production due-diligence engine, not investment / trading / token advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).
