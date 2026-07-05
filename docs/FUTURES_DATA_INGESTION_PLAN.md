@@ -320,6 +320,10 @@ Prove the whole path with data we invent, so no download questions arise.
 > per-root summary of the normalized output (metadata lookup + one-contract
 > first-close→last-close P&L, direct == tick-based). This closes the local,
 > synthetic-only workflow (validate → normalize → report) as **v0.1 stable**.
+> **Planned (design approved 2026-07-05):** the remaining store-backed ingest
+> CLI + append-only ingestion log — the open part of I2 described below — is
+> planned as **Phase 7**; see `docs/AI_QUANT_ARCHITECTURE.md` **Appendix H** for
+> the full design, test plan, and commit plan. No code is implemented yet.
 
 Same loader generalized to files a human places under
 `C:\quantlab\data\incoming\futures\csv_local\`, plus operational trimmings:

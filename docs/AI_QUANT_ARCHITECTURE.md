@@ -1836,3 +1836,350 @@ no pickle / joblib; no DB registry / MLflow / W&B.
   `main([...])`; the e2e test drives `main([...])` in-process (not via a shell).
 - **Local file-based registry only** (no DB / remote tracking); CSV frames (no
   parquet engine installed).
+
+---
+
+## Appendix H — Phase 7 Local Futures Data Ingestion Plan
+
+> **Status: design only (Commit 0).** Nothing in this appendix is implemented by
+> this appendix. It records the approved Phase 7 plan so implementation lands in
+> tiny, testable commits on top of the storage/validation machinery that already
+> exists. Phase 7 completes the **store-backed** local CSV ingestion step that
+> `docs/FUTURES_DATA_INGESTION_PLAN.md` §9 lists as the open remainder of
+> **Ingestion Phase I2**. No code, script, data, or test is created by Commit 0.
+
+### H.1 Scope
+
+**Goal:** close the one missing link in the local futures path — take
+already-validated local CSV bars and land them in the canonical **store raw
+namespace** (`RawFuturesStore.write_raw`), with read-back verification, content
+hashing, and an append-only ingestion log.
+
+**Pipeline:**
+
+```text
+local CSV → load_futures_bars_csv → daily_bars_to_frame → validate_raw_futures
+        → RawFuturesStore.write_raw → read_raw → verify(rows + key cols + hash)
+        → append ingestion-log line (JSONL)
+```
+
+**In scope**
+
+- A reusable orchestrator (`app/datastore/ingest.py`) plus a **thin** CLI
+  (`scripts/ingest_local_futures_csv.py`).
+- Per-contract `raw_data_version_hash` — **reuse the existing function**, do not
+  invent a new one.
+- Duplicate/overwrite policy with an explicit guard (write_raw overwrites
+  silently — Phase 7 adds the guard *above* it; default **reject**).
+- Append-only JSONL ingestion log, path-configurable, gitignored.
+
+### H.2 Explicit exclusions (locked)
+
+- **No network / vendor / yfinance / IBKR / live data.**
+- **No continuous futures construction** — the `continuous/futures` namespace is
+  untouched (that is Ingestion I4, still forbidden).
+- **No features / labels / ML pipeline.**
+- **No Research CLI real-data mode.**
+- **No frontend, no DB, no cloud storage.**
+- **No committing data artifacts.**
+- No changes to the validation logic in `store.py` / `daily_bar.py` /
+  `csv_fixtures.py` (Phase 7 *consumes* them). **No new dependencies.**
+
+### H.3 Locked decisions
+
+1. Phase 7 completes **store-backed local CSV ingestion only**.
+2. Reuse existing building blocks: `FuturesDailyBar`, `load_futures_bars_csv`,
+   `validate_raw_futures`, `RawFuturesStore`, `raw_data_version_hash`.
+3. **Do not invent a new raw hash function** — reuse `raw_data_version_hash`.
+4. Do not modify continuous futures construction.
+5. Do not start features / labels / ML.
+6. Do not add a Research CLI real-data mode yet.
+7. No network / vendor / yfinance / IBKR / live-data support.
+8. Tests never write to real data paths.
+9. Tests use `tmp_path` only.
+10. `data/` remains gitignored; no data artifacts are committed.
+11. Duplicate ingest **defaults to reject** unless `--overwrite` is explicit.
+12. Ingestion log is **append-only JSONL** and **path-configurable**.
+13. `logs/` and `data/` are never committed.
+14. The CLI is **thin** and **local-file only**.
+15. Any real data path is **user-provided**, never hard-coded.
+16. Do not confuse the two output namespaces:
+    - `normalize_local_futures_csv.py` writes **processed CSV** to
+      `data/processed/futures_daily/`;
+    - Phase 7 ingest writes the **RawFuturesStore raw namespace** at
+      `<base_dir>/raw/futures/<source>/<root>/<contract>`.
+
+### H.4 Existing groundwork Phase 7 reuses
+
+| File | What Phase 7 uses | Notes |
+|---|---|---|
+| `backend/app/datastore/daily_bar.py` | `FuturesDailyBar` fields → the 12 canonical columns | frozen, registry-aware; `open_interest: float\|None` |
+| `backend/app/datastore/csv_fixtures.py` | `load_futures_bars_csv(path) -> list[FuturesDailyBar]` | already enforces §6 cross-checks: **month-in-cycle, expiry == spec, timezone == spec**, dup `(contract,timestamp)`, ISO parsing; raises `FixtureFormatError` |
+| `backend/app/datastore/store.py` | `validate_raw_futures(df)`, `raw_data_version_hash(df)`, `RawFuturesStore(base_dir, prefer_parquet).write_raw(df) -> list[Path]`, `.read_raw(root, contract, source) -> df`, `.raw_path/.raw_root`, `REQUIRED_COLUMNS` | `write_raw` validates + groups by `(source, root, contract)`, one file each; parquet-preferred, CSV fallback via `.storage_format` |
+| `scripts/check_local_futures_csv.py` | pattern: read-only validate + per-file/per-symbol summary, exit 0/nonzero | Phase 7 CLI mirrors its reporting/exit style |
+| `scripts/normalize_local_futures_csv.py` | pattern: "validate everything first, write nothing unless all pass"; path-collision guards; `reconfigure(errors="backslashreplace")` | Phase 7 reuses the **fail-first-then-write** discipline; differs only in *destination* (store raw namespace, not processed CSV) |
+| `scripts/report_local_futures_csv.py`, `run_local_futures_buyhold_report.py` | downstream read-only reporting (unchanged) | not modified in Phase 7 |
+| `docs/FUTURES_DATA_INGESTION_PLAN.md` | §5 schema, §6 metadata rules, §7 on-disk layout, §8 validation layers, §9 **I2** | Phase 7 is I2's open remainder (store-backed ingest CLI + ingestion log) |
+| `backend/tests/fixtures/futures_csv/{esm25,nqm25}.csv` | ready-made synthetic ES + NQ per-contract fixtures | reused for single- and multi-contract tests |
+
+### H.5 Proposed store-backed ingestion design
+
+**Structure:** business logic in a module, thin CLI on top — mirrors the Research
+CLI pattern so the orchestrator is unit-testable without a subprocess. This is a
+small, deliberate deviation from the self-contained `normalize_*.py` script style,
+chosen for testability.
+
+**New module `backend/app/datastore/ingest.py`:**
+
+```python
+def daily_bars_to_frame(bars: list[FuturesDailyBar]) -> pd.DataFrame:
+    """Build a REQUIRED_COLUMNS frame from validated bars (open_interest None -> NaN).
+       Does NOT re-validate; callers pass it to validate_raw_futures / write_raw."""
+
+@dataclass(frozen=True)
+class ContractIngestResult:
+    root_symbol: str
+    contract_symbol: str
+    source: str
+    rows: int
+    version_hash: str
+    path: str            # basename / store-relative only — never absolute in logs/tests
+
+@dataclass(frozen=True)
+class IngestReport:
+    input_files: list[str]
+    base_dir: str
+    roots: list[str]
+    contracts: list[ContractIngestResult]
+    rows_written: int
+    warnings: list[str]
+
+def ingest_local_futures_csv(
+    csv_paths: Sequence[str | Path],
+    *,
+    base_dir: str | Path,
+    source: str | None = None,     # None => keep each file's source column; else override all rows
+    overwrite: bool = False,
+    prefer_parquet: bool = True,
+    log_path: str | Path | None = None,
+) -> IngestReport: ...
+```
+
+**Orchestrator algorithm (fail-first, then write):**
+
+1. Collect input CSV paths (explicit files; reject empty/missing).
+2. **Load + validate all** via `load_futures_bars_csv` (this already does the §6
+   cross-checks). Any `FixtureFormatError` → abort, write nothing.
+3. Concatenate records → `daily_bars_to_frame(all_bars)`; if `source` is given,
+   override the `source` column on every row.
+4. `norm = validate_raw_futures(frame)` (dedup + normalize; cross-file duplicate
+   `(contract,timestamp)` caught here as `RawSchemaError`).
+5. Group `norm` by `(source, root_symbol, contract_symbol)`.
+6. **Duplicate guard (Phase 7's own):** for each group compute the target
+   `store.raw_path(...)`; if it exists **and not `overwrite`** → abort with a
+   clear error, write nothing. (Necessary because `write_raw` overwrites
+   silently.)
+7. `store.write_raw(norm)` → written paths.
+8. **Read-back verify** each group: `store.read_raw(root, contract, source)` and
+   assert `len == group_len`, key columns (`timestamp, contract_symbol,
+   root_symbol, close`) equal, and
+   `raw_data_version_hash(readback) == raw_data_version_hash(group)`. Any
+   mismatch → raise (round-trip invariant broken).
+9. Build `IngestReport`; append one ingestion-log line (H.6).
+10. Return the report.
+
+**`--source` semantics:** optional. If given, it **overrides** the `source`
+column on every loaded row (operator-declared provenance / store namespace,
+recommended `csv_local`). If omitted, the file's own `source` value(s) are used
+as-is (`write_raw` groups by source, so mixed sources each land in their own
+namespace). Overriding `source` is safe — validation only requires it be
+non-empty.
+
+### H.6 CLI design — `scripts/ingest_local_futures_csv.py`
+
+Thin argparse wrapper importing the orchestrator; bootstraps `backend` onto
+`sys.path` like `normalize_local_futures_csv.py`. `main(argv) -> int`;
+`raise SystemExit(main())`.
+
+| Flag | Meaning |
+|---|---|
+| `paths...` (positional) | one or more local CSV files |
+| `--base-dir` (required) | `RawFuturesStore` base dir (raw lands under `<base>/raw/futures/...`) |
+| `--source` | optional; overrides source column / store namespace (recommend `csv_local`) |
+| `--overwrite` | replace existing contract files (default: refuse + nonzero exit) |
+| `--log-path` | ingestion-log path (default `<base-dir>/logs/futures_ingest.jsonl`) |
+| `--no-parquet` | force CSV fallback (testing / parity) |
+
+Prints per-contract `[WRITE] root/contract rows=… hash=…` and a `RESULT: OK/FAIL`
+line; returns **0** on success, **nonzero** on any validation / guard / verify
+failure. Local files only; no network.
+
+### H.7 Ingestion log design — `data/logs/futures_ingest.jsonl`
+
+Append-only; **one JSON object per line** (one line per ingest invocation).
+Default path `<base_dir>/logs/futures_ingest.jsonl` (logs sit *beside* `raw/`,
+never inside it — plan §7). Overridable via `--log-path` / `log_path=`.
+
+```json
+{
+  "schema_version": 1,
+  "timestamp": "2026-07-05T12:34:56+00:00",
+  "source": "csv_local",
+  "input_files": ["esm25.csv", "nqm25.csv"],
+  "base_dir": "<base_dir as given>",
+  "roots": ["ES", "NQ"],
+  "contracts_written": 2,
+  "rows_written": 20,
+  "contracts": [
+    {"root_symbol": "ES", "contract_symbol": "ESM25", "rows": 10, "version_hash": "…"},
+    {"root_symbol": "NQ", "contract_symbol": "NQM25", "rows": 10, "version_hash": "…"}
+  ],
+  "warnings": [],
+  "git_commit": "03a1b56"
+}
+```
+
+**Rules:**
+
+- **Append-only:** open mode `"a"`, one `json.dumps(record) + "\n"` per run;
+  never rewrite/truncate. Create the parent dir if missing.
+- **Path configurable**, defaulting under `base_dir`; **tests pass `tmp_path`**.
+- **Never committed:** lives under `data/` (gitignored); tests write under
+  `tmp_path` only.
+- `git_commit`: best-effort `git rev-parse --short HEAD`; `null` if unavailable
+  (never fail the ingest on this).
+- `input_files` stores **basenames only** (no absolute paths) so records are
+  host-agnostic; `base_dir` is echoed as-given but tests only assert the tmp value
+  they passed.
+- `timestamp` is the wall-clock ingest time (UTC ISO) — the one non-deterministic
+  field; tests assert presence/parse, not value.
+- The log line is written **after** a successful verify, so a failed ingest leaves
+  no log line.
+
+### H.8 Hash / provenance design
+
+- **Reuse `raw_data_version_hash(df)`** from `store.py` — do **not** invent a new
+  hash. Per contract: filter `norm` to the `(root, contract)` group and call
+  `raw_data_version_hash(group)`.
+- **What it hashes:** the *canonical normalized rows* — `validate_raw_futures`
+  sorts by `(contract_symbol, timestamp)`, formats prices `.12g`, volume as int,
+  `open_interest` blank when NaN, strings stripped, then a `\n`-terminated CSV of
+  `REQUIRED_COLUMNS` → `sha256`. Content-addressed and **order-independent**.
+- **Determinism:** fixed float format, fixed column order, fixed line terminator,
+  UTC ISO timestamps — no locale/timezone/OS dependence. Same bars ⇒ same hash on
+  every machine and run. The read-back check
+  (`hash(readback) == hash(written)`) proves the store round-trip preserves
+  content.
+- **Relation to `continuous_config_hash`:** different layers, must not be
+  conflated. `raw_data_version_hash` is a *content* hash of raw per-contract bars
+  (the ingestion layer). `continuous_config_hash` is a *config/provenance* hash of
+  continuous-construction parameters and the root of the downstream chain
+  (`continuous → feature → label → dataset → model → train_run`). Phase 7 touches
+  **only** `raw_data_version_hash`; it neither computes nor depends on
+  `continuous_config_hash`. Wiring the raw hash into the continuous provenance
+  chain is deferred (Ingestion I4).
+
+### H.9 Safety and data rules
+
+- **Local files only** — inputs are explicit local CSV paths; the loader opens
+  read-only and never mutates inputs. **No network import anywhere** (guard test).
+- **`data/` stays gitignored** (`.gitignore` `data/` and `*.parquet`; verified via
+  `git check-ignore`). Real ingests land under `data/`; nothing under it is ever
+  committed.
+- **Tests use synthetic fixtures + `tmp_path` only** — reuse
+  `fixtures/futures_csv/*.csv`; all `base_dir` and `--log-path` point to
+  `tmp_path`.
+- **No absolute paths in committed docs/tests** — the log stores basenames; tests
+  assert on tmp values they created, never a hard-coded `C:\…`.
+- **No writes outside `tmp_path` in tests** — asserted by scanning that neither
+  repo-root `data/` nor `backend/data/` gains files.
+- **Clear, loud errors** (all → nonzero exit, nothing written): invalid CSV
+  shape/values → `FixtureFormatError`; off-cycle contract / expiry ≠ spec /
+  timezone ≠ spec → already raised by `load_futures_bars_csv` (§6); cross-file
+  duplicate `(contract,timestamp)` → `RawSchemaError`; existing contract file
+  without `--overwrite` → explicit `DuplicateIngestError` (Phase 7's guard).
+
+### H.10 Test plan — `backend/tests/test_ingest_local_futures_csv.py`
+
+Module-level (import orchestrator) + a few CLI cases. All under `tmp_path`.
+
+| # | Test | Asserts |
+|---|---|---|
+| 1 | ingest single `esm25.csv` into `RawFuturesStore(tmp_path)` | returns `IngestReport`; 1 contract; `store.raw_path(ES,ESM25,source)` exists |
+| 2 | ingest `esm25.csv` + `nqm25.csv` | 2 roots, 2 contracts; both files written |
+| 3 | read-back row count matches | `len(store.read_raw(ES,ESM25,source)) == input rows` (both formats via `--no-parquet`) |
+| 4 | `raw_data_version_hash` stable | hash(read-back) == hash(written group); re-ingest (overwrite) yields identical hash |
+| 5 | log jsonl appended | `tmp/logs/futures_ingest.jsonl` exists; **two** ingests ⇒ **2 lines**; each `json.loads`-parses; keys present; `contracts[*].version_hash` truthy |
+| 6 | duplicate ingest, no `--overwrite` | raises `DuplicateIngestError` / CLI nonzero; original file unchanged (hash pre == post); **no** log line added |
+| 6b | duplicate ingest **with** `--overwrite` | succeeds; deterministic identical content |
+| 7 | invalid CSV rejected | malformed fixture → `FixtureFormatError`; nothing written; nonzero exit |
+| 8 | off-cycle contract rejected | off-cycle month → error (loader §6); nothing written |
+| 9 | expiry mismatch rejected | wrong expiry → error (loader §6); nothing written |
+| 10 | no writes outside `tmp_path` | repo-root `data/` and `backend/data/` gain no files |
+| 11 | no repo-root data artifacts | `store.base_dir` under tmp; nothing under CWD/repo root |
+| 12 | no network | regex-guard: orchestrator + CLI source contain no `requests/urllib/httpx/socket/aiohttp` imports |
+| 13 | CLI exit codes | valid → `main(...) == 0`; invalid / duplicate-without-overwrite → nonzero |
+| 14 | `daily_bars_to_frame` shape | frame has exactly `REQUIRED_COLUMNS`; `open_interest` None → NaN; `validate_raw_futures` accepts it |
+
+Malformed fixtures for 7–9 are synthesized inside the test from a good template
+into `tmp_path` (no new committed fixtures required).
+
+### H.11 Commit plan
+
+**Commit 0 — Appendix H, doc-only** *(this commit)*
+- *Objective:* record the approved Phase 7 plan as this appendix (+ optional I2
+  status note in `FUTURES_DATA_INGESTION_PLAN.md`).
+- *Files:* `docs/AI_QUANT_ARCHITECTURE.md` (+ optional `FUTURES_DATA_INGESTION_PLAN.md`).
+- *Tests:* none.
+- *Acceptance:* doc-only; no code touched; scope/exclusions match this plan.
+
+**Commit 1 — ingestion helpers + hash design**
+- *Objective:* `app/datastore/ingest.py` with `daily_bars_to_frame`, the result
+  dataclasses, and the hash/verify helpers (no CLI, no log yet).
+- *Files:* `backend/app/datastore/ingest.py`, export in `datastore/__init__.py`,
+  `backend/tests/test_ingest_local_futures_csv.py` (tests 14, 3/4 partial).
+- *Tests:* frame shape/dtypes; `validate_raw_futures` accepts the frame;
+  per-contract hash equals `raw_data_version_hash(group)`.
+- *Acceptance:* helpers deterministic; no store writes yet; green.
+
+**Commit 2 — store-backed ingest orchestrator + thin CLI**
+- *Objective:* `ingest_local_futures_csv(...)` (load → validate → write_raw →
+  read-back verify → overwrite guard) and the thin
+  `scripts/ingest_local_futures_csv.py`.
+- *Files:* `backend/app/datastore/ingest.py` (orchestrator),
+  `scripts/ingest_local_futures_csv.py`, tests.
+- *Tests:* 1, 2, 3 (both formats), 6/6b, 7, 8, 9, 10, 11, 13 — **no log yet**.
+- *Acceptance:* single + multi-contract ingest writes to store raw namespace;
+  read-back matches; duplicate guard works; invalid/off-cycle/expiry rejected;
+  exit codes correct; nothing outside `tmp_path`.
+
+**Commit 3 — append-only ingestion log**
+- *Objective:* JSONL log writer wired into the orchestrator + `--log-path`.
+- *Files:* `backend/app/datastore/ingest.py` (log writer),
+  `scripts/ingest_local_futures_csv.py` (flag), tests.
+- *Tests:* 5 (append / 2-lines / parse / keys), 12 (no-network guard incl. log
+  path), re-assert 10/11 with the log under `tmp_path`.
+- *Acceptance:* append-only verified; `schema_version` + required keys present;
+  `git_commit` best-effort; log defaults under `base_dir`, gitignored.
+
+**Commit 4 — e2e synthetic ingest + as-built docs**
+- *Objective:* one end-to-end test (two fixtures → ingest → read-back → hash → 1
+  log line) and an Appendix H "as-built" update.
+- *Files:* `backend/tests/test_ingest_local_futures_csv.py` (e2e),
+  `docs/AI_QUANT_ARCHITECTURE.md`.
+- *Tests:* full-path e2e determinism + provenance.
+- *Acceptance:* e2e green; docs match shipped behavior; full backend suite green.
+
+### H.12 Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Accidentally committing `data/` | already gitignored (`data/`, `*.parquet`; `git check-ignore` confirmed); tests never write under repo root |
+| Writing to a real data path in tests | every test passes `base_dir=tmp_path` and `log_path=tmp_path/...`; tests 10/11 assert repo-root `data/` / `backend/data/` gain nothing |
+| Hash nondeterminism | reuse `raw_data_version_hash` (fixed `.12g` floats, fixed column order/line-terminator, UTC ISO); read-back-hash-equality test |
+| **Duplicate ingest overwriting data silently** | `write_raw` overwrites silently → Phase 7 adds a pre-write existence guard; default **reject**, require explicit `--overwrite`; tests 6 / 6b |
+| Schema drift between normalize and store | single source of truth: both go through `validate_raw_futures` / `REQUIRED_COLUMNS`; `daily_bars_to_frame` emits exactly those columns |
+| Confusing processed CSV output with store raw namespace | Phase 7 writes **only** via `RawFuturesStore.write_raw` into `<base>/raw/futures/<source>/<root>/<contract>`; it does **not** touch `data/processed/futures_daily/` (that is `normalize_*`'s output) |
+| Jumping early to continuous / ML | hard exclusion: `continuous/futures` untouched; no `features`/`labels`/`ml_signal` imports (a guard test can assert this) |
+| CSV-vs-parquet environment divergence | store has explicit CSV fallback (`storage_format`); tests run **both** paths (`--no-parquet`) |
+| Log growth / partial-write on crash | one line per invocation, append-only; written only **after** successful verify, so a failed ingest leaves no line |
