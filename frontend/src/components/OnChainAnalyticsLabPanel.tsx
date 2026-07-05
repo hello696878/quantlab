@@ -20,6 +20,9 @@ import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
 import FormulaReference from "@/components/math/FormulaReference";
 import type { FormulaGroup } from "@/components/math/formulaTypes";
+import ShockSlider from "@/components/controls/ShockSlider";
+import { ScenarioBarChart } from "@/components/charts/LabCharts";
+import { seriesColor } from "@/lib/chartPalette";
 import {
   analyzeOnChain,
   fetchOnChainSample,
@@ -34,6 +37,31 @@ import {
   type OnChainAnalysisResponse,
   type OnChainSampleResponse,
 } from "@/lib/onchainAnalytics";
+
+// Deterministic scenario-shock sliders (client-side transforms of the sample
+// request before re-analysis — no live on-chain data, not advice).
+const DEFAULT_SHOCKS = {
+  price_shock: 0,      // ±% token price
+  inflow_mult: 1,      // × 24h exchange inflow
+  outflow_mult: 1,     // × 24h exchange outflow
+  address_shock: 0,    // ±% active addresses
+  transfer_mult: 1,    // × 24h transfer volume
+  whale_conc_shock: 0, // ± points on the top-holder shares
+};
+type ShockKey = keyof typeof DEFAULT_SHOCKS;
+
+const SCENARIO_SHORT: Record<string, string> = {
+  base: "Base",
+  exchange_inflow_spike: "Inflow ×3",
+  exchange_outflow_wave: "Outflow ×3",
+  whale_deposit_pressure: "Whale dep.",
+  whale_accumulation: "Whale acc.",
+  active_address_slowdown: "Addr −60%",
+  transfer_volume_collapse: "Vol −85%",
+  high_velocity_burst: "Vel burst",
+  holder_concentration_shock: "Conc +",
+  severe_combo: "Severe",
+};
 
 const FIELDS = [
   { key: "token_price", label: "Price", step: "0.1", allowZero: false },
@@ -108,6 +136,9 @@ export default function OnChainAnalyticsLabPanel() {
   const [result, setResult] = useState<OnChainAnalysisResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [shock, setShock] = useState({ ...DEFAULT_SHOCKS });
+  const setShockValue = (k: ShockKey) => (v: number) => setShock((s) => ({ ...s, [k]: v }));
+  const shocksActive = (Object.keys(DEFAULT_SHOCKS) as ShockKey[]).some((k) => shock[k] !== DEFAULT_SHOCKS[k]);
 
   function fieldsFrom(req: OnChainAnalysisRequest): Record<string, string> {
     const src = req.network as unknown as Record<string, number>;
@@ -134,6 +165,7 @@ export default function OnChainAnalyticsLabPanel() {
     if (!sample) return;
     setSelected(idx);
     setFieldStr(fieldsFrom(sample.networks[idx]));
+    setShock({ ...DEFAULT_SHOCKS });
   }
 
   const request = useMemo<OnChainAnalysisRequest | null>(() => {
@@ -145,8 +177,26 @@ export default function OnChainAnalyticsLabPanel() {
       const valid = Number.isFinite(v) && (f.allowZero ? v >= 0 : v > 0);
       overrides[f.key] = valid ? v : fallback;
     });
-    return { ...base, network: { ...base.network, ...overrides } };
-  }, [base, fieldStr]);
+
+    // Apply the deterministic scenario-shock sliders (client-side, sample-only).
+    const network = {
+      ...base.network,
+      ...overrides,
+      token_price: Math.max(overrides["token_price"] * (1 + shock.price_shock), 1e-9),
+      exchange_inflow_tokens_24h: Math.max(overrides["exchange_inflow_tokens_24h"] * shock.inflow_mult, 0),
+      exchange_outflow_tokens_24h: Math.max(overrides["exchange_outflow_tokens_24h"] * shock.outflow_mult, 0),
+      active_addresses_24h: Math.max(overrides["active_addresses_24h"] * (1 + shock.address_shock), 0),
+      transfer_volume_tokens_24h: Math.max(overrides["transfer_volume_tokens_24h"] * shock.transfer_mult, 0),
+    };
+    const wf = base.whale_flow;
+    const whale_flow = {
+      ...wf,
+      top_10_holder_share: Math.min(Math.max(wf.top_10_holder_share + shock.whale_conc_shock, 0), 1),
+      top_50_holder_share: Math.min(Math.max(wf.top_50_holder_share + shock.whale_conc_shock, 0), 1),
+      top_100_holder_share: Math.min(Math.max(wf.top_100_holder_share + shock.whale_conc_shock, 0), 1),
+    };
+    return { ...base, network, whale_flow };
+  }, [base, fieldStr, shock]);
 
   const reqKey = request ? JSON.stringify([request.network, request.whale_flow]) : "";
   useEffect(() => {
@@ -254,6 +304,38 @@ export default function OnChainAnalyticsLabPanel() {
         </div>
       </div>
 
+      {/* ── Interactive scenario shocks ──────────────────────────────────── */}
+      <div className="card p-4">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="section-title">Interactive scenario shocks</p>
+          {shocksActive && (
+            <button type="button" onClick={() => setShock({ ...DEFAULT_SHOCKS })}
+              className="rounded-md px-2.5 py-1 text-xs font-semibold"
+              style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}>
+              Reset shocks
+            </button>
+          )}
+        </div>
+        <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-3">
+          <ShockSlider label="Token price shock" value={shock.price_shock} min={-0.6} max={0.6} step={0.05}
+            format={(v) => signedPct(v, 0)} onChange={setShockValue("price_shock")} />
+          <ShockSlider label="Exchange inflow ×" value={shock.inflow_mult} min={0} max={4} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("inflow_mult")} />
+          <ShockSlider label="Exchange outflow ×" value={shock.outflow_mult} min={0} max={4} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("outflow_mult")} />
+          <ShockSlider label="Active address shock" value={shock.address_shock} min={-0.8} max={0.8} step={0.05}
+            format={(v) => signedPct(v, 0)} onChange={setShockValue("address_shock")} />
+          <ShockSlider label="Transfer volume ×" value={shock.transfer_mult} min={0.1} max={4} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("transfer_mult")} />
+          <ShockSlider label="Whale concentration shock" value={shock.whale_conc_shock} min={-0.1} max={0.25} step={0.01}
+            format={(v) => `${v >= 0 ? "+" : ""}${(v * 100).toFixed(0)} pts`} onChange={setShockValue("whale_conc_shock")} />
+        </div>
+        <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
+          Deterministic shocks applied to the static sample before re-analysis — hypothetical
+          what-ifs, not forecasts, not investment, trading, or token advice.
+        </p>
+      </div>
+
       {/* ── Key metrics ──────────────────────────────────────────────────── */}
       {r && ef && am && vm && wa && ca && (
         <div className="card p-4">
@@ -293,7 +375,18 @@ export default function OnChainAnalyticsLabPanel() {
               <MetricCard label="24h outflow" value={tokens(ef.exchange_outflow_tokens_24h)} />
               <MetricCard label="Net flow" value={signedTokens(ef.net_exchange_flow_tokens)} tone={ef.net_exchange_flow_tokens > 0 ? "warn" : "positive"} />
             </div>
-            <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
+            <div className="mt-3">
+              <ScenarioBarChart
+                data={[
+                  { label: "24h inflow", value: ef.exchange_inflow_tokens_24h, color: "var(--warn)" },
+                  { label: "24h outflow", value: ef.exchange_outflow_tokens_24h, color: seriesColor(0) },
+                  { label: "Net flow", value: ef.net_exchange_flow_tokens, color: ef.net_exchange_flow_tokens > 0 ? "var(--risk)" : seriesColor(1) },
+                ]}
+                format={(v) => tokens(v)}
+                height={120}
+              />
+            </div>
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
               Positive net flow = tokens moving onto exchanges (potential sell-side supply);
               negative = withdrawals. Reserve change uses the same 24h approximation.
             </p>
@@ -351,6 +444,17 @@ export default function OnChainAnalyticsLabPanel() {
                 </tbody>
               </table>
             </div>
+            <div className="mt-3">
+              <ScenarioBarChart
+                data={r.holder_distribution.map((row) => ({
+                  label: row.cohort_name.replace(" / foundation-like wallets", " / foundation"),
+                  value: row.balance_share,
+                  color: row.balance_share >= 0.25 ? "var(--warn)" : seriesColor(1),
+                }))}
+                format={(v) => pct(v, 0)}
+                height={170}
+              />
+            </div>
             <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
               Illustrative sample cohorts (shares of circulating supply) — not wallet-level or
               labelled on-chain data.
@@ -370,6 +474,17 @@ export default function OnChainAnalyticsLabPanel() {
               <MetricCard label="Concentration" value={num(ca.concentration_score, 2)} tone={ca.concentration_score >= 0.3 ? "warn" : "positive"} />
               <MetricCard label="Gini-style" value={num(ca.gini_style_score, 3)} />
               <MetricCard label="Largest cohort" value={pct(ca.largest_cohort_share, 0)} />
+            </div>
+            <div className="mt-3">
+              <ScenarioBarChart
+                data={[
+                  { label: "Whale inflow", value: wa.whale_inflow_tokens_24h, color: "var(--warn)" },
+                  { label: "Whale outflow", value: wa.whale_outflow_tokens_24h, color: seriesColor(0) },
+                  { label: "Whale net", value: wa.whale_net_flow_tokens, color: wa.whale_net_flow_tokens > 0 ? "var(--risk)" : seriesColor(1) },
+                ]}
+                format={(v) => tokens(v)}
+                height={120}
+              />
             </div>
             <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px]" style={{ color: "var(--text-mut)" }}>
               {ca.notes.map((n) => <li key={n}>{n}</li>)}
@@ -399,6 +514,54 @@ export default function OnChainAnalyticsLabPanel() {
             Deterministic educational classification on static sample data — not a signal, forecast,
             or token recommendation.
           </p>
+        </div>
+      )}
+
+      {/* ── Scenario charts ──────────────────────────────────────────────── */}
+      {r && (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div className="card p-4">
+            <p className="section-title mb-2">Exchange reserve ratio by scenario</p>
+            <ScenarioBarChart
+              data={r.scenario_results.map((s) => ({
+                label: SCENARIO_SHORT[s.id] ?? s.name,
+                value: s.exchange_reserve_ratio,
+                color: seriesColor(0),
+              }))}
+              format={(v) => pct(v, 1)}
+              height={230}
+            />
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">NVT-style ratio by scenario</p>
+            <ScenarioBarChart
+              data={r.scenario_results.map((s) => ({
+                label: SCENARIO_SHORT[s.id] ?? s.name,
+                value: Math.min(s.nvt_ratio, 500),
+                color: s.nvt_ratio >= 50 ? "var(--warn)" : seriesColor(2),
+              }))}
+              format={(v) => v.toFixed(0)}
+              height={230}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Chart capped at 500 (the ~zero-transfer cap shows as the cap).
+            </p>
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">Velocity by scenario</p>
+            <ScenarioBarChart
+              data={r.scenario_results.map((s) => ({
+                label: SCENARIO_SHORT[s.id] ?? s.name,
+                value: s.token_velocity,
+                color: s.token_velocity >= 0.15 ? "var(--accent-text)" : seriesColor(1),
+              }))}
+              format={(v) => v.toFixed(3)}
+              height={230}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              24h transfer volume ÷ circulating supply; active addresses per scenario are in the table below.
+            </p>
+          </div>
         </div>
       )}
 
@@ -449,7 +612,7 @@ export default function OnChainAnalyticsLabPanel() {
 
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <FormulaReference title="Formulas & notes" groups={ONCHAIN_FORMULA_GROUPS} />
+        <FormulaReference title="Formulas & notes" groups={ONCHAIN_FORMULA_GROUPS} collapsible />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — not live on-chain data or token prices; no wallets, blockchain RPC, smart-contract, explorer, or exchange APIs.</li>
           <li>The NVT-style ratio, velocity, and concentration/Gini-style scores are simplified documented heuristics — not a production due-diligence engine.</li>

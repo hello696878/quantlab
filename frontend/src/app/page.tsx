@@ -422,27 +422,27 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
   cryptoderivatives: {
     title: "Crypto Perpetual Funding & Basis Lab",
     subtitle:
-      "Spot / perpetual / dated-futures basis, funding-rate mechanics and annualized funding yield, long/short funding P&L, a cash-and-carry example, position margin / liquidation approximation, a funding-regime read, and funding/basis stress scenarios — deterministic static sample data, no live exchange data or crypto prices, not investment, trading, or liquidation advice.",
+      "Spot / perpetual / dated-futures basis, funding-rate mechanics and annualized funding yield, long/short funding P&L, a cash-and-carry example, position margin / liquidation approximation, a funding-regime read, and funding/basis stress scenarios with interactive shock sliders, a basis curve, and funding/liquidation stress charts — deterministic static sample data, no live exchange data or crypto prices, not investment, trading, or liquidation advice.",
   },
   defirisk: {
     title: "DeFi Yield, Stablecoin Peg & Lending Risk Lab",
     subtitle:
-      "Stablecoin peg deviation, lending/borrow APY with a kinked utilization rate model, collateral value / debt / LTV / health factor, an approximate liquidation price, net APY carry, a risk-regime read, and protocol stress scenarios — deterministic static sample data, no live protocol data or crypto prices, no wallets or smart-contract calls, not investment, lending, borrowing, or liquidation advice.",
+      "Stablecoin peg deviation, lending/borrow APY with a kinked utilization rate model, collateral value / debt / LTV / health factor, an approximate liquidation price, net APY carry, a risk-regime read, and protocol stress scenarios with interactive shock sliders, a rate-curve chart, and health-factor/peg/net-APY stress charts — deterministic static sample data, no live protocol data or crypto prices, no wallets or smart-contract calls, not investment, lending, borrowing, or liquidation advice.",
   },
   tokenomics: {
     title: "Tokenomics, Unlock Schedule & Treasury Risk Lab",
     subtitle:
-      "Market cap vs FDV, float ratio, unlock schedules and dilution pressure, emission inflation and a real staking-yield approximation, treasury runway, holder concentration, a tokenomics risk-regime read, and unlock/treasury stress scenarios — deterministic static sample data, no live token prices or on-chain data, no wallets or smart-contract calls, not investment, trading, token, or venture advice.",
+      "Market cap vs FDV, float ratio, unlock schedules and dilution pressure, emission inflation and a real staking-yield approximation, treasury runway, holder concentration, a tokenomics risk-regime read, and unlock/treasury stress scenarios with interactive shock sliders, an unlock-horizon selector, and unlock/runway/FDV/concentration charts — deterministic static sample data, no live token prices or on-chain data, no wallets or smart-contract calls, not investment, trading, token, or venture advice.",
   },
   onchain: {
     title: "On-Chain Flow, Exchange Reserve & Whale Concentration Lab",
     subtitle:
-      "Exchange inflows/outflows and reserve ratios, active addresses, transfer volume, token velocity, an NVT-style valuation ratio, holder cohorts with a Gini-style concentration approximation, whale flows, an on-chain risk-regime read, and on-chain stress scenarios — deterministic static sample data, no live on-chain data or token prices, no wallets, RPC, or explorer APIs, not investment, trading, or token advice.",
+      "Exchange inflows/outflows and reserve ratios, active addresses, transfer volume, token velocity, an NVT-style valuation ratio, holder cohorts with a Gini-style concentration approximation, whale flows, an on-chain risk-regime read, and on-chain stress scenarios with interactive shock sliders plus flow, cohort, reserve, NVT, and velocity charts — deterministic static sample data, no live on-chain data or token prices, no wallets, RPC, or explorer APIs, not investment, trading, or token advice.",
   },
   altdata: {
     title: "Alternative Data, News Sentiment & Signal Decay Lab",
     subtitle:
-      "Sample news/social/earnings/macro/supply-chain events with weighted sentiment, novelty, freshness decay, a leakage guard, event-study horizons, information coefficient, hit rate, a signal-decay curve, an alpha composite, a research risk-regime read, and scenario stresses — deterministic static sample data, no live news or social media, no scraping, no LLM or provider APIs, not investment, trading, or signal advice.",
+      "Sample news/social/earnings/macro/supply-chain events with weighted sentiment, novelty, freshness decay, a leakage guard, event-study horizons, information coefficient, hit rate, a signal-decay curve, an alpha composite, a research risk-regime read, and scenario stresses with interactive shock sliders, a return-horizon selector, and timeline/decay/IC charts — deterministic static sample data, no live news or social media, no scraping, no LLM or provider APIs, not investment, trading, or signal advice.",
   },
   macroregime: {
     title: "Macro Regime & Cross-Asset Allocation Lab",
@@ -1024,11 +1024,11 @@ export default function HomePage() {
     { view: "futures", title: "Open Futures and Commodities Lab", keywords: "futures commodities commodity cost of carry convenience yield contango backwardation curve roll yield calendar spread margin leverage notional crude oil gold natural gas wheat basis scenario stress" },
     { view: "volatility", title: "Open Volatility Lab", keywords: "volatility surface variance swap implied vol iv smile skew term structure realized vol vega black scholes option chain fair strike vix scenario stress derivatives" },
     { view: "microstructure", title: "Open Market Microstructure Lab", keywords: "microstructure execution order book limit order book bid ask spread depth imbalance microprice vwap twap implementation shortfall slippage market impact participation rate liquidity stress execution schedule transaction cost analysis tca" },
-    { view: "cryptoderivatives", title: "Open Crypto Derivatives Lab", keywords: "crypto derivatives perpetual perp futures funding rate basis annualized carry cash and carry liquidation margin leverage btc eth sol bitcoin ethereum solana contango backwardation funding pnl" },
-    { view: "defirisk", title: "Open DeFi Risk Lab", keywords: "defi decentralized finance stablecoin peg depeg lending borrow apy utilization kink interest rate model collateral health factor ltv loan to value liquidation threshold net apy carry usdc usdt dai aave protocol stress" },
-    { view: "tokenomics", title: "Open Tokenomics Risk Lab", keywords: "tokenomics token unlock schedule vesting cliff dilution fdv fully diluted valuation market cap float ratio emission inflation staking real yield treasury runway burn holder concentration crypto fundamentals" },
-    { view: "onchain", title: "Open On-Chain Analytics Lab", keywords: "on-chain onchain exchange inflow outflow net flow exchange reserve active addresses transfer volume transaction count token velocity nvt whale concentration gini holder cohort crypto analytics" },
-    { view: "altdata", title: "Open Alternative Data Lab", keywords: "alternative data alt data news sentiment social sentiment earnings macro supply chain events novelty freshness leakage guard information coefficient ic hit rate signal decay alpha score event study" },
+    { view: "cryptoderivatives", title: "Open Crypto Derivatives Lab", keywords: "crypto derivatives perpetual perp futures funding rate basis annualized carry cash and carry liquidation margin leverage btc eth sol bitcoin ethereum solana contango backwardation funding pnl interactive shock slider basis curve chart" },
+    { view: "defirisk", title: "Open DeFi Risk Lab", keywords: "defi decentralized finance stablecoin peg depeg lending borrow apy utilization kink interest rate model collateral health factor ltv loan to value liquidation threshold net apy carry usdc usdt dai aave protocol stress interactive shock slider rate curve chart" },
+    { view: "tokenomics", title: "Open Tokenomics Risk Lab", keywords: "tokenomics token unlock schedule vesting cliff dilution fdv fully diluted valuation market cap float ratio emission inflation staking real yield treasury runway burn holder concentration crypto fundamentals interactive shock slider horizon chart" },
+    { view: "onchain", title: "Open On-Chain Analytics Lab", keywords: "on-chain onchain exchange inflow outflow net flow exchange reserve active addresses transfer volume transaction count token velocity nvt whale concentration gini holder cohort crypto analytics interactive shock slider flow chart" },
+    { view: "altdata", title: "Open Alternative Data Lab", keywords: "alternative data alt data news sentiment social sentiment earnings macro supply chain events novelty freshness leakage guard information coefficient ic hit rate signal decay alpha score event study interactive shock slider timeline decay chart" },
     { view: "macroregime", title: "Open Macro Regime Lab", keywords: "macro regime cross asset allocation growth inflation policy liquidity credit stress usd pressure z-score goldilocks stagflation recession risk parity inverse volatility regime tilt" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },

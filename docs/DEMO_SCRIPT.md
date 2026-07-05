@@ -459,7 +459,12 @@ Return to the Command Center's **Platform Direction** panel (or open
   gross carry), and the **funding/basis stress scenarios** (funding spike +/−, perp premium
   blowout, perp discount, spot selloff/rally, basis convergence, margin stress, volatility
   shock). Edit spot / perp mark / funding / leverage / notional and watch everything
-  re-compute. The **Formulas & notes** render as **LaTeX** (KaTeX, local — no CDN).
+  re-compute. Then drag the **interactive scenario shock sliders** (31.5: spot shock,
+  funding shock, perp basis shock, futures basis ×, maintenance margin ×, plus a
+  long/short toggle) and watch the **basis curve chart**, **funding P&L chart**,
+  **liquidation-distance stress chart**, and **scenario comparison chart** re-draw
+  deterministically (all local recharts — no chart CDN). The **Formulas & notes**
+  are collapsible and render as **LaTeX** (KaTeX, local — no CDN).
   Emphasise: static illustrative sample data — **not** live exchange data or live crypto
   prices, no broker/exchange integration, funding/carry/liquidation are simplified
   educational approximations, **not** a production risk engine, **not** real-time funding
@@ -477,7 +482,12 @@ Return to the Command Center's **Platform Direction** panel (or open
   the **net APY** panel, and the **protocol stress scenarios** (mild/severe depeg,
   collateral drawdown, borrow asset rally, utilization spike, liquidity drought, borrow
   rate shock, threshold cut, stress combo). Edit the stablecoin price / collateral /
-  debt / threshold / APYs and watch everything re-compute. The **Formulas & notes**
+  debt / threshold / APYs and watch everything re-compute. Then drag the
+  **interactive scenario shock sliders** (31.5: collateral / debt price shocks,
+  depeg shock, utilization shock, liquidity ×, borrow-rate shock, threshold shock)
+  and watch the **kinked rate-curve chart** (borrow + supply APY vs utilization),
+  **health-factor stress chart**, **peg-deviation chart**, and **net-APY scenario
+  chart** re-draw deterministically. The **Formulas & notes** are collapsible and
   render as **LaTeX** (KaTeX, local — no CDN). Emphasise: static illustrative sample
   data — **not** live protocol data or crypto prices, no wallets / RPC / smart-contract
   calls, the rate model / health factor / liquidation price are simplified educational
@@ -498,8 +508,13 @@ Return to the Command Center's **Platform Direction** panel (or open
   (price drawdown, unlock acceleration, emission increase, treasury drawdown, burn
   increase, concentration shock, revenue decline, low-float repricing, severe combo —
   the combo flips the regime to Severe tokenomics stress). Edit price / supply /
-  emission / burn / treasury and watch everything re-compute. The **Formulas & notes**
-  render as **LaTeX** (KaTeX, local — no CDN). Emphasise: static illustrative sample
+  emission / burn / treasury and watch everything re-compute. Then drag the
+  **interactive scenario shock sliders** (31.5: price shock, unlock ×, emission ×,
+  burn ×, treasury asset shock, concentration shock) and flip the **30/90/180/365d
+  unlock-horizon selector**; the **unlock schedule bar + cumulative line chart**,
+  **treasury runway chart**, **FDV vs market cap chart**, **holder concentration
+  chart**, and **real staking yield chart** re-draw deterministically. The
+  **Formulas & notes** are collapsible and render as **LaTeX** (KaTeX, local — no CDN). Emphasise: static illustrative sample
   data — **not** live token prices or on-chain data, no wallets / RPC / smart-contract
   calls, documented heuristic scores, **not** a production due-diligence engine,
   **not** real-time tokenomics analytics, not investment / trading / token / venture
@@ -521,7 +536,12 @@ Return to the Command Center's **Platform Direction** panel (or open
   spike, outflow wave, whale deposit pressure, whale accumulation, address slowdown,
   transfer collapse — watch NVT jump and the regime flip to Low activity / high
   valuation — velocity burst, concentration shock, severe combo). Edit price /
-  supply / reserve / flows and watch everything re-compute. The **Formulas & notes**
+  supply / reserve / flows and watch everything re-compute. Then drag the
+  **interactive scenario shock sliders** (31.5: token price shock, exchange
+  inflow ×, exchange outflow ×, active-address shock, transfer volume ×, whale
+  concentration shock) and watch the **exchange flow chart**, **holder cohort
+  chart**, **whale flow chart**, and the **reserve-ratio / NVT / velocity scenario
+  charts** re-draw deterministically. The **Formulas & notes** are collapsible and
   render as **LaTeX** (KaTeX, local — no CDN). Emphasise: static illustrative sample
   data — **not** live on-chain data or token prices, no wallets / RPC / explorer /
   exchange APIs, documented heuristic scores, **not** live whale tracking, **not** a
@@ -543,8 +563,13 @@ Return to the Command Center's **Platform Direction** panel (or open
   scenarios** (positive/negative news, social noise spike, reliability downgrade,
   lag increase, novelty collapse, crowded cluster, the synthetic leakage
   violation, severe combo). Nudge the **λ / γ** model knobs and watch everything
-  re-compute. The **Formulas & notes** render as **LaTeX** (KaTeX, local — no
-  CDN). Emphasise: static illustrative sample data with hand-written scores and
+  re-compute. Then drag the **interactive scenario shock sliders** (31.5:
+  sentiment shock, intensity ×, novelty ×, reliability ×, publication lag ×,
+  return noise ×, event count ×) and flip the **1/5/20d return-horizon selector**;
+  the **event timeline chart**, **sentiment distribution chart**, **event-study
+  return path**, **signal-decay curve**, and **IC / hit-rate chart** re-draw
+  deterministically. The **Formulas & notes** are collapsible and render as
+  **LaTeX** (KaTeX, local — no CDN). Emphasise: static illustrative sample data with hand-written scores and
   returns — **no** live news or social media, **no** scraping, **no** LLM or
   provider APIs, the IC/decay figures illustrate the workflow (**not** evidence
   of alpha), **not** a production alpha engine, not investment / trading / signal

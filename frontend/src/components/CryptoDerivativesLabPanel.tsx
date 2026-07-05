@@ -18,6 +18,9 @@ import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
 import FormulaReference from "@/components/math/FormulaReference";
 import type { FormulaGroup } from "@/components/math/formulaTypes";
+import ShockSlider from "@/components/controls/ShockSlider";
+import { GroupedBarChart, ScenarioBarChart, SimpleLineChart } from "@/components/charts/LabCharts";
+import { seriesColor } from "@/lib/chartPalette";
 import {
   analyzeCryptoDerivatives,
   bps,
@@ -32,6 +35,31 @@ import {
   type CryptoDerivativesAnalysisResponse,
   type CryptoDerivativesSampleResponse,
 } from "@/lib/cryptoDerivatives";
+
+// Deterministic scenario-shock sliders (client-side transforms of the sample
+// request before it is re-analysed — no live data, not advice).
+const DEFAULT_SHOCKS = {
+  spot_shock: 0,          // ±% applied to spot / index / perp / futures
+  funding_shock: 0,       // additive shift to the 8h funding rate
+  perp_basis_shock: 0,    // additive bps on the perp basis
+  futures_basis_mult: 1,  // multiplier on each dated future's premium to spot
+  margin_mult: 1,         // multiplier on the maintenance-margin rate
+};
+type ShockKey = keyof typeof DEFAULT_SHOCKS;
+
+// Short labels so scenario ids fit on grouped chart axes.
+const SCENARIO_SHORT: Record<string, string> = {
+  base: "Base",
+  funding_spike_positive: "Fund +",
+  funding_turns_negative: "Fund −",
+  perp_premium_blowout: "Prem ↑",
+  perp_discount_shock: "Disc ↓",
+  spot_selloff: "Sell-off",
+  spot_rally: "Rally",
+  basis_convergence: "Converge",
+  margin_stress: "Margin",
+  volatility_shock: "Vol",
+};
 
 const MARKET_FIELDS = [
   { key: "spot_price", label: "Spot", step: "1", scope: "market" as const },
@@ -106,6 +134,12 @@ export default function CryptoDerivativesLabPanel() {
   const [result, setResult] = useState<CryptoDerivativesAnalysisResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [shock, setShock] = useState({ ...DEFAULT_SHOCKS });
+  const [sideOverride, setSideOverride] = useState<"long" | "short" | null>(null);
+  const setShockValue = (k: ShockKey) => (v: number) => setShock((s) => ({ ...s, [k]: v }));
+  const shocksActive =
+    sideOverride !== null ||
+    (Object.keys(DEFAULT_SHOCKS) as ShockKey[]).some((k) => shock[k] !== DEFAULT_SHOCKS[k]);
 
   function fieldsFrom(req: CryptoDerivativesAnalysisRequest): Record<string, string> {
     const out: Record<string, string> = {};
@@ -138,6 +172,8 @@ export default function CryptoDerivativesLabPanel() {
     if (!sample) return;
     setSelected(idx);
     setFieldStr(fieldsFrom(sample.markets[idx]));
+    setShock({ ...DEFAULT_SHOCKS });
+    setSideOverride(null);
   }
 
   const request = useMemo<CryptoDerivativesAnalysisRequest | null>(() => {
@@ -161,12 +197,39 @@ export default function CryptoDerivativesLabPanel() {
       base.position.initial_margin_rate,
     );
     const market = { ...base.market, ...marketOverrides };
-    const position = { ...base.position, ...posOverrides, maintenance_margin_rate: maint, mark_price: market.perp_mark_price };
-    return { ...base, market, position };
-  }, [base, fieldStr]);
+    let position = { ...base.position, ...posOverrides, maintenance_margin_rate: maint, mark_price: market.perp_mark_price };
+    let datedFutures = base.dated_futures;
+
+    // Apply the deterministic scenario-shock sliders (client-side, sample-only).
+    const spotMult = 1 + shock.spot_shock;
+    const basePerpPrem = market.spot_price > 0 ? market.perp_mark_price / market.spot_price - 1 : 0;
+    const shockedSpot = Math.max(market.spot_price * spotMult, 1e-9);
+    const shockedPerp = Math.max(shockedSpot * (1 + basePerpPrem + shock.perp_basis_shock / 10000), 1e-9);
+    datedFutures = base.dated_futures.map((f) => {
+      const prem = market.spot_price > 0 ? f.futures_price / market.spot_price - 1 : 0;
+      return { ...f, futures_price: Math.max(shockedSpot * (1 + prem * shock.futures_basis_mult), 1e-9) };
+    });
+    const shockedMarket = {
+      ...market,
+      spot_price: shockedSpot,
+      index_price: Math.max(market.index_price * spotMult, 1e-9),
+      perp_mark_price: shockedPerp,
+      funding_rate_8h: market.funding_rate_8h + shock.funding_shock,
+    };
+    position = {
+      ...position,
+      side: sideOverride ?? position.side,
+      mark_price: shockedPerp,
+      maintenance_margin_rate: Math.min(
+        Math.max(maint * shock.margin_mult, 0),
+        base.position.initial_margin_rate,
+      ),
+    };
+    return { ...base, market: shockedMarket, position, dated_futures: datedFutures };
+  }, [base, fieldStr, shock, sideOverride]);
 
   const reqKey = request
-    ? JSON.stringify([request.market, request.position, request.funding_intervals_per_day])
+    ? JSON.stringify([request.market, request.position, request.dated_futures, request.funding_intervals_per_day])
     : "";
   useEffect(() => {
     if (!request) return;
@@ -272,6 +335,52 @@ export default function CryptoDerivativesLabPanel() {
         </div>
       </div>
 
+      {/* ── Interactive scenario shocks ──────────────────────────────────── */}
+      <div className="card p-4">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="section-title">Interactive scenario shocks</p>
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1" role="group" aria-label="Position side">
+              {(["long", "short"] as const).map((s) => {
+                const active = (sideOverride ?? base?.position.side) === s;
+                return (
+                  <button key={s} type="button" onClick={() => setSideOverride(s)} aria-pressed={active}
+                    className="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-colors"
+                    style={{
+                      background: active ? "var(--accent-softer)" : "var(--glass)",
+                      border: `1px solid ${active ? "var(--accent-line)" : "var(--line)"}`,
+                      color: active ? "var(--accent-text)" : "var(--text-mut)",
+                    }}>{s}</button>
+                );
+              })}
+            </div>
+            {shocksActive && (
+              <button type="button" onClick={() => { setShock({ ...DEFAULT_SHOCKS }); setSideOverride(null); }}
+                className="rounded-md px-2.5 py-1 text-xs font-semibold"
+                style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}>
+                Reset shocks
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-5">
+          <ShockSlider label="Spot shock" value={shock.spot_shock} min={-0.5} max={0.5} step={0.01}
+            format={(v) => signedPct(v, 0)} onChange={setShockValue("spot_shock")} />
+          <ShockSlider label="Funding shock (8h)" value={shock.funding_shock} min={-0.002} max={0.002} step={0.0001}
+            format={(v) => `${v >= 0 ? "+" : ""}${(v * 10000).toFixed(1)} bp`} onChange={setShockValue("funding_shock")} />
+          <ShockSlider label="Perp basis shock" value={shock.perp_basis_shock} min={-150} max={150} step={5}
+            format={(v) => signedBps(v, 0)} onChange={setShockValue("perp_basis_shock")} />
+          <ShockSlider label="Futures basis ×" value={shock.futures_basis_mult} min={0} max={3} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("futures_basis_mult")} />
+          <ShockSlider label="Maint. margin ×" value={shock.margin_mult} min={0.5} max={3} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("margin_mult")} />
+        </div>
+        <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
+          Deterministic shocks applied to the static sample before re-analysis — hypothetical
+          what-ifs, not forecasts, not trading or liquidation advice.
+        </p>
+      </div>
+
       {/* ── Key metrics ──────────────────────────────────────────────────── */}
       {r && ba && fa && pr && (
         <div className="card p-4">
@@ -303,6 +412,14 @@ export default function CryptoDerivativesLabPanel() {
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           <div className="card p-4 xl:col-span-2">
             <p className="section-title mb-2">Futures curve &amp; basis</p>
+            <SimpleLineChart
+              data={r.futures_curve.map((c) => ({ x: c.maturity_days, ann: c.annualized_basis }))}
+              series={[{ key: "ann", label: "Annualized basis", color: seriesColor(0) }]}
+              format={(v) => signedPct(v, 1)}
+              formatX={(v) => `${v}d`}
+              xLabel="maturity"
+              height={170}
+            />
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -387,6 +504,67 @@ export default function CryptoDerivativesLabPanel() {
         </div>
       )}
 
+      {/* ── Scenario charts ──────────────────────────────────────────────── */}
+      {r && (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div className="card p-4">
+            <p className="section-title mb-2">Funding P&amp;L by scenario (daily)</p>
+            <GroupedBarChart
+              data={r.scenario_results.map((s) => ({
+                label: SCENARIO_SHORT[s.id] ?? s.name,
+                long: s.long_funding_pnl,
+                short: s.short_funding_pnl,
+              }))}
+              series={[
+                { key: "long", label: "Long funding P&L", color: seriesColor(0) },
+                { key: "short", label: "Short funding P&L", color: seriesColor(2) },
+              ]}
+              format={(v) => money(v)}
+              height={210}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Positive funding is a drag on longs and a credit to shorts (and vice versa).
+            </p>
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">Liquidation distance stress</p>
+            <ScenarioBarChart
+              data={r.scenario_results
+                .filter((s) => ["base", "spot_selloff", "margin_stress", "volatility_shock"].includes(s.id))
+                .map((s) => ({
+                  label: s.name,
+                  value: s.liquidation_distance_bps,
+                  color: s.id === "base" ? seriesColor(0) : "var(--warn)",
+                }))}
+              format={(v) => bps(v, 0)}
+              height={190}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Distance from the shocked mark to the approximate educational liquidation estimate.
+            </p>
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">Scenario comparison (bps)</p>
+            <GroupedBarChart
+              data={r.scenario_results.map((s) => ({
+                label: SCENARIO_SHORT[s.id] ?? s.name,
+                basis: s.perp_basis_bps,
+                liq: s.liquidation_distance_bps,
+              }))}
+              series={[
+                { key: "basis", label: "Perp basis (bps)", color: seriesColor(4) },
+                { key: "liq", label: "Liq. distance (bps)", color: seriesColor(1) },
+              ]}
+              format={(v) => bps(v, 0)}
+              height={210}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Annualized funding per scenario is listed in the table below.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Scenario stress ──────────────────────────────────────────────── */}
       {r && (
         <div className="card p-4">
@@ -432,7 +610,7 @@ export default function CryptoDerivativesLabPanel() {
 
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <FormulaReference title="Formulas & notes" groups={CRYPTO_FORMULA_GROUPS} />
+        <FormulaReference title="Formulas & notes" groups={CRYPTO_FORMULA_GROUPS} collapsible />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — not live exchange data and not live crypto prices.</li>
           <li>Funding annualization, the carry example, and the liquidation approximation are simplified educational models, not a production risk engine.</li>

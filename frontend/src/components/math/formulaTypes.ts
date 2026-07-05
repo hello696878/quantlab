@@ -39,4 +39,8 @@ export interface FormulaReferenceProps {
   copyable?: boolean;
   /** Number of responsive columns for groups (default 2). */
   columns?: 1 | 2;
+  /** Render as a collapsible section with a show/hide toggle (default false). */
+  collapsible?: boolean;
+  /** Initial open state when collapsible (default false = collapsed). */
+  defaultOpen?: boolean;
 }

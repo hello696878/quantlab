@@ -19,6 +19,9 @@ import { useEffect, useMemo, useState } from "react";
 import MetricCard from "@/components/MetricCard";
 import FormulaReference from "@/components/math/FormulaReference";
 import type { FormulaGroup } from "@/components/math/formulaTypes";
+import ShockSlider from "@/components/controls/ShockSlider";
+import { GroupedBarChart, ScenarioBarChart, SimpleLineChart } from "@/components/charts/LabCharts";
+import { seriesColor } from "@/lib/chartPalette";
 import {
   analyzeAlternativeData,
   corr,
@@ -36,6 +39,22 @@ const KNOBS = [
   { key: "lambda_novelty", label: "Novelty weight λ", step: "0.1" },
   { key: "gamma_freshness_per_hour", label: "Freshness decay γ (/h)", step: "0.02" },
 ];
+
+// Deterministic scenario-shock sliders (client-side transforms of the sample
+// events before re-analysis — no live news/social data, not advice).
+const DEFAULT_SHOCKS = {
+  sentiment_shock: 0,   // ± additive sentiment shift
+  intensity_mult: 1,    // × event intensity
+  novelty_mult: 1,      // × novelty score
+  reliability_mult: 1,  // × source reliability
+  lag_mult: 1,          // × publication lag
+  noise_mult: 1,        // deterministic alternating return noise
+  count_mult: 1,        // × event count (whole copies of the event set)
+};
+type ShockKey = keyof typeof DEFAULT_SHOCKS;
+
+const HORIZONS = [1, 5, 20] as const;
+type Horizon = (typeof HORIZONS)[number];
 
 const SAMPLE_LABELS: Record<string, string> = {
   MEGACAP_NEWS_SAMPLE: "Mega Cap Equity News",
@@ -112,6 +131,10 @@ export default function AlternativeDataLabPanel() {
   const [result, setResult] = useState<AlternativeDataAnalysisResponse | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [analyzeError, setAnalyzeError] = useState<string | null>(null);
+  const [shock, setShock] = useState({ ...DEFAULT_SHOCKS });
+  const [horizon, setHorizon] = useState<Horizon>(5);
+  const setShockValue = (k: ShockKey) => (v: number) => setShock((s) => ({ ...s, [k]: v }));
+  const shocksActive = (Object.keys(DEFAULT_SHOCKS) as ShockKey[]).some((k) => shock[k] !== DEFAULT_SHOCKS[k]);
 
   function fieldsFrom(req: AlternativeDataAnalysisRequest): Record<string, string> {
     const src = req as unknown as Record<string, number>;
@@ -138,6 +161,7 @@ export default function AlternativeDataLabPanel() {
     if (!sample) return;
     setSelected(idx);
     setFieldStr(fieldsFrom(sample.samples[idx]));
+    setShock({ ...DEFAULT_SHOCKS });
   }
 
   const request = useMemo<AlternativeDataAnalysisRequest | null>(() => {
@@ -148,11 +172,33 @@ export default function AlternativeDataLabPanel() {
       const fallback = (base as unknown as Record<string, number>)[f.key];
       overrides[f.key] = Number.isFinite(v) && v >= 0 ? v : fallback;
     });
-    return { ...base, ...overrides };
-  }, [base, fieldStr]);
+
+    // Apply the deterministic scenario-shock sliders (client-side, sample-only).
+    const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi);
+    const shocked = base.events.map((e, i) => ({
+      ...e,
+      sentiment_score: clamp(e.sentiment_score + shock.sentiment_shock, -1, 1),
+      event_intensity: clamp(e.event_intensity * shock.intensity_mult, 0, 1),
+      novelty_score: clamp(e.novelty_score * shock.novelty_mult, 0, 1),
+      source_reliability: clamp(e.source_reliability * shock.reliability_mult, 0, 1),
+      publication_lag_minutes: Math.max(e.publication_lag_minutes * shock.lag_mult, 0),
+      observed_return_1d: e.observed_return_1d + 0.02 * (shock.noise_mult - 1) * (i % 2 === 0 ? 1 : -1),
+      observed_return_5d: e.observed_return_5d + 0.02 * (shock.noise_mult - 1) * (i % 2 === 0 ? 1 : -1),
+      observed_return_20d: e.observed_return_20d + 0.02 * (shock.noise_mult - 1) * (i % 2 === 0 ? 1 : -1),
+    }));
+    // Whole deterministic copies of the event set (ids suffixed to stay unique).
+    const copies = Math.max(1, Math.round(shock.count_mult));
+    const events =
+      copies === 1
+        ? shocked
+        : Array.from({ length: copies }, (_, c) =>
+            shocked.map((e) => (c === 0 ? e : { ...e, event_id: `${e.event_id}~${c + 1}` })),
+          ).flat();
+    return { ...base, ...overrides, events };
+  }, [base, fieldStr, shock]);
 
   const reqKey = request
-    ? JSON.stringify([request.sample_id, request.lambda_novelty, request.gamma_freshness_per_hour])
+    ? JSON.stringify([request.sample_id, request.lambda_novelty, request.gamma_freshness_per_hour, shock])
     : "";
   useEffect(() => {
     if (!request) return;
@@ -175,6 +221,26 @@ export default function AlternativeDataLabPanel() {
   }, [reqKey]);
 
   const r = result;
+
+  // Event timeline: day offsets on the static sample timeline (deterministic
+  // parse of the fixed ISO sample timestamps — no live clock).
+  const timeline = useMemo(() => {
+    const rows = result?.event_table ?? [];
+    if (!rows.length) return [];
+    const t0 = Date.parse(rows[0].timestamp);
+    return rows
+      .map((e) => {
+        const t = Date.parse(e.timestamp);
+        if (!Number.isFinite(t) || !Number.isFinite(t0)) return null;
+        return {
+          x: Math.round((t - t0) / 86_400_000),
+          sentiment: e.sentiment_score,
+          signal: e.lag_adjusted_signal,
+        };
+      })
+      .filter((p): p is { x: number; sentiment: number; signal: number } => p !== null)
+      .sort((a, b) => a.x - b.x);
+  }, [result]);
 
   if (loadError) {
     return (
@@ -259,6 +325,53 @@ export default function AlternativeDataLabPanel() {
         </div>
       </div>
 
+      {/* ── Interactive scenario shocks ──────────────────────────────────── */}
+      <div className="card p-4">
+        <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+          <p className="section-title">Interactive scenario shocks</p>
+          <div className="flex items-center gap-2">
+            <div className="flex gap-1" role="group" aria-label="Return horizon">
+              {HORIZONS.map((h) => (
+                <button key={h} type="button" onClick={() => setHorizon(h)} aria-pressed={horizon === h}
+                  className="rounded-md px-2 py-0.5 text-[11px] font-semibold transition-colors"
+                  style={{
+                    background: horizon === h ? "var(--accent-softer)" : "var(--glass)",
+                    border: `1px solid ${horizon === h ? "var(--accent-line)" : "var(--line)"}`,
+                    color: horizon === h ? "var(--accent-text)" : "var(--text-mut)",
+                  }}>{h}d</button>
+              ))}
+            </div>
+            {shocksActive && (
+              <button type="button" onClick={() => setShock({ ...DEFAULT_SHOCKS })}
+                className="rounded-md px-2.5 py-1 text-xs font-semibold"
+                style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}>
+                Reset shocks
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="grid grid-cols-1 gap-x-5 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
+          <ShockSlider label="Sentiment shock" value={shock.sentiment_shock} min={-0.6} max={0.6} step={0.05}
+            format={(v) => `${v >= 0 ? "+" : ""}${v.toFixed(2)}`} onChange={setShockValue("sentiment_shock")} />
+          <ShockSlider label="Intensity ×" value={shock.intensity_mult} min={0} max={2} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("intensity_mult")} />
+          <ShockSlider label="Novelty ×" value={shock.novelty_mult} min={0} max={2} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("novelty_mult")} />
+          <ShockSlider label="Reliability ×" value={shock.reliability_mult} min={0} max={2} step={0.1}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("reliability_mult")} />
+          <ShockSlider label="Publication lag ×" value={shock.lag_mult} min={1} max={20} step={0.5}
+            format={(v) => `${v.toFixed(1)}×`} onChange={setShockValue("lag_mult")} />
+          <ShockSlider label="Return noise ×" value={shock.noise_mult} min={0} max={3} step={0.25}
+            format={(v) => `${v.toFixed(2)}×`} onChange={setShockValue("noise_mult")} />
+          <ShockSlider label="Event count ×" value={shock.count_mult} min={1} max={3} step={1}
+            format={(v) => `${v.toFixed(0)}×`} onChange={setShockValue("count_mult")} />
+        </div>
+        <p className="mt-3 text-[11px]" style={{ color: "var(--text-faint)" }}>
+          Deterministic shocks applied to the static sample events before re-analysis —
+          hypothetical what-ifs, not forecasts, not investment, trading, or signal advice.
+        </p>
+      </div>
+
       {/* ── Key metrics ──────────────────────────────────────────────────── */}
       {r && sa && fa && lg && sq && (
         <div className="card p-4">
@@ -332,6 +445,44 @@ export default function AlternativeDataLabPanel() {
         </div>
       )}
 
+      {/* ── Timeline + sentiment distribution charts ─────────────────────── */}
+      {r && sa && (
+        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+          <div className="card p-4 xl:col-span-2">
+            <p className="section-title mb-2">Event timeline (sample days)</p>
+            <SimpleLineChart
+              data={timeline}
+              series={[
+                { key: "sentiment", label: "Sentiment", color: seriesColor(2) },
+                { key: "signal", label: "Lag-adjusted signal", color: seriesColor(0) },
+              ]}
+              format={(v) => signedNum(v, 2)}
+              formatX={(v) => `Day ${v}`}
+              xLabel="sample day"
+              height={200}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Per-event sentiment and lag-adjusted signal across the static sample timeline.
+            </p>
+          </div>
+          <div className="card p-4">
+            <p className="section-title mb-2">Sentiment distribution</p>
+            <ScenarioBarChart
+              data={[
+                { label: "Positive", value: sa.positive_event_count, color: "var(--emerald)" },
+                { label: "Neutral", value: sa.neutral_event_count, color: seriesColor(1) },
+                { label: "Negative", value: sa.negative_event_count, color: "var(--risk)" },
+              ]}
+              format={(v) => v.toFixed(0)}
+              height={130}
+            />
+            <p className="mt-2 text-[11px]" style={{ color: "var(--text-faint)" }}>
+              Event counts by sentiment sign (|s| ≤ 0.1 counts as neutral).
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* ── Sentiment + freshness/leakage ────────────────────────────────── */}
       {r && sa && fa && lg && (
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -373,14 +524,29 @@ export default function AlternativeDataLabPanel() {
           <div className="card p-4">
             <p className="section-title mb-2">Signal quality</p>
             <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-              <MetricCard label="IC 1d" value={corr(sq.information_coefficient_1d)} />
-              <MetricCard label="IC 5d" value={corr(sq.information_coefficient_5d)} tone="accent" />
-              <MetricCard label="IC 20d" value={corr(sq.information_coefficient_20d)} />
-              <MetricCard label="Hit 1d" value={pct(sq.hit_rate_1d, 0)} />
-              <MetricCard label="Hit 5d" value={pct(sq.hit_rate_5d, 0)} />
-              <MetricCard label="Hit 20d" value={pct(sq.hit_rate_20d, 0)} />
+              <MetricCard label="IC 1d" value={corr(sq.information_coefficient_1d)} tone={horizon === 1 ? "accent" : "default"} />
+              <MetricCard label="IC 5d" value={corr(sq.information_coefficient_5d)} tone={horizon === 5 ? "accent" : "default"} />
+              <MetricCard label="IC 20d" value={corr(sq.information_coefficient_20d)} tone={horizon === 20 ? "accent" : "default"} />
+              <MetricCard label="Hit 1d" value={pct(sq.hit_rate_1d, 0)} tone={horizon === 1 ? "accent" : "default"} />
+              <MetricCard label="Hit 5d" value={pct(sq.hit_rate_5d, 0)} tone={horizon === 5 ? "accent" : "default"} />
+              <MetricCard label="Hit 20d" value={pct(sq.hit_rate_20d, 0)} tone={horizon === 20 ? "accent" : "default"} />
               <MetricCard label="Signal/noise" value={num(sq.signal_to_noise_score, 2)} />
               <MetricCard label="Rel-wtd quality" value={num(sq.reliability_weighted_quality, 3)} />
+            </div>
+            <div className="mt-3">
+              <GroupedBarChart
+                data={[
+                  { label: "1d", ic: sq.information_coefficient_1d ?? Number.NaN, hit: sq.hit_rate_1d },
+                  { label: "5d", ic: sq.information_coefficient_5d ?? Number.NaN, hit: sq.hit_rate_5d },
+                  { label: "20d", ic: sq.information_coefficient_20d ?? Number.NaN, hit: sq.hit_rate_20d },
+                ]}
+                series={[
+                  { key: "ic", label: "IC", color: seriesColor(0) },
+                  { key: "hit", label: "Hit rate", color: seriesColor(2) },
+                ]}
+                format={(v) => v.toFixed(2)}
+                height={150}
+              />
             </div>
             <ul className="mt-3 list-disc space-y-1 pl-4 text-[11px]" style={{ color: "var(--text-mut)" }}>
               {sq.notes.map((n) => <li key={n}>{n}</li>)}
@@ -389,6 +555,24 @@ export default function AlternativeDataLabPanel() {
 
           <div className="card p-4">
             <p className="section-title mb-2">Event study &amp; signal decay</p>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <SimpleLineChart
+                data={r.event_study.map((p) => ({ x: p.horizon_days, ret: p.average_forward_return }))}
+                series={[{ key: "ret", label: "Avg fwd return", color: seriesColor(0) }]}
+                format={(v) => signedPct(v)}
+                formatX={(v) => `${v}d`}
+                xLabel="horizon"
+                height={150}
+              />
+              <SimpleLineChart
+                data={r.signal_decay.map((p) => ({ x: p.horizon_days, decay: p.decay_correlation ?? Number.NaN }))}
+                series={[{ key: "decay", label: "Decay corr", color: seriesColor(4) }]}
+                format={(v) => corr(v)}
+                formatX={(v) => `${v}d`}
+                xLabel="horizon"
+                height={150}
+              />
+            </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -498,7 +682,7 @@ export default function AlternativeDataLabPanel() {
 
       {/* ── Formulas & notes ─────────────────────────────────────────────── */}
       <div className="card p-4">
-        <FormulaReference title="Formulas & notes" groups={ALTDATA_FORMULA_GROUPS} />
+        <FormulaReference title="Formulas & notes" groups={ALTDATA_FORMULA_GROUPS} collapsible />
         <ul className="mt-3 list-disc space-y-1 pl-4 text-xs" style={{ color: "var(--text-mut)" }}>
           <li>Static illustrative sample data — no live news, social media, or market data; no scraping, LLM, or data-provider APIs.</li>
           <li>Sentiment/novelty/reliability scores and return paths are hand-written sample numbers; the IC/hit-rate/decay figures illustrate the workflow, not evidence of alpha.</li>

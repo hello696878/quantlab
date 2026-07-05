@@ -1372,8 +1372,9 @@ export default function HomeDashboard({
             </span>
             <span className="text-xs text-slate-400">
               Analyze deterministic sample perpetual funding, spot/perp/futures basis, annualized
-              carry, funding P&amp;L, margin, liquidation distance, and basis stress scenarios — not
-              investment, trading, or liquidation advice.
+              carry, funding P&amp;L, margin, and liquidation distance with interactive shock
+              sliders, a basis curve, and funding/liquidation stress charts — not investment,
+              trading, or liquidation advice.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Crypto Derivatives Lab →
@@ -1397,8 +1398,9 @@ export default function HomeDashboard({
             </span>
             <span className="text-xs text-slate-400">
               Analyze deterministic sample stablecoin peg deviation, lending/borrow APY,
-              utilization, collateral health factor, liquidation distance, net carry, and protocol
-              stress scenarios — not investment, lending, borrowing, or liquidation advice.
+              utilization, collateral health factor, liquidation distance, and net carry with
+              interactive shock sliders, a kinked rate-curve chart, and health-factor/peg/net-APY
+              stress charts — not investment, lending, borrowing, or liquidation advice.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open DeFi Risk Lab →
@@ -1422,9 +1424,9 @@ export default function HomeDashboard({
             </span>
             <span className="text-xs text-slate-400">
               Analyze deterministic sample token valuation, FDV vs market cap, unlock schedules,
-              dilution pressure, emissions, real staking yield, treasury runway, holder
-              concentration, and tokenomics stress scenarios — not investment, trading, or token
-              advice.
+              dilution, emissions, real staking yield, treasury runway, and holder concentration
+              with interactive shock sliders, an unlock horizon selector, and unlock/runway/FDV
+              charts — not investment, trading, or token advice.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Tokenomics Risk Lab →
@@ -1448,8 +1450,9 @@ export default function HomeDashboard({
             </span>
             <span className="text-xs text-slate-400">
               Analyze deterministic sample exchange inflows/outflows, reserve ratios, active
-              addresses, token velocity, NVT-style valuation, whale flows, holder concentration,
-              and on-chain stress scenarios — not investment, trading, or token advice.
+              addresses, token velocity, NVT-style valuation, whale flows, and holder
+              concentration with interactive shock sliders plus flow, cohort, reserve, NVT, and
+              velocity charts — not investment, trading, or token advice.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open On-Chain Analytics Lab →
@@ -1473,9 +1476,9 @@ export default function HomeDashboard({
             </span>
             <span className="text-xs text-slate-400">
               Analyze deterministic sample news, social, earnings, macro, and supply-chain events
-              with sentiment scores, novelty, freshness decay, leakage checks, information
-              coefficient, hit rate, and signal decay scenarios — not investment, trading, or
-              signal advice.
+              with sentiment scores, novelty, freshness decay, leakage checks, IC/hit-rate, and
+              signal decay plus interactive shock sliders, a horizon selector, and
+              timeline/decay/IC charts — not investment, trading, or signal advice.
             </span>
             <span className="mt-1 text-xs font-medium text-blue-600">
               Open Alternative Data Lab →

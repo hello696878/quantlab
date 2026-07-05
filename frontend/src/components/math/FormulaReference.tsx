@@ -48,9 +48,13 @@ export default function FormulaReference({
   disclaimer,
   copyable = true,
   columns = 2,
+  collapsible = false,
+  defaultOpen = false,
 }: FormulaReferenceProps) {
   const [copied, setCopied] = useState(false);
   const [copyFailed, setCopyFailed] = useState(false);
+  const [open, setOpen] = useState(!collapsible || defaultOpen);
+  const bodyVisible = !collapsible || open;
 
   async function copyFormulas() {
     setCopyFailed(false);
@@ -73,7 +77,7 @@ export default function FormulaReference({
 
   return (
     <div>
-      {(title || copyable) && (
+      {(title || copyable || collapsible) && (
         <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
           <div>
             {title && <p className="section-title">{title}</p>}
@@ -83,18 +87,18 @@ export default function FormulaReference({
               </p>
             )}
           </div>
-          {copyable && (
-            <div className="flex items-center gap-2">
-              {copied && (
-                <span role="status" aria-live="polite" className="text-[11px]" style={{ color: "var(--accent-text)" }}>
-                  Copied LaTeX formulas.
-                </span>
-              )}
-              {copyFailed && (
-                <span role="status" aria-live="polite" className="text-[11px]" style={{ color: "var(--warn)" }}>
-                  Could not copy formulas automatically.
-                </span>
-              )}
+          <div className="flex items-center gap-2">
+            {copyable && copied && (
+              <span role="status" aria-live="polite" className="text-[11px]" style={{ color: "var(--accent-text)" }}>
+                Copied LaTeX formulas.
+              </span>
+            )}
+            {copyable && copyFailed && (
+              <span role="status" aria-live="polite" className="text-[11px]" style={{ color: "var(--warn)" }}>
+                Could not copy formulas automatically.
+              </span>
+            )}
+            {copyable && (
               <button
                 type="button"
                 onClick={copyFormulas}
@@ -104,12 +108,30 @@ export default function FormulaReference({
               >
                 {copied ? "Copied ✓" : "📋 Copy LaTeX"}
               </button>
-            </div>
-          )}
+            )}
+            {collapsible && (
+              <button
+                type="button"
+                onClick={() => setOpen((o) => !o)}
+                aria-expanded={open}
+                aria-label={open ? "Hide the formula reference" : "Show the formula reference"}
+                className="rounded-md px-2.5 py-1 text-xs font-semibold transition-colors"
+                style={{ background: "var(--glass)", border: "1px solid var(--line)", color: "var(--text-hi)" }}
+              >
+                {open ? "Hide formulas ▴" : "Show formulas ▾"}
+              </button>
+            )}
+          </div>
         </div>
       )}
 
-      <div className={`grid gap-4 ${gridCols}`}>
+      {!bodyVisible && (
+        <p className="text-[11px]" style={{ color: "var(--text-faint)" }}>
+          {groups.length} formula group{groups.length === 1 ? "" : "s"} hidden — use “Show formulas” to expand.
+        </p>
+      )}
+
+      <div className={`grid gap-4 ${gridCols}`} style={bodyVisible ? undefined : { display: "none" }}>
         {groups.map((group) => (
           <section key={group.title} aria-label={group.title}>
             <p className="mb-2 text-xs font-semibold uppercase tracking-wide" style={{ color: "var(--text-mut)" }}>

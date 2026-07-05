@@ -291,6 +291,16 @@ Strategy and parameter selection form. Renders different parameter fields per st
 - `DrawdownChart` — drawdown area chart
 - `MetricsGrid` — performance metrics table
 - `TradeTable` — sortable trade log
+- `components/charts/LabCharts.tsx` (31.5) — shared theme-aware recharts building
+  blocks for the recent labs: `ScenarioBarChart` (horizontal labelled bars),
+  `GroupedBarChart` (multi-series bars), `SimpleLineChart` (numeric-x lines),
+  `BarLineChart` (dual-axis bar + cumulative line); all filter non-finite values
+  to an empty-state and disable animation for deterministic rendering.
+- `components/controls/ShockSlider.tsx` (31.5) — shared labelled range slider used
+  by the interactive "scenario shock" control cards in the Crypto Derivatives,
+  DeFi Risk, Tokenomics, On-Chain, and Alternative Data labs; the shocks are
+  deterministic client-side transforms of the static sample request before
+  re-analysis (no new backend endpoints, no live data).
 
 ### `src/components/math/` — shared LaTeX formula reference (25.1)
 
@@ -301,7 +311,10 @@ in `layout.tsx`):
 
 - `FormulaReference.tsx` — grouped formula block with a built-in "📋 Copy LaTeX"
   button (copies clean grouped LaTeX **source**, success/failure status), optional
-  title / subtitle / disclaimer; lives inside each lab's existing card.
+  title / subtitle / disclaimer; lives inside each lab's existing card. Supports an
+  optional `collapsible` mode (31.5) — used by the five recent crypto/alt-data labs
+  to keep the formula panel compact (collapsed by default, "Show formulas" toggle,
+  all formulas and the copy button preserved when expanded).
 - `SafeMath.tsx` — renders one LaTeX string with `katex.renderToString({ throwOnError:
   false })` wrapped in try/catch → styled raw-LaTeX fallback, so a malformed formula
   can never crash the page; long equations scroll horizontally inside their own row.
