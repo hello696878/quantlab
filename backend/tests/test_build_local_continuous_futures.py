@@ -597,3 +597,65 @@ def test_serialize_helper_is_strict_json_safe(tmp_path):
 def test_continuous_build_module_still_invents_no_new_hash_after_serialize():
     src = (_BACKEND / "app" / "datastore" / "continuous_build.py").read_text(encoding="utf-8")
     assert "hashlib" not in src and "sha256" not in src
+
+
+# --------------------------------------------------------------------------- #
+# Commit 4 — integrated end-to-end (ingest -> build -> persist + report)
+# --------------------------------------------------------------------------- #
+
+
+def test_e2e_ingest_build_persist_report_full_provenance(tmp_path, monkeypatch):
+    """One integrated pass: generate ES M/U -> ingest (Phase 7) -> build + persist
+    via the CLI with --write-store + --report-json (all under tmp_path) -> read the
+    continuous series back and confirm the report, store, and adapter all agree;
+    nothing written outside tmp_path."""
+    before_data = (_REPO_ROOT / "data").exists()
+    before_artifacts = (_REPO_ROOT / "artifacts").exists()
+    before_backend_data = (_BACKEND / "data").exists()
+    monkeypatch.chdir(tmp_path)
+
+    store, base = _ingest_es_roll(tmp_path)  # generate + Phase 7 ingest
+    report = tmp_path / "reports" / "es_ratio.json"
+
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--write-store", "--report-json", str(report)))
+    assert rc == 0
+
+    # --- report parses strictly and carries the provenance ---
+    rec = json.loads(report.read_text(encoding="utf-8"))
+    assert rec["root_symbol"] == "ES" and rec["source"] == "csv_fixture"
+    assert rec["adjustment_method"] == "ratio"
+    assert rec["contracts"] == ["ESM25", "ESU25"]
+    assert rec["report_only"] is False
+    assert rec["output_path"] == "continuous/futures/csv_fixture/ES/ratio.csv"
+    assert not Path(rec["output_path"]).is_absolute()  # relative for --write-store
+    assert len(rec["roll_events"]) == 1
+    assert rec["roll_events"][0]["from_contract"] == "ESM25"
+    assert rec["roll_events"][0]["to_contract"] == "ESU25"
+
+    # --- report hashes match the adapter build result + stored raw ---
+    _, result = build_continuous_from_store(store, source="csv_fixture", root="ES")
+    assert rec["continuous_config_hash"] == result.continuous_config_hash
+    stacked = read_root_raw_frame(store, "csv_fixture", "ES")
+    assert rec["raw_data_version_hash"] == raw_data_version_hash(stacked)
+    for contract in ("ESM25", "ESU25"):
+        assert rec["contract_version_hashes"][contract] == raw_data_version_hash(
+            store.read_raw("ES", contract, "csv_fixture")
+        )
+
+    # --- persisted continuous series reads back with the ESM25 -> ESU25 roll ---
+    read_store = RawFuturesStore(base, prefer_parquet=False)
+    cont = read_store.read_continuous("ES", "csv_fixture", "ratio")
+    assert list(cont.columns) == CONTINUOUS_COLUMNS
+    assert cont["active_contract"].iloc[0] == "ESM25"
+    assert cont["active_contract"].iloc[-1] == "ESU25"
+    assert set(cont["active_contract"]) == {"ESM25", "ESU25"}
+    assert len(cont) == rec["rows"]
+
+    # --- everything under tmp_path; no repo-root data/artifacts ---
+    assert (base / "continuous").exists()
+    assert str(report).startswith(str(tmp_path))
+    assert all(str(p).startswith(str(tmp_path)) for p in _store_files(base))
+    assert (_REPO_ROOT / "data").exists() == before_data
+    assert (_REPO_ROOT / "artifacts").exists() == before_artifacts
+    assert (_BACKEND / "data").exists() == before_backend_data
