@@ -372,6 +372,15 @@ back-adjustment warnings in every consumer. No new stitching code should be
 needed — I4 is wiring and verification, and its design details live with
 that phase, not here.
 
+> **Planned (Phase 8, design approved 2026-07-05):** the store-to-continuous
+> **wiring** — read stored per-contract bars back from the raw namespace, stack
+> them, run the existing `build_continuous_futures` / `continuous_config_hash`,
+> and (only on an explicit flag) persist via `RawFuturesStore.write_continuous` —
+> is the planned continuation after I2. It is **report-only by default** and runs
+> on already-ingested local/synthetic data; it adds **no vendor fetch (I5) and no
+> download**. See `docs/AI_QUANT_ARCHITECTURE.md` **Appendix I** for the full
+> design, test plan, and commit plan. No code is implemented yet.
+
 ### Ingestion Phase 5 (I5) — real vendor integration
 
 Pick one vendor (§10 survey), one root, behind the same loader interface as
