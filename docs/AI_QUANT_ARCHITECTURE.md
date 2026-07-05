@@ -2271,3 +2271,417 @@ the module and CLI import no network or `futures_continuous` / `features` /
   integration** — raw per-contract bars are the end of this path for now.
 - No vendor downloader — "real data" means local files the user already holds
   (Ingestion I5 remains future work).
+
+---
+
+## Appendix I — Phase 8 Local Continuous Futures Construction
+
+> **Status: as-built (Phase 8 shipped, Commits 0–4).** Sections I.1–I.10 are the
+> approved design; **§I.11 records the shipped result.** Phase 8 connects the
+> Phase 7 raw store to the (already built + tested) continuous-futures builder —
+> it invented **no new construction algorithm and no new hash**. It is
+> **report-only by default**; writing continuous output requires an explicit
+> `--write-store` or `--output-path`. Runs on already-ingested local/synthetic
+> data only — no vendor fetch, no download.
+
+### I.1 Current state after Phase 7
+
+**What Phase 7 provides.** Local CSV →
+`load_futures_bars_csv` → `daily_bars_to_frame` → `validate_raw_futures` →
+`RawFuturesStore.write_raw` (one file per `(source, root, contract)`) → read-back
+verify → per-contract `raw_data_version_hash` → append-only JSONL ingestion log.
+Raw per-contract bars now live in the store's raw namespace:
+
+```text
+<base_dir>/raw/futures/<source>/<root_symbol>/<contract_symbol>.<parquet|csv>
+```
+
+**What `build_continuous_futures` already supports (built + tested in Phase 1).**
+
+- `compute_roll_schedule(raw_df, spec) -> list[RollEvent]` — deterministic
+  volume/OI crossover with a days-before-expiry fallback, spec-driven; each
+  `RollEvent` carries `roll_date`, `from_contract`, `to_contract`, `roll_reason`.
+- `build_continuous_futures(raw_df, spec, adjustment_method="ratio") -> DataFrame`
+  — stitches a **stacked** raw frame (all contracts of one root) into a
+  `CONTINUOUS_COLUMNS` series with `*_raw` (held, genuine) and `*_adjusted`
+  (ratio or Panama back-adjusted), seam-correct; calls `compute_roll_schedule`
+  internally.
+- `continuous_config_hash(raw_df, spec, adjustment_method="ratio") -> str` —
+  provenance hash that **already folds in** `raw_data_version_hash(raw_df)` plus
+  root, adjustment method, cycle months, expiry rule, and the full rollover
+  config, so it changes whenever the inputs or the computed roll schedule would.
+- `RawFuturesStore.write_continuous(df, source) -> Path` / `read_continuous(...)`
+  — a structurally separate `continuous/futures` namespace (raw writes can never
+  clobber it).
+- `get_instrument(root)` returns a `FuturesSpec` (subclass of `InstrumentSpec`)
+  for futures roots — exactly the `spec` the builder and hash need.
+
+**The missing gap between the store and the builder.**
+
+1. **Enumeration + stacking.** The store can only `read_raw` one explicit
+   `(root, contract, source)`. There is **no** "read all contracts for
+   `(source, root)` and stack them into one `raw_df`" — which is precisely the
+   input `build_continuous_futures` requires.
+2. **A driver.** Nothing wires `store → stacked raw_df → build_continuous_futures
+   + continuous_config_hash → summary / optional persist`.
+3. **Multi-contract same-root fixtures.** `esm25.csv` / `nqm25.csv` are
+   single-contract and **different roots** (ES vs NQ), so they cannot roll.
+
+### I.2 Phase 8 scope
+
+**In scope**
+
+- A **store-to-continuous adapter** (new module
+  `backend/app/datastore/continuous_build.py`): enumerate stored contracts for
+  `(source, root)`, stack via `read_raw`, call the **existing**
+  `build_continuous_futures` + `continuous_config_hash`, and collect provenance.
+- A **thin CLI** `scripts/build_local_continuous_futures.py`.
+- **Report-only by default**; optional persistence via the existing
+  `write_continuous` (store continuous namespace) or an explicit `--output-path`
+  CSV.
+- Provenance preservation (per-contract raw hash, `continuous_config_hash`, roll
+  schedule, adjustment, contract list, date range, output path).
+
+**Explicit exclusions**
+
+- No vendor / network / yfinance / IBKR / live-data downloader.
+- No live data.
+- No features / labels / ML pipeline.
+- No Research CLI real-data mode.
+- No frontend, no DB, no cloud storage.
+- No portfolio / strategy, no real-money trading.
+- **No committing data artifacts.**
+- **No new continuous-construction algorithm and no new hash** (reuse
+  `build_continuous_futures` / `continuous_config_hash`).
+- **No roll-parameter CLI overrides** — rolls are spec-driven (the builder
+  accepts no roll overrides).
+- No changes to the logic in `store.py` / `futures_continuous.py` (Phase 8
+  consumes them).
+
+### I.3 Locked decisions
+
+1. Phase 8 **consumes already-ingested raw futures bars** from `RawFuturesStore`.
+2. Phase 8 **does not download data**.
+3. Phase 8 **does not create vendor integrations**.
+4. Phase 8 **does not run features / labels / ML**.
+5. Phase 8 **does not add a Research CLI real-data mode**.
+6. Phase 8 **reuses existing** building blocks: `RawFuturesStore`,
+   `build_continuous_futures`, `compute_roll_schedule`, `continuous_config_hash`,
+   `get_instrument` / `FuturesSpec`, `raw_data_version_hash`.
+7. **Do not invent a new continuous-construction algorithm.**
+8. **Do not invent a new continuous hash.**
+9. **Report-only is the default.**
+10. Writing continuous output requires an explicit `--write-store` **or**
+    `--output-path`.
+11. Tests use `tmp_path` only.
+12. No repo-root `data/` or `artifacts/` files are created.
+13. The continuous namespace must not be confused with the raw namespace:
+    - raw input: `<base_dir>/raw/futures/<source>/<root>/<contract>`
+    - optional continuous output:
+      `<base_dir>/continuous/futures/<source>/<root>/<adjustment_method>`
+14. `esm25.csv` / `nqm25.csv` are not enough for a roll (different roots); Phase 8
+    tests **generate same-root multi-contract ES data in `tmp_path`**.
+15. The default CLI does not write — it prints a summary and `RESULT: OK`.
+
+### I.4 Proposed store-to-continuous adapter design
+
+**New module `backend/app/datastore/continuous_build.py`:**
+
+```python
+class ContinuousSourceError(ValueError):
+    """No stored contracts found for (source, root)."""
+
+@dataclass(frozen=True)
+class ContinuousBuildResult:
+    root_symbol: str
+    source: str
+    adjustment_method: str
+    contracts: list[str]                       # sorted contract symbols used
+    contract_version_hashes: dict[str, str]    # per-contract raw_data_version_hash
+    raw_data_version_hash: str                 # hash of the stacked raw frame
+    continuous_config_hash: str
+    rows: int
+    start: str                                 # ISO date of first continuous bar
+    end: str                                   # ISO date of last
+    roll_events: list[dict]                    # from/to/roll_date/reason
+    output_path: str = ""                      # relative-to-base, "" when report-only
+
+def list_stored_contracts(store, source, root) -> list[str]:
+    """Enumerate contract symbols under the store's raw namespace for
+    (source, root) using ONLY public path helpers:
+      dir = store.raw_path(root, "__probe__", source).parent
+    glob *.parquet + *.csv; stems -> sorted unique symbols. Empty -> caller raises
+    ContinuousSourceError."""
+
+def read_root_raw_frame(store, source, root) -> pd.DataFrame:
+    """Stack read_raw() over every enumerated contract into one validated raw
+    frame (each read_raw already returns a validate_raw_futures frame)."""
+
+def build_continuous_from_store(
+    store, *, source, root, adjustment_method="ratio", spec=None,
+) -> tuple[pd.DataFrame, ContinuousBuildResult]:
+    """Enumerate -> stack -> get_instrument(root) (assert FuturesSpec) ->
+    build_continuous_futures + continuous_config_hash + compute_roll_schedule ->
+    ContinuousBuildResult. No writes."""
+```
+
+Enumeration uses only the store's **public** `raw_path(...).parent`, so `store.py`
+stays untouched. (Alternative: add a `list_raw_contracts(source, root)` method to
+the store — a cleaner home, but it modifies a Phase 1 file; the adapter-module
+approach is recommended, with the store method noted as an option.)
+
+### I.5 CLI design — `scripts/build_local_continuous_futures.py`
+
+Thin argparse wrapper that bootstraps `backend` onto `sys.path` (mirrors the
+Phase 7 ingest CLI); `main(argv) -> int`; no business logic beyond parsing + one
+adapter call + printing.
+
+| Flag | Meaning |
+|---|---|
+| `--base-dir` (required) | `RawFuturesStore` base |
+| `--root-symbol` (required) | e.g. `ES` |
+| `--source` (required) | e.g. `csv_fixture` |
+| `--adjustment-method` | `ratio` (default) or `panama` |
+| `--write-store` | persist via `store.write_continuous` into `<base>/continuous/futures/<source>/<root>/<method>.<ext>` |
+| `--output-path <file>` | write the continuous frame to an explicit CSV instead |
+| `--report-json <file>` | also write the provenance summary as one strict-JSON object |
+| `--no-parquet` | force CSV storage parity |
+
+**Report-only default** — with neither `--write-store` nor `--output-path`, the
+CLI reads + builds + prints and writes **nothing**. The two write flags are
+mutually exclusive. Output pattern:
+
+```text
+root=ES source=csv_fixture adjustment=ratio contracts=ESM25,ESU25 rows=NN
+range=2025-05-.. -> 2025-09-.. rolls=1 (ESM25->ESU25 @ 2025-06-..)
+continuous_config_hash=<sha256>
+[WRITE] <relative path>            # only when persisted
+RESULT: OK
+```
+
+Exit `0` on success; nonzero with `RESULT: FAIL (...)` on: unknown root
+(`get_instrument` raises), no stored contracts for `(source, root)`
+(`ContinuousSourceError`), invalid adjustment method, or `ContinuousBuildError`
+(e.g., a roll seam with no common prior session).
+
+### I.6 Provenance design
+
+Everything traces raw → continuous, reusing existing hashes (no new ones):
+
+- **Per-contract `raw_data_version_hash`** — computed per stored contract (reuse
+  Phase 7's `compute_contract_version_hashes` / `raw_data_version_hash`), recorded
+  in `contract_version_hashes`.
+- **Stacked `raw_data_version_hash`** — of the full multi-contract frame fed to
+  the builder.
+- **`continuous_config_hash`** — from the existing function; it already folds in
+  the stacked raw hash + adjustment + full spec/rollover config.
+- **Source / root / contract list** — `source`, `root_symbol`, sorted `contracts`.
+- **Roll schedule / roll dates** — `roll_events` from `compute_roll_schedule`
+  (`from` / `to` / `roll_date` / `reason`).
+- **Adjustment method** — `ratio` / `panama`.
+- **Output path** — stored **relative to `base_dir`** (POSIX) when persisted,
+  `""` when report-only — never an absolute path in tests / JSON reports.
+- The optional `--report-json` writes exactly these fields as one strict-JSON
+  object (no `NaN` / `Infinity`).
+
+### I.7 Safety / data rules
+
+- **Tests use `tmp_path` only** — `base_dir`, any `--output-path` / `--report-json`,
+  and the store all under `tmp_path`.
+- **No writes to repo-root `data/`** — default is report-only; guard tests assert
+  repo-root `data/` / `artifacts/` and `backend/data/` are unchanged.
+- **No network / vendor / ML / frontend** — adapter + CLI import only `datastore`
+  / `instruments`; a guard test asserts no `requests/urllib/httpx/socket/aiohttp`,
+  no `features/labels/ml_signal/research_cli`, and no vendor terms.
+- **`data/` stays gitignored** (`data/`, `*.parquet`); no data artifacts committed.
+- **Fail clearly if required contracts are missing** — `ContinuousSourceError`
+  when `(source, root)` enumerates to zero files; the summary lists what was found.
+- **Fail clearly if not processable** — `get_instrument` raises on unknown root;
+  `build_continuous_futures` raises `ContinuousBuildError` on an unresolvable roll
+  / no common prior session; invalid adjustment method is rejected.
+- **Namespace clarity** — reads only from `raw/futures/...`; persists (if asked)
+  only into `continuous/futures/...` (via `write_continuous`) or a user CSV path;
+  never touches `data/processed/futures_daily/` (normalize's output).
+
+### I.8 Test plan — `backend/tests/test_build_local_continuous_futures.py`
+
+**Fixture gap + smallest fix.** The current fixtures can't roll. Smallest viable
+data = **same-root ES, two contracts with correct spec-derived expiries and an
+overlap window**: `ESM25` (expiry 2025-06-20) and `ESU25` (expiry 2025-09-19),
+overlapping daily bars in the weeks before 2025-06-20 where `ESU25` volume/OI
+overtakes `ESM25`. **Recommendation: generate these in-test into `tmp_path`** (a
+small helper writes the two CSVs with correct expiries + a clean crossover,
+ingests them via the Phase 7 `ingest_local_futures_csv`, then builds) — so
+**nothing new is committed** and everything stays under `tmp_path`. (Optional
+alternative: two tiny committed fixtures under `fixtures/futures_csv/es_roll/`;
+in-test generation is preferred to avoid committed data.)
+
+| # | Test | Asserts |
+|---|---|---|
+| 1 | ingest ES M+U into tmp store, then `build_continuous_from_store` | frame + `ContinuousBuildResult`; `contracts == ["ESM25","ESU25"]` |
+| 2 | output shape | columns == `CONTINUOUS_COLUMNS`; `rows > 0`; `active_contract` transitions ESM25→ESU25 at the roll |
+| 3 | provenance | `continuous_config_hash` == `continuous_config_hash(stacked, spec, "ratio")`; per-contract hashes == `raw_data_version_hash` of each stored contract; `roll_events` non-empty (`from=ESM25,to=ESU25`) |
+| 4 | determinism | building twice → identical `continuous_config_hash` and equal frames |
+| 5 | ratio vs panama differ | `panama` build has a different `continuous_config_hash` and different `*_adjusted` values |
+| 6 | report-only writes nothing | default path creates no file under the store's `continuous/` and no `--output-path` file |
+| 7 | `--write-store` persists | `store.read_continuous(root, source, "ratio")` round-trips; path relative in the result |
+| 8 | `--output-path` CSV | file exists under `tmp_path`; re-readable |
+| 9 | missing root/source fails | unknown `(source,root)` → `ContinuousSourceError` / CLI nonzero; unknown root → error |
+| 10 | invalid adjustment fails | `--adjustment-method bogus` → nonzero, nothing written |
+| 11 | no repo-root artifacts | repo-root `data/` / `artifacts/`, `backend/data/` unchanged; all writes under `tmp_path` |
+| 12 | no network / forbidden imports | regex guard over adapter + CLI (network, `features/labels/ml_signal/research_cli`, vendor terms) |
+| 13 | CLI exit codes | valid → 0 (+ `RESULT: OK`, `continuous_config_hash=`); missing/invalid → nonzero (+ `RESULT: FAIL`) |
+
+### I.9 Commit plan
+
+- **Commit 0 — Appendix I, doc-only** *(this commit)*: record the approved plan
+  (+ optional pointer in `FUTURES_DATA_INGESTION_PLAN.md`). *Acceptance:*
+  doc-only, no code.
+- **Commit 1 — store→continuous adapter/helpers**: `continuous_build.py`
+  (`list_stored_contracts`, `read_root_raw_frame`, `build_continuous_from_store`,
+  `ContinuousBuildResult`, `ContinuousSourceError`) + tests 1–5, 9, 12.
+  *Acceptance:* builds from a tmp store; provenance + determinism green; no writes.
+- **Commit 2 — CLI**: `scripts/build_local_continuous_futures.py` (report-only
+  default; `--write-store` / `--output-path`) + tests 6, 7, 8, 13. *Acceptance:*
+  report-only writes nothing; persist paths round-trip; exit codes correct.
+- **Commit 3 — provenance / report output**: `--report-json` (strict-JSON
+  summary) + full roll-schedule surfacing + report-content tests (hashes, roll
+  dates, relative paths, no `NaN`). *Acceptance:* report parses, carries all
+  provenance, no absolute paths.
+- **Commit 4 — e2e + as-built docs**: one integrated e2e (ingest ES M+U → build →
+  optional persist → verify provenance, all under `tmp_path`) + flip Appendix I to
+  as-built. *Acceptance:* e2e + full suite green; docs match shipped behavior.
+
+Each commit runs `pytest tests/test_build_local_continuous_futures.py -v` then the
+full `pytest tests`; the user commits manually.
+
+### I.10 Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Confusing raw store namespace with processed continuous output | reads only `raw/futures/...`; persists only into `continuous/futures/...` (via `write_continuous`) or an explicit user CSV; never touches `data/processed/futures_daily/` |
+| Insufficient multi-contract fixtures | generate same-root ES M+U with **correct spec-derived expiries** + overlap in-test under `tmp_path`; don't reuse the single-contract fixtures |
+| Roll schedule edge cases | rely on the **already-tested** `compute_roll_schedule` (crossover + days-before-expiry fallback); surface `ContinuousBuildError` loudly; the generated fixture guarantees overlap so a seam resolves |
+| Ratio / Panama adjusted-price misuse | reuse the builder's `*_raw` vs `*_adjusted` contract; the report labels `adjustment_method`; docs repeat the Phase-1 caveat (adjusted levels fictitious; ratio for returns, Panama for point/charts) |
+| Accidental data commits | default report-only; `data/` / `*.parquet` gitignored; tests write under `tmp_path` only; guard tests assert no repo-root artifacts |
+| Jumping early into features / ML | hard exclusion; adapter / CLI import no `features` / `labels` / `ml_signal` / `research_cli`; guard test enforces it; output is continuous bars, nothing downstream |
+| Spec type mismatch (`get_instrument` typed `InstrumentSpec`) | assert the returned spec is a `FuturesSpec` in the adapter; fail clearly otherwise |
+| Enumeration relying on a private slug helper | use only the public `store.raw_path(...).parent` to locate the contract dir; glob both formats and dedupe by stem |
+| CSV-vs-parquet environment divergence | reuse the store's `storage_format` fallback; tests exercise `--no-parquet` |
+
+### I.11 As-built (Phase 8 shipped)
+
+Implemented across Commits 1–4 exactly as designed above; tests are synthetic +
+`tmp_path` only, no network, and the full backend suite stays green.
+
+**Shipped components**
+
+- `backend/app/datastore/continuous_build.py` — `ContinuousSourceError`, frozen
+  `ContinuousBuildResult`, `list_stored_contracts`, `read_root_raw_frame`,
+  `build_continuous_from_store(store, *, source, root, adjustment_method="ratio",
+  spec=None) -> (DataFrame, ContinuousBuildResult)`, and
+  `serialize_continuous_build_result(result, *, output_path="", report_only=True)
+  -> dict`. Reuses `build_continuous_futures` / `continuous_config_hash` /
+  `compute_roll_schedule` / `raw_data_version_hash` — no new algorithm, no new hash.
+- `scripts/build_local_continuous_futures.py` — thin argparse CLI; no business
+  logic beyond parsing + one adapter call + optional persistence/printing.
+- `backend/tests/test_build_local_continuous_futures.py` — 45 tests (adapter,
+  CLI, strict-JSON report, and one integrated end-to-end pass).
+
+**CLI usage**
+
+Report-only default (prints a summary; writes no continuous output):
+
+```powershell
+cd C:\quantlab
+.\backend\venv\Scripts\python.exe .\scripts\build_local_continuous_futures.py `
+  --base-dir data --root-symbol ES --source csv_fixture --adjustment-method ratio
+```
+
+Optional persist into the store's continuous namespace:
+
+```powershell
+.\backend\venv\Scripts\python.exe .\scripts\build_local_continuous_futures.py `
+  --base-dir data --root-symbol ES --source csv_fixture --adjustment-method ratio --write-store
+```
+
+Optional explicit CSV output:
+
+```powershell
+.\backend\venv\Scripts\python.exe .\scripts\build_local_continuous_futures.py `
+  --base-dir data --root-symbol ES --source csv_fixture --adjustment-method ratio `
+  --output-path data\processed\continuous_futures\ES_ratio.csv
+```
+
+Optional strict-JSON provenance report (composes with any mode):
+
+```powershell
+.\backend\venv\Scripts\python.exe .\scripts\build_local_continuous_futures.py `
+  --base-dir data --root-symbol ES --source csv_fixture --adjustment-method ratio `
+  --report-json data\reports\continuous_ES_ratio.json
+```
+
+Expected output pattern:
+
+```text
+root=ES
+source=csv_fixture
+adjustment=ratio
+contracts=ESM25,ESU25
+rows=NN
+range=2025-05-.. -> 2025-06-..
+rolls=1 (ESM25->ESU25 @ 2025-06-..)
+continuous_config_hash=<sha256>
+[WRITE] path=...        # only with --write-store / --output-path
+[REPORT] path=...       # only with --report-json
+RESULT: OK
+```
+
+`--write-store` and `--output-path` are mutually exclusive (argparse error).
+Exit `0` on success; nonzero (`RESULT: FAIL (...)`, no report written) on invalid
+root/source, no stored contracts, invalid adjustment method, or an unresolvable
+roll.
+
+**Namespaces**
+
+- raw input: `<base_dir>/raw/futures/<source>/<root>/<contract>.<parquet|csv>`
+- optional continuous output (`--write-store`):
+  `<base_dir>/continuous/futures/<source>/<root>/<adjustment_method>.<parquet|csv>`
+- optional explicit CSV: user-provided `--output-path`
+- optional report: user-provided `--report-json`
+
+The continuous namespace is structurally separate from raw (raw writes can never
+clobber it), and Phase 8 never touches `data/processed/futures_daily/`
+(`normalize_local_futures_csv.py`'s output).
+
+**Provenance (in `ContinuousBuildResult` and the `--report-json` object)**
+
+- per-contract `raw_data_version_hash` (`contract_version_hashes`)
+- stacked `raw_data_version_hash`
+- `continuous_config_hash` (reused; already folds in the stacked raw hash + spec/rollover)
+- `roll_events` (`from`/`to`/`roll_date`/`decision_date`/`roll_reason`/`rule_used`/`metadata`)
+- `adjustment_method`, `contracts`, `rows`, `start`/`end`
+- `output_path` (base-relative for `--write-store`, user path for `--output-path`, `""` otherwise)
+- `report_only` (True unless continuous output was written)
+
+The report is strict JSON (`json.dumps(..., allow_nan=False)`) — no `NaN` /
+`Infinity`; dates are strings; contract paths never appear (no absolute paths).
+
+**Safety (as-built)** — local store only; **no network / vendor / yfinance / IBKR
+/ live data**; **no features / labels / ML**; **no Research CLI real-data mode**;
+default **report-only** (writing is explicit); `data/` (and `*.parquet`) stay
+gitignored; tests write under `tmp_path` only and assert no repo-root `data/` /
+`artifacts/`; guard tests assert the module and CLI import no network or
+`features` / `labels` / `ml_signal` / `research_cli` modules and invent no hash.
+
+**Known limitations**
+
+- No vendor downloader — Phase 8 runs on already-ingested local files only.
+- No continuous → feature / label / ML integration yet — continuous bars are the
+  end of this path for now.
+- No Research CLI real-data mode yet.
+- `--output-path` / `--report-json` overwrite existing files; `--write-store`
+  uses `write_continuous`'s existing overwrite behavior — there is **no
+  idempotent-skip policy** yet.
+- The end-to-end tests use synthetic ES M/U overlap data generated under
+  `tmp_path` (correct spec-derived expiries + a volume/OI crossover).

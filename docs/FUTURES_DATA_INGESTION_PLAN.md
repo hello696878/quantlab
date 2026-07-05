@@ -372,6 +372,19 @@ back-adjustment warnings in every consumer. No new stitching code should be
 needed — I4 is wiring and verification, and its design details live with
 that phase, not here.
 
+> **Implemented (Phase 8, 2026-07-05):** the store-to-continuous **wiring** now
+> exists — `scripts/build_local_continuous_futures.py` +
+> `backend/app/datastore/continuous_build.py` read stored per-contract bars back
+> from the raw namespace, stack them, run the existing `build_continuous_futures`
+> / `continuous_config_hash` / `compute_roll_schedule`, and (only on an explicit
+> `--write-store` / `--output-path`) persist the continuous series, with an
+> optional strict-JSON `--report-json` provenance report. It is **report-only by
+> default** and runs on already-ingested **local/synthetic** data. This satisfies
+> the *wiring/verification* part of I4 on local data; running the builder on
+> **real** per-contract data (the original I4 precondition) and **vendor fetch
+> (I5)** remain **not implemented**. See `docs/AI_QUANT_ARCHITECTURE.md`
+> **Appendix I (§I.11 as-built)** for details.
+
 ### Ingestion Phase 5 (I5) — real vendor integration
 
 Pick one vendor (§10 survey), one root, behind the same loader interface as
