@@ -11,6 +11,7 @@ feature warmup + a train/val split — written into a tmp `RawFuturesStore`
 
 from __future__ import annotations
 
+import importlib.util
 import re
 from pathlib import Path
 
@@ -49,6 +50,31 @@ def _repo_paths_snapshot() -> tuple[bool, bool, bool]:
         (_REPO_ROOT / "artifacts").exists(),
         (_BACKEND / "data").exists(),
     )
+
+
+_CLI_PATH = _REPO_ROOT / "scripts" / "run_local_futures_ml_experiment.py"
+
+
+def _load_cli():
+    """Import the thin CLI module by path (executes its sys.path bootstrap)."""
+    spec = importlib.util.spec_from_file_location("run_local_ml_cli", _CLI_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _cli_args(base: Path, *extra: str) -> list[str]:
+    """Base CLI args with the default synthetic-ES windows; append per-test extras."""
+    return [
+        "--base-dir", str(base),
+        "--root-symbol", "ES",
+        "--source", "synthetic",
+        "--train-start", "2024-04-01",
+        "--train-end", "2024-06-05",
+        "--validation-start", "2024-06-06",
+        "--validation-end", "2024-09-15",
+        *extra,
+    ]
 
 
 # --------------------------------------------------------------------------- #
@@ -222,3 +248,136 @@ def test_local_pipeline_invents_no_new_hash():
     for name in ("config.py", "pipeline.py"):
         src = (_BACKEND / "app" / "local_pipeline" / name).read_text(encoding="utf-8")
         assert "hashlib" not in src and "sha256" not in src, name
+
+
+# --------------------------------------------------------------------------- #
+# Commit 2 — thin CLI
+# --------------------------------------------------------------------------- #
+
+
+def test_cli_valid_no_artifacts_returns_zero_and_writes_nothing(tmp_path, capsys):
+    store, base = _raw_store(tmp_path)
+    before = {p for p in base.rglob("*") if p.is_file()}
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base))
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "RESULT: OK" in out
+    assert "train_run_hash=" in out and "continuous_config_hash=" in out
+    assert "artifact_dir=\n" in out or out.rstrip().endswith("RESULT: OK")  # empty artifact_dir
+    assert "root=ES" in out and "adjustment=ratio" in out
+    # no experiment artifacts written (raw store untouched, no exp dir)
+    assert {p for p in base.rglob("*") if p.is_file()} == before
+
+
+def test_cli_with_artifacts_saves_under_tmp_path(tmp_path, capsys):
+    store, base = _raw_store(tmp_path)
+    exp = tmp_path / "exp"
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--artifacts-dir", str(exp)))
+    out = capsys.readouterr().out
+    assert rc == 0 and "RESULT: OK" in out
+    # a run dir now exists under the tmp artifacts dir, and it's printed
+    run_dirs = [p for p in exp.glob("*") if p.is_dir()]
+    assert len(run_dirs) == 1
+    assert f"artifact_dir={run_dirs[0]}" in out
+    assert str(run_dirs[0]).startswith(str(tmp_path))
+
+
+def test_cli_feature_columns_comma_list(tmp_path, capsys):
+    store, base = _raw_store(tmp_path)
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--feature-columns", "feature__return_20"))
+    out = capsys.readouterr().out
+    assert rc == 0 and "RESULT: OK" in out
+
+
+def test_cli_panama_or_none_fails(tmp_path, capsys):
+    store, base = _raw_store(tmp_path)
+    cli = _load_cli()
+    for method in ("panama", "none"):
+        rc = cli.main(_cli_args(base, "--adjustment-method", method))
+        out = capsys.readouterr().out
+        assert rc == 1 and "RESULT: FAIL" in out
+
+
+def test_cli_missing_source_returns_nonzero(tmp_path, capsys):
+    store, base = _raw_store(tmp_path)
+    cli = _load_cli()
+    args = _cli_args(base)
+    args[args.index("--source") + 1] = "nope"
+    rc = cli.main(args)
+    out = capsys.readouterr().out
+    assert rc == 1 and "RESULT: FAIL" in out
+
+
+def test_cli_narrow_windows_return_nonzero(tmp_path, capsys):
+    store, base = _raw_store(tmp_path)
+    cli = _load_cli()
+    rc = cli.main([
+        "--base-dir", str(base), "--root-symbol", "ES", "--source", "synthetic",
+        "--train-start", "2030-01-01", "--train-end", "2030-02-01",
+        "--validation-start", "2030-02-02", "--validation-end", "2030-03-01",
+    ])
+    out = capsys.readouterr().out
+    assert rc == 1 and "RESULT: FAIL" in out
+
+
+def test_cli_duplicate_without_overwrite_nonzero_then_overwrite_ok(tmp_path, capsys):
+    store, base = _raw_store(tmp_path)
+    exp = tmp_path / "exp"
+    cli = _load_cli()
+    assert cli.main(_cli_args(base, "--artifacts-dir", str(exp))) == 0
+    capsys.readouterr()
+    # second identical run -> duplicate -> nonzero
+    rc = cli.main(_cli_args(base, "--artifacts-dir", str(exp)))
+    out = capsys.readouterr().out
+    assert rc == 1 and "RESULT: FAIL" in out
+    # ... with --overwrite it succeeds
+    assert cli.main(_cli_args(base, "--artifacts-dir", str(exp), "--overwrite")) == 0
+
+
+def test_cli_invalid_model_or_task_is_argparse_error(tmp_path):
+    store, base = _raw_store(tmp_path)
+    cli = _load_cli()
+    with pytest.raises(SystemExit) as exc:
+        cli.main(_cli_args(base, "--model-type", "bogus"))
+    assert exc.value.code != 0
+    with pytest.raises(SystemExit):
+        cli.main(_cli_args(base, "--task-type", "bogus"))
+
+
+def test_cli_no_parquet_works(tmp_path, capsys):
+    store, base = _raw_store(tmp_path)
+    exp = tmp_path / "exp"
+    cli = _load_cli()
+    rc = cli.main(_cli_args(base, "--no-parquet", "--artifacts-dir", str(exp)))
+    assert rc == 0 and "RESULT: OK" in capsys.readouterr().out
+
+
+def test_cli_no_repo_root_data_or_artifacts(tmp_path, monkeypatch):
+    before = _repo_paths_snapshot()
+    monkeypatch.chdir(tmp_path)
+    store, base = _raw_store(tmp_path)
+    exp = tmp_path / "exp"
+    cli = _load_cli()
+    assert cli.main(_cli_args(base, "--artifacts-dir", str(exp))) == 0
+    assert all(str(p).startswith(str(tmp_path)) for p in exp.rglob("*") if p.is_file())
+    assert _repo_paths_snapshot() == before
+
+
+def test_cli_is_thin_and_clean():
+    src = _CLI_PATH.read_text(encoding="utf-8")
+    assert "run_local_futures_ml_experiment" in src
+    # the CLI must not reach into the Phase 2-5 building blocks directly
+    for token in ("build_feature_matrix", "build_label_matrix", "train_model",
+                  "build_continuous_futures"):
+        assert token not in src, token
+    assert "hashlib" not in src and "sha256" not in src
+    assert not re.search(
+        r"(?m)^\s*(from|import)\s+\S*\b(requests|urllib|httpx|aiohttp|socket)\b", src
+    )
+    assert not re.search(
+        r"(?m)^\s*(from|import)\s+\S*"
+        r"(yfinance|ibkr|sklearn|xgboost|lightgbm|torch|tensorflow)\b", src
+    )
