@@ -246,6 +246,24 @@ labs' engines. Static illustrative sample data — no live data of any kind, not
 a production risk report, not investment research, not investment / trading /
 asset-allocation advice.
 
+The **Research Workspace & Experiment Journal** (`ResearchWorkspacePanel`, view
+`researchworkspace`, Phase 33.0) loads six deterministic saved research packs
+of hand-written sample experiment runs and re-analyses live via
+`/api/research-workspace/analyze` (severity-ranked run comparison with Δ and
+ε-guarded Δ%, average/max severity, module coverage, a documented methodology
+checklist with reproducibility score, a workspace-regime pill, a workflow
+timeline, and a Markdown + JSON export with copy buttons). Summary /
+comparison / journal / export view modes; runs stage/unstage from journal
+cards; a bounded workspace-note editor feeds the report. **Optional
+browser-local drafts** persist the preset/runs/note/sections via
+`localStorage` only — loaded after mount (SSR output never depends on
+storage, so no hydration mismatch), every access wrapped for unavailable
+storage, with save/load/delete/delete-all and reset controls; notes are plain
+text, so keep them non-sensitive. Static illustrative sample data — not
+recorded lab outputs, no live data, no login, no cloud sync, not a production
+research-management system, not compliance records, not investment / trading /
+asset-allocation advice.
+
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract
 assumptions, and re-analyses live via `/api/futures/analyze` (cost-of-carry

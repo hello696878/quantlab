@@ -31,6 +31,7 @@ export type View =
   | "altdata"
   | "macroregime"
   | "scenariostudio"
+  | "researchworkspace"
   | "csv"
   | "builder"
   | "portfolio"

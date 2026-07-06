@@ -56,6 +56,7 @@ import OnChainAnalyticsLabPanel from "@/components/OnChainAnalyticsLabPanel";
 import AlternativeDataLabPanel from "@/components/AlternativeDataLabPanel";
 import MacroRegimeLabPanel from "@/components/MacroRegimeLabPanel";
 import ScenarioStudioPanel from "@/components/ScenarioStudioPanel";
+import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -454,6 +455,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Unified Scenario Studio & Report Builder",
     subtitle:
       "Deterministic scenario templates and global shock controls mapped through documented cross-lab impact scores — module impact charts, a scenario heatmap, baseline-vs-stress comparisons, a severity gauge, a regime read, and a copy-friendly educational report builder across macro, portfolio, crypto derivatives, DeFi, tokenomics, on-chain, alternative data, and microstructure — static sample data, no live data, not investment, trading, or asset-allocation advice, not a production risk report.",
+  },
+  researchworkspace: {
+    title: "Research Workspace & Experiment Journal",
+    subtitle:
+      "Organize deterministic sample lab runs into saved research presets — stage runs, compare baseline vs stressed reads with change and guarded percentage-change formulas, inspect severity/coverage/reproducibility scores, a workflow timeline, and a methodology checklist, write experiment notes, and export copy-friendly Markdown or JSON summaries (optional browser-local drafts, no accounts, no cloud) — static sample data, no live data, not investment, trading, or asset-allocation advice, not production research or compliance records.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1037,6 +1043,7 @@ export default function HomePage() {
     { view: "altdata", title: "Open Alternative Data Lab", keywords: "alternative data alt data news sentiment social sentiment earnings macro supply chain events novelty freshness leakage guard information coefficient ic hit rate signal decay alpha score event study interactive shock slider timeline decay chart" },
     { view: "macroregime", title: "Open Macro Regime Lab", keywords: "macro regime cross asset allocation growth inflation policy liquidity credit stress usd pressure z-score goldilocks stagflation recession risk parity inverse volatility regime tilt" },
     { view: "scenariostudio", title: "Open Scenario Studio", keywords: "scenario studio unified cross lab report builder stress template soft landing inflation growth shock liquidity crunch credit crypto risk off depeg inflow panic severe combo impact score heatmap severity regime markdown report" },
+    { view: "researchworkspace", title: "Open Research Workspace", keywords: "research workspace experiment journal saved presets run comparison baseline stressed severity coverage reproducibility methodology checklist workflow timeline notes markdown json export local drafts" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1485,6 +1492,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("scenariostudio"),
+    })),
+    ...(
+      [
+        ["Open Research Workspace", "research workspace experiment journal saved presets lab runs organize educational"],
+        ["Experiment Journal", "experiment journal run cards notes scenario baseline stressed severity confidence label"],
+        ["Saved Presets", "saved research presets macro stress crypto risk off defi liquidity tokenomics unlock alternative data cross asset pack"],
+        ["Run Comparison", "run comparison table baseline stressed change percent change severity ranking sort"],
+        ["Research Report Builder", "research report builder markdown json export copy sections overview assumptions methodology limitations next steps"],
+        ["Methodology Checklist", "methodology checklist reproducibility score assumptions limitations run notes documentation checks"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `researchworkspace-${title}`,
+      group: "Research Workspace",
+      title,
+      keywords,
+      run: () => handleNav("researchworkspace"),
     })),
     ...(
       [
@@ -2070,6 +2093,8 @@ export default function HomePage() {
         {view === "macroregime" && <MacroRegimeLabPanel />}
 
         {view === "scenariostudio" && <ScenarioStudioPanel />}
+
+        {view === "researchworkspace" && <ResearchWorkspacePanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

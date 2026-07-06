@@ -615,6 +615,29 @@ Return to the Command Center's **Platform Direction** panel (or open
   sample shocks — the studio does **not** call the other labs' engines, is
   **not** a risk measurement or a production risk report, uses **no** live
   data, and is not investment / trading / asset-allocation advice.
+- **Research Workspace & Experiment Journal (33.0)** — open from the sidebar (or
+  Ctrl/Cmd+K → "Open Research Workspace" / "Experiment Journal"). Switch among
+  the six **saved research presets** (Macro Stress, Crypto Risk-Off, DeFi
+  Liquidity Stress, Tokenomics Unlock Review, Alternative Data Signal Quality,
+  Cross-Asset Scenario Report packs) — each is a hand-written pack of sample
+  experiment runs on fixed timestamps. Flip the **view modes**: *Summary* shows
+  the workspace regime pill, avg/max severity, coverage and reproducibility
+  cards, the **run severity chart**, **indexed baseline-vs-stressed chart**,
+  **module coverage chart**, the **workflow timeline**, and the **methodology
+  checklist** (the tokenomics pack ships one un-annotated run so a check
+  visibly fails); *Comparison* shows the Δ/Δ% table with the sort selector
+  (note the ε-guarded Δ% renders as — for the zero-baseline leakage run);
+  *Journal* shows clickable run cards (stage/unstage; staging only the mild
+  concentration run flips the regime to Calm research pack) and the bounded
+  **workspace note** editor; *Export* shows the report-section checkboxes, the
+  generated Markdown preview with **📋 Copy Markdown / Copy JSON**, and the
+  optional **browser-local drafts** (save/load/delete/delete-all + reset —
+  localStorage only, no accounts, no cloud). The **Formulas & notes** are
+  collapsible **LaTeX** (KaTeX, local — no CDN). Emphasise: hand-written static
+  sample presets — **not** recorded lab outputs, the reproducibility score is a
+  documentation count (**not** verification), **no** live data, **not** a
+  production research-management system, **not** compliance records, not
+  investment / trading / asset-allocation advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

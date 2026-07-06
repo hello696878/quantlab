@@ -1677,6 +1677,70 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 33.0 — Research Workspace, Saved Presets & Experiment Journal v1 ✅
+
+- **New deterministic educational product-workflow layer: a central workspace
+  that organizes sample lab runs into saved research presets with an
+  experiment journal and report export.** Static sample data only; no login,
+  no cloud sync, no database dependency, no external storage, no live data,
+  no API keys, no trading, not investment / trading / asset-allocation /
+  compliance advice, not production research records. No existing module
+  changed (separate package + view).
+- Backend: new `app/research_workspace/` package (`models.py` strict Pydantic
+  v2 with `extra="forbid"` + `FiniteFloat`, module/section/confidence/regime
+  literal enums, severity bounded [0, 100], notes ≤ 500 chars / user note
+  ≤ 2000 chars, non-empty `linked_modules` / `experiment_runs` /
+  `report_sections`; `sample.py` six deterministic research packs — Macro
+  Stress, Crypto Risk-Off, DeFi Liquidity Stress, Tokenomics Unlock Review,
+  Alternative Data Signal Quality, Cross-Asset Scenario Report — each with
+  hand-written experiment runs on fixed sample timestamps; `service.py` pure
+  analytics) + `app/research_workspace_routes.py`
+  (`GET /research-workspace/sample`, `POST /research-workspace/analyze`;
+  unknown preset id or an empty staged-run match → 422), wired via
+  `include_router`.
+- Analytics: per-run change `Δ = stress − base` and guarded percentage change
+  `Δ% = Δ/(|base| + ε)` (finite even at a zero baseline), a severity-ranked
+  run comparison, average/max severity, module coverage
+  `C = distinct staged modules / 9`, a documented six-item **methodology
+  checklist** with reproducibility score `R = passed/total` (a
+  documentation-completeness count, not verification), a deterministic
+  **workspace-regime classification** (calm / focused-module review /
+  multi-module stress / severe research pack / incomplete methodology), a
+  seven-step **workflow timeline**, a deterministic **Markdown report
+  preview** (seven selectable sections; no recommendation wording), and a
+  Markdown + canonical-JSON **export payload**. Everything guarded → no
+  NaN/Inf.
+- Frontend: new `ResearchWorkspacePanel` (view `researchworkspace`) — hero,
+  six-way preset selector, **summary / comparison / journal / export view
+  modes**, staged-run journal cards (click to stage/unstage), a bounded
+  workspace-note editor, report-section checkboxes, a sort selector, run
+  severity + indexed baseline-vs-stressed + module-coverage charts, the
+  workflow timeline and methodology checklist visuals, a run-comparison
+  table with Δ/Δ%, a copyable Markdown + JSON report preview, and **optional
+  browser-local drafts** (localStorage only: loaded after mount so SSR never
+  depends on storage, every access guarded for unavailable storage, clear
+  save/load/delete/delete-all/reset controls, non-sensitive-note warning);
+  collapsible shared `FormulaReference` (Δ, Δ%, S̄, C, R); new
+  `lib/researchWorkspace.ts` types + API client. Wired into Sidebar
+  ("Research Workspace"), Dashboard card ("Research workspace" badge), and
+  Command Palette (Open Research Workspace, Experiment Journal, Saved
+  Presets, Run Comparison, Research Report Builder, Methodology Checklist).
+- 26 new backend tests (deterministic, no network) — sample/analyze
+  endpoints, change/Δ%/average/max formulas (incl. the zero-baseline guard),
+  severity bounds, severity-descending ranking, coverage/reproducibility
+  bounds, per-preset regime mapping plus reachable calm/incomplete regimes,
+  report section selection, limitations-when-selected, no-recommendation
+  wording, Markdown + JSON export payload, validation rejections (empty
+  linked modules/runs/sections, severity out of bounds, NaN/Inf, oversized
+  note, unknown preset, unmatched run ids), full-payload finiteness, and
+  timeline/checklist behaviour. `npx tsc --noEmit` clean; no frontend build
+  run (per instructions). Docs: `README.md`, `backend/README.md`,
+  `frontend/README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`,
+  `DEMO_SCRIPT.md`. **Static sample, educational — hand-written presets and
+  runs, documented teaching scores, optional browser-local drafts only, not
+  a production research-management system, not compliance records, not
+  investment / trading / asset-allocation advice.**
+
 ### Phase 32.0 — Unified Scenario Studio & Cross-Lab Report Builder v1 ✅
 
 - **New deterministic educational workflow layer that connects the recent labs
