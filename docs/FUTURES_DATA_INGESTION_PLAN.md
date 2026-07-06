@@ -385,13 +385,16 @@ that phase, not here.
 > (I5)** remain **not implemented**. See `docs/AI_QUANT_ARCHITECTURE.md`
 > **Appendix I (§I.11 as-built)** for details.
 >
-> **Planned (Phase 9, design approved 2026-07-05):** wiring the Phase 8 local
-> continuous output into the existing feature / label / ML / experiment chain
-> (Phases 2–5) — store-backed continuous → features → labels → dataset → train →
-> evaluate → save, on already-ingested **local/synthetic** data only. It adds **no
-> vendor fetch (I5) and no real-data acquisition** (both remain out of scope and
-> unimplemented). See `docs/AI_QUANT_ARCHITECTURE.md` **Appendix J** for the full
-> plan. No code is implemented yet.
+> **Implemented (Phase 9, 2026-07-05):** the Phase 8 local continuous output is
+> now wired into the existing feature / label / ML / experiment chain (Phases 2–5)
+> — `backend/app/local_pipeline/` + `scripts/run_local_futures_ml_experiment.py`
+> run store-backed continuous → features → labels → dataset → train → evaluate →
+> (optional) save, on already-ingested **local/synthetic** data only, with the full
+> `raw → … → train_run` hash chain preserved (a test proves an identical
+> `train_run_hash` vs the synthetic Research CLI). It adds **no vendor fetch (I5)
+> and no real-data acquisition** (both remain out of scope and **not
+> implemented**). See `docs/AI_QUANT_ARCHITECTURE.md` **Appendix J (§J.11
+> as-built)** for details.
 
 ### Ingestion Phase 5 (I5) — real vendor integration
 

@@ -2688,15 +2688,15 @@ gitignored; tests write under `tmp_path` only and assert no repo-root `data/` /
 
 ---
 
-## Appendix J — Phase 9 Local Continuous Futures → ML Pipeline Plan
+## Appendix J — Phase 9 Local Continuous Futures → ML Pipeline
 
-> **Status: design only (Commit 0).** Nothing in this appendix is implemented by
-> this appendix. It records the approved Phase 9 plan so implementation lands in
-> tiny, testable commits on top of the store → continuous machinery (Phases 7–8)
-> and the feature / label / ML / experiment chain (Phases 2–5) that already
-> exist. Phase 9 changes **only the source of the continuous DataFrame** — it
-> invents **no new ML stack, no new model family, and no new hash**. No code,
-> script, data, or test is created by Commit 0.
+> **Status: as-built (Phase 9 shipped, Commits 0–3).** Sections J.1–J.10 are the
+> approved design; **§J.11 records the shipped result.** Phase 9 changed **only
+> the source of the continuous DataFrame** (the store instead of a synthetic
+> generator) and reused the existing Phase 2–5 chain verbatim — it invented **no
+> new ML stack, no new model family, and no new hash**. The ML path is
+> **ratio-only**; a run is persisted **only** when an artifacts dir is given;
+> local/synthetic data only — no vendor, no download, no Research CLI change.
 
 ### J.1 Current state
 
@@ -2898,3 +2898,105 @@ Each commit runs `pytest tests/test_local_futures_ml_pipeline.py -v` then the fu
 | Coupling runtime to the synthetic demo | `local_pipeline` imports **no** synthetic generator; it consumes whatever is in the store; the generator is used only as **test data**, not a runtime dependency |
 | Adjusted vs raw price confusion | pin `ratio` for the ML path (features/labels read `*_adjusted`; execution reads `*_raw`), the same discipline the chain already enforces; panama/none rejected up front |
 | Jumping to real vendor data too early | hard exclusion: store/local only, no downloader; a guard test asserts no network/vendor imports; "real data" stays a future phase (Ingestion I5) |
+
+### J.11 As-built (Phase 9 shipped)
+
+Implemented across Commits 1–3 exactly as designed above; tests are synthetic +
+`tmp_path` only, no network, and the full backend suite stays green.
+
+**Shipped components**
+
+- `backend/app/local_pipeline/__init__.py` — package exports
+  (`LocalExperimentConfig`, `LocalExperimentResult`, `run_local_futures_ml_experiment`).
+- `backend/app/local_pipeline/config.py` — `LocalExperimentConfig` (frozen,
+  strict; required `source`; `ratio`-pinned; identical `to_model_spec()` to
+  `research_cli.ExperimentConfig`).
+- `backend/app/local_pipeline/pipeline.py` — `LocalExperimentResult` +
+  `run_local_futures_ml_experiment(store, *, config, experiment_store=None)` +
+  the shared `_run_experiment_from_continuous` tail. Reuses
+  `build_continuous_from_store` / `build_feature_matrix` / `build_label_matrix` /
+  `build_supervised_dataset` / `chronological_holdout_split` / `dataset_config_hash`
+  / `train_model` / `evaluate_ml_signal` / `save_experiment_run` — no new algorithm,
+  no new hash.
+- `scripts/run_local_futures_ml_experiment.py` — thin argparse CLI (no business
+  logic beyond parsing + one pipeline call + printing).
+- `backend/tests/test_local_futures_ml_pipeline.py` — 25 tests (pipeline, CLI,
+  Phase 6 cross-check, and one integrated end-to-end pass).
+
+**CLI usage**
+
+Report of the run's hash chain; a run is saved only when `--artifacts-dir` is given:
+
+```bat
+cd C:\quantlab
+
+.\backend\venv\Scripts\python.exe .\scripts\run_local_futures_ml_experiment.py ^
+  --base-dir data ^
+  --root-symbol ES ^
+  --source synthetic ^
+  --train-start 2024-04-01 ^
+  --train-end 2024-06-05 ^
+  --validation-start 2024-06-06 ^
+  --validation-end 2024-09-15 ^
+  --artifacts-dir artifacts\experiments ^
+  --overwrite
+```
+
+Expected output pattern:
+
+```text
+=== LOCAL/SYNTHETIC DEMO — not real market performance ===
+root=ES
+source=synthetic
+adjustment=ratio
+model=ridge_regression
+task=regression
+train=2024-04-01 -> 2024-06-05
+validation=2024-06-06 -> 2024-09-15
+contracts=ESH24,ESM24,ESU24
+train_run_hash=<sha256>
+continuous_config_hash=<sha256>
+feature_config_hash=<sha256>
+label_config_hash=<sha256>
+dataset_config_hash=<sha256>
+model_config_hash=<sha256>
+artifact_dir=...            # empty unless --artifacts-dir was given
+RESULT: OK
+```
+
+Exit `0` on success; nonzero (`RESULT: FAIL (...)`) on invalid config
+(non-`ratio` adjustment, bad feature/label columns, date ordering), missing
+`(source, root)` data, untrainable windows, or duplicate-without-`--overwrite`
+(unknown `--model-type` / `--task-type` are argparse errors).
+
+**Behavior**
+
+- **Local / store-only** — reads already-ingested raw from `RawFuturesStore`; **no
+  vendor / download / live data**.
+- **Ratio-only** adjustment on the ML path (features/labels require it).
+- **No `--artifacts-dir` ⇒ no experiment artifacts written** (`artifact_dir=""`,
+  `experiment_run=None`); the raw store is untouched.
+- **`--artifacts-dir` explicitly enables `ExperimentStore` persistence** — one run
+  saved under it, `artifact_dir` set to the run directory.
+- Output summary includes `train_run_hash` and the full hash chain;
+  `RESULT: OK` / `RESULT: FAIL`.
+- **Reuses the existing Phase 2–5** feature / label / ML / experiment code; **does
+  not modify the Research CLI**; **adds no new ML dependency**.
+
+**Provenance** — `LocalExperimentResult` (and the saved `ExperimentRun`) carry the
+full chain `raw_data_version_hash → continuous_config_hash → feature_config_hash →
+label_config_hash → dataset_config_hash → model_config_hash → train_run_hash`, plus
+the Phase 8 `contracts`, per-contract `contract_version_hashes`, and `roll_events`.
+A test proves the same synthetic raw yields the **identical `train_run_hash`**
+whether run through Phase 6 (synthetic origin) or Phase 9 (store origin).
+
+**Known limitations**
+
+- No vendor downloader; no live data; no real-money trading.
+- No Research CLI real-data mode (the Research CLI is untouched).
+- **Ratio-only** ML path (panama/none rejected up front).
+- No new model families and no new backtest engine — Phase 4 models / the futures
+  backtest are reused as-is.
+- Duplicate-run behavior follows the existing `ExperimentStore` semantics
+  (reject unless `--overwrite`).
+- Tests use synthetic ES data (3 contracts × ~120 sessions) under `tmp_path`.

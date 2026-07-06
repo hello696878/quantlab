@@ -381,3 +381,67 @@ def test_cli_is_thin_and_clean():
         r"(?m)^\s*(from|import)\s+\S*"
         r"(yfinance|ibkr|sklearn|xgboost|lightgbm|torch|tensorflow)\b", src
     )
+
+
+# --------------------------------------------------------------------------- #
+# Commit 3 — integrated end-to-end (raw store -> continuous -> ML -> experiment)
+# --------------------------------------------------------------------------- #
+
+
+def test_e2e_local_raw_to_continuous_to_ml_to_experiment(tmp_path, monkeypatch):
+    """Full local path under tmp_path: generate synthetic ES raw -> RawFuturesStore
+    (Phase 7-style storage) -> Phase 8 continuous -> Phase 9 ML pipeline -> Phase 5
+    ExperimentStore save -> load + provenance verification. Nothing outside tmp_path."""
+    before = _repo_paths_snapshot()
+    monkeypatch.chdir(tmp_path)
+
+    # 1) generate + store raw (Phase 7-style RawFuturesStore storage)
+    store, base = _raw_store(tmp_path)
+    raw_files = [p for p in (base / "raw" / "futures").rglob("*") if p.is_file()]
+    assert len(raw_files) >= 2  # >= 2 ES contracts stored under the raw namespace
+
+    # 2-4) Phase 8 continuous -> Phase 9 ML -> Phase 5 save
+    exp = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    result = run_local_futures_ml_experiment(
+        store, config=LocalExperimentConfig(source="synthetic"), experiment_store=exp
+    )
+    assert isinstance(result, LocalExperimentResult)
+
+    # full hash chain non-empty
+    for h in (
+        result.continuous_config_hash, result.feature_config_hash,
+        result.label_config_hash, result.dataset_config_hash,
+        result.model_config_hash, result.train_run_hash, result.raw_data_version_hash,
+    ):
+        assert isinstance(h, str) and h
+
+    # per-contract hashes, contracts, roll_events present
+    assert result.contracts
+    assert set(result.contract_version_hashes) == set(result.contracts)
+    assert all(isinstance(v, str) and v for v in result.contract_version_hashes.values())
+    assert len(result.roll_events) >= 1
+    assert {"from_contract", "to_contract", "roll_date"} <= set(result.roll_events[0])
+
+    # ExperimentStore round-trips the saved run; artifact_dir under tmp_path
+    assert result.artifact_dir and str(result.artifact_dir).startswith(str(tmp_path))
+    assert exp.run_dir(result.train_run_hash).exists()
+    loaded = load_experiment_run(result.train_run_hash, store=exp)
+    assert loaded is not None and loaded.run.train_run_hash == result.train_run_hash
+
+    # all writes under tmp_path; no repo-root data/ or artifacts/
+    assert all(str(p).startswith(str(tmp_path)) for p in (tmp_path / "exp").rglob("*") if p.is_file())
+    assert all(str(p).startswith(str(tmp_path)) for p in base.rglob("*") if p.is_file())
+    assert _repo_paths_snapshot() == before
+
+    # no network / vendor / ML-framework imports anywhere in the shipped path
+    for path in (
+        _BACKEND / "app" / "local_pipeline" / "config.py",
+        _BACKEND / "app" / "local_pipeline" / "pipeline.py",
+        _CLI_PATH,
+    ):
+        text = path.read_text(encoding="utf-8")
+        assert not re.search(
+            r"(?m)^\s*(from|import)\s+\S*"
+            r"(requests|urllib|httpx|aiohttp|socket|yfinance|ibkr|sklearn|xgboost|lightgbm|torch|tensorflow)\b",
+            text,
+        ), path.name
