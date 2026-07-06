@@ -638,6 +638,27 @@ Return to the Command Center's **Platform Direction** panel (or open
   documentation count (**not** verification), **no** live data, **not** a
   production research-management system, **not** compliance records, not
   investment / trading / asset-allocation advice.
+- **Product Demo Center & Guided Walkthroughs (34.0)** — the meta-demo: open it
+  first from the sidebar (or Ctrl/Cmd+K → "Open Demo Center" / "Founder Demo
+  Tour") when presenting QuantLab itself. Switch among the eight **guided demo
+  paths** (Founder/Investor, Quant Research Workflow, Crypto Risk, Macro &
+  Portfolio Stress, Microstructure & Execution, Alternative Data & Signal
+  Quality, Real Estate & Credit, Full Platform Showcase), flip the **audience
+  selector** (founder / investor / quant researcher / recruiter / student /
+  general — the generated script re-frames its opening), drag the **time-budget
+  slider** (the overview pill flips between "Fits time budget" and "Over time
+  budget"), and toggle **limitations / technical notes** (technical notes add
+  route + data-mode annotations to every step). Walk a few **step cards** and
+  click **Open module →** to deep-link into the actual labs. Show the
+  **module health dashboard** (status + data-mode badges over 21 modules, with
+  the category filter), the **capability matrix** (backend / charts / controls /
+  formulas / export flags with K scores), the **readiness / coverage /
+  complexity charts**, and the **completion checklist**. Finish with **📋 Copy
+  Markdown** on the generated demo script. The **Formulas & notes** are
+  collapsible **LaTeX** (KaTeX, local — no CDN). Emphasise: everything here is
+  **hand-written static demo metadata** — no telemetry, no runtime health
+  checks, no live data; the scripts are educational presentation aids, and no
+  module is a production trading system.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

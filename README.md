@@ -122,6 +122,16 @@ browser-local drafts (localStorage only — no login, no cloud sync, no
 database). Hand-written static samples, educational summaries only — not
 production research or compliance records, not investment or trading advice.
 
+The **Product Demo Center, Guided Walkthroughs & Module Health Dashboard**
+(34.0) is a product-UX layer for showcasing the platform: eight guided demo
+paths with per-step deep links, an audience/time-budget-aware demo script
+builder (copyable Markdown/JSON), a 21-module health dashboard with status
+and data-mode badges, and a capability matrix with readiness / coverage /
+complexity scores. Hand-written static demo metadata — no telemetry, no
+login, no cloud sync, no live data, generated scripts are educational
+summaries, not investment or trading advice, and no module is a production
+trading system.
+
 ## Project Docs
 
 - [TASKS.md](TASKS.md) — current task list

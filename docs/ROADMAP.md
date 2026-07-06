@@ -1677,6 +1677,80 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 34.0 — Product Demo Center, Guided Walkthroughs & Module Health Dashboard v1 ✅
+
+- **New product-UX layer (not a financial model): a Demo Center that makes the
+  platform easier to understand, demo, and navigate.** Hand-written static
+  demo METADATA about QuantLab's own modules; no telemetry, no analytics
+  tracking, no login, no cloud sync, no live data, no API keys, no trading,
+  not investment / trading / asset-allocation / compliance advice; no module
+  is claimed to be a production trading system. No existing module changed
+  (separate package + view).
+- Backend (follows the established sample/analyze architecture): new
+  `app/demo_center/` package (`models.py` strict Pydantic v2 with
+  `extra="forbid"` + `FiniteFloat`, audience/script-section/status/data-mode/
+  category literal enums, `time_budget_minutes > 0`, non-empty
+  `script_sections`, `included_modules` non-empty when provided; `sample.py`
+  eight deterministic guided demo paths — Founder/Investor, Quant Research
+  Workflow, Crypto Risk, Macro & Portfolio Stress, Microstructure &
+  Execution, Alternative Data & Signal Quality, Real Estate & Credit, Full
+  Platform Showcase — each with steps (linked module, sidebar route, expected
+  action/output, demo tip), learning goals, talking points, limitations, and
+  output artifacts, plus a **21-module health catalog** (status, data mode,
+  backend/charts/controls/formulas/export capability flags, limitation,
+  suggested path, static review label) whose flags were fact-checked against
+  the actual routers and panel imports; `service.py` pure analytics) +
+  `app/demo_center_routes.py` (`GET /demo-center/sample`,
+  `POST /demo-center/analyze`; unknown path id or empty module match → 422),
+  wired via `include_router`.
+- Analytics: path summary with time-budget fit, category coverage
+  `C = categories_included / 10`, module readiness `R = mean(rᵢ)` over
+  documented status weights (stable 1.0 / static-sample-only 0.85 /
+  experimental 0.65 / review-needed 0.5), demo complexity
+  `D = 0.4·M_norm + 0.3·S_norm + 0.3·T_norm` (normalizers 10 modules / 10
+  steps / 60 min, clamped), script coverage `Q = selected/6`, per-module
+  capability scores `K = enabled/5`, a six-item completion checklist, and a
+  deterministic **audience-tailored Markdown demo script** (six sections;
+  the include-limitations toggle force-adds the limitations section;
+  technical-notes toggle appends route/data-mode/capability annotations; no
+  recommendation wording) with a Markdown + canonical-JSON export payload.
+  Everything clamped/guarded → no NaN/Inf.
+- Frontend: new `DemoCenterPanel` (view `democenter`, placed right under Home
+  in the sidebar) — hero, eight-way demo-path selector, six-way audience
+  selector, 5–60 min time-budget slider, script-section chips,
+  limitations/technical-notes toggles, and a module-category filter; demo
+  path overview (metric cards, learning goals, artifacts, time-fit pill);
+  guided walkthrough step cards that **deep-link into the actual modules**
+  via the app's navigation; readiness bar chart, category-coverage chart,
+  R/D/Q/C score bars, and a capability-count chart; the completion
+  checklist; the module health dashboard (status + data-mode badges,
+  capability flags, per-module open buttons); the full capability matrix
+  with K scores; a copyable Markdown/JSON demo-script preview; a standing
+  limitations panel; and a collapsible shared `FormulaReference` (C, R, D,
+  Q, K). **Optional demo preferences** persist via localStorage only (loaded
+  after mount — no SSR dependence or hydration mismatch; guarded for
+  unavailable storage; explicit "Reset demo preferences" control); new
+  `lib/demoCenter.ts` types + API client. Wired into Sidebar ("Demo
+  Center"), Dashboard card ("Demo center" badge), and Command Palette (Open
+  Demo Center, Product Walkthrough, Founder Demo Tour, Quant Research Tour,
+  Crypto Risk Demo, Macro Stress Demo, Module Health Dashboard, Demo Script
+  Builder).
+- 23 new backend tests (deterministic, no network) — sample/analyze
+  endpoints, module-health rows for all target modules, per-path analysis,
+  coverage/readiness/complexity/script formulas with spot-checks, script
+  section selection and the limitations force-include toggle,
+  no-recommendation wording (with and without technical notes),
+  Markdown + JSON export, status/data-mode enum validity, capability-matrix
+  contents and K formula, validation rejections (unknown path, non-positive
+  time budget, empty sections/modules, NaN/Inf), full-payload finiteness,
+  step-route referential integrity, and the time-budget checklist.
+  `npx tsc --noEmit` clean; no frontend build run (per instructions). Docs:
+  `README.md`, `backend/README.md`, `frontend/README.md`,
+  `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static demo
+  metadata, educational — hand-maintained labels (not telemetry or a quality
+  certification), generated scripts are educational summaries, no live data,
+  not advice, not a production trading system.**
+
 ### Phase 33.0 — Research Workspace, Saved Presets & Experiment Journal v1 ✅
 
 - **New deterministic educational product-workflow layer: a central workspace

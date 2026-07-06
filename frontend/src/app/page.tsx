@@ -57,6 +57,7 @@ import AlternativeDataLabPanel from "@/components/AlternativeDataLabPanel";
 import MacroRegimeLabPanel from "@/components/MacroRegimeLabPanel";
 import ScenarioStudioPanel from "@/components/ScenarioStudioPanel";
 import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
+import DemoCenterPanel from "@/components/DemoCenterPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -455,6 +456,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Unified Scenario Studio & Report Builder",
     subtitle:
       "Deterministic scenario templates and global shock controls mapped through documented cross-lab impact scores — module impact charts, a scenario heatmap, baseline-vs-stress comparisons, a severity gauge, a regime read, and a copy-friendly educational report builder across macro, portfolio, crypto derivatives, DeFi, tokenomics, on-chain, alternative data, and microstructure — static sample data, no live data, not investment, trading, or asset-allocation advice, not a production risk report.",
+  },
+  democenter: {
+    title: "Product Demo Center & Guided Walkthroughs",
+    subtitle:
+      "Guided product walkthroughs with audience and time-budget controls, a 21-module health dashboard with status and data-mode badges, a capability matrix, readiness/coverage/complexity scores, and a copy-friendly audience-tailored demo script builder (Markdown + JSON) — hand-written static demo metadata, no telemetry, no live data, not investment, trading, or compliance advice, and no module is a production trading system.",
   },
   researchworkspace: {
     title: "Research Workspace & Experiment Journal",
@@ -1044,6 +1050,7 @@ export default function HomePage() {
     { view: "macroregime", title: "Open Macro Regime Lab", keywords: "macro regime cross asset allocation growth inflation policy liquidity credit stress usd pressure z-score goldilocks stagflation recession risk parity inverse volatility regime tilt" },
     { view: "scenariostudio", title: "Open Scenario Studio", keywords: "scenario studio unified cross lab report builder stress template soft landing inflation growth shock liquidity crunch credit crypto risk off depeg inflow panic severe combo impact score heatmap severity regime markdown report" },
     { view: "researchworkspace", title: "Open Research Workspace", keywords: "research workspace experiment journal saved presets run comparison baseline stressed severity coverage reproducibility methodology checklist workflow timeline notes markdown json export local drafts" },
+    { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1508,6 +1515,24 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("researchworkspace"),
+    })),
+    ...(
+      [
+        ["Open Demo Center", "demo center product walkthrough guided tour module health capability matrix demo script"],
+        ["Product Walkthrough", "product walkthrough guided steps demo path tour presentation showcase portfolio"],
+        ["Founder Demo Tour", "founder investor product tour globe backtest scenario studio research workspace fifteen minutes"],
+        ["Quant Research Tour", "quant research workflow tour backtest comparison portfolio risk macro scenario journal methodology"],
+        ["Crypto Risk Demo", "crypto risk research tour funding basis defi tokenomics onchain cross lab stress demo"],
+        ["Macro Stress Demo", "macro portfolio stress tour regime scores risk lab scenario studio inflation demo"],
+        ["Module Health Dashboard", "module health dashboard status data mode badges stable demo static sample experimental readiness"],
+        ["Demo Script Builder", "demo script builder audience time budget markdown json copy sections opening overview limitations closing"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `democenter-${title}`,
+      group: "Demo Center",
+      title,
+      keywords,
+      run: () => handleNav("democenter"),
     })),
     ...(
       [
@@ -2095,6 +2120,8 @@ export default function HomePage() {
         {view === "scenariostudio" && <ScenarioStudioPanel />}
 
         {view === "researchworkspace" && <ResearchWorkspacePanel />}
+
+        {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

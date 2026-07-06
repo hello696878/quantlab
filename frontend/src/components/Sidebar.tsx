@@ -44,6 +44,7 @@ const ICONS: Record<string, string> = {
   macroregime: "M3 21h18M5 21V10l4 3 4-6 4 4 3-5v15M12 3v2M12 3l-2 1.5M12 3l2 1.5",
   scenariostudio: "M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M7 16v4",
   researchworkspace: "M5 4h13a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5V4Zm0 0v16M9 9h6M9 13h6M9 17h3",
+  democenter: "M4 5h16v11H4V5Zm6 3.5 4 2-4 2v-4ZM8 21l4-3 4 3",
   scanner: "M4 14h3v6H4zM10.5 9h3v11h-3zM17 4h3v16h-3z",
   finml: "M4 18 9 9l4 5 3-6 4 7M4 4v16h16",
   globe:
@@ -119,6 +120,7 @@ function Logo() {
 
 export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "home" },
+  { id: "democenter", label: "Demo Center", icon: "democenter" },
   { id: "globe", label: "Global Markets Globe", icon: "globe" },
   { id: "backtest", label: "Backtest", icon: "backtest" },
   { id: "library", label: "Strategy Library", icon: "library" },
