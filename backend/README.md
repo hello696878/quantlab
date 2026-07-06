@@ -42,6 +42,8 @@ backend/
 │   ├── macro_regime_routes.py    Macro Regime & Cross-Asset Allocation Lab API routes
 │   ├── scenario_studio/    static-sample cross-lab scenario/impact/report analytics (models/sample/service)
 │   ├── scenario_studio_routes.py  Unified Scenario Studio & Cross-Lab Report Builder API routes
+│   ├── research_workspace/ static-sample research preset/journal/report analytics (models/sample/service)
+│   ├── research_workspace_routes.py  Research Workspace, Saved Presets & Experiment Journal API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -69,7 +71,8 @@ backend/
 │   ├── test_onchain_analytics.py On-Chain Flow, Exchange Reserve & Whale Concentration Lab analytics/API/validation tests
 │   ├── test_alternative_data.py  Alternative Data, News Sentiment & Signal Decay Lab analytics/API/validation tests
 │   ├── test_macro_regime.py      Macro Regime & Cross-Asset Allocation Lab analytics/API/validation tests
-│   └── test_scenario_studio.py   Unified Scenario Studio & Cross-Lab Report Builder analytics/API/validation tests
+│   ├── test_scenario_studio.py   Unified Scenario Studio & Cross-Lab Report Builder analytics/API/validation tests
+│   └── test_research_workspace.py  Research Workspace, Saved Presets & Experiment Journal analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -443,6 +446,31 @@ NaN/Infinity in or out (every score is clipped to [0, 100]). An unknown
 intensities (z-score-like units; multipliers neutral at 1.0), not market
 returns. The generated report is a deterministic educational summary with no
 recommendation wording.
+
+---
+
+### Research Workspace, Saved Presets & Experiment Journal Endpoints
+
+Deterministic static-sample research-workflow analytics (Phase 33.0). The six
+"research packs" and their experiment runs are hand-written sample numbers on
+fixed timestamps — not recorded lab outputs. No live data, no login, no
+database, no cloud sync, no API keys, no network calls, educational only —
+not investment, trading, asset-allocation, legal, tax, compliance, or
+risk-management advice, and not production research or compliance records.
+
+| Endpoint | Description |
+|---|---|
+| `GET /research-workspace/sample` | Six deterministic research packs (macro stress, crypto risk-off, DeFi liquidity stress, tokenomics unlock review, alternative-data signal quality, cross-asset scenario report), each with sample experiment runs (metric baseline/stressed, severity, confidence label, notes), plus module/section catalogs and a default request |
+| `POST /research-workspace/analyze` | Per-run change `Δ = stress − base` and guarded percentage change `Δ% = Δ/(|base| + ε)`, a severity-ranked run comparison, average/max severity, module coverage `C = staged modules / available`, a documented methodology checklist with reproducibility score `R = passed/total`, a workspace-regime classification, a workflow timeline, a deterministic Markdown report preview, and a Markdown + canonical-JSON export payload |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): required
+strings non-empty, severity scores in [0, 100], run notes ≤ 500 chars and the
+workspace note ≤ 2000 chars, non-empty `linked_modules` / `experiment_runs` /
+`report_sections`, module/section/confidence literal enums; no NaN/Infinity in
+or out. An unknown `selected_preset_id` — or `included_run_ids` matching none
+of the preset's runs — returns 422. The reproducibility score is a
+documentation-completeness count, not verification that results reproduce; the
+generated report carries no recommendation wording.
 
 ---
 

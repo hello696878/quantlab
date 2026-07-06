@@ -113,6 +113,15 @@ heatmap, a regime read, and a copy-friendly generated Markdown report — all
 static sample data, educational summaries only, no live data, not investment,
 trading, or allocation advice, and not a production risk report.
 
+The **Research Workspace, Saved Presets & Experiment Journal** (33.0) organizes
+deterministic sample lab runs into six saved research packs: an experiment
+journal with staged runs, baseline-vs-stressed comparisons, severity /
+coverage / reproducibility scores, a workflow timeline, a methodology
+checklist, and copy-friendly Markdown/JSON exports, plus optional
+browser-local drafts (localStorage only — no login, no cloud sync, no
+database). Hand-written static samples, educational summaries only — not
+production research or compliance records, not investment or trading advice.
+
 ## Project Docs
 
 - [TASKS.md](TASKS.md) — current task list
