@@ -9,6 +9,7 @@ Everything lives under `tmp_path`; no network; nothing written outside `tmp_path
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import re
 from datetime import date
@@ -59,6 +60,17 @@ def _repo_paths_snapshot() -> tuple[bool, bool, bool]:
         (_REPO_ROOT / "artifacts").exists(),
         (_BACKEND / "data").exists(),
     )
+
+
+_CLI_PATH = _REPO_ROOT / "scripts" / "report_local_futures_experiments.py"
+
+
+def _load_cli():
+    """Import the thin reporting CLI module by path (executes its sys.path bootstrap)."""
+    spec = importlib.util.spec_from_file_location("report_cli", _CLI_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
 
 
 # --------------------------------------------------------------------------- #
@@ -259,3 +271,176 @@ def test_reporting_module_invents_no_new_hash():
     for name in ("summary.py", "render.py"):
         src = (_BACKEND / "app" / "reporting" / name).read_text(encoding="utf-8")
         assert "hashlib" not in src and "sha256" not in src, name
+
+
+# --------------------------------------------------------------------------- #
+# Commit 2 — thin CLI
+# --------------------------------------------------------------------------- #
+
+
+def _exp_files(exp: ExperimentStore) -> set[Path]:
+    return {p for p in exp.base_dir.rglob("*") if p.is_file()}
+
+
+def test_cli_summary_returns_zero(tmp_path, capsys):
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0,))
+    cli = _load_cli()
+    rc = cli.main(["summary", "--artifacts-dir", str(exp.base_dir), "--train-run-hash", hashes[0]])
+    out = capsys.readouterr().out
+    assert rc == 0 and "RESULT: OK" in out
+    assert hashes[0] in out and "## Disclaimers" in out
+
+
+def test_cli_compare_returns_zero_and_deterministic(tmp_path, capsys):
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0, 1))
+    cli = _load_cli()
+    args = ["compare", "--artifacts-dir", str(exp.base_dir), *hashes]
+    rc1 = cli.main(args)
+    out1 = capsys.readouterr().out
+    rc2 = cli.main(args)
+    out2 = capsys.readouterr().out
+    assert rc1 == 0 and rc2 == 0
+    assert "RESULT: OK" in out1
+    assert out1 == out2                        # deterministic
+    assert "train_run_hash,model_type,task_type" in out1  # CSV header
+
+
+def test_cli_best_prints_selected_hash(tmp_path, capsys):
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0, 1))
+    cli = _load_cli()
+    rc = cli.main(["best", "--artifacts-dir", str(exp.base_dir), "--metric", "sharpe"])
+    out = capsys.readouterr().out
+    assert rc == 0 and "RESULT: OK" in out
+    assert "best_by=sharpe train_run_hash=" in out
+    assert any(h in out for h in hashes)
+
+
+def test_cli_export_markdown_writes_only_output_path(tmp_path, capsys):
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0,))
+    before = _exp_files(exp)
+    out_md = tmp_path / "reports" / "run.md"
+    cli = _load_cli()
+    rc = cli.main([
+        "export-markdown", "--artifacts-dir", str(exp.base_dir),
+        "--train-run-hash", hashes[0], "--output-path", str(out_md),
+    ])
+    out = capsys.readouterr().out
+    assert rc == 0 and f"[WRITE] path={out_md}" in out and "RESULT: OK" in out
+    assert out_md.exists() and "## Disclaimers" in out_md.read_text(encoding="utf-8")
+    assert _exp_files(exp) == before           # store untouched
+
+
+def test_cli_export_json_strict(tmp_path, capsys):
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0,))
+    out_json = tmp_path / "run.json"
+    cli = _load_cli()
+    rc = cli.main([
+        "export-json", "--artifacts-dir", str(exp.base_dir),
+        "--train-run-hash", hashes[0], "--output-path", str(out_json),
+    ])
+    assert rc == 0 and "RESULT: OK" in capsys.readouterr().out
+    raw = out_json.read_text(encoding="utf-8")
+    assert "NaN" not in raw and "Infinity" not in raw
+    assert json.loads(raw)["run_identity"]["train_run_hash"] == hashes[0]
+
+
+def test_cli_export_csv_writes_output(tmp_path, capsys):
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0, 1))
+    out_csv = tmp_path / "cmp.csv"
+    cli = _load_cli()
+    rc = cli.main([
+        "export-csv", "--artifacts-dir", str(exp.base_dir), *hashes,
+        "--output-path", str(out_csv),
+    ])
+    assert rc == 0 and f"[WRITE] path={out_csv}" in capsys.readouterr().out
+    lines = out_csv.read_text(encoding="utf-8").strip().splitlines()
+    assert lines[0].startswith("train_run_hash,model_type,task_type")
+    assert len(lines) == 1 + len(hashes)
+
+
+def test_cli_read_only_subcommands_write_nothing(tmp_path, capsys):
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0, 1))
+    before = _exp_files(exp)
+    cli = _load_cli()
+    cli.main(["summary", "--artifacts-dir", str(exp.base_dir), "--train-run-hash", hashes[0]])
+    cli.main(["compare", "--artifacts-dir", str(exp.base_dir), *hashes])
+    cli.main(["best", "--artifacts-dir", str(exp.base_dir)])
+    capsys.readouterr()
+    assert _exp_files(exp) == before           # no new files anywhere in the store
+
+
+def test_cli_missing_artifacts_dir_nonzero(tmp_path, capsys):
+    cli = _load_cli()
+    rc = cli.main([
+        "summary", "--artifacts-dir", str(tmp_path / "nope"), "--train-run-hash", "abc123",
+    ])
+    assert rc == 1 and "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_unknown_hash_nonzero(tmp_path, capsys):
+    exp, _ = _store_with_runs(tmp_path, seeds=(0,))
+    cli = _load_cli()
+    rc = cli.main([
+        "summary", "--artifacts-dir", str(exp.base_dir), "--train-run-hash", "deadbeef" * 8,
+    ])
+    assert rc == 1 and "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_missing_metric_nonzero(tmp_path, capsys):
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0, 1))
+    cli = _load_cli()
+    rc = cli.main(["best", "--artifacts-dir", str(exp.base_dir), "--metric", "not_a_metric"])
+    assert rc == 1 and "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_incompatible_windows_fail_unless_allowed(tmp_path, capsys):
+    raw = generate_synthetic_es_raw(ExperimentConfig())
+    raw_store = RawFuturesStore(tmp_path / "store", prefer_parquet=False)
+    raw_store.write_raw(raw)
+    exp = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    r_a = run_local_futures_ml_experiment(
+        raw_store, config=LocalExperimentConfig(source="synthetic"), experiment_store=exp
+    )
+    r_b = run_local_futures_ml_experiment(
+        raw_store,
+        config=LocalExperimentConfig(source="synthetic", validation_end=date(2024, 9, 10)),
+        experiment_store=exp,
+    )
+    cli = _load_cli()
+    hashes = [r_a.train_run_hash, r_b.train_run_hash]
+    rc = cli.main(["compare", "--artifacts-dir", str(exp.base_dir), *hashes])
+    assert rc == 1 and "RESULT: FAIL" in capsys.readouterr().out
+    rc_ok = cli.main([
+        "compare", "--artifacts-dir", str(exp.base_dir), *hashes, "--allow-different-windows",
+    ])
+    assert rc_ok == 0 and "RESULT: OK" in capsys.readouterr().out
+
+
+def test_cli_no_repo_root_artifacts(tmp_path, monkeypatch):
+    before = _repo_paths_snapshot()
+    monkeypatch.chdir(tmp_path)
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0,))
+    cli = _load_cli()
+    assert cli.main([
+        "export-json", "--artifacts-dir", str(exp.base_dir),
+        "--train-run-hash", hashes[0], "--output-path", str(tmp_path / "r.json"),
+    ]) == 0
+    assert _repo_paths_snapshot() == before
+
+
+def test_cli_is_thin_and_clean():
+    src = _CLI_PATH.read_text(encoding="utf-8")
+    # uses the reporting wrappers, not the raw registry compare/best helpers
+    for token in ("summarize_experiment_run", "compare_experiment_runs", "best_experiment_run"):
+        assert token in src, token
+    for token in ("compare_experiments", "get_best_experiment", "app.local_pipeline",
+                  "train_model", "build_feature_matrix", "build_label_matrix",
+                  "hashlib", "sha256"):
+        assert token not in src, token
+    assert not re.search(
+        r"(?m)^\s*(from|import)\s+\S*\b(requests|urllib|httpx|aiohttp|socket)\b", src
+    )
+    assert not re.search(
+        r"(?m)^\s*(from|import)\s+\S*"
+        r"(yfinance|ibkr|sklearn|xgboost|lightgbm|torch|tensorflow)\b", src
+    )
