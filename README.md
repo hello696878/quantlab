@@ -106,6 +106,13 @@ every control is a deterministic client-side transform of the static sample
 re-sent to the existing analyze endpoints — no live data, no trading, not
 investment advice.
 
+The **Unified Scenario Studio & Cross-Lab Report Builder** (32.0) connects the
+recent labs through a documented deterministic impact-scoring layer: ten
+scenario templates, global shock sliders, module impact charts, a scenario
+heatmap, a regime read, and a copy-friendly generated Markdown report — all
+static sample data, educational summaries only, no live data, not investment,
+trading, or allocation advice, and not a production risk report.
+
 ## Project Docs
 
 - [TASKS.md](TASKS.md) — current task list

@@ -594,6 +594,27 @@ Return to the Command Center's **Platform Direction** panel (or open
   illustrative betas/correlations, educational allocation constructions (**never**
   recommendations), **not** a production allocation engine, not investment / trading /
   asset-allocation advice.
+- **Unified Scenario Studio & Report Builder (32.0)** — open from the sidebar (or
+  Ctrl/Cmd+K → "Open Scenario Studio" / "Report Builder"). Switch among the ten
+  **scenario templates** (Soft Landing, Inflation Reacceleration, Growth Shock,
+  Liquidity Crunch, Credit Stress, Crypto Risk-Off, Stablecoin Depeg Stress,
+  Exchange Inflow Panic, Alternative Data Noise Shock, Severe Cross-Asset Stress
+  Combo) — the impact dashboard, charts, heatmap, and report re-compute
+  deterministically, and the templates land on distinct **scenario regimes**
+  (Soft Landing reads Benign cross-asset; the Severe combo reads Severe systemic
+  stress). Drag the **12 global shock sliders** (growth, inflation, policy,
+  liquidity, credit, crypto price, volatility ×, sentiment, depeg, inflow ×,
+  unlock ×, publication lag) and watch the **module impact bar chart**,
+  **baseline-vs-stressed chart**, **cross-module radar**, **severity gauge**,
+  and **module × shock-group heatmap** re-draw. Click **module cards** to
+  include/exclude modules (composite severity re-averages), toggle **report
+  sections** (Limitations is always on), and show the **generated Markdown
+  report preview** with the **📋 Copy report Markdown** button. The **Formulas &
+  notes** are collapsible **LaTeX** (KaTeX, local — no CDN). Emphasise: the
+  impact scores are **documented linear teaching weights** on standardized
+  sample shocks — the studio does **not** call the other labs' engines, is
+  **not** a risk measurement or a production risk report, uses **no** live
+  data, and is not investment / trading / asset-allocation advice.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

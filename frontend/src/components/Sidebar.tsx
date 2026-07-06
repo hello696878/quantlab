@@ -42,6 +42,7 @@ const ICONS: Record<string, string> = {
   onchain: "M7 7h4v4H7V7Zm6 6h4v4h-4v-4ZM4 4h4v4H4zm12 0h4v4h-4zM4 16h4v4H4zm12 0h4v4h-4zM8 6h8M6 8v8M18 8v8M8 18h8",
   altdata: "M4 6h16M4 6v12h16V6M4 10h16M8 6v12M7 14l2.5-2 2 1.5L15 10l2 3",
   macroregime: "M3 21h18M5 21V10l4 3 4-6 4 4 3-5v15M12 3v2M12 3l-2 1.5M12 3l2 1.5",
+  scenariostudio: "M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M7 16v4",
   scanner: "M4 14h3v6H4zM10.5 9h3v11h-3zM17 4h3v16h-3z",
   finml: "M4 18 9 9l4 5 3-6 4 7M4 4v16h16",
   globe:
@@ -139,6 +140,7 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "onchain", label: "On-Chain Analytics Lab", icon: "onchain" },
   { id: "altdata", label: "Alternative Data Lab", icon: "altdata" },
   { id: "macroregime", label: "Macro Regime Lab", icon: "macroregime" },
+  { id: "scenariostudio", label: "Scenario Studio", icon: "scenariostudio" },
   { id: "scanner", label: "Cross-Sectional Scanner", icon: "scanner" },
   { id: "finml", label: "AFML Methodology Lab", icon: "finml" },
   { id: "csv", label: "CSV Backtest", icon: "upload" },
