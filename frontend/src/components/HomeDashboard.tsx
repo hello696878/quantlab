@@ -1564,6 +1564,31 @@ export default function HomeDashboard({
           </button>
           <button
             type="button"
+            onClick={() => onNav("democenter")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                Demo Center
+              </span>
+              <span
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+              >
+                Demo center
+              </span>
+            </span>
+            <span className="text-xs text-slate-400">
+              Follow guided product walkthroughs, inspect module health and capability coverage,
+              build audience-specific demo scripts, and jump into polished QuantLab research
+              flows — static demo metadata, not investment or trading advice.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Demo Center →
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => onNav("scanner")}
             className="card flex flex-col gap-1 p-4 text-left"
           >

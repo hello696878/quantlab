@@ -32,6 +32,7 @@ export type View =
   | "macroregime"
   | "scenariostudio"
   | "researchworkspace"
+  | "democenter"
   | "csv"
   | "builder"
   | "portfolio"

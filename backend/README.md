@@ -44,6 +44,8 @@ backend/
 │   ├── scenario_studio_routes.py  Unified Scenario Studio & Cross-Lab Report Builder API routes
 │   ├── research_workspace/ static-sample research preset/journal/report analytics (models/sample/service)
 │   ├── research_workspace_routes.py  Research Workspace, Saved Presets & Experiment Journal API routes
+│   ├── demo_center/        static demo-metadata walkthrough/health/script analytics (models/sample/service)
+│   ├── demo_center_routes.py  Product Demo Center, Guided Walkthroughs & Module Health API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -72,7 +74,8 @@ backend/
 │   ├── test_alternative_data.py  Alternative Data, News Sentiment & Signal Decay Lab analytics/API/validation tests
 │   ├── test_macro_regime.py      Macro Regime & Cross-Asset Allocation Lab analytics/API/validation tests
 │   ├── test_scenario_studio.py   Unified Scenario Studio & Cross-Lab Report Builder analytics/API/validation tests
-│   └── test_research_workspace.py  Research Workspace, Saved Presets & Experiment Journal analytics/API/validation tests
+│   ├── test_research_workspace.py  Research Workspace, Saved Presets & Experiment Journal analytics/API/validation tests
+│   └── test_demo_center.py       Product Demo Center, Guided Walkthroughs & Module Health analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -471,6 +474,31 @@ or out. An unknown `selected_preset_id` — or `included_run_ids` matching none
 of the preset's runs — returns 422. The reproducibility score is a
 documentation-completeness count, not verification that results reproduce; the
 generated report carries no recommendation wording.
+
+---
+
+### Product Demo Center & Module Health Endpoints
+
+Deterministic static demo-metadata analytics (Phase 34.0) — a product-UX layer
+describing QuantLab's own modules, not a financial model. All health/status
+labels and capability flags are hand-maintained static annotations — no
+telemetry, no analytics tracking, no runtime introspection, no live data, no
+login, educational only — not investment, trading, asset-allocation, legal,
+tax, compliance, or risk-management advice; no module is a production trading
+system.
+
+| Endpoint | Description |
+|---|---|
+| `GET /demo-center/sample` | Eight hand-written guided demo paths (founder/investor, quant research workflow, crypto risk, macro & portfolio stress, microstructure & execution, alternative data & signal quality, real estate & credit, full platform showcase) with per-step routes/actions/tips, plus a 21-module health/capability catalog, script-section and audience catalogs, and a default request |
+| `POST /demo-center/analyze` | Path summary with time-budget fit, category coverage `C = categories/10`, module readiness `R = mean(rᵢ)` over documented status weights (stable 1.0 / static-sample-only 0.85 / experimental 0.65 / review-needed 0.5), demo complexity `D = 0.4·M + 0.3·S + 0.3·T` (normalized, clamped), script coverage `Q = selected/6`, per-module capability scores `K = enabled/5`, a completion checklist, and an audience-tailored deterministic Markdown demo script with a Markdown + JSON export payload |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): required
+strings non-empty, `time_budget_minutes > 0`, non-empty `script_sections`,
+`included_modules` non-empty when provided, audience/section literal enums; no
+NaN/Infinity in or out (all scores clamped to [0, 1]). An unknown
+`selected_path_id` — or `included_modules` matching none of the path's modules
+— returns 422. The include-limitations toggle force-adds the limitations
+section to the generated script; the script carries no recommendation wording.
 
 ---
 

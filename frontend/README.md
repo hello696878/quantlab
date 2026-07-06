@@ -264,6 +264,23 @@ recorded lab outputs, no live data, no login, no cloud sync, not a production
 research-management system, not compliance records, not investment / trading /
 asset-allocation advice.
 
+The **Product Demo Center & Guided Walkthroughs** (`DemoCenterPanel`, view
+`democenter`, Phase 34.0) is a product-UX layer for presenting QuantLab: it
+loads eight hand-written guided demo paths and a 21-module health/capability
+catalog and re-analyses live via `/api/demo-center/analyze` (path overview
+with time-budget fit, readiness / category-coverage / complexity / script
+scores, a completion checklist, and an audience-tailored Markdown demo script
+with Markdown/JSON copy buttons). Walkthrough step cards and health cards
+**deep-link into the actual modules** via the app's normal navigation;
+controls cover the path, audience, 5–60-minute time budget, script sections,
+limitations/technical-notes toggles, and a module-category filter. Demo
+preferences persist via `localStorage` only (loaded after mount — no SSR
+dependence or hydration mismatch; guarded for unavailable storage; explicit
+reset control). Hand-written static demo metadata — the health labels are
+manual annotations, not telemetry; no live data, no login, no analytics;
+generated scripts are educational presentation aids; no module is a
+production trading system.
+
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract
 assumptions, and re-analyses live via `/api/futures/analyze` (cost-of-carry

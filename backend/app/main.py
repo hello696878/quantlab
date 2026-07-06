@@ -80,6 +80,7 @@ from app.alternative_data_routes import router as alternative_data_router
 from app.macro_regime_routes import router as macro_regime_router
 from app.scenario_studio_routes import router as scenario_studio_router
 from app.research_workspace_routes import router as research_workspace_router
+from app.demo_center_routes import router as demo_center_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -424,6 +425,9 @@ app.include_router(scenario_studio_router)
 
 # Research Workspace, Saved Presets & Experiment Journal (Phase 33.0) — static sample API.
 app.include_router(research_workspace_router)
+
+# Product Demo Center, Guided Walkthroughs & Module Health Dashboard (Phase 34.0) — static demo metadata API.
+app.include_router(demo_center_router)
 
 
 # ---------------------------------------------------------------------------
