@@ -1677,6 +1677,69 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 32.0 — Unified Scenario Studio & Cross-Lab Report Builder v1 ✅
+
+- **New deterministic educational workflow layer that connects the recent labs
+  into one product experience.** Static sample data only; no live macro,
+  market, crypto, or news data, no scraping, no LLM or provider APIs, no API
+  keys, no broker/exchange/wallet integration, no trading, not investment /
+  trading / asset-allocation advice, not a production risk report. No existing
+  module changed (separate package + view).
+- Backend: new `app/scenario_studio/` package (`models.py` strict Pydantic v2
+  with `extra="forbid"` + `FiniteFloat`, module/section/regime/bucket literal
+  enums, multiplier constraints `volatility_multiplier > 0`,
+  `token_unlock_multiplier ≥ 0`, `exchange_inflow_multiplier ≥ 0`,
+  `publication_lag_shock ≥ 0`, non-empty `included_modules` /
+  `report_sections`; `sample.py` ten deterministic scenario templates — Soft
+  Landing, Inflation Reacceleration, Growth Shock, Liquidity Crunch, Credit
+  Stress, Crypto Risk-Off, Stablecoin Depeg Stress, Exchange Inflow Panic,
+  Alternative Data Noise Shock, Severe Cross-Asset Stress Combo — each with 19
+  standardized shock intensities; `service.py` pure analytics) +
+  `app/scenario_studio_routes.py` (`GET /scenario-studio/sample`,
+  `POST /scenario-studio/analyze`; unknown scenario id → 422), wired via
+  `include_router`.
+- Analytics: a **lightweight cross-lab impact layer** (it does not call the
+  other labs' engines) — per-module impact scores
+  `I_m = clip_0_100(Σ_k w_{m,k}·|s_k|)` with documented weight tables for
+  macro / portfolio / crypto-derivatives / DeFi / tokenomics / on-chain /
+  alternative-data / microstructure (multipliers contribute `max(m−1, 0)`),
+  composite severity `S = mean(I_m)` over the included modules, a
+  deterministic scenario-regime classification (benign, macro/policy,
+  credit/liquidity, crypto-specific, data-quality, broad risk-off, severe
+  systemic via documented cluster scores + thresholds; the ten templates land
+  on their intended regimes), a module × shock-group **heatmap**
+  decomposition, illustrative **baseline-vs-stress** metric rows, and a
+  deterministic **Markdown report builder** (nine sections, Limitations always
+  included, coverage `C = N_included/N_available`, no recommendation wording).
+  Everything clipped/guarded → no NaN/Inf.
+- Frontend: new `ScenarioStudioPanel` (view `scenariostudio`) — hero, ten-way
+  scenario template selector, **12 global shock sliders** (growth, inflation,
+  policy, liquidity, credit, crypto price, volatility ×, sentiment, depeg,
+  inflow ×, unlock ×, publication lag) with template-reset, impact dashboard
+  (composite severity + regime pill + severity gauge + drivers), module impact
+  bar chart, baseline-vs-stressed grouped chart, an SVG cross-module radar,
+  the scenario heatmap, clickable module include/exclude cards, a
+  baseline-vs-stress metric table, a report-section builder with coverage bar,
+  a copyable generated-Markdown report preview, and a collapsible shared
+  `FormulaReference`; new `lib/scenarioStudio.ts` types + API client. Wired
+  into Sidebar ("Scenario Studio"), Dashboard card ("Scenario studio" badge),
+  and Command Palette (Open Scenario Studio, Cross-Lab Scenario Studio, Report
+  Builder, Cross-Asset Stress Report, Crypto Stress Report, Macro Stress
+  Report).
+- 27 new backend tests (deterministic, no network) — sample/analyze endpoints,
+  0–100 impact bounds, severity formula, per-template regime mapping,
+  scenario-specific impact ordering (crypto risk-off / depeg / inflow panic /
+  data noise / credit stress), report-builder section selection, forced
+  limitations, coverage formula, no-recommendation wording, validation
+  rejections (non-positive vol multiplier, negative multipliers, empty
+  modules/sections, NaN/Inf, unknown scenario id), and full-payload
+  finiteness. `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`,
+  `DEMO_SCRIPT.md`. **Static sample, educational — a documented teaching
+  approximation of cross-module sensitivity, not calibrated risk, not a
+  production risk report, not investment / trading / asset-allocation
+  advice.**
+
 ### Phase 31.0 — Macro Regime & Cross-Asset Allocation Lab v1 ✅
 
 - **New deterministic educational macro-regime analytics lab.** Static sample

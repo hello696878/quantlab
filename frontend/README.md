@@ -232,6 +232,20 @@ this lab), illustrative betas/correlations, educational allocation constructions
 (never recommendations), not a production allocation engine, not real-time macro
 regime detection, not investment / trading / asset-allocation advice.
 
+The **Unified Scenario Studio & Cross-Lab Report Builder** (`ScenarioStudioPanel`,
+view `scenariostudio`, Phase 32.0) loads ten deterministic scenario templates,
+lets you adjust twelve global shock sliders, include/exclude modules, and pick
+report sections, and re-analyses live via `/api/scenario-studio/analyze`
+(documented module impact scores across macro / portfolio / crypto derivatives /
+DeFi / tokenomics / on-chain / alternative data / microstructure, a composite
+severity with gauge, a scenario-regime pill, a module × shock-group heatmap, a
+cross-module radar, baseline-vs-stress rows, and a deterministic Markdown
+report preview with a copy button; Limitations is always included). The impact
+layer is a transparent teaching approximation — it does not call the other
+labs' engines. Static illustrative sample data — no live data of any kind, not
+a production risk report, not investment research, not investment / trading /
+asset-allocation advice.
+
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract
 assumptions, and re-analyses live via `/api/futures/analyze` (cost-of-carry

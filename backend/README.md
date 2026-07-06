@@ -40,6 +40,8 @@ backend/
 │   ├── alternative_data_routes.py  Alternative Data, News Sentiment & Signal Decay Lab API routes
 │   ├── macro_regime/       static-sample macro-regime/cross-asset analytics (models/sample/service)
 │   ├── macro_regime_routes.py    Macro Regime & Cross-Asset Allocation Lab API routes
+│   ├── scenario_studio/    static-sample cross-lab scenario/impact/report analytics (models/sample/service)
+│   ├── scenario_studio_routes.py  Unified Scenario Studio & Cross-Lab Report Builder API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -66,7 +68,8 @@ backend/
 │   ├── test_tokenomics.py        Tokenomics, Unlock Schedule & Treasury Risk Lab analytics/API/validation tests
 │   ├── test_onchain_analytics.py On-Chain Flow, Exchange Reserve & Whale Concentration Lab analytics/API/validation tests
 │   ├── test_alternative_data.py  Alternative Data, News Sentiment & Signal Decay Lab analytics/API/validation tests
-│   └── test_macro_regime.py      Macro Regime & Cross-Asset Allocation Lab analytics/API/validation tests
+│   ├── test_macro_regime.py      Macro Regime & Cross-Asset Allocation Lab analytics/API/validation tests
+│   └── test_scenario_studio.py   Unified Scenario Studio & Cross-Lab Report Builder analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -414,6 +417,32 @@ a note when all scores are non-positive; λ/η are editable request assumptions.
 All allocations are educational constructions — never recommendations. Scenarios
 are hypothetical additive score shocks — not forecasts and not advice. Every
 division is guarded so all outputs are finite.
+
+---
+
+### Unified Scenario Studio & Cross-Lab Report Builder Endpoints
+
+Deterministic static-sample cross-lab scenario analytics (Phase 32.0). A
+lightweight teaching layer that maps scenario shocks into documented
+module-level impact scores — it does **not** call the other labs' engines. No
+live macro, market, crypto, or news data, no API keys, no network calls,
+educational only — not investment, trading, asset-allocation, legal, tax, or
+risk-management advice, and not a production risk report.
+
+| Endpoint | Description |
+|---|---|
+| `GET /scenario-studio/sample` | Ten deterministic scenario templates (soft landing, inflation reacceleration, growth shock, liquidity crunch, credit stress, crypto risk-off, stablecoin depeg stress, exchange inflow panic, alternative-data noise shock, severe cross-asset stress combo), each with 19 standardized shock intensities, plus module/section catalogs and a default request |
+| `POST /scenario-studio/analyze` | Per-module impact scores `I_m = clip_0_100(Σ_k w_{m,k}·|s_k|)` (multipliers contribute `max(m−1, 0)`) for macro / portfolio / crypto-derivatives / DeFi / tokenomics / on-chain / alternative-data / microstructure, composite severity (mean over included modules), a deterministic scenario-regime classification, a module × shock-group heatmap, illustrative baseline-vs-stress rows, and a deterministic Markdown report (Limitations always included; coverage `C = N_included/N_available`) |
+
+Inputs are strictly validated (`extra="forbid"`, `FiniteFloat`): required
+strings non-empty, `volatility_multiplier > 0`, `token_unlock_multiplier ≥ 0`,
+`exchange_inflow_multiplier ≥ 0`, `publication_lag_shock ≥ 0`, non-empty
+`included_modules` / `report_sections`, module/section literal enums; no
+NaN/Infinity in or out (every score is clipped to [0, 100]). An unknown
+`selected_scenario_id` returns 422. Shocks are standardized illustrative
+intensities (z-score-like units; multipliers neutral at 1.0), not market
+returns. The generated report is a deterministic educational summary with no
+recommendation wording.
 
 ---
 

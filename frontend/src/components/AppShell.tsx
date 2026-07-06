@@ -30,6 +30,7 @@ export type View =
   | "onchain"
   | "altdata"
   | "macroregime"
+  | "scenariostudio"
   | "csv"
   | "builder"
   | "portfolio"

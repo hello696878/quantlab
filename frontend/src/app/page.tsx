@@ -55,6 +55,7 @@ import TokenomicsLabPanel from "@/components/TokenomicsLabPanel";
 import OnChainAnalyticsLabPanel from "@/components/OnChainAnalyticsLabPanel";
 import AlternativeDataLabPanel from "@/components/AlternativeDataLabPanel";
 import MacroRegimeLabPanel from "@/components/MacroRegimeLabPanel";
+import ScenarioStudioPanel from "@/components/ScenarioStudioPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -448,6 +449,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Macro Regime & Cross-Asset Allocation Lab",
     subtitle:
       "Indicator z-scores and growth / inflation / policy / liquidity / credit / USD category scores, a composite macro regime read, regime-adjusted cross-asset assumptions, inverse-volatility / risk-parity-style / regime-tilted educational allocations with risk contributions, and macro stress scenarios — deterministic static sample data, no live macro or market data, not investment, trading, or asset-allocation advice.",
+  },
+  scenariostudio: {
+    title: "Unified Scenario Studio & Report Builder",
+    subtitle:
+      "Deterministic scenario templates and global shock controls mapped through documented cross-lab impact scores — module impact charts, a scenario heatmap, baseline-vs-stress comparisons, a severity gauge, a regime read, and a copy-friendly educational report builder across macro, portfolio, crypto derivatives, DeFi, tokenomics, on-chain, alternative data, and microstructure — static sample data, no live data, not investment, trading, or asset-allocation advice, not a production risk report.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1030,6 +1036,7 @@ export default function HomePage() {
     { view: "onchain", title: "Open On-Chain Analytics Lab", keywords: "on-chain onchain exchange inflow outflow net flow exchange reserve active addresses transfer volume transaction count token velocity nvt whale concentration gini holder cohort crypto analytics interactive shock slider flow chart" },
     { view: "altdata", title: "Open Alternative Data Lab", keywords: "alternative data alt data news sentiment social sentiment earnings macro supply chain events novelty freshness leakage guard information coefficient ic hit rate signal decay alpha score event study interactive shock slider timeline decay chart" },
     { view: "macroregime", title: "Open Macro Regime Lab", keywords: "macro regime cross asset allocation growth inflation policy liquidity credit stress usd pressure z-score goldilocks stagflation recession risk parity inverse volatility regime tilt" },
+    { view: "scenariostudio", title: "Open Scenario Studio", keywords: "scenario studio unified cross lab report builder stress template soft landing inflation growth shock liquidity crunch credit crypto risk off depeg inflow panic severe combo impact score heatmap severity regime markdown report" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1462,6 +1469,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("macroregime"),
+    })),
+    ...(
+      [
+        ["Open Scenario Studio", "scenario studio unified cross lab stress templates global shock controls impact dashboard educational"],
+        ["Cross-Lab Scenario Studio", "cross lab scenario impact scores macro portfolio crypto defi tokenomics onchain alternative data microstructure heatmap radar"],
+        ["Report Builder", "report builder generated markdown sections executive summary limitations copy educational research summary"],
+        ["Cross-Asset Stress Report", "cross asset stress report severe combo broad risk off composite severity scenario regime"],
+        ["Crypto Stress Report", "crypto stress report crypto risk off stablecoin depeg exchange inflow panic funding unlock whale scenario"],
+        ["Macro Stress Report", "macro stress report inflation reacceleration growth shock liquidity crunch credit stress policy scenario"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `scenariostudio-${title}`,
+      group: "Scenario Studio",
+      title,
+      keywords,
+      run: () => handleNav("scenariostudio"),
     })),
     ...(
       [
@@ -2045,6 +2068,8 @@ export default function HomePage() {
 
         {/* ── Macro Regime & Cross-Asset Allocation Lab ─────────────────── */}
         {view === "macroregime" && <MacroRegimeLabPanel />}
+
+        {view === "scenariostudio" && <ScenarioStudioPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (
