@@ -396,13 +396,15 @@ that phase, not here.
 > implemented**). See `docs/AI_QUANT_ARCHITECTURE.md` **Appendix J (§J.11
 > as-built)** for details.
 >
-> **Planned (Phase 10, design approved 2026-07-05):** a **local ExperimentStore
-> reporting / comparison** layer over persisted Phase 9 runs — deterministic
-> Markdown / CSV / JSON summaries and multi-run comparison, read-only by default.
-> It reads existing local artifacts only; it adds **no vendor fetch (I5), no live
-> data, and no real-data acquisition** (all remain out of scope and **not
-> implemented**). See `docs/AI_QUANT_ARCHITECTURE.md` **Appendix K** for the full
-> plan. No code is implemented yet.
+> **Implemented (Phase 10, 2026-07-05):** a **local ExperimentStore reporting /
+> comparison** layer over persisted Phase 9 runs now exists —
+> `backend/app/reporting/` + `scripts/report_local_futures_experiments.py` produce
+> deterministic Markdown / CSV / strict-JSON summaries and multi-run comparison,
+> **read-only by default** (exports only to an explicit `--output-path`). It reads
+> existing local artifacts only and **wraps** the existing compare / best helpers;
+> it adds **no vendor fetch (I5), no live data, and no real-data acquisition** (all
+> remain out of scope and **not implemented**). See
+> `docs/AI_QUANT_ARCHITECTURE.md` **Appendix K (§K.13 as-built)** for details.
 
 ### Ingestion Phase 5 (I5) — real vendor integration
 

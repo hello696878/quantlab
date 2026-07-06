@@ -3003,15 +3003,16 @@ whether run through Phase 6 (synthetic origin) or Phase 9 (store origin).
 
 ---
 
-## Appendix K — Phase 10 Local Experiment Reporting & Comparison Plan
+## Appendix K — Phase 10 Local Experiment Reporting & Comparison
 
-> **Status: design only (Commit 0).** Nothing in this appendix is implemented by
-> this appendix. It records the approved Phase 10 plan so implementation lands in
-> tiny, testable commits on top of the persisted `ExperimentStore` artifacts
-> (Phase 5) and the existing read-only experiment helpers. Phase 10 is a
-> **reporting / rendering layer only** — it invents **no new ML pipeline, no new
-> metrics, and no `ExperimentRun` schema change**, and it **does not retrain**.
-> No code, script, data, or test is created by Commit 0.
+> **Status: as-built (Phase 10 shipped, Commits 0–3).** Sections K.1–K.12 are the
+> approved design; **§K.13 records the shipped result.** Phase 10 is a
+> **reporting / rendering layer only** over persisted `ExperimentStore` artifacts —
+> it **wraps** the existing compare / best / summarize helpers and adds
+> deterministic Markdown / CSV / JSON exports with standing disclaimers. It invents
+> **no new ML pipeline, no new metrics, and no `ExperimentRun` schema change**, and
+> it **does not retrain**. Read-only by default; local artifacts only; unavailable
+> Phase 8/9 provenance fields remain **"not recorded"**.
 
 ### K.1 Current state
 
@@ -3248,3 +3249,107 @@ Each commit runs `pytest tests/test_experiment_reporting.py -v` then the full
 | Overfitting to synthetic demo outputs | reporting is generic over any `ExperimentRun` (Phase 6 or Phase 9); tests assert structure / determinism, not specific metric values |
 | Pretending local / synthetic ⇒ live performance | every report states **synthetic / local-only, not a performance guarantee, not live**; the CLI banner repeats it |
 | Missing provenance because `ExperimentRun` doesn't persist Phase 9 local fields | reports mark `root_symbol` / `source` / `adjustment_method` / `contracts` / `roll_events` / `raw_data_version_hash` as **not recorded** (§K.5); no schema change in Phase 10 |
+
+### K.13 As-built (Phase 10 shipped)
+
+Implemented across Commits 1–3 exactly as designed above; tests are synthetic +
+`tmp_path` only, no network, and the full backend suite stays green.
+
+**Shipped components**
+
+- `backend/app/reporting/__init__.py` — package exports.
+- `backend/app/reporting/summary.py` — `ExperimentRunSummary`,
+  `ExperimentComparisonRow`, and the wrappers `summarize_experiment_run` /
+  `compare_experiment_runs` / `best_experiment_run` (reusing `load_experiment_run`
+  / `summarize_experiment` / `compare_experiments` / `get_best_experiment` — **no**
+  new compare/best logic).
+- `backend/app/reporting/render.py` — `render_experiment_report_markdown`,
+  `export_experiment_report_json`, `export_experiment_comparison_csv`,
+  `export_experiment_comparison_json`, `DISCLAIMERS`, and a strict-JSON sanitizer.
+- `scripts/report_local_futures_experiments.py` — thin argparse CLI
+  (`summary` / `compare` / `best` / `export-markdown` / `export-json` /
+  `export-csv`); no business logic beyond parsing + calling `app.reporting` +
+  printing / writing.
+- `backend/tests/test_experiment_reporting.py` — 31 tests (module wrappers,
+  renderers, CLI, and one integrated end-to-end pass).
+
+**CLI usage**
+
+```bat
+cd C:\quantlab
+```
+
+Summary (read-only):
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py summary ^
+  --artifacts-dir artifacts\experiments ^
+  --train-run-hash <TRAIN_RUN_HASH>
+```
+
+Compare (read-only):
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py compare ^
+  --artifacts-dir artifacts\experiments ^
+  <HASH_1> <HASH_2> ^
+  --metric sharpe
+```
+
+Best (read-only):
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py best ^
+  --artifacts-dir artifacts\experiments ^
+  --metric sharpe ^
+  --maximize
+```
+
+Export Markdown / JSON / CSV (write to an explicit `--output-path`):
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py export-markdown ^
+  --artifacts-dir artifacts\experiments ^
+  --train-run-hash <TRAIN_RUN_HASH> ^
+  --output-path reports\experiment.md
+
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py export-json ^
+  --artifacts-dir artifacts\experiments ^
+  --train-run-hash <TRAIN_RUN_HASH> ^
+  --output-path reports\experiment.json
+
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py export-csv ^
+  --artifacts-dir artifacts\experiments ^
+  <HASH_1> <HASH_2> ^
+  --output-path reports\comparison.csv
+```
+
+**Behavior**
+
+- **Local `ExperimentStore` artifacts only.**
+- **Read-only by default** — `summary` / `compare` / `best` write no files.
+- **`export-*` writes only to the explicit `--output-path`** (parent dir created).
+- Deterministic Markdown / CSV / strict JSON (sorted keys, `NaN` / `inf` → `null`,
+  fixed float format, fixed section / column order).
+- `RESULT: OK` on success; `RESULT: FAIL (...)` + nonzero on missing store /
+  unknown hash / missing metric / incompatible windows (unless
+  `--allow-different-windows`).
+- **Standing disclaimers** in every report (synthetic / local-only; not investment
+  advice; not live trading; not a performance guarantee).
+- **No training; no vendor / download / live data; no `ExperimentRun` schema
+  change.**
+- **Unavailable persisted fields remain "not recorded":** `root_symbol` /
+  `source` / `adjustment_method` / `contracts` / `roll_events` /
+  `raw_data_version_hash`.
+
+**Known limitations**
+
+- `root_symbol`, `source`, `adjustment_method`, `contracts`, `roll_events`, and
+  `raw_data_version_hash` are **not persisted** in `ExperimentRun`, so they remain
+  unavailable in stored-run reports (shown "not recorded"; no schema change).
+- No live data; no real-money trading; no frontend; no Research CLI real-data mode.
+- No new metrics beyond the reporting wrappers / display formatting.
+- **No `--top-n` / `--sort`** — deferred (the underlying helpers expose no safe
+  top-n / sort primitive; adding them would risk re-implementing selection logic).
+- Reports describe **historical local artifacts only** and are not investment
+  advice.

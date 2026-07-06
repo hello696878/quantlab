@@ -444,3 +444,92 @@ def test_cli_is_thin_and_clean():
         r"(?m)^\s*(from|import)\s+\S*"
         r"(yfinance|ibkr|sklearn|xgboost|lightgbm|torch|tensorflow)\b", src
     )
+
+
+# --------------------------------------------------------------------------- #
+# Commit 3 — integrated end-to-end (runs -> summarize -> compare -> best -> export)
+# --------------------------------------------------------------------------- #
+
+
+def test_e2e_reporting_full_path(tmp_path, monkeypatch):
+    """Full reporting path under tmp_path: Phase 9 saved runs -> summarize ->
+    compare -> best -> export Markdown / JSON / CSV, with every safety property."""
+    before = _repo_paths_snapshot()
+    monkeypatch.chdir(tmp_path)
+
+    exp, hashes = _store_with_runs(tmp_path, seeds=(0, 1))
+    assert len(hashes) >= 2
+    run_dirs = [p for p in exp.base_dir.glob("*") if p.is_dir()]
+    assert len(run_dirs) >= 2
+
+    # --- module wrappers: summarize / compare / best ---
+    s = summarize_experiment_run(hashes[0], store=exp)
+    assert isinstance(s, ExperimentRunSummary) and s.train_run_hash == hashes[0]
+    for key in ("continuous_config_hash", "feature_config_hash", "label_config_hash",
+                "dataset_config_hash", "model_config_hash", "train_run_hash"):
+        assert s.hash_chain[key]
+    rows1 = compare_experiment_runs(hashes, store=exp)
+    rows2 = compare_experiment_runs(hashes, store=exp)
+    assert [r.train_run_hash for r in rows1] == [r.train_run_hash for r in rows2]  # deterministic
+    assert {r.train_run_hash for r in rows1} == set(hashes)
+    best = best_experiment_run(store=exp, metric="sharpe")
+    assert best.train_run_hash in hashes
+
+    # --- CLI exports (only to explicit output paths under tmp_path) ---
+    out_md = tmp_path / "reports" / "run.md"
+    out_json = tmp_path / "reports" / "run.json"
+    out_csv = tmp_path / "reports" / "cmp.csv"
+    cli = _load_cli()
+    assert cli.main(["export-markdown", "--artifacts-dir", str(exp.base_dir),
+                     "--train-run-hash", hashes[0], "--output-path", str(out_md)]) == 0
+    assert cli.main(["export-json", "--artifacts-dir", str(exp.base_dir),
+                     "--train-run-hash", hashes[0], "--output-path", str(out_json)]) == 0
+    assert cli.main(["export-csv", "--artifacts-dir", str(exp.base_dir), *hashes,
+                     "--output-path", str(out_csv)]) == 0
+
+    # --- Markdown: disclaimers + identity + metrics + hash chain + unavailable note ---
+    md = out_md.read_text(encoding="utf-8")
+    for disclaimer in DISCLAIMERS:
+        assert disclaimer in md
+    for heading in ("## Run identity", "## ML metrics", "## Backtest metrics", "## Hash chain"):
+        assert heading in md
+    assert "not recorded" in md
+
+    # --- JSON: strict, parses, no NaN/Infinity ---
+    jtext = out_json.read_text(encoding="utf-8")
+    assert "NaN" not in jtext and "Infinity" not in jtext
+    assert json.loads(jtext)["run_identity"]["train_run_hash"] == hashes[0]
+
+    # --- CSV: deterministic columns, one row per run ---
+    clines = out_csv.read_text(encoding="utf-8").strip().splitlines()
+    assert clines[0].startswith("train_run_hash,model_type,task_type")
+    assert len(clines) == 1 + len(hashes)
+
+    # --- no absolute local paths leak into the Markdown or JSON reports ---
+    for text in (md, jtext):
+        assert str(tmp_path) not in text
+        assert not re.search(r"[A-Za-z]:[\\/]", text)
+
+    # --- exports exist only at their explicit output paths; all under tmp_path ---
+    assert out_md.exists() and out_json.exists() and out_csv.exists()
+    assert all(str(p).startswith(str(tmp_path)) for p in (out_md, out_json, out_csv))
+    assert all(str(p).startswith(str(tmp_path)) for p in exp.base_dir.rglob("*") if p.is_file())
+    assert _repo_paths_snapshot() == before
+
+    # --- ExperimentRun schema unchanged: local Phase 8/9 fields are not persisted ---
+    from app.experiments.spec import ExperimentRun
+    for field in ("root_symbol", "source", "adjustment_method",
+                  "contracts", "roll_events", "raw_data_version_hash"):
+        assert field not in ExperimentRun.model_fields
+
+    # --- reporting module does not train / import training or ML frameworks ---
+    for name in ("__init__.py", "summary.py", "render.py"):
+        src = (_BACKEND / "app" / "reporting" / name).read_text(encoding="utf-8")
+        for token in ("train_model", "run_local_futures_ml_experiment",
+                      "build_feature_matrix", "build_label_matrix"):
+            assert token not in src, f"{name}:{token}"
+        assert not re.search(
+            r"(?m)^\s*(from|import)\s+\S*"
+            r"(requests|urllib|httpx|aiohttp|socket|yfinance|ibkr|sklearn|xgboost|lightgbm|torch|tensorflow)\b",
+            src,
+        ), name
