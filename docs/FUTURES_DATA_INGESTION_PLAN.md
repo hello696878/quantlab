@@ -405,6 +405,15 @@ that phase, not here.
 > it adds **no vendor fetch (I5), no live data, and no real-data acquisition** (all
 > remain out of scope and **not implemented**). See
 > `docs/AI_QUANT_ARCHITECTURE.md` **Appendix K (§K.13 as-built)** for details.
+>
+> **Planned (Phase 11, design only):** a **local batch / sweep orchestration** layer
+> over Phase 9 experiments — deterministic expansion of multiple
+> `LocalExperimentConfig` values, sequential execution through the existing
+> `run_local_futures_ml_experiment`, per-item status / error recording, and optional
+> Phase 10 comparison output. It adds **no vendor fetch (I5), no live data, and no
+> real-data acquisition** (all remain out of scope and **not implemented**), and
+> introduces **no new ML models / features / labels / backtest logic**. See
+> `docs/AI_QUANT_ARCHITECTURE.md` **Appendix L** for the design.
 
 ### Ingestion Phase 5 (I5) — real vendor integration
 
