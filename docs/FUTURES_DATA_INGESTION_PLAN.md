@@ -395,6 +395,16 @@ that phase, not here.
 > and no real-data acquisition** (both remain out of scope and **not
 > implemented**). See `docs/AI_QUANT_ARCHITECTURE.md` **Appendix J (§J.11
 > as-built)** for details.
+>
+> **Implemented (Phase 10, 2026-07-05):** a **local ExperimentStore reporting /
+> comparison** layer over persisted Phase 9 runs now exists —
+> `backend/app/reporting/` + `scripts/report_local_futures_experiments.py` produce
+> deterministic Markdown / CSV / strict-JSON summaries and multi-run comparison,
+> **read-only by default** (exports only to an explicit `--output-path`). It reads
+> existing local artifacts only and **wraps** the existing compare / best helpers;
+> it adds **no vendor fetch (I5), no live data, and no real-data acquisition** (all
+> remain out of scope and **not implemented**). See
+> `docs/AI_QUANT_ARCHITECTURE.md` **Appendix K (§K.13 as-built)** for details.
 
 ### Ingestion Phase 5 (I5) — real vendor integration
 

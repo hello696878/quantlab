@@ -3000,3 +3000,356 @@ whether run through Phase 6 (synthetic origin) or Phase 9 (store origin).
 - Duplicate-run behavior follows the existing `ExperimentStore` semantics
   (reject unless `--overwrite`).
 - Tests use synthetic ES data (3 contracts × ~120 sessions) under `tmp_path`.
+
+---
+
+## Appendix K — Phase 10 Local Experiment Reporting & Comparison
+
+> **Status: as-built (Phase 10 shipped, Commits 0–3).** Sections K.1–K.12 are the
+> approved design; **§K.13 records the shipped result.** Phase 10 is a
+> **reporting / rendering layer only** over persisted `ExperimentStore` artifacts —
+> it **wraps** the existing compare / best / summarize helpers and adds
+> deterministic Markdown / CSV / JSON exports with standing disclaimers. It invents
+> **no new ML pipeline, no new metrics, and no `ExperimentRun` schema change**, and
+> it **does not retrain**. Read-only by default; local artifacts only; unavailable
+> Phase 8/9 provenance fields remain **"not recorded"**.
+
+### K.1 Current state
+
+- **Phase 7** — local raw futures ingestion into `RawFuturesStore`.
+- **Phase 8** — local continuous futures construction from store-backed raw
+  contracts (`build_continuous_from_store`).
+- **Phase 9** — local continuous futures → features / labels / ML / experiments
+  (`backend/app/local_pipeline/`), persisting each run via the Phase 5
+  `ExperimentStore`.
+- **Phase 5 `ExperimentStore`** already persists an `ExperimentRun` per run under
+  `<base>/<train_run_hash>/` (metadata JSON + frames with **relative**
+  `artifact_paths`).
+- **Existing experiment helpers already provide** list / load / summarize /
+  compare / best behavior: `list_experiments(store)`,
+  `load_experiment_run(hash, store)`, `summarize_experiment(run)`,
+  `compare_experiments(runs, store, metrics, allow_different_windows)` (with a
+  same-OOS-window / label / dataset guard), and
+  `get_best_experiment(store, metric, maximize)` (deterministic tie-break by
+  `train_run_hash`, clear "metric unavailable" errors).
+- **Missing layer** — deterministic, user-facing **reports** (Markdown / CSV /
+  JSON) and local **comparison exports** with standing disclaimers. The current
+  helpers return a bare dict / text / DataFrame; nothing formats a full,
+  disclaimer-bearing, byte-stable report.
+
+### K.2 Core design decision
+
+Phase 10 is a **reporting / rendering layer over persisted `ExperimentRun`
+artifacts**. It **must**:
+
+- read saved `ExperimentStore` runs;
+- summarize one run;
+- compare multiple runs;
+- select the best run using the **existing** `ExperimentStore` helpers;
+- export deterministic Markdown / CSV / JSON reports.
+
+It **must not**:
+
+- retrain models;
+- create a new ML pipeline;
+- change Phase 2–9 logic (including the `ExperimentRun` schema);
+- reimplement the existing compare / best logic (it **wraps** them).
+
+### K.3 Proposed package — `backend/app/reporting/`
+
+A new package generic over `ExperimentRun` (works for Phase 6 Research CLI runs
+**and** Phase 9 local runs; decoupled from Phase 9; reuses `app.experiments`):
+
+```text
+backend/app/reporting/
+├── __init__.py         # public exports
+├── summary.py          # ExperimentRunSummary, ExperimentComparisonRow + summarize/compare/best wrappers
+└── render.py           # Markdown / CSV / JSON renderers + disclaimers + strict-JSON helper
+```
+
+- **`ExperimentRunSummary`** (frozen) — the persisted run fields (identity,
+  windows, metrics, the six persisted hashes, `artifact_paths`, `created_at` /
+  `git_commit` / `code_version`, `n_oos_rows` / `n_scored_rows`).
+- **`ExperimentComparisonRow`** (frozen) — one comparison row
+  (`train_run_hash`, `model_type`, `label_column`, validation window,
+  `same_window` flag when applicable, and the selected `metrics`).
+- **`summarize_experiment_run(run_or_hash, *, store=None) -> ExperimentRunSummary`**
+  — reuses `load_experiment_run` + `summarize_experiment`.
+- **`compare_experiment_runs(hashes, *, store, metrics=None,
+  allow_different_windows=False) -> list[ExperimentComparisonRow]`** — wraps
+  `compare_experiments` (keeps its same-window guard).
+- **`best_experiment_run(*, store, metric="sharpe", maximize=True,
+  allow_different_windows=False) -> ExperimentRunSummary`** — wraps
+  `get_best_experiment`.
+- **`render_experiment_report_markdown(summary, *, include_provenance=True,
+  include_hash_chain=True) -> str`** — deterministic Markdown report.
+- **`export_experiment_report_json(summary, *, ...) -> str`** — strict JSON.
+- **`export_experiment_comparison_csv(rows) -> str`** — deterministic CSV.
+- **`export_experiment_comparison_json(rows) -> str`** — strict JSON.
+
+### K.4 Scope
+
+**In scope:** local `ExperimentStore` artifacts only; single-run summary;
+multiple-run comparison; best-run selection; deterministic Markdown export;
+deterministic CSV export; strict JSON export; standing disclaimers; a read-only
+default CLI design; writes only to an explicit output path.
+
+**Out of scope:** vendor / network / yfinance / IBKR downloader; live data;
+real-money trading; frontend; DB / cloud; new ML frameworks; sklearn / xgboost /
+lightgbm / torch / tensorflow; new model families; new backtest engine;
+retraining; rewriting Phase 2–9; a Research CLI real-data mode; auto-generated
+trading recommendations; **`ExperimentRun` schema changes**.
+
+### K.5 Persisted-field limitation
+
+Stored `ExperimentRun` reports **can show**:
+
+- `train_run_hash`, `model_type`, `task_type`, `feature_columns`, `label_column`
+- `train_start` / `train_end`, `validation_start` / `validation_end`
+- `ml_metrics` (`metrics`), `backtest_metrics`, `baseline_metrics`
+- `continuous_config_hash`, `feature_config_hash`, `label_config_hash`,
+  `dataset_config_hash`, `model_config_hash`
+- `artifact_paths`, `created_at`, `git_commit`, `code_version`
+- `n_oos_rows`, `n_scored_rows`
+
+Stored `ExperimentRun` reports **cannot currently show** (not persisted by the
+Phase 5 schema):
+
+- `root_symbol`
+- `source`
+- `adjustment_method`
+- `contracts`
+- `roll_events`
+- `raw_data_version_hash`
+
+For these unavailable fields, reports display **"not recorded"** or omit them with
+a clear note. **Phase 10 does not add these fields** — surfacing them would be a
+small *additive* future `ExperimentRun` (Phase 5.x) change, out of scope here.
+
+### K.6 Report contents (sections)
+
+- **Disclaimers** (always, first): synthetic / local-only data; not investment
+  advice; not live trading; not a performance guarantee.
+- **Run identity:** `train_run_hash`, `model_type`, `task_type`, `label_column`,
+  `feature_columns`. (`root_symbol` / `source` / `adjustment_method` — **not
+  recorded**.)
+- **Windows:** `train_start` / `train_end`, `validation_start` / `validation_end`.
+- **ML metrics.**
+- **Backtest metrics.**
+- **Baseline metrics** (`no_trade` + `momentum` when present).
+- **Hash chain:** `continuous_config_hash` → `feature_config_hash` →
+  `label_config_hash` → `dataset_config_hash` → `model_config_hash` →
+  `train_run_hash`. (`raw_data_version_hash` — **not recorded**.)
+- **Artifact paths** (relative).
+- **Provenance available from the persisted `ExperimentRun`:** `created_at`,
+  `git_commit`, `code_version`, `n_oos_rows`, `n_scored_rows`.
+- **Unavailable-provenance note:** `contracts` / `roll_events` / `root_symbol` /
+  `source` / `adjustment_method` / `raw_data_version_hash` are not persisted by the
+  current schema.
+
+### K.7 CLI design (future script — not implemented in Commit 0)
+
+`scripts/report_local_futures_experiments.py` — a thin argparse wrapper
+(bootstraps `backend` onto `sys.path`); **read-only by default**; writes only to an
+explicit `--output-path`.
+
+| Subcommand | Action |
+|---|---|
+| `summary` | print one run's summary |
+| `compare` | print a comparison table |
+| `best` | print the best run by a metric |
+| `export-markdown` | write a Markdown report |
+| `export-json` | write a JSON report |
+| `export-csv` | write a comparison CSV |
+
+| Flag | Meaning |
+|---|---|
+| `--artifacts-dir` | `ExperimentStore` base (read) |
+| `--train-run-hash` | target run (summary / export) |
+| `--metric` | comparison / best metric (default `sharpe`) |
+| `--top-n` | limit compare rows |
+| `--sort` | sort comparison by a metric |
+| `--allow-different-windows` | opt out of the same-window guard (surfaces `same_window`) |
+| `--include-provenance` / `--include-hash-chain` | toggle report sections |
+| `--output-path` | write target (export-* only) |
+| `--no-parquet` | storage parity |
+
+CLI rules: local files only; read-only by default; writes only to explicit
+`--output-path`; deterministic output; `RESULT: OK` / `RESULT: FAIL`; no network.
+
+### K.8 Determinism / strict output rules
+
+- **Sorted keys** for JSON objects.
+- `json.dumps(..., allow_nan=False)` — no `NaN` / `Infinity` literals.
+- Non-finite floats (`NaN` / ±`inf`) converted to `null`.
+- Stable float formatting where relevant.
+- **Deterministic CSV column order** (fixed schema).
+- **Deterministic Markdown section order** (fixed section order).
+- Output is **byte-stable** for the same stored run (a fixed store yields
+  identical reports across runs / machines).
+
+### K.9 Safety / data rules
+
+- **Tests use `tmp_path` only** — `ExperimentStore(tmp_path)`; exports to
+  `tmp_path`.
+- **No repo-root `data/` or `artifacts/` writes.**
+- **No network; no vendor fetch; no new ML dependencies.**
+- **No absolute paths** in committed tests / docs; reports echo the store's
+  **relative** `artifact_paths`; the report carries no host paths.
+- **Local artifacts only.**
+- **Clear failures:** missing artifacts dir; unknown `train_run_hash`; missing /
+  incomparable comparison metric; incompatible windows (unless
+  `--allow-different-windows`).
+- **Output files only written to an explicit output path.**
+
+### K.10 Test plan — `backend/tests/test_experiment_reporting.py`
+
+- Create **2–3 synthetic local futures ML experiment runs** under `tmp_path` using
+  the Phase 9 helpers (`generate_synthetic_es_raw` → tmp `RawFuturesStore` →
+  `run_local_futures_ml_experiment(..., experiment_store=ExperimentStore(tmp_path))`;
+  vary `model_type` / `random_seed` for distinct `train_run_hash`es).
+- **Verify:** summarize one run; compare multiple runs; select best by an existing
+  metric; export Markdown / CSV / JSON to `tmp_path`; deterministic output (render
+  twice → identical); strict JSON parses and contains no `NaN` / `Infinity`;
+  disclaimer text appears; missing run fails clearly; missing metric fails clearly;
+  incompatible windows fail unless `--allow-different-windows`; no repo-root
+  artifacts; no forbidden imports; **no retraining** in the reporting module
+  (no `train_model`); CLI exit codes (in the CLI commit).
+
+### K.11 Commit plan
+
+- **Commit 0 — Appendix K, doc-only** *(this commit)*: record the approved plan.
+- **Commit 1 — reporting module**: `backend/app/reporting/{__init__,summary,render}.py`
+  (summary / comparison wrappers + Markdown / CSV / JSON renderers + disclaimers)
+  + tests. *Acceptance:* wraps existing compare / best; deterministic; strict JSON;
+  no retrain; no repo-root writes.
+- **Commit 2 — thin CLI + CLI tests**:
+  `scripts/report_local_futures_experiments.py` + exit-code / output-path tests.
+  *Acceptance:* read-only default; exports only to `--output-path`; exit codes
+  correct.
+- **Commit 3 — integrated e2e + Appendix K as-built docs**: one end-to-end pass
+  (Phase 9 runs → summarize → compare → best → export md / csv / json under
+  `tmp_path`) + flip Appendix K to as-built. *Acceptance:* e2e + full suite green;
+  docs match shipped behavior.
+
+Each commit runs `pytest tests/test_experiment_reporting.py -v` then the full
+`pytest tests`; the user commits manually.
+
+### K.12 Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Accidentally turning reporting into **trading advice** | reports are descriptive only; no buy/sell/allocate language; standing disclaimers (not advice / not live / not a guarantee) in every report; a test asserts the disclaimer text is present |
+| Comparing incompatible **validation windows** | reuse `compare_experiments`'s same-`(validation window, label, dataset)` guard; require explicit `--allow-different-windows` (surfaces a `same_window` flag) |
+| Comparing incompatible **label columns / feature sets** | the guard keys include `label_column` + `dataset_config_hash`; the summary shows `feature_columns` / `label_column` so mismatches are visible |
+| Sorting by **missing / misleading** metrics | reuse `get_best_experiment`'s NaN-coercion + "metric unavailable for all" error + deterministic `train_run_hash` tie-break; never silently rank on NaN |
+| Leaking **absolute local paths** into reports | echo the store's **relative** `artifact_paths` only; a test asserts no absolute path in the JSON / Markdown |
+| Writing reports to **repo-root artifacts** | read-only default; exports only to explicit `--output-path`; tests keep everything under `tmp_path` + assert no repo-root writes |
+| **Duplicating** ExperimentStore comparison logic | Phase 10 **wraps** `compare_experiments` / `get_best_experiment` / `summarize_experiment` — rendering only, no new compare / best code |
+| Overfitting to synthetic demo outputs | reporting is generic over any `ExperimentRun` (Phase 6 or Phase 9); tests assert structure / determinism, not specific metric values |
+| Pretending local / synthetic ⇒ live performance | every report states **synthetic / local-only, not a performance guarantee, not live**; the CLI banner repeats it |
+| Missing provenance because `ExperimentRun` doesn't persist Phase 9 local fields | reports mark `root_symbol` / `source` / `adjustment_method` / `contracts` / `roll_events` / `raw_data_version_hash` as **not recorded** (§K.5); no schema change in Phase 10 |
+
+### K.13 As-built (Phase 10 shipped)
+
+Implemented across Commits 1–3 exactly as designed above; tests are synthetic +
+`tmp_path` only, no network, and the full backend suite stays green.
+
+**Shipped components**
+
+- `backend/app/reporting/__init__.py` — package exports.
+- `backend/app/reporting/summary.py` — `ExperimentRunSummary`,
+  `ExperimentComparisonRow`, and the wrappers `summarize_experiment_run` /
+  `compare_experiment_runs` / `best_experiment_run` (reusing `load_experiment_run`
+  / `summarize_experiment` / `compare_experiments` / `get_best_experiment` — **no**
+  new compare/best logic).
+- `backend/app/reporting/render.py` — `render_experiment_report_markdown`,
+  `export_experiment_report_json`, `export_experiment_comparison_csv`,
+  `export_experiment_comparison_json`, `DISCLAIMERS`, and a strict-JSON sanitizer.
+- `scripts/report_local_futures_experiments.py` — thin argparse CLI
+  (`summary` / `compare` / `best` / `export-markdown` / `export-json` /
+  `export-csv`); no business logic beyond parsing + calling `app.reporting` +
+  printing / writing.
+- `backend/tests/test_experiment_reporting.py` — 31 tests (module wrappers,
+  renderers, CLI, and one integrated end-to-end pass).
+
+**CLI usage**
+
+```bat
+cd C:\quantlab
+```
+
+Summary (read-only):
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py summary ^
+  --artifacts-dir artifacts\experiments ^
+  --train-run-hash <TRAIN_RUN_HASH>
+```
+
+Compare (read-only):
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py compare ^
+  --artifacts-dir artifacts\experiments ^
+  <HASH_1> <HASH_2> ^
+  --metric sharpe
+```
+
+Best (read-only):
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py best ^
+  --artifacts-dir artifacts\experiments ^
+  --metric sharpe ^
+  --maximize
+```
+
+Export Markdown / JSON / CSV (write to an explicit `--output-path`):
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py export-markdown ^
+  --artifacts-dir artifacts\experiments ^
+  --train-run-hash <TRAIN_RUN_HASH> ^
+  --output-path reports\experiment.md
+
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py export-json ^
+  --artifacts-dir artifacts\experiments ^
+  --train-run-hash <TRAIN_RUN_HASH> ^
+  --output-path reports\experiment.json
+
+.\backend\venv\Scripts\python.exe .\scripts\report_local_futures_experiments.py export-csv ^
+  --artifacts-dir artifacts\experiments ^
+  <HASH_1> <HASH_2> ^
+  --output-path reports\comparison.csv
+```
+
+**Behavior**
+
+- **Local `ExperimentStore` artifacts only.**
+- **Read-only by default** — `summary` / `compare` / `best` write no files.
+- **`export-*` writes only to the explicit `--output-path`** (parent dir created).
+- Deterministic Markdown / CSV / strict JSON (sorted keys, `NaN` / `inf` → `null`,
+  fixed float format, fixed section / column order).
+- `RESULT: OK` on success; `RESULT: FAIL (...)` + nonzero on missing store /
+  unknown hash / missing metric / incompatible windows (unless
+  `--allow-different-windows`).
+- **Standing disclaimers** in every report (synthetic / local-only; not investment
+  advice; not live trading; not a performance guarantee).
+- **No training; no vendor / download / live data; no `ExperimentRun` schema
+  change.**
+- **Unavailable persisted fields remain "not recorded":** `root_symbol` /
+  `source` / `adjustment_method` / `contracts` / `roll_events` /
+  `raw_data_version_hash`.
+
+**Known limitations**
+
+- `root_symbol`, `source`, `adjustment_method`, `contracts`, `roll_events`, and
+  `raw_data_version_hash` are **not persisted** in `ExperimentRun`, so they remain
+  unavailable in stored-run reports (shown "not recorded"; no schema change).
+- No live data; no real-money trading; no frontend; no Research CLI real-data mode.
+- No new metrics beyond the reporting wrappers / display formatting.
+- **No `--top-n` / `--sort`** — deferred (the underlying helpers expose no safe
+  top-n / sort primitive; adding them would risk re-implementing selection logic).
+- Reports describe **historical local artifacts only** and are not investment
+  advice.
