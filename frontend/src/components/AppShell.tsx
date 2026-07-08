@@ -33,6 +33,7 @@ export type View =
   | "scenariostudio"
   | "researchworkspace"
   | "democenter"
+  | "datareliability"
   | "csv"
   | "builder"
   | "portfolio"

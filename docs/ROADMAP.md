@@ -1677,6 +1677,75 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 35.0 — Data Mode Registry, Offline Fixtures & API Reliability Center v1 ✅
+
+- **New product reliability layer (not a financial model): a central registry
+  explaining how every module sources data and why demos/tests stay
+  deterministic.** Hand-maintained static reliability METADATA fact-checked
+  against the code when written; this layer never calls the providers it
+  describes (no yfinance, no FRED, no network), never guarantees external
+  availability, adds no telemetry/login/cloud/database dependency, and is not
+  investment / trading / compliance advice or a data governance system. No
+  existing module changed (separate package + view).
+- Backend: new `app/data_reliability/` package (`models.py` strict Pydantic v2
+  with `extra="forbid"` + `FiniteFloat`, data-mode/provider-type/failure-mode/
+  fixture-type/category/section enums, non-empty `report_sections`,
+  `selected_modules` non-empty when provided; `sample.py` a **20-module
+  data-mode registry** (demo-safe/test-safe/external/fallback/deterministic
+  flags, providers, fixtures, failure behavior, user-visible labels, honest
+  limitations — recent labs static_sample; Backtest Studio / Strategy
+  Comparison honestly `optional_external_provider` with the KO/PEP demo-pair
+  fixture; the Globe `optional_external_provider` with disabled-by-default
+  fail-closed adapters), a **7-provider registry** (Static Fixtures, Internal
+  Sample Registry, Local Calculation Engine, User Input, plus the optional
+  yfinance / FRED / delayed-quote providers — external, `allowed_in_tests =
+  False`, offline fallbacks, fail-closed defaults), and an **11-fixture
+  offline registry** (incl. the pairs-trading KO/PEP demo fallback and every
+  recent lab's sample set); `service.py` pure analytics) +
+  `app/data_reliability_routes.py` (`GET /data-reliability/sample`,
+  `POST /data-reliability/analyze`; empty scope match → 422), wired via
+  `include_router`.
+- Analytics: demo-safe rate `D`, test-safe rate `T`, offline-fallback coverage
+  `F`, external-provider exposure `E` (2/20 modules at full scope), and the
+  reliability score `R = 100·(0.35D + 0.25T + 0.25F + 0.15(1−E))` with
+  buckets (≥90 highly deterministic / ≥75 mostly / ≥55 mixed / else
+  external-dependent), a per-module **test-safety matrix** (tests monkeypatch
+  the fetch layer; optional providers never called), a **fallback matrix**
+  (failure behavior per module), category/module scoping, provider/fixture/
+  test-safety include toggles, and a deterministic **Markdown reliability
+  report** (seven sections; "recommendations" renders as "Suggested Handling";
+  no recommendation wording, no availability-guarantee wording) with a
+  Markdown + canonical-JSON export payload. Rates over a non-empty scope +
+  fixed convex score → no NaN/Inf.
+- Frontend: new `DataReliabilityPanel` (view `datareliability`) — hero,
+  category filter, per-module scope chips (≥1 guard), external/fixtures/
+  test-safety toggles, report-section chips; reliability summary cards with
+  bucket pill + score gauge + drivers; data-mode distribution, provider-usage
+  (external providers amber), and safety/fallback-coverage charts; the module
+  data-mode table (failure behavior per row), the test-safety matrix, the
+  provider registry table (network / API key / "never" in tests / on-failure
+  behavior), the offline fixture registry table, a copyable Markdown/JSON
+  report, and a collapsible shared `FormulaReference` (D, T, F, E, R); new
+  `lib/dataReliability.ts` types + API client. Wired into Sidebar ("Data
+  Reliability Center"), Dashboard card ("Data reliability" badge), and
+  Command Palette (Open Data Reliability Center, Data Mode Registry, Offline
+  Fixtures, Provider Registry, Test Safety Matrix, API Reliability Report).
+- 23 new backend tests (deterministic, no network, no provider imports —
+  enforced by a source-scan test) — registry endpoints and contents, all
+  four rate formulas plus the score formula/bounds/bucket ordering, enum
+  validity, the **yfinance contract** (`allowed_in_tests = False` +
+  offline fallback), the **pairs-demo fallback representation** (fixture ↔
+  module cross-references, KO/PEP failure behavior), report section
+  selection, limitations-when-selected, no-recommendation and
+  no-availability-guarantee wording, toggle filtering, category/module
+  scoping, Markdown + JSON export, validation rejections, and full-payload
+  finiteness. `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`,
+  `frontend/README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`,
+  `DEMO_SCRIPT.md`. **Static reliability metadata — tests never depend on
+  live providers, default demos have deterministic fallbacks, no live-data
+  guarantee, not advice, not a production data governance system.**
+
 ### Phase 34.0 — Product Demo Center, Guided Walkthroughs & Module Health Dashboard v1 ✅
 
 - **New product-UX layer (not a financial model): a Demo Center that makes the

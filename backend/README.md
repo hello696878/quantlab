@@ -46,6 +46,8 @@ backend/
 │   ├── research_workspace_routes.py  Research Workspace, Saved Presets & Experiment Journal API routes
 │   ├── demo_center/        static demo-metadata walkthrough/health/script analytics (models/sample/service)
 │   ├── demo_center_routes.py  Product Demo Center, Guided Walkthroughs & Module Health API routes
+│   ├── data_reliability/   static data-mode/provider/fixture reliability registries (models/sample/service)
+│   ├── data_reliability_routes.py  Data Mode Registry, Offline Fixtures & API Reliability API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -75,7 +77,8 @@ backend/
 │   ├── test_macro_regime.py      Macro Regime & Cross-Asset Allocation Lab analytics/API/validation tests
 │   ├── test_scenario_studio.py   Unified Scenario Studio & Cross-Lab Report Builder analytics/API/validation tests
 │   ├── test_research_workspace.py  Research Workspace, Saved Presets & Experiment Journal analytics/API/validation tests
-│   └── test_demo_center.py       Product Demo Center, Guided Walkthroughs & Module Health analytics/API/validation tests
+│   ├── test_demo_center.py       Product Demo Center, Guided Walkthroughs & Module Health analytics/API/validation tests
+│   └── test_data_reliability.py  Data Mode Registry, Offline Fixtures & API Reliability analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -499,6 +502,32 @@ NaN/Infinity in or out (all scores clamped to [0, 1]). An unknown
 `selected_path_id` — or `included_modules` matching none of the path's modules
 — returns 422. The include-limitations toggle force-adds the limitations
 section to the generated script; the script carries no recommendation wording.
+
+---
+
+### Data Mode Registry & API Reliability Endpoints
+
+Static reliability-metadata analytics (Phase 35.0) — a product reliability
+layer explaining how QuantLab's modules source data. This layer **never calls
+the providers it describes** (no yfinance, no FRED, no network), holds no API
+keys, and never guarantees external availability. Hand-maintained annotations
+fact-checked against the code when written — not telemetry, not an SLA, not a
+data governance system, and not investment, trading, or compliance advice.
+
+| Endpoint | Description |
+|---|---|
+| `GET /data-reliability/sample` | The 20-module data-mode registry (static sample / user input / local calculation / optional external provider, with demo-safe/test-safe/fallback/deterministic flags and failure behavior), the 7-provider registry (internal fixtures/local/user-input plus the optional yfinance / FRED / delayed-quote providers — external, never allowed in tests, fail-closed defaults), the 11-fixture offline registry (incl. the KO/PEP pairs-demo fallback), and section/category catalogs with a default request |
+| `POST /data-reliability/analyze` | Demo-safe `D`, test-safe `T`, fallback-coverage `F`, and external-exposure `E` rates over the scoped modules, the reliability score `R = 100·(0.35D + 0.25T + 0.25F + 0.15(1−E))` with buckets, a per-module test-safety matrix and fallback matrix, and a deterministic Markdown reliability report with a Markdown + JSON export payload |
+
+Inputs are strictly validated (`extra="forbid"`): non-empty
+`report_sections`, `selected_modules` non-empty when provided,
+category/section literal enums; no NaN/Infinity in or out (rates are counts
+over a non-empty scope; the score is a fixed convex combination). An empty
+category/module match returns 422. Key contracts pinned by tests: the
+optional yfinance provider has `allowed_in_tests = False` with an offline
+fallback; the KO/PEP pairs-demo fixture is cross-referenced from the Backtest
+Studio row; and the report carries no recommendation or
+availability-guarantee wording.
 
 ---
 

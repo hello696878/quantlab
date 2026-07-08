@@ -58,6 +58,7 @@ import MacroRegimeLabPanel from "@/components/MacroRegimeLabPanel";
 import ScenarioStudioPanel from "@/components/ScenarioStudioPanel";
 import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
+import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -461,6 +462,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Product Demo Center & Guided Walkthroughs",
     subtitle:
       "Guided product walkthroughs with audience and time-budget controls, a 21-module health dashboard with status and data-mode badges, a capability matrix, readiness/coverage/complexity scores, and a copy-friendly audience-tailored demo script builder (Markdown + JSON) — hand-written static demo metadata, no telemetry, no live data, not investment, trading, or compliance advice, and no module is a production trading system.",
+  },
+  datareliability: {
+    title: "Data Mode Registry & API Reliability Center",
+    subtitle:
+      "A hand-maintained registry of module data modes (static sample / user input / local calculation / optional external provider), the provider registry (optional yfinance/FRED/delayed-quote paths are disabled by default, fail closed, and are never relied on in tests), the offline fixture registry (including the KO/PEP pairs demo fallback), documented demo-safe/test-safe/fallback/exposure rates with a reliability score, and a copy-friendly Markdown/JSON reliability report — static reliability metadata, never a provider call, no availability guarantee, not investment, trading, or compliance advice, not a data governance system.",
   },
   researchworkspace: {
     title: "Research Workspace & Experiment Journal",
@@ -1051,6 +1057,7 @@ export default function HomePage() {
     { view: "scenariostudio", title: "Open Scenario Studio", keywords: "scenario studio unified cross lab report builder stress template soft landing inflation growth shock liquidity crunch credit crypto risk off depeg inflow panic severe combo impact score heatmap severity regime markdown report" },
     { view: "researchworkspace", title: "Open Research Workspace", keywords: "research workspace experiment journal saved presets run comparison baseline stressed severity coverage reproducibility methodology checklist workflow timeline notes markdown json export local drafts" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
+    { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1533,6 +1540,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("democenter"),
+    })),
+    ...(
+      [
+        ["Open Data Reliability Center", "data reliability center registry deterministic demos offline fixtures provider exposure"],
+        ["Data Mode Registry", "data mode registry static sample user input local calculation optional external provider module modes"],
+        ["Offline Fixtures", "offline fixtures pairs demo fallback ko pep deterministic test safe sample registry"],
+        ["Provider Registry", "provider registry yfinance fred delayed quotes network api key allowed in tests fail closed"],
+        ["Test Safety Matrix", "test safety matrix monkeypatch fixtures no network deterministic tests providers disabled"],
+        ["API Reliability Report", "api reliability report markdown json demo safe test safe fallback coverage external exposure score"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `datareliability-${title}`,
+      group: "Data Reliability Center",
+      title,
+      keywords,
+      run: () => handleNav("datareliability"),
     })),
     ...(
       [
@@ -2122,6 +2145,8 @@ export default function HomePage() {
         {view === "researchworkspace" && <ResearchWorkspacePanel />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
+
+        {view === "datareliability" && <DataReliabilityPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

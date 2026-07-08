@@ -659,6 +659,24 @@ Return to the Command Center's **Platform Direction** panel (or open
   **hand-written static demo metadata** — no telemetry, no runtime health
   checks, no live data; the scripts are educational presentation aids, and no
   module is a production trading system.
+- **Data Mode Registry & API Reliability Center (35.0)** — open from the
+  sidebar (or Ctrl/Cmd+K → "Open Data Reliability Center" / "Test Safety
+  Matrix"). Show the **reliability summary** (demo-safe / test-safe /
+  fallback / external-exposure rates and the score gauge — the full 20-module
+  scope reads highly deterministic), then filter to the **Backtesting**
+  category and watch the score drop as external exposure jumps to 100% —
+  that's the honest yfinance story. Walk the **module data-mode table**
+  (static sample vs user input vs local calculation vs optional external
+  provider, with per-module failure behavior), the **provider registry**
+  (yfinance / FRED / delayed quotes marked external, "never" allowed in
+  tests, fail-closed on failure), and the **offline fixture registry** —
+  point at the **KO/PEP pairs demo fallback** that keeps the built-in pairs
+  demo network-free. Toggle external providers / fixtures / test safety and
+  the report re-assembles; finish with **📋 Copy Markdown**. The **Formulas &
+  notes** are collapsible **LaTeX** (KaTeX, local — no CDN). Emphasise:
+  hand-maintained static registry (**not** telemetry or an SLA), tests never
+  depend on live providers, default demos have deterministic fallbacks, and
+  **external availability is never guaranteed**.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

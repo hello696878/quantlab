@@ -1589,6 +1589,31 @@ export default function HomeDashboard({
           </button>
           <button
             type="button"
+            onClick={() => onNav("datareliability")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                Data Reliability Center
+              </span>
+              <span
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+              >
+                Data reliability
+              </span>
+            </span>
+            <span className="text-xs text-slate-400">
+              Inspect module data modes, static fixtures, external-provider exposure, offline
+              fallback coverage, and test-safety status so QuantLab demos stay deterministic
+              and robust — static reliability metadata, not compliance advice.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Data Reliability Center →
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => onNav("scanner")}
             className="card flex flex-col gap-1 p-4 text-left"
           >

@@ -132,6 +132,17 @@ login, no cloud sync, no live data, generated scripts are educational
 summaries, not investment or trading advice, and no module is a production
 trading system.
 
+The **Data Mode Registry, Offline Fixtures & API Reliability Center** (35.0)
+explains how every module sources data: a 20-module data-mode registry, a
+provider registry (the optional yfinance/FRED/delayed-quote paths are
+disabled by default, fail closed, and are never relied on in tests), an
+offline fixture registry (including the KO/PEP pairs-demo fallback that keeps
+the built-in pairs demo network-free), documented reliability rates and
+score, and a copyable Markdown/JSON reliability report. Hand-maintained
+static metadata — tests never depend on live providers, default demos have
+deterministic fallbacks, external availability is never guaranteed, and it is
+not a production data governance system.
+
 ## Project Docs
 
 - [TASKS.md](TASKS.md) — current task list

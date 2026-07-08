@@ -281,6 +281,23 @@ manual annotations, not telemetry; no live data, no login, no analytics;
 generated scripts are educational presentation aids; no module is a
 production trading system.
 
+The **Data Mode Registry & API Reliability Center** (`DataReliabilityPanel`,
+view `datareliability`, Phase 35.0) explains how every module sources data.
+It loads the 20-module data-mode registry, 7-provider registry, and
+11-fixture offline registry and re-analyses live via
+`/api/data-reliability/analyze` (demo-safe / test-safe / fallback /
+external-exposure rates, the reliability score with a bucket pill and gauge,
+data-mode / provider-usage / safety-coverage charts, the module data-mode
+table with failure behavior, the test-safety matrix, provider and fixture
+tables, and a Markdown/JSON reliability report with copy buttons). Controls:
+category filter, per-module scope chips, external/fixtures/test-safety
+toggles, and report-section chips. The panel never calls the providers it
+describes — the optional yfinance/FRED/delayed-quote paths are disabled by
+default, fail closed, and are never relied on in tests, and the built-in
+KO/PEP pairs demo has a deterministic network-free fixture. Hand-maintained
+static metadata — no telemetry, no availability guarantee, not a data
+governance system, not investment / trading / compliance advice.
+
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract
 assumptions, and re-analyses live via `/api/futures/analyze` (cost-of-carry
