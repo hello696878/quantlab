@@ -143,6 +143,16 @@ static metadata — tests never depend on live providers, default demos have
 deterministic fallbacks, external availability is never guaranteed, and it is
 not a production data governance system.
 
+The **Release Readiness, Smoke Test Matrix & QA Command Center** (36.0) helps
+prepare demos and releases: a 21-module QA registry with release-status and
+priority labels, coverage rates and a release score, a rule-based release
+decision, per-module smoke and regression checklists, the exact local
+verification commands with copy buttons, a known-limitations tracker, and
+copy-friendly release notes (Markdown/JSON). Hand-maintained static QA
+metadata — **it does not prove tests were run**; the user still runs the
+backend suite, typecheck, and production build locally; not a production
+compliance system, not investment or trading advice.
+
 ## Project Docs
 
 - [TASKS.md](TASKS.md) — current task list

@@ -59,6 +59,7 @@ import ScenarioStudioPanel from "@/components/ScenarioStudioPanel";
 import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
+import QACommandCenterPanel from "@/components/QACommandCenterPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -462,6 +463,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Product Demo Center & Guided Walkthroughs",
     subtitle:
       "Guided product walkthroughs with audience and time-budget controls, a 21-module health dashboard with status and data-mode badges, a capability matrix, readiness/coverage/complexity scores, and a copy-friendly audience-tailored demo script builder (Markdown + JSON) — hand-written static demo metadata, no telemetry, no live data, not investment, trading, or compliance advice, and no module is a production trading system.",
+  },
+  qacommandcenter: {
+    title: "Release Readiness & QA Command Center",
+    subtitle:
+      "A hand-maintained 21-module QA registry with release-status and priority labels, ready/smoke/test-proxy/interactivity/chart coverage rates and the release score Q = 100(0.30R+0.20S+0.20T+0.15I+0.15C), a rule-based release decision, the per-module smoke-test matrix, a grouped manual regression checklist, the exact local verification commands (listed with copy buttons — never executed here), a known-limitations tracker, and copy-friendly release notes (Markdown + JSON) — static QA metadata, it never claims tests or builds were run, not a compliance system, not investment or trading advice.",
   },
   datareliability: {
     title: "Data Mode Registry & API Reliability Center",
@@ -1058,6 +1064,7 @@ export default function HomePage() {
     { view: "researchworkspace", title: "Open Research Workspace", keywords: "research workspace experiment journal saved presets run comparison baseline stressed severity coverage reproducibility methodology checklist workflow timeline notes markdown json export local drafts" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
+    { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1556,6 +1563,23 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("datareliability"),
+    })),
+    ...(
+      [
+        ["Open QA Command Center", "qa command center release readiness smoke test regression release notes quality"],
+        ["Release Readiness", "release readiness score ready rate decision ready for demo blocked needs review"],
+        ["Smoke Test Matrix", "smoke test matrix module route steps expected result status label"],
+        ["Regression Checklist", "manual regression checklist grouped by category copy friendly qa steps"],
+        ["Release Notes Builder", "release notes builder markdown json copy draft highlights data policy"],
+        ["Backend Test Commands", "backend test commands pytest venv python backend tests command checklist"],
+        ["Frontend Build Checklist", "frontend build checklist npx tsc noemit npm run build typecheck user local"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `qacommandcenter-${title}`,
+      group: "QA Command Center",
+      title,
+      keywords,
+      run: () => handleNav("qacommandcenter"),
     })),
     ...(
       [
@@ -2147,6 +2171,8 @@ export default function HomePage() {
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 
         {view === "datareliability" && <DataReliabilityPanel />}
+
+        {view === "qacommandcenter" && <QACommandCenterPanel />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

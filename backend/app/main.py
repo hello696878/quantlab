@@ -82,6 +82,7 @@ from app.scenario_studio_routes import router as scenario_studio_router
 from app.research_workspace_routes import router as research_workspace_router
 from app.demo_center_routes import router as demo_center_router
 from app.data_reliability_routes import router as data_reliability_router
+from app.qa_command_center_routes import router as qa_command_center_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -432,6 +433,9 @@ app.include_router(demo_center_router)
 
 # Data Mode Registry, Offline Fixtures & API Reliability Center (Phase 35.0) — static reliability metadata API.
 app.include_router(data_reliability_router)
+
+# Release Readiness, Smoke Test Matrix & QA Command Center (Phase 36.0) — static QA metadata API.
+app.include_router(qa_command_center_router)
 
 
 # ---------------------------------------------------------------------------

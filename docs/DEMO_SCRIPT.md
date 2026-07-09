@@ -677,6 +677,21 @@ Return to the Command Center's **Platform Direction** panel (or open
   hand-maintained static registry (**not** telemetry or an SLA), tests never
   depend on live providers, default demos have deterministic fallbacks, and
   **external availability is never guaranteed**.
+- **Release Readiness & QA Command Center (36.0)** — open from the sidebar (or
+  Ctrl/Cmd+K → "Open QA Command Center" / "Smoke Test Matrix"). Show the
+  **readiness summary** (ready/smoke/test-proxy/interactivity/chart rates,
+  the release score gauge, and the decision pill — the full 21-module scope
+  reads "Ready for demo"), and say the line that matters: **the score is a
+  documentation-coverage read — it does not prove tests were run**. Filter by
+  category/status/priority and watch the summary re-compute. Walk the
+  **smoke-test matrix** (per-module steps → expected result), the grouped
+  **manual regression checklist** (copy it), and the **command checklist** —
+  copy the exact backend pytest, `npx tsc --noEmit`, and `npm run build`
+  commands (the build is the user's local step, never run here). Show the
+  **known-limitations tracker** and finish with **📋 Copy Markdown** on the
+  release report. The **Formulas & notes** are collapsible **LaTeX** (KaTeX,
+  local — no CDN). Emphasise: hand-maintained static QA metadata — not CI,
+  not QA automation, not compliance; verification stays a local, manual step.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).

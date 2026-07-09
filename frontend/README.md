@@ -298,6 +298,22 @@ KO/PEP pairs demo has a deterministic network-free fixture. Hand-maintained
 static metadata — no telemetry, no availability guarantee, not a data
 governance system, not investment / trading / compliance advice.
 
+The **Release Readiness & QA Command Center** (`QACommandCenterPanel`, view
+`qacommandcenter`, Phase 36.0) is a project-quality workflow layer for
+preparing demos and releases. It loads the 21-module QA registry and
+re-analyses live via `/api/qa-command-center/analyze` (ready/smoke/test-proxy/
+interactivity/chart coverage rates, the release score with a decision pill
+and gauge — explicitly labelled a documentation-coverage read, **not proof
+tests were run** — status/capability/priority-matrix visuals, the smoke-test
+matrix, a grouped manual regression checklist with a copy button, the exact
+local verification commands with per-command copy buttons, a known-limitations
+tracker, and a Markdown/JSON release report). Controls: category filter,
+multi-select release-status and priority filters, four include toggles, and
+report-section chips. The page lists commands but never runs them — the
+backend suite, `npx tsc --noEmit`, and `npm run build` remain the user's
+local steps. Hand-maintained static QA metadata — not CI, not QA automation,
+not a compliance system, not investment / trading advice.
+
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract
 assumptions, and re-analyses live via `/api/futures/analyze` (cost-of-carry

@@ -34,6 +34,7 @@ export type View =
   | "researchworkspace"
   | "democenter"
   | "datareliability"
+  | "qacommandcenter"
   | "csv"
   | "builder"
   | "portfolio"

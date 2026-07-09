@@ -1677,6 +1677,74 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 36.0 — Release Readiness, Smoke Test Matrix & QA Command Center v1 ✅
+
+- **New product-quality workflow layer (not a financial model): a QA Command
+  Center for preparing demos, portfolio presentation, and future releases.**
+  Hand-maintained static QA METADATA about QuantLab's own modules; it lists
+  the local verification commands but NEVER runs them and never claims tests
+  or builds were executed. No telemetry, no live data, no login, not a
+  production compliance or release-management system, not investment /
+  trading / compliance advice. No existing module broken (separate package +
+  view; one honest metadata correction — see below).
+- Backend: new `app/qa_command_center/` package (`models.py` strict Pydantic
+  v2 with `extra="forbid"` + `FiniteFloat`, release-status/priority/data-mode/
+  category/section enums, non-empty `report_sections`, optional filter lists
+  non-empty when provided; `sample.py` a **21-module QA registry** —
+  capability flags fact-checked against the actual routers, main.py
+  endpoints, panel imports, and test files — with per-module smoke-test
+  steps, manual regression steps, known limitations, release-status and
+  priority labels, plus the exact **command checklist** (backend pytest,
+  `npx tsc --noEmit`, `npm run build` for the user, uvicorn dev server);
+  `service.py` pure analytics) + `app/qa_command_center_routes.py`
+  (`GET /qa-command-center/sample`, `POST /qa-command-center/analyze`; empty
+  filter match → 422), wired via `include_router`.
+- Analytics: ready rate `R`, smoke coverage `S`, test-coverage proxy `T`
+  (test files exist — explicitly not proof they were run), interactivity
+  coverage `I`, chart coverage `C`, and the release score
+  `Q = 100·(0.30R + 0.20S + 0.20T + 0.15I + 0.15C)`; a rule-based **release
+  decision** (any blocked critical module → blocked; Q < 70 or ≥3
+  needs-review → needs review; Q ≥ 85 → ready for demo; else ready with
+  limitations — `build_readiness_summary` is public so tests exercise the
+  blocked-critical rule on constructed fixtures); the smoke-test matrix, a
+  category-grouped regression checklist, a limitations tracker, draft
+  release notes, and a deterministic Markdown report + Markdown/JSON export.
+  Rates over a non-empty scope + fixed convex score → no NaN/Inf.
+- Frontend: new `QACommandCenterPanel` (view `qacommandcenter`) — hero,
+  category filter, multi-select release-status and priority filters, four
+  include toggles, report-section chips; readiness summary cards with the
+  decision pill and score gauge (labelled "documentation coverage — not proof
+  tests were run"); release-status distribution, capability-coverage, and
+  priority × status matrix visuals; the smoke-test matrix table; the grouped
+  regression checklist with a copy button; the **command checklist card with
+  per-command copy buttons**; the known-limitations tracker; a copyable
+  Markdown/JSON release report; and a collapsible shared `FormulaReference`
+  (R, S, T, I, C, Q); new `lib/qaCommandCenter.ts` types + API client. Wired
+  into Sidebar ("QA Command Center"), Dashboard card ("QA command center"
+  badge), and Command Palette (Open QA Command Center, Release Readiness,
+  Smoke Test Matrix, Regression Checklist, Release Notes Builder, Backend
+  Test Commands, Frontend Build Checklist).
+- **Registry drift fixed (the 35.0 layer's predicted scenario):** the Demo
+  Center health catalog had `has_backend_endpoint=False` for the Options and
+  Credit labs, but both expose endpoints directly in `main.py`
+  (`/options/black-scholes`, `/credit/merton`, …) with dedicated test files —
+  corrected to `True` with updated review labels; the new QA registry pins
+  the corrected facts with a test.
+- 24 new backend tests (deterministic, no network, no command execution) —
+  registry endpoints, all five rate formulas plus the score
+  formula/bounds, the decision rules (including a **blocked-critical
+  fixture** and a low-score fixture), section selection, the
+  "never claims tests were run" wording ban, no-recommendation wording, the
+  three command-checklist assertions (pytest / `npx tsc --noEmit` /
+  `npm run build` "run locally by the user"), filter validation, toggle
+  filtering, Markdown + JSON export, full-payload finiteness, and the
+  corrected options/credit backend facts. `npx tsc --noEmit` clean; no
+  frontend build run (per instructions). Docs: `README.md`,
+  `backend/README.md`, `frontend/README.md`, `PROJECT_OVERVIEW.md`,
+  `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static QA metadata — it does not
+  prove tests were run; the user still runs the backend suite, typecheck,
+  and production build locally; not a compliance system, not advice.**
+
 ### Phase 35.0 — Data Mode Registry, Offline Fixtures & API Reliability Center v1 ✅
 
 - **New product reliability layer (not a financial model): a central registry

@@ -46,6 +46,7 @@ const ICONS: Record<string, string> = {
   researchworkspace: "M5 4h13a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5V4Zm0 0v16M9 9h6M9 13h6M9 17h3",
   democenter: "M4 5h16v11H4V5Zm6 3.5 4 2-4 2v-4ZM8 21l4-3 4 3",
   datareliability: "M12 3 4 7v5c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V7l-8-4ZM8 12h2l1.5-3 2 5 1.5-2h1",
+  qacommandcenter: "M5 4h14v16H5V4ZM8 8.5l1.5 1.5L12 7.5M8 14.5l1.5 1.5L12 13.5M14 9h3M14 15h3",
   scanner: "M4 14h3v6H4zM10.5 9h3v11h-3zM17 4h3v16h-3z",
   finml: "M4 18 9 9l4 5 3-6 4 7M4 4v16h16",
   globe:
@@ -147,6 +148,7 @@ export const NAV: { id: View; label: string; icon: string }[] = [
   { id: "scenariostudio", label: "Scenario Studio", icon: "scenariostudio" },
   { id: "researchworkspace", label: "Research Workspace", icon: "researchworkspace" },
   { id: "datareliability", label: "Data Reliability Center", icon: "datareliability" },
+  { id: "qacommandcenter", label: "QA Command Center", icon: "qacommandcenter" },
   { id: "scanner", label: "Cross-Sectional Scanner", icon: "scanner" },
   { id: "finml", label: "AFML Methodology Lab", icon: "finml" },
   { id: "csv", label: "CSV Backtest", icon: "upload" },
