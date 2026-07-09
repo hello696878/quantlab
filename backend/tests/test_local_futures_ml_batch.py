@@ -9,6 +9,7 @@ tests are pure and offline.  Later commits add the runner, CLI, and e2e tests.
 
 from __future__ import annotations
 
+import importlib.util
 import json
 from pathlib import Path
 
@@ -54,6 +55,40 @@ def _raw_store(tmp_path: Path) -> RawFuturesStore:
 
 def _exp_store(tmp_path: Path) -> ExperimentStore:
     return ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+
+
+_BATCH_CLI_PATH = _REPO_ROOT / "scripts" / "run_local_futures_ml_batch.py"
+
+
+def _load_batch_cli():
+    """Import the thin batch CLI module by path (executes its sys.path bootstrap)."""
+    spec = importlib.util.spec_from_file_location("run_local_ml_batch_cli", _BATCH_CLI_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _write_spec(
+    tmp_path: Path,
+    *,
+    base: dict | None = None,
+    grid: dict | None = None,
+    overwrite=None,
+    on_error=None,
+    name: str = "spec.json",
+) -> Path:
+    """Write a batch-spec JSON file and return its path."""
+    spec: dict = {
+        "base": base if base is not None else {"source": "synthetic"},
+        "grid": grid if grid is not None else {"random_seed": [0, 1]},
+    }
+    if overwrite is not None:
+        spec["overwrite"] = overwrite
+    if on_error is not None:
+        spec["on_error"] = on_error
+    path = tmp_path / name
+    path.write_text(json.dumps(spec), encoding="utf-8")
+    return path
 
 
 def _repo_snapshot() -> tuple[bool, bool, bool]:
@@ -550,3 +585,309 @@ def test_run_batch_creates_no_repo_artifacts(tmp_path):
     configs = expand_grid(_base(), {"random_seed": [0, 1]})
     run_local_experiment_batch(raw, configs, experiment_store=exp)
     assert _repo_snapshot() == before
+
+
+# --------------------------------------------------------------------------- #
+# CLI — scripts/run_local_futures_ml_batch.py
+# --------------------------------------------------------------------------- #
+
+
+def _cli_base_args(tmp_path: Path, spec: Path, *extra: str) -> list[str]:
+    return [
+        "--base-dir", str(tmp_path / "store"),
+        "--config-json", str(spec),
+        "--no-parquet",
+        *extra,
+    ]
+
+
+def test_cli_valid_run_ok_saves_runs(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, grid={"random_seed": [0, 1]})
+    cli = _load_batch_cli()
+
+    code = cli.main(_cli_base_args(tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp")))
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "RESULT: OK" in out
+    assert out.count("] ok train_run_hash=") == 2
+    assert "n_ok=2" in out and "batch_config_hash=" in out
+    # two runs persisted under the experiment store
+    assert len(list((tmp_path / "exp").iterdir())) == 2
+
+
+def test_cli_dry_run_returns_ok_and_writes_nothing(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, grid={"random_seed": [0, 1]})
+    cli = _load_batch_cli()
+
+    code = cli.main(_cli_base_args(tmp_path, spec, "--dry-run"))
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "RESULT: OK" in out
+    assert out.count("] skipped reason=") == 2
+    assert not (tmp_path / "exp").exists()  # no experiment artifacts
+
+
+def test_cli_report_json_strict(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, grid={"random_seed": [0, 1]})
+    report = tmp_path / "out" / "batch.json"
+    cli = _load_batch_cli()
+
+    code = cli.main(
+        _cli_base_args(
+            tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"), "--report-json", str(report)
+        )
+    )
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert f"[REPORT] path={report}" in out
+    assert report.exists()
+    data = json.loads(report.read_text(encoding="utf-8"))
+    assert data["batch_config_hash"] and data["n_ok"] == 2
+    assert [it["item_id"] for it in data["items"]] == ["item_0000", "item_0001"]
+    # strict: reparse with allow_nan=False must succeed (no NaN/Infinity)
+    json.loads(json.dumps(data, allow_nan=False))
+
+
+def test_cli_comparison_csv(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, grid={"random_seed": [0, 1]})
+    comp = tmp_path / "out" / "cmp.csv"
+    cli = _load_batch_cli()
+
+    code = cli.main(
+        _cli_base_args(
+            tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"),
+            "--comparison-output", str(comp),
+        )
+    )
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert f"[COMPARE] path={comp}" in out
+    assert comp.exists()
+    text = comp.read_text(encoding="utf-8")
+    assert text.splitlines()[0].startswith("train_run_hash,")  # CSV header
+    assert len(text.strip().splitlines()) == 3  # header + 2 runs
+
+
+def test_cli_comparison_json(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, grid={"random_seed": [0, 1]})
+    comp = tmp_path / "out" / "cmp.json"
+    cli = _load_batch_cli()
+
+    code = cli.main(
+        _cli_base_args(
+            tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"),
+            "--comparison-output", str(comp),
+        )
+    )
+    assert code == 0
+    payload = json.loads(comp.read_text(encoding="utf-8"))
+    assert len(payload["rows"]) == 2
+    assert "disclaimers" in payload
+
+
+def test_cli_comparison_unsupported_extension_fails(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path)
+    cli = _load_batch_cli()
+
+    code = cli.main(
+        _cli_base_args(
+            tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"),
+            "--comparison-output", str(tmp_path / "cmp.txt"),
+        )
+    )
+    assert code != 0
+    assert "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_comparison_insufficient_runs_fails(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, grid={"random_seed": [0]})  # only one config -> one success
+    comp = tmp_path / "cmp.json"
+    cli = _load_batch_cli()
+
+    code = cli.main(
+        _cli_base_args(
+            tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"),
+            "--comparison-output", str(comp),
+        )
+    )
+    assert code != 0
+    assert "RESULT: FAIL" in capsys.readouterr().out
+    assert not comp.exists()
+
+
+def test_cli_stop_on_error_returns_nonzero_and_skips_remaining(tmp_path, capsys):
+    _raw_store(tmp_path)
+    # item_0000 synthetic (ok), item_0001 missing (fail -> stop), item_0002 skipped
+    spec = _write_spec(tmp_path, grid={"source": ["synthetic", "missing", "synthetic"]})
+    cli = _load_batch_cli()
+
+    code = cli.main(
+        _cli_base_args(tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"), "--stop-on-error")
+    )
+    out = capsys.readouterr().out
+
+    assert code != 0
+    assert "RESULT: FAIL" in out
+    assert "[item_0000] ok" in out
+    assert "[item_0001] failed" in out
+    assert "[item_0002] skipped" in out
+
+
+def test_cli_continue_on_error_returns_ok_with_a_failure(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, grid={"source": ["synthetic", "missing"]})
+    cli = _load_batch_cli()
+
+    code = cli.main(
+        _cli_base_args(tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"), "--continue-on-error")
+    )
+    out = capsys.readouterr().out
+
+    assert code == 0
+    assert "RESULT: OK" in out
+    assert "n_ok=1" in out and "n_failed=1" in out
+    assert "[item_0001] failed" in out
+
+
+def test_cli_all_items_fail_returns_nonzero(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, base={"source": "missing"}, grid={"random_seed": [0, 1]})
+    cli = _load_batch_cli()
+
+    code = cli.main(_cli_base_args(tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp")))
+    out = capsys.readouterr().out
+
+    assert code != 0
+    assert "RESULT: FAIL" in out and "n_ok=0" in out
+
+
+def test_cli_overwrite_allows_duplicate_rerun(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, grid={"random_seed": [0]})
+    args = _cli_base_args(tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"), "--overwrite")
+    cli = _load_batch_cli()
+
+    assert cli.main(args) == 0
+    capsys.readouterr()
+    assert cli.main(args) == 0  # re-run with overwrite succeeds
+    out = capsys.readouterr().out
+    assert "RESULT: OK" in out and "n_ok=1" in out
+
+
+def test_cli_duplicate_without_overwrite_fails(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path, grid={"random_seed": [0]})
+    args = _cli_base_args(tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"))
+    cli = _load_batch_cli()
+
+    assert cli.main(args) == 0
+    capsys.readouterr()
+    code = cli.main(args)  # duplicate run, no overwrite -> the only item fails
+    out = capsys.readouterr().out
+    assert code != 0
+    assert "RESULT: FAIL" in out and "n_ok=0" in out
+
+
+def test_cli_invalid_json_fails(tmp_path, capsys):
+    _raw_store(tmp_path)
+    bad = tmp_path / "bad.json"
+    bad.write_text("{ this is not valid json", encoding="utf-8")
+    cli = _load_batch_cli()
+
+    code = cli.main(_cli_base_args(tmp_path, bad, "--artifacts-dir", str(tmp_path / "exp")))
+    assert code != 0
+    assert "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_invalid_config_fails(tmp_path, capsys):
+    _raw_store(tmp_path)
+    # non-ratio adjustment_method is rejected by LocalExperimentConfig validation
+    spec = _write_spec(
+        tmp_path, base={"source": "synthetic", "adjustment_method": "backward"},
+        grid={"random_seed": [0]},
+    )
+    cli = _load_batch_cli()
+
+    code = cli.main(_cli_base_args(tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp")))
+    assert code != 0
+    assert "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_missing_artifacts_dir_without_dry_run_fails(tmp_path, capsys):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path)
+    cli = _load_batch_cli()
+
+    code = cli.main(_cli_base_args(tmp_path, spec))  # no --artifacts-dir, no --dry-run
+    assert code != 0
+    assert "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_mutually_exclusive_error_flags(tmp_path):
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path)
+    cli = _load_batch_cli()
+    with pytest.raises(SystemExit):
+        cli.main(
+            _cli_base_args(
+                tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp"),
+                "--stop-on-error", "--continue-on-error",
+            )
+        )
+
+
+def test_cli_creates_no_repo_artifacts(tmp_path):
+    before = _repo_snapshot()
+    _raw_store(tmp_path)
+    spec = _write_spec(tmp_path)
+    cli = _load_batch_cli()
+    cli.main(_cli_base_args(tmp_path, spec, "--artifacts-dir", str(tmp_path / "exp")))
+    assert _repo_snapshot() == before
+
+
+def test_cli_module_has_no_forbidden_imports():
+    src = Path(_BATCH_CLI_PATH).read_text(encoding="utf-8")
+    forbidden = [
+        "import requests",
+        "urllib",
+        "httpx",
+        "aiohttp",
+        "socket",
+        "yfinance",
+        "ibkr",
+        "sklearn",
+        "xgboost",
+        "lightgbm",
+        "torch",
+        "tensorflow",
+    ]
+    for token in forbidden:
+        assert token not in src, f"CLI must not reference {token!r}"
+
+
+def test_cli_module_has_no_ml_internals_or_hashing():
+    src = Path(_BATCH_CLI_PATH).read_text(encoding="utf-8")
+    for token in ("train_model", "build_feature_matrix", "build_label_matrix"):
+        assert token not in src, f"CLI must not touch ML internal {token!r}"
+    assert "hashlib" not in src
+    assert "sha256" not in src
+
+
+def test_cli_imports_reporting_but_runner_does_not():
+    cli_src = Path(_BATCH_CLI_PATH).read_text(encoding="utf-8")
+    assert "app.reporting" in cli_src  # Phase 10 comparison is wired at the CLI layer
+    from app.batch_experiments import runner as runner_module
+
+    runner_src = Path(runner_module.__file__).read_text(encoding="utf-8")
+    assert "app.reporting" not in runner_src  # ... and never in the runner
