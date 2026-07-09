@@ -143,6 +143,13 @@ static metadata — tests never depend on live providers, default demos have
 deterministic fallbacks, external availability is never guaranteed, and it is
 not a production data governance system.
 
+**Platform UX polish (37.0):** app-router error/loading/not-found safety
+pages (friendly recovery, no raw stack traces), an 11-group sidebar with all
+existing entries preserved, a dashboard "Suggested Starting Paths" strip,
+accessible chart labels, and visible keyboard focus on shared sliders —
+polish only; it does not prove production reliability, and the backend
+suite, typecheck, and production build remain local verification steps.
+
 The **Release Readiness, Smoke Test Matrix & QA Command Center** (36.0) helps
 prepare demos and releases: a 21-module QA registry with release-status and
 priority labels, coverage rates and a release score, a rule-based release

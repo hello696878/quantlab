@@ -381,7 +381,7 @@ export default function QACommandCenterPanel() {
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           <div className="card p-4">
             <p className="section-title mb-2">Release status distribution</p>
-            <ScenarioBarChart data={statusChart} format={(v) => `${v.toFixed(0)} module(s)`} height={170} />
+            <ScenarioBarChart ariaLabel="Module count by release status" data={statusChart} format={(v) => `${v.toFixed(0)} module(s)`} height={170} />
           </div>
           <div className="card p-4">
             <p className="section-title mb-2">Capability coverage</p>

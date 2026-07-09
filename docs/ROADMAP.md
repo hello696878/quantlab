@@ -1677,6 +1677,58 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 37.0 — Platform UX Polish, Error Boundaries & Responsive QA v1 ✅
+
+- **Platform-quality polish phase (no new financial model): route-level error
+  safety, navigation grouping, chart accessibility, and dashboard starting
+  paths.** Targeted, low-risk improvements on top of the existing shared
+  primitives — no new dependencies, no telemetry, no live data, and it does
+  not prove production reliability (the user still runs the backend suite,
+  typecheck, and production build locally).
+- **Inspection first:** the platform already had a root `AppErrorBoundary`
+  (friendly panel, collapsed technical details), shared
+  `components/ui/` state primitives (EmptyState / ErrorState /
+  LoadingSkeleton / OfflineState / RetryButton), non-finite filtering +
+  empty states + `role="img"` labels in the shared `LabCharts`, a
+  crash-proof `SafeMath` KaTeX fallback with horizontal-scroll containment
+  (`.ql-math`), collapsible `FormulaReference` panels, `overflow-x-auto`
+  tables, and responsive metric grids throughout — these were **reused, not
+  duplicated**.
+- **Route safety added:** new app-router `error.tsx` (friendly recovery panel
+  with the framework `reset()` retry + back-to-dashboard, no raw stack trace
+  in the main view, explicit "numbers before the error should not be trusted
+  for this pass" wording), `loading.tsx` (skeleton shell reusing the shared
+  primitives), and `not-found.tsx` (friendly 404 pointing back to the
+  dashboard/command palette). The root `AppErrorBoundary` remains the outer
+  safety net.
+- **Sidebar grouping:** the flat 39-entry NAV became 11 labelled groups
+  (Start Here, Product Workflow, Backtesting, Strategy Knowledge, Portfolio &
+  Macro, Crypto & DeFi, Market Structure & Alt Data, Derivatives &
+  Volatility, Rates/Credit/Real Assets, Methodology & Scanning, Saved Work) —
+  **every existing entry, id, and label preserved**; group headers are
+  decorative (`aria-hidden`, hidden on the mobile bar) so keyboard tabbing
+  still walks button-to-button; active buttons now carry
+  `aria-current="page"` and the nav an `aria-label`.
+- **Dashboard:** a new "Suggested Starting Paths" strip (Demo Center →
+  Scenario Studio → Research Workspace → Reliability/QA) with numbered
+  cards; all existing cards, quick links, and onboarding untouched.
+- **Chart accessibility:** the four shared `LabCharts` components gained an
+  optional `ariaLabel` prop with smarter series-derived defaults (wired at
+  key Scenario Studio / Data Reliability / QA Command Center call sites);
+  non-finite filtering and empty states were verified already in place.
+- **Controls:** the shared `ShockSlider` gained a visible keyboard
+  `focus-visible` outline (accent-colored) on its `appearance-none` track.
+- **Deliberately skipped (documented):** a new frontend route-smoke registry
+  (the QA Command Center's backend smoke matrix already covers route/steps/
+  expected-result metadata); command-palette restructuring (entries are
+  already unique and consistently named); a frontend test framework (none
+  exists in the repo — not added in a polish phase).
+- Backend suite re-run green (no backend changes); `npx tsc --noEmit` clean;
+  no frontend build run (per instructions). Docs: `README.md`,
+  `frontend/README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`,
+  `DEMO_SCRIPT.md`. **Polish does not prove production reliability — verify
+  locally before demos/releases.**
+
 ### Phase 36.0 — Release Readiness, Smoke Test Matrix & QA Command Center v1 ✅
 
 - **New product-quality workflow layer (not a financial model): a QA Command

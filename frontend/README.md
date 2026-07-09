@@ -18,6 +18,9 @@ frontend/
 │   ├── app/
 │   │   ├── globals.css               Tailwind directives + shared component classes
 │   │   ├── layout.tsx                Root layout: nav bar, footer, metadata
+│   │   ├── error.tsx                 Route error boundary: friendly recovery panel + retry (37.0)
+│   │   ├── loading.tsx               Route loading state: shared skeleton shell (37.0)
+│   │   ├── not-found.tsx             Friendly 404 pointing back to the dashboard (37.0)
 │   │   └── page.tsx                  Main page: mode tabs, backtest state, research tabs
 │   ├── components/
 │   │   ├── BacktestForm.tsx          Parameter inputs + Run button + validation
@@ -467,6 +470,22 @@ The Strategy Comparison panel exposes:
 Parameters are flagged as **unstable** when no single (fast, slow) pair is chosen in more than 50 % of the windows.  Instability is not a definitive failure — it may reflect genuine regime adaptation — but it means the strategy's future behaviour is harder to predict and warrants additional scrutiny.
 
 ---
+
+## Platform UX safety (Phase 37.0)
+
+Unexpected render errors are caught twice: the app-router `error.tsx` shows a
+friendly recovery panel (framework `reset()` retry + back to dashboard, no raw
+stack trace in the main view), and the root `AppErrorBoundary` in
+`layout.tsx` remains the outer net. `loading.tsx` renders a skeleton shell
+from the shared `components/ui/LoadingSkeleton` primitives and
+`not-found.tsx` handles unknown URLs. The sidebar is grouped into 11 labelled
+sections (all entries preserved; `aria-current="page"` on the active route),
+the dashboard opens with a "Suggested Starting Paths" strip, the shared
+`LabCharts` accept an `ariaLabel` prop (non-finite values are filtered and
+empty data renders a friendly note), and the shared `ShockSlider` has a
+visible keyboard-focus outline. Polish only — it does not prove production
+reliability; run the backend suite, `npx tsc --noEmit`, and the production
+build locally before demos or releases.
 
 ## Production build
 

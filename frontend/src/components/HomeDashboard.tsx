@@ -787,6 +787,67 @@ export default function HomeDashboard({
         </div>
       </section>
 
+      {/* ── Suggested starting paths (37.0 UX polish) ────────────────────── */}
+      <section aria-label="Suggested starting paths">
+        <p className="section-title mb-1">Suggested Starting Paths</p>
+        <p className="mb-3 text-xs text-slate-400">
+          Four ways into the platform — from a guided tour to release checks. All on
+          deterministic sample data.
+        </p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {(
+            [
+              {
+                step: "1",
+                view: "democenter" as View,
+                title: "Start with the Demo Center",
+                text: "Guided walkthroughs, module health, and audience-ready demo scripts.",
+              },
+              {
+                step: "2",
+                view: "scenariostudio" as View,
+                title: "Build a scenario",
+                text: "Cross-lab stress templates, shock sliders, and a copyable report.",
+              },
+              {
+                step: "3",
+                view: "researchworkspace" as View,
+                title: "Organize your research",
+                text: "Saved presets, an experiment journal, and Markdown/JSON exports.",
+              },
+              {
+                step: "4",
+                view: "qacommandcenter" as View,
+                title: "Check reliability & QA",
+                text: "Data modes, offline fixtures, smoke tests, and release readiness.",
+              },
+            ]
+          ).map((p) => (
+            <button
+              key={p.view}
+              type="button"
+              onClick={() => onNav(p.view)}
+              className="card flex flex-col gap-1 p-4 text-left"
+            >
+              <span className="flex items-center gap-2">
+                <span
+                  className="mono flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-full text-[11px] font-bold"
+                  style={{ background: "var(--accent-softer)", border: "1px solid var(--accent-line)", color: "var(--accent-text)" }}
+                  aria-hidden
+                >
+                  {p.step}
+                </span>
+                <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                  {p.title}
+                </span>
+              </span>
+              <span className="text-xs text-slate-400">{p.text}</span>
+              <span className="mt-1 text-xs font-medium text-blue-600">Open →</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
       {/* ── System Status ────────────────────────────────────────────────── */}
       <section>
         <p className="section-title mb-3">System Status</p>

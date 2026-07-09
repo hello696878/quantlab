@@ -698,6 +698,13 @@ Return to the Command Center's **Platform Direction** panel (or open
 - **Theme** — switch the accent in Settings to show the whole app re-skin instantly.
 
 ## Tips
+- The sidebar is grouped (Start Here → Product Workflow → asset-class labs →
+  Saved Work, 37.0) and the dashboard opens with **Suggested Starting Paths**
+  (Demo Center → Scenario Studio → Research Workspace → Reliability/QA) — a
+  clean spine for any live demo.
+- Unexpected frontend errors land on a friendly recovery panel (retry / back
+  to dashboard, 37.0) instead of a crash — but if it ever fires mid-demo,
+  reload rather than trusting that view's numbers.
 - Keep the window at ~1440×900 for clean charts.
 - Pre-run steps 3–6 so recents/search have content on camera.
 - If a run shows few/zero trades, that's expected for long-only in a downtrend —

@@ -403,7 +403,7 @@ The sections above describe the original MVP backtest path. The platform has sin
 - **Onboarding / guided demos** (`lib/demoPresets.ts`, `lib/onboarding.ts`) — first-run welcome card, dismissible, with prefilled (never auto-run) demo presets and a local quick-start checklist.
 - **Command palette + global search** (`CommandPalette`, `lib/search.ts`) — Ctrl/Cmd+K to navigate and search commands plus real local resources (saved backtests/reports, templates, gallery).
 - **Reporting** (`lib/reportExport.ts`, `ExportReportButton`, `PrintableReportModal`) — local Markdown generation, browser print-to-PDF, four branded templates, and a saved-reports gallery.
-- **State & feedback primitives** (`components/ui/`, `lib/toast.ts`, `hooks/useToasts.ts`, `AppErrorBoundary`) — shared loading skeletons, empty/offline/error states, a global toast store, and an app-level error boundary.
+- **State & feedback primitives** (`components/ui/`, `lib/toast.ts`, `hooks/useToasts.ts`, `AppErrorBoundary`) — shared loading skeletons, empty/offline/error states, a global toast store, and an app-level error boundary. Phase 37.0 added the app-router safety files (`app/error.tsx` with framework reset + back-to-dashboard, `app/loading.tsx` skeleton shell, `app/not-found.tsx` friendly 404 — no raw stack traces in the main view), grouped the sidebar into 11 labelled sections (all entries preserved; `aria-current` on the active route), added a dashboard "Suggested Starting Paths" strip, and gave the shared `LabCharts` an optional `ariaLabel` prop plus the `ShockSlider` a visible keyboard-focus outline.
 - **Theme & charts** (`lib/settings.ts`, `lib/useAccentColors.ts`, `components/charts/`) — CSS-variable neon accent theme and accent-aware neon chart styling.
 
 ---

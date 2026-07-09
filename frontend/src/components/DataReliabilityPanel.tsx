@@ -377,7 +377,7 @@ export default function DataReliabilityPanel() {
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
           <div className="card p-4">
             <p className="section-title mb-2">Data-mode distribution</p>
-            <ScenarioBarChart data={modeChart} format={(v) => `${v.toFixed(0)} module(s)`} height={190} />
+            <ScenarioBarChart ariaLabel="Module count by data mode" data={modeChart} format={(v) => `${v.toFixed(0)} module(s)`} height={190} />
           </div>
           <div className="card p-4">
             <p className="section-title mb-2">Provider usage (scoped modules)</p>
