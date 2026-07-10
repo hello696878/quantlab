@@ -1,14 +1,31 @@
+# ── Environments & secrets (Phase 41.0 hygiene sweep) ───────────────────────
 .venv/
+venv/
+.env
+.env.*
+!.env.example
+
+# ── Python caches / coverage ─────────────────────────────────────────────────
 __pycache__/
 *.pyc
-.env
-.env.local
 .pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# ── Frontend / Node ──────────────────────────────────────────────────────────
 node_modules/
 .next/
+out/
 dist/
 build/
+
+# ── OS / editor / scratch noise ──────────────────────────────────────────────
 .DS_Store
+Thumbs.db
+*.log
+*.tmp
 fe_err.txt
 fe_out.txt
 

@@ -3,7 +3,10 @@
 The fastest honest path from `git clone` to a productive change. Companion
 docs: [`PROJECT_OVERVIEW.md`](PROJECT_OVERVIEW.md) (full architecture map) ·
 [`COMMAND_REFERENCE.md`](COMMAND_REFERENCE.md) ·
-[`TROUBLESHOOTING.md`](TROUBLESHOOTING.md).
+[`TROUBLESHOOTING.md`](TROUBLESHOOTING.md) ·
+[`../CONTRIBUTING.md`](../CONTRIBUTING.md) (PR checklist + safe-copy rules) ·
+[`REPOSITORY_HYGIENE.md`](REPOSITORY_HYGIENE.md) ·
+[`SECURITY_AND_SECRETS.md`](SECURITY_AND_SECRETS.md) · [`CI.md`](CI.md).
 
 ## 1. Repo structure
 

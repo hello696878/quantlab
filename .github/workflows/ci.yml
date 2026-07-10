@@ -1,10 +1,20 @@
 name: CI
 
+# QuantLab CI preflight (see docs/CI.md): backend tests + frontend typecheck
+# and build. Deliberately conservative — no deployment, no release publishing,
+# no secrets, no live-provider calls (the test suite is deterministic and
+# offline by design; the frontend build job predates Phase 41 and is kept).
+# A green run is a preflight signal, not a production, compliance, or trading
+# certification.
+
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+
+permissions:
+  contents: read
 
 jobs:
   # ── Job 1: run the Python test suite ──────────────────────────────────────
@@ -50,6 +60,11 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+
+      # Fast-fail typecheck before the full build (Phase 41.0).
+      - name: TypeScript check
+        working-directory: frontend
+        run: npx tsc --noEmit
 
       - name: Build
         working-directory: frontend

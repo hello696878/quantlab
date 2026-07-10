@@ -257,6 +257,8 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
 - [CHANGELOG.md](CHANGELOG.md) · [VERSION](VERSION) — grouped changelog and the current milestone label
 - [docs/VERSION_MANIFEST.md](docs/VERSION_MANIFEST.md) · [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) — versioning conventions and the release flow
 - [docs/PROJECT_SNAPSHOT.md](docs/PROJECT_SNAPSHOT.md) · [docs/MILESTONE_HISTORY.md](docs/MILESTONE_HISTORY.md) — one-page handoff and the capability narrative
+- [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/CI.md](docs/CI.md) — how to contribute and what CI checks (and deliberately doesn't)
+- [docs/REPOSITORY_HYGIENE.md](docs/REPOSITORY_HYGIENE.md) · [docs/SECURITY_AND_SECRETS.md](docs/SECURITY_AND_SECRETS.md) — what never gets committed, and the zero-secrets policy
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — the honest limitations ledger
 - [docs/PORTFOLIO_LAUNCH_PACK.md](docs/PORTFOLIO_LAUNCH_PACK.md) — pitches & launch checklist
 - [docs/PUBLIC_PROJECT_SUMMARY.md](docs/PUBLIC_PROJECT_SUMMARY.md) — recruiter / quant / technical summaries

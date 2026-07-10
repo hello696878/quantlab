@@ -1677,6 +1677,58 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 41.0 — CI Preflight, Repository Hygiene & Security Sweep v1 ✅
+
+- **Repository-quality phase (no new financial model, no frontend page): make
+  the repo safer and more credible as a public GitHub project.** No
+  deployment automation, no GitHub release automation, no bots, no secrets —
+  and nothing claims CI/tests/builds passed unless actually observed.
+- **CI workflow updated, not replaced:** the pre-existing
+  `.github/workflows/ci.yml` (Backend Tests + Frontend Build with `npm ci` +
+  lockfile cache — the build job predates this phase and is kept because the
+  project has always expected CI to verify the build) gained
+  `permissions: contents: read`, a fast-fail `npx tsc --noEmit` step before
+  the build, and a header comment stating what CI is (a preflight signal)
+  and is not (a certification). Action versions already stable
+  (checkout@v4 / setup-python@v5 / setup-node@v4).
+- **Docs:** `CI.md` (what each job checks; the deliberate not-list — no
+  deployment/publishing/secrets/live-provider tests; local equivalents with
+  the repo's real `backend\venv` paths; known limitations incl. no frontend
+  unit tests; troubleshooting; "CI passed" claims must reference an actual
+  run); `REPOSITORY_HYGIENE.md` (committed vs never-committed inventory,
+  conventions, safe targeted cleanup only, pre-commit inspection, credential
+  avoidance, an oversized-file check, the go-public checklist, and an honest
+  write-up of the **tsbuildinfo inconsistency** — listed in `.gitignore` yet
+  tracked-and-committed every phase — with both resolution options left to
+  the user); `SECURITY_AND_SECRETS.md` (zero-secrets-by-design policy, the
+  one optional local `FRED_API_KEY`, no-live-data guarantees,
+  rotate-first accidental-commit procedure, safe env-var practice, a
+  publishing-time secret search, and honest security limitations — no audit
+  performed or claimed); root `CONTRIBUTING.md` (scope, setup, verification
+  commands, the add-a-lab pointer, non-negotiable safe-copy rules, PR
+  checklist, Add/Review commit convention, zero-secrets policy).
+- **`.gitignore` extended, nothing removed:** added `venv/` (protects the
+  real `backend\venv` and the root `.venv`, both previously unignored),
+  `.env.*` + `!.env.example`, `.mypy_cache/`, `.ruff_cache/`, `.coverage`,
+  `htmlcov/`, `out/`, `*.log`, `*.tmp`, `Thumbs.db`, with section headers.
+  **Verified before committing** that no tracked file is shadowed
+  (`git ls-files` checks; `frontend/.env.example` confirmed still tracked
+  via `git check-ignore`).
+- **`scripts/check_repo_hygiene.ps1`** — read-only: branch, latest commit,
+  `git status --short`, presence of `.env`/venvs/`.next`/`artifacts`/
+  `node_modules` (present = fine locally, never committed), and policy
+  reminders; parser-validated and executed once to verify output. Never
+  deletes, installs, pushes, tags, or contacts anything.
+- README project-docs list gained the CONTRIBUTING/CI and hygiene/security
+  lines; `RELEASE_CHECKLIST.md` Part 1 gained an explicit CI-green item with
+  the preflight-not-certification caveat; `DEVELOPER_ONBOARDING.md` now
+  links the new docs. Spec §11 safety/secret/overclaim search run — all
+  matches are negations, documented env-var names, policy text, or substring
+  false-positives. Backend suite re-run green; `npx tsc --noEmit` clean; no
+  frontend build run and no workflow executed locally (per instructions).
+  **CI green is a preflight signal on a specific commit — never a
+  production, compliance, security, or trading certification.**
+
 ### Phase 40.0 — Version Manifest, Changelog & Release Notes Center v1 ✅
 
 - **Release-management phase (no new financial model): a version/changelog/

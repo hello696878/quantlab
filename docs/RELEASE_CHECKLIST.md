@@ -80,8 +80,12 @@ npm run build
       40.0 ROADMAP entry).
 - [ ] No secrets/API keys anywhere:
       `git grep -iE "api_key|apikey|secret|password" -- . ":!docs" | less`
-      (expect only documented env-var *names* like `FRED_API_KEY`).
+      (expect only documented env-var *names* like `FRED_API_KEY`; full policy
+      and search in [`SECURITY_AND_SECRETS.md`](SECURITY_AND_SECRETS.md)).
 - [ ] No telemetry/analytics added.
+- [ ] CI green on the release commit (backend tests + frontend typecheck/build
+      on the runner — see [`CI.md`](CI.md); a green badge is a preflight
+      signal, not a certification).
 
 ## 7. Tag (after the Review commit)
 
