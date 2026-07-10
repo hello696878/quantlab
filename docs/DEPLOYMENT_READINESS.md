@@ -47,7 +47,9 @@ npm run build
 ```
 
 These are listed, not run, by this document; the QA Command Center in-app
-checklist mirrors them.
+checklist mirrors them. Safe local wrappers exist in `scripts\*.ps1`
+(Phase 39.0 — read-only doctor, run/test/typecheck wrappers, `.next` cache
+cleaner; they never install, build, download, or handle secrets).
 
 ## 7. Environment variables review
 

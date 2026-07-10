@@ -59,6 +59,14 @@ palette, shared charts, local LaTeX formula panels).
 
 ## Quick start (user-run commands)
 
+New here? [`docs/LOCAL_DEMO_GUIDE.md`](docs/LOCAL_DEMO_GUIDE.md) and
+[`docs/DEVELOPER_ONBOARDING.md`](docs/DEVELOPER_ONBOARDING.md) are the guided
+versions of this section; `scripts\check_environment.ps1` is a **read-only**
+environment doctor, and [`docs/TROUBLESHOOTING.md`](docs/TROUBLESHOOTING.md)
+covers the common failures. Safe local helper scripts (inspect before
+running; they never install, build, download, or touch secrets) live in
+`scripts\*.ps1` — see [`docs/COMMAND_REFERENCE.md`](docs/COMMAND_REFERENCE.md).
+
 Backend (Python venv lives at `backend\venv`):
 
 ```powershell
@@ -252,6 +260,8 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
 - [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) · [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md) — live & recorded demo scripts
 - [docs/SCREENSHOT_CHECKLIST.md](docs/SCREENSHOT_CHECKLIST.md) · [docs/SCREENSHOT_PLAN.md](docs/SCREENSHOT_PLAN.md) — capture guides
 - [docs/DEPLOYMENT_READINESS.md](docs/DEPLOYMENT_READINESS.md) — what hosted deployment would still need
+- [docs/LOCAL_DEMO_GUIDE.md](docs/LOCAL_DEMO_GUIDE.md) · [docs/DEVELOPER_ONBOARDING.md](docs/DEVELOPER_ONBOARDING.md) — run it locally & contribute
+- [docs/COMMAND_REFERENCE.md](docs/COMMAND_REFERENCE.md) · [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) · [docs/ENVIRONMENT_DOCTOR.md](docs/ENVIRONMENT_DOCTOR.md) — commands, fixes, and the read-only doctor script
 - [TASKS.md](TASKS.md) — current task list
 - [LOG.md](LOG.md) — work log
 - [STOP_POINT.md](STOP_POINT.md) — latest checkpoint and next safe step

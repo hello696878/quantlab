@@ -1677,6 +1677,61 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 39.0 — Local Demo Launcher, Environment Doctor & Developer Onboarding v1 ✅
+
+- **Developer-experience phase (no new financial model): make QuantLab easier
+  to run, debug, demo, and hand off.** No installs without user action, no
+  auto-run of dev servers or builds, no downloads, no execution-policy
+  changes, no secrets — and nothing claims tests/builds passed unless
+  actually run.
+- **Five new docs:** `LOCAL_DEMO_GUIDE.md` (prerequisites, real startup
+  commands, the six-stop demo route, 3-minute and 8-minute demo plans,
+  what-not-to-overclaim, safety wording), `DEVELOPER_ONBOARDING.md` (repo
+  structure, backend/frontend architecture in a paragraph each, the
+  add-a-new-lab checklist, testing rules incl. the never-depend-on-a-live-
+  provider pattern, conventions inferred from the repo),
+  `TROUBLESHOOTING.md` (14 Windows-friendly issues: uvicorn/venv/pytest/
+  node_modules/tsc missing, .next cache, busy ports, provider unavailability
+  as expected behavior, NaN/formula/palette debugging, the execution-policy
+  note), `COMMAND_REFERENCE.md` (run/verify/clean/git commands — all
+  user-run; the repo's real venv path `backend\venv` used throughout), and
+  `ENVIRONMENT_DOCTOR.md` (what the doctor checks, what it deliberately
+  doesn't — no network, no fixes, presence ≠ correctness — and how to read
+  its output).
+- **Six safe PowerShell helper scripts** in `scripts\` (the repo's first
+  .ps1 files; all parser-validated, header-documented, no-admin, no-network,
+  no-install): `check_environment.ps1` (read-only doctor: Python, the
+  `backend\venv` venv with `.venv` as alternate, an offline import probe for
+  fastapi/pydantic/pytest, Node/npm, node_modules, docs, try/catch-guarded
+  port hints for 8000/3000, [OK]/[MISS] summary with user-run fixes, exit
+  code 0/1), `run_backend.ps1` (prints the exact uvicorn command then runs
+  it; venv fallback warns instead of installing), `run_backend_tests.ps1`
+  (removes only the repo-root `artifacts\` if present, runs pytest, checks
+  artifacts absent after; never hides failures), `run_frontend_typecheck.ps1`
+  (`npx tsc --noEmit` with presence checks), `clean_frontend_build_cache.ps1`
+  (removes exactly `frontend\.next` with a path-shape guard),
+  `print_demo_commands.ps1` (print-only cheat sheet). The read-only two were
+  executed to verify behavior; the doctor was re-run green after the docs
+  landed.
+- **Frontend Developer Onboarding page** (view `developeronboarding`, Start
+  Here sidebar group) — static frontend-only reference copy like the
+  Portfolio Showcase (no backend endpoint, no browser-side environment
+  probing — the real doctor is the PowerShell script): environment
+  checklist, six copyable command cards, five troubleshooting cards, the
+  six-stop demo route with deep links, and the standing safety panel. Wired
+  into Sidebar, Dashboard card ("Dev experience" badge), title registry, and
+  Command Palette (Open Developer Onboarding, Local Demo Guide, Environment
+  Doctor, Command Reference, Troubleshooting).
+- README: quick-start now links the guides + doctor + helper scripts;
+  project-docs list extended. Consistency pass: `PROJECT_OVERVIEW.md`,
+  `LIMITATIONS.md`, `DEPLOYMENT_READINESS.md`, `frontend/README.md`.
+  Safety-pattern scan run over the new scripts/docs (no downloads, no
+  execution-policy changes, no broad deletes, no secrets, no auto
+  dev/build). Backend suite re-run green; `npx tsc --noEmit` clean; no
+  frontend build run (per instructions). **Helper scripts are local
+  conveniences only — verification (tests, typecheck, production build)
+  remains the user's step.**
+
 ### Phase 38.0 — Portfolio Launch Pack, Public Docs & Showcase Readiness v1 ✅
 
 - **Public-facing packaging phase (no new financial model): pitches, public

@@ -61,6 +61,7 @@ import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
 import PortfolioShowcasePanel from "@/components/PortfolioShowcasePanel";
+import DeveloperOnboardingPanel from "@/components/DeveloperOnboardingPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -469,6 +470,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "QuantLab Portfolio Showcase",
     subtitle:
       "The public-presentation view: what the platform demonstrates (full-stack quant research platform, interactive labs, deterministic demo data, scenario/report workflow, reliability & QA readiness), the suggested demo path with deep links, grouped project highlights, copyable one-sentence/recruiter/quant/technical pitches, and the standing safety panel — static presentation copy, educational only, not investment or trading advice, not a live trading system, not production compliance infrastructure.",
+  },
+  developeronboarding: {
+    title: "Local Demo & Developer Onboarding",
+    subtitle:
+      "Everything needed to run, verify, and demo QuantLab locally: the environment checklist (mirroring the read-only scripts\\check_environment.ps1 doctor), copyable backend/tests/typecheck/dev/build/git commands (all run by the user — this page never runs anything), common troubleshooting fixes, and the suggested demo route with deep links — static reference copy, deterministic sample data, no live trading, not investment advice, not production compliance infrastructure.",
   },
   qacommandcenter: {
     title: "Release Readiness & QA Command Center",
@@ -1072,6 +1078,7 @@ export default function HomePage() {
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
     { view: "portfolioshowcase", title: "Open Portfolio Showcase", keywords: "portfolio showcase public presentation pitch recruiter quant technical demo path highlights launch pack resume interview linkedin" },
+    { view: "developeronboarding", title: "Open Developer Onboarding", keywords: "developer onboarding local demo launcher environment doctor commands troubleshooting venv uvicorn pytest typecheck npm setup" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1602,6 +1609,21 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("portfolioshowcase"),
+    })),
+    ...(
+      [
+        ["Open Developer Onboarding", "developer onboarding local demo environment checklist commands troubleshooting setup"],
+        ["Local Demo Guide", "local demo guide backend frontend startup demo route three minute eight minute docs local_demo_guide"],
+        ["Environment Doctor", "environment doctor check_environment script python venv node npm dependencies ports read only docs environment_doctor"],
+        ["Command Reference", "command reference backend run tests typecheck build dev git commit tag clean artifacts docs command_reference"],
+        ["Troubleshooting", "troubleshooting uvicorn venv pytest node_modules ports yfinance nan formulas execution policy docs troubleshooting"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `developeronboarding-${title}`,
+      group: "Developer Onboarding",
+      title,
+      keywords,
+      run: () => handleNav("developeronboarding"),
     })),
     ...(
       [
@@ -2197,6 +2219,8 @@ export default function HomePage() {
         {view === "qacommandcenter" && <QACommandCenterPanel />}
 
         {view === "portfolioshowcase" && <PortfolioShowcasePanel onNav={(route) => handleNav(route as View)} />}
+
+        {view === "developeronboarding" && <DeveloperOnboardingPanel onNav={(route) => handleNav(route as View)} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

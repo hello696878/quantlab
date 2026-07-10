@@ -471,6 +471,19 @@ Parameters are flagged as **unstable** when no single (fast, slow) pair is chose
 
 ---
 
+## Developer Onboarding (Phase 39.0)
+
+The **Developer Onboarding** page (`DeveloperOnboardingPanel`, view
+`developeronboarding`, Start Here sidebar group) is a frontend-only static
+reference: the environment checklist (mirroring the read-only
+`scripts\check_environment.ps1` doctor), copyable run/verify/git commands,
+common troubleshooting fixes, and the six-stop demo route with deep links.
+It lists commands — it never runs them, never probes the environment from
+the browser, and never claims anything passed. The full guides are
+`docs/LOCAL_DEMO_GUIDE.md`, `docs/DEVELOPER_ONBOARDING.md`,
+`docs/TROUBLESHOOTING.md`, `docs/COMMAND_REFERENCE.md`, and
+`docs/ENVIRONMENT_DOCTOR.md`.
+
 ## Portfolio Showcase (Phase 38.0)
 
 The **Portfolio Showcase** (`PortfolioShowcasePanel`, view `portfolioshowcase`,
