@@ -56,18 +56,21 @@ export function ScenarioBarChart({
   height,
   defaultColor = seriesColor(0),
   emptyNote,
+  ariaLabel,
 }: {
   data: BarDatum[];
   format: (v: number) => string;
   height?: number;
   defaultColor?: string;
   emptyNote?: string;
+  /** Specific accessible name for the chart (falls back to a generic label). */
+  ariaLabel?: string;
 }) {
   const rows = data.filter((d) => fin(d.value));
   if (!rows.length) return <EmptyState note={emptyNote} />;
   const h = height ?? Math.max(120, rows.length * 26 + 40);
   return (
-    <div style={{ width: "100%", height: h }} aria-label="Scenario bar chart" role="img">
+    <div style={{ width: "100%", height: h }} aria-label={ariaLabel ?? "Scenario bar chart"} role="img">
       <ResponsiveContainer>
         <BarChart data={rows} layout="vertical" margin={{ top: 4, right: 12, left: 8, bottom: 0 }}>
           <CartesianGrid stroke={CHART_GRID} horizontal={false} />
@@ -118,17 +121,20 @@ export function GroupedBarChart({
   format,
   height = 200,
   emptyNote,
+  ariaLabel,
 }: {
   data: Array<Record<string, number | string>>;
   series: SeriesDef[];
   format: (v: number) => string;
   height?: number;
   emptyNote?: string;
+  /** Specific accessible name for the chart (falls back to a generic label). */
+  ariaLabel?: string;
 }) {
   const rows = data.filter((d) => series.some((s) => fin(d[s.key] as number)));
   if (!rows.length || !series.length) return <EmptyState note={emptyNote} />;
   return (
-    <div style={{ width: "100%", height }} aria-label="Grouped bar chart" role="img">
+    <div style={{ width: "100%", height }} aria-label={ariaLabel ?? `Grouped bar chart: ${series.map((s) => s.label).join(", ")}`} role="img">
       <ResponsiveContainer>
         <BarChart data={rows} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={CHART_GRID} vertical={false} />
@@ -168,6 +174,7 @@ export function SimpleLineChart({
   formatX = (v) => String(v),
   height = 200,
   emptyNote,
+  ariaLabel,
 }: {
   data: Array<Record<string, number | string | null>>;
   series: SeriesDef[];
@@ -176,11 +183,13 @@ export function SimpleLineChart({
   formatX?: (v: unknown) => string;
   height?: number;
   emptyNote?: string;
+  /** Specific accessible name for the chart (falls back to a generic label). */
+  ariaLabel?: string;
 }) {
   const rows = data.filter((d) => series.some((s) => fin(d[s.key] as number)));
   if (!rows.length || !series.length) return <EmptyState note={emptyNote} />;
   return (
-    <div style={{ width: "100%", height }} aria-label={xLabel ? `Line chart by ${xLabel}` : "Line chart"} role="img">
+    <div style={{ width: "100%", height }} aria-label={ariaLabel ?? (xLabel ? `Line chart by ${xLabel}` : `Line chart: ${series.map((s) => s.label).join(", ")}`)} role="img">
       <ResponsiveContainer>
         <LineChart data={rows} margin={{ top: 4, right: 12, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={CHART_GRID} vertical={false} />
@@ -222,6 +231,7 @@ export function BarLineChart({
   formatLine,
   height = 220,
   emptyNote,
+  ariaLabel,
 }: {
   data: Array<Record<string, number | string>>;
   bar: SeriesDef;
@@ -230,11 +240,13 @@ export function BarLineChart({
   formatLine: (v: number) => string;
   height?: number;
   emptyNote?: string;
+  /** Specific accessible name for the chart (falls back to a generic label). */
+  ariaLabel?: string;
 }) {
   const rows = data.filter((d) => fin(d[bar.key] as number) || fin(d[line.key] as number));
   if (!rows.length) return <EmptyState note={emptyNote} />;
   return (
-    <div style={{ width: "100%", height }} aria-label="Bar and line chart" role="img">
+    <div style={{ width: "100%", height }} aria-label={ariaLabel ?? `Bar and line chart: ${bar.label}, ${line.label}`} role="img">
       <ResponsiveContainer>
         <ComposedChart data={rows} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}>
           <CartesianGrid stroke={CHART_GRID} vertical={false} />

@@ -58,6 +58,9 @@ import MacroRegimeLabPanel from "@/components/MacroRegimeLabPanel";
 import ScenarioStudioPanel from "@/components/ScenarioStudioPanel";
 import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
+import DataReliabilityPanel from "@/components/DataReliabilityPanel";
+import QACommandCenterPanel from "@/components/QACommandCenterPanel";
+import PortfolioShowcasePanel from "@/components/PortfolioShowcasePanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -461,6 +464,21 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Product Demo Center & Guided Walkthroughs",
     subtitle:
       "Guided product walkthroughs with audience and time-budget controls, a 21-module health dashboard with status and data-mode badges, a capability matrix, readiness/coverage/complexity scores, and a copy-friendly audience-tailored demo script builder (Markdown + JSON) — hand-written static demo metadata, no telemetry, no live data, not investment, trading, or compliance advice, and no module is a production trading system.",
+  },
+  portfolioshowcase: {
+    title: "QuantLab Portfolio Showcase",
+    subtitle:
+      "The public-presentation view: what the platform demonstrates (full-stack quant research platform, interactive labs, deterministic demo data, scenario/report workflow, reliability & QA readiness), the suggested demo path with deep links, grouped project highlights, copyable one-sentence/recruiter/quant/technical pitches, and the standing safety panel — static presentation copy, educational only, not investment or trading advice, not a live trading system, not production compliance infrastructure.",
+  },
+  qacommandcenter: {
+    title: "Release Readiness & QA Command Center",
+    subtitle:
+      "A hand-maintained 21-module QA registry with release-status and priority labels, ready/smoke/test-proxy/interactivity/chart coverage rates and the release score Q = 100(0.30R+0.20S+0.20T+0.15I+0.15C), a rule-based release decision, the per-module smoke-test matrix, a grouped manual regression checklist, the exact local verification commands (listed with copy buttons — never executed here), a known-limitations tracker, and copy-friendly release notes (Markdown + JSON) — static QA metadata, it never claims tests or builds were run, not a compliance system, not investment or trading advice.",
+  },
+  datareliability: {
+    title: "Data Mode Registry & API Reliability Center",
+    subtitle:
+      "A hand-maintained registry of module data modes (static sample / user input / local calculation / optional external provider), the provider registry (optional yfinance/FRED/delayed-quote paths are disabled by default, fail closed, and are never relied on in tests), the offline fixture registry (including the KO/PEP pairs demo fallback), documented demo-safe/test-safe/fallback/exposure rates with a reliability score, and a copy-friendly Markdown/JSON reliability report — static reliability metadata, never a provider call, no availability guarantee, not investment, trading, or compliance advice, not a data governance system.",
   },
   researchworkspace: {
     title: "Research Workspace & Experiment Journal",
@@ -1051,6 +1069,9 @@ export default function HomePage() {
     { view: "scenariostudio", title: "Open Scenario Studio", keywords: "scenario studio unified cross lab report builder stress template soft landing inflation growth shock liquidity crunch credit crypto risk off depeg inflow panic severe combo impact score heatmap severity regime markdown report" },
     { view: "researchworkspace", title: "Open Research Workspace", keywords: "research workspace experiment journal saved presets run comparison baseline stressed severity coverage reproducibility methodology checklist workflow timeline notes markdown json export local drafts" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
+    { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
+    { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
+    { view: "portfolioshowcase", title: "Open Portfolio Showcase", keywords: "portfolio showcase public presentation pitch recruiter quant technical demo path highlights launch pack resume interview linkedin" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1533,6 +1554,54 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("democenter"),
+    })),
+    ...(
+      [
+        ["Open Data Reliability Center", "data reliability center registry deterministic demos offline fixtures provider exposure"],
+        ["Data Mode Registry", "data mode registry static sample user input local calculation optional external provider module modes"],
+        ["Offline Fixtures", "offline fixtures pairs demo fallback ko pep deterministic test safe sample registry"],
+        ["Provider Registry", "provider registry yfinance fred delayed quotes network api key allowed in tests fail closed"],
+        ["Test Safety Matrix", "test safety matrix monkeypatch fixtures no network deterministic tests providers disabled"],
+        ["API Reliability Report", "api reliability report markdown json demo safe test safe fallback coverage external exposure score"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `datareliability-${title}`,
+      group: "Data Reliability Center",
+      title,
+      keywords,
+      run: () => handleNav("datareliability"),
+    })),
+    ...(
+      [
+        ["Open QA Command Center", "qa command center release readiness smoke test regression release notes quality"],
+        ["Release Readiness", "release readiness score ready rate decision ready for demo blocked needs review"],
+        ["Smoke Test Matrix", "smoke test matrix module route steps expected result status label"],
+        ["Regression Checklist", "manual regression checklist grouped by category copy friendly qa steps"],
+        ["Release Notes Builder", "release notes builder markdown json copy draft highlights data policy"],
+        ["Backend Test Commands", "backend test commands pytest venv python backend tests command checklist"],
+        ["Frontend Build Checklist", "frontend build checklist npx tsc noemit npm run build typecheck user local"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `qacommandcenter-${title}`,
+      group: "QA Command Center",
+      title,
+      keywords,
+      run: () => handleNav("qacommandcenter"),
+    })),
+    ...(
+      [
+        ["Open Portfolio Showcase", "portfolio showcase public presentation what quantlab demonstrates demo path highlights pitches"],
+        ["Public Project Summary", "public project summary recruiter quant researcher technical architecture docs public_project_summary"],
+        ["Demo Video Script", "demo video script 60 second 3 minute 8 minute recording screen order docs demo_video_script"],
+        ["Screenshot Checklist", "screenshot checklist capture targets routes captions docs screenshot_checklist screenshot plan"],
+        ["LinkedIn Drafts", "linkedin post drafts technical quant full stack product learning recruiter docs linkedin_post_drafts"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `portfolioshowcase-${title}`,
+      group: "Portfolio Showcase",
+      title,
+      keywords,
+      run: () => handleNav("portfolioshowcase"),
     })),
     ...(
       [
@@ -2122,6 +2191,12 @@ export default function HomePage() {
         {view === "researchworkspace" && <ResearchWorkspacePanel />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
+
+        {view === "datareliability" && <DataReliabilityPanel />}
+
+        {view === "qacommandcenter" && <QACommandCenterPanel />}
+
+        {view === "portfolioshowcase" && <PortfolioShowcasePanel onNav={(route) => handleNav(route as View)} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

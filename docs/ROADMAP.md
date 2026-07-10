@@ -1677,6 +1677,247 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 38.0 — Portfolio Launch Pack, Public Docs & Showcase Readiness v1 ✅
+
+- **Public-facing packaging phase (no new financial model): pitches, public
+  docs, and an in-app showcase page for presenting QuantLab on GitHub,
+  LinkedIn, portfolio pages, resumes, and interviews.** No hype, no fake
+  metrics, no user/customer/revenue claims, no live-data or
+  production-trading claims anywhere in the new material; verification
+  commands are always framed as user-run.
+- **README rewritten public-first:** new top (title + one-paragraph
+  description with the ground rules, "what this project demonstrates",
+  grouped module map, real quick-start/test commands, suggested demo path,
+  data & safety) while **preserving all prior factual content** — the Phase-1
+  futures-first status, verification commands, Research CLI quickstart, and
+  the per-phase platform notes (now condensed into a bulleted "Platform layer
+  notes" section) — and linking the full docs set. Stale suite count updated
+  honestly (2,900 as of this phase's run).
+- **Seven new docs**, all copy-friendly and cross-linked with the existing
+  `SCREENSHOT_PLAN.md` / `RELEASE_CHECKLIST.md`:
+  `PORTFOLIO_LAUNCH_PACK.md` (one-sentence → 2-minute → technical / quant /
+  recruiter / founder pitches, demo route, what-to-show-first,
+  what-not-to-overclaim, reusable safety + data-mode wording, GitHub release
+  checklist), `PUBLIC_PROJECT_SUMMARY.md` (recruiter / quant researcher /
+  technical-architecture summaries), `SCREENSHOT_CHECKLIST.md` (16 targets
+  with setup/must-show/avoid/captions; extends the existing plan; manual
+  captures only, real runs only), `DEMO_VIDEO_SCRIPT.md` (60s / 3-min /
+  8-min scripts with screen order, what to say, what to avoid, mandatory
+  safety statements), `LINKEDIN_POST_DRAFTS.md` (six drafts: technical,
+  quant, full-stack, product, learning-journey, recruiter — each with the
+  data-policy line and a professional CTA), `INTERVIEW_TALKING_POINTS.md`
+  (architecture/backend/frontend/reliability/testing/UX/quant sections,
+  limitations-before-asked, what-I'd-improve-next, likely Q&A), and
+  `DEPLOYMENT_READINESS.md` (real local setup incl. the verified
+  `GLOBE_FRED_ENABLED`/`FRED_API_KEY`/`GLOBE_QUOTES_ENABLED` env vars,
+  Docker/CI facts, single-user/no-rate-limit caveats, and an honest list of
+  what public hosting still needs — deployment is explicitly not claimed).
+- **Frontend Portfolio Showcase page** (view `portfolioshowcase`, in the
+  Start Here sidebar group): a deliberately **frontend-only static page** (no
+  backend endpoint — it is presentation copy, not data) with hero,
+  what-QuantLab-demonstrates list, the five-step demo path deep-linking into
+  the real modules, six grouped highlight cards, four copyable pitches
+  (clipboard pattern shared with the other panels), and the standing
+  safety/limitations panel. Wired into Sidebar, Dashboard card ("Showcase"
+  badge), title registry, and Command Palette (Open Portfolio Showcase,
+  Public Project Summary, Demo Video Script, Screenshot Checklist, LinkedIn
+  Drafts).
+- Backend suite re-run green (no backend changes; count recorded in README);
+  `npx tsc --noEmit` clean; no frontend build run (per instructions). Docs
+  consistency pass: `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`,
+  `DEMO_SCRIPT.md`, `frontend/README.md` updated. **All new material repeats
+  the ground rules: deterministic sample data, user-run verification, not
+  investment advice, not live trading, not production compliance.**
+
+### Phase 37.0 — Platform UX Polish, Error Boundaries & Responsive QA v1 ✅
+
+- **Platform-quality polish phase (no new financial model): route-level error
+  safety, navigation grouping, chart accessibility, and dashboard starting
+  paths.** Targeted, low-risk improvements on top of the existing shared
+  primitives — no new dependencies, no telemetry, no live data, and it does
+  not prove production reliability (the user still runs the backend suite,
+  typecheck, and production build locally).
+- **Inspection first:** the platform already had a root `AppErrorBoundary`
+  (friendly panel, collapsed technical details), shared
+  `components/ui/` state primitives (EmptyState / ErrorState /
+  LoadingSkeleton / OfflineState / RetryButton), non-finite filtering +
+  empty states + `role="img"` labels in the shared `LabCharts`, a
+  crash-proof `SafeMath` KaTeX fallback with horizontal-scroll containment
+  (`.ql-math`), collapsible `FormulaReference` panels, `overflow-x-auto`
+  tables, and responsive metric grids throughout — these were **reused, not
+  duplicated**.
+- **Route safety added:** new app-router `error.tsx` (friendly recovery panel
+  with the framework `reset()` retry + back-to-dashboard, no raw stack trace
+  in the main view, explicit "numbers before the error should not be trusted
+  for this pass" wording), `loading.tsx` (skeleton shell reusing the shared
+  primitives), and `not-found.tsx` (friendly 404 pointing back to the
+  dashboard/command palette). The root `AppErrorBoundary` remains the outer
+  safety net.
+- **Sidebar grouping:** the flat 39-entry NAV became 11 labelled groups
+  (Start Here, Product Workflow, Backtesting, Strategy Knowledge, Portfolio &
+  Macro, Crypto & DeFi, Market Structure & Alt Data, Derivatives &
+  Volatility, Rates/Credit/Real Assets, Methodology & Scanning, Saved Work) —
+  **every existing entry, id, and label preserved**; group headers are
+  decorative (`aria-hidden`, hidden on the mobile bar) so keyboard tabbing
+  still walks button-to-button; active buttons now carry
+  `aria-current="page"` and the nav an `aria-label`.
+- **Dashboard:** a new "Suggested Starting Paths" strip (Demo Center →
+  Scenario Studio → Research Workspace → Reliability/QA) with numbered
+  cards; all existing cards, quick links, and onboarding untouched.
+- **Chart accessibility:** the four shared `LabCharts` components gained an
+  optional `ariaLabel` prop with smarter series-derived defaults (wired at
+  key Scenario Studio / Data Reliability / QA Command Center call sites);
+  non-finite filtering and empty states were verified already in place.
+- **Controls:** the shared `ShockSlider` gained a visible keyboard
+  `focus-visible` outline (accent-colored) on its `appearance-none` track.
+- **Deliberately skipped (documented):** a new frontend route-smoke registry
+  (the QA Command Center's backend smoke matrix already covers route/steps/
+  expected-result metadata); command-palette restructuring (entries are
+  already unique and consistently named); a frontend test framework (none
+  exists in the repo — not added in a polish phase).
+- Backend suite re-run green (no backend changes); `npx tsc --noEmit` clean;
+  no frontend build run (per instructions). Docs: `README.md`,
+  `frontend/README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`,
+  `DEMO_SCRIPT.md`. **Polish does not prove production reliability — verify
+  locally before demos/releases.**
+
+### Phase 36.0 — Release Readiness, Smoke Test Matrix & QA Command Center v1 ✅
+
+- **New product-quality workflow layer (not a financial model): a QA Command
+  Center for preparing demos, portfolio presentation, and future releases.**
+  Hand-maintained static QA METADATA about QuantLab's own modules; it lists
+  the local verification commands but NEVER runs them and never claims tests
+  or builds were executed. No telemetry, no live data, no login, not a
+  production compliance or release-management system, not investment /
+  trading / compliance advice. No existing module broken (separate package +
+  view; one honest metadata correction — see below).
+- Backend: new `app/qa_command_center/` package (`models.py` strict Pydantic
+  v2 with `extra="forbid"` + `FiniteFloat`, release-status/priority/data-mode/
+  category/section enums, non-empty `report_sections`, optional filter lists
+  non-empty when provided; `sample.py` a **21-module QA registry** —
+  capability flags fact-checked against the actual routers, main.py
+  endpoints, panel imports, and test files — with per-module smoke-test
+  steps, manual regression steps, known limitations, release-status and
+  priority labels, plus the exact **command checklist** (backend pytest,
+  `npx tsc --noEmit`, `npm run build` for the user, uvicorn dev server);
+  `service.py` pure analytics) + `app/qa_command_center_routes.py`
+  (`GET /qa-command-center/sample`, `POST /qa-command-center/analyze`; empty
+  filter match → 422), wired via `include_router`.
+- Analytics: ready rate `R`, smoke coverage `S`, test-coverage proxy `T`
+  (test files exist — explicitly not proof they were run), interactivity
+  coverage `I`, chart coverage `C`, and the release score
+  `Q = 100·(0.30R + 0.20S + 0.20T + 0.15I + 0.15C)`; a rule-based **release
+  decision** (any blocked critical module → blocked; Q < 70 or ≥3
+  needs-review → needs review; Q ≥ 85 → ready for demo; else ready with
+  limitations — `build_readiness_summary` is public so tests exercise the
+  blocked-critical rule on constructed fixtures); the smoke-test matrix, a
+  category-grouped regression checklist, a limitations tracker, draft
+  release notes, and a deterministic Markdown report + Markdown/JSON export.
+  Rates over a non-empty scope + fixed convex score → no NaN/Inf.
+- Frontend: new `QACommandCenterPanel` (view `qacommandcenter`) — hero,
+  category filter, multi-select release-status and priority filters, four
+  include toggles, report-section chips; readiness summary cards with the
+  decision pill and score gauge (labelled "documentation coverage — not proof
+  tests were run"); release-status distribution, capability-coverage, and
+  priority × status matrix visuals; the smoke-test matrix table; the grouped
+  regression checklist with a copy button; the **command checklist card with
+  per-command copy buttons**; the known-limitations tracker; a copyable
+  Markdown/JSON release report; and a collapsible shared `FormulaReference`
+  (R, S, T, I, C, Q); new `lib/qaCommandCenter.ts` types + API client. Wired
+  into Sidebar ("QA Command Center"), Dashboard card ("QA command center"
+  badge), and Command Palette (Open QA Command Center, Release Readiness,
+  Smoke Test Matrix, Regression Checklist, Release Notes Builder, Backend
+  Test Commands, Frontend Build Checklist).
+- **Registry drift fixed (the 35.0 layer's predicted scenario):** the Demo
+  Center health catalog had `has_backend_endpoint=False` for the Options and
+  Credit labs, but both expose endpoints directly in `main.py`
+  (`/options/black-scholes`, `/credit/merton`, …) with dedicated test files —
+  corrected to `True` with updated review labels; the new QA registry pins
+  the corrected facts with a test.
+- 24 new backend tests (deterministic, no network, no command execution) —
+  registry endpoints, all five rate formulas plus the score
+  formula/bounds, the decision rules (including a **blocked-critical
+  fixture** and a low-score fixture), section selection, the
+  "never claims tests were run" wording ban, no-recommendation wording, the
+  three command-checklist assertions (pytest / `npx tsc --noEmit` /
+  `npm run build` "run locally by the user"), filter validation, toggle
+  filtering, Markdown + JSON export, full-payload finiteness, and the
+  corrected options/credit backend facts. `npx tsc --noEmit` clean; no
+  frontend build run (per instructions). Docs: `README.md`,
+  `backend/README.md`, `frontend/README.md`, `PROJECT_OVERVIEW.md`,
+  `LIMITATIONS.md`, `DEMO_SCRIPT.md`. **Static QA metadata — it does not
+  prove tests were run; the user still runs the backend suite, typecheck,
+  and production build locally; not a compliance system, not advice.**
+
+### Phase 35.0 — Data Mode Registry, Offline Fixtures & API Reliability Center v1 ✅
+
+- **New product reliability layer (not a financial model): a central registry
+  explaining how every module sources data and why demos/tests stay
+  deterministic.** Hand-maintained static reliability METADATA fact-checked
+  against the code when written; this layer never calls the providers it
+  describes (no yfinance, no FRED, no network), never guarantees external
+  availability, adds no telemetry/login/cloud/database dependency, and is not
+  investment / trading / compliance advice or a data governance system. No
+  existing module changed (separate package + view).
+- Backend: new `app/data_reliability/` package (`models.py` strict Pydantic v2
+  with `extra="forbid"` + `FiniteFloat`, data-mode/provider-type/failure-mode/
+  fixture-type/category/section enums, non-empty `report_sections`,
+  `selected_modules` non-empty when provided; `sample.py` a **20-module
+  data-mode registry** (demo-safe/test-safe/external/fallback/deterministic
+  flags, providers, fixtures, failure behavior, user-visible labels, honest
+  limitations — recent labs static_sample; Backtest Studio / Strategy
+  Comparison honestly `optional_external_provider` with the KO/PEP demo-pair
+  fixture; the Globe `optional_external_provider` with disabled-by-default
+  fail-closed adapters), a **7-provider registry** (Static Fixtures, Internal
+  Sample Registry, Local Calculation Engine, User Input, plus the optional
+  yfinance / FRED / delayed-quote providers — external, `allowed_in_tests =
+  False`, offline fallbacks, fail-closed defaults), and an **11-fixture
+  offline registry** (incl. the pairs-trading KO/PEP demo fallback and every
+  recent lab's sample set); `service.py` pure analytics) +
+  `app/data_reliability_routes.py` (`GET /data-reliability/sample`,
+  `POST /data-reliability/analyze`; empty scope match → 422), wired via
+  `include_router`.
+- Analytics: demo-safe rate `D`, test-safe rate `T`, offline-fallback coverage
+  `F`, external-provider exposure `E` (2/20 modules at full scope), and the
+  reliability score `R = 100·(0.35D + 0.25T + 0.25F + 0.15(1−E))` with
+  buckets (≥90 highly deterministic / ≥75 mostly / ≥55 mixed / else
+  external-dependent), a per-module **test-safety matrix** (tests monkeypatch
+  the fetch layer; optional providers never called), a **fallback matrix**
+  (failure behavior per module), category/module scoping, provider/fixture/
+  test-safety include toggles, and a deterministic **Markdown reliability
+  report** (seven sections; "recommendations" renders as "Suggested Handling";
+  no recommendation wording, no availability-guarantee wording) with a
+  Markdown + canonical-JSON export payload. Rates over a non-empty scope +
+  fixed convex score → no NaN/Inf.
+- Frontend: new `DataReliabilityPanel` (view `datareliability`) — hero,
+  category filter, per-module scope chips (≥1 guard), external/fixtures/
+  test-safety toggles, report-section chips; reliability summary cards with
+  bucket pill + score gauge + drivers; data-mode distribution, provider-usage
+  (external providers amber), and safety/fallback-coverage charts; the module
+  data-mode table (failure behavior per row), the test-safety matrix, the
+  provider registry table (network / API key / "never" in tests / on-failure
+  behavior), the offline fixture registry table, a copyable Markdown/JSON
+  report, and a collapsible shared `FormulaReference` (D, T, F, E, R); new
+  `lib/dataReliability.ts` types + API client. Wired into Sidebar ("Data
+  Reliability Center"), Dashboard card ("Data reliability" badge), and
+  Command Palette (Open Data Reliability Center, Data Mode Registry, Offline
+  Fixtures, Provider Registry, Test Safety Matrix, API Reliability Report).
+- 23 new backend tests (deterministic, no network, no provider imports —
+  enforced by a source-scan test) — registry endpoints and contents, all
+  four rate formulas plus the score formula/bounds/bucket ordering, enum
+  validity, the **yfinance contract** (`allowed_in_tests = False` +
+  offline fallback), the **pairs-demo fallback representation** (fixture ↔
+  module cross-references, KO/PEP failure behavior), report section
+  selection, limitations-when-selected, no-recommendation and
+  no-availability-guarantee wording, toggle filtering, category/module
+  scoping, Markdown + JSON export, validation rejections, and full-payload
+  finiteness. `npx tsc --noEmit` clean; no frontend build run (per
+  instructions). Docs: `README.md`, `backend/README.md`,
+  `frontend/README.md`, `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`,
+  `DEMO_SCRIPT.md`. **Static reliability metadata — tests never depend on
+  live providers, default demos have deterministic fallbacks, no live-data
+  guarantee, not advice, not a production data governance system.**
+
 ### Phase 34.0 — Product Demo Center, Guided Walkthroughs & Module Health Dashboard v1 ✅
 
 - **New product-UX layer (not a financial model): a Demo Center that makes the

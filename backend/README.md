@@ -46,6 +46,10 @@ backend/
 │   ├── research_workspace_routes.py  Research Workspace, Saved Presets & Experiment Journal API routes
 │   ├── demo_center/        static demo-metadata walkthrough/health/script analytics (models/sample/service)
 │   ├── demo_center_routes.py  Product Demo Center, Guided Walkthroughs & Module Health API routes
+│   ├── data_reliability/   static data-mode/provider/fixture reliability registries (models/sample/service)
+│   ├── data_reliability_routes.py  Data Mode Registry, Offline Fixtures & API Reliability API routes
+│   ├── qa_command_center/  static QA registry / release-readiness analytics (models/sample/service)
+│   ├── qa_command_center_routes.py  Release Readiness, Smoke Test Matrix & QA Command Center API routes
 │   └── utils.py            shared helpers
 ├── tests/
 │   ├── test_metrics.py           unit tests for metrics
@@ -75,7 +79,9 @@ backend/
 │   ├── test_macro_regime.py      Macro Regime & Cross-Asset Allocation Lab analytics/API/validation tests
 │   ├── test_scenario_studio.py   Unified Scenario Studio & Cross-Lab Report Builder analytics/API/validation tests
 │   ├── test_research_workspace.py  Research Workspace, Saved Presets & Experiment Journal analytics/API/validation tests
-│   └── test_demo_center.py       Product Demo Center, Guided Walkthroughs & Module Health analytics/API/validation tests
+│   ├── test_demo_center.py       Product Demo Center, Guided Walkthroughs & Module Health analytics/API/validation tests
+│   ├── test_data_reliability.py  Data Mode Registry, Offline Fixtures & API Reliability analytics/API/validation tests
+│   └── test_qa_command_center.py Release Readiness, Smoke Test Matrix & QA Command Center analytics/API/validation tests
 ├── pyproject.toml          pytest config (pythonpath, testpaths)
 └── requirements.txt
 ```
@@ -499,6 +505,56 @@ NaN/Infinity in or out (all scores clamped to [0, 1]). An unknown
 `selected_path_id` — or `included_modules` matching none of the path's modules
 — returns 422. The include-limitations toggle force-adds the limitations
 section to the generated script; the script carries no recommendation wording.
+
+---
+
+### Data Mode Registry & API Reliability Endpoints
+
+Static reliability-metadata analytics (Phase 35.0) — a product reliability
+layer explaining how QuantLab's modules source data. This layer **never calls
+the providers it describes** (no yfinance, no FRED, no network), holds no API
+keys, and never guarantees external availability. Hand-maintained annotations
+fact-checked against the code when written — not telemetry, not an SLA, not a
+data governance system, and not investment, trading, or compliance advice.
+
+| Endpoint | Description |
+|---|---|
+| `GET /data-reliability/sample` | The 20-module data-mode registry (static sample / user input / local calculation / optional external provider, with demo-safe/test-safe/fallback/deterministic flags and failure behavior), the 7-provider registry (internal fixtures/local/user-input plus the optional yfinance / FRED / delayed-quote providers — external, never allowed in tests, fail-closed defaults), the 11-fixture offline registry (incl. the KO/PEP pairs-demo fallback), and section/category catalogs with a default request |
+| `POST /data-reliability/analyze` | Demo-safe `D`, test-safe `T`, fallback-coverage `F`, and external-exposure `E` rates over the scoped modules, the reliability score `R = 100·(0.35D + 0.25T + 0.25F + 0.15(1−E))` with buckets, a per-module test-safety matrix and fallback matrix, and a deterministic Markdown reliability report with a Markdown + JSON export payload |
+
+Inputs are strictly validated (`extra="forbid"`): non-empty
+`report_sections`, `selected_modules` non-empty when provided,
+category/section literal enums; no NaN/Infinity in or out (rates are counts
+over a non-empty scope; the score is a fixed convex combination). An empty
+category/module match returns 422. Key contracts pinned by tests: the
+optional yfinance provider has `allowed_in_tests = False` with an offline
+fallback; the KO/PEP pairs-demo fixture is cross-referenced from the Backtest
+Studio row; and the report carries no recommendation or
+availability-guarantee wording.
+
+---
+
+### Release Readiness & QA Command Center Endpoints
+
+Static QA-metadata analytics (Phase 36.0) — a project-quality workflow layer
+for preparing demos and releases. It **lists** the local verification
+commands but never runs them and never claims tests or builds were executed.
+Hand-maintained annotations fact-checked against the code when written — not
+CI, not QA automation, not a compliance system, and not investment, trading,
+or compliance advice.
+
+| Endpoint | Description |
+|---|---|
+| `GET /qa-command-center/sample` | The 21-module QA registry (capability flags, smoke-test and manual regression steps, release-status and priority labels, known limitations, data modes) plus section/category/status/priority catalogs, the exact command checklist (backend pytest, `npx tsc --noEmit`, `npm run build` for the user, uvicorn dev server), and a default request |
+| `POST /qa-command-center/analyze` | Ready rate `R`, smoke coverage `S`, test-coverage proxy `T` (test files exist — not proof they ran), interactivity `I`, chart coverage `C`, the release score `Q = 100·(0.30R + 0.20S + 0.20T + 0.15I + 0.15C)`, a rule-based release decision (blocked critical → blocked; low score or ≥3 needs-review → needs review; high score → ready for demo; else ready with limitations), the smoke-test matrix, a grouped regression checklist, a limitations tracker, draft release notes, and a deterministic Markdown report with a Markdown + JSON export payload |
+
+Inputs are strictly validated (`extra="forbid"`): non-empty
+`report_sections`, optional status/priority filter lists non-empty when
+provided, category/section literal enums; no NaN/Infinity in or out. An empty
+filter match returns 422. Wording contracts pinned by tests: the report never
+contains "tests passed" / "build succeeded"-style claims and no
+recommendation wording; the command section explicitly labels the production
+build as run locally by the user.
 
 ---
 

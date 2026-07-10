@@ -45,6 +45,9 @@ const ICONS: Record<string, string> = {
   scenariostudio: "M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M7 16v4",
   researchworkspace: "M5 4h13a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5V4Zm0 0v16M9 9h6M9 13h6M9 17h3",
   democenter: "M4 5h16v11H4V5Zm6 3.5 4 2-4 2v-4ZM8 21l4-3 4 3",
+  datareliability: "M12 3 4 7v5c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V7l-8-4ZM8 12h2l1.5-3 2 5 1.5-2h1",
+  qacommandcenter: "M5 4h14v16H5V4ZM8 8.5l1.5 1.5L12 7.5M8 14.5l1.5 1.5L12 13.5M14 9h3M14 15h3",
+  portfolioshowcase: "M4 5h16v11H4V5Zm4 14h8M12 16v3M8 12l2.5-3 2 2L16 7.5",
   scanner: "M4 14h3v6H4zM10.5 9h3v11h-3zM17 4h3v16h-3z",
   finml: "M4 18 9 9l4 5 3-6 4 7M4 4v16h16",
   globe:
@@ -118,45 +121,118 @@ function Logo() {
 // Navigation
 // ---------------------------------------------------------------------------
 
-export const NAV: { id: View; label: string; icon: string }[] = [
-  { id: "home", label: "Home", icon: "home" },
-  { id: "democenter", label: "Demo Center", icon: "democenter" },
-  { id: "globe", label: "Global Markets Globe", icon: "globe" },
-  { id: "backtest", label: "Backtest", icon: "backtest" },
-  { id: "library", label: "Strategy Library", icon: "library" },
-  { id: "comparison", label: "Strategy Comparison", icon: "compare" },
-  { id: "replications", label: "Paper Replications", icon: "papers" },
-  { id: "disasters", label: "Quant Disasters", icon: "warning" },
-  { id: "options", label: "Options Lab", icon: "options" },
-  { id: "events", label: "Event Lab", icon: "events" },
-  { id: "rates", label: "Yield Curve Lab", icon: "rates" },
-  { id: "fx", label: "FX Lab", icon: "fx" },
-  { id: "credit", label: "Credit Risk Lab", icon: "credit" },
-  { id: "risklab", label: "Portfolio Risk Lab", icon: "risklab" },
-  { id: "realestate", label: "Real Estate Lab", icon: "realestate" },
-  { id: "futures", label: "Futures & Commodities Lab", icon: "futures" },
-  { id: "volatility", label: "Volatility Lab", icon: "volatility" },
-  { id: "microstructure", label: "Market Microstructure Lab", icon: "microstructure" },
-  { id: "cryptoderivatives", label: "Crypto Derivatives Lab", icon: "cryptoderivatives" },
-  { id: "defirisk", label: "DeFi Risk Lab", icon: "defirisk" },
-  { id: "tokenomics", label: "Tokenomics Risk Lab", icon: "tokenomics" },
-  { id: "onchain", label: "On-Chain Analytics Lab", icon: "onchain" },
-  { id: "altdata", label: "Alternative Data Lab", icon: "altdata" },
-  { id: "macroregime", label: "Macro Regime Lab", icon: "macroregime" },
-  { id: "scenariostudio", label: "Scenario Studio", icon: "scenariostudio" },
-  { id: "researchworkspace", label: "Research Workspace", icon: "researchworkspace" },
-  { id: "scanner", label: "Cross-Sectional Scanner", icon: "scanner" },
-  { id: "finml", label: "AFML Methodology Lab", icon: "finml" },
-  { id: "csv", label: "CSV Backtest", icon: "upload" },
-  { id: "builder", label: "Strategy Builder", icon: "builder" },
-  { id: "portfolio", label: "Portfolio Backtest", icon: "portfolio" },
-  { id: "sweep", label: "Parameter Sweep", icon: "sweep" },
-  { id: "train-test", label: "Train/Test Validation", icon: "research" },
-  { id: "walk-forward", label: "Walk-Forward", icon: "walkfwd" },
-  { id: "saved", label: "Saved Backtests", icon: "saved" },
-  { id: "reports", label: "Saved Reports", icon: "report" },
-  { id: "settings", label: "Settings", icon: "settings" },
+interface NavItem {
+  id: View;
+  label: string;
+  icon: string;
+}
+
+/**
+ * Grouped navigation (37.0 UX polish). Every pre-existing entry/id/label is
+ * preserved — only the ordering and the group headers are new. Group headers
+ * are visual only (hidden on the mobile horizontal bar) and are skipped by
+ * keyboard tabbing, so keyboard navigation still walks button-to-button.
+ */
+export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
+  {
+    label: "Start Here",
+    items: [
+      { id: "home", label: "Home", icon: "home" },
+      { id: "democenter", label: "Demo Center", icon: "democenter" },
+      { id: "portfolioshowcase", label: "Portfolio Showcase", icon: "portfolioshowcase" },
+      { id: "globe", label: "Global Markets Globe", icon: "globe" },
+    ],
+  },
+  {
+    label: "Product Workflow",
+    items: [
+      { id: "scenariostudio", label: "Scenario Studio", icon: "scenariostudio" },
+      { id: "researchworkspace", label: "Research Workspace", icon: "researchworkspace" },
+      { id: "datareliability", label: "Data Reliability Center", icon: "datareliability" },
+      { id: "qacommandcenter", label: "QA Command Center", icon: "qacommandcenter" },
+    ],
+  },
+  {
+    label: "Backtesting",
+    items: [
+      { id: "backtest", label: "Backtest", icon: "backtest" },
+      { id: "comparison", label: "Strategy Comparison", icon: "compare" },
+      { id: "portfolio", label: "Portfolio Backtest", icon: "portfolio" },
+      { id: "csv", label: "CSV Backtest", icon: "upload" },
+      { id: "builder", label: "Strategy Builder", icon: "builder" },
+      { id: "sweep", label: "Parameter Sweep", icon: "sweep" },
+      { id: "train-test", label: "Train/Test Validation", icon: "research" },
+      { id: "walk-forward", label: "Walk-Forward", icon: "walkfwd" },
+    ],
+  },
+  {
+    label: "Strategy Knowledge",
+    items: [
+      { id: "library", label: "Strategy Library", icon: "library" },
+      { id: "replications", label: "Paper Replications", icon: "papers" },
+      { id: "disasters", label: "Quant Disasters", icon: "warning" },
+    ],
+  },
+  {
+    label: "Portfolio & Macro",
+    items: [
+      { id: "risklab", label: "Portfolio Risk Lab", icon: "risklab" },
+      { id: "macroregime", label: "Macro Regime Lab", icon: "macroregime" },
+    ],
+  },
+  {
+    label: "Crypto & DeFi",
+    items: [
+      { id: "cryptoderivatives", label: "Crypto Derivatives Lab", icon: "cryptoderivatives" },
+      { id: "defirisk", label: "DeFi Risk Lab", icon: "defirisk" },
+      { id: "tokenomics", label: "Tokenomics Risk Lab", icon: "tokenomics" },
+      { id: "onchain", label: "On-Chain Analytics Lab", icon: "onchain" },
+    ],
+  },
+  {
+    label: "Market Structure & Alt Data",
+    items: [
+      { id: "microstructure", label: "Market Microstructure Lab", icon: "microstructure" },
+      { id: "altdata", label: "Alternative Data Lab", icon: "altdata" },
+      { id: "events", label: "Event Lab", icon: "events" },
+    ],
+  },
+  {
+    label: "Derivatives & Volatility",
+    items: [
+      { id: "options", label: "Options Lab", icon: "options" },
+      { id: "volatility", label: "Volatility Lab", icon: "volatility" },
+      { id: "futures", label: "Futures & Commodities Lab", icon: "futures" },
+    ],
+  },
+  {
+    label: "Rates, Credit & Real Assets",
+    items: [
+      { id: "rates", label: "Yield Curve Lab", icon: "rates" },
+      { id: "fx", label: "FX Lab", icon: "fx" },
+      { id: "credit", label: "Credit Risk Lab", icon: "credit" },
+      { id: "realestate", label: "Real Estate Lab", icon: "realestate" },
+    ],
+  },
+  {
+    label: "Methodology & Scanning",
+    items: [
+      { id: "scanner", label: "Cross-Sectional Scanner", icon: "scanner" },
+      { id: "finml", label: "AFML Methodology Lab", icon: "finml" },
+    ],
+  },
+  {
+    label: "Saved Work",
+    items: [
+      { id: "saved", label: "Saved Backtests", icon: "saved" },
+      { id: "reports", label: "Saved Reports", icon: "report" },
+      { id: "settings", label: "Settings", icon: "settings" },
+    ],
+  },
 ];
+
+/** Flat list preserved for any consumer that wants the full route set. */
+export const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 
 interface SidebarProps {
   active: View;
@@ -177,20 +253,27 @@ export default function Sidebar({ active, onNav }: SidebarProps) {
         <Logo />
       </div>
 
-      <nav className="flex w-full items-center gap-1 md:flex-col md:items-stretch">
-        <div className="uplabel hidden px-2 pb-1.5 md:block">Workspaces</div>
-        {NAV.map((n) => (
-          <button
-            key={n.id}
-            type="button"
-            onClick={() => onNav(n.id)}
-            className={"navbtn" + (active === n.id ? " active" : "")}
-          >
-            <span className="navicon">
-              <Icon name={n.icon} />
-            </span>
-            {n.label}
-          </button>
+      <nav aria-label="Workspaces" className="flex w-full items-center gap-1 md:flex-col md:items-stretch">
+        {NAV_GROUPS.map((group, gi) => (
+          <div key={group.label} className="flex items-center gap-1 md:block md:space-y-1">
+            <div className={`uplabel hidden px-2 pb-0.5 md:block ${gi > 0 ? "pt-3" : ""}`} aria-hidden>
+              {group.label}
+            </div>
+            {group.items.map((n) => (
+              <button
+                key={n.id}
+                type="button"
+                onClick={() => onNav(n.id)}
+                aria-current={active === n.id ? "page" : undefined}
+                className={"navbtn md:w-full" + (active === n.id ? " active" : "")}
+              >
+                <span className="navicon">
+                  <Icon name={n.icon} />
+                </span>
+                {n.label}
+              </button>
+            ))}
+          </div>
         ))}
       </nav>
 

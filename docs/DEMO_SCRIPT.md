@@ -659,12 +659,58 @@ Return to the Command Center's **Platform Direction** panel (or open
   **hand-written static demo metadata** — no telemetry, no runtime health
   checks, no live data; the scripts are educational presentation aids, and no
   module is a production trading system.
+- **Data Mode Registry & API Reliability Center (35.0)** — open from the
+  sidebar (or Ctrl/Cmd+K → "Open Data Reliability Center" / "Test Safety
+  Matrix"). Show the **reliability summary** (demo-safe / test-safe /
+  fallback / external-exposure rates and the score gauge — the full 20-module
+  scope reads highly deterministic), then filter to the **Backtesting**
+  category and watch the score drop as external exposure jumps to 100% —
+  that's the honest yfinance story. Walk the **module data-mode table**
+  (static sample vs user input vs local calculation vs optional external
+  provider, with per-module failure behavior), the **provider registry**
+  (yfinance / FRED / delayed quotes marked external, "never" allowed in
+  tests, fail-closed on failure), and the **offline fixture registry** —
+  point at the **KO/PEP pairs demo fallback** that keeps the built-in pairs
+  demo network-free. Toggle external providers / fixtures / test safety and
+  the report re-assembles; finish with **📋 Copy Markdown**. The **Formulas &
+  notes** are collapsible **LaTeX** (KaTeX, local — no CDN). Emphasise:
+  hand-maintained static registry (**not** telemetry or an SLA), tests never
+  depend on live providers, default demos have deterministic fallbacks, and
+  **external availability is never guaranteed**.
+- **Release Readiness & QA Command Center (36.0)** — open from the sidebar (or
+  Ctrl/Cmd+K → "Open QA Command Center" / "Smoke Test Matrix"). Show the
+  **readiness summary** (ready/smoke/test-proxy/interactivity/chart rates,
+  the release score gauge, and the decision pill — the full 21-module scope
+  reads "Ready for demo"), and say the line that matters: **the score is a
+  documentation-coverage read — it does not prove tests were run**. Filter by
+  category/status/priority and watch the summary re-compute. Walk the
+  **smoke-test matrix** (per-module steps → expected result), the grouped
+  **manual regression checklist** (copy it), and the **command checklist** —
+  copy the exact backend pytest, `npx tsc --noEmit`, and `npm run build`
+  commands (the build is the user's local step, never run here). Show the
+  **known-limitations tracker** and finish with **📋 Copy Markdown** on the
+  release report. The **Formulas & notes** are collapsible **LaTeX** (KaTeX,
+  local — no CDN). Emphasise: hand-maintained static QA metadata — not CI,
+  not QA automation, not compliance; verification stays a local, manual step.
 - **Custom Strategy Builder** — load the *Momentum + Trend* gallery template and run it (no-code rules, no `eval`).
 - **Stress Test** — run COVID Crash + 2022 Rate-Hike on the basket.
 - **Offline UX** — stop the backend and open Saved Reports to show the friendly **Backend offline** panel with **Retry** (graceful, not a crash).
 - **Theme** — switch the accent in Settings to show the whole app re-skin instantly.
 
 ## Tips
+- Recording a video instead of demoing live? Use
+  [`DEMO_VIDEO_SCRIPT.md`](DEMO_VIDEO_SCRIPT.md) (60s / 3-min / 8-min
+  versions); pitches and captions live in
+  [`PORTFOLIO_LAUNCH_PACK.md`](PORTFOLIO_LAUNCH_PACK.md) and
+  [`SCREENSHOT_CHECKLIST.md`](SCREENSHOT_CHECKLIST.md), and the in-app
+  **Portfolio Showcase** page (38.0) carries the copyable pitches.
+- The sidebar is grouped (Start Here → Product Workflow → asset-class labs →
+  Saved Work, 37.0) and the dashboard opens with **Suggested Starting Paths**
+  (Demo Center → Scenario Studio → Research Workspace → Reliability/QA) — a
+  clean spine for any live demo.
+- Unexpected frontend errors land on a friendly recovery panel (retry / back
+  to dashboard, 37.0) instead of a crash — but if it ever fires mid-demo,
+  reload rather than trusting that view's numbers.
 - Keep the window at ~1440×900 for clean charts.
 - Pre-run steps 3–6 so recents/search have content on camera.
 - If a run shows few/zero trades, that's expected for long-only in a downtrend —

@@ -18,6 +18,9 @@ frontend/
 │   ├── app/
 │   │   ├── globals.css               Tailwind directives + shared component classes
 │   │   ├── layout.tsx                Root layout: nav bar, footer, metadata
+│   │   ├── error.tsx                 Route error boundary: friendly recovery panel + retry (37.0)
+│   │   ├── loading.tsx               Route loading state: shared skeleton shell (37.0)
+│   │   ├── not-found.tsx             Friendly 404 pointing back to the dashboard (37.0)
 │   │   └── page.tsx                  Main page: mode tabs, backtest state, research tabs
 │   ├── components/
 │   │   ├── BacktestForm.tsx          Parameter inputs + Run button + validation
@@ -281,6 +284,39 @@ manual annotations, not telemetry; no live data, no login, no analytics;
 generated scripts are educational presentation aids; no module is a
 production trading system.
 
+The **Data Mode Registry & API Reliability Center** (`DataReliabilityPanel`,
+view `datareliability`, Phase 35.0) explains how every module sources data.
+It loads the 20-module data-mode registry, 7-provider registry, and
+11-fixture offline registry and re-analyses live via
+`/api/data-reliability/analyze` (demo-safe / test-safe / fallback /
+external-exposure rates, the reliability score with a bucket pill and gauge,
+data-mode / provider-usage / safety-coverage charts, the module data-mode
+table with failure behavior, the test-safety matrix, provider and fixture
+tables, and a Markdown/JSON reliability report with copy buttons). Controls:
+category filter, per-module scope chips, external/fixtures/test-safety
+toggles, and report-section chips. The panel never calls the providers it
+describes — the optional yfinance/FRED/delayed-quote paths are disabled by
+default, fail closed, and are never relied on in tests, and the built-in
+KO/PEP pairs demo has a deterministic network-free fixture. Hand-maintained
+static metadata — no telemetry, no availability guarantee, not a data
+governance system, not investment / trading / compliance advice.
+
+The **Release Readiness & QA Command Center** (`QACommandCenterPanel`, view
+`qacommandcenter`, Phase 36.0) is a project-quality workflow layer for
+preparing demos and releases. It loads the 21-module QA registry and
+re-analyses live via `/api/qa-command-center/analyze` (ready/smoke/test-proxy/
+interactivity/chart coverage rates, the release score with a decision pill
+and gauge — explicitly labelled a documentation-coverage read, **not proof
+tests were run** — status/capability/priority-matrix visuals, the smoke-test
+matrix, a grouped manual regression checklist with a copy button, the exact
+local verification commands with per-command copy buttons, a known-limitations
+tracker, and a Markdown/JSON release report). Controls: category filter,
+multi-select release-status and priority filters, four include toggles, and
+report-section chips. The page lists commands but never runs them — the
+backend suite, `npx tsc --noEmit`, and `npm run build` remain the user's
+local steps. Hand-maintained static QA metadata — not CI, not QA automation,
+not a compliance system, not investment / trading advice.
+
 The **Futures & Commodities Lab** (`FuturesLabPanel`, view `futures`) loads four
 deterministic sample commodities, lets you pick one and edit the contract
 assumptions, and re-analyses live via `/api/futures/analyze` (cost-of-carry
@@ -434,6 +470,36 @@ The Strategy Comparison panel exposes:
 Parameters are flagged as **unstable** when no single (fast, slow) pair is chosen in more than 50 % of the windows.  Instability is not a definitive failure — it may reflect genuine regime adaptation — but it means the strategy's future behaviour is harder to predict and warrants additional scrutiny.
 
 ---
+
+## Portfolio Showcase (Phase 38.0)
+
+The **Portfolio Showcase** (`PortfolioShowcasePanel`, view `portfolioshowcase`,
+in the Start Here sidebar group) is a deliberately frontend-only static
+presentation page — no backend endpoint, no data fetch. It carries what
+QuantLab demonstrates, the five-step demo path (deep links into Demo Center,
+Scenario Studio, Research Workspace, Data Reliability, and QA Command
+Center), grouped project highlights, four copyable pitches, and the standing
+safety/limitations panel. The matching public docs live under `docs/`
+(PORTFOLIO_LAUNCH_PACK, PUBLIC_PROJECT_SUMMARY, SCREENSHOT_CHECKLIST,
+DEMO_VIDEO_SCRIPT, LINKEDIN_POST_DRAFTS, INTERVIEW_TALKING_POINTS,
+DEPLOYMENT_READINESS). Static presentation copy — educational only, not
+investment or trading advice, not a live trading system.
+
+## Platform UX safety (Phase 37.0)
+
+Unexpected render errors are caught twice: the app-router `error.tsx` shows a
+friendly recovery panel (framework `reset()` retry + back to dashboard, no raw
+stack trace in the main view), and the root `AppErrorBoundary` in
+`layout.tsx` remains the outer net. `loading.tsx` renders a skeleton shell
+from the shared `components/ui/LoadingSkeleton` primitives and
+`not-found.tsx` handles unknown URLs. The sidebar is grouped into 11 labelled
+sections (all entries preserved; `aria-current="page"` on the active route),
+the dashboard opens with a "Suggested Starting Paths" strip, the shared
+`LabCharts` accept an `ariaLabel` prop (non-finite values are filtered and
+empty data renders a friendly note), and the shared `ShockSlider` has a
+visible keyboard-focus outline. Polish only — it does not prove production
+reliability; run the backend suite, `npx tsc --noEmit`, and the production
+build locally before demos or releases.
 
 ## Production build
 

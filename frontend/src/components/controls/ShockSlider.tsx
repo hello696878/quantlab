@@ -49,7 +49,7 @@ export default function ShockSlider({
           const v = Number.parseFloat(e.target.value);
           if (Number.isFinite(v)) onChange(v);
         }}
-        className="mt-1 h-1.5 w-full cursor-pointer appearance-none rounded-full"
+        className="mt-1 h-1.5 w-full cursor-pointer appearance-none rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--accent)]"
         style={{ background: "var(--glass)", accentColor: "var(--accent)" }}
       />
     </label>

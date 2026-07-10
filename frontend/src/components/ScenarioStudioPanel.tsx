@@ -451,6 +451,7 @@ export default function ScenarioStudioPanel() {
           <div className="card p-4">
             <p className="section-title mb-2">Module impact scores</p>
             <ScenarioBarChart
+              ariaLabel="Module impact scores by module, 0 to 100"
               data={r.module_impacts.map((m) => ({
                 label: MODULE_SHORT[m.module_id],
                 value: m.impact_score,
