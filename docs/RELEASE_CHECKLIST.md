@@ -1,9 +1,115 @@
-# QuantLab — v4.7 Showcase Candidate QA Checklist
+# QuantLab — Release Checklist
 
-A manual pre-release checklist for cutting a **v4.7 showcase candidate**. Work
-top to bottom; everything is local and reproducible. Companion docs:
+**Part 1** is the general release flow for every milestone tag (Phase 40.0).
+**Part 2** is the detailed manual QA walkthrough (written for the v4.7
+showcase candidate; the flows it covers are still valid). Companion docs:
+[`VERSION_MANIFEST.md`](VERSION_MANIFEST.md) ·
+[`RELEASE_NOTES_TEMPLATE.md`](RELEASE_NOTES_TEMPLATE.md) ·
 [`DEMO_SCRIPT.md`](DEMO_SCRIPT.md) · [`KNOWN_ISSUES.md`](KNOWN_ISSUES.md) ·
-[`SCREENSHOT_PLAN.md`](SCREENSHOT_PLAN.md).
+[`SCREENSHOT_PLAN.md`](SCREENSHOT_PLAN.md) ·
+[`SCREENSHOT_CHECKLIST.md`](SCREENSHOT_CHECKLIST.md).
+
+---
+
+# Part 1 — Release flow (every milestone)
+
+All commands are Windows PowerShell, **run by you**. This repo's venv lives
+at `backend\venv`.
+
+## 1. Working tree & branch
+
+```powershell
+cd C:\quantlab
+git status
+git branch --show-current
+git pull --rebase origin main
+```
+
+- [ ] Working tree clean (or only the release's own changes).
+- [ ] On `main`, rebased on the remote.
+
+## 2. Backend tests (run, don't assume)
+
+```powershell
+cd C:\quantlab
+if (Test-Path .\artifacts) {
+    Remove-Item -Recurse -Force .\artifacts
+}
+backend\venv\Scripts\python.exe -m pytest backend\tests -q
+```
+
+- [ ] Suite green; record the real count in the release notes.
+- [ ] `artifacts\` absent after the run.
+
+## 3. Frontend typecheck
+
+```powershell
+cd C:\quantlab\frontend
+npx tsc --noEmit
+```
+
+- [ ] Exit 0.
+
+## 4. Frontend production build (user-run)
+
+```powershell
+cd C:\quantlab\frontend
+if (Test-Path .next) {
+    Remove-Item -Recurse -Force .next
+}
+npm run build
+```
+
+- [ ] Build succeeds locally. (This step is always yours — no script or
+      automated flow in this repo runs it.)
+
+## 5. Manual route smoke pass
+
+- [ ] Walk the QA Command Center smoke matrix (or minimally: dashboard, Demo
+      Center, Scenario Studio, Research Workspace, Data Reliability, QA
+      Command Center, one deep lab) — no crashes, no NaN/Infinity, honest
+      empty states.
+
+## 6. Docs & wording
+
+- [ ] README links resolve; CHANGELOG "Unreleased" moved under the new
+      version heading; `VERSION` bumped.
+- [ ] Safety-wording spot check: no live-data guarantees, no
+      production-trading/compliance claims, no performance/alpha claims, no
+      user/customer/revenue claims (safety search patterns are in the Phase
+      40.0 ROADMAP entry).
+- [ ] No secrets/API keys anywhere:
+      `git grep -iE "api_key|apikey|secret|password" -- . ":!docs" | less`
+      (expect only documented env-var *names* like `FRED_API_KEY`).
+- [ ] No telemetry/analytics added.
+
+## 7. Tag (after the Review commit)
+
+```powershell
+cd C:\quantlab
+git tag v4.xx.0-short-feature-name-v1
+git push origin v4.xx.0-short-feature-name-v1
+```
+
+- [ ] Tag name follows `v4.xx.0-short-feature-name-v1`.
+- [ ] Release notes drafted from
+      [`RELEASE_NOTES_TEMPLATE.md`](RELEASE_NOTES_TEMPLATE.md) — with the
+      "actually run" vs "expected" distinction filled honestly.
+
+## 8. Optional public steps (manual, never automated)
+
+- [ ] GitHub release draft from the notes (manual step — nothing in this
+      repo calls the GitHub API).
+- [ ] LinkedIn / portfolio update if warranted — drafts in
+      [`LINKEDIN_POST_DRAFTS.md`](LINKEDIN_POST_DRAFTS.md); screenshots per
+      [`SCREENSHOT_CHECKLIST.md`](SCREENSHOT_CHECKLIST.md) (real runs only).
+
+---
+
+# Part 2 — Detailed manual QA walkthrough (v4.7 era)
+
+A manual pre-release checklist originally written for the **v4.7 showcase
+candidate**. Work top to bottom; everything is local and reproducible.
 
 > **Honesty rule:** every result shown during QA must come from a **real backend
 > run** on real data. No fabricated metrics, no placeholder rows.
@@ -31,7 +137,7 @@ cd backend
 python -m pytest -q
 ```
 
-- [ ] **All tests pass** — 1,060+ tests across 53 files, all on synthetic data (no network calls at test time).
+- [ ] **All tests pass** — ~2,900 tests as of Phase 40.0 (the count grows per phase; record the real number), all on deterministic/synthetic data (no network calls at test time). Canonical invocation: `backend\venv\Scripts\python.exe -m pytest backend\tests -q` from the repo root.
 - [ ] **No real database polluted by tests** — persistence tests redirect to a temporary SQLite file via the `fresh_db` / `monkeypatch` fixture; the guard test `test_tests_use_temp_database_not_real_database` asserts the active DB path is **never** the real `backend/data/quantlab.db`. After a test run, confirm your real DB's row counts are unchanged.
 - [ ] **Health endpoint works** — `curl http://localhost:8000/health` returns a healthy JSON payload; `GET /api/health` works through the frontend proxy.
 - [ ] **Swagger loads** — <http://localhost:8000/docs> lists endpoints grouped by tag (`backtest`, `research`, `portfolio`, persistence, `ops`).

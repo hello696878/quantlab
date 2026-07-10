@@ -1750,6 +1750,31 @@ export default function HomeDashboard({
           </button>
           <button
             type="button"
+            onClick={() => onNav("releasenotes")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                Release Notes Center
+              </span>
+              <span
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+              >
+                Release center
+              </span>
+            </span>
+            <span className="text-xs text-slate-400">
+              Version manifest, changelog by release area, the release-flow checklist, and a
+              copyable release-notes skeleton — milestone labels, not package publications;
+              verification results are recorded honestly per release.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Release Notes Center →
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => onNav("scanner")}
             className="card flex flex-col gap-1 p-4 text-left"
           >

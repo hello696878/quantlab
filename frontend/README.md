@@ -471,6 +471,19 @@ Parameters are flagged as **unstable** when no single (fast, slow) pair is chose
 
 ---
 
+## Release Notes Center (Phase 40.0)
+
+The **Release Notes Center** (`ReleaseNotesCenterPanel`, view `releasenotes`,
+Product Workflow sidebar group) is a frontend-only static reference for the
+project's versioning story: the current version card (label, latest verified
+tag, expected next tag), release-area cards with deep links, changelog
+summaries, the release-flow checklist, and a copyable release-notes skeleton
+that separates "tests actually run" from "checks expected" (the production
+build is always user-run). No git or GitHub access from the browser — the
+canonical sources are `VERSION`, `CHANGELOG.md`, and `docs/`, and the
+read-only live summary is `scripts\print_release_summary.ps1`. Version labels
+are milestone markers, not package publications or certifications.
+
 ## Developer Onboarding (Phase 39.0)
 
 The **Developer Onboarding** page (`DeveloperOnboardingPanel`, view

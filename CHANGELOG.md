@@ -2,57 +2,117 @@
 
 All notable changes to QuantLab are documented here. The format is based on
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims
-to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+to follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html). Changes
+after v4.7.0 are **grouped by release area** rather than per-commit — the
+per-phase detail lives in [`docs/ROADMAP.md`](docs/ROADMAP.md), and local tags
+follow `v4.xx.0-short-feature-name-v1`
+(see [`docs/VERSION_MANIFEST.md`](docs/VERSION_MANIFEST.md)). Version labels
+are project milestone labels, not package publications; no public release is
+claimed by an entry here.
 
 > **Research only.** QuantLab is an educational/research tool — it does not place
-> trades, connect to a broker, or provide investment advice.
+> trades, connect to a broker, or provide investment advice, and it is not
+> production trading, risk, or compliance infrastructure.
 
 ---
 
-## Unreleased — Options & Volatility Lab v1
+## Unreleased
 
-### Added
+- **Version Manifest, Changelog & Release Notes Center v1** (v4.58 series):
+  version manifest, this grouped changelog refresh, release-notes template,
+  extended release checklist, milestone history, project snapshot, `VERSION`
+  file, in-app Release Notes Center page, and
+  `scripts/print_release_summary.ps1` (print-only).
 
-- **Options Lab** workspace with European Black–Scholes pricing, Greeks,
-  bisection implied-volatility solving, and single/multi-leg expiration payoff
-  diagrams.
-- Deterministic backend endpoints: `POST /options/black-scholes`,
-  `POST /options/implied-volatility`, and `POST /options/payoff`.
-- CRR binomial tree endpoints for European/American exercise:
-  `POST /options/binomial` and `POST /options/tree-convergence`, with small
-  lattice visualization capped for readability.
-- Monte Carlo GBM endpoint `POST /options/monte-carlo` for European,
-  arithmetic-average Asian, and simple discretely monitored barrier payoffs,
-  with seed reproducibility, standard error, 95% confidence interval, and capped
-  path preview.
-- Volatility surface endpoints `POST /options/surface` and
-  `POST /options/surface/sample` for manual/synthetic option chains, per-row IV
-  extraction, smile/skew/ATM term structure, moneyness × expiry heatmap, and SVI
-  research fit.
-- Heston stochastic-volatility endpoint `POST /options/heston` for educational
-  full-truncation Euler Monte Carlo European pricing with standard error, 95%
-  confidence interval, Feller-condition warning, Black-Scholes reference, and
-  capped price/volatility path preview.
-- Strategy payoff presets for long call/put, covered call, protective put,
-  bull/bear spreads, straddles, and strangles.
-- Dashboard, sidebar, command-palette/search, Black–Scholes paper, and
-  Volmageddon cross-links.
+## Grouped release areas — v4.8 through v4.57 (post-showcase series)
 
-### Fixed
+The tags between v4.8.0 and v4.57.0 (local milestone tags; full per-phase
+detail in `docs/ROADMAP.md`) grouped by area:
 
-- Strategy Comparison is now placed beside Backtest and Strategy Library in
-  the sidebar; the fixed desktop rail scrolls vertically on shorter screens.
-- Global Markets Globe API payloads reject non-finite values and the frontend
-  validates the complete static dossier schema before using backend data.
+### Developer onboarding & local demo readiness (v4.57)
 
-### Limitations
+- Local demo guide, developer onboarding, troubleshooting, command reference,
+  and environment-doctor docs; six safe PowerShell helper scripts (read-only
+  doctor, run/test/typecheck wrappers, `.next` cache cleaner, print-only
+  cheat sheet); in-app Developer Onboarding page.
 
-- Educational calculator only: American exercise is limited to the simplified
-  CRR tree model, GBM Monte Carlo is constant-volatility with sampling error,
-  and Heston is an uncalibrated Euler simulator; no live option chains, broker
-  integration, assignment, discrete-dividend/corporate-action modelling,
-  transaction-cost/liquidity modelling, or arbitrage-free production volatility
-  calibration.
+### Portfolio launch & public docs (v4.56)
+
+- Public-facing README; portfolio launch pack, public project summaries,
+  screenshot checklist, demo video scripts, LinkedIn drafts, interview
+  talking points, deployment-readiness notes; in-app Portfolio Showcase page.
+
+### Platform UX polish (v4.55)
+
+- App-router error/loading/not-found safety pages; the sidebar grouped into
+  labelled sections (all entries preserved); dashboard "Suggested Starting
+  Paths"; chart `ariaLabel` support; visible keyboard focus on shared sliders.
+
+### QA & release readiness (v4.54)
+
+- QA Command Center: 21-module QA registry, coverage rates and release
+  score, rule-based release decision, smoke-test matrix, regression
+  checklists, exact local verification commands — explicitly never claiming
+  tests were run.
+
+### Data reliability & offline fixtures (v4.53)
+
+- Data Reliability Center: module data-mode registry, provider registry
+  (optional yfinance/FRED/delayed-quote paths disabled by default,
+  fail-closed, never relied on in tests), offline fixture registry incl. the
+  KO/PEP pairs-demo fallback, documented reliability rates and score.
+
+### Demo center & product walkthroughs (v4.52)
+
+- Demo Center: eight guided demo paths with deep links, module health
+  dashboard, capability matrix, audience/time-budget-aware demo script
+  builder with Markdown/JSON export.
+
+### Research workspace & experiment journal (v4.51)
+
+- Research Workspace: saved research packs, staged-run experiment journal,
+  severity/coverage/reproducibility scores, workflow timeline, methodology
+  checklist, Markdown/JSON exports, optional browser-local drafts.
+
+### Scenario studio & cross-lab reports (v4.50)
+
+- Unified Scenario Studio: ten deterministic scenario templates, global
+  shock sliders, documented cross-lab impact-score weight tables, module
+  impact charts and heatmap, regime classification, copyable Markdown report.
+
+### Crypto / DeFi / on-chain / alternative data / macro labs (≈v4.42–v4.49)
+
+- Crypto Derivatives (perp funding/basis, educational liquidation
+  estimates), DeFi Risk (kinked rate model, finite-by-construction health
+  factors), Tokenomics (unlocks, treasury runway), On-Chain Analytics
+  (flows, cohorts, whale reads), Alternative Data (sentiment pipeline,
+  signal decay, leakage guards), Macro Regime & Cross-Asset Allocation —
+  later upgraded with interactive shock sliders, horizon selectors, local
+  charts, and collapsible formula panels.
+
+### Derivatives / volatility / futures / real assets / microstructure labs (≈v4.8–v4.41)
+
+- Options Lab (Black-Scholes, Greeks, IV solver, payoff builder, CRR trees,
+  Monte Carlo incl. Asian/barrier, vol surface + SVI research fit, Heston);
+  Volatility Surface & Variance Swap Lab (explicitly not the VIX
+  methodology); Futures & Commodities Lab (cost-of-carry, curve shapes,
+  roll yield); Real Estate + MBS Prepayment (CPR/SMM/PSA, WAL, duration);
+  Credit Risk (Merton, hazard, simplified CDS); Yield Curve & Short Rate
+  (Vasicek/CIR); FX (parity, carry, Garman-Kohlhagen); Event Lab (event
+  studies); Market Microstructure & Execution (order-book analytics, TCA
+  attribution summing to shortfall by construction, order-flow toxicity
+  approximations); Global Markets Globe data layer with opt-in fail-closed
+  adapters; Cross-Sectional Scanner; local LaTeX formula rendering
+  everywhere.
+
+### Methodology & testing (throughout)
+
+- AFML Methodology Lab (CUSUM events, triple-barrier labels, purged K-fold +
+  embargo, sequential bootstrap, fractional differentiation — synthetic
+  data, no fitted models, no performance claims); platform-wide testing
+  discipline: ~2,900 deterministic backend tests with no live-provider
+  dependency, strict Pydantic v2 schemas with finiteness guarantees, wording
+  contracts as tests, GitHub Actions CI (backend tests + frontend build).
 
 ---
 

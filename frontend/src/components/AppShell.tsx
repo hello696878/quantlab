@@ -37,6 +37,7 @@ export type View =
   | "qacommandcenter"
   | "portfolioshowcase"
   | "developeronboarding"
+  | "releasenotes"
   | "csv"
   | "builder"
   | "portfolio"

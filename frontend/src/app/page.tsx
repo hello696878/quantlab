@@ -62,6 +62,7 @@ import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
 import PortfolioShowcasePanel from "@/components/PortfolioShowcasePanel";
 import DeveloperOnboardingPanel from "@/components/DeveloperOnboardingPanel";
+import ReleaseNotesCenterPanel from "@/components/ReleaseNotesCenterPanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -470,6 +471,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "QuantLab Portfolio Showcase",
     subtitle:
       "The public-presentation view: what the platform demonstrates (full-stack quant research platform, interactive labs, deterministic demo data, scenario/report workflow, reliability & QA readiness), the suggested demo path with deep links, grouped project highlights, copyable one-sentence/recruiter/quant/technical pitches, and the standing safety panel — static presentation copy, educational only, not investment or trading advice, not a live trading system, not production compliance infrastructure.",
+  },
+  releasenotes: {
+    title: "Version Manifest & Release Notes Center",
+    subtitle:
+      "The project's versioning story: current version label and verified tag/commit conventions (Add/Review commits, v4.xx.0-name-v1 tags created manually after review), changelog summaries by release area, the release-flow checklist, a copyable release-notes skeleton that separates tests actually run from tests expected (frontend build always user-run), and the project snapshot — static reference copy; version labels are milestone markers, not package publications or production/compliance certifications; not investment or trading advice.",
   },
   developeronboarding: {
     title: "Local Demo & Developer Onboarding",
@@ -1079,6 +1085,7 @@ export default function HomePage() {
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
     { view: "portfolioshowcase", title: "Open Portfolio Showcase", keywords: "portfolio showcase public presentation pitch recruiter quant technical demo path highlights launch pack resume interview linkedin" },
     { view: "developeronboarding", title: "Open Developer Onboarding", keywords: "developer onboarding local demo launcher environment doctor commands troubleshooting venv uvicorn pytest typecheck npm setup" },
+    { view: "releasenotes", title: "Open Release Notes Center", keywords: "release notes center version manifest changelog milestone history project snapshot tag conventions release checklist" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1624,6 +1631,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("developeronboarding"),
+    })),
+    ...(
+      [
+        ["Open Release Notes Center", "release notes center version manifest changelog release areas current version tag conventions"],
+        ["Version Manifest", "version manifest tag naming commit naming review tag meaning versioning policy docs version_manifest"],
+        ["Changelog", "changelog grouped release areas unreleased keep a changelog CHANGELOG.md"],
+        ["Release Checklist", "release checklist flow git tests typecheck build tag safety wording docs release_checklist"],
+        ["Project Snapshot", "project snapshot one page summary module inventory architecture testing handoff docs project_snapshot"],
+        ["Milestone History", "milestone history project capability narrative foundation showcase expansion docs milestone_history"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `releasenotes-${title}`,
+      group: "Release Notes Center",
+      title,
+      keywords,
+      run: () => handleNav("releasenotes"),
     })),
     ...(
       [
@@ -2221,6 +2244,8 @@ export default function HomePage() {
         {view === "portfolioshowcase" && <PortfolioShowcasePanel onNav={(route) => handleNav(route as View)} />}
 
         {view === "developeronboarding" && <DeveloperOnboardingPanel onNav={(route) => handleNav(route as View)} />}
+
+        {view === "releasenotes" && <ReleaseNotesCenterPanel onNav={(route) => handleNav(route as View)} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (

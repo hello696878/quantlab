@@ -1677,6 +1677,66 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 40.0 — Version Manifest, Changelog & Release Notes Center v1 ✅
+
+- **Release-management phase (no new financial model): a version/changelog/
+  release-notes layer so the project is traceable and presentable.** No
+  GitHub API calls, no automatic tags or releases, no fabricated dates, and
+  nothing claims tests/builds ran unless actually run.
+- **Verified before writing:** 104 local tags following
+  `v4.xx.0-short-feature-name-v1` (latest
+  `v4.57.0-local-demo-launcher-environment-doctor-v1`); the
+  `Add <feature> v1` / `Review <feature> v1` commit convention; a real but
+  stale root `CHANGELOG.md` (its "Unreleased" was Options-era) and the
+  existing v4.7-era `docs/RELEASE_CHECKLIST.md`.
+- **Docs:** `VERSION_MANIFEST.md` (current label, the v4.x release family,
+  release areas, the versioning policy as actually practiced, verified tag/
+  commit conventions, what a review tag means and explicitly does NOT mean,
+  safety checklist); root `CHANGELOG.md` **updated in place** (kept the
+  canonical Keep-a-Changelog location and the real dated v4.7.0/v4.0.0
+  entries; replaced the stale Options-era "Unreleased" with the Phase-40
+  Unreleased entry plus grouped release-area sections covering v4.8→v4.57 —
+  no dates fabricated, tags referenced only where verified);
+  `RELEASE_NOTES_TEMPLATE.md` (copy-ready skeleton whose load-bearing
+  distinction is "tests actually run" vs "checks expected but not run" vs
+  "frontend build user-run"); `RELEASE_CHECKLIST.md` **extended, not
+  replaced** — new Part 1 release flow (git/tests/typecheck/user-run
+  build/smoke/wording/secrets/tag/optional manual public steps, with the
+  repo's real `backend\venv` paths) in front of the preserved v4.7 manual QA
+  walkthrough (Part 2; stale test-count line updated honestly);
+  `MILESTONE_HISTORY.md` (15 capability milestones, ground rules restated);
+  `PROJECT_SNAPSHOT.md` (one-page handoff: inventory by sidebar group,
+  architecture, data modes, testing, doc inventory, readiness, limitations,
+  next improvements).
+- **`VERSION` file added** (`4.58.0-dev`) with the docs stating version
+  labels are milestone labels, not package publications; expected next tag
+  `v4.58.0-version-manifest-release-notes-center-v1` (created by the user
+  after review, never automatically).
+- **Frontend Release Notes Center page** (view `releasenotes`, Product
+  Workflow sidebar group after the QA Command Center) — static frontend-only
+  reference copy (no backend endpoint, no git/GitHub access from the
+  browser; the live read is `scripts\print_release_summary.ps1`): current
+  version card (label + latest-verified and expected-next tags), five
+  release-area cards with deep links, ten changelog summary cards, the
+  8-step release flow, a copyable release-notes skeleton, the project
+  snapshot summary, and the standing safety panel. Wired into Sidebar,
+  Dashboard card ("Release center" badge), title registry, and Command
+  Palette (Open Release Notes Center, Version Manifest, Changelog, Release
+  Checklist, Project Snapshot, Milestone History).
+- **`scripts/print_release_summary.ps1`** — read-only: prints branch, latest
+  commit, latest tag (local `git describe`), the `VERSION` label, the
+  verification commands (user-run), a tag command TEMPLATE, and the release
+  doc paths; never tags, pushes, calls any API, builds, installs, or deletes.
+  Parser-validated and executed once to verify output.
+- Spec §13 safety search run across README/docs/frontend/scripts/backend —
+  all matches are negations ("not production-ready", "never claims…"),
+  documented env-var names, or honest-limitation phrasing; no overclaims
+  introduced. Backend suite re-run green; `npx tsc --noEmit` clean; no
+  frontend build run (per instructions). Consistency pass:
+  `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`, `frontend/README.md`, README
+  links. **Milestone labels, honest verification language, no public-release
+  claims.**
+
 ### Phase 39.0 — Local Demo Launcher, Environment Doctor & Developer Onboarding v1 ✅
 
 - **Developer-experience phase (no new financial model): make QuantLab easier
