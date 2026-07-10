@@ -891,3 +891,132 @@ def test_cli_imports_reporting_but_runner_does_not():
 
     runner_src = Path(runner_module.__file__).read_text(encoding="utf-8")
     assert "app.reporting" not in runner_src  # ... and never in the runner
+
+
+# --------------------------------------------------------------------------- #
+# integrated end-to-end: raw store -> batch CLI -> ExperimentStore -> report + comparison
+# --------------------------------------------------------------------------- #
+
+_HASH_CHAIN_KEYS = {
+    "raw_data_version_hash",
+    "continuous_config_hash",
+    "feature_config_hash",
+    "label_config_hash",
+    "dataset_config_hash",
+    "model_config_hash",
+    "train_run_hash",
+}
+
+
+def test_e2e_local_futures_batch_cli(tmp_path, capsys):
+    """Full Phase 11 path: synthetic ES raw store -> 3-config batch spec -> batch CLI
+    -> Phase 9 runs saved in an ExperimentStore -> strict batch manifest JSON ->
+    Phase 10 comparison. Everything under `tmp_path`; no network; no repo writes."""
+    before = _repo_snapshot()
+
+    _raw_store(tmp_path)  # synthetic ES raw (3 contracts) under tmp_path/store
+    spec = _write_spec(tmp_path, grid={"random_seed": [0, 1, 2]})  # 3 configs
+    exp_dir = tmp_path / "exp"
+    report = tmp_path / "reports" / "batch_manifest.json"
+    comparison = tmp_path / "reports" / "batch_comparison.json"
+
+    cli = _load_batch_cli()
+    code = cli.main(
+        _cli_base_args(
+            tmp_path, spec,
+            "--artifacts-dir", str(exp_dir),
+            "--report-json", str(report),
+            "--comparison-output", str(comparison),
+        )
+    )
+    out = capsys.readouterr().out
+
+    # --- CLI outcome + per-item lines ---------------------------------------- #
+    assert code == 0
+    assert "RESULT: OK" in out
+    for item_id in ("item_0000", "item_0001", "item_0002"):
+        assert f"[{item_id}] ok train_run_hash=" in out
+    assert f"[REPORT] path={report}" in out
+    assert f"[COMPARE] path={comparison}" in out
+
+    # --- Phase 9 runs persisted under tmp_path (>= 2 successful) -------------- #
+    run_dirs = sorted(p.name for p in exp_dir.iterdir() if p.is_dir())
+    assert len(run_dirs) >= 2
+    for run_hash in run_dirs:
+        assert (exp_dir / run_hash / "metadata.json").exists()
+
+    # --- strict batch manifest JSON ------------------------------------------ #
+    report_text = report.read_text(encoding="utf-8")
+    assert "NaN" not in report_text and "Infinity" not in report_text
+    manifest = json.loads(report_text)
+    json.dumps(manifest, allow_nan=False)  # strict re-serialization
+
+    assert manifest["n_total"] == 3
+    assert manifest["n_ok"] == 3
+    assert manifest["n_failed"] == 0
+    assert manifest["n_skipped"] == 0
+
+    # ordered successful hashes, matching item order and the saved run dirs
+    hashes = manifest["train_run_hashes"]
+    assert len(hashes) == 3 and len(set(hashes)) == 3
+    assert hashes == [it["train_run_hash"] for it in manifest["items"] if it["status"] == "ok"]
+    assert sorted(hashes) == run_dirs
+
+    # item statuses + full Phase 9 hash chain per successful item
+    assert [it["item_id"] for it in manifest["items"]] == ["item_0000", "item_0001", "item_0002"]
+    for item in manifest["items"]:
+        assert item["status"] == "ok"
+        assert set(item["hash_chain"]) == _HASH_CHAIN_KEYS
+        assert item["hash_chain"]["train_run_hash"] == item["train_run_hash"]
+        assert item["artifact_dir"] == item["train_run_hash"]  # store-relative, not absolute
+
+    # --- batch_config_hash: manifest fingerprint only, never ML lineage ------- #
+    batch_hash = manifest["batch_config_hash"]
+    assert batch_hash and f"batch_config_hash={batch_hash}" in out
+    assert batch_hash not in hashes
+    for item in manifest["items"]:
+        assert batch_hash not in item["hash_chain"].values()
+
+    # --- Phase 10 comparison, only at the explicit output path ---------------- #
+    assert comparison.exists()
+    comparison_text = comparison.read_text(encoding="utf-8")
+    payload = json.loads(comparison_text)
+    assert sorted(row["train_run_hash"] for row in payload["rows"]) == run_dirs
+    assert "disclaimers" in payload
+    assert sorted(p.name for p in (tmp_path / "reports").iterdir()) == [
+        "batch_comparison.json",
+        "batch_manifest.json",
+    ]
+
+    # --- no absolute local paths leak into either artifact -------------------- #
+    for text in (report_text, comparison_text):
+        assert ":\\" not in text  # no Windows drive-letter path (JSON-escaped form)
+        assert tmp_path.name not in text
+
+    # --- everything stayed under tmp_path; repo root untouched ---------------- #
+    assert _repo_snapshot() == before
+
+    # --- layer guards: orchestration only, no new ML, no new hash chain ------- #
+    from app.batch_experiments import config as config_module
+    from app.batch_experiments import runner as runner_module
+
+    config_src = Path(config_module.__file__).read_text(encoding="utf-8")
+    runner_src = Path(runner_module.__file__).read_text(encoding="utf-8")
+    cli_src = Path(_BATCH_CLI_PATH).read_text(encoding="utf-8")
+
+    forbidden = (
+        "import requests", "urllib", "httpx", "aiohttp", "socket",
+        "yfinance", "ibkr", "sklearn", "xgboost", "lightgbm", "torch", "tensorflow",
+    )
+    ml_internals = ("train_model", "build_feature_matrix", "build_label_matrix")
+    for name, src in (("config.py", config_src), ("runner.py", runner_src), ("CLI", cli_src)):
+        for token in forbidden:
+            assert token not in src, f"{name} must not reference {token!r}"
+        for token in ml_internals:
+            assert token not in src, f"{name} must not touch ML internal {token!r}"
+        # no new hash chain: nothing hashes on its own
+        assert "hashlib" not in src and "sha256" not in src, f"{name} must not hash directly"
+
+    assert "compute_config_hash" in runner_src  # reuses the existing reproducibility helper
+    assert "app.reporting" not in runner_src  # runner stays decoupled from Phase 10
+    assert "app.reporting" in cli_src  # Phase 10 used only at the CLI, for --comparison-output

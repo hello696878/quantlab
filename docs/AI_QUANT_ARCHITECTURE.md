@@ -3358,10 +3358,10 @@ Export Markdown / JSON / CSV (write to an explicit `--output-path`):
 
 ## Appendix L — Phase 11 Local Experiment Batch / Sweep Runner Plan
 
-> **Status: design only (Phase 11 not implemented).** Sections L.1–L.12 are the
-> approved plan; **no code, script, test, data, or artifact exists yet.** Phase 11
-> is an **orchestration layer only** over the existing Phase 9
-> `run_local_futures_ml_experiment` and (optionally, at the CLI layer) the Phase 10
+> **Status: as-built (Phase 11 shipped, Commits 0–4).** Sections L.1–L.12 are the
+> approved design; **§L.13 records the shipped result.** Phase 11 is an
+> **orchestration layer only** over the existing Phase 9
+> `run_local_futures_ml_experiment` and (at the CLI layer only) the Phase 10
 > reporting exports. It invents **no new ML models, no new features / labels, no new
 > backtest logic, no adaptive optimization, and no live / vendor data**, and it
 > **changes no Phase 2–10 behavior**. Local / synthetic data only; deterministic;
@@ -3606,3 +3606,132 @@ The `LocalExperimentBatchResult` records:
 | **Parallelism** causing nondeterminism | strictly sequential; no threads / async / multiprocessing; a deterministic-order test |
 | **Bloating** `local_pipeline` or `reporting` | a **separate** `batch_experiments/` package; the runner imports neither reporting nor new ML |
 | Confusing **`batch_config_hash`** with ML lineage hashes | it is a **manifest fingerprint only** (§L.6): not part of the chain, does not replace `train_run_hash`; documented and named accordingly |
+
+### L.13 As-built (Phase 11 shipped)
+
+Implemented across Commits 1–3 exactly as designed above; tests are synthetic +
+`tmp_path` only, no network, and the full backend suite stays green.
+
+**Shipped components**
+
+- `backend/app/batch_experiments/__init__.py` — package exports (config + runner
+  layers).
+- `backend/app/batch_experiments/config.py` — `BatchError`, `batch_item_id`
+  (`0 -> item_0000`), `LocalExperimentBatchConfig` (frozen / strict: non-empty grid,
+  grid keys must be real `LocalExperimentConfig` fields, non-empty value lists,
+  `on_error` ∈ {`continue`, `stop`}), and `expand_grid` — a deterministic cartesian
+  product (**keys sorted alphabetically, values in user order**) in which every
+  combination is **reconstructed as a `LocalExperimentConfig`**, so the Phase 9
+  validators (ratio-only, feature / label naming, window ordering) re-run. No
+  hashing here; it does not import the runner.
+- `backend/app/batch_experiments/runner.py` — `LocalExperimentBatchItem`,
+  `LocalExperimentBatchResult`, `run_local_experiment_batch` (strictly sequential,
+  per-item status / error capture), `summarize_batch_result` (compact, deterministic,
+  JSON-safe), and `batch_config_hash` (manifest fingerprint via the **existing**
+  `app.reproducibility.compute_config_hash`). It calls the Phase 9
+  `run_local_futures_ml_experiment` only — **never** `app.reporting`, and never the
+  model-training or feature / label builders.
+- `scripts/run_local_futures_ml_batch.py` — thin argparse CLI; the **only** place
+  Phase 10 reporting is used (for `--comparison-output`).
+- `backend/tests/test_local_futures_ml_batch.py` — 67 tests (config / grid expansion,
+  runner, CLI, guard rails, and one integrated end-to-end pass).
+
+**CLI usage**
+
+```bat
+cd C:\quantlab
+```
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\run_local_futures_ml_batch.py ^
+  --base-dir data ^
+  --artifacts-dir artifacts\experiments ^
+  --config-json configs\local_futures_batch.json ^
+  --report-json reports\batch_manifest.json ^
+  --comparison-output reports\batch_comparison.csv
+```
+
+Other flags: `--dry-run` (expand / plan only), `--overwrite`,
+`--stop-on-error` / `--continue-on-error` (mutually exclusive), `--no-parquet`.
+
+**Batch spec shape** (`--config-json`)
+
+```json
+{
+  "base": {
+    "root_symbol": "ES",
+    "source": "synthetic",
+    "adjustment_method": "ratio",
+    "train_start": "YYYY-MM-DD",
+    "train_end": "YYYY-MM-DD",
+    "validation_start": "YYYY-MM-DD",
+    "validation_end": "YYYY-MM-DD",
+    "feature_columns": ["feature__return_1", "feature__realized_vol_20"],
+    "label_column": "label__forward_return_5",
+    "model_type": "ridge_regression",
+    "task_type": "regression",
+    "prediction_horizon": 5,
+    "transaction_cost_bps": 1.0
+  },
+  "grid": {
+    "model_type": ["ridge_regression", "dummy_baseline"],
+    "random_seed": [0, 1]
+  },
+  "overwrite": false,
+  "on_error": "continue"
+}
+```
+
+`grid` is required and must be non-empty (a single-config batch uses a one-value
+grid, e.g. `{"random_seed": [0]}`). CLI `--overwrite` overrides the JSON `overwrite`
+and applies to every expanded config; `--stop-on-error` / `--continue-on-error`
+override the JSON `on_error`.
+
+**Behavior**
+
+- **Local files only**; **sequential execution only**; **no parallelism**.
+- **Deterministic grid expansion** (sorted keys, user value order) and **stable item
+  IDs** (`item_0000`, `item_0001`, ...).
+- **`--dry-run` writes no experiment artifacts** (every item is `skipped`) and needs
+  no `--artifacts-dir`.
+- **`--artifacts-dir` controls `ExperimentStore` persistence**; duplicate / overwrite
+  behavior follows the existing store + `config.overwrite`.
+- **`--report-json` writes the strict manifest only to the explicit path**
+  (`json.dumps(..., allow_nan=False, sort_keys=True)`; no `NaN` / `Infinity`; no
+  absolute paths — `artifact_dir` is store-relative). Prints `[REPORT] path=...`.
+- **`--comparison-output` writes the Phase 10 comparison only to the explicit path**
+  (`.csv` / `.json`; any other extension fails clearly), over the **successful** runs
+  only, and requires **at least 2** of them. Prints `[COMPARE] path=...`.
+- **`--stop-on-error`** records the failure and marks every remaining item `skipped`;
+  **`--continue-on-error`** (default) records the failure and proceeds.
+- **`RESULT: OK`** (exit 0) — including continue-on-error with at least one success
+  (the summary still shows `n_failed > 0`). **`RESULT: FAIL`** (nonzero) on an
+  invalid spec / JSON, a missing `--artifacts-dir` without `--dry-run`, **all** items
+  failing, `--stop-on-error` triggering, an unsupported comparison extension, or a
+  comparison with fewer than 2 successful runs.
+- **`batch_config_hash` is a manifest fingerprint only** — a deterministic SHA-256
+  over the ordered expanded config dumps plus the execution policy (`on_error` /
+  `dry_run`), via the existing reproducibility helper. It is **not ML lineage**, it
+  **does not replace `train_run_hash`**, and it never enters the Phase 9 chain.
+- **Successful items keep the existing Phase 9 hash chain**
+  (`raw_data_version_hash` → `continuous_config_hash` → `feature_config_hash` →
+  `label_config_hash` → `dataset_config_hash` → `model_config_hash` →
+  `train_run_hash`).
+- **Comparison output uses Phase 10 reporting** (`compare_experiment_runs` +
+  `export_experiment_comparison_csv` / `_json`), inheriting its standing disclaimers.
+
+**Known limitations**
+
+- **Not a hyperparameter optimizer**; **no adaptive search** (static grid / explicit
+  list only — no early stopping, no Bayesian tuning).
+- **No parallelism** (sequential by design, for determinism).
+- **No vendor / download / live data**; **no real-money trading**; **no frontend**;
+  **no Research CLI real-data mode**.
+- **No new metrics, model families, or backtest engine** — Phase 11 orchestrates
+  existing Phase 9 runs and reuses Phase 10 rendering.
+- **`--comparison-output` can fail** for incompatible validation windows / labels /
+  datasets, through the existing Phase 10 (`compare_experiments`) guard — sweeping
+  windows or labels therefore makes the comparison step fail clearly rather than
+  compare apples to oranges.
+- Local / synthetic results are **not investment advice** and **not a live
+  performance guarantee**.
