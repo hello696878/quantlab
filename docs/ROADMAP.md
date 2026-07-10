@@ -1677,6 +1677,58 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 38.0 — Portfolio Launch Pack, Public Docs & Showcase Readiness v1 ✅
+
+- **Public-facing packaging phase (no new financial model): pitches, public
+  docs, and an in-app showcase page for presenting QuantLab on GitHub,
+  LinkedIn, portfolio pages, resumes, and interviews.** No hype, no fake
+  metrics, no user/customer/revenue claims, no live-data or
+  production-trading claims anywhere in the new material; verification
+  commands are always framed as user-run.
+- **README rewritten public-first:** new top (title + one-paragraph
+  description with the ground rules, "what this project demonstrates",
+  grouped module map, real quick-start/test commands, suggested demo path,
+  data & safety) while **preserving all prior factual content** — the Phase-1
+  futures-first status, verification commands, Research CLI quickstart, and
+  the per-phase platform notes (now condensed into a bulleted "Platform layer
+  notes" section) — and linking the full docs set. Stale suite count updated
+  honestly (2,900 as of this phase's run).
+- **Seven new docs**, all copy-friendly and cross-linked with the existing
+  `SCREENSHOT_PLAN.md` / `RELEASE_CHECKLIST.md`:
+  `PORTFOLIO_LAUNCH_PACK.md` (one-sentence → 2-minute → technical / quant /
+  recruiter / founder pitches, demo route, what-to-show-first,
+  what-not-to-overclaim, reusable safety + data-mode wording, GitHub release
+  checklist), `PUBLIC_PROJECT_SUMMARY.md` (recruiter / quant researcher /
+  technical-architecture summaries), `SCREENSHOT_CHECKLIST.md` (16 targets
+  with setup/must-show/avoid/captions; extends the existing plan; manual
+  captures only, real runs only), `DEMO_VIDEO_SCRIPT.md` (60s / 3-min /
+  8-min scripts with screen order, what to say, what to avoid, mandatory
+  safety statements), `LINKEDIN_POST_DRAFTS.md` (six drafts: technical,
+  quant, full-stack, product, learning-journey, recruiter — each with the
+  data-policy line and a professional CTA), `INTERVIEW_TALKING_POINTS.md`
+  (architecture/backend/frontend/reliability/testing/UX/quant sections,
+  limitations-before-asked, what-I'd-improve-next, likely Q&A), and
+  `DEPLOYMENT_READINESS.md` (real local setup incl. the verified
+  `GLOBE_FRED_ENABLED`/`FRED_API_KEY`/`GLOBE_QUOTES_ENABLED` env vars,
+  Docker/CI facts, single-user/no-rate-limit caveats, and an honest list of
+  what public hosting still needs — deployment is explicitly not claimed).
+- **Frontend Portfolio Showcase page** (view `portfolioshowcase`, in the
+  Start Here sidebar group): a deliberately **frontend-only static page** (no
+  backend endpoint — it is presentation copy, not data) with hero,
+  what-QuantLab-demonstrates list, the five-step demo path deep-linking into
+  the real modules, six grouped highlight cards, four copyable pitches
+  (clipboard pattern shared with the other panels), and the standing
+  safety/limitations panel. Wired into Sidebar, Dashboard card ("Showcase"
+  badge), title registry, and Command Palette (Open Portfolio Showcase,
+  Public Project Summary, Demo Video Script, Screenshot Checklist, LinkedIn
+  Drafts).
+- Backend suite re-run green (no backend changes; count recorded in README);
+  `npx tsc --noEmit` clean; no frontend build run (per instructions). Docs
+  consistency pass: `PROJECT_OVERVIEW.md`, `LIMITATIONS.md`,
+  `DEMO_SCRIPT.md`, `frontend/README.md` updated. **All new material repeats
+  the ground rules: deterministic sample data, user-run verification, not
+  investment advice, not live trading, not production compliance.**
+
 ### Phase 37.0 — Platform UX Polish, Error Boundaries & Responsive QA v1 ✅
 
 - **Platform-quality polish phase (no new financial model): route-level error

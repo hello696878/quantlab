@@ -471,6 +471,20 @@ Parameters are flagged as **unstable** when no single (fast, slow) pair is chose
 
 ---
 
+## Portfolio Showcase (Phase 38.0)
+
+The **Portfolio Showcase** (`PortfolioShowcasePanel`, view `portfolioshowcase`,
+in the Start Here sidebar group) is a deliberately frontend-only static
+presentation page — no backend endpoint, no data fetch. It carries what
+QuantLab demonstrates, the five-step demo path (deep links into Demo Center,
+Scenario Studio, Research Workspace, Data Reliability, and QA Command
+Center), grouped project highlights, four copyable pitches, and the standing
+safety/limitations panel. The matching public docs live under `docs/`
+(PORTFOLIO_LAUNCH_PACK, PUBLIC_PROJECT_SUMMARY, SCREENSHOT_CHECKLIST,
+DEMO_VIDEO_SCRIPT, LINKEDIN_POST_DRAFTS, INTERVIEW_TALKING_POINTS,
+DEPLOYMENT_READINESS). Static presentation copy — educational only, not
+investment or trading advice, not a live trading system.
+
 ## Platform UX safety (Phase 37.0)
 
 Unexpected render errors are caught twice: the app-router `error.tsx` shows a

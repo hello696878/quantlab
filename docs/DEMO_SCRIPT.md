@@ -698,6 +698,12 @@ Return to the Command Center's **Platform Direction** panel (or open
 - **Theme** — switch the accent in Settings to show the whole app re-skin instantly.
 
 ## Tips
+- Recording a video instead of demoing live? Use
+  [`DEMO_VIDEO_SCRIPT.md`](DEMO_VIDEO_SCRIPT.md) (60s / 3-min / 8-min
+  versions); pitches and captions live in
+  [`PORTFOLIO_LAUNCH_PACK.md`](PORTFOLIO_LAUNCH_PACK.md) and
+  [`SCREENSHOT_CHECKLIST.md`](SCREENSHOT_CHECKLIST.md), and the in-app
+  **Portfolio Showcase** page (38.0) carries the copyable pitches.
 - The sidebar is grouped (Start Here → Product Workflow → asset-class labs →
   Saved Work, 37.0) and the dashboard opens with **Suggested Starting Paths**
   (Demo Center → Scenario Studio → Research Workspace → Reliability/QA) — a

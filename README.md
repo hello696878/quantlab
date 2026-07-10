@@ -1,13 +1,129 @@
-# QuantLab
+# QuantLab — Interactive Quant Research Platform
 
-QuantLab is a long-term multi-market AI quant research platform, being upgraded
-in-place: futures-first, while preserving the existing crypto code.
+A deterministic, local-first, **educational** quant research platform:
+interactive labs for portfolio risk, macro regimes, derivatives, crypto/DeFi
+risk, market microstructure, scenario analysis, research journaling, data
+reliability, and QA readiness — behind one shell (sidebar, dashboard, command
+palette, shared charts, local LaTeX formula panels).
 
-## Current Phase
+> **Ground rules:** deterministic static sample / synthetic / user-entered
+> data (optional external providers are disabled by default and fail closed);
+> no live trading, no telemetry, no login, no cloud. Educational only — not
+> investment, trading, allocation, legal, tax, compliance, or risk-management
+> advice, and not production trading, risk, or compliance infrastructure.
 
-QuantLab v0.1 foundation (Phase 1: futures-first).
+## What this project demonstrates
 
-## Status (2026-07-05)
+- **Full-stack engineering** — FastAPI + Pydantic v2 backend, Next.js 14 +
+  TypeScript + Tailwind frontend, typed end to end.
+- **Quantitative finance modeling** — documented educational implementations
+  across ~40 workspaces (options, volatility, rates, credit, FX, futures,
+  real estate/MBS, microstructure, crypto derivatives/DeFi/tokenomics/
+  on-chain, alternative data, macro regimes).
+- **Deterministic sample-data design** — every lab runs offline on
+  hand-written static samples; tests never depend on live providers.
+- **API design** — consistent `GET /sample` + `POST /analyze` pattern with
+  strict validation (`extra="forbid"`, finite-float guards, friendly 422s).
+- **Frontend data visualization** — shared theme-aware recharts components,
+  interactive shock sliders, local KaTeX formula rendering (no CDNs).
+- **Risk-aware product language** — every module states its data mode,
+  simplifications, and limitations in the UI and docs.
+- **Testing & QA workflow** — a large deterministic backend test suite
+  (2,900 tests green as of Phase 38.0), CI (backend tests + frontend build),
+  a QA Command Center, and a Data Reliability Center.
+- **Documentation discipline** — per-phase roadmap entries, limitations
+  ledger, demo scripts, and this launch pack.
+
+## Major modules
+
+- **Start Here / Product Workflow** — Home dashboard, Demo Center (guided
+  walkthroughs + module health), Portfolio Showcase, Scenario Studio
+  (cross-lab stress + report builder), Research Workspace (presets +
+  experiment journal), Data Reliability Center, QA Command Center.
+- **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
+  Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
+  tools.
+- **Derivatives** — Options Lab (BS/greeks/trees/Monte Carlo/Heston),
+  Volatility Surface & Variance Swap Lab, Futures & Commodities Lab.
+- **Crypto & DeFi** — Crypto Derivatives (funding/basis), DeFi Risk
+  (peg/lending/health factor), Tokenomics (unlocks/treasury), On-Chain
+  Analytics (flows/whales).
+- **Market Structure** — Market Microstructure & Execution Lab (order book,
+  TCA, order-flow toxicity), Alternative Data & Signal Decay Lab, Event Lab.
+- **Real Assets & Credit** — Real Estate & MBS Prepayment Lab, Credit Risk
+  Lab, Yield Curve & Short Rate Labs, FX Lab.
+- **Methodology & QA** — Backtest Studio + Strategy Comparison (lookahead-safe,
+  cost-aware), Cross-Sectional Scanner, AFML Methodology Lab (triple-barrier,
+  purged CV, sequential bootstrap, fracdiff), Strategy Library / Paper
+  Replications / Quant Disasters.
+
+## Quick start (user-run commands)
+
+Backend (Python venv lives at `backend\venv`):
+
+```powershell
+cd C:\quantlab\backend
+venv\Scripts\uvicorn app.main:app --reload --port 8000
+```
+
+Frontend:
+
+```powershell
+cd C:\quantlab\frontend
+npm install
+npm run dev
+```
+
+Production build (run locally by you — not by any tooling in this repo):
+
+```powershell
+cd C:\quantlab\frontend
+npm run build
+```
+
+Docker Compose (`docker compose up --build`) brings up both services; CI
+(`.github/workflows/ci.yml`) runs backend tests and a frontend build on push.
+
+## Testing
+
+```powershell
+cd C:\quantlab
+backend\venv\Scripts\python.exe -m pytest backend\tests -q
+
+cd C:\quantlab\frontend
+npx tsc --noEmit
+```
+
+## Suggested demo path
+
+1. **Demo Center** — pick a guided walkthrough, check module health.
+2. **Scenario Studio** — flip Soft Landing → Severe Combo, copy the report.
+3. **Research Workspace** — stage runs in a preset, export Markdown/JSON.
+4. **Data Reliability Center** — data modes, offline fixtures, provider caveats.
+5. **QA Command Center** — smoke matrix, release readiness, command checklist.
+
+See `docs/DEMO_SCRIPT.md`, `docs/DEMO_VIDEO_SCRIPT.md`, and
+`docs/PORTFOLIO_LAUNCH_PACK.md` for presenting the project.
+
+## Data & safety
+
+- Deterministic static sample data in most labs; the backtest engines use
+  user-configured inputs, and the built-in KO/PEP pairs demo has a
+  network-free deterministic fixture.
+- Optional external providers (yfinance historical downloads, opt-in FRED
+  macro, opt-in delayed quotes for the globe) are **disabled by default,
+  fail closed to static data, and are never relied on in tests**; their
+  availability is never guaranteed.
+- **Not investment advice. Not a trading system. Not production risk,
+  compliance, or data-governance infrastructure.** Educational and portfolio
+  purposes only. See `docs/LIMITATIONS.md` for the full honest ledger.
+
+---
+
+## Current research focus (Phase 1: futures-first)
+
+QuantLab is also being upgraded in-place as a long-term multi-market platform,
+futures-first, while preserving the existing code.
 
 **QuantLab local futures data path v0.1 is stable.** The local, synthetic-only
 futures data foundation is complete end to end:
@@ -21,7 +137,7 @@ futures data foundation is complete end to end:
   ```
 
 - Read-only smoke checks and reports all exit 0; full backend suite green
-  (2469 passed).
+  (2,900 passed as of Phase 38.0).
 
 Key files for the local futures data path:
 
@@ -37,19 +153,17 @@ Key files for the local futures data path:
 - `docs/INSTRUMENTS_LAYER.md` — instruments layer architecture note
 - `docs/FUTURES_DATA_INGESTION_PLAN.md` — how real futures data will enter later (design only)
 
-## Not Allowed Yet
+### Not allowed yet (deliberate scope limits)
 
-Deliberately out of scope for now:
-
-- ML
+- ML beyond the methodology labs
 - CFDs
-- options
-- futures_continuous
-- real data download (no yfinance, no IBKR)
+- options work in the futures pipeline (the educational Options Lab predates this scope)
+- futures_continuous beyond the local pipeline
+- real data download for the futures path (no IBKR)
 - production trading
 - major backtest engine rewrite
 
-## Verification
+### Verification (futures path)
 
 ```powershell
 backend\venv\Scripts\python.exe scripts\check_instruments.py
@@ -65,7 +179,7 @@ The two CSV commands write only to `backend\tests\_tmp_normalized_futures`, a
 throwaway folder that is not committed; delete it afterward
 (`Remove-Item -Recurse -Force backend\tests\_tmp_normalized_futures`).
 
-## Research CLI Quickstart
+## Research CLI quickstart
 
 Run the synthetic ES ML experiment demo from Windows PowerShell. **This is a
 synthetic ES demo, not real market performance.** It runs the full Phase 1→6
@@ -95,73 +209,49 @@ compare runs, pass real `train_run_hash` values taken from the `list` output:
 .\venv\Scripts\python.exe -m app.research_cli.cli compare <train_run_hash_a> <train_run_hash_b> --artifacts-dir ..\artifacts\experiments
 ```
 
-## Web App Labs
+## Platform layer notes
 
-The Next.js frontend (`frontend/`) ships a set of educational research labs on
+The Next.js frontend (`frontend/`) ships the educational research labs on
 deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
-`docs/LIMITATIONS.md`). The five recent labs — Crypto Derivatives, DeFi Risk,
-Tokenomics, On-Chain Analytics, and Alternative Data — include **interactive
-scenario-shock sliders, horizon selectors, and local recharts panels** (31.5):
-every control is a deterministic client-side transform of the static sample
-re-sent to the existing analyze endpoints — no live data, no trading, not
-investment advice.
+`docs/LIMITATIONS.md`). Highlights from recent phases:
 
-The **Unified Scenario Studio & Cross-Lab Report Builder** (32.0) connects the
-recent labs through a documented deterministic impact-scoring layer: ten
-scenario templates, global shock sliders, module impact charts, a scenario
-heatmap, a regime read, and a copy-friendly generated Markdown report — all
-static sample data, educational summaries only, no live data, not investment,
-trading, or allocation advice, and not a production risk report.
+- **Interactive lab controls & charts (31.5)** — deterministic shock sliders,
+  horizon selectors, and local recharts panels across the crypto/alt-data
+  labs; every control is a client-side transform of the static sample.
+- **Scenario Studio (32.0)** — ten scenario templates mapped through
+  documented impact-score weight tables into module charts, a heatmap, a
+  regime read, and a copyable Markdown report.
+- **Research Workspace (33.0)** — saved research packs, an experiment journal
+  with severity/coverage/reproducibility scores, Markdown/JSON exports, and
+  optional browser-local drafts (localStorage only).
+- **Demo Center (34.0)** — eight guided demo paths with deep links, a
+  21-module health dashboard, a capability matrix, and an audience-aware demo
+  script builder.
+- **Data Reliability Center (35.0)** — data-mode/provider/fixture registries,
+  documented reliability rates and score; tests never depend on live
+  providers and default demos have deterministic fallbacks.
+- **QA Command Center (36.0)** — release-readiness rates and score, a
+  smoke-test matrix, regression checklists, the exact local verification
+  commands, and copy-friendly release notes. **It does not prove tests were
+  run** — verification stays a local step.
+- **Platform UX polish (37.0)** — app-router error/loading/not-found safety
+  pages, an 11-group sidebar, dashboard starting paths, accessible chart
+  labels, and visible keyboard focus on shared sliders.
+- **Portfolio launch pack (38.0)** — this README, the in-app Portfolio
+  Showcase page, and the presentation docs under `docs/` (launch pack,
+  screenshot checklist, demo video script, LinkedIn drafts, interview
+  talking points, deployment readiness, public project summary).
 
-The **Research Workspace, Saved Presets & Experiment Journal** (33.0) organizes
-deterministic sample lab runs into six saved research packs: an experiment
-journal with staged runs, baseline-vs-stressed comparisons, severity /
-coverage / reproducibility scores, a workflow timeline, a methodology
-checklist, and copy-friendly Markdown/JSON exports, plus optional
-browser-local drafts (localStorage only — no login, no cloud sync, no
-database). Hand-written static samples, educational summaries only — not
-production research or compliance records, not investment or trading advice.
+## Project docs
 
-The **Product Demo Center, Guided Walkthroughs & Module Health Dashboard**
-(34.0) is a product-UX layer for showcasing the platform: eight guided demo
-paths with per-step deep links, an audience/time-budget-aware demo script
-builder (copyable Markdown/JSON), a 21-module health dashboard with status
-and data-mode badges, and a capability matrix with readiness / coverage /
-complexity scores. Hand-written static demo metadata — no telemetry, no
-login, no cloud sync, no live data, generated scripts are educational
-summaries, not investment or trading advice, and no module is a production
-trading system.
-
-The **Data Mode Registry, Offline Fixtures & API Reliability Center** (35.0)
-explains how every module sources data: a 20-module data-mode registry, a
-provider registry (the optional yfinance/FRED/delayed-quote paths are
-disabled by default, fail closed, and are never relied on in tests), an
-offline fixture registry (including the KO/PEP pairs-demo fallback that keeps
-the built-in pairs demo network-free), documented reliability rates and
-score, and a copyable Markdown/JSON reliability report. Hand-maintained
-static metadata — tests never depend on live providers, default demos have
-deterministic fallbacks, external availability is never guaranteed, and it is
-not a production data governance system.
-
-**Platform UX polish (37.0):** app-router error/loading/not-found safety
-pages (friendly recovery, no raw stack traces), an 11-group sidebar with all
-existing entries preserved, a dashboard "Suggested Starting Paths" strip,
-accessible chart labels, and visible keyboard focus on shared sliders —
-polish only; it does not prove production reliability, and the backend
-suite, typecheck, and production build remain local verification steps.
-
-The **Release Readiness, Smoke Test Matrix & QA Command Center** (36.0) helps
-prepare demos and releases: a 21-module QA registry with release-status and
-priority labels, coverage rates and a release score, a rule-based release
-decision, per-module smoke and regression checklists, the exact local
-verification commands with copy buttons, a known-limitations tracker, and
-copy-friendly release notes (Markdown/JSON). Hand-maintained static QA
-metadata — **it does not prove tests were run**; the user still runs the
-backend suite, typecheck, and production build locally; not a production
-compliance system, not investment or trading advice.
-
-## Project Docs
-
+- [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — architecture map
+- [docs/ROADMAP.md](docs/ROADMAP.md) — per-phase build log and future plans
+- [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — the honest limitations ledger
+- [docs/PORTFOLIO_LAUNCH_PACK.md](docs/PORTFOLIO_LAUNCH_PACK.md) — pitches & launch checklist
+- [docs/PUBLIC_PROJECT_SUMMARY.md](docs/PUBLIC_PROJECT_SUMMARY.md) — recruiter / quant / technical summaries
+- [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) · [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md) — live & recorded demo scripts
+- [docs/SCREENSHOT_CHECKLIST.md](docs/SCREENSHOT_CHECKLIST.md) · [docs/SCREENSHOT_PLAN.md](docs/SCREENSHOT_PLAN.md) — capture guides
+- [docs/DEPLOYMENT_READINESS.md](docs/DEPLOYMENT_READINESS.md) — what hosted deployment would still need
 - [TASKS.md](TASKS.md) — current task list
 - [LOG.md](LOG.md) — work log
 - [STOP_POINT.md](STOP_POINT.md) — latest checkpoint and next safe step

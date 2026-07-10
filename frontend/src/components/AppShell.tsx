@@ -35,6 +35,7 @@ export type View =
   | "democenter"
   | "datareliability"
   | "qacommandcenter"
+  | "portfolioshowcase"
   | "csv"
   | "builder"
   | "portfolio"

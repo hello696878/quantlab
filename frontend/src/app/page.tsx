@@ -60,6 +60,7 @@ import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
+import PortfolioShowcasePanel from "@/components/PortfolioShowcasePanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -463,6 +464,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Product Demo Center & Guided Walkthroughs",
     subtitle:
       "Guided product walkthroughs with audience and time-budget controls, a 21-module health dashboard with status and data-mode badges, a capability matrix, readiness/coverage/complexity scores, and a copy-friendly audience-tailored demo script builder (Markdown + JSON) — hand-written static demo metadata, no telemetry, no live data, not investment, trading, or compliance advice, and no module is a production trading system.",
+  },
+  portfolioshowcase: {
+    title: "QuantLab Portfolio Showcase",
+    subtitle:
+      "The public-presentation view: what the platform demonstrates (full-stack quant research platform, interactive labs, deterministic demo data, scenario/report workflow, reliability & QA readiness), the suggested demo path with deep links, grouped project highlights, copyable one-sentence/recruiter/quant/technical pitches, and the standing safety panel — static presentation copy, educational only, not investment or trading advice, not a live trading system, not production compliance infrastructure.",
   },
   qacommandcenter: {
     title: "Release Readiness & QA Command Center",
@@ -1065,6 +1071,7 @@ export default function HomePage() {
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
+    { view: "portfolioshowcase", title: "Open Portfolio Showcase", keywords: "portfolio showcase public presentation pitch recruiter quant technical demo path highlights launch pack resume interview linkedin" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1580,6 +1587,21 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("qacommandcenter"),
+    })),
+    ...(
+      [
+        ["Open Portfolio Showcase", "portfolio showcase public presentation what quantlab demonstrates demo path highlights pitches"],
+        ["Public Project Summary", "public project summary recruiter quant researcher technical architecture docs public_project_summary"],
+        ["Demo Video Script", "demo video script 60 second 3 minute 8 minute recording screen order docs demo_video_script"],
+        ["Screenshot Checklist", "screenshot checklist capture targets routes captions docs screenshot_checklist screenshot plan"],
+        ["LinkedIn Drafts", "linkedin post drafts technical quant full stack product learning recruiter docs linkedin_post_drafts"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `portfolioshowcase-${title}`,
+      group: "Portfolio Showcase",
+      title,
+      keywords,
+      run: () => handleNav("portfolioshowcase"),
     })),
     ...(
       [
@@ -2173,6 +2195,8 @@ export default function HomePage() {
         {view === "datareliability" && <DataReliabilityPanel />}
 
         {view === "qacommandcenter" && <QACommandCenterPanel />}
+
+        {view === "portfolioshowcase" && <PortfolioShowcasePanel onNav={(route) => handleNav(route as View)} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (
