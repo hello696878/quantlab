@@ -23,13 +23,27 @@ from app.experiment_catalog import (
     CatalogError,
     ExperimentCatalogFilter,
     ExperimentCatalogRow,
+    ExperimentCompatibilityGroup,
+    ExperimentLeaderboardSpec,
     build_experiment_catalog,
+    export_catalog_csv,
+    export_catalog_json,
+    export_catalog_markdown,
     filter_experiment_catalog,
+    group_compatible_runs,
     list_experiment_runs,
+    rank_experiment_catalog,
 )
 from app.experiment_catalog import catalog as catalog_module
+from app.experiment_catalog import leaderboard as leaderboard_module
 from app.experiment_catalog.catalog import _row_from_run
-from app.experiments import ExperimentError, ExperimentRun, ExperimentStore
+from app.experiments import (
+    ExperimentError,
+    ExperimentRun,
+    ExperimentStore,
+    get_best_experiment,
+)
+from app.reporting import DISCLAIMERS
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -435,3 +449,302 @@ def test_catalog_creates_no_repo_artifacts(tmp_path):
     rows = _rows(tmp_path)
     filter_experiment_catalog(rows, ExperimentCatalogFilter(model_type="ridge_regression"))
     assert _repo_snapshot() == before
+
+
+# --------------------------------------------------------------------------- #
+# hand-built rows for pure grouping / ranking / export tests
+# --------------------------------------------------------------------------- #
+
+
+def _mk_row(train_run_hash: str, *, sharpe=1.0, mse=None, **overrides) -> ExperimentCatalogRow:
+    base = dict(
+        train_run_hash=train_run_hash,
+        created_at=_T1,
+        model_type="ridge_regression",
+        task_type="regression",
+        train_start="2024-04-01",
+        train_end="2024-06-05",
+        validation_start="2024-06-06",
+        validation_end="2024-09-15",
+        feature_columns=_FEATURES,
+        label_column="label__forward_return_1",
+        n_oos_rows=70,
+        n_scored_rows=68,
+        metrics={"sharpe": sharpe, "mse": mse},
+        baseline_metrics={"no_trade": {"sharpe": 0.0, "total_return": 0.0}},
+        artifact_dir=train_run_hash,
+        git_commit=None,
+        code_version=None,
+        continuous_config_hash="cch",
+        feature_config_hash="fch",
+        label_config_hash="lch",
+        dataset_config_hash="dch",
+        model_config_hash="mch",
+    )
+    base.update(overrides)
+    return ExperimentCatalogRow(**base)
+
+
+# --------------------------------------------------------------------------- #
+# compatibility grouping
+# --------------------------------------------------------------------------- #
+
+
+def test_group_compatible_runs_deterministic_ids_and_member_order():
+    r_zz = _mk_row("zz")
+    r_aa = _mk_row("aa")
+    r_shifted = _mk_row("mm", validation_end="2024-09-30")
+    groups = group_compatible_runs([r_zz, r_aa, r_shifted])
+
+    assert [g.group_id for g in groups] == ["group_0000", "group_0001"]
+    # groups ordered by sorted key: 2024-09-15 window sorts before 2024-09-30
+    assert groups[0].validation_end == "2024-09-15"
+    assert groups[1].validation_end == "2024-09-30"
+    # members preserve incoming row order (zz before aa), not hash order
+    assert groups[0].train_run_hashes == ("zz", "aa")
+    assert groups[1].train_run_hashes == ("mm",)
+    # deterministic across calls
+    assert group_compatible_runs([r_zz, r_aa, r_shifted]) == groups
+
+
+def test_group_key_includes_task_type():
+    r_reg = _mk_row("aa")
+    r_cls = _mk_row("bb", task_type="classification")
+    groups = group_compatible_runs([r_reg, r_cls])
+    assert len(groups) == 2  # stricter than the Phase 10 guard key
+
+
+def test_two_validation_windows_produce_two_groups(tmp_path):
+    # store-backed rows: run_b differs by label, run_c by window/task -> 3 groups
+    rows = _rows(tmp_path)
+    groups = group_compatible_runs(rows)
+    assert len(groups) == 3
+    assert [g.group_id for g in groups] == ["group_0000", "group_0001", "group_0002"]
+
+
+def test_group_uses_persisted_fields_only():
+    group = group_compatible_runs([_mk_row("aa")])[0]
+    assert isinstance(group, ExperimentCompatibilityGroup)
+    for absent in ("root_symbol", "source", "raw_data_version_hash"):
+        assert not hasattr(group, absent)
+
+
+def test_group_empty_input_yields_empty_list():
+    assert group_compatible_runs([]) == []
+
+
+# --------------------------------------------------------------------------- #
+# leaderboard spec + ranking
+# --------------------------------------------------------------------------- #
+
+
+def test_leaderboard_spec_validation():
+    with pytest.raises(CatalogError):
+        ExperimentLeaderboardSpec(metric="")
+    with pytest.raises(CatalogError):
+        ExperimentLeaderboardSpec(top_n=0)
+    with pytest.raises(CatalogError):
+        ExperimentLeaderboardSpec(top_n=-3)
+    with pytest.raises(CatalogError):
+        ExperimentLeaderboardSpec(on_missing_metric="drop")
+
+
+def test_rank_maximize_and_minimize():
+    rows = [_mk_row("aa", sharpe=0.5), _mk_row("bb", sharpe=1.5), _mk_row("cc", sharpe=0.9)]
+    top = rank_experiment_catalog(rows, ExperimentLeaderboardSpec(metric="sharpe"))
+    assert [r.train_run_hash for r in top] == ["bb", "cc", "aa"]
+    low = rank_experiment_catalog(
+        rows, ExperimentLeaderboardSpec(metric="sharpe", maximize=False)
+    )
+    assert [r.train_run_hash for r in low] == ["aa", "cc", "bb"]
+
+
+def test_rank_top_n():
+    rows = [_mk_row("aa", sharpe=0.5), _mk_row("bb", sharpe=1.5), _mk_row("cc", sharpe=0.9)]
+    top2 = rank_experiment_catalog(rows, ExperimentLeaderboardSpec(metric="sharpe", top_n=2))
+    assert [r.train_run_hash for r in top2] == ["bb", "cc"]
+
+
+def test_rank_tie_break_by_train_run_hash():
+    rows = [_mk_row("zz", sharpe=1.0), _mk_row("aa", sharpe=1.0)]
+    for maximize in (True, False):
+        ranked = rank_experiment_catalog(
+            rows, ExperimentLeaderboardSpec(metric="sharpe", maximize=maximize)
+        )
+        assert [r.train_run_hash for r in ranked] == ["aa", "zz"]
+
+
+def test_rank_missing_metric_exclude():
+    rows = [_mk_row("aa", sharpe=None), _mk_row("bb", sharpe=1.5)]
+    ranked = rank_experiment_catalog(rows, ExperimentLeaderboardSpec(metric="sharpe"))
+    assert [r.train_run_hash for r in ranked] == ["bb"]  # aa dropped deterministically
+
+
+def test_rank_metric_unavailable_for_all_fails():
+    rows = [_mk_row("aa", sharpe=None), _mk_row("bb", sharpe=None)]
+    with pytest.raises(CatalogError):
+        rank_experiment_catalog(rows, ExperimentLeaderboardSpec(metric="sharpe"))
+
+
+def test_rank_missing_metric_fail_mode():
+    rows = [_mk_row("aa", sharpe=1.0), _mk_row("bb", sharpe=None)]
+    with pytest.raises(CatalogError):
+        rank_experiment_catalog(
+            rows, ExperimentLeaderboardSpec(metric="sharpe", on_missing_metric="fail")
+        )
+
+
+def test_rank_metric_not_in_selection_fails():
+    rows = [_mk_row("aa")]
+    with pytest.raises(CatalogError):
+        rank_experiment_catalog(rows, ExperimentLeaderboardSpec(metric="accuracy"))
+
+
+def test_rank_require_compatible_single_group_ok():
+    rows = [_mk_row("aa", sharpe=0.5), _mk_row("bb", sharpe=1.5)]
+    ranked = rank_experiment_catalog(
+        rows, ExperimentLeaderboardSpec(metric="sharpe", require_compatible=True)
+    )
+    assert [r.train_run_hash for r in ranked] == ["bb", "aa"]
+
+
+def test_rank_require_compatible_mixed_groups_fails():
+    rows = [_mk_row("aa"), _mk_row("bb", validation_end="2024-09-30")]
+    with pytest.raises(CatalogError):
+        rank_experiment_catalog(
+            rows, ExperimentLeaderboardSpec(metric="sharpe", require_compatible=True)
+        )
+
+
+def test_rank_empty_input_fails():
+    with pytest.raises(CatalogError):
+        rank_experiment_catalog([], ExperimentLeaderboardSpec())
+
+
+def test_rank_top1_parity_with_get_best_experiment(tmp_path):
+    store = _store_with_three_runs(tmp_path)
+    rows = build_experiment_catalog(store)
+    for maximize in (True, False):
+        best_run = get_best_experiment(
+            store=store, metric="sharpe", maximize=maximize, allow_different_windows=True
+        )
+        ranked = rank_experiment_catalog(
+            rows, ExperimentLeaderboardSpec(metric="sharpe", maximize=maximize, top_n=1)
+        )
+        assert ranked[0].train_run_hash == best_run.train_run_hash
+
+
+# --------------------------------------------------------------------------- #
+# exporters
+# --------------------------------------------------------------------------- #
+
+
+def test_export_csv_deterministic_and_stable_columns(tmp_path):
+    rows = _rows(tmp_path)
+    text = export_catalog_csv(rows)
+    assert export_catalog_csv(rows) == text  # deterministic across calls
+    header = text.splitlines()[0]
+    assert header.startswith(
+        "train_run_hash,created_at,model_type,task_type,label_column,"
+        "train_start,train_end,validation_start,validation_end,feature_columns,"
+        "n_oos_rows,n_scored_rows,artifact_dir,git_commit,code_version,"
+        "dataset_config_hash"
+    )
+    # sorted metric columns + sorted flattened baseline columns
+    assert "accuracy" in header and "sharpe" in header
+    assert "baseline__no_trade__sharpe" in header
+    assert len(text.strip().splitlines()) == 4  # header + 3 rows
+    # unavailable values are empty cells (run_b has git_commit=None)
+    row_b = next(line for line in text.splitlines() if line.startswith("run_b"))
+    assert ",," in row_b
+
+
+def test_export_json_deterministic_and_strict(tmp_path):
+    rows = _rows(tmp_path)
+    text = export_catalog_json(rows)
+    assert export_catalog_json(rows) == text
+    assert "NaN" not in text and "Infinity" not in text
+    payload = json.loads(text)
+    json.dumps(payload, allow_nan=False)  # strict re-serialization
+    assert payload["disclaimers"] == list(DISCLAIMERS)
+    assert [r["train_run_hash"] for r in payload["rows"]] == ["run_c", "run_a", "run_b"]
+    assert isinstance(payload["rows"][0]["feature_columns"], list)
+    # unavailable values are null in JSON
+    row_b = next(r for r in payload["rows"] if r["train_run_hash"] == "run_b")
+    assert row_b["git_commit"] is None
+
+
+def test_export_markdown_deterministic_with_disclaimers(tmp_path):
+    rows = _rows(tmp_path)
+    text = export_catalog_markdown(rows)
+    assert export_catalog_markdown(rows) == text
+    assert text.startswith("# Experiment Catalog")
+    assert "| train_run_hash |" in text
+    assert "## Disclaimers" in text
+    for line in DISCLAIMERS:
+        assert line in text
+
+
+def test_exporters_no_absolute_paths_or_advice_language(tmp_path):
+    rows = _rows(tmp_path)
+    for text in (
+        export_catalog_csv(rows),
+        export_catalog_json(rows),
+        export_catalog_markdown(rows),
+    ):
+        assert ":\\" not in text and "C:/" not in text
+        assert tmp_path.name not in text
+        assert "NaN" not in text and "Infinity" not in text
+        lowered = text.lower()
+        for token in ("buy", "sell", "allocate", "deploy"):
+            assert token not in lowered, f"advice-like token {token!r} leaked into export"
+
+
+# --------------------------------------------------------------------------- #
+# leaderboard module guard rails
+# --------------------------------------------------------------------------- #
+
+
+def test_leaderboard_module_has_no_forbidden_imports():
+    src = Path(leaderboard_module.__file__).read_text(encoding="utf-8")
+    forbidden = [
+        "import requests",
+        "urllib",
+        "httpx",
+        "aiohttp",
+        "socket",
+        "yfinance",
+        "ibkr",
+        "sklearn",
+        "xgboost",
+        "lightgbm",
+        "torch",
+        "tensorflow",
+    ]
+    for token in forbidden:
+        assert token not in src, f"leaderboard.py must not reference {token!r}"
+
+
+def test_leaderboard_module_respects_layer_boundaries():
+    src = Path(leaderboard_module.__file__).read_text(encoding="utf-8")
+    for token in (
+        "app.local_pipeline",
+        "app.batch_experiments",
+        "run_local_futures_ml_experiment",
+        "train_model",
+        "build_feature_matrix",
+        "build_label_matrix",
+        "ExperimentStore",  # pure over rows: no store reads in this module
+    ):
+        assert token not in src, f"leaderboard.py must not reference {token!r}"
+    for token in ("hashlib", "sha256", "compute_config_hash"):
+        assert token not in src, f"leaderboard.py must not reference {token!r}"
+
+
+def test_leaderboard_creates_no_repo_artifacts(tmp_path):
+    before = _repo_snapshot()
+    rows = _rows(tmp_path)
+    groups = group_compatible_runs(rows)
+    rank_experiment_catalog(rows, ExperimentLeaderboardSpec(metric="sharpe"))
+    export_catalog_csv(rows), export_catalog_json(rows), export_catalog_markdown(rows)
+    assert groups and _repo_snapshot() == before
