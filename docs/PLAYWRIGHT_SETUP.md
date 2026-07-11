@@ -68,9 +68,10 @@ written by the harness.
 
 - **First run against a freshly started dev server is slow / used to flake** —
   `next dev` compiles pages on demand and hydrates slowly on the first
-  request. The harness waits for real interactivity (the header API chip
-  resolving to ONLINE/OFFLINE is its hydration witness) with generous
-  budgets, so a cold first run just takes longer; it should not fail. If it
+  request. The harness waits for real interactivity (the mounted TopBar
+  clock rendering HH:MM:SS is its hydration witness — independent of backend
+  health) with generous budgets, so a cold first run just takes longer; it
+  should not fail. If it
   ever does, re-read the failure message — `gotoView` errors include the
   current URL, h1, and visible buttons.
 - **Prod-mode (:3100) pages render unstyled / tests fail in setup** — `next
