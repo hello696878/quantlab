@@ -1055,3 +1055,136 @@ def test_cli_no_advice_language_in_source_or_output(tmp_path, capsys):
     out = capsys.readouterr().out.lower()
     for token in ("buy", "sell", "allocate", "deploy"):
         assert token not in out, f"advice-like token {token!r} in CLI output"
+
+
+# --------------------------------------------------------------------------- #
+# integrated end-to-end: Phase 9/11 runs -> catalog CLI -> Phase 10 comparison
+# --------------------------------------------------------------------------- #
+
+
+def test_e2e_catalog_over_real_runs(tmp_path, capsys):
+    """Full Phase 12 path over real persisted runs: synthetic ES raw store ->
+    Phase 11 batch (3 seed-varied Phase 9 runs) saved to a tmp ExperimentStore ->
+    catalog CLI list / leaderboard / hashes / export-json -> bare hashes ->
+    Phase 10 comparison under its strict guard.  Everything under `tmp_path`."""
+    import re
+
+    from app.batch_experiments import expand_grid, run_local_experiment_batch
+    from app.datastore.store import RawFuturesStore
+    from app.local_pipeline import LocalExperimentConfig
+    from app.reporting import compare_experiment_runs
+    from app.research_cli.config import ExperimentConfig
+    from app.research_cli.synthetic import generate_synthetic_es_raw
+
+    repo_before = _repo_snapshot()
+
+    # --- real Phase 9/11 runs saved under tmp_path ----------------------------- #
+    raw_store = RawFuturesStore(tmp_path / "raw", prefer_parquet=False)
+    raw_store.write_raw(generate_synthetic_es_raw(ExperimentConfig()))
+    exp_store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    configs = expand_grid(
+        LocalExperimentConfig(source="synthetic"), {"random_seed": [0, 1, 2]}
+    )
+    batch = run_local_experiment_batch(raw_store, configs, experiment_store=exp_store)
+    assert batch.n_ok == 3
+
+    cli = _load_catalog_cli()
+    store_arg = str(exp_store.base_dir)
+
+    # --- catalog discovers the saved runs -------------------------------------- #
+    rows = build_experiment_catalog(exp_store)
+    assert len(rows) >= 3
+    assert {r.train_run_hash for r in rows} == set(batch.train_run_hashes)
+    for row in rows:
+        assert row.artifact_dir == row.train_run_hash  # relative / store-safe
+        for absent in ("root_symbol", "source", "raw_data_version_hash"):
+            assert not hasattr(row, absent)  # not invented
+
+    # --- read-only CLI subcommands write nothing at all ------------------------ #
+    tree_before = _tree_snapshot(tmp_path)
+    assert cli.main(["list", "--artifacts-dir", store_arg, "--no-parquet"]) == 0
+    list_out = capsys.readouterr().out
+    assert "RESULT: OK" in list_out and "n_rows=3" in list_out
+
+    assert (
+        cli.main(
+            ["leaderboard", "--artifacts-dir", store_arg, "--no-parquet",
+             "--metric", "sharpe", "--maximize"]
+        )
+        == 0
+    )
+    lb_out = capsys.readouterr().out
+    assert "RESULT: OK" in lb_out
+    # CLI ranking matches the in-process ranking (deterministic by metric + hash)
+    ranked = rank_experiment_catalog(rows, ExperimentLeaderboardSpec(metric="sharpe"))
+    for position, row in enumerate(ranked, start=1):
+        assert f"#{position} train_run_hash={row.train_run_hash}" in lb_out
+
+    assert cli.main(["hashes", "--artifacts-dir", store_arg, "--no-parquet"]) == 0
+    hashes_out = capsys.readouterr().out
+    assert "RESULT: OK" in hashes_out
+    # bare hash lines are extractable (the only unprefixed lines)
+    bare = [ln for ln in hashes_out.splitlines() if re.fullmatch(r"[0-9a-f]{16,}", ln)]
+    assert sorted(bare) == sorted(batch.train_run_hashes)
+
+    assert _tree_snapshot(tmp_path) == tree_before  # nothing written by any of the above
+
+    # --- compatibility: grouping is at least as strict as the Phase 10 guard --- #
+    groups = group_compatible_runs(rows)
+    assert len(groups) == 1  # same windows / label / dataset / task across seeds
+    comparison_rows = compare_experiment_runs(bare, store=exp_store)  # strict guard passes
+    assert sorted(r.train_run_hash for r in comparison_rows) == sorted(bare)
+
+    # --- export-json only at the explicit output path -------------------------- #
+    out_path = tmp_path / "reports" / "catalog.json"
+    assert (
+        cli.main(
+            ["export-json", "--artifacts-dir", store_arg, "--no-parquet",
+             "--output-path", str(out_path)]
+        )
+        == 0
+    )
+    export_out = capsys.readouterr().out
+    assert f"[EXPORT] path={out_path}" in export_out
+    assert [p.name for p in (tmp_path / "reports").iterdir()] == ["catalog.json"]
+
+    text = out_path.read_text(encoding="utf-8")
+    assert "NaN" not in text and "Infinity" not in text
+    payload = json.loads(text)
+    json.dumps(payload, allow_nan=False)  # strict re-serialization
+    assert len(payload["rows"]) == 3
+    assert ":\\" not in text and tmp_path.name not in text  # no path leakage
+
+    # --- layer guards over the three Phase 12 sources -------------------------- #
+    catalog_src = Path(catalog_module.__file__).read_text(encoding="utf-8")
+    leaderboard_src = Path(leaderboard_module.__file__).read_text(encoding="utf-8")
+    cli_src = Path(_CATALOG_CLI_PATH).read_text(encoding="utf-8")
+    forbidden = (
+        "import requests", "urllib", "httpx", "aiohttp", "socket",
+        "yfinance", "ibkr", "sklearn", "xgboost", "lightgbm", "torch", "tensorflow",
+    )
+    ml_internals = (
+        "app.local_pipeline", "app.batch_experiments", "run_local_futures_ml_experiment",
+        "train_model", "build_feature_matrix", "build_label_matrix",
+    )
+    for name, src in (
+        ("catalog.py", catalog_src),
+        ("leaderboard.py", leaderboard_src),
+        ("CLI", cli_src),
+    ):
+        for token in forbidden:
+            assert token not in src, f"{name} must not reference {token!r}"
+        for token in ml_internals:
+            assert token not in src, f"{name} must not reference {token!r}"
+        for token in ("hashlib", "sha256", "compute_config_hash"):
+            assert token not in src, f"{name} must not hash ({token!r})"
+
+    # --- no advice language anywhere in the collected outputs ------------------ #
+    all_out = (list_out + lb_out + hashes_out + export_out + text).lower()
+    for token in ("buy", "allocate", "deploy"):
+        assert token not in all_out
+    # 'sell' checked word-wise: real train_run_hash hex can contain the substring
+    assert not re.search(r"\bsell\b", all_out)
+
+    # --- repo root untouched ---------------------------------------------------- #
+    assert _repo_snapshot() == repo_before

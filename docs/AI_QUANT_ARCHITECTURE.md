@@ -3740,9 +3740,9 @@ override the JSON `on_error`.
 
 ## Appendix M — Phase 12 Local ExperimentStore Catalog / Leaderboard Plan
 
-> **Status: design only (Phase 12 not implemented).** Sections M.1–M.12 are the
-> approved plan; **no code, script, test, data, or artifact exists yet.** Phase 12
-> is a **read-only catalog / leaderboard layer** over existing `ExperimentStore`
+> **Status: as-built (Phase 12 shipped, Commits 0–4).** Sections M.1–M.12 are the
+> approved design; **§M.13 records the shipped result.** Phase 12 is a
+> **read-only catalog / leaderboard layer** over existing `ExperimentStore`
 > artifacts: discover saved runs, build deterministic rows, filter, group
 > compatible runs, rank by one metric, and export — without manually copying every
 > `train_run_hash`. It **runs nothing, retrains nothing, writes nothing** (the
@@ -4065,3 +4065,137 @@ exclusive), `--top-n`, `--require-compatible`, `--on-missing-metric`.
 | **Adding implicit writes** | the package performs **no file writes at all**; the CLI writes only via `export-*` to `--output-path`; tests verify read-only subcommands write nothing |
 | **Frontend / dashboard scope creep** | CLI + strings only; no server, no routes, no HTML |
 | **Adding new hash identities unnecessarily** | the catalog mints **no hash of any kind** — no `hashlib` / `sha256` / manifest fingerprint; identity remains the existing `train_run_hash` (guard-tested) |
+
+### M.13 As-built (Phase 12 shipped)
+
+Implemented across Commits 1–3 exactly as designed above; tests are synthetic +
+`tmp_path` only, no network, and the full backend suite stays green.
+
+**Shipped components**
+
+- `backend/app/experiment_catalog/__init__.py` — package exports (catalog core +
+  leaderboard / grouping / exporters).
+- `backend/app/experiment_catalog/catalog.py` — `CatalogError`,
+  `ExperimentCatalogRow` (frozen, 22 stable fields: identity, ISO windows,
+  columns, counts, sanitized `metrics` / `baseline_metrics` with `NaN` / `inf` →
+  `null`, store-relative `artifact_dir`, the five persisted config hashes),
+  `ExperimentCatalogFilter` (construction-validated exact-match / threshold /
+  `created_at`-range constraints), `list_experiment_runs` (thin delegation to the
+  existing `list_experiments`), `build_experiment_catalog` (default metric keys =
+  the existing `DEFAULT_COMPARE_METRICS`; `CatalogError` on an empty store), and
+  `filter_experiment_catalog` (pure, order-preserving; a `require_metric` outside
+  the selected keys fails clearly instead of returning a silent empty result).
+  It imports only the Phase 5 experiments package — not the reporting layer.
+- `backend/app/experiment_catalog/leaderboard.py` — `ExperimentLeaderboardSpec`,
+  `ExperimentCompatibilityGroup` + `group_compatible_runs` (7-field key:
+  train / validation windows, `label_column`, `dataset_config_hash`, `task_type`
+  — a strict superset of the Phase 10 comparison guard; `group_0000` ids by
+  sorted key; members keep catalog order), `rank_experiment_catalog` (ordering
+  and hash tie-break **identical to the existing `get_best_experiment`**, pinned
+  by a top-1 parity test in both directions), and the string-returning
+  `export_catalog_csv / _json / _markdown` (fixed identity columns + sorted
+  metric / flattened baseline columns; JSON and Markdown carry the Phase 10
+  `DISCLAIMERS`, CSV stays a bare table, matching the existing export style).
+- `scripts/catalog_local_futures_experiments.py` — thin argparse CLI
+  (`list` / `leaderboard` / `groups` / `hashes` / `export-csv` / `export-json` /
+  `export-markdown`; common filter flags on every subcommand).
+- `backend/tests/test_experiment_catalog.py` — 79 tests (rows / discovery /
+  filters, grouping / ranking / exporters, CLI, guard rails, and one integrated
+  end-to-end pass over real Phase 9 / 11 runs feeding Phase 10 comparison).
+
+**CLI usage**
+
+```bat
+cd C:\quantlab
+```
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\catalog_local_futures_experiments.py list ^
+  --artifacts-dir artifacts\experiments
+
+.\backend\venv\Scripts\python.exe .\scripts\catalog_local_futures_experiments.py leaderboard ^
+  --artifacts-dir artifacts\experiments ^
+  --metric sharpe ^
+  --maximize ^
+  --top-n 10
+
+.\backend\venv\Scripts\python.exe .\scripts\catalog_local_futures_experiments.py groups ^
+  --artifacts-dir artifacts\experiments
+
+.\backend\venv\Scripts\python.exe .\scripts\catalog_local_futures_experiments.py hashes ^
+  --artifacts-dir artifacts\experiments ^
+  --model-type ridge_regression ^
+  --require-metric sharpe
+
+.\backend\venv\Scripts\python.exe .\scripts\catalog_local_futures_experiments.py export-csv ^
+  --artifacts-dir artifacts\experiments ^
+  --metric sharpe ^
+  --top-n 10 ^
+  --output-path reports\catalog_leaderboard.csv
+
+.\backend\venv\Scripts\python.exe .\scripts\catalog_local_futures_experiments.py export-json ^
+  --artifacts-dir artifacts\experiments ^
+  --output-path reports\catalog.json
+
+.\backend\venv\Scripts\python.exe .\scripts\catalog_local_futures_experiments.py export-markdown ^
+  --artifacts-dir artifacts\experiments ^
+  --output-path reports\catalog.md
+```
+
+Common filter flags (every subcommand): `--model-type`, `--task-type`,
+`--label-column`, `--train-start` / `--train-end`,
+`--validation-start` / `--validation-end`, `--feature-columns` (comma-separated),
+`--features-as-set`, `--require-metric`, `--metric-min` / `--metric-max`,
+`--created-after` / `--created-before`, `--no-parquet`.  Ranking flags
+(`leaderboard` / `hashes` / `export-*`): `--metric`,
+`--maximize` / `--minimize` (mutually exclusive), `--top-n`,
+`--require-compatible`, `--on-missing-metric`; `leaderboard` always ranks
+(default `sharpe`, maximize), while `hashes` / `export-*` keep catalog discovery
+order unless a ranking flag is given.
+
+**Behavior**
+
+- **Read-only over existing `ExperimentStore` artifacts** — no experiment
+  execution, no retraining, no Phase 9 pipeline calls, no Phase 11 batch runner
+  calls.
+- **Deterministic** discovery (inherited `(created_at, train_run_hash)` order),
+  filtering (pure, order-preserving), compatibility grouping (sorted 7-field key,
+  `group_0000` ids), ranking (metric direction, then `train_run_hash`), and
+  CSV / JSON / Markdown exporters (byte-stable across calls).
+- **Read-only subcommands write nothing** (test: not a single new file);
+  **`export-*` writes only to the explicit `--output-path`** (parent created).
+  Prints `[EXPORT] path=...`.
+- **`hashes` output is intended for Phase 10 comparison** — consumers should use
+  the **bare hash lines only** (the banner and `RESULT:` lines are the only
+  non-hash lines).
+- **`root_symbol` / `source` / `raw_data_version_hash` are not invented** — they
+  are not persisted by `ExperimentRun` and do not appear in rows, groups, or
+  exports.
+- **Missing metrics default to excluding those rows, but fail clearly if no row
+  has the requested metric**; `--on-missing-metric fail` raises on the first
+  missing value.
+- **`--require-compatible` fails clearly for mixed groups** — never a silent
+  cross-window ranking; hashes handed to Phase 10 still pass its unchanged guard.
+- **The leaderboard is descriptive only** — a sorted table of historical local
+  metrics; no selection advice, no automatic deployment.
+- **`RESULT: OK` / `RESULT: FAIL (...)`** with matching exit code; expected
+  failures (empty store, no rows after filtering, unavailable metric, corrupt
+  metadata) exit nonzero without stack traces.
+
+**Known limitations**
+
+- **Not a hyperparameter optimizer**; **no adaptive search**; **no parallel
+  experiment execution**.
+- **No vendor / download / live data**; **no real-money trading**;
+  **no frontend / dashboard**; **no Research CLI real-data mode**.
+- **No new metrics, model families, or backtest engine**; **no new feature /
+  label logic**; **no new `ExperimentRun` schema fields**; **no new hash
+  identities**.
+- The CLI builds the catalog with the existing default metric keys
+  (`DEFAULT_COMPARE_METRICS`); ranking or filtering by a metric outside that set
+  fails with a clear "rebuild the catalog with it included" message (no
+  `--metrics` selection flag yet — deliberately thin).
+- **Comparison hashes still pass through the Phase 10 guard** — the catalog
+  never bypasses or re-implements it.
+- Local / synthetic results are **not investment advice** and **not a live
+  performance guarantee**.

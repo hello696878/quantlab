@@ -417,13 +417,16 @@ that phase, not here.
 > **no new ML models / features / labels / backtest logic**. See
 > `docs/AI_QUANT_ARCHITECTURE.md` **Appendix L (§L.13 as-built)** for details.
 >
-> **Planned (Phase 12, design only):** a **local read-only ExperimentStore
-> catalog / leaderboard** over saved experiment artifacts — discover, filter, group
-> compatible runs, rank by one metric, and export CSV / JSON / Markdown, feeding
-> selected `train_run_hash`es into the existing Phase 10 comparison. It runs and
-> retrains nothing, and adds **no vendor fetch (I5), no live data, and no real-data
-> acquisition** (all remain out of scope and **not implemented**). See
-> `docs/AI_QUANT_ARCHITECTURE.md` **Appendix M** for the design.
+> **Implemented (Phase 12, 2026-07-12):** a **local read-only ExperimentStore
+> catalog / leaderboard** over saved experiment artifacts now exists —
+> `backend/app/experiment_catalog/` + `scripts/catalog_local_futures_experiments.py`
+> discover, filter, group compatible runs, rank by one metric, and export
+> deterministic CSV / JSON / Markdown (only to explicit output paths), feeding
+> selected `train_run_hash`es into the existing Phase 10 comparison (its guard
+> unchanged). It runs and retrains nothing, and adds **no vendor fetch (I5), no
+> live data, and no real-data acquisition** (all remain out of scope and **not
+> implemented**). See `docs/AI_QUANT_ARCHITECTURE.md` **Appendix M (§M.13
+> as-built)** for details.
 
 ### Ingestion Phase 5 (I5) — real vendor integration
 
