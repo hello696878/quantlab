@@ -38,3 +38,24 @@ cards, and a command-palette shot (Ctrl/Cmd+K over any lab).
 After capturing, update the status column thinking in
 [`SCREENSHOT_PLAN.md`](SCREENSHOT_PLAN.md) and reference the images from the
 README or portfolio page as needed.
+
+## Release-evidence captures (Phase 42.2)
+
+The release-gate verification (see
+[`BROWSER_SMOKE_TEST_REPORT.md`](BROWSER_SMOKE_TEST_REPORT.md)) confirmed
+these states render correctly in **production mode** (`npm run build` +
+`next start`), but the in-session browser tooling **cannot export image
+files** — and no browser-testing dependency is added just for screenshots.
+So these five captures are **manual** (same rules as above; PNG into
+`docs/screenshots/`):
+
+| # | Capture | Exact setup | File name suggestion |
+|---|---|---|---|
+| R1 | Landing at 1440 px | Fresh load of `/`, API **ONLINE**, hero + Global Markets strip visible | `release_landing_1440.png` |
+| R2 | Scenario Studio data-rich | Select "Severe Cross-Asset Stress Combo" → severity 100.0, all-red heatmap | `release_scenario_studio.png` |
+| R3 | Home at 1024 px | Devtools width 1024; scroll to the Feature Map (badges must sit inside their cards) | `release_home_1024.png` |
+| R4 | Home at 768 px | Devtools width 768; header wraps (controls under title), market chips show full % values | `release_home_768.png` |
+| R5 | Pairs backtest result | Backtest → Pairs Trading (KO/PEP defaults) → Run; 119 trades, 4 charts, performance summary incl. the honest −23.0% vs B&H | `release_pairs_backtest.png` |
+
+R3/R4 double as the regression record for the Phase 42.1 responsive fixes —
+if a badge escapes its card or a chip clips its value, the fix regressed.

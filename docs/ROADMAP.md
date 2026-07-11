@@ -1677,6 +1677,113 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 42.2 — Final Release Gates & Production Build Verification ✅
+
+- **Test-count discrepancy explained:** Phase 41 ran 2,967 green *before*
+  the YM work landed; Phase 42.0 collected 2,968 (2,967 + the new
+  `test_build_local_continuous_futures_ym.py`, which passes) with 4 failures
+  — all four were folder-aggregate futures tests that normalized the **live**
+  fixtures folder (recursive CSV discovery), so the untracked-but-intended
+  `ym_roll.csv` fixture broke their exact ES+NQ counts.
+- **Path-isolation fix (test-only, no production code, no assertion
+  weakened):** `test_normalize_local_futures_csv.py`,
+  `test_report_local_futures_csv.py`, and
+  `test_run_local_futures_buyhold_report.py` now stage exactly
+  `esm25.csv` + `nqm25.csv` into an isolated tmp dir before normalizing —
+  aggregate tests no longer depend on the developer's working tree, and any
+  future fixture added to the shared folder cannot break them. `ym_roll.csv`
+  and the YM end-to-end test are untouched and green.
+- **Authoritative verification:** full suite **2,968 passed / 0 failed /
+  0 skipped in 241.55s, exit 0**, `artifacts\` absent before/after;
+  `npx tsc --noEmit` exit 0; **`npm run build` exit 0, no warnings**
+  (routes `/`, `/_not-found`, `/globe ƒ`).
+- **Production-mode browser smoke** (`next start --port 3100` against the
+  real backend): landing, nav, Scenario Studio roundtrip, deterministic
+  pairs KO/PEP backtest (identical results to dev), saved-work empty state —
+  all 200s, no StrictMode aborts in prod; Phase 42.1 responsive fixes
+  re-verified at 1440/1024/768 in production. Dev servers restored after.
+- `SCREENSHOT_CHECKLIST.md` gained the five release-evidence captures with
+  exact manual setup (automated image export isn't possible with existing
+  tooling, and no browser-testing dependency was added for it);
+  `BROWSER_SMOKE_TEST_REPORT.md` gained the 42.2 addendum.
+
+### Phase 42.1 — First Browser-Based End-to-End Smoke Test ✅
+
+- **Test-and-fix pass, not a feature phase:** the running app was exercised
+  end-to-end in a real browser against the live dev servers — all 37 sidebar
+  views audited (titles, content, NaN scan, overflow, error states), plus the
+  frozen demo route, the Scenario Studio analyze roundtrip (severity
+  11.3 → 100.0 on template flip), a Crypto Derivatives slider roundtrip
+  (request/response verified), and a full Pairs KO/PEP backtest (119 trades,
+  4 charts, honest negative metrics) on the network-free fixture — no live
+  provider touched. Full evidence record:
+  `docs/BROWSER_SMOKE_TEST_REPORT.md`.
+- **Three confirmed responsive defects fixed (CSS-only, no logic changes):**
+  dashboard card badges overflowing at 1024 (`HomeDashboard.tsx` title rows
+  wrap + badges truncate), the TopBar squeezing titles to ~140 px at 768
+  (`TopBar.tsx` `max-lg:flex-wrap` + `max-lg:line-clamp-2`; desktop verified
+  unchanged after an initial unconditional-wrap attempt regressed 1440 and
+  was corrected), and Global Markets chips clipping values at 768 (markets
+  grid 2-col until `lg`). All re-verified at 1440/1024/768 with DOM geometry
+  probes; `npx tsc --noEmit` clean.
+- No backend changes; no quantitative logic, formulas, API contracts, or
+  fixtures touched.
+
+### Phase 42.0 — Public Release Candidate, Final Smoke Runbook & Demo Freeze v1 ✅
+
+- **Public-readiness phase (no new financial model): the final manual
+  verification layer before QuantLab is shared publicly.** Public portfolio
+  readiness only — not a production certification; no check is claimed as
+  passed anywhere in the new material (every status starts at "Not yet run"
+  and only fills in with user-run evidence).
+- **Six docs:** `PUBLIC_RELEASE_CANDIDATE.md` (what the RC includes/excludes,
+  nine required user-run checks, a status table with Owner/Status/Evidence
+  columns and an explicit "no assumed passed" vocabulary);
+  `FINAL_SMOKE_TEST_RUNBOOK.md` (the hands-on pass: start backend/frontend,
+  dashboard, nine workflow pages, fifteen core labs, a 12-point per-page
+  checklist, responsive smoke at 3 widths, final commands, evidence
+  collection — deliberately human, no browser automation);
+  `DEMO_FREEZE_CHECKLIST.md` (freeze date/commit/tag placeholders, frozen
+  7-stop demo route, screenshot/video/LinkedIn/docs final checks, a
+  do-not-change list and the five allowed last-minute fixes);
+  `PUBLIC_LAUNCH_READINESS.md` (ten readiness areas + final user-run checks
+  + a Ready/Needs fix/Defer decision table);
+  `KNOWN_LIMITATIONS_PUBLIC.md` (the public-facing limitations, honest and
+  unapologetic, including "not audited" and the fail-closed provider story);
+  `FINAL_DEMO_SCRIPT.md` (90-second / 3-minute / 7-minute scripts over the
+  same route spine, per-page say/click/capture beats, a what-NOT-to-say
+  list, closing lines for GitHub/LinkedIn/interview).
+- **Frontend Public Release Candidate page** (view `publicreleasecandidate`,
+  Product Workflow group after the Release Notes Center) — static
+  frontend-only reference copy like the Showcase/Onboarding/Release pages:
+  version/tag cards, five RC status cards (statuses like "Manual — not yet
+  run", never "passed"), the frozen demo route with deep links, the smoke
+  checklist, public limitations, a copyable final pitch, and the six doc
+  paths. Wired into Sidebar, Dashboard card ("Final check" badge), title
+  registry, and Command Palette (Open Public Release Candidate + one entry
+  per doc).
+- **`scripts/print_public_release_candidate.ps1`** — print-only: branch,
+  latest commit, `VERSION` label, the six RC doc paths with found/missing
+  tags, the user-run verification commands, and a tag command TEMPLATE;
+  never tags, pushes, builds, tests, installs, deletes, or calls any API.
+  Parser-validated (0 errors) and executed once to verify output.
+- **Consistency pass:** README project-docs list gained the six RC links;
+  `RELEASE_CHECKLIST.md` §5/§8 now route public milestones through the RC
+  layer; `PORTFOLIO_LAUNCH_PACK.md` §14 points at the RC flow;
+  `PROJECT_SNAPSHOT.md` refreshed (Phase 42.0, doc inventory, readiness);
+  `VERSION` reconciled `4.58.0-dev` → `4.60.0-dev` (two review tags had
+  landed since it was written — latest verified tag
+  `v4.59.0-ci-preflight-repo-hygiene-security-sweep-v1`, 106 local tags);
+  `VERSION_MANIFEST.md` §1–2 and the Release Notes Center constants/cards
+  updated to match; `CHANGELOG.md` stale "Unreleased" (v4.58 content, since
+  tagged) moved under grouped areas, v4.59 area added, new Unreleased entry
+  for this phase.
+- Spec §12 safety/overclaim/secret search run; backend suite re-run and
+  green; `npx tsc --noEmit` clean; frontend build not run (user-run, per
+  instructions). **A completed release candidate means "ready for the
+  user's final manual verification before public portfolio sharing" —
+  never a production, compliance, or trading certification.**
+
 ### Phase 41.0 — CI Preflight, Repository Hygiene & Security Sweep v1 ✅
 
 - **Repository-quality phase (no new financial model, no frontend page): make

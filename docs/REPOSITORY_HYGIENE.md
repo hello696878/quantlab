@@ -36,22 +36,15 @@ followed by **`Review <feature> v1`**; the user tags after review as
 **`v4.xx.0-short-feature-name-v1`** and pushes the tag manually (full policy:
 [`VERSION_MANIFEST.md`](VERSION_MANIFEST.md)).
 
-## The tsbuildinfo special case (known inconsistency)
+## The tsbuildinfo special case (resolved in Phase 42.3)
 
-`frontend/tsconfig.tsbuildinfo` is **listed in `.gitignore` but already
-tracked** — git keeps tracking it (ignore rules only affect untracked files),
-and the project has been committing its updates every phase. Pick one and
-stay consistent:
-
-- **Keep tracking it** (current practice): remove the `.gitignore` line so
-  the state is honest; commit it with each phase as today. Cheap, matches
-  history.
-- **Stop tracking it**: `git rm --cached frontend/tsconfig.tsbuildinfo`,
-  commit, and the existing ignore line takes over. Slightly cleaner diffs
-  going forward.
-
-Either is fine; the broken middle state (ignored-but-tracked) is the only
-wrong option long-term. This phase documents it rather than deciding for you.
+`frontend/tsconfig.tsbuildinfo` was **listed in `.gitignore` but tracked**
+for many phases (ignore rules only affect untracked files). Resolved at
+release-freeze time: the file is generated output of the current TypeScript
+config (`"incremental": true`), so it was untracked via
+`git rm --cached frontend/tsconfig.tsbuildinfo` and the existing ignore line
+now governs it. The local file is untouched; it simply no longer appears in
+diffs. Do not re-add it.
 
 ## Cleaning generated files safely
 

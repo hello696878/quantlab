@@ -83,8 +83,9 @@ primitives: `components/charts/LabCharts.tsx`, `components/math/`
 ## 7. Typecheck
 
 `cd frontend; npx tsc --noEmit` (or `.\scripts\run_frontend_typecheck.ps1`).
-Strict TypeScript; avoid `any`. `tsconfig.tsbuildinfo` is tracked — commit it
-with your change. There is currently no frontend test framework.
+Strict TypeScript; avoid `any`. `tsconfig.tsbuildinfo` is generated and
+gitignored (untracked since Phase 42.3) — never commit it. There is currently
+no frontend test framework.
 
 ## 8. Conventions worth copying (inferred from the repo)
 
