@@ -38,6 +38,7 @@ export type View =
   | "portfolioshowcase"
   | "developeronboarding"
   | "releasenotes"
+  | "publicreleasecandidate"
   | "csv"
   | "builder"
   | "portfolio"

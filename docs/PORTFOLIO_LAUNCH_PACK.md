@@ -171,6 +171,16 @@ are computed).
 
 ## 14. Suggested GitHub release checklist
 
+For the **final public pass**, the Phase 42 release-candidate layer is the
+authoritative flow: [`PUBLIC_RELEASE_CANDIDATE.md`](PUBLIC_RELEASE_CANDIDATE.md)
+(status table with evidence) →
+[`FINAL_SMOKE_TEST_RUNBOOK.md`](FINAL_SMOKE_TEST_RUNBOOK.md) →
+[`DEMO_FREEZE_CHECKLIST.md`](DEMO_FREEZE_CHECKLIST.md) →
+[`PUBLIC_LAUNCH_READINESS.md`](PUBLIC_LAUNCH_READINESS.md), with
+[`FINAL_DEMO_SCRIPT.md`](FINAL_DEMO_SCRIPT.md) and
+[`KNOWN_LIMITATIONS_PUBLIC.md`](KNOWN_LIMITATIONS_PUBLIC.md) for the demo
+itself.
+
 Work with [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md) (the manual QA pass)
 and [`SCREENSHOT_CHECKLIST.md`](SCREENSHOT_CHECKLIST.md), then:
 

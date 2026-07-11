@@ -13,17 +13,18 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.58.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
-expected tag on completion of this phase's review is
-`v4.58.0-version-manifest-release-notes-center-v1` — "expected" because tags
+**`4.60.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
+expected tag on completion of the current phase's review is
+`v4.60.0-public-release-candidate-demo-freeze-v1` — "expected" because tags
 are created by the user after review, never automatically.
 
 ## 2. Release family
 
 The **v4.x productization / platformization series**: v4.0.0 (local-first
 research terminal) → v4.7.0 (showcase candidate) → v4.8+ (one milestone tag
-per feature phase). 104 local tags existed when this manifest was written;
-the latest verified tag is `v4.57.0-local-demo-launcher-environment-doctor-v1`.
+per feature phase). 106 local tags existed when this manifest was last
+updated (Phase 42.0); the latest verified tag is
+`v4.59.0-ci-preflight-repo-hygiene-security-sweep-v1`.
 
 ## 3. Major release areas
 

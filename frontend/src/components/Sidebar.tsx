@@ -50,6 +50,7 @@ const ICONS: Record<string, string> = {
   portfolioshowcase: "M4 5h16v11H4V5Zm4 14h8M12 16v3M8 12l2.5-3 2 2L16 7.5",
   developeronboarding: "M8 7 4 12l4 5M16 7l4 5-4 5M13.5 5 10.5 19",
   releasenotes: "M7 3h10a1 1 0 0 1 1 1v17l-3-2-3 2-3-2-3 2V4a1 1 0 0 1 1-1ZM9 8h6M9 12h6M9 16h3",
+  publicreleasecandidate: "M12 3l2.3 4.6 5.2.8-3.75 3.6.9 5.1L12 14.7l-4.65 2.4.9-5.1L4.5 8.4l5.2-.8L12 3ZM7 21h10",
   scanner: "M4 14h3v6H4zM10.5 9h3v11h-3zM17 4h3v16h-3z",
   finml: "M4 18 9 9l4 5 3-6 4 7M4 4v16h16",
   globe:
@@ -154,6 +155,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { id: "datareliability", label: "Data Reliability Center", icon: "datareliability" },
       { id: "qacommandcenter", label: "QA Command Center", icon: "qacommandcenter" },
       { id: "releasenotes", label: "Release Notes Center", icon: "releasenotes" },
+      { id: "publicreleasecandidate", label: "Public Release Candidate", icon: "publicreleasecandidate" },
     ],
   },
   {

@@ -1775,6 +1775,31 @@ export default function HomeDashboard({
           </button>
           <button
             type="button"
+            onClick={() => onNav("publicreleasecandidate")}
+            className="card flex flex-col gap-1 p-4 text-left"
+          >
+            <span className="flex items-center justify-between gap-2">
+              <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
+                Public Release Candidate
+              </span>
+              <span
+                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
+              >
+                Final check
+              </span>
+            </span>
+            <span className="text-xs text-slate-400">
+              The final public-readiness layer: RC status, the frozen demo route, the manual
+              smoke checklist, and public limitations — every check is user-run and recorded
+              with evidence; nothing here claims a pass.
+            </span>
+            <span className="mt-1 text-xs font-medium text-blue-600">
+              Open Public Release Candidate →
+            </span>
+          </button>
+          <button
+            type="button"
             onClick={() => onNav("scanner")}
             className="card flex flex-col gap-1 p-4 text-left"
           >

@@ -19,9 +19,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.58.0-dev";
-const EXPECTED_NEXT_TAG = "v4.58.0-version-manifest-release-notes-center-v1";
-const LATEST_VERIFIED_TAG = "v4.57.0-local-demo-launcher-environment-doctor-v1";
+const VERSION_LABEL = "4.60.0-dev";
+const EXPECTED_NEXT_TAG = "v4.60.0-public-release-candidate-demo-freeze-v1";
+const LATEST_VERIFIED_TAG = "v4.59.0-ci-preflight-repo-hygiene-security-sweep-v1";
 
 const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
   { title: "Quant research labs", text: "Portfolio/macro, derivatives & volatility, crypto/DeFi/on-chain/alt-data, microstructure, real assets & credit, rates/FX — deterministic educational models with formulas beside the numbers.", route: "risklab" },
@@ -32,7 +32,9 @@ const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
 ];
 
 const CHANGELOG_CARDS: { tag: string; title: string; text: string }[] = [
-  { tag: "v4.58 (this)", title: "Release management", text: "Version manifest, grouped changelog, release-notes template, extended checklist, milestone history, project snapshot, this page." },
+  { tag: "v4.60 (next)", title: "Public release candidate", text: "Final smoke runbook, demo freeze checklist, launch readiness, public limitations, final demo script, Public Release Candidate page." },
+  { tag: "v4.59", title: "CI preflight & repo hygiene", text: "CI hardening (read-only permissions, fast-fail typecheck), CONTRIBUTING, hygiene and security/secrets docs, read-only hygiene script." },
+  { tag: "v4.58", title: "Release management", text: "Version manifest, grouped changelog, release-notes template, extended checklist, milestone history, project snapshot, this page." },
   { tag: "v4.57", title: "Developer onboarding", text: "Local demo guide, environment doctor, six safe helper scripts, onboarding page." },
   { tag: "v4.56", title: "Portfolio launch pack", text: "Public README, pitches, screenshot/video/interview docs, Portfolio Showcase page." },
   { tag: "v4.55", title: "Platform UX polish", text: "Route error boundaries, grouped sidebar, starting paths, accessibility passes." },

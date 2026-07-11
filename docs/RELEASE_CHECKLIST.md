@@ -69,6 +69,9 @@ npm run build
       Center, Scenario Studio, Research Workspace, Data Reliability, QA
       Command Center, one deep lab) — no crashes, no NaN/Infinity, honest
       empty states.
+- [ ] Before a **public** milestone (repo made public, demo recorded), run
+      the full page-by-page pass instead:
+      [`FINAL_SMOKE_TEST_RUNBOOK.md`](FINAL_SMOKE_TEST_RUNBOOK.md).
 
 ## 6. Docs & wording
 
@@ -107,6 +110,14 @@ git push origin v4.xx.0-short-feature-name-v1
 - [ ] LinkedIn / portfolio update if warranted — drafts in
       [`LINKEDIN_POST_DRAFTS.md`](LINKEDIN_POST_DRAFTS.md); screenshots per
       [`SCREENSHOT_CHECKLIST.md`](SCREENSHOT_CHECKLIST.md) (real runs only).
+- [ ] Going public / recording a demo? Work through the release-candidate
+      layer first: [`PUBLIC_RELEASE_CANDIDATE.md`](PUBLIC_RELEASE_CANDIDATE.md)
+      (status table with evidence),
+      [`DEMO_FREEZE_CHECKLIST.md`](DEMO_FREEZE_CHECKLIST.md) (freeze
+      date/commit/tag), and
+      [`PUBLIC_LAUNCH_READINESS.md`](PUBLIC_LAUNCH_READINESS.md) (go / no-go
+      decision table). Public portfolio readiness only — not a production
+      certification.
 
 ---
 

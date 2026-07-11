@@ -1,7 +1,7 @@
-# QuantLab — Project Snapshot (Phase 40.0)
+# QuantLab — Project Snapshot (Phase 42.0)
 
 A one-page handoff doc. Facts verified against the repo when written
-(version label `4.58.0-dev`); counts drift as phases land — re-verify before
+(version label `4.60.0-dev`); counts drift as phases land — re-verify before
 public use.
 
 ## Summary
@@ -19,7 +19,8 @@ trading/risk/compliance infrastructure.
 - **Start Here:** Home, Demo Center, Portfolio Showcase, Developer
   Onboarding, Global Markets Globe.
 - **Product Workflow:** Scenario Studio, Research Workspace, Data
-  Reliability Center, QA Command Center, Release Notes Center.
+  Reliability Center, QA Command Center, Release Notes Center, Public
+  Release Candidate.
 - **Backtesting:** Backtest, Strategy Comparison, Portfolio Backtest, CSV
   Backtest, Strategy Builder, Parameter Sweep, Train/Test, Walk-Forward.
 - **Strategy Knowledge:** Strategy Library, Paper Replications, Quant
@@ -79,15 +80,23 @@ snapshot) · launch docs (`PORTFOLIO_LAUNCH_PACK`, `PUBLIC_PROJECT_SUMMARY`,
 `SCREENSHOT_CHECKLIST`/`SCREENSHOT_PLAN`, `DEMO_VIDEO_SCRIPT`,
 `LINKEDIN_POST_DRAFTS`, `INTERVIEW_TALKING_POINTS`, `DEPLOYMENT_READINESS`)
 · onboarding docs (`LOCAL_DEMO_GUIDE`, `DEVELOPER_ONBOARDING`,
-`TROUBLESHOOTING`, `COMMAND_REFERENCE`, `ENVIRONMENT_DOCTOR`) · futures-path
-docs (`INSTRUMENTS_LAYER`, `FUTURES_DATA_INGESTION_PLAN`).
+`TROUBLESHOOTING`, `COMMAND_REFERENCE`, `ENVIRONMENT_DOCTOR`) ·
+contribution/hygiene docs (`CONTRIBUTING`, `CI`, `REPOSITORY_HYGIENE`,
+`SECURITY_AND_SECRETS`) · public-readiness docs (`PUBLIC_RELEASE_CANDIDATE`,
+`FINAL_SMOKE_TEST_RUNBOOK`, `DEMO_FREEZE_CHECKLIST`,
+`PUBLIC_LAUNCH_READINESS`, `KNOWN_LIMITATIONS_PUBLIC`, `FINAL_DEMO_SCRIPT`)
+· futures-path docs (`INSTRUMENTS_LAYER`, `FUTURES_DATA_INGESTION_PLAN`).
 
 ## Public portfolio readiness
 
 README, launch pack, pitches, demo scripts, and the in-app Showcase are
-ready; screenshots for the newer labs are the main outstanding capture work
-(`SCREENSHOT_CHECKLIST.md`); hosted deployment is deliberately not claimed
-(`DEPLOYMENT_READINESS.md` lists what it would need).
+ready, and the release-candidate layer (`PUBLIC_RELEASE_CANDIDATE.md` +
+smoke runbook + demo freeze + launch decision table) defines the final
+manual pass — its status table starts at "Not yet run" and only fills in
+with user-run evidence. Screenshots for the newer labs are the main
+outstanding capture work (`SCREENSHOT_CHECKLIST.md`); hosted deployment is
+deliberately not claimed (`DEPLOYMENT_READINESS.md` lists what it would
+need).
 
 ## Known limitations (headlines)
 

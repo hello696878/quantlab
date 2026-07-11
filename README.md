@@ -260,6 +260,9 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
 - [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/CI.md](docs/CI.md) — how to contribute and what CI checks (and deliberately doesn't)
 - [docs/REPOSITORY_HYGIENE.md](docs/REPOSITORY_HYGIENE.md) · [docs/SECURITY_AND_SECRETS.md](docs/SECURITY_AND_SECRETS.md) — what never gets committed, and the zero-secrets policy
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — the honest limitations ledger
+- [docs/PUBLIC_RELEASE_CANDIDATE.md](docs/PUBLIC_RELEASE_CANDIDATE.md) · [docs/PUBLIC_LAUNCH_READINESS.md](docs/PUBLIC_LAUNCH_READINESS.md) — the final manual verification pass and the go/no-go decision table (public portfolio readiness only)
+- [docs/FINAL_SMOKE_TEST_RUNBOOK.md](docs/FINAL_SMOKE_TEST_RUNBOOK.md) · [docs/DEMO_FREEZE_CHECKLIST.md](docs/DEMO_FREEZE_CHECKLIST.md) — the page-by-page manual smoke pass and the demo freeze discipline
+- [docs/KNOWN_LIMITATIONS_PUBLIC.md](docs/KNOWN_LIMITATIONS_PUBLIC.md) · [docs/FINAL_DEMO_SCRIPT.md](docs/FINAL_DEMO_SCRIPT.md) — public-facing limitations and the timed final demo scripts
 - [docs/PORTFOLIO_LAUNCH_PACK.md](docs/PORTFOLIO_LAUNCH_PACK.md) — pitches & launch checklist
 - [docs/PUBLIC_PROJECT_SUMMARY.md](docs/PUBLIC_PROJECT_SUMMARY.md) — recruiter / quant / technical summaries
 - [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) · [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md) — live & recorded demo scripts

@@ -18,16 +18,32 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Version Manifest, Changelog & Release Notes Center v1** (v4.58 series):
-  version manifest, this grouped changelog refresh, release-notes template,
+- **Public Release Candidate, Final Smoke Runbook & Demo Freeze v1** (v4.60
+  series): six public-readiness docs (release candidate, final smoke test
+  runbook, demo freeze checklist, public launch readiness, public known
+  limitations, final demo script), the in-app Public Release Candidate page,
+  and `scripts/print_public_release_candidate.ps1` (print-only). Public
+  portfolio readiness only — no check is claimed as passed; everything is
+  user-run and recorded with evidence.
+
+## Grouped release areas — v4.8 through v4.59 (post-showcase series)
+
+The tags between v4.8.0 and v4.59.0 (local milestone tags; full per-phase
+detail in `docs/ROADMAP.md`) grouped by area:
+
+### CI preflight, repository hygiene & security sweep (v4.59)
+
+- CI workflow hardening (read-only permissions, fast-fail typecheck step),
+  extended `.gitignore`, `CONTRIBUTING.md`, CI / repository-hygiene /
+  security-and-secrets docs, and the read-only
+  `scripts/check_repo_hygiene.ps1`.
+
+### Release management (v4.58)
+
+- Version manifest, the grouped changelog refresh, release-notes template,
   extended release checklist, milestone history, project snapshot, `VERSION`
   file, in-app Release Notes Center page, and
   `scripts/print_release_summary.ps1` (print-only).
-
-## Grouped release areas — v4.8 through v4.57 (post-showcase series)
-
-The tags between v4.8.0 and v4.57.0 (local milestone tags; full per-phase
-detail in `docs/ROADMAP.md`) grouped by area:
 
 ### Developer onboarding & local demo readiness (v4.57)
 

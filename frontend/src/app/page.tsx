@@ -63,6 +63,7 @@ import QACommandCenterPanel from "@/components/QACommandCenterPanel";
 import PortfolioShowcasePanel from "@/components/PortfolioShowcasePanel";
 import DeveloperOnboardingPanel from "@/components/DeveloperOnboardingPanel";
 import ReleaseNotesCenterPanel from "@/components/ReleaseNotesCenterPanel";
+import PublicReleaseCandidatePanel from "@/components/PublicReleaseCandidatePanel";
 import GlobeLabPanel from "@/components/GlobeLabPanel";
 import { MARKETS } from "@/lib/globe/markets";
 import {
@@ -476,6 +477,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Version Manifest & Release Notes Center",
     subtitle:
       "The project's versioning story: current version label and verified tag/commit conventions (Add/Review commits, v4.xx.0-name-v1 tags created manually after review), changelog summaries by release area, the release-flow checklist, a copyable release-notes skeleton that separates tests actually run from tests expected (frontend build always user-run), and the project snapshot — static reference copy; version labels are milestone markers, not package publications or production/compliance certifications; not investment or trading advice.",
+  },
+  publicreleasecandidate: {
+    title: "Public Release Candidate",
+    subtitle:
+      "The final public-readiness layer: release-candidate status cards (docs written, smoke test required, user-run build required, secrets check required — nothing claimed as passed), the frozen seven-stop demo route with deep links, the per-page manual smoke checklist, public-facing known limitations, a copyable final demo pitch, and pointers to the six Phase 42 docs — static reference copy, public portfolio readiness only, every verification step is run manually by the user; not a production, compliance, or trading certification, not investment advice.",
   },
   developeronboarding: {
     title: "Local Demo & Developer Onboarding",
@@ -1086,6 +1092,7 @@ export default function HomePage() {
     { view: "portfolioshowcase", title: "Open Portfolio Showcase", keywords: "portfolio showcase public presentation pitch recruiter quant technical demo path highlights launch pack resume interview linkedin" },
     { view: "developeronboarding", title: "Open Developer Onboarding", keywords: "developer onboarding local demo launcher environment doctor commands troubleshooting venv uvicorn pytest typecheck npm setup" },
     { view: "releasenotes", title: "Open Release Notes Center", keywords: "release notes center version manifest changelog milestone history project snapshot tag conventions release checklist" },
+    { view: "publicreleasecandidate", title: "Open Public Release Candidate", keywords: "public release candidate final smoke test runbook demo freeze checklist launch readiness known limitations public final demo script rc status manual verification portfolio sharing" },
     { view: "csv", title: "Go to CSV Upload", keywords: "import upload data file" },
     { view: "builder", title: "Go to Custom Strategy Builder", keywords: "no code rules indicator" },
     { view: "portfolio", title: "Go to Portfolio Lab", keywords: "multi asset weights" },
@@ -1647,6 +1654,22 @@ export default function HomePage() {
       title,
       keywords,
       run: () => handleNav("releasenotes"),
+    })),
+    ...(
+      [
+        ["Open Public Release Candidate", "public release candidate rc status cards demo route smoke checklist final pitch public portfolio readiness"],
+        ["Final Smoke Test Runbook", "final smoke test runbook manual page by page verification routes labs responsive widths evidence docs final_smoke_test_runbook"],
+        ["Demo Freeze Checklist", "demo freeze checklist freeze date commit hash tag do not change list allowed fixes docs demo_freeze_checklist"],
+        ["Public Launch Readiness", "public launch readiness github readme docs demo screenshots linkedin interview ci security limitations decision table docs public_launch_readiness"],
+        ["Known Limitations Public", "known limitations public educational sample data not investment advice not live trading not audited provider caveats docs known_limitations_public"],
+        ["Final Demo Script", "final demo script 90 second 3 minute 7 minute route order talking points what not to say closing line docs final_demo_script"],
+      ] as const
+    ).map(([title, keywords]) => ({
+      id: `publicreleasecandidate-${title}`,
+      group: "Public Release Candidate",
+      title,
+      keywords,
+      run: () => handleNav("publicreleasecandidate"),
     })),
     ...(
       [
@@ -2246,6 +2269,8 @@ export default function HomePage() {
         {view === "developeronboarding" && <DeveloperOnboardingPanel onNav={(route) => handleNav(route as View)} />}
 
         {view === "releasenotes" && <ReleaseNotesCenterPanel onNav={(route) => handleNav(route as View)} />}
+
+        {view === "publicreleasecandidate" && <PublicReleaseCandidatePanel onNav={(route) => handleNav(route as View)} />}
 
         {/* ── CSV Backtest ─────────────────────────────────────────────── */}
         {view === "csv" && (
