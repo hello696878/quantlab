@@ -12,6 +12,7 @@ P&L (tied to the audited ``long_trade_report`` so the numbers can't silently
 drift), the exit-code contract, and unknown-root rejection.
 """
 
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -24,6 +25,12 @@ BUYHOLD_SCRIPT = REPO_ROOT / "scripts" / "run_local_futures_buyhold_report.py"
 NORMALIZE_SCRIPT = REPO_ROOT / "scripts" / "normalize_local_futures_csv.py"
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "futures_csv"
 
+# The exact fixtures these ES/NQ pipeline tests are about (staged into an
+# isolated dir — the scripts discover CSVs recursively, and the live fixtures
+# folder may hold fixtures for other tests, e.g. the YM roll fixture, so
+# aggregate assertions must not depend on the developer's working tree).
+PIPELINE_FIXTURES = ("esm25.csv", "nqm25.csv")
+
 
 def _run(script: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
@@ -34,12 +41,20 @@ def _run(script: Path, *args: str) -> subprocess.CompletedProcess:
     )
 
 
-def _normalize_fixtures(out_dir: Path) -> None:
-    """Produce ES_daily.csv / NQ_daily.csv under ``out_dir`` from the fixtures."""
+def _normalize_fixtures(tmp_path: Path) -> Path:
+    """Stage the ES/NQ fixtures into ``tmp_path/raw`` and normalize them into
+    ``tmp_path/normalized`` (returned as the dir holding ES_daily.csv /
+    NQ_daily.csv)."""
+    raw_dir = tmp_path / "raw"
+    norm_dir = tmp_path / "normalized"
+    raw_dir.mkdir()
+    for name in PIPELINE_FIXTURES:
+        shutil.copy(FIXTURES_DIR / name, raw_dir / name)
     result = _run(
-        NORMALIZE_SCRIPT, "--input", str(FIXTURES_DIR), "--output-dir", str(out_dir)
+        NORMALIZE_SCRIPT, "--input", str(raw_dir), "--output-dir", str(norm_dir)
     )
     assert result.returncode == 0, result.stdout + result.stderr
+    return norm_dir
 
 
 def _expected(fixture_name: str):
@@ -48,8 +63,8 @@ def _expected(fixture_name: str):
 
 
 def test_es_buyhold_pnl_correct(tmp_path):
-    _normalize_fixtures(tmp_path)
-    result = _run(BUYHOLD_SCRIPT, "--input", str(tmp_path / "ES_daily.csv"))
+    norm_dir = _normalize_fixtures(tmp_path)
+    result = _run(BUYHOLD_SCRIPT, "--input", str(norm_dir / "ES_daily.csv"))
     assert result.returncode == 0, result.stdout + result.stderr
     r = _expected("esm25.csv")
     assert r.pnl_usd == 387.50  # 7.75 pts * $50/pt (guards the fixture itself)
@@ -74,8 +89,8 @@ def test_es_buyhold_pnl_correct(tmp_path):
 
 
 def test_nq_buyhold_pnl_correct(tmp_path):
-    _normalize_fixtures(tmp_path)
-    result = _run(BUYHOLD_SCRIPT, "--input", str(tmp_path / "NQ_daily.csv"))
+    norm_dir = _normalize_fixtures(tmp_path)
+    result = _run(BUYHOLD_SCRIPT, "--input", str(norm_dir / "NQ_daily.csv"))
     assert result.returncode == 0, result.stdout + result.stderr
     r = _expected("nqm25.csv")
     assert r.pnl_usd == 1490.00  # 74.50 pts * $20/pt (guards the fixture itself)
@@ -91,8 +106,8 @@ def test_nq_buyhold_pnl_correct(tmp_path):
 def test_tick_and_multiplier_pnl_match(tmp_path):
     # The whole normalized folder: every contract's multiplier-based P&L must
     # equal its tick-based P&L (the spec tick-value invariant, end to end).
-    _normalize_fixtures(tmp_path)
-    result = _run(BUYHOLD_SCRIPT, "--input", str(tmp_path))
+    norm_dir = _normalize_fixtures(tmp_path)
+    result = _run(BUYHOLD_SCRIPT, "--input", str(norm_dir))
     assert result.returncode == 0, result.stdout + result.stderr
     for fixture in ("esm25.csv", "nqm25.csv"):
         r = _expected(fixture)
@@ -131,9 +146,9 @@ def test_missing_path_exits_nonzero(tmp_path):
 
 
 def test_report_does_not_mutate_inputs(tmp_path):
-    _normalize_fixtures(tmp_path)
-    before = {p.name: p.read_bytes() for p in tmp_path.glob("*.csv")}
-    result = _run(BUYHOLD_SCRIPT, "--input", str(tmp_path))
+    norm_dir = _normalize_fixtures(tmp_path)
+    before = {p.name: p.read_bytes() for p in norm_dir.glob("*.csv")}
+    result = _run(BUYHOLD_SCRIPT, "--input", str(norm_dir))
     assert result.returncode == 0, result.stdout + result.stderr
-    after = {p.name: p.read_bytes() for p in tmp_path.glob("*.csv")}
+    after = {p.name: p.read_bytes() for p in norm_dir.glob("*.csv")}
     assert before == after

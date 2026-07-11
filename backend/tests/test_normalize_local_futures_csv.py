@@ -20,6 +20,20 @@ REPO_ROOT = Path(__file__).resolve().parents[2]
 SCRIPT = REPO_ROOT / "scripts" / "normalize_local_futures_csv.py"
 FIXTURES_DIR = Path(__file__).parent / "fixtures" / "futures_csv"
 
+# The exact fixtures these ES/NQ pipeline tests are about.  Folder-input tests
+# stage them into an isolated dir instead of normalizing the live fixtures
+# folder: the scripts discover CSVs recursively, and the shared folder may
+# legitimately hold fixtures for other tests (e.g. the YM roll fixture), so
+# aggregate assertions must not depend on the developer's working tree.
+PIPELINE_FIXTURES = ("esm25.csv", "nqm25.csv")
+
+
+def _stage_pipeline_fixtures(dst: Path) -> None:
+    """Copy the two committed ES/NQ fixtures into ``dst`` (created)."""
+    dst.mkdir(parents=True, exist_ok=True)
+    for name in PIPELINE_FIXTURES:
+        shutil.copy(FIXTURES_DIR / name, dst / name)
+
 
 def _run(*args: str) -> subprocess.CompletedProcess:
     return subprocess.run(
@@ -61,9 +75,12 @@ def test_nq_fixture_normalizes_to_output_csv(tmp_path):
 
 
 def test_folder_input_writes_one_csv_per_root(tmp_path):
-    result = _run("--input", str(FIXTURES_DIR), "--output-dir", str(tmp_path))
+    in_dir = tmp_path / "raw"
+    out_dir = tmp_path / "out"
+    _stage_pipeline_fixtures(in_dir)
+    result = _run("--input", str(in_dir), "--output-dir", str(out_dir))
     assert result.returncode == 0, result.stdout + result.stderr
-    assert sorted(p.name for p in tmp_path.iterdir()) == [
+    assert sorted(p.name for p in out_dir.iterdir()) == [
         "ES_daily.csv",
         "NQ_daily.csv",
     ]
@@ -109,10 +126,13 @@ def test_output_columns_match_normalized_schema(tmp_path):
 
 
 def test_output_revalidates_through_loader(tmp_path):
-    result = _run("--input", str(FIXTURES_DIR), "--output-dir", str(tmp_path))
+    in_dir = tmp_path / "raw"
+    out_dir = tmp_path / "out"
+    _stage_pipeline_fixtures(in_dir)
+    result = _run("--input", str(in_dir), "--output-dir", str(out_dir))
     assert result.returncode == 0, result.stdout + result.stderr
     for name in ("ES_daily.csv", "NQ_daily.csv"):
-        bars = load_futures_bars_csv(tmp_path / name)
+        bars = load_futures_bars_csv(out_dir / name)
         assert len(bars) == 5
 
 
