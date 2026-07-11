@@ -650,7 +650,7 @@ export default function HomeDashboard({
             Static sample
           </span>
         </div>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
           {regionRollup().map((r) => (
             <button
               key={r.region}
@@ -1098,12 +1098,12 @@ export default function HomeDashboard({
         </p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="card flex flex-col gap-1 p-4">
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Global Markets Globe
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Static API + optional adapters
@@ -1295,12 +1295,12 @@ export default function HomeDashboard({
             onClick={() => onNav("risklab")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Portfolio Risk Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Portfolio analytics + robustness
@@ -1320,12 +1320,12 @@ export default function HomeDashboard({
             onClick={() => onNav("realestate")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Real Estate Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Real estate + MBS analytics
@@ -1345,12 +1345,12 @@ export default function HomeDashboard({
             onClick={() => onNav("futures")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Futures &amp; Commodities Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Futures analytics
@@ -1370,12 +1370,12 @@ export default function HomeDashboard({
             onClick={() => onNav("volatility")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Volatility Surface Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Volatility analytics
@@ -1395,12 +1395,12 @@ export default function HomeDashboard({
             onClick={() => onNav("microstructure")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Market Microstructure Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Execution + liquidity analytics
@@ -1420,12 +1420,12 @@ export default function HomeDashboard({
             onClick={() => onNav("cryptoderivatives")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Crypto Derivatives Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Crypto derivatives
@@ -1446,12 +1446,12 @@ export default function HomeDashboard({
             onClick={() => onNav("defirisk")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 DeFi Risk Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 DeFi risk
@@ -1472,12 +1472,12 @@ export default function HomeDashboard({
             onClick={() => onNav("tokenomics")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Tokenomics Risk Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Crypto fundamentals
@@ -1498,12 +1498,12 @@ export default function HomeDashboard({
             onClick={() => onNav("onchain")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 On-Chain Analytics Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 On-chain analytics
@@ -1524,12 +1524,12 @@ export default function HomeDashboard({
             onClick={() => onNav("altdata")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Alternative Data Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Alternative data
@@ -1550,12 +1550,12 @@ export default function HomeDashboard({
             onClick={() => onNav("macroregime")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Macro Regime Lab
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Macro regime
@@ -1576,12 +1576,12 @@ export default function HomeDashboard({
             onClick={() => onNav("scenariostudio")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Scenario Studio
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Scenario studio
@@ -1602,12 +1602,12 @@ export default function HomeDashboard({
             onClick={() => onNav("researchworkspace")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Research Workspace
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Research workspace
@@ -1628,12 +1628,12 @@ export default function HomeDashboard({
             onClick={() => onNav("democenter")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Demo Center
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Demo center
@@ -1653,12 +1653,12 @@ export default function HomeDashboard({
             onClick={() => onNav("datareliability")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Data Reliability Center
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Data reliability
@@ -1678,12 +1678,12 @@ export default function HomeDashboard({
             onClick={() => onNav("qacommandcenter")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 QA Command Center
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 QA command center
@@ -1703,12 +1703,12 @@ export default function HomeDashboard({
             onClick={() => onNav("portfolioshowcase")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Portfolio Showcase
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Showcase
@@ -1728,12 +1728,12 @@ export default function HomeDashboard({
             onClick={() => onNav("developeronboarding")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Developer Onboarding
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Dev experience
@@ -1753,12 +1753,12 @@ export default function HomeDashboard({
             onClick={() => onNav("releasenotes")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Release Notes Center
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Release center
@@ -1778,12 +1778,12 @@ export default function HomeDashboard({
             onClick={() => onNav("publicreleasecandidate")}
             className="card flex flex-col gap-1 p-4 text-left"
           >
-            <span className="flex items-center justify-between gap-2">
+            <span className="flex flex-wrap items-center justify-between gap-2">
               <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                 Public Release Candidate
               </span>
               <span
-                className="flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
+                className="max-w-full truncate rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
                 style={{ background: "var(--warn-soft)", border: "1px solid var(--line)", color: "var(--warn)" }}
               >
                 Final check
@@ -1845,7 +1845,7 @@ export default function HomeDashboard({
               onClick={f.onClick}
               className="card flex flex-col gap-1.5 p-4 text-left"
             >
-              <span className="flex items-center justify-between gap-2">
+              <span className="flex flex-wrap items-center justify-between gap-2">
                 <span className="text-sm font-semibold" style={{ color: "var(--text-hi)" }}>
                   {f.title}
                 </span>

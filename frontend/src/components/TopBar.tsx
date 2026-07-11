@@ -118,7 +118,7 @@ interface TopBarProps {
 export default function TopBar({ title, subtitle }: TopBarProps) {
   return (
     <header
-      className="topbar sticky top-0 z-20 flex items-center gap-4 px-7 py-4"
+      className="topbar sticky top-0 z-20 flex items-center gap-4 px-7 py-4 max-lg:flex-wrap"
       style={{
         borderBottom: "1px solid var(--line)",
         background: "rgba(8,11,20,0.72)",
@@ -148,7 +148,7 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
             {title}
           </h1>
           {subtitle && (
-            <p className="mt-0.5 text-[12.5px]" style={{ color: "var(--text-mut)" }}>
+            <p className="mt-0.5 text-[12.5px] max-lg:line-clamp-2" style={{ color: "var(--text-mut)" }}>
               {subtitle}
             </p>
           )}
