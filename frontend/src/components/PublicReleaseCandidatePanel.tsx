@@ -17,9 +17,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.60.0-dev";
-const LATEST_VERIFIED_TAG = "v4.59.0-ci-preflight-repo-hygiene-security-sweep-v1";
-const EXPECTED_NEXT_TAG = "v4.60.0-public-release-candidate-demo-freeze-v1";
+const VERSION_LABEL = "4.62.0-dev";
+const LATEST_VERIFIED_TAG = "v4.61.0-browser-e2e-regression-guard-v1";
+const EXPECTED_NEXT_TAG = "v4.62.0-public-release-package-demo-asset-kit-v1";
 
 const RC_STATUS_CARDS: { title: string; status: string; tone: "ok" | "warn"; text: string }[] = [
   {

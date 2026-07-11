@@ -19,9 +19,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.60.0-dev";
-const EXPECTED_NEXT_TAG = "v4.60.0-public-release-candidate-demo-freeze-v1";
-const LATEST_VERIFIED_TAG = "v4.59.0-ci-preflight-repo-hygiene-security-sweep-v1";
+const VERSION_LABEL = "4.62.0-dev";
+const EXPECTED_NEXT_TAG = "v4.62.0-public-release-package-demo-asset-kit-v1";
+const LATEST_VERIFIED_TAG = "v4.61.0-browser-e2e-regression-guard-v1";
 
 const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
   { title: "Quant research labs", text: "Portfolio/macro, derivatives & volatility, crypto/DeFi/on-chain/alt-data, microstructure, real assets & credit, rates/FX — deterministic educational models with formulas beside the numbers.", route: "risklab" },
@@ -32,7 +32,9 @@ const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
 ];
 
 const CHANGELOG_CARDS: { tag: string; title: string; text: string }[] = [
-  { tag: "v4.60 (next)", title: "Public release candidate", text: "Final smoke runbook, demo freeze checklist, launch readiness, public limitations, final demo script, Public Release Candidate page." },
+  { tag: "v4.62 (next)", title: "Public release package", text: "GitHub release draft (manual publish), LinkedIn drafts, portfolio case study, demo video shot list + scripts, release asset manifest." },
+  { tag: "v4.61", title: "Browser E2E guard", text: "Playwright harness (12 tests, zero browser downloads) pinning the frozen demo route, scenario result, KO/PEP fixture, responsive geometry." },
+  { tag: "v4.60", title: "Public release candidate", text: "Demo freeze with SHA-256'd evidence screenshots, final smoke runbook, launch readiness, public limitations, Public Release Candidate page." },
   { tag: "v4.59", title: "CI preflight & repo hygiene", text: "CI hardening (read-only permissions, fast-fail typecheck), CONTRIBUTING, hygiene and security/secrets docs, read-only hygiene script." },
   { tag: "v4.58", title: "Release management", text: "Version manifest, grouped changelog, release-notes template, extended checklist, milestone history, project snapshot, this page." },
   { tag: "v4.57", title: "Developer onboarding", text: "Local demo guide, environment doctor, six safe helper scripts, onboarding page." },

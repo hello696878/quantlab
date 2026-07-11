@@ -18,17 +18,35 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Public Release Candidate, Final Smoke Runbook & Demo Freeze v1** (v4.60
-  series): six public-readiness docs (release candidate, final smoke test
-  runbook, demo freeze checklist, public launch readiness, public known
-  limitations, final demo script), the in-app Public Release Candidate page,
-  and `scripts/print_public_release_candidate.ps1` (print-only). Public
-  portfolio readiness only — no check is claimed as passed; everything is
-  user-run and recorded with evidence.
+- **Public Release Package, GitHub Release Draft & Demo Asset Kit v1**
+  (v4.62 series): copy-ready GitHub release draft (manual publication only),
+  LinkedIn launch post drafts, portfolio case study, demo video shot list +
+  90-second and 3-minute scripts, public-README checklist, release asset
+  manifest, and `scripts/print_public_release_package.ps1` (print-only).
+  Presentation material only — no product behavior changes, no automatic
+  releases, all cited evidence is recorded user-run results.
 
-## Grouped release areas — v4.8 through v4.59 (post-showcase series)
+## Grouped release areas — v4.8 through v4.61 (post-showcase series)
 
-The tags between v4.8.0 and v4.59.0 (local milestone tags; full per-phase
+### Browser E2E regression guard (v4.61)
+
+- Playwright harness (one devDependency; drives OS-installed Edge — zero
+  browser downloads): 12 tests guarding the frozen demo route, Scenario
+  Studio severe-combo result, the KO/PEP pairs fixture, and 1440/1024/768
+  responsive geometry; hydration-aware stabilization; E2E runbook, setup,
+  and frozen-demo-guard docs; refuse-if-down wrapper scripts.
+
+### Public release candidate & demo freeze (v4.60)
+
+- Six public-readiness docs (release candidate, final smoke test runbook,
+  demo freeze checklist, public launch readiness, public known limitations,
+  final demo script), the in-app Public Release Candidate page,
+  `scripts/print_public_release_candidate.ps1` (print-only), the first full
+  browser smoke test (37 views; three responsive defects fixed), futures
+  fixture isolation + YM roll coverage, and the frozen freeze record with
+  five SHA-256'd production screenshots.
+
+The tags between v4.8.0 and v4.61.0 (local milestone tags; full per-phase
 detail in `docs/ROADMAP.md`) grouped by area:
 
 ### CI preflight, repository hygiene & security sweep (v4.59)

@@ -267,6 +267,9 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
 - [docs/FINAL_SMOKE_TEST_RUNBOOK.md](docs/FINAL_SMOKE_TEST_RUNBOOK.md) · [docs/DEMO_FREEZE_CHECKLIST.md](docs/DEMO_FREEZE_CHECKLIST.md) — the page-by-page manual smoke pass and the demo freeze discipline
 - [docs/KNOWN_LIMITATIONS_PUBLIC.md](docs/KNOWN_LIMITATIONS_PUBLIC.md) · [docs/FINAL_DEMO_SCRIPT.md](docs/FINAL_DEMO_SCRIPT.md) — public-facing limitations and the timed final demo scripts
 - [docs/BROWSER_E2E_RUNBOOK.md](docs/BROWSER_E2E_RUNBOOK.md) · [docs/FROZEN_DEMO_REGRESSION_GUARD.md](docs/FROZEN_DEMO_REGRESSION_GUARD.md) · [docs/PLAYWRIGHT_SETUP.md](docs/PLAYWRIGHT_SETUP.md) — the local browser E2E harness guarding the frozen demo path (regression signal, not certification)
+- [docs/GITHUB_RELEASE_DRAFT_v4.61.md](docs/GITHUB_RELEASE_DRAFT_v4.61.md) · [docs/RELEASE_ASSET_MANIFEST.md](docs/RELEASE_ASSET_MANIFEST.md) — copy-ready release text (published manually, never automatically) and the release asset inventory
+- [docs/LINKEDIN_LAUNCH_POST.md](docs/LINKEDIN_LAUNCH_POST.md) · [docs/PORTFOLIO_CASE_STUDY.md](docs/PORTFOLIO_CASE_STUDY.md) · [docs/PUBLIC_REPO_README_CHECKLIST.md](docs/PUBLIC_REPO_README_CHECKLIST.md) — launch copy and the pre-publish README checklist
+- [docs/DEMO_VIDEO_SHOT_LIST.md](docs/DEMO_VIDEO_SHOT_LIST.md) · [docs/DEMO_VIDEO_90_SECOND_SCRIPT.md](docs/DEMO_VIDEO_90_SECOND_SCRIPT.md) · [docs/DEMO_VIDEO_3_MINUTE_SCRIPT.md](docs/DEMO_VIDEO_3_MINUTE_SCRIPT.md) — the demo-video asset kit on the frozen demo path
 - [docs/PORTFOLIO_LAUNCH_PACK.md](docs/PORTFOLIO_LAUNCH_PACK.md) — pitches & launch checklist
 - [docs/PUBLIC_PROJECT_SUMMARY.md](docs/PUBLIC_PROJECT_SUMMARY.md) — recruiter / quant / technical summaries
 - [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) · [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md) — live & recorded demo scripts

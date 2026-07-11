@@ -4,6 +4,16 @@ UI screenshots for the README, captured on the dark neon theme (PNG, ~1440 × 90
 
 The **README showcase set** below is embedded in the main [README](../../README.md#screenshots), grouped by workflow. The **additional captures** (research tools + API docs) are kept here for reference.
 
+> **Frozen release evidence (do not regenerate):** the five
+> `release_*.png` files (`release_landing_1440`, `release_scenario_studio`,
+> `release_home_1024`, `release_home_768`, `release_pairs_backtest`) are the
+> v4.60 demo-freeze evidence — captured from the **production build at
+> commit `c059c4e` on deterministic sample data**, with SHA-256 hashes
+> recorded in [`DEMO_FREEZE_CHECKLIST.md`](../DEMO_FREEZE_CHECKLIST.md).
+> Unlike the showcase set below, they are frozen historical evidence: never
+> overwrite, re-capture, or "refresh" them — a future release mints a new
+> evidence set instead. Inventory: [`RELEASE_ASSET_MANIFEST.md`](../RELEASE_ASSET_MANIFEST.md).
+
 > Reproduce a capture by running the stack and using the listed demo parameters. Have a few saved backtests/reports/templates stored first so the Command Center, Saved Reports, and Command Palette show real content.
 
 ---

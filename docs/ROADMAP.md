@@ -1677,6 +1677,43 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 44.0 — Public Release Package, GitHub Release Draft & Demo Asset Kit v1 ✅
+
+- **Presentation/packaging phase (no product behavior changes, no new
+  financial models):** a copy-ready public release kit built on the frozen
+  v4.60 evidence and the v4.61 E2E guard.
+- **Eight docs:** `GITHUB_RELEASE_DRAFT_v4.61.md` (copy-paste release text
+  targeting the existing `v4.61.0-browser-e2e-regression-guard-v1` tag —
+  publication is strictly manual; the evidence table cites only recorded
+  user-run results: backend 2,968 passed, tsc exit 0, build exit 0, prod
+  smoke PASS, E2E 12 passed, CI run 29147666495 on `7cf9708`);
+  `LINKEDIN_LAUNCH_POST.md` (three lengths + captions + hard "what not to
+  claim" rules + reply templates); `PORTFOLIO_CASE_STUDY.md` (problem →
+  solution → architecture → recorded evidence → limitations → learnings);
+  `DEMO_VIDEO_SHOT_LIST.md` (9 shots with click/expected/narration/avoid
+  columns, recording setup incl. the dev/prod `.next` warning, retake
+  checklist); `DEMO_VIDEO_90_SECOND_SCRIPT.md` and
+  `DEMO_VIDEO_3_MINUTE_SCRIPT.md` (timestamped, word-for-word, with
+  slow-page fallbacks and what-not-to-say lists);
+  `PUBLIC_REPO_README_CHECKLIST.md`; `RELEASE_ASSET_MANIFEST.md` (asset ×
+  path × frozen/generated/copy × tag relationship, with binding policies:
+  frozen evidence stays frozen, generated never committed, publishing always
+  manual).
+- **`scripts/print_public_release_package.ps1`** — print-only (parser 0
+  errors, executed once); never tags/pushes/builds/tests/calls APIs.
+- **Consistency:** VERSION reconciled `4.60.0-dev` → `4.62.0-dev` (v4.60 and
+  v4.61 tags both exist; 108 local tags); VERSION_MANIFEST §1–2; CHANGELOG
+  Unreleased rotated (v4.60/v4.61 areas added, new v4.62 Unreleased);
+  Release Notes Center and Public Release Candidate page constants updated
+  to the verified tags; README project-docs links; RELEASE_CHECKLIST §8
+  points at the draft; `docs/screenshots/README.md` now separates the frozen
+  evidence set from the showcase set.
+- Safety search clean; backend suite re-run; `npx tsc --noEmit` re-run;
+  browser E2E **not run this phase** (no servers were running and the phase
+  forbids starting them) — the release draft distinguishes recorded evidence
+  from expected commands throughout. **No GitHub release was created; the
+  frozen v4.60 and v4.61 tags are untouched.**
+
 ### Phase 43.0 — Browser E2E Harness & Frozen Demo Regression Guard v1 ✅
 
 - **Post-freeze quality-engineering phase (no new financial model): the

@@ -110,7 +110,10 @@ git push origin v4.xx.0-short-feature-name-v1
 ## 8. Optional public steps (manual, never automated)
 
 - [ ] GitHub release draft from the notes (manual step — nothing in this
-      repo calls the GitHub API).
+      repo calls the GitHub API). For the v4.61 public release, the
+      copy-ready text is [`GITHUB_RELEASE_DRAFT_v4.61.md`](GITHUB_RELEASE_DRAFT_v4.61.md)
+      and the asset inventory is
+      [`RELEASE_ASSET_MANIFEST.md`](RELEASE_ASSET_MANIFEST.md).
 - [ ] LinkedIn / portfolio update if warranted — drafts in
       [`LINKEDIN_POST_DRAFTS.md`](LINKEDIN_POST_DRAFTS.md); screenshots per
       [`SCREENSHOT_CHECKLIST.md`](SCREENSHOT_CHECKLIST.md) (real runs only).
