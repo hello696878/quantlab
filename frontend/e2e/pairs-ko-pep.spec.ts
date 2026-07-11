@@ -36,8 +36,7 @@ test("KO/PEP pairs fixture reproduces the frozen 119-trade result", async ({
   await page.goto("/");
   await waitForAppSettled(page);
 
-  await gotoView(page, "Backtest");
-  await expect(page.locator("header h1")).toHaveText(/Backtest/);
+  await gotoView(page, "Backtest", /Backtest/);
 
   // Select the Pairs Trading strategy card (its label starts with the name).
   await page

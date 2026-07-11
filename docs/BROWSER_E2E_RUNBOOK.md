@@ -54,6 +54,14 @@ hosting.
 | Frontend dev | http://localhost:3000 | `cd C:\quantlab\frontend; npm run dev` |
 | Frontend production (optional) | http://localhost:3100 | `npm run build` then `npx next start --port 3100` (both user-run) |
 
+> **Dev and production share `.next`** — never run `next dev` and `next
+> start` at the same time, and always rebuild immediately before
+> `next start`: the dev server rewrites `.next` under a running production
+> server, which then serves stale/missing hashed assets (pages render
+> unstyled, hydration never completes, and E2E fails in setup). If prod-mode
+> results look corrupted, stop both servers, `npm run build`, start
+> `next start` fresh.
+
 ## 4. Running
 
 From `C:\quantlab\frontend`:
@@ -95,6 +103,14 @@ delete at any time. The harness **never writes to
 3. Geometry failures name the offending badge/chip and the overflow in px.
 4. "BLOCKED" from the wrapper scripts means a server isn't running — that is
    a precondition failure, not a regression.
+5. On a **freshly started dev server**, the first run is slower (on-demand
+   compile + hydration). The harness waits for real interactivity — the
+   header clock rendering (a mount-gated client effect) is its hydration
+   witness — so cold starts take longer rather than failing.
+6. **Don't run the harness while the backend pytest suite is running** — the
+   suite saturates the machine and starves the live backend/frontend,
+   producing timeout flakes that look like regressions. Run them
+   sequentially.
 
 ## 7. Known limitations (v1)
 

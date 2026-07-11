@@ -42,8 +42,11 @@ test.describe("frozen demo route", () => {
     await expect(
       page.getByRole("heading", { name: "QuantLab Research Terminal" }),
     ).toBeVisible();
-    // Dashboard / command-center content present.
-    await expect(page.getByText("Welcome to QuantLab")).toBeVisible();
+    // Structural dashboard markers only — deliberately NOT the onboarding
+    // card ("Welcome to QuantLab"): that copy is localStorage-dismissible
+    // and effect-gated, so it is not part of the frozen demo contract.
+    await expect(page.getByText(/quick actions/i).first()).toBeVisible();
+    await expect(page.getByText(/system status/i).first()).toBeVisible();
     await expectApiOnlineIfShown(page);
     await expectNoVisibleNaNOrInfinity(page);
     await expectNoRawStackTrace(page);
@@ -59,8 +62,7 @@ test.describe("frozen demo route", () => {
       { sidebar: "Developer Onboarding", h1: /Developer Onboarding/ },
     ];
     for (const stop of stops) {
-      await gotoView(page, stop.sidebar);
-      await expect(page.locator("header h1")).toHaveText(stop.h1);
+      await gotoView(page, stop.sidebar, stop.h1); // navigates AND verifies h1
       await expectNoVisibleNaNOrInfinity(page);
       await expectNoRawStackTrace(page);
     }
@@ -94,8 +96,11 @@ test.describe("frozen demo route", () => {
   test("saved-work empty/loaded states render without errors", async ({
     page,
   }) => {
-    await gotoView(page, "Saved Reports");
-    await expect(page.locator("header h1")).toHaveText(/Saved Reports/);
+    // Deliberately state-agnostic: an EMPTY list and a POPULATED list are
+    // both valid frozen states — the guard only requires the page to render
+    // without errors and without failed local requests. Nothing here writes
+    // to (or requires anything from) the local SQLite data.
+    await gotoView(page, "Saved Reports", /Saved Reports/);
     await expectNoVisibleNaNOrInfinity(page);
     await expectNoRawStackTrace(page);
     assertNoFailedLocalRequests(failures);

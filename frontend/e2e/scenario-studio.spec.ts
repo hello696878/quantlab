@@ -31,8 +31,7 @@ test("severe cross-asset stress combo reaches severity 100.0 (8/8 modules)", asy
   await page.goto("/");
   await waitForAppSettled(page);
 
-  await gotoView(page, "Scenario Studio");
-  await expect(page.locator("header h1")).toHaveText(/Scenario Studio/);
+  await gotoView(page, "Scenario Studio", /Scenario Studio/);
 
   // Selecting the template triggers the debounced analyze POST; hold the
   // response promise open before clicking so the 200 cannot be missed.

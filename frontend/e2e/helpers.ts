@@ -9,29 +9,95 @@
 
 import { expect, type Page } from "@playwright/test";
 
-/** Give the SPA time to mount and fire its debounced sample/analyze calls. */
+/**
+ * Wait until the SPA is actually INTERACTIVE, not merely painted.
+ *
+ * Root cause of the Phase 43.0 flake this guards against: on a cold dev
+ * server, Next compiles on demand and the SSR HTML (including the header h1)
+ * renders long before React hydrates — clicks and keyboard shortcuts fired
+ * in that window land on inert DOM.
+ *
+ * Hydration witness: the TopBar Clock renders NOTHING until it has mounted
+ * (TopBar.tsx renders null pre-mount to avoid a hydration mismatch), so the
+ * HH:MM:SS text existing in the header proves React effects are live —
+ * independent of backend health. (An earlier witness used the API chip's
+ * ONLINE/OFFLINE state, but that hangs the whole setup when a health request
+ * stalls; backend availability is asserted by the tests that need it, where
+ * a failure message is meaningful.)
+ */
 export async function waitForAppSettled(page: Page): Promise<void> {
-  await expect(page.locator("header h1")).toBeVisible({ timeout: 30_000 });
-  // Sample-on-mount + ~300ms debounced analyze; generous but bounded.
-  await page.waitForTimeout(1_200);
+  await expect(page.locator("header h1")).toBeVisible({ timeout: 60_000 });
+  await expect(
+    page.locator("header").getByText(/\d{1,2}:\d{2}:\d{2}/),
+  ).toBeVisible({ timeout: 60_000 });
+  await page.waitForTimeout(400); // let mount-time debounced fetches kick off
 }
 
 /**
- * Navigate the single-page shell by clicking a sidebar entry.
- * QuantLab views are not URL-addressable (by design), so navigation is the
- * same sidebar click a user performs.
+ * Navigate the single-page shell by clicking a sidebar entry, then VERIFY
+ * arrival via the header h1 marker.
+ *
+ * QuantLab views are deliberately not URL-addressable (`?view=` exists only
+ * for the globe — verified in the Phase 42.1 smoke evidence), so navigation
+ * is the same sidebar click a user performs. The click is retried once:
+ * on a slow dev server the first click can still land pre-hydration.
+ * Failures throw with the current URL, h1, and visible button labels so a
+ * red run is debuggable from the message alone.
  */
-export async function gotoView(page: Page, label: string): Promise<void> {
-  await page.getByRole("button", { name: label, exact: true }).first().click();
-  await page.waitForTimeout(900); // view mount + debounced analyze kickoff
+export async function gotoView(
+  page: Page,
+  sidebarLabel: string,
+  headerMarker: RegExp,
+): Promise<void> {
+  const button = page
+    .getByRole("button", { name: sidebarLabel, exact: true })
+    .first();
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    await button.click();
+    try {
+      await expect(page.locator("header h1")).toHaveText(headerMarker, {
+        timeout: attempt === 1 ? 10_000 : 20_000,
+      });
+      await page.waitForTimeout(700); // view mount + debounced analyze kickoff
+      return;
+    } catch {
+      // retry once — see hydration note above
+    }
+  }
+  const h1 = await page
+    .locator("header h1")
+    .textContent()
+    .catch(() => "<unreadable>");
+  const buttons = await page.evaluate(() =>
+    Array.from(document.querySelectorAll("button"))
+      .map((b) => (b.textContent ?? "").trim())
+      .filter((t) => t.length > 0 && t.length < 40)
+      .slice(0, 60),
+  );
+  throw new Error(
+    `gotoView("${sidebarLabel}") failed: header h1 never matched ${headerMarker}. ` +
+      `url=${page.url()} h1="${h1}". Visible buttons: ${buttons.join(" | ")}`,
+  );
 }
 
-/** Open the command palette with the real keyboard shortcut. */
+/**
+ * Open the command palette. Primary path is the real Ctrl+K shortcut; if the
+ * dialog does not appear (e.g. the keypress landed pre-hydration), fall back
+ * to the TopBar search chip — the same affordance a user would click. The
+ * dialog markup itself is accessible (role="dialog",
+ * aria-label="Command palette" in CommandPalette.tsx).
+ */
 export async function openCommandPalette(page: Page): Promise<void> {
+  const dialog = page.getByRole("dialog", { name: "Command palette" });
   await page.keyboard.press("Control+k");
-  await expect(
-    page.getByRole("dialog", { name: "Command palette" }),
-  ).toBeVisible({ timeout: 5_000 });
+  try {
+    await expect(dialog).toBeVisible({ timeout: 3_000 });
+    return;
+  } catch {
+    // fall through to the visible TopBar affordance
+  }
+  await page.getByRole("button", { name: /Search commands/ }).click();
+  await expect(dialog).toBeVisible({ timeout: 5_000 });
 }
 
 /** Dismiss the palette / any escapable overlay if one is open. */

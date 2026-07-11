@@ -34,6 +34,9 @@ export default defineConfig({
   workers: 1,
   retries: 0, // a frozen-demo regression must fail loudly, not retry away
   timeout: 120_000, // the KO/PEP pairs backtest takes ~10s on the backend
+  // Cold dev servers compile on demand and hydrate slowly; assertions get a
+  // budget that tolerates that without masking real regressions.
+  expect: { timeout: 15_000 },
   reporter: [
     ["list"],
     ["html", { outputFolder: "../artifacts/e2e/playwright-report", open: "never" }],
@@ -42,6 +45,7 @@ export default defineConfig({
     baseURL,
     ...(channel ? { channel } : {}),
     viewport: { width: 1440, height: 900 },
+    navigationTimeout: 60_000, // first goto on a cold dev server compiles the page
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
     // Video is deliberately OFF in v1: it requires Playwright's downloadable

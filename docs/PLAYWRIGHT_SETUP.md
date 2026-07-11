@@ -66,6 +66,18 @@ written by the harness.
 
 ## 6. Troubleshooting
 
+- **First run against a freshly started dev server is slow / used to flake** —
+  `next dev` compiles pages on demand and hydrates slowly on the first
+  request. The harness waits for real interactivity (the header API chip
+  resolving to ONLINE/OFFLINE is its hydration witness) with generous
+  budgets, so a cold first run just takes longer; it should not fail. If it
+  ever does, re-read the failure message — `gotoView` errors include the
+  current URL, h1, and visible buttons.
+- **Prod-mode (:3100) pages render unstyled / tests fail in setup** — `next
+  dev` and `next start` share the `.next` directory; a dev server running
+  alongside (or after) the production server corrupts the served assets.
+  Stop both, `npm run build`, then `npx next start --port 3100` fresh —
+  never run both at once.
 - **"Executable doesn't exist … ffmpeg"** — video was enabled without the
   ffmpeg component; keep `video: "off"` or run `npx playwright install ffmpeg`.
 - **"BLOCKED" from wrapper scripts / connection refused** — the backend or

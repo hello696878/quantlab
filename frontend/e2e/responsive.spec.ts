@@ -107,14 +107,10 @@ for (const vp of VIEWPORTS) {
     await page.goto("/");
     await waitForAppSettled(page);
 
-    await gotoView(page, "Public Release Candidate");
-    await expect(page.locator("header h1")).toHaveText(
-      /Public Release Candidate/,
-    );
+    await gotoView(page, "Public Release Candidate", /Public Release Candidate/);
     await assertNoHorizontalOverflow(page, 2);
 
-    await gotoView(page, "Scenario Studio");
-    await expect(page.locator("header h1")).toHaveText(/Scenario Studio/);
+    await gotoView(page, "Scenario Studio", /Scenario Studio/);
     await page.waitForTimeout(1_500); // sample + debounced analyze + charts
     await assertNoHorizontalOverflow(page, 2);
   });
