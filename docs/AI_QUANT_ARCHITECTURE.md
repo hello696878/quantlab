@@ -3735,3 +3735,333 @@ override the JSON `on_error`.
   compare apples to oranges.
 - Local / synthetic results are **not investment advice** and **not a live
   performance guarantee**.
+
+---
+
+## Appendix M — Phase 12 Local ExperimentStore Catalog / Leaderboard Plan
+
+> **Status: design only (Phase 12 not implemented).** Sections M.1–M.12 are the
+> approved plan; **no code, script, test, data, or artifact exists yet.** Phase 12
+> is a **read-only catalog / leaderboard layer** over existing `ExperimentStore`
+> artifacts: discover saved runs, build deterministic rows, filter, group
+> compatible runs, rank by one metric, and export — without manually copying every
+> `train_run_hash`. It **runs nothing, retrains nothing, writes nothing** (the
+> package performs no file writes at all), invents **no new ML models, features,
+> labels, metrics, backtests, or hashes**, and **changes no Phase 2–11 behavior**.
+> Local artifacts only; deterministic; not investment advice.
+
+### M.1 Current state
+
+- **`ExperimentStore` (Phase 5)** saves / loads one run per
+  `<base>/<train_run_hash>/` directory (`metadata.json` + frames with **relative**
+  `artifact_paths`).
+- **`list_experiments(store=, filters=)` already discovers runs
+  deterministically** — sorted `(created_at, train_run_hash)`, skipping directories
+  without a `metadata.json`, raising `ExperimentError` on corrupt metadata — but its
+  filters are exact-match over six fields only, and `get_best_experiment` returns
+  **top-1 only** (Appendix K §K.13 explicitly deferred top-n / sort).
+- **Phase 10** can summarize / compare / export **explicit** `train_run_hash`es
+  (with the same-window comparison guard) and pick the single best run.
+- **Phase 11** can produce **many** saved runs per batch, with ordered
+  `train_run_hashes` in its manifest — which makes the gap acute: after a sweep,
+  hashes must be copied by hand from manifests or `list` output.
+- **Missing layer** — discover, filter, **rank**, and export saved runs as a
+  deterministic table, and hand a selected hash set to Phase 10 comparison, without
+  manually knowing every `train_run_hash`.
+
+### M.2 Core design decision
+
+Phase 12 is a **read-only catalog / leaderboard layer over existing
+`ExperimentStore` artifacts**. It **must**:
+
+- discover saved experiment runs (reusing the existing `list_experiments`);
+- load persisted `ExperimentRun` metadata;
+- build **deterministic catalog rows**;
+- **filter** rows safely;
+- **group compatible** rows;
+- **rank** rows by one selected metric;
+- export **CSV / JSON / Markdown**;
+- optionally output selected `train_run_hash`es for Phase 10 comparison.
+
+It **must not**:
+
+- run experiments or retrain models;
+- call the Phase 9 pipeline or the Phase 11 batch runner;
+- add new ML models, features / labels, metrics, or backtests;
+- optimize adaptively;
+- add live / vendor data;
+- add trading recommendations;
+- change Phase 2–11 behavior.
+
+### M.3 Proposed package — `backend/app/experiment_catalog/`
+
+A **new package** parallel to `batch_experiments/` and `reporting/` — table-building
+stays out of `experiments/` (no `ExperimentStore` bloat) and out of `reporting/`
+(no renderer bloat):
+
+```text
+backend/app/experiment_catalog/
+├── __init__.py       # public exports
+├── catalog.py        # CatalogError, ExperimentCatalogRow, ExperimentCatalogFilter,
+│                     #   list_experiment_runs, build_experiment_catalog,
+│                     #   filter_experiment_catalog
+└── leaderboard.py    # ExperimentLeaderboardSpec, group_compatible_runs,
+                      #   rank_experiment_catalog,
+                      #   export_catalog_csv / export_catalog_json / export_catalog_markdown
+```
+
+- **`CatalogError`** — catalog-spec failure (empty store, unknown filter field,
+  metric unavailable for all rows, incompatible required-compatible selection);
+  distinct from `ExperimentError`, which still propagates for corrupt artifacts.
+- **`ExperimentCatalogRow`** (frozen) — one stable, JSON-safe row per run (§M.5).
+- **`ExperimentCatalogFilter`** (frozen) — optional exact-match / threshold /
+  range constraints (§M.6).
+- **`ExperimentLeaderboardSpec`** (frozen) — metric, direction, top-n,
+  missing-metric policy, require-compatible (§M.7).
+- **`list_experiment_runs(store)`** — thin delegation to the existing
+  `list_experiments` (reuse, not reimplementation).
+- **`build_experiment_catalog(store, *, metrics=None) -> list[ExperimentCatalogRow]`**
+  — rows in the inherited deterministic order; `CatalogError` on an empty store.
+- **`filter_experiment_catalog(rows, flt)`** — pure, order-preserving.
+- **`group_compatible_runs(rows)`** — deterministic compatibility groups with
+  index-based ids (`group_0000`, ... — the Phase 11 id idiom).
+- **`rank_experiment_catalog(rows, spec)`** — pure ranking; **top-1 agrees with the
+  existing `get_best_experiment`** (a parity test pins this).
+- **`export_catalog_csv / _json / _markdown(rows) -> str`** — deterministic strings
+  (no file I/O in the package; only the CLI writes, to an explicit path).
+
+**Package rules**
+
+- **Read-only** over `ExperimentStore`; **no writes in package code**.
+- **No `local_pipeline` import; no `batch_experiments` import.**
+- **No `train_model` / feature / label builder imports.**
+- **No new hash function** (no `hashlib` / `sha256` / `compute_config_hash` — the
+  catalog mints no identity).
+- **No new `ExperimentRun` schema fields.**
+- **`catalog.py` does not import `app.reporting`**; the exporter / Markdown layer
+  (`leaderboard.py`) **may reuse the Phase 10 `DISCLAIMERS`** constant so the
+  standing disclaimer text has one source.
+
+### M.4 Scope
+
+**In scope**
+
+- listing saved `train_run_hash`es; loading each `ExperimentRun`;
+- extracting stable metadata columns and **selected metrics**;
+- filtering by `model_type`, `task_type`, `label_column`, `feature_columns`,
+  train / validation windows, metric availability, metric thresholds, and
+  `created_at` range;
+- **compatibility grouping**;
+- a **leaderboard** sorted by one metric, with `top_n` and deterministic
+  tie-breaking;
+- **CSV / JSON / Markdown exporters**;
+- selected-hashes output for Phase 10 comparison.
+
+**Out of scope**
+
+- vendor / network / yfinance / IBKR downloader; live data; real-money trading;
+- frontend; DB / cloud;
+- new ML frameworks; `sklearn` / `xgboost` / `lightgbm` / `torch` / `tensorflow`;
+- new model families; a new backtest engine; new feature / label logic;
+- rewriting Phase 2–11; a Research CLI real-data mode;
+- **adaptive optimization / search / early stopping**;
+- **parallel experiment execution**; auto-generated trading recommendations.
+
+### M.5 Catalog row design
+
+`ExperimentCatalogRow` (frozen dataclass), stable fields in fixed order:
+
+| Field | Source / rule |
+|---|---|
+| `train_run_hash`, `created_at` | as persisted |
+| `model_type`, `task_type`, `label_column` | as persisted |
+| `train_start` / `train_end` / `validation_start` / `validation_end` | **ISO strings** (JSON-safe) |
+| `feature_columns` | tuple, as persisted |
+| `n_oos_rows`, `n_scored_rows` | as persisted |
+| selected **metrics** | ML + backtest metrics via the **existing** precedence (`backtest_metrics` first, then `metrics`); default keys = the existing `DEFAULT_COMPARE_METRICS` |
+| selected **backtest / baseline metrics** | compact dicts, **if persisted** |
+| `artifact_dir` | **relative to the `ExperimentStore`** (the `train_run_hash` directory name — never absolute) |
+| `git_commit`, `code_version` | `None` → `null` / **"not recorded"** (Phase 10 convention) |
+| hash chain | the **six persisted hashes** (continuous → feature → label → dataset → model → train) |
+
+**Rules**
+
+- **No absolute paths in outputs**; `artifact_dir` is relative / store-safe.
+- Unavailable fields become `null` / **"not recorded"**.
+- **`root_symbol` / `source` / `raw_data_version_hash` are not persisted by
+  `ExperimentRun` and must not be invented** — they stay "not recorded".
+- **Deterministic column order** (dataclass field order) and **deterministic row
+  order before sorting** (`(created_at, train_run_hash)`, inherited from
+  `list_experiments`).
+- **Strict JSON-safe values only**; **`NaN` / `Infinity` sanitized to `null`** at
+  row construction.
+
+### M.6 Filtering / compatibility design
+
+`ExperimentCatalogFilter` — all fields optional (`None` = no constraint), safe
+filters only:
+
+- `model_type`, `task_type`, `label_column` — **exact match**;
+- `train_start` / `train_end`, `validation_start` / `validation_end` — **exact
+  match** (no range / overlap semantics — no invented window logic);
+- `feature_columns` — **exact ordered match**, with an optional
+  `features_as_set` flag for order-insensitive set match;
+- `require_metric` — metric present **and numeric** (not null / NaN);
+- `metric_min` / `metric_max` — thresholds on the `require_metric` metric;
+- `created_after` / `created_before` — lexicographic ISO-8601 comparison on the
+  persisted `created_at`.
+
+**Rules**
+
+- `metric_min` / `metric_max` **require an explicit `require_metric`** (no silent
+  metric guessing) — otherwise `CatalogError`.
+- Unknown filters fail clearly.
+- An **empty result after filtering is a valid, clear result**; an **empty store is
+  a failure** (`CatalogError`).
+- **Never silently compare incompatible runs.**
+
+**Compatibility grouping key** —
+`(train_start, train_end, validation_start, validation_end, label_column,
+dataset_config_hash, task_type)`:
+
+- a **strict superset of Phase 10's comparison guard key**
+  (`validation_start, validation_end, label_column, dataset_config_hash`), so every
+  group is guaranteed to pass `compare_experiments`' guard **by construction**;
+- selected hashes handed to Phase 10 **still pass through its own guard** (defense
+  in depth — Phase 12 never bypasses or re-implements it);
+- `dataset_config_hash` (persisted) already pins the feature / label identity;
+- **`root_symbol` / `source` are not persisted, so they are neither used nor
+  invented** in the key — reported "not recorded" only.
+
+### M.7 Leaderboard design
+
+`ExperimentLeaderboardSpec` (frozen): `metric` (default `"sharpe"`),
+`maximize=True` / minimize, `top_n=None` (all), `on_missing_metric="exclude"`,
+`require_compatible=False`.
+
+**Rules**
+
+- **Default missing-metric behavior: exclude** rows lacking a numeric value
+  (deterministically), **but fail clearly (`CatalogError`) if no rows have the
+  requested metric** (mirrors `get_best_experiment`'s "unavailable for all
+  experiments").
+- **`"fail"` mode** may fail on the **first** missing metric value.
+- **Deterministic tie-break by `train_run_hash`** (after the metric value) —
+  identical to `get_best_experiment`, so `rank(..., top_n=1)` equals its pick (a
+  parity test pins this; Phase 12 thereby resolves §K.13's deferred top-n / sort in
+  its own layer, without touching Phase 10).
+- **`require_compatible=True` fails clearly** if the selected rows span multiple
+  compatibility groups — never a silent cross-window ranking.
+- The leaderboard is **descriptive only**: **no buy / sell / allocate / deploy
+  language, no investment advice, no automatic model deployment** — a sorted table
+  of historical local metrics, nothing more.
+
+### M.8 CLI design — `scripts/catalog_local_futures_experiments.py`
+
+**Future thin script — documented here, not implemented in Commit 0.** Argparse
+subparsers with a `common` parent (the Phase 10 CLI idiom); **filter flags live on
+the common parent**, so every subcommand filters (no separate `filter`
+subcommand).
+
+| Subcommand | Output |
+|---|---|
+| `list` | catalog table to stdout (read-only) |
+| `leaderboard` | ranked table to stdout |
+| `groups` | compatibility groups + member hashes to stdout |
+| `hashes` | selected `train_run_hash`es, one per line (pipe-friendly for the Phase 10 CLI) |
+| `export-csv` / `export-json` / `export-markdown` | write the (filtered / ranked) catalog to the explicit `--output-path` |
+
+**Common flags:** `--artifacts-dir`, `--model-type`, `--task-type`,
+`--label-column`, `--train-start` / `--train-end`,
+`--validation-start` / `--validation-end`, `--feature-columns`,
+`--features-as-set`, `--require-metric`, `--metric-min` / `--metric-max`,
+`--created-after` / `--created-before`, `--no-parquet`.
+
+**Leaderboard flags:** `--metric`, `--maximize` / `--minimize` (mutually
+exclusive), `--top-n`, `--require-compatible`, `--on-missing-metric`.
+
+**Export flags:** `--output-path` (required for `export-*`).
+
+**CLI rules**
+
+- **read-only by default** — only `export-*` writes, **only to the explicit
+  `--output-path`** (parent directory created);
+- **local files only**; **deterministic output**;
+- **`RESULT: OK` / `RESULT: FAIL (...)`** with matching exit code;
+- **no network; no retraining; no trading advice.**
+
+### M.9 Safety / data rules
+
+- **Tests use `tmp_path` only**; **no repo-root `data/` or `artifacts/` writes.**
+- **No network; no vendor fetch; no new ML dependencies.**
+- **No absolute paths** in committed tests / docs or in any output.
+- **Local artifacts only.**
+- **Clear failure when the `ExperimentStore` has no runs** (`CatalogError`).
+- **Clear failure when the requested metric is unavailable for all rows.**
+- **Clear failure when a required-compatible selection is incompatible.**
+- **Clear behavior for malformed experiment directories** — directories without a
+  `metadata.json` are skipped (existing `list_experiments` behavior); a directory
+  **with** corrupt metadata raises the existing `ExperimentError`.
+- **No investment-advice language**; exports include the **standing disclaimers**
+  where appropriate (reusing Phase 10's `DISCLAIMERS`).
+
+### M.10 Test plan
+
+`backend/tests/test_experiment_catalog.py` (later commits) will:
+
+- use **synthetic `ExperimentStore` runs under `tmp_path`**, preferably built once
+  via the **existing Phase 9 / 11 helpers** (`generate_synthetic_es_raw` → tmp
+  `RawFuturesStore` → Phase 9 / batch runs saved to a tmp `ExperimentStore`);
+- **discover 2–4 saved runs**; verify **deterministic row order** and **stable
+  catalog columns**;
+- verify **strict JSON output** (`allow_nan=False`; `NaN` → `null`) and
+  **deterministic CSV / Markdown output**;
+- verify **no absolute path leakage** in any export;
+- filter by **`model_type`**, **`task_type`**, **`label_column`**, **windows**, and
+  **`feature_columns` exact / set match**;
+- verify **missing-metric behavior** (exclude vs fail; unavailable-for-all fails);
+- verify **leaderboard maximize / minimize**, **`top_n`**, and the **deterministic
+  tie-breaker** (hand-built rows force an exact tie);
+- verify **compatibility grouping** (two groups from mixed-window fixtures) and
+  **`require_compatible`** behavior;
+- verify **selected hashes can be passed to Phase 10 comparison** (guard passes for
+  one group);
+- verify **malformed / missing run directories** are handled clearly and an
+  **empty `ExperimentStore` fails clearly**;
+- verify **CLI exit codes** and that the **CLI writes only to the explicit
+  `--output-path`**;
+- verify **no repo-root artifacts** and **no forbidden imports**
+  (network / vendor / ML frameworks);
+- verify **no `local_pipeline` / `batch_experiments` imports in the catalog
+  package**, **no direct `train_model` / `build_feature_matrix` /
+  `build_label_matrix` imports**, and **no hashing helpers or raw
+  `hashlib` / `sha256`**.
+
+### M.11 Commit plan
+
+- **Commit 0** — **Appendix M doc-only plan** (this section).
+- **Commit 1** — **catalog row / discovery / filtering module** (`catalog.py`:
+  `CatalogError`, `ExperimentCatalogRow`, `ExperimentCatalogFilter`,
+  `list_experiment_runs`, `build_experiment_catalog`, `filter_experiment_catalog`).
+- **Commit 2** — **leaderboard / compatibility grouping / deterministic exporters**
+  (`leaderboard.py`: `ExperimentLeaderboardSpec`, `group_compatible_runs`,
+  `rank_experiment_catalog`, `export_catalog_csv / _json / _markdown`).
+- **Commit 3** — **thin CLI + CLI tests**
+  (`scripts/catalog_local_futures_experiments.py`).
+- **Commit 4** — **integrated e2e + Appendix M as-built docs**.
+
+### M.12 Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Turning the leaderboard into an **optimizer or model-selection advice** | descriptive sorted table only; no auto-selection, no deploy hooks, no advice language; ranking pinned to the existing `get_best_experiment` semantics (top-1 parity test), not new selection logic |
+| **Comparing incompatible runs** | grouping key is a strict **superset** of the Phase 10 guard key; `require_compatible` fails loudly; hashes handed to Phase 10 still pass its unchanged guard |
+| **Over-trusting synthetic metrics** | tests assert structure / determinism, never metric values; exports carry standing disclaimers (synthetic / local-only) |
+| **Missing or malformed `ExperimentStore` artifacts** | non-run directories skipped (existing behavior); corrupt metadata raises the existing `ExperimentError`; empty store → `CatalogError`, never a silent empty table |
+| **Leaking absolute paths** | `artifact_dir` = hash directory name; e2e greps every output for drive letters / tmp names |
+| **Inventing metadata not persisted by `ExperimentRun`** | `root_symbol` / `source` / `raw_data_version_hash` stay **"not recorded"** (Phase 10 convention); no schema change |
+| **Bloating `ExperimentStore` or `reporting`** | a **separate** `experiment_catalog/` package; imports only `list_experiments` (+ `DISCLAIMERS` in the exporter layer) |
+| **Changing Phase 10 comparison behavior** | zero edits to `reporting/` / `experiments/`; the catalog only *feeds* hashes to the unchanged comparison |
+| **Adding implicit writes** | the package performs **no file writes at all**; the CLI writes only via `export-*` to `--output-path`; tests verify read-only subcommands write nothing |
+| **Frontend / dashboard scope creep** | CLI + strings only; no server, no routes, no HTML |
+| **Adding new hash identities unnecessarily** | the catalog mints **no hash of any kind** — no `hashlib` / `sha256` / manifest fingerprint; identity remains the existing `train_run_hash` (guard-tested) |
