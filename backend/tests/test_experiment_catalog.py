@@ -12,6 +12,7 @@ lives under ``tmp_path``; no network; nothing written outside ``tmp_path``.
 from __future__ import annotations
 
 import dataclasses
+import importlib.util
 import json
 from datetime import date
 from pathlib import Path
@@ -748,3 +749,309 @@ def test_leaderboard_creates_no_repo_artifacts(tmp_path):
     rank_experiment_catalog(rows, ExperimentLeaderboardSpec(metric="sharpe"))
     export_catalog_csv(rows), export_catalog_json(rows), export_catalog_markdown(rows)
     assert groups and _repo_snapshot() == before
+
+
+# --------------------------------------------------------------------------- #
+# CLI — scripts/catalog_local_futures_experiments.py
+# --------------------------------------------------------------------------- #
+
+_CATALOG_CLI_PATH = _REPO_ROOT / "scripts" / "catalog_local_futures_experiments.py"
+
+
+def _load_catalog_cli():
+    """Import the thin catalog CLI module by path (executes its sys.path bootstrap)."""
+    spec = importlib.util.spec_from_file_location("catalog_cli", _CATALOG_CLI_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _cli_store(tmp_path) -> str:
+    return str(_store_with_three_runs(tmp_path).base_dir)
+
+
+def _tree_snapshot(tmp_path) -> list:
+    return sorted(str(p) for p in tmp_path.rglob("*"))
+
+
+def test_cli_list_ok(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    code = cli.main(["list", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet"])
+    out = capsys.readouterr().out
+    assert code == 0 and "RESULT: OK" in out
+    for h in ("run_c", "run_a", "run_b"):
+        assert f"[{h}]" in out
+    assert "n_rows=3" in out
+
+
+def test_cli_leaderboard_ranked_output(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    code = cli.main(["leaderboard", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet"])
+    out = capsys.readouterr().out
+    assert code == 0 and "RESULT: OK" in out
+    # sharpe: run_a 1.5 > run_c 0.9 > run_b 0.5
+    assert "#1 train_run_hash=run_a" in out
+    assert "#2 train_run_hash=run_c" in out
+    assert "#3 train_run_hash=run_b" in out
+    assert "metric=sharpe maximize=True" in out
+
+
+def test_cli_leaderboard_minimize_and_top_n(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    store = _cli_store(tmp_path)
+    code = cli.main(
+        ["leaderboard", "--artifacts-dir", store, "--no-parquet", "--minimize", "--top-n", "1"]
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "#1 train_run_hash=run_b" in out  # lowest sharpe
+    assert "#2" not in out  # top_n applied
+
+
+def test_cli_groups_ok(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    code = cli.main(["groups", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet"])
+    out = capsys.readouterr().out
+    assert code == 0 and "RESULT: OK" in out
+    assert "[group_0000]" in out and "n_groups=3" in out
+    assert "members=" in out
+
+
+def test_cli_hashes_one_per_line_catalog_order(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    code = cli.main(["hashes", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet"])
+    out = capsys.readouterr().out
+    assert code == 0 and "RESULT: OK" in out
+    lines = out.splitlines()
+    assert "run_c" in lines and "run_a" in lines and "run_b" in lines  # bare, one per line
+    assert lines.index("run_c") < lines.index("run_a") < lines.index("run_b")
+
+
+def test_cli_filters_apply(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    store = _cli_store(tmp_path)
+    code = cli.main(
+        ["list", "--artifacts-dir", store, "--no-parquet", "--model-type", "ridge_regression"]
+    )
+    out = capsys.readouterr().out
+    assert code == 0
+    assert "[run_a]" in out and "[run_b]" not in out and "[run_c]" not in out
+    assert "n_rows=1" in out
+
+
+def test_cli_feature_columns_filter(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    store = _cli_store(tmp_path)
+    joined = ",".join(_FEATURES)
+    code = cli.main(["list", "--artifacts-dir", store, "--no-parquet", "--feature-columns", joined])
+    out = capsys.readouterr().out
+    assert code == 0 and "n_rows=2" in out  # run_c has reversed order
+    capsys.readouterr()
+    code = cli.main(
+        ["list", "--artifacts-dir", store, "--no-parquet",
+         "--feature-columns", joined, "--features-as-set"]
+    )
+    out = capsys.readouterr().out
+    assert code == 0 and "n_rows=3" in out  # set match includes run_c
+
+
+def test_cli_export_csv(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    store = _cli_store(tmp_path)
+    out_path = tmp_path / "out" / "nested" / "catalog.csv"
+    code = cli.main(
+        ["export-csv", "--artifacts-dir", store, "--no-parquet", "--output-path", str(out_path)]
+    )
+    out = capsys.readouterr().out
+    assert code == 0 and f"[EXPORT] path={out_path}" in out
+    assert out_path.exists()  # parent dirs created for the explicit path only
+    assert out_path.read_text(encoding="utf-8").startswith("train_run_hash,")
+    assert list(out_path.parent.iterdir()) == [out_path]  # nothing else written there
+
+
+def test_cli_export_json_strict(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    out_path = tmp_path / "catalog.json"
+    code = cli.main(
+        ["export-json", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet",
+         "--output-path", str(out_path)]
+    )
+    assert code == 0
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    json.dumps(payload, allow_nan=False)
+    assert payload["disclaimers"] == list(DISCLAIMERS)
+    assert len(payload["rows"]) == 3
+
+
+def test_cli_export_markdown_with_disclaimers(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    out_path = tmp_path / "catalog.md"
+    code = cli.main(
+        ["export-markdown", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet",
+         "--output-path", str(out_path)]
+    )
+    assert code == 0
+    text = out_path.read_text(encoding="utf-8")
+    assert "## Disclaimers" in text
+    for line in DISCLAIMERS:
+        assert line in text
+
+
+def test_cli_export_ranked_when_ranking_flags_given(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    out_path = tmp_path / "top1.csv"
+    code = cli.main(
+        ["export-csv", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet",
+         "--output-path", str(out_path), "--metric", "sharpe", "--top-n", "1"]
+    )
+    assert code == 0
+    lines = out_path.read_text(encoding="utf-8").strip().splitlines()
+    assert len(lines) == 2  # header + the single top row
+    assert lines[1].startswith("run_a")  # best sharpe
+
+
+def test_cli_require_compatible_mixed_groups_fails(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    code = cli.main(
+        ["leaderboard", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet",
+         "--require-compatible"]
+    )
+    out = capsys.readouterr().out
+    assert code != 0 and "RESULT: FAIL" in out
+
+
+def test_cli_metric_unavailable_for_all_fails(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    # r2 is a selected default metric key but no fixture run has a value for it
+    code = cli.main(
+        ["leaderboard", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet", "--metric", "r2"]
+    )
+    out = capsys.readouterr().out
+    assert code != 0 and "RESULT: FAIL" in out
+
+
+def test_cli_empty_store_fails(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    empty = tmp_path / "empty_store"
+    empty.mkdir()
+    code = cli.main(["list", "--artifacts-dir", str(empty), "--no-parquet"])
+    out = capsys.readouterr().out
+    assert code != 0 and "RESULT: FAIL" in out
+
+
+def test_cli_no_rows_after_filter_fails(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    code = cli.main(
+        ["list", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet",
+         "--model-type", "nonexistent"]
+    )
+    out = capsys.readouterr().out
+    assert code != 0 and "RESULT: FAIL" in out and "no rows after filtering" in out
+
+
+def test_cli_invalid_top_n_fails(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    code = cli.main(
+        ["leaderboard", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet", "--top-n", "0"]
+    )
+    out = capsys.readouterr().out
+    assert code != 0 and "RESULT: FAIL" in out
+
+
+def test_cli_missing_output_path_fails(tmp_path):
+    cli = _load_catalog_cli()
+    with pytest.raises(SystemExit):
+        cli.main(["export-csv", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet"])
+
+
+def test_cli_conflicting_direction_flags_fail(tmp_path):
+    cli = _load_catalog_cli()
+    with pytest.raises(SystemExit):
+        cli.main(
+            ["leaderboard", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet",
+             "--maximize", "--minimize"]
+        )
+
+
+def test_cli_corrupt_metadata_fails_cleanly(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    store_dir = _cli_store(tmp_path)
+    bad = Path(store_dir) / "run_bad"
+    bad.mkdir()
+    (bad / "metadata.json").write_text("{ not valid json", encoding="utf-8")
+    code = cli.main(["list", "--artifacts-dir", store_dir, "--no-parquet"])
+    out = capsys.readouterr().out
+    assert code != 0 and "RESULT: FAIL" in out
+    assert "Traceback" not in out
+
+
+def test_cli_read_only_subcommands_write_nothing(tmp_path, capsys):
+    cli = _load_catalog_cli()
+    store = _cli_store(tmp_path)
+    before = _tree_snapshot(tmp_path)
+    for argv in (
+        ["list", "--artifacts-dir", store, "--no-parquet"],
+        ["leaderboard", "--artifacts-dir", store, "--no-parquet"],
+        ["groups", "--artifacts-dir", store, "--no-parquet"],
+        ["hashes", "--artifacts-dir", store, "--no-parquet"],
+    ):
+        assert cli.main(argv) == 0
+        capsys.readouterr()
+    assert _tree_snapshot(tmp_path) == before  # not a single new file
+
+
+def test_cli_creates_no_repo_artifacts(tmp_path, capsys):
+    before = _repo_snapshot()
+    cli = _load_catalog_cli()
+    cli.main(["list", "--artifacts-dir", _cli_store(tmp_path), "--no-parquet"])
+    capsys.readouterr()
+    assert _repo_snapshot() == before
+
+
+def test_cli_module_has_no_forbidden_imports():
+    src = Path(_CATALOG_CLI_PATH).read_text(encoding="utf-8")
+    forbidden = [
+        "import requests",
+        "urllib",
+        "httpx",
+        "aiohttp",
+        "socket",
+        "yfinance",
+        "ibkr",
+        "sklearn",
+        "xgboost",
+        "lightgbm",
+        "torch",
+        "tensorflow",
+    ]
+    for token in forbidden:
+        assert token not in src, f"catalog CLI must not reference {token!r}"
+
+
+def test_cli_module_respects_layer_boundaries():
+    src = Path(_CATALOG_CLI_PATH).read_text(encoding="utf-8")
+    for token in (
+        "app.local_pipeline",
+        "app.batch_experiments",
+        "run_local_futures_ml_experiment",
+        "train_model",
+        "build_feature_matrix",
+        "build_label_matrix",
+        "hashlib",
+        "sha256",
+        "compute_config_hash",
+    ):
+        assert token not in src, f"catalog CLI must not reference {token!r}"
+
+
+def test_cli_no_advice_language_in_source_or_output(tmp_path, capsys):
+    src = Path(_CATALOG_CLI_PATH).read_text(encoding="utf-8").lower()
+    for token in ("buy", "sell", "allocate", "deploy"):
+        assert token not in src, f"advice-like token {token!r} in CLI source"
+    cli = _load_catalog_cli()
+    store = _cli_store(tmp_path)
+    cli.main(["list", "--artifacts-dir", store, "--no-parquet"])
+    cli.main(["leaderboard", "--artifacts-dir", store, "--no-parquet"])
+    out = capsys.readouterr().out.lower()
+    for token in ("buy", "sell", "allocate", "deploy"):
+        assert token not in out, f"advice-like token {token!r} in CLI output"
