@@ -5,16 +5,37 @@ video, capturing final screenshots, and posting publicly — so what you show
 is what the repo actually contains. Fill in the placeholders by hand; nothing
 in this repo automates any of it.
 
-## 1. Freeze record
+## 1. Freeze record — COMPLETED (Phase 42.4)
 
 | Field | Value |
 |---|---|
-| Freeze date | `____-__-__` (fill in) |
-| Frozen commit hash | `_______` (`git log -1 --format=%h`) |
-| Tag at freeze | `v4.__._-________-v1` (created manually after review) |
-| Backend test count at freeze | `____ passed` (from a real run — see runbook §9) |
-| Typecheck at freeze | exit `_` (from a real run) |
-| `npm run build` at freeze | user-run: `______` (record the real outcome) |
+| Freeze date | 2026-07-11 |
+| Branch | `main` |
+| Verified application commit | `c059c4e` (all release gates ran against this commit) |
+| Freeze evidence commit | the commit targeted by the annotated release tag (contains this record + the R1–R5 evidence; recorded externally, not self-referentially) |
+| Release tag | `v4.60.0-public-release-candidate-demo-freeze-v1` (created only after the evidence commit's own CI run is green) |
+| Backend suite at freeze | **2,968 passed, 0 failed, exit 0** (241.55s; `artifacts\` absent before/after) |
+| Frontend typecheck at freeze | `npx tsc --noEmit` → exit 0 |
+| `npm run build` at freeze | exit 0, no warnings (routes `/`, `/_not-found`, `/globe ƒ`) |
+| Production browser smoke | PASS (`next start --port 3100` against the real backend — see `BROWSER_SMOKE_TEST_REPORT.md`, Phase 42.2 addendum) |
+| Application CI run | [29141440276](https://github.com/hello696878/quantlab/actions/runs/29141440276) on `c059c4e` — Backend Tests ✅, Frontend Build ✅ |
+| Known limitations | [`KNOWN_LIMITATIONS_PUBLIC.md`](KNOWN_LIMITATIONS_PUBLIC.md) (public) · [`LIMITATIONS.md`](LIMITATIONS.md) (full ledger) |
+| Approval state | ready for evidence-commit CI verification |
+
+### R1–R5 release evidence (production build at `c059c4e`, SHA-256)
+
+| # | Path | Dimensions | SHA-256 |
+|---|---|---|---|
+| R1 | `docs/screenshots/release_landing_1440.png` | 1440×900 | `46db0fd41c896987803520bcafb19585247df32658116aad95897b7c86d19334` |
+| R2 | `docs/screenshots/release_scenario_studio.png` | 1243×781 | `2ebb4b28893257f9138290ac4855fc99e3b0a8c015d858efbbd25719231fc599` |
+| R3 | `docs/screenshots/release_home_1024.png` | 1024×5800 | `98a3dde06e4a894176a3f942b75e9702f8c4cbfc450a43b51949c29ea13797bd` |
+| R4 | `docs/screenshots/release_home_768.png` | 768×1000 | `d0b88dac5d968d7b1baf5ab1eaef376dc251d858b94242d5ea7d5b3fab6f71db` |
+| R5 | `docs/screenshots/release_pairs_backtest.png` | 1042×1273 | `b271f413ce2426c81bca361a457df008103f5d366e65e4a319e32a68d5b32183` |
+
+R1/R3/R4 were exported by OS-installed Edge headless (`--screenshot`) against
+the production server; R2/R5 were captured manually from the same production
+session. Capture recipes: `SCREENSHOT_CHECKLIST.md` §Release-evidence
+captures.
 
 ## 2. Demo route order (frozen)
 
