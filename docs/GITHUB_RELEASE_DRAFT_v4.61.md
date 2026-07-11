@@ -70,7 +70,7 @@ Windows setup and are recorded with context in the repo docs — they are
 | Production build | `npm run build` exit 0, no warnings | freeze record |
 | Production browser smoke | PASS (all 37 views; prod mode) | `docs/BROWSER_SMOKE_TEST_REPORT.md` |
 | Playwright E2E | 12 passed (dev and production base URLs) | `docs/ROADMAP.md` Phase 43.0 |
-| CI (freeze evidence commit `7cf9708`) | run 29147666495 — Backend Tests ✅ Frontend Build ✅ | freeze record |
+| CI (freeze evidence commit `7cf9708`) | run 29147666495 — Backend Tests ✅ Frontend Build ✅ | `docs/ROADMAP.md` (Phase 43.0) |
 
 Key commits: application state `c059c4e` · freeze evidence `7cf9708` ·
 E2E harness `e1dcdca` · E2E stabilization `4a06c5b`.
