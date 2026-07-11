@@ -1677,6 +1677,52 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 43.0 — Browser E2E Harness & Frozen Demo Regression Guard v1 ✅
+
+- **Post-freeze quality-engineering phase (no new financial model): the
+  manual Claude Browser smoke process is now a repeatable local Playwright
+  harness protecting the frozen v4.60.0 demo path.** One devDependency
+  (`@playwright/test`); **zero browser downloads** — the config drives the
+  OS-installed Edge via `channel: "msedge"` (env-overridable; bundled
+  Chromium documented as a manual alternative). No webServer block: the
+  harness never starts servers and the wrapper scripts refuse to run until
+  the user has.
+- **12 tests across 4 specs + shared helpers** (`frontend/e2e/`): the frozen
+  route walk (landing/hero/API-chip, five workflow pages, Ctrl+K palette
+  navigation, Saved Reports empty state); the Scenario Studio guard (analyze
+  POST 200 → 100.0/100, 8/8, severe-systemic-stress, heatmap+charts); the
+  KO/PEP pairs guard (**pins the frozen 2016-07-11 → 2026-07-11 range** —
+  the app's default dates are relative to today — and asserts 119 trades,
+  −23.0% vs +112.7%, 4 charts, trade log, no live provider); and the
+  responsive geometry guard encoding the three fixed Phase 42.1 defects
+  (badges-in-cards, TopBar readability, market-chip clipping) at
+  1440/1024/768. Safety invariants everywhere: no rendered NaN/Infinity
+  (QA/RC checklist *wording* is a documented stripped exception), no raw
+  stack traces, no failed local `/api/*` calls (StrictMode `ERR_ABORTED`
+  dev-mount aborts documented and ignored).
+- **Evidence policy:** all output under gitignored `artifacts/e2e/`
+  (test-results + HTML report); failure videos deliberately off (would need
+  Playwright's downloadable ffmpeg — an initial all-fail run caught this and
+  the config now documents it); the frozen `docs/screenshots/release_*.png`
+  are never written.
+- **Scripts:** `print_e2e_commands.ps1` (print-only),
+  `run_e2e_frozen_demo.ps1` / `run_e2e_responsive.ps1` (TCP-probe the
+  servers, refuse-if-down, run Playwright only — never install/start/build);
+  all parser-validated; refusal and pass paths both exercised.
+- **CI decision:** deliberately **not** a CI job in v1 (needs live servers;
+  avoids pipeline flake while the harness stabilizes) — documented in
+  `CI.md` and `PLAYWRIGHT_SETUP.md`; run locally before releases/reviews.
+- **Docs:** `BROWSER_E2E_RUNBOOK.md`, `FROZEN_DEMO_REGRESSION_GUARD.md`
+  (what is protected, what may not change casually, how to evolve the guard),
+  `PLAYWRIGHT_SETUP.md`; README/RELEASE_CHECKLIST links; the frozen
+  `DEMO_FREEZE_CHECKLIST.md` record deliberately untouched.
+- **Verified by real runs:** full harness **12/12 passed (50.7s, exit 0)
+  against the production build on :3100**; wrapper pass path 6/6; backend
+  suite re-run green; `npx tsc --noEmit` exit 0 (specs typecheck under the
+  app's strict config); frozen screenshot SHA-256s confirmed unchanged.
+  **E2E green is a regression signal for the frozen demo path — never a
+  production, trading, or compliance certification.**
+
 ### Phase 42.2 — Final Release Gates & Production Build Verification ✅
 
 - **Test-count discrepancy explained:** Phase 41 ran 2,967 green *before*

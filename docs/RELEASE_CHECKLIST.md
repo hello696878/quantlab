@@ -72,6 +72,10 @@ npm run build
 - [ ] Before a **public** milestone (repo made public, demo recorded), run
       the full page-by-page pass instead:
       [`FINAL_SMOKE_TEST_RUNBOOK.md`](FINAL_SMOKE_TEST_RUNBOOK.md).
+- [ ] Run the frozen-demo E2E guard (local, servers running):
+      `npm run e2e` from `frontend\` —
+      [`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md). Green is a
+      regression signal, not a certification.
 
 ## 6. Docs & wording
 

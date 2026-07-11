@@ -10,6 +10,12 @@ automation in this repo, and this runbook does not add any. Budget roughly
 > page fails a check, fix or note it — never share publicly with a known red
 > failure and never claim the pass happened if it didn't.
 
+> **Automated companion (Phase 43.0):** the frozen demo path, the Scenario
+> Studio severe combo, the KO/PEP pairs fixture, and the 1440/1024/768
+> geometry checks now also have a local Playwright guard —
+> [`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md). It complements this
+> manual pass; it does not replace it (it covers ~7 of the 37 views).
+
 ## 1. Before starting
 
 - Clean tree: `git status --short` (only expected work in progress).

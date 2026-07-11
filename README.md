@@ -100,6 +100,9 @@ backend\venv\Scripts\python.exe -m pytest backend\tests -q
 
 cd C:\quantlab\frontend
 npx tsc --noEmit
+npm run e2e   # browser regression guard for the frozen demo path
+              # (local/manual; servers must already be running —
+              #  see docs/BROWSER_E2E_RUNBOOK.md)
 ```
 
 ## Suggested demo path
@@ -263,6 +266,7 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
 - [docs/PUBLIC_RELEASE_CANDIDATE.md](docs/PUBLIC_RELEASE_CANDIDATE.md) · [docs/PUBLIC_LAUNCH_READINESS.md](docs/PUBLIC_LAUNCH_READINESS.md) — the final manual verification pass and the go/no-go decision table (public portfolio readiness only)
 - [docs/FINAL_SMOKE_TEST_RUNBOOK.md](docs/FINAL_SMOKE_TEST_RUNBOOK.md) · [docs/DEMO_FREEZE_CHECKLIST.md](docs/DEMO_FREEZE_CHECKLIST.md) — the page-by-page manual smoke pass and the demo freeze discipline
 - [docs/KNOWN_LIMITATIONS_PUBLIC.md](docs/KNOWN_LIMITATIONS_PUBLIC.md) · [docs/FINAL_DEMO_SCRIPT.md](docs/FINAL_DEMO_SCRIPT.md) — public-facing limitations and the timed final demo scripts
+- [docs/BROWSER_E2E_RUNBOOK.md](docs/BROWSER_E2E_RUNBOOK.md) · [docs/FROZEN_DEMO_REGRESSION_GUARD.md](docs/FROZEN_DEMO_REGRESSION_GUARD.md) · [docs/PLAYWRIGHT_SETUP.md](docs/PLAYWRIGHT_SETUP.md) — the local browser E2E harness guarding the frozen demo path (regression signal, not certification)
 - [docs/PORTFOLIO_LAUNCH_PACK.md](docs/PORTFOLIO_LAUNCH_PACK.md) — pitches & launch checklist
 - [docs/PUBLIC_PROJECT_SUMMARY.md](docs/PUBLIC_PROJECT_SUMMARY.md) — recruiter / quant / technical summaries
 - [docs/DEMO_SCRIPT.md](docs/DEMO_SCRIPT.md) · [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md) — live & recorded demo scripts

@@ -192,3 +192,9 @@ same environment):
   configuration restored afterward.
 - Release-evidence captures remain manual — see the Phase 42.2 section of
   [`SCREENSHOT_CHECKLIST.md`](SCREENSHOT_CHECKLIST.md).
+
+**Successor (Phase 43.0):** the manual process recorded in this report now
+has a repeatable local Playwright harness —
+[`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md) /
+[`FROZEN_DEMO_REGRESSION_GUARD.md`](FROZEN_DEMO_REGRESSION_GUARD.md). This
+report stays as the frozen v4.60.0 evidence record.
