@@ -32,7 +32,12 @@ evidence commit `7cf9708` (tag `v4.60.0-public-release-candidate-demo-freeze-v1`
 | E2E run outputs | `artifacts/e2e/**` (test-results, playwright-report) | generated | Local E2E traces/reports | **Generated — never committed** | gitignored via `artifacts/` | safe to delete; regenerated per run |
 | Manual CI browser E2E workflow | `.github/workflows/browser-e2e.yml` | workflow | Run the E2E guard in an isolated runner (`workflow_dispatch` only) | Source | v4.63 series (Phase 45.0) | read-only perms; no secrets; never publishes anything |
 | CI browser E2E doc | `docs/CI_BROWSER_E2E.md` | doc | How to trigger/interpret the manual workflow | Living doc | v4.63 series | remote-run status recorded only from real observed runs |
-| CI E2E evidence artifacts | GitHub Actions run artifacts (`browser-e2e-evidence-<run id>`) | generated | Per-run logs/report/traces, 14-day retention | **Generated — never committed** | attached to a specific workflow run | temporary CI evidence — not frozen screenshots, not certification |
+| CI E2E evidence artifacts | GitHub Actions run artifacts (`browser-e2e-evidence-<run id>`) | generated | Per-run logs/report/traces, 14-day retention | **Generated — never committed** | attached to a specific workflow run | first observed green run: 29185725247 on `47bfec0` (v4.63 tag target) |
+| Final v4.64 release draft | `docs/GITHUB_RELEASE_FINAL_v4.64.md` | doc | **Manual copy-paste** text for the public GitHub Release | Manual publication material | targets the future `v4.64.0-…` tag (not yet created) | release NOT published — user publishes by hand |
+| v4.64 evidence ledger | `docs/RELEASE_EVIDENCE_v4.64.md` | doc | Facts-only evidence tables + release-blocking conditions | Tracked | v4.64 series | pending rows stay pending until real evidence exists |
+| Public GitHub launch checklist | `docs/PUBLIC_GITHUB_LAUNCH_CHECKLIST.md` | doc | 22-section manual gate + exact publication runbook | Tracked | v4.64 series | never changes GitHub settings itself |
+| Release checksum manifest | `docs/RELEASE_CHECKSUMS_v4.64.sha256` | manifest | SHA-256 of frozen screenshots + key evidence files | Tracked | v4.64 series | regenerate only when listed files legitimately change |
+| Checksum verifier | `scripts/verify_release_checksums.py` | script | Read-only manifest verification (exit 0/1/2; rejects unsafe paths) | Tracked | v4.64 series | unit-tested; never modifies or fetches anything |
 
 ## Policies (binding)
 

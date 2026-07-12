@@ -6,10 +6,15 @@ artifacts. Companions: [`CI.md`](CI.md) (the main preflight) ·
 [`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md) (the local harness) ·
 [`FROZEN_DEMO_REGRESSION_GUARD.md`](FROZEN_DEMO_REGRESSION_GUARD.md).
 
-> **Remote workflow status: Not yet run after this phase.** This document
-> describes what the workflow does — it does not claim a green run. Update
-> this line only with a real run ID and conclusion observed on the Actions
-> tab.
+> **Remote workflow status: GREEN — observed run
+> [29185725247](https://github.com/hello696878/quantlab/actions/runs/29185725247)
+> on commit `47bfec0` (the `v4.63.0-manual-ci-browser-e2e-evidence-v1` tag
+> target), `workflow_dispatch`, conclusion `success`.** Every step succeeded
+> — backend tests, typecheck, production build, both readiness waits, the
+> Playwright suite, and the evidence upload
+> (`browser-e2e-evidence-29185725247`, ~212 KB, 14-day retention, expires
+> 2026-07-26). Observed via read-only API inspection during Phase 46.0.
+> A green run is evidence about that commit only — update this line per run.
 
 ## 1. Purpose
 

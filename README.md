@@ -12,6 +12,20 @@ palette, shared charts, local LaTeX formula panels).
 > investment, trading, allocation, legal, tax, compliance, or risk-management
 > advice, and not production trading, risk, or compliance infrastructure.
 
+## Screenshots
+
+Frozen v4.60 release evidence — captured from the production build on
+deterministic sample data (hashes recorded in
+[docs/DEMO_FREEZE_CHECKLIST.md](docs/DEMO_FREEZE_CHECKLIST.md)):
+
+![QuantLab landing — research terminal dashboard at 1440px](docs/screenshots/release_landing_1440.png)
+
+![Scenario Studio — severe cross-asset stress combo at severity 100.0/100, 8/8 modules](docs/screenshots/release_scenario_studio.png)
+
+![Deterministic KO/PEP pairs backtest — 119 trades, honest losing-strategy demo](docs/screenshots/release_pairs_backtest.png)
+
+More captures: [docs/screenshots/](docs/screenshots/README.md).
+
 ## What this project demonstrates
 
 - **Full-stack engineering** — FastAPI + Pydantic v2 backend, Next.js 14 +
@@ -29,8 +43,10 @@ palette, shared charts, local LaTeX formula panels).
 - **Risk-aware product language** — every module states its data mode,
   simplifications, and limitations in the UI and docs.
 - **Testing & QA workflow** — a large deterministic backend test suite
-  (2,900 tests green as of Phase 38.0), CI (backend tests + frontend build),
-  a QA Command Center, and a Data Reliability Center.
+  (2,975 green as of Phase 45.0), CI preflight (backend tests + frontend
+  typecheck/build), a 12-test Playwright browser guard for the frozen demo
+  path with a manually triggered CI workflow, a QA Command Center, and a
+  Data Reliability Center.
 - **Documentation discipline** — per-phase roadmap entries, limitations
   ledger, demo scripts, and this launch pack.
 

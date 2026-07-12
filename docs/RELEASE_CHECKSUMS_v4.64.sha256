@@ -1,0 +1,19 @@
+# QuantLab release checksum manifest — v4.64 (Phase 46.0)
+# SHA-256, repository-relative forward-slash paths.
+# Verify: python scripts/verify_release_checksums.py docs/RELEASE_CHECKSUMS_v4.64.sha256
+# Frozen release evidence (v4.60 — never regenerate):
+46db0fd41c896987803520bcafb19585247df32658116aad95897b7c86d19334  docs/screenshots/release_landing_1440.png
+2ebb4b28893257f9138290ac4855fc99e3b0a8c015d858efbbd25719231fc599  docs/screenshots/release_scenario_studio.png
+98a3dde06e4a894176a3f942b75e9702f8c4cbfc450a43b51949c29ea13797bd  docs/screenshots/release_home_1024.png
+d0b88dac5d968d7b1baf5ab1eaef376dc251d858b94242d5ea7d5b3fab6f71db  docs/screenshots/release_home_768.png
+b271f413ce2426c81bca361a457df008103f5d366e65e4a319e32a68d5b32183  docs/screenshots/release_pairs_backtest.png
+# Key release/evidence files (regenerate this manifest if these legitimately change):
+74485563c89bf81e300b79d9be7025917f13fb8097337d32570c9e029c62fb7e  docs/GITHUB_RELEASE_FINAL_v4.64.md
+b87be306723c9c2d597c82e69998c5409c2b2c806c425ed00acfc0c939ff9e7b  docs/RELEASE_EVIDENCE_v4.64.md
+e3ed196afe4574889fdbb3a444b44a327f7301683426ecc781294a773b37e36d  docs/PUBLIC_GITHUB_LAUNCH_CHECKLIST.md
+77a207736e64d75a13b15abbcc47c26a513039579491aa6c80d13d3911340268  docs/DEMO_FREEZE_CHECKLIST.md
+b3168b499b353af2c0de1242bda02f38935e5fe140359e46732601235e3b0a84  docs/BROWSER_SMOKE_TEST_REPORT.md
+4c050de5af642feec5e25b410e31c2d2d94a91fcf957d0594ceee1fc0e4fb46d  docs/BROWSER_E2E_RUNBOOK.md
+8a364109465d0e5718a62f7d56dfa8de37c7ee0d4f36473018cdcd7faefffc2c  docs/CI_BROWSER_E2E.md
+fea7b515121bed0150b88769302d4489df81ac94366e528c02dc9d72c0d3d876  .github/workflows/browser-e2e.yml
+cc0f1d01cfa885c480c51a10bf9e460ef1b8063e421b61b0087d8538febda2c4  frontend/playwright.config.ts

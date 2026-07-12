@@ -18,17 +18,24 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Manual CI Browser E2E Workflow & Evidence Artifacts v1** (v4.63
-  series): a `workflow_dispatch`-only GitHub Actions workflow
-  (`Browser E2E Preflight`) that builds and starts QuantLab in an isolated
-  Ubuntu runner and runs the Playwright frozen-demo guard against it, with
-  per-run evidence artifacts (14-day retention); a stdlib-only,
-  localhost-only readiness helper (`scripts/wait_for_http.py`, unit-tested);
-  docs (`CI_BROWSER_E2E.md`). Read-only permissions, no secrets, no live
-  data, non-blocking — main CI unchanged; no remote run is claimed until
-  actually observed.
+- **Public GitHub Release Launch & Evidence Closure v1** (v4.64 series):
+  final manual release draft (`GITHUB_RELEASE_FINAL_v4.64.md`), facts-only
+  evidence ledger with observed CI/E2E run IDs, 22-section public launch
+  checklist + exact publication runbook, SHA-256 checksum manifest with a
+  read-only verifier script (`verify_release_checksums.py`, unit-tested),
+  README screenshot gallery from the frozen evidence. The GitHub Release is
+  NOT created automatically — publication remains a manual user action.
 
-## Grouped release areas — v4.8 through v4.62 (post-showcase series)
+## Grouped release areas — v4.8 through v4.63 (post-showcase series)
+
+### Manual CI browser E2E evidence (v4.63)
+
+- `workflow_dispatch`-only GitHub Actions workflow (`Browser E2E Preflight`)
+  that builds and starts QuantLab in an isolated Ubuntu runner and runs the
+  Playwright frozen-demo guard, with per-run evidence artifacts (14-day
+  retention); stdlib-only localhost-only readiness helper
+  (`scripts/wait_for_http.py`, unit-tested); `CI_BROWSER_E2E.md`. First
+  remote run observed green (run 29185725247 on the tag target commit).
 
 ### Public release package & demo asset kit (v4.62)
 
@@ -56,7 +63,7 @@ claimed by an entry here.
   fixture isolation + YM roll coverage, and the frozen freeze record with
   five SHA-256'd production screenshots.
 
-The tags between v4.8.0 and v4.62.0 (local milestone tags; full per-phase
+The tags between v4.8.0 and v4.63.0 (local milestone tags; full per-phase
 detail in `docs/ROADMAP.md`) grouped by area:
 
 ### CI preflight, repository hygiene & security sweep (v4.59)

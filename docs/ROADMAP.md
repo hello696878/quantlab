@@ -1677,6 +1677,46 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 46.0 — Public GitHub Release Launch & Evidence Closure v1 ✅
+
+- **Release-documentation and evidence-closure phase (no product changes):**
+  everything the user needs to publish the public GitHub Release manually,
+  with every claim tied to recorded or observed evidence.
+- **Evidence verified first:** tag reality confirmed (v4.60→`7cf9708`,
+  v4.61→`32c8f35`, v4.62→`f2d8831`, v4.63→`47bfec0`; local and remote
+  agree; v4.64 does not exist yet). **Phase 45's remote run observed green
+  via read-only API inspection**: Browser E2E Preflight run 29185725247 on
+  `47bfec0` (`workflow_dispatch`, all 16 steps ✅ including the full
+  Playwright suite; artifact `browser-e2e-evidence-29185725247`, ~212 KB) —
+  plus push-CI run 29185696068 ✅ on the same commit; `CI_BROWSER_E2E.md`
+  status line updated with the real run. Convention note recorded honestly:
+  no Phase 45 "Review …" commit exists — the v4.63 tag sits on `47bfec0`,
+  which also contains unrelated Phase 12 catalog work.
+- **Docs:** `GITHUB_RELEASE_FINAL_v4.64.md` (copy-ready manual release body:
+  milestones, demo workflows, evidence split into frozen/local/remote/
+  re-runnable, screenshots, architecture, quickstart, limitations,
+  publication steps — the v4.64 tag explicitly marked not-yet-existing);
+  `RELEASE_EVIDENCE_v4.64.md` (facts-only ledger: repository state, frozen
+  evidence, local + remote validation tables with real run IDs,
+  integrity checks, release-blocking conditions, decision **NOT READY —
+  BLOCKERS REMAIN** until the review commit + its own green runs + the tag
+  exist); `PUBLIC_GITHUB_LAUNCH_CHECKLIST.md` (22 inspection sections + the
+  exact 26-step manual publication runbook — never changes GitHub settings).
+- **Integrity tooling:** `docs/RELEASE_CHECKSUMS_v4.64.sha256` (SHA-256 of
+  the five frozen screenshots + key evidence/workflow files, generated after
+  final edits) and `scripts/verify_release_checksums.py` (stdlib-only,
+  read-only, rejects absolute/traversal paths, exit 0/1/2) with eight
+  deterministic tmp-dir tests.
+- **README:** screenshot gallery added from the frozen evidence (three
+  images, honest captions) and the stale test-count line updated to the
+  recorded 2,975.
+- **Consistency:** VERSION `4.63.0-dev` → `4.64.0-dev` (v4.63 tag exists;
+  110 tags); VERSION_MANIFEST, CHANGELOG rotation (v4.63 area + v4.64
+  Unreleased), panel constants, RELEASE_ASSET_MANIFEST (six new rows),
+  PROJECT_SNAPSHOT header; `print_public_github_launch_summary.ps1`
+  (print-only). **No tag created, no release published, no workflow
+  triggered — the observed runs were read-only inspections.**
+
 ### Phase 45.0 — Manual CI Browser E2E Workflow & Evidence Artifacts v1 ✅
 
 - **Quality-engineering/CI-preflight phase (no product behavior changes):**

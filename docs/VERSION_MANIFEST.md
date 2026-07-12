@@ -13,20 +13,19 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.63.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
+**`4.64.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
 expected tag on completion of the current phase's review is
-`v4.63.0-manual-ci-browser-e2e-evidence-v1` — "expected" because tags are
+`v4.64.0-public-github-release-launch-v1` — "expected" because tags are
 created by the user after review, never automatically.
 
 ## 2. Release family
 
 The **v4.x productization / platformization series**: v4.0.0 (local-first
 research terminal) → v4.7.0 (showcase candidate) → v4.8+ (one milestone tag
-per feature phase). 109 local tags existed when this manifest was last
-updated (Phase 45.0); the latest verified tag is
-`v4.62.0-public-release-package-demo-asset-kit-v1` (the frozen
-release-candidate tag is
-`v4.60.0-public-release-candidate-demo-freeze-v1`).
+per feature phase). 110 local tags existed when this manifest was last
+updated (Phase 46.0); the latest verified tag is
+`v4.63.0-manual-ci-browser-e2e-evidence-v1` (the frozen release-candidate
+tag is `v4.60.0-public-release-candidate-demo-freeze-v1`).
 
 ## 3. Major release areas
 

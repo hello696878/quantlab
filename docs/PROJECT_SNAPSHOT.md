@@ -1,7 +1,7 @@
-# QuantLab — Project Snapshot (Phase 45.0)
+# QuantLab — Project Snapshot (Phase 46.0)
 
 A one-page handoff doc. Facts verified against the repo when written
-(version label `4.63.0-dev`); counts drift as phases land — re-verify before
+(version label `4.64.0-dev`); counts drift as phases land — re-verify before
 public use.
 
 ## Summary

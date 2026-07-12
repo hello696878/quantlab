@@ -19,9 +19,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.63.0-dev";
-const EXPECTED_NEXT_TAG = "v4.63.0-manual-ci-browser-e2e-evidence-v1";
-const LATEST_VERIFIED_TAG = "v4.62.0-public-release-package-demo-asset-kit-v1";
+const VERSION_LABEL = "4.64.0-dev";
+const EXPECTED_NEXT_TAG = "v4.64.0-public-github-release-launch-v1";
+const LATEST_VERIFIED_TAG = "v4.63.0-manual-ci-browser-e2e-evidence-v1";
 
 const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
   { title: "Quant research labs", text: "Portfolio/macro, derivatives & volatility, crypto/DeFi/on-chain/alt-data, microstructure, real assets & credit, rates/FX — deterministic educational models with formulas beside the numbers.", route: "risklab" },
@@ -32,7 +32,8 @@ const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
 ];
 
 const CHANGELOG_CARDS: { tag: string; title: string; text: string }[] = [
-  { tag: "v4.63 (next)", title: "Manual CI browser E2E", text: "workflow_dispatch-only GitHub Actions workflow running the Playwright guard in an isolated runner with per-run evidence artifacts." },
+  { tag: "v4.64 (next)", title: "Public release launch", text: "Final manual release draft, facts-only evidence ledger with observed run IDs, public launch checklist, SHA-256 checksum manifest + verifier." },
+  { tag: "v4.63", title: "Manual CI browser E2E", text: "workflow_dispatch-only GitHub Actions workflow running the Playwright guard in an isolated runner with per-run evidence artifacts." },
   { tag: "v4.62", title: "Public release package", text: "GitHub release draft (manual publish), LinkedIn drafts, portfolio case study, demo video shot list + scripts, release asset manifest." },
   { tag: "v4.61", title: "Browser E2E guard", text: "Playwright harness (12 tests, zero browser downloads) pinning the frozen demo route, scenario result, KO/PEP fixture, responsive geometry." },
   { tag: "v4.60", title: "Public release candidate", text: "Demo freeze with SHA-256'd evidence screenshots, final smoke runbook, launch readiness, public limitations, Public Release Candidate page." },
