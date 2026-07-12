@@ -1677,6 +1677,49 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 45.0 — Manual CI Browser E2E Workflow & Evidence Artifacts v1 ✅
+
+- **Quality-engineering/CI-preflight phase (no product behavior changes):**
+  the Playwright frozen-demo guard can now run in an isolated GitHub Actions
+  runner, on demand.
+- **`.github/workflows/browser-e2e.yml`** ("Browser E2E Preflight"):
+  `workflow_dispatch` **only** (no push/PR/schedule triggers, no inputs),
+  `permissions: contents: read`, per-ref concurrency, 30-min timeout, one
+  ubuntu-latest job. Pipeline: checkout → Python 3.11 + Node 20 (npm cache
+  on the lockfile) → `pip install -r requirements.txt` → `npm ci` →
+  `npx playwright install --with-deps chromium` (runner-only; locally the
+  harness keeps using the OS browser) → backend `pytest -q` →
+  `tsc --noEmit` → `npm run build` with the repo's real build-time
+  `BACKEND_URL=http://127.0.0.1:8000` (next.config.js bakes the rewrite) →
+  background uvicorn :8000 + `next start` :3100 with logs to
+  `artifacts/e2e-ci/` → deterministic readiness polling → `npx playwright
+  test --project=chromium` with `E2E_BASE_URL=http://127.0.0.1:3100` and
+  `E2E_BROWSER_CHANNEL=""` (bundled Chromium), zero retries →
+  `actions/upload-artifact@v4` **if: always()**
+  (`browser-e2e-evidence-<run id>`, 14-day retention: `artifacts/e2e/` +
+  service logs) → narrow failure diagnostics (log tails + listening ports;
+  never dumps env).
+- **`scripts/wait_for_http.py`** — stdlib-only, **localhost-only** readiness
+  poller (exit 0/1/2, typed, prints elapsed; refuses non-local hosts) with
+  seven deterministic subprocess tests
+  (`backend/tests/test_wait_for_http_script.py`: validation rejections,
+  in-process ephemeral-server success, closed-port timeout — no external
+  network).
+- **Docs:** `CI_BROWSER_E2E.md` (pipeline, artifact policy, triggering,
+  troubleshooting, promotion criteria; **"Remote workflow status: Not yet
+  run after this phase"** — updated only from an observed run); consistency
+  updates in README, `CI.md`, `BROWSER_E2E_RUNBOOK.md`,
+  `FROZEN_DEMO_REGRESSION_GUARD.md` (§4b where the guard runs),
+  `PLAYWRIGHT_SETUP.md` §7, `RELEASE_CHECKLIST.md`,
+  `RELEASE_ASSET_MANIFEST.md` (workflow + CI-evidence rows),
+  `PROJECT_SNAPSHOT.md`; VERSION reconciled `4.62.0-dev` → `4.63.0-dev`
+  (v4.62 tag exists; 109 tags) with VERSION_MANIFEST + panel constants;
+  CHANGELOG rotated.
+- Main CI (`ci.yml`) untouched; no tags/releases touched; no secrets or
+  provider credentials anywhere in the workflow; frozen screenshots
+  untouched. **No remote run of the new workflow is claimed — triggering it
+  from the Actions tab is the user's next step.**
+
 ### Phase 44.0 — Public Release Package, GitHub Release Draft & Demo Asset Kit v1 ✅
 
 - **Presentation/packaging phase (no product behavior changes, no new

@@ -91,10 +91,12 @@ written by the harness.
 
 ## 7. CI status
 
-**E2E is local/manual in v1 — it is deliberately NOT a CI job** (blocking or
-otherwise). CI keeps covering backend tests + frontend typecheck/build; the
-E2E harness runs before releases/reviews until it has proven stable enough
-to consider CI integration ([`CI.md`](CI.md)).
+**E2E is not part of the push/PR CI gate.** Since Phase 45.0 a separate,
+**manually triggered** workflow (`Browser E2E Preflight`,
+`.github/workflows/browser-e2e.yml`) can run the suite in an isolated
+Ubuntu runner — it installs its own Chromium there, builds/starts the app,
+and uploads evidence artifacts ([`CI_BROWSER_E2E.md`](CI_BROWSER_E2E.md)).
+Main CI (`ci.yml`) is unchanged: backend tests + frontend typecheck/build.
 
 E2E green is a regression signal only — not a production, trading, or
 compliance certification. Deterministic fixtures are intentional; no live

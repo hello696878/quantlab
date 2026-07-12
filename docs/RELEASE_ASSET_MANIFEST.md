@@ -30,6 +30,9 @@ evidence commit `7cf9708` (tag `v4.60.0-public-release-candidate-demo-freeze-v1`
 | 90-second video script | `docs/DEMO_VIDEO_90_SECOND_SCRIPT.md` | doc | Timestamped short script | Copy material | frozen demo path | exact words + clicks |
 | 3-minute video script | `docs/DEMO_VIDEO_3_MINUTE_SCRIPT.md` | doc | Timestamped long script | Copy material | frozen demo path | includes slow-page fallbacks |
 | E2E run outputs | `artifacts/e2e/**` (test-results, playwright-report) | generated | Local E2E traces/reports | **Generated — never committed** | gitignored via `artifacts/` | safe to delete; regenerated per run |
+| Manual CI browser E2E workflow | `.github/workflows/browser-e2e.yml` | workflow | Run the E2E guard in an isolated runner (`workflow_dispatch` only) | Source | v4.63 series (Phase 45.0) | read-only perms; no secrets; never publishes anything |
+| CI browser E2E doc | `docs/CI_BROWSER_E2E.md` | doc | How to trigger/interpret the manual workflow | Living doc | v4.63 series | remote-run status recorded only from real observed runs |
+| CI E2E evidence artifacts | GitHub Actions run artifacts (`browser-e2e-evidence-<run id>`) | generated | Per-run logs/report/traces, 14-day retention | **Generated — never committed** | attached to a specific workflow run | temporary CI evidence — not frozen screenshots, not certification |
 
 ## Policies (binding)
 

@@ -75,7 +75,9 @@ npm run build
 - [ ] Run the frozen-demo E2E guard (local, servers running):
       `npm run e2e` from `frontend\` —
       [`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md). Green is a
-      regression signal, not a certification.
+      regression signal, not a certification. Optionally also trigger the
+      manual **Browser E2E Preflight** workflow on the release commit and
+      record the run ID ([`CI_BROWSER_E2E.md`](CI_BROWSER_E2E.md)).
 
 ## 6. Docs & wording
 

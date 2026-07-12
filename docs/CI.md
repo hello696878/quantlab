@@ -62,12 +62,16 @@ Wrappers: `scripts\run_backend_tests.ps1`, `scripts\run_frontend_typecheck.ps1`.
 
 ## Known limitations
 
-- No frontend *unit* tests exist yet. A local browser E2E harness exists
-  (Phase 43.0 — [`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md)) but is
-  **deliberately not a CI job in v1**: it needs live local servers, and
-  keeping it out of CI avoids making the pipeline slower/flakier while the
-  harness stabilizes. CI keeps covering backend tests + typecheck + build;
-  the frozen-demo E2E guard is run locally before releases/reviews.
+- No frontend *unit* tests exist yet. The browser E2E harness (Phase 43.0 —
+  [`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md)) is **deliberately not
+  part of this push/PR gate**: it needs a built, running app, and keeping it
+  out of the default pipeline avoids slowness/flake while the harness
+  builds a stability record. It CAN be run in CI on demand via the separate,
+  manually triggered **Browser E2E Preflight** workflow
+  (`.github/workflows/browser-e2e.yml` —
+  [`CI_BROWSER_E2E.md`](CI_BROWSER_E2E.md)), which is non-blocking and
+  `workflow_dispatch`-only in v1. This workflow (`ci.yml`) keeps covering
+  backend tests + typecheck + build unchanged.
 - CI proves the suite passes on a clean Linux runner — local-environment
   issues (venv drift, node_modules staleness) are covered by
   `scripts\check_environment.ps1` instead.

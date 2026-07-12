@@ -1,0 +1,148 @@
+name: Browser E2E Preflight
+
+# Manually triggered browser E2E preflight (Phase 45.0 — docs/CI_BROWSER_E2E.md).
+#
+# Builds and starts QuantLab inside this disposable runner, then runs the
+# existing Playwright Chromium regression suite (the frozen-demo guard) and
+# uploads logs/reports as workflow artifacts.
+#
+# Deliberately conservative v1:
+#   - workflow_dispatch ONLY (no push/PR/schedule triggers) — non-blocking
+#     relative to the main CI workflow, run on demand from the Actions tab.
+#   - read-only permissions; no secrets; no deployment; no release/tag
+#     creation; no GitHub API mutations.
+#   - fully deterministic and offline: the suite runs on QuantLab's built-in
+#     fixtures (KO/PEP demo pair, static samples). Optional data adapters
+#     stay disabled/fail-closed — no FRED_API_KEY or any provider credential
+#     is set, and no live market data is fetched.
+#   - Chromium only, installed into this runner only (the local harness uses
+#     the OS browser instead — docs/PLAYWRIGHT_SETUP.md).
+#
+# A green run is a regression signal for the frozen demo path on one commit —
+# never a production, security, compliance, financial, or trading
+# certification.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: browser-e2e-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  browser-e2e:
+    name: Browser E2E (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    env:
+      # Baked into the production build: next.config.js reads BACKEND_URL at
+      # build time for the /api/* rewrite (verified in this repo's config).
+      BACKEND_URL: http://127.0.0.1:8000
+      # Playwright targets the production server started below.
+      E2E_BASE_URL: http://127.0.0.1:3100
+      # Empty channel = use the Chromium installed by Playwright on this
+      # runner (locally the harness defaults to the OS-installed Edge).
+      E2E_BROWSER_CHANNEL: ""
+
+    steps:
+      # ── Stage A: checkout + runtimes (matches the main CI workflow) ──────
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      # ── Stage B: backend dependencies ─────────────────────────────────────
+      - name: Install backend dependencies
+        working-directory: backend
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # ── Stage C: frontend dependencies (lockfile-exact) ───────────────────
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      # ── Stage D: Playwright Chromium (this runner only) ───────────────────
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      # ── Stage E: fast static validation before any browser work ───────────
+      - name: Backend tests
+        working-directory: backend
+        run: python -m pytest -q
+
+      - name: TypeScript check
+        working-directory: frontend
+        run: npx tsc --noEmit
+
+      # ── Stage F: production build (BACKEND_URL baked via job env) ─────────
+      - name: Build frontend (production)
+        working-directory: frontend
+        run: npm run build
+
+      # ── Stage G: start services in the background, logs to artifacts ──────
+      - name: Start backend (127.0.0.1:8000)
+        working-directory: backend
+        run: |
+          mkdir -p ../artifacts/e2e-ci
+          nohup python -m uvicorn app.main:app --host 127.0.0.1 --port 8000 \
+            > ../artifacts/e2e-ci/backend.log 2>&1 &
+
+      - name: Start frontend production server (127.0.0.1:3100)
+        working-directory: frontend
+        run: |
+          nohup npx next start --hostname 127.0.0.1 --port 3100 \
+            > ../artifacts/e2e-ci/frontend.log 2>&1 &
+
+      # ── Readiness: deterministic polling, no fixed sleeps ──────────────────
+      - name: Wait for backend readiness
+        run: python scripts/wait_for_http.py http://127.0.0.1:8000/health --timeout 90
+
+      - name: Wait for frontend readiness
+        run: python scripts/wait_for_http.py http://127.0.0.1:3100/ --timeout 120
+
+      # ── The regression suite (fails the workflow on any red test) ─────────
+      - name: Run Playwright browser E2E suite
+        working-directory: frontend
+        run: npx playwright test --project=chromium
+
+      # ── Evidence: uploaded even when a step above failed ───────────────────
+      - name: Upload browser E2E evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-e2e-evidence-${{ github.run_id }}
+          retention-days: 14
+          if-no-files-found: warn
+          path: |
+            artifacts/e2e/
+            artifacts/e2e-ci/
+
+      # ── Failure diagnostics (kept narrow; never dumps env/secrets) ─────────
+      - name: Diagnostics on failure
+        if: failure()
+        run: |
+          echo "=== backend.log (last 200 lines) ==="
+          tail -n 200 artifacts/e2e-ci/backend.log 2>/dev/null || echo "(no backend.log)"
+          echo "=== frontend.log (last 200 lines) ==="
+          tail -n 200 artifacts/e2e-ci/frontend.log 2>/dev/null || echo "(no frontend.log)"
+          echo "=== listening sockets (8000/3100) ==="
+          ss -tlnp 2>/dev/null | grep -E ':(8000|3100)' || echo "(none listening)"
+          echo "=== python/node processes ==="
+          ps -eo pid,comm,etime | grep -E 'python|node' || echo "(none)"

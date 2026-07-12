@@ -103,6 +103,9 @@ npx tsc --noEmit
 npm run e2e   # browser regression guard for the frozen demo path
               # (local/manual; servers must already be running —
               #  see docs/BROWSER_E2E_RUNBOOK.md)
+              # The same suite can be run in an isolated CI runner via the
+              # manually triggered "Browser E2E Preflight" workflow
+              # (docs/CI_BROWSER_E2E.md) — not part of the push/PR gate.
 ```
 
 ## Suggested demo path
@@ -260,7 +263,7 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
 - [CHANGELOG.md](CHANGELOG.md) · [VERSION](VERSION) — grouped changelog and the current milestone label
 - [docs/VERSION_MANIFEST.md](docs/VERSION_MANIFEST.md) · [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) — versioning conventions and the release flow
 - [docs/PROJECT_SNAPSHOT.md](docs/PROJECT_SNAPSHOT.md) · [docs/MILESTONE_HISTORY.md](docs/MILESTONE_HISTORY.md) — one-page handoff and the capability narrative
-- [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/CI.md](docs/CI.md) — how to contribute and what CI checks (and deliberately doesn't)
+- [CONTRIBUTING.md](CONTRIBUTING.md) · [docs/CI.md](docs/CI.md) · [docs/CI_BROWSER_E2E.md](docs/CI_BROWSER_E2E.md) — how to contribute, what CI checks (and deliberately doesn't), and the manual browser-E2E preflight workflow
 - [docs/REPOSITORY_HYGIENE.md](docs/REPOSITORY_HYGIENE.md) · [docs/SECURITY_AND_SECRETS.md](docs/SECURITY_AND_SECRETS.md) — what never gets committed, and the zero-secrets policy
 - [docs/LIMITATIONS.md](docs/LIMITATIONS.md) — the honest limitations ledger
 - [docs/PUBLIC_RELEASE_CANDIDATE.md](docs/PUBLIC_RELEASE_CANDIDATE.md) · [docs/PUBLIC_LAUNCH_READINESS.md](docs/PUBLIC_LAUNCH_READINESS.md) — the final manual verification pass and the go/no-go decision table (public portfolio readiness only)

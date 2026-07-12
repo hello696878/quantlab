@@ -1,7 +1,7 @@
-# QuantLab — Project Snapshot (Phase 42.0)
+# QuantLab — Project Snapshot (Phase 45.0)
 
 A one-page handoff doc. Facts verified against the repo when written
-(version label `4.60.0-dev`); counts drift as phases land — re-verify before
+(version label `4.63.0-dev`); counts drift as phases land — re-verify before
 public use.
 
 ## Summary
@@ -63,11 +63,13 @@ the in-app Data Reliability Center.
 
 ## Testing
 
-~2,900 deterministic backend tests (2,900 green when this snapshot was
-written — see the ROADMAP entry per phase for the count at each milestone);
-strict finiteness guarantees at the API boundary; wording contracts as
-tests; `npx tsc --noEmit` for the frontend; **no frontend test framework
-yet**. Verification is always run locally by the user (helper wrappers in
+~2,900+ deterministic backend tests (2,968 green at the v4.60 freeze — see
+the ROADMAP entry per phase for each milestone's count); strict finiteness
+guarantees at the API boundary; wording contracts as tests;
+`npx tsc --noEmit` for the frontend; a 12-test Playwright browser E2E guard
+for the frozen demo path (local-first, plus a manually triggered CI
+workflow — `CI_BROWSER_E2E.md`); **no frontend unit-test framework yet**.
+Verification is run locally by the user (helper wrappers in
 `scripts\*.ps1`).
 
 ## Documentation inventory

@@ -51,6 +51,14 @@ sound, backend additions that don't alter the fixture outputs, copy edits
 outside the navigated labels — the guard is deliberately narrow so normal
 development stays free.
 
+## 4b. Where the guard runs
+
+Locally (primary — [`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md)), and
+on demand in an isolated CI runner via the manually triggered
+**Browser E2E Preflight** workflow ([`CI_BROWSER_E2E.md`](CI_BROWSER_E2E.md))
+— `workflow_dispatch` only, non-blocking, evidence uploaded as temporary
+workflow artifacts.
+
 ## 5. Updating the guard in future phases
 
 - New protected workflow → new spec file under `frontend/e2e/`, listed here.

@@ -114,8 +114,12 @@ delete at any time. The harness **never writes to
 
 ## 7. Known limitations (v1)
 
-- Local/manual only — deliberately **not a CI job yet** (see
-  [`CI.md`](CI.md)); run it before releases/reviews.
+- Deliberately **not part of the push/PR CI gate**. An isolated CI run is
+  available on demand via the manually triggered **Browser E2E Preflight**
+  workflow ([`CI_BROWSER_E2E.md`](CI_BROWSER_E2E.md)) — it builds and starts
+  the app inside the runner and uploads evidence artifacts; the local
+  commands in this runbook remain fully supported and are still the primary
+  pre-release habit.
 - Chromium-engine only, via the OS-installed Edge (`channel: "msedge"`).
 - Failure videos are off (they'd require Playwright's downloadable ffmpeg;
   traces + screenshots are the evidence).
