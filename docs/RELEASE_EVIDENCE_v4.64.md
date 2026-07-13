@@ -11,8 +11,8 @@ marked pending. Companion: [`GITHUB_RELEASE_FINAL_v4.64.md`](GITHUB_RELEASE_FINA
 | Field | Value |
 |---|---|
 | Target version | 4.64.0 |
-| Target tag | `v4.64.0-public-github-release-launch-v1` — **does not exist yet; user-created after review** |
-| Expected release commit | Pending — the Phase 46 review commit (not yet created) |
+| Target tag | `v4.64.0-public-github-release-launch-v1` — **exists**, local = remote → `2d4bcfe` (verified Phase 47.0) |
+| Release commit | `2d4bcfe` "Add public GitHub release launch closure v1" — the implementation commit was tagged directly (no separate Phase 46 review commit exists; recorded) |
 | Branch | `main` |
 | Frozen predecessor tag | `v4.60.0-public-release-candidate-demo-freeze-v1` → `7cf9708` |
 | E2E-guard predecessor tag | `v4.61.0-browser-e2e-regression-guard-v1` → `32c8f35` |
@@ -60,9 +60,13 @@ was skipped for that phase. Recorded as-is; the tag was not modified.
 | CI | 29185696068 | `47bfec0` | success | Backend Tests ✅ Frontend Build ✅ | — | observed this phase |
 | Browser E2E Preflight | 29185725247 | `47bfec0` | success | all 16 steps ✅ (backend tests, typecheck, build, both readiness waits, full Playwright suite, evidence upload; diagnostics skipped) | `browser-e2e-evidence-29185725247` (212,058 B, expires 2026-07-26) | observed this phase (`workflow_dispatch`) |
 
-Remote evidence for the **future v4.64 release commit**:
-`Pending — user must supply a successful run` (both workflows must be green
-on the final review commit before publication).
+Remote evidence for the **v4.64 release commit `2d4bcfe`** (observed
+2026-07-12, read-only — Phase 47.0):
+
+| Workflow | Run ID | Commit | Conclusion | Key steps | Artifact |
+|---|---|---|---|---|---|
+| CI | 29188597089 | `2d4bcfe` | **success** | Backend Tests ✅ Frontend Build ✅ | — |
+| Browser E2E Preflight | 29193708980 | `2d4bcfe` | **success** | all steps ✅ incl. full Playwright suite + evidence upload | `browser-e2e-evidence-29193708980` (212,110 B, expires 2026-07-26) |
 
 ## E. Integrity checks (this phase)
 
@@ -93,17 +97,23 @@ Publication is blocked while ANY of these hold:
 - [ ] Release notes contradicting the evidence in this ledger.
 - [ ] Unresolved test failures (backend, typecheck, or E2E).
 
-## G. Final release decision (as of Phase 46.0 implementation)
+## G. Final release decision (updated Phase 47.0)
 
-**NOT READY — BLOCKERS REMAIN** (expected at this stage):
+**READY FOR MANUAL PUBLICATION** — the three original blockers cleared:
 
-1. The Phase 46 review commit does not exist yet (this work is uncommitted).
-2. Normal CI + Browser E2E Preflight must run green **on that commit**.
-3. The `v4.64.0-public-github-release-launch-v1` tag must then be created by
-   the user.
+1. ~~Review commit~~ → the release commit exists: `2d4bcfe` (the
+   implementation commit was tagged directly; convention deviation
+   recorded in §A).
+2. ~~Green runs on that commit~~ → CI 29188597089 ✅ and Browser E2E
+   Preflight 29193708980 ✅, both observed on `2d4bcfe`.
+3. ~~Tag~~ → `v4.64.0-public-github-release-launch-v1` exists, local =
+   remote.
 
-Everything else in sections B–E is verified. When blockers 1–3 clear, the
-decision flips to READY FOR MANUAL PUBLICATION via the checklist.
+The remaining act is publication itself (launch-checklist runbook steps
+16–26). **The GitHub Release is NOT yet published** — publication status is
+tracked in [`PUBLIC_RELEASE_RECORD_v4.64.md`](PUBLIC_RELEASE_RECORD_v4.64.md),
+which stays "PUBLICATION RECORD INCOMPLETE" until the real release URL and
+timestamp are recorded.
 
 ## Ground rules (unchanged by this doc)
 

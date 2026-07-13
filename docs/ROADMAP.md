@@ -1677,6 +1677,46 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 47.0 — Post-Publication Verification & Stable Release Baseline v1 ✅
+
+- **Read-only verification + evidence-recording phase (no product changes,
+  nothing published/triggered/tagged/pushed).**
+- **Verified reality (2026-07-12, read-only):** v4.64 tag exists —
+  lightweight, local = remote → `2d4bcfe` ("Add public GitHub release launch
+  closure v1", the Phase 46 implementation commit tagged directly; no
+  separate review commit — convention deviation recorded), ancestor of
+  `main`. **Both workflows green on that exact commit:** CI run 29188597089
+  (Backend Tests ✅ Frontend Build ✅) and Browser E2E Preflight run
+  29193708980 (all steps ✅ incl. the full Playwright suite; artifact
+  `browser-e2e-evidence-29193708980`, 212,110 B, expires 2026-07-26).
+  **The GitHub Release is NOT published** — the repo's only published
+  release is the historical v4.0.0; publication remains the user's manual
+  runbook steps 16–26.
+- **Docs:** `PUBLIC_RELEASE_RECORD_v4.64.md` (factual publication record —
+  identity fields honestly "Pending — not verified"; decision **PUBLICATION
+  RECORD INCOMPLETE — BLOCKERS REMAIN**);
+  `POST_PUBLICATION_VERIFICATION_v4.64.md` (20-item expected/observed/
+  result/source table — 12 PASS, 1 FAIL [release existence], rest pending on
+  publication); `POST_RELEASE_BASELINE_v4.64.md` (stable baseline anchored
+  to the verified tag: protected behavior, protected fixture outputs
+  labeled regression fixtures not performance promises, binding change
+  policy, seven development lanes, eight next-phase candidates listed
+  without selection).
+- **Updates:** evidence ledger (pending remote row → the two verified runs;
+  decision → **READY FOR MANUAL PUBLICATION**), launch checklist (§§2–5,
+  10–11 checked with evidence; new post-publication section),
+  `GITHUB_RELEASE_FINAL_v4.64.md` (tag-exists note + the release commit's
+  own runs added to its evidence), RELEASE_ASSET_MANIFEST, VERSION
+  `4.64.0-dev` → `4.65.0-dev` (v4.64 tag exists; 111 tags),
+  VERSION_MANIFEST, CHANGELOG rotation, panel constants,
+  PROJECT_SNAPSHOT header.
+- **Integrity:** frozen screenshots SHA-256 re-verified (5/5); the
+  release-time checksum manifest's entries for the two legitimately edited
+  evidence docs regenerated (justified: publication has not occurred, and
+  the manifest's own policy permits regeneration on legitimate change) and
+  re-verified; new `POST_PUBLICATION_CHECKSUMS_v4.64.sha256` covering the
+  Phase 47 record set — both manifests verify exit 0.
+
 ### Phase 46.0 — Public GitHub Release Launch & Evidence Closure v1 ✅
 
 - **Release-documentation and evidence-closure phase (no product changes):**

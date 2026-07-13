@@ -38,6 +38,10 @@ evidence commit `7cf9708` (tag `v4.60.0-public-release-candidate-demo-freeze-v1`
 | Public GitHub launch checklist | `docs/PUBLIC_GITHUB_LAUNCH_CHECKLIST.md` | doc | 22-section manual gate + exact publication runbook | Tracked | v4.64 series | never changes GitHub settings itself |
 | Release checksum manifest | `docs/RELEASE_CHECKSUMS_v4.64.sha256` | manifest | SHA-256 of frozen screenshots + key evidence files | Tracked | v4.64 series | regenerate only when listed files legitimately change |
 | Checksum verifier | `scripts/verify_release_checksums.py` | script | Read-only manifest verification (exit 0/1/2; rejects unsafe paths) | Tracked | v4.64 series | unit-tested; never modifies or fetches anything |
+| Public release record | `docs/PUBLIC_RELEASE_RECORD_v4.64.md` | doc | Factual publication evidence; identity fields pending until published | Tracked / **Pending** publication fields | v4.65 series (Phase 47.0) | flips to VERIFIED only with a real URL + timestamp |
+| Post-publication verification | `docs/POST_PUBLICATION_VERIFICATION_v4.64.md` | doc | 20-item expected/observed verification table | Tracked | v4.65 series | release-existence item FAILS until published |
+| Post-release baseline | `docs/POST_RELEASE_BASELINE_v4.64.md` | doc | Stable dev baseline: protected behavior/outputs, change policy, lanes | Tracked | v4.65 series | anchored to the verified tag `2d4bcfe` |
+| Post-publication checksum manifest | `docs/POST_PUBLICATION_CHECKSUMS_v4.64.sha256` | manifest | SHA-256 of the Phase 47 record set + the release-time manifest | Tracked | v4.65 series | release-time manifest preserved separately |
 
 ## Policies (binding)
 

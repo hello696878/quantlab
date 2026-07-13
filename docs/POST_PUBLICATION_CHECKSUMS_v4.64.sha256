@@ -1,0 +1,12 @@
+# QuantLab post-publication checksum manifest — v4.64 (Phase 47.0)
+# SHA-256, repository-relative forward-slash paths.
+# Verify: python scripts/verify_release_checksums.py docs/POST_PUBLICATION_CHECKSUMS_v4.64.sha256
+# The release-time manifest is preserved and itself covered below:
+dd2c01d77bb418993dd23edebcc09017650d1e7f5e4eda021eb3afdbc1757dc3  docs/RELEASE_CHECKSUMS_v4.64.sha256
+d03fcff60db20a4dc18095630c539be7f147300ca1c680e0e5b8dbe4689f4e6a  docs/PUBLIC_RELEASE_RECORD_v4.64.md
+1852291eff09b44b0a6a26f5f9f7d8b8cf070e8462e0e1dfe79c3f0b7f7971ec  docs/POST_PUBLICATION_VERIFICATION_v4.64.md
+8999ff62cb426cb836210e998aaa02c2bd135a7d2f6e9ec494fe7bc463ec3852  docs/POST_RELEASE_BASELINE_v4.64.md
+96a7a9fd612205c88c30e132dd5288f8b5395203dfe20322110ffa194613f34b  docs/RELEASE_EVIDENCE_v4.64.md
+da3b4d22e1a10c1c08dcf1fef12dbea2405e6179e836fe118198121bc64fb6c5  docs/PUBLIC_GITHUB_LAUNCH_CHECKLIST.md
+6a27bb0b8844399ff0289c11b22a605bc3da05e7b744c78cdfb5ee0239b627a2  docs/VERSION_MANIFEST.md
+95dcbacf6222bff685446d2f703ebca9618e086ce3769ffbb551ece04c892153  docs/PROJECT_SNAPSHOT.md

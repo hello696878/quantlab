@@ -17,8 +17,9 @@ QuantLab v4.64.0 — Public Research Platform Release with Browser E2E Evidence
 v4.64.0-public-github-release-launch-v1
 ```
 
-This tag **does not exist yet** — the user creates it after the Phase 46
-review, per repository convention. Do not publish before it exists.
+This tag **exists** (verified Phase 47.0): local = remote →
+`2d4bcfe` ("Add public GitHub release launch closure v1"). Publish against
+this existing tag — never recreate or move it.
 
 ---
 
@@ -82,10 +83,12 @@ both dev and production base URLs.
 - CI run 29141440276 (`c059c4e`) — Backend Tests ✅ Frontend Build ✅
 - CI run 29147666495 (`7cf9708`, freeze evidence commit) — ✅ ✅
 - CI run 29185696068 (`47bfec0`, v4.63 tag target) — ✅ ✅
-- **Browser E2E Preflight run 29185725247** (`47bfec0`,
-  `workflow_dispatch`) — all steps ✅ including the full Playwright suite;
-  evidence artifact `browser-e2e-evidence-29185725247` uploaded (14-day
-  retention).
+- Browser E2E Preflight run 29185725247 (`47bfec0`) — all steps ✅
+- **CI run 29188597089 (`2d4bcfe`, this release's tag target)** — ✅ ✅
+- **Browser E2E Preflight run 29193708980 (`2d4bcfe`, this release's tag
+  target, `workflow_dispatch`)** — all steps ✅ including the full
+  Playwright suite; evidence artifact `browser-e2e-evidence-29193708980`
+  uploaded (14-day retention).
 
 **4. Re-runnable verification commands** (commands, not results — run them
 yourself):

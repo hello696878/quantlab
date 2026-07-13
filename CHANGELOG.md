@@ -18,15 +18,25 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Public GitHub Release Launch & Evidence Closure v1** (v4.64 series):
-  final manual release draft (`GITHUB_RELEASE_FINAL_v4.64.md`), facts-only
-  evidence ledger with observed CI/E2E run IDs, 22-section public launch
-  checklist + exact publication runbook, SHA-256 checksum manifest with a
-  read-only verifier script (`verify_release_checksums.py`, unit-tested),
-  README screenshot gallery from the frozen evidence. The GitHub Release is
-  NOT created automatically — publication remains a manual user action.
+- **Post-Publication Verification & Stable Release Baseline v1** (v4.65
+  series): read-only verification of the real v4.64 state (tag local =
+  remote → `2d4bcfe`; CI run 29188597089 ✅ and Browser E2E Preflight run
+  29193708980 ✅ observed on that exact commit; **GitHub Release publication
+  still pending**), a factual publication record, an item-by-item
+  post-publication verification report, the stable post-release baseline
+  document (protected behavior, fixture outputs, change policy, development
+  lanes), evidence-ledger/launch-checklist updates, and a post-publication
+  checksum manifest. Nothing was published, triggered, tagged, or pushed.
 
-## Grouped release areas — v4.8 through v4.63 (post-showcase series)
+## Grouped release areas — v4.8 through v4.64 (post-showcase series)
+
+### Public GitHub release launch closure (v4.64)
+
+- Final manual release draft, facts-only evidence ledger with observed
+  CI/E2E run IDs, 22-section public launch checklist + publication runbook,
+  SHA-256 checksum manifest with a read-only verifier
+  (`verify_release_checksums.py`, unit-tested), README screenshot gallery
+  from the frozen evidence. Publication remains a manual user action.
 
 ### Manual CI browser E2E evidence (v4.63)
 
@@ -63,7 +73,7 @@ claimed by an entry here.
   fixture isolation + YM roll coverage, and the frozen freeze record with
   five SHA-256'd production screenshots.
 
-The tags between v4.8.0 and v4.63.0 (local milestone tags; full per-phase
+The tags between v4.8.0 and v4.64.0 (local milestone tags; full per-phase
 detail in `docs/ROADMAP.md`) grouped by area:
 
 ### CI preflight, repository hygiene & security sweep (v4.59)

@@ -13,26 +13,30 @@ top to bottom; every box is a manual inspection by the user. Evidence ledger:
       expected ignored paths (venvs, node_modules, `.next`, `artifacts/`).
 
 ## 2. Branch and commit verification
-- [ ] On `main`, synced with `origin/main`; HEAD is the intended Phase 46
-      review commit; note its SHA.
+- [x] On `main`, synced with `origin/main`; HEAD is the release commit
+      `2d4bcfe` = the v4.64 tag target (verified Phase 47.0; note: the
+      implementation commit was tagged directly — no separate review commit).
 
 ## 3. Required tags
-- [ ] v4.60/v4.61/v4.62/v4.63 exist locally and remotely with the targets
-      recorded in the evidence ledger (`git ls-remote --tags origin "v4.6*"`).
-- [ ] `v4.64.0-public-github-release-launch-v1` — created only at step 20-adjacent
-      runbook stage below, never before review.
+- [x] v4.60/v4.61/v4.62/v4.63 exist locally and remotely with the targets
+      recorded in the evidence ledger (verified Phase 47.0 via
+      `git ls-remote`).
+- [x] `v4.64.0-public-github-release-launch-v1` exists, local = remote →
+      `2d4bcfe` (verified Phase 47.0).
 
 ## 4. Normal CI
-- [ ] The push CI run on the release commit is green — record the run ID.
+- [x] The push CI run on the release commit is green — run **29188597089**
+      on `2d4bcfe` (Backend Tests ✅ Frontend Build ✅; observed 2026-07-12).
 
 ## 5. Browser E2E Preflight
-- [ ] A `workflow_dispatch` run of **Browser E2E Preflight** on the release
-      commit is green — record the run ID (the observed `47bfec0` run does
-      not transfer to newer commits).
+- [x] `workflow_dispatch` run **29193708980** on `2d4bcfe` is green — all
+      steps ✅ including the full Playwright suite (observed 2026-07-12).
 
 ## 6. Artifact inspection
-- [ ] Download `browser-e2e-evidence-<run id>` from that run; the Playwright
-      HTML report opens and shows the expected suite results.
+- [ ] Download `browser-e2e-evidence-29193708980` from run 29193708980
+      (metadata verified Phase 47.0: 212,110 B, unexpired, expires
+      2026-07-26 — contents not yet inspected); the Playwright HTML report
+      opens and shows the expected suite results.
 
 ## 7. Backend log inspection
 - [ ] `backend.log` in the artifact: normal uvicorn startup + request lines;
@@ -46,13 +50,15 @@ top to bottom; every box is a manual inspection by the user. Evidence ledger:
       zero failures; no unexpected skips.
 
 ## 10. Frozen screenshot integrity
-- [ ] `git diff -- docs/screenshots` empty; SHA-256 of the five
-      `release_*.png` match `DEMO_FREEZE_CHECKLIST.md` §1. Any mismatch is a
-      hard blocker — investigate history, never re-capture.
+- [x] `git diff -- docs/screenshots` empty; SHA-256 of the five
+      `release_*.png` match `DEMO_FREEZE_CHECKLIST.md` §1 (re-verified
+      Phase 47.0). Any future mismatch is a hard blocker — investigate
+      history, never re-capture.
 
 ## 11. Release checksum verification
-- [ ] `python scripts/verify_release_checksums.py docs/RELEASE_CHECKSUMS_v4.64.sha256`
-      → exit 0, all files OK.
+- [x] `python scripts/verify_release_checksums.py docs/RELEASE_CHECKSUMS_v4.64.sha256`
+      → exit 0, all files OK (re-verified Phase 47.0; also run the
+      post-publication manifest: `docs/POST_PUBLICATION_CHECKSUMS_v4.64.sha256`).
 
 ## 12. README verification
 - [ ] README renders on GitHub at the release commit: gallery images load,
@@ -139,6 +145,19 @@ top to bottom; every box is a manual inspection by the user. Evidence ledger:
 25. Correct factual errors immediately if found (§22 above).
 26. Record the final release URL in the docs in a later evidence commit —
     never pre-write it.
+
+## Post-publication verification (complete AFTER clicking Publish)
+
+- [ ] Release opens in a logged-out/private browser window.
+- [ ] README screenshots render publicly at the tag.
+- [ ] Release-notes links work on the published page.
+- [ ] Limitations section visible in the published body.
+- [ ] No secret-like values anywhere on the release page or in linked logs.
+- [ ] Publication URL recorded in `PUBLIC_RELEASE_RECORD_v4.64.md`
+      (flip its decision to VERIFIED PUBLISHED RELEASE with the real URL +
+      timestamp).
+- [ ] Correction procedure understood (§22 above) in case of factual errors.
+- [ ] Final evidence commit (record update) pushed later.
 
 ## Ground rules (unchanged by this doc)
 
