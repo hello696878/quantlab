@@ -15,6 +15,12 @@ from app.experiment_audit.audit import (
     audit_experiment_store,
     summarize_audit_result,
 )
+from app.experiment_audit.render import (
+    AUDIT_DISCLAIMERS,
+    export_audit_csv,
+    export_audit_json,
+    export_audit_markdown,
+)
 from app.experiment_audit.models import (
     CANONICAL_ARTIFACT_KEYS,
     CANONICAL_FRAME_NAMES,
@@ -68,4 +74,9 @@ __all__ = [
     "audit_experiment_run",
     "audit_experiment_store",
     "summarize_audit_result",
+    # renderers
+    "AUDIT_DISCLAIMERS",
+    "export_audit_json",
+    "export_audit_csv",
+    "export_audit_markdown",
 ]

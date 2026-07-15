@@ -12,6 +12,7 @@ Parity tests prove the audit-scoped path helpers agree with the **public**
 from __future__ import annotations
 
 import dataclasses
+import io
 import json
 from datetime import date
 from pathlib import Path
@@ -32,8 +33,12 @@ from app.experiment_audit import (
     AuditSeverity,
     ExperimentRunAudit,
     ExperimentStoreAuditResult,
+    AUDIT_DISCLAIMERS,
     audit_experiment_run,
     audit_experiment_store,
+    export_audit_csv,
+    export_audit_json,
+    export_audit_markdown,
     finding_sort_key,
     has_parent_traversal,
     is_absolute_artifact_path,
@@ -48,6 +53,7 @@ from app.experiment_audit import (
 )
 from app.experiment_audit import audit as audit_module
 from app.experiment_audit import models as models_module
+from app.experiment_audit import render as render_module
 from app.experiments import ExperimentError, ExperimentRun, ExperimentStore
 from pydantic import ValidationError
 
@@ -1077,3 +1083,287 @@ def test_audit_module_no_forbidden_or_private_imports():
     ]
     for token in forbidden:
         assert token not in src, f"audit.py must not reference {token!r}"
+
+
+# --------------------------------------------------------------------------- #
+# renderers (hand-built audit results — no store scanning)
+# --------------------------------------------------------------------------- #
+
+
+def _render_result(findings=None) -> ExperimentStoreAuditResult:
+    """A hand-built store result with two runs and three findings across
+    severities (info/warning/error), all report-safe (no absolute paths)."""
+    if findings is None:
+        findings = (
+            _finding(
+                code=AuditCode.UNEXPECTED_FILE, severity=AuditSeverity.INFO,
+                run_directory="run_a", relative_path="notes.txt", message="unexpected file",
+            ),
+            _finding(
+                code=AuditCode.ORPHAN_ARTIFACT, severity=AuditSeverity.WARNING,
+                run_directory="run_a", relative_path="extra.json", message="orphan artifact",
+            ),
+            _finding(
+                code=AuditCode.MISSING_REFERENCED_ARTIFACT, severity=AuditSeverity.ERROR,
+                run_directory="run_b", artifact_name="predictions",
+                relative_path="predictions.csv", message="missing referenced artifact",
+            ),
+        )
+    numbered = sort_and_number_findings(findings)
+    by_dir = {}
+    for f in numbered:
+        by_dir.setdefault(f.run_directory, []).append(f)
+    run_meta = [("run_a", "run_a"), ("run_b", "run_b")]
+    run_audits = tuple(
+        ExperimentRunAudit(
+            run_directory=name, train_run_hash=h,
+            status=status_for_findings(by_dir.get(name, ())),
+            findings=tuple(by_dir.get(name, ())),
+        )
+        for name, h in run_meta
+    )
+    from collections import Counter
+
+    return ExperimentStoreAuditResult(
+        runs_discovered=2,
+        runs_valid=sum(1 for ra in run_audits if ra.status == AuditRunStatus.VALID),
+        runs_with_warnings=sum(1 for ra in run_audits if ra.status == AuditRunStatus.WARNING),
+        runs_invalid=sum(1 for ra in run_audits if ra.status == AuditRunStatus.INVALID),
+        non_run_entries=0,
+        findings_total=len(numbered),
+        findings_by_severity=dict(Counter(f.severity.value for f in numbered)),
+        findings_by_code=dict(Counter(f.code.value for f in numbered)),
+        audited_run_hashes=("run_a", "run_b"),
+        run_audits=run_audits,
+        findings=numbered,
+        overall_status=overall_status_for(numbered),
+    )
+
+
+def _empty_result() -> ExperimentStoreAuditResult:
+    return ExperimentStoreAuditResult(
+        runs_discovered=0, runs_valid=0, runs_with_warnings=0, runs_invalid=0,
+        non_run_entries=0, findings_total=0, findings_by_severity={}, findings_by_code={},
+        audited_run_hashes=(), run_audits=(), findings=(), overall_status=AuditOverallStatus.OK,
+    )
+
+
+_ADVICE_TOKENS = ("buy", "sell", "allocate", "deploy")
+
+
+# ---- JSON ---- #
+
+
+def test_export_json_strict_and_deterministic():
+    result = _render_result()
+    text = export_audit_json(result)
+    assert export_audit_json(result) == text  # deterministic
+    payload = json.loads(text)  # strict parse
+    json.dumps(payload, allow_nan=False)  # strict re-serialization
+    assert text.endswith("\n")
+    assert "NaN" not in text and "Infinity" not in text
+
+
+def test_export_json_stable_top_level_keys():
+    payload = json.loads(export_audit_json(_render_result()))
+    assert set(payload) == {
+        "disclaimers", "overall_status", "runs_discovered", "runs_valid",
+        "runs_with_warnings", "runs_invalid", "non_run_entries", "findings_total",
+        "findings_by_severity", "findings_by_code", "audited_run_hashes",
+        "run_audits", "findings",
+    }
+
+
+def test_export_json_content_and_order():
+    payload = json.loads(export_audit_json(_render_result()))
+    assert payload["disclaimers"] == list(AUDIT_DISCLAIMERS)
+    assert payload["overall_status"] == "failed"
+    assert payload["audited_run_hashes"] == ["run_a", "run_b"]
+    assert [f["finding_id"] for f in payload["findings"]] == [
+        "finding_0000", "finding_0001", "finding_0002",
+    ]
+    assert [ra["run_directory"] for ra in payload["run_audits"]] == ["run_a", "run_b"]
+
+
+def test_export_json_none_becomes_null():
+    payload = json.loads(export_audit_json(_render_result()))
+    info_finding = next(f for f in payload["findings"] if f["code"] == "UNEXPECTED_FILE")
+    assert info_finding["train_run_hash"] is None
+    assert info_finding["artifact_name"] is None
+
+
+def test_export_json_no_paths_or_timestamps():
+    import re as _re
+
+    text = export_audit_json(_render_result())
+    assert ":\\" not in text and ":/" not in text
+    assert _re.search(r"\d{4}-\d{2}-\d{2}T", text) is None  # no ISO timestamp
+
+
+def test_export_json_empty_result():
+    payload = json.loads(export_audit_json(_empty_result()))
+    assert payload["findings"] == [] and payload["run_audits"] == []
+    assert payload["disclaimers"] == list(AUDIT_DISCLAIMERS)
+
+
+# ---- CSV ---- #
+
+
+def test_export_csv_deterministic_and_headers():
+    result = _render_result()
+    text = export_audit_csv(result)
+    assert export_audit_csv(result) == text
+    lines = text.splitlines()
+    assert lines[0] == (
+        "finding_id,severity,code,run_directory,train_run_hash,"
+        "artifact_name,relative_path,expected,actual,message"
+    )
+    assert len(lines) == 1 + result.findings_total  # header + one row per finding
+
+
+def test_export_csv_none_becomes_empty():
+    import csv as _csv
+
+    rows = list(_csv.reader(io.StringIO(export_audit_csv(_render_result()))))
+    info_row = next(r for r in rows[1:] if r[2] == "UNEXPECTED_FILE")
+    # columns: 0 finding_id,1 severity,2 code,3 run_directory,4 train_run_hash,
+    #          5 artifact_name,6 relative_path,7 expected,8 actual,9 message
+    assert info_row[4] == "" and info_row[5] == "" and info_row[6] == "notes.txt"
+
+
+def test_export_csv_header_only_for_zero_findings():
+    text = export_audit_csv(_empty_result())
+    assert text.strip().splitlines() == [
+        "finding_id,severity,code,run_directory,train_run_hash,"
+        "artifact_name,relative_path,expected,actual,message"
+    ]
+
+
+def test_export_csv_escapes_special_characters():
+    import csv as _csv
+
+    tricky = _finding(
+        code=AuditCode.UNEXPECTED_FILE, severity=AuditSeverity.INFO,
+        run_directory="run_a", message='has, comma "quote" and\nnewline',
+    )
+    text = export_audit_csv(_render_result(findings=(tricky,)))
+    rows = list(_csv.reader(io.StringIO(text)))
+    assert rows[1][-1] == 'has, comma "quote" and\nnewline'  # round-trips exactly
+
+
+def test_export_csv_no_paths_or_nan():
+    text = export_audit_csv(_render_result())
+    assert ":\\" not in text and "NaN" not in text and "Infinity" not in text
+
+
+# ---- Markdown ---- #
+
+
+def test_export_markdown_deterministic_sections():
+    result = _render_result()
+    text = export_audit_markdown(result)
+    assert export_audit_markdown(result) == text
+    for heading in (
+        "# ExperimentStore Integrity Audit",
+        "**Overall status:** failed",
+        "## Summary",
+        "## Findings by severity",
+        "## Findings by code",
+        "## Audited runs",
+        "## Findings",
+        "## Scope & Safety",
+    ):
+        assert heading in text
+
+
+def test_export_markdown_all_disclaimers_present():
+    text = export_audit_markdown(_render_result())
+    for disclaimer in AUDIT_DISCLAIMERS:
+        assert f"- {disclaimer}" in text
+
+
+def test_export_markdown_zero_findings_renders_all_sections():
+    text = export_audit_markdown(_empty_result())
+    for heading in (
+        "## Summary", "## Findings by severity", "## Findings by code",
+        "## Audited runs", "## Findings", "## Scope & Safety",
+    ):
+        assert heading in text
+    for disclaimer in AUDIT_DISCLAIMERS:
+        assert f"- {disclaimer}" in text
+
+
+def test_export_markdown_escapes_pipes_and_newlines():
+    tricky = _finding(
+        code=AuditCode.UNEXPECTED_FILE, severity=AuditSeverity.INFO,
+        run_directory="run_a", message="pipe | here\nand newline",
+    )
+    text = export_audit_markdown(_render_result(findings=(tricky,)))
+    assert "pipe \\| here and newline" in text  # pipe escaped, newline collapsed
+
+
+def test_export_markdown_no_paths_nan_or_advice():
+    text = export_audit_markdown(_render_result()).lower()
+    assert ":\\" not in text and "nan" not in text.replace("scan", "") and "infinity" not in text
+    for token in _ADVICE_TOKENS:
+        assert token not in text, f"advice token {token!r} leaked into markdown"
+
+
+# ---- render read-only + boundaries ---- #
+
+
+def test_renderers_do_not_mutate_result():
+    result = _render_result()
+    before = result.to_dict()
+    export_audit_json(result)
+    export_audit_csv(result)
+    export_audit_markdown(result)
+    assert result.to_dict() == before
+
+
+def test_render_module_no_mutation_or_forbidden_imports():
+    import re as _re
+
+    src = Path(render_module.__file__).read_text(encoding="utf-8")
+    for token in (
+        ".write_text", ".write_bytes", "open(", ".mkdir", ".touch", ".unlink",
+        ".rmdir", ".rename", "rmtree", "shutil", "to_csv", "to_parquet", "os.remove",
+    ):
+        assert token not in src, f"render.py must not contain mutation call {token!r}"
+    for private in ("_ABSOLUTE_PATH", "_FRAME_NAMES", "_is_relative_path"):
+        assert not _re.search(rf"\b{private}\b", src)
+    forbidden = [
+        "app.experiments",
+        "app.reporting",
+        "app.experiment_catalog",
+        "app.local_pipeline",
+        "app.batch_experiments",
+        "run_local_futures_ml_experiment",
+        "train_model",
+        "build_feature_matrix",
+        "build_label_matrix",
+        "hashlib",
+        "sha256",
+        "compute_config_hash",
+        "urllib",
+        "httpx",
+        "socket",
+        "yfinance",
+        "ibkr",
+        "sklearn",
+        "xgboost",
+        "lightgbm",
+        "torch",
+        "tensorflow",
+    ]
+    for token in forbidden:
+        assert token not in src, f"render.py must not reference {token!r}"
+
+
+def test_renderers_create_no_repo_artifacts():
+    before = _repo_snapshot()
+    result = _render_result()
+    export_audit_json(result)
+    export_audit_csv(result)
+    export_audit_markdown(result)
+    assert _repo_snapshot() == before
