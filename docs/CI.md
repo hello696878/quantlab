@@ -15,7 +15,7 @@ TypeScript check, and wrote this document.
 
 **Job 1 — Backend Tests** (`ubuntu-latest`, Python 3.11):
 installs `backend/requirements.txt`, runs `python -m pytest -q` from
-`backend/`. The suite (~2,900 tests) is deterministic and offline by design —
+`backend/`. The suite (3,000+ tests) is deterministic and offline by design —
 no live provider is ever contacted (yfinance is monkeypatched in the backtest
 API tests; every lab runs on static samples).
 

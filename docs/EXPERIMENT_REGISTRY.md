@@ -244,7 +244,20 @@ parameterised. Inputs are strictly validated (bounded strings/tags/JSON, finite
 numbers only, SHA-256 validation, forbidden extra fields). Export and provenance
 deliberately exclude paths and secrets.
 
-## 17. Future extensions
+## 17. Dataset Lineage links (Phase 49.0)
+
+The Dataset Lineage registry ([`DATASET_REGISTRY.md`](DATASET_REGISTRY.md))
+can associate an experiment with the exact dataset **versions** it used
+(roles: input / benchmark / labels / features / reference / output) via
+`experiment_dataset_links`. The experiment detail shows a "Linked datasets"
+section, each link reports whether the experiment's recorded
+`dataset_fingerprint` matches one of the version's fingerprints, and the
+reciprocal list is available at
+`GET /experiment-registry/experiments/{id}/datasets`. Links are additive
+context — historical experiments that recorded only
+`dataset_name`/`dataset_fingerprint` keep working unchanged.
+
+## 18. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

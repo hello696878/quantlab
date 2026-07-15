@@ -85,7 +85,17 @@ and outputs. It is not a re-execution of the experiment, not scientific
 reproducibility, not an audit trail, and not tamper-proof security. A
 "reproducible" status means the recorded metadata matches, nothing more.
 
-## 13. Future improvements (openly planned)
+## 13. Dataset provenance is declared metadata, not verified data
+
+The Dataset Lineage registry records dataset identity, versions,
+transformations, and quality-check results as **declared metadata** with
+deterministic fingerprints over that metadata. It does not open or verify the
+underlying data files during normal operation, is not a tamper-proof ledger,
+not an enterprise data catalog, and not a regulatory audit trail. Quality
+checks validate declared structural properties only — passing checks does not
+mean the data is financially or scientifically correct.
+
+## 14. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

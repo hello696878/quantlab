@@ -38,7 +38,18 @@ protected and why).
   neutral diff, and there is no horizontal overflow at 1024/768. The spec's
   only write is the idempotent demo-seed (clearly-marked records, never
   overwrites or deletes real data); baseline/delete/invalidate transitions are
-  covered by the backend tests on isolated databases.
+  covered by the backend tests on isolated databases. The review pass added
+  guards for the dark-theme `ql-input` filter controls (rgb & oklch
+  serializations) and table-column overlap geometry.
+- **Dataset Lineage** (Phase 49.0, `dataset-lineage.spec.ts`): the view opens
+  with its provenance disclaimer, the demo lineage seeds idempotently (re-seed
+  duplicates nothing), filters narrow the table, a dataset detail shows
+  version history, fingerprints, the SVG lineage graph (with its accessible
+  tabular fallback) and linked experiments, the alt-data example renders its
+  quality warning and invalidated version, version comparison reports neutral
+  schema drift, filter controls stay dark, the name column never overlaps its
+  neighbour, and there is no page overflow at 1024/768. Same isolation policy:
+  the only writes are the idempotent demo seeds.
 - Page-safety invariants everywhere: no rendered `NaN`/`Infinity` (checklist
   *wording* on the QA/RC pages is a documented exception), no raw stack
   traces, no failed local `/api/*` requests (dev-mode StrictMode

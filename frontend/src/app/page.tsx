@@ -58,6 +58,7 @@ import MacroRegimeLabPanel from "@/components/MacroRegimeLabPanel";
 import ScenarioStudioPanel from "@/components/ScenarioStudioPanel";
 import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
 import ExperimentRegistryPanel from "@/components/ExperimentRegistryPanel";
+import DatasetLineagePanel from "@/components/DatasetLineagePanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
@@ -508,6 +509,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Research Experiment Registry & Reproducibility Dashboard",
     subtitle:
       "A local-first, single-user registry of reproducibility metadata for research runs: what was run, with which module / configuration / dataset / seed / Git commit, what metrics resulted, whether it succeeded or failed, and how two runs differ — stored in local SQLite, with deterministic SHA-256 configuration/result fingerprints, a conservative reproducibility check, baseline selection per module/type/dataset scope, neutral two-experiment comparison, and JSON export. Fingerprints and the reproducibility status are integrity aids only — not a scientific-reproducibility claim, an audit trail, or investment, trading, or risk advice.",
+  },
+  datasetlineage: {
+    title: "Data Provenance & Dataset Lineage",
+    subtitle:
+      "A local-first registry of dataset identity and provenance: which dataset and exact version a research run used, where it came from (deterministic fixture, local file, generated, derived, or opt-in provider), its schema and date range, the transformations and parent versions that produced it, metadata-driven quality checks, neutral schema-drift comparison between versions, and links to Experiment Registry records — stored in local SQLite with deterministic SHA-256 schema/manifest fingerprints and privacy-safe logical storage locators (absolute local paths are never stored). Provenance records are declared metadata plus fingerprints over that metadata — integrity aids only, not a regulatory audit trail, not tamper-proof, not proof of data correctness, and not investment, trading, or risk advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1093,6 +1099,7 @@ export default function HomePage() {
     { view: "scenariostudio", title: "Open Scenario Studio", keywords: "scenario studio unified cross lab report builder stress template soft landing inflation growth shock liquidity crunch credit crypto risk off depeg inflow panic severe combo impact score heatmap severity regime markdown report" },
     { view: "researchworkspace", title: "Open Research Workspace", keywords: "research workspace experiment journal saved presets run comparison baseline stressed severity coverage reproducibility methodology checklist workflow timeline notes markdown json export local drafts" },
     { view: "experimentregistry", title: "Open Experiment Registry", keywords: "experiment registry reproducibility dashboard research run provenance fingerprint sha256 configuration result dataset random seed git commit metrics baseline compare diff status completed failed invalidated reproducible partially not reproducible lineage parent export json demo records local sqlite" },
+    { view: "datasetlineage", title: "Open Dataset Lineage", keywords: "dataset lineage data provenance registry version schema drift fingerprint manifest content source quality checks transformation parent child derived fixture local file generated provider license storage locator experiment links compare versions invalidated export json demo lineage sqlite" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
@@ -2266,6 +2273,8 @@ export default function HomePage() {
         {view === "researchworkspace" && <ResearchWorkspacePanel />}
 
         {view === "experimentregistry" && <ExperimentRegistryPanel />}
+
+        {view === "datasetlineage" && <DatasetLineagePanel />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

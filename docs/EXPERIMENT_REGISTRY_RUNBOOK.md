@@ -49,7 +49,10 @@ The detail shows identity/status, the reproducibility assessment (with the
 per-check reasons and the honest-scope disclaimer), full fingerprints (click to
 copy), provenance & lineage (Git commit, app version, dataset, seed, parent),
 timing, parameters, metrics, tags, notes, any error message, and a read-only raw
-JSON view.
+JSON view. When the Dataset Lineage registry (Phase 49.0) has versions linked
+to the experiment, a **Linked datasets** section lists them with their roles
+and fingerprint match/mismatch flags — see
+[`DATASET_LINEAGE_RUNBOOK.md`](DATASET_LINEAGE_RUNBOOK.md).
 
 ## 6. Compare two experiments
 

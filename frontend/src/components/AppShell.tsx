@@ -33,6 +33,7 @@ export type View =
   | "scenariostudio"
   | "researchworkspace"
   | "experimentregistry"
+  | "datasetlineage"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

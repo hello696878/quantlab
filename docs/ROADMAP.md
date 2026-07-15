@@ -1677,6 +1677,68 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 49.0 — Data Provenance & Dataset Lineage Dashboard v1 ✅
+
+- **Research-infrastructure phase:** a local-first dataset registry and
+  provenance layer connecting dataset lineage to the Experiment Registry —
+  which dataset/version a run used, where it came from, what it contained,
+  how it was produced, and whether its identity can be re-verified later.
+- **Backend:** new `app/dataset_registry` package — `locators.py` (logical
+  storage URIs: `fixture://`, `generated://`, `local-file://` basename-only,
+  `provider://`; absolute Windows/POSIX/UNC paths, `..`, credentials, query
+  strings, and control characters all rejected — the filesystem never leaks),
+  `fingerprints.py` (schema fingerprint over normalized field
+  names/types/nullability + ordering-when-significant; manifest fingerprint
+  over identity/counts/range/format/schema-fp/deterministic flag; content
+  fingerprints only via explicit operations — never per-request file
+  hashing), `store.py` (parameterised SQL over five new idempotent tables:
+  `datasets`, `dataset_versions` (immutable; UNIQUE dataset+label),
+  `dataset_lineage` (UNIQUE identical edges), `dataset_quality_results`,
+  `experiment_dataset_links` (UNIQUE experiment+version+role)),
+  `lineage.py` (BFS cycle rejection with an absolute edge cap; bounded
+  ancestor/descendant traversal ≤ depth 12 / 200 nodes with honest
+  truncation), `drift.py` (neutral schema drift classified conservatively:
+  none/compatible/potentially_breaking/breaking/unknown), `quality.py`
+  (11 metadata-driven checks with worst-of rollup — declared structure only,
+  never financial correctness), `service.py` (immutability, invalidation
+  that preserves lineage + links, provenance derivation
+  complete/partial/unknown/invalidated, fingerprint-match flags on links),
+  `demo.py` (idempotent three-chain demo: Scenario Studio macro chain,
+  KO/PEP price→features chain, and an alt-data example with a quality
+  warning, breaking schema drift, an invalidated v1, and partial
+  provenance — Experiment Registry demo records seeded first and linked).
+  Router `dataset_registry_routes.py` at `/datasets`, `/dataset-versions`,
+  `/dataset-lineage`, `/dataset-links` + a reciprocal
+  `/experiment-registry/experiments/{id}/datasets`.
+- **Frontend:** new **Dataset Lineage** view (Product Workflow group +
+  command palette) — summary cards, dark-theme `ql-input` filters (the
+  Phase 48-review primitive; never white), a min-width table that scrolls in
+  its card, dataset detail with version history + checkbox version compare,
+  per-version fingerprints/schema/quality, a bounded SVG lineage graph
+  (clickable nodes, invalidated dashed, quality dots, accessible label,
+  tabular parents/children fallback), neutral version comparison with drift
+  badges, JSON export download, and a reciprocal "Linked datasets" section
+  in the Experiment Registry detail.
+- **Tests:** 87 backend tests across three files (locators/fingerprints/
+  drift/quality; service + lineage rules incl. chain/branch/merge/dup/self/
+  direct+indirect cycles/invalidated-ancestor/depth+node truncation; API
+  happy/error/adversarial incl. export privacy and registry coexistence) on
+  temporary SQLite; a 9-test Playwright spec (`dataset-lineage.spec.ts`)
+  covering demo idempotence, filters, detail, graph, comparison drift,
+  quality warning + invalidation, dark-theme controls (rgb & oklch
+  serialization), column-overlap geometry, and 1024/768 overflow. The
+  Phase 48 review's dark-theme E2E assertion was made serialization-robust
+  (same dark threshold; newer engines return `oklch()` for `color-mix`).
+- **Docs:** `DATASET_REGISTRY.md`, `DATA_PROVENANCE_POLICY.md`,
+  `DATASET_LINEAGE_RUNBOOK.md`; VERSION `4.66.0-dev` → `4.67.0-dev`
+  (v4.66 tag exists; 113 tags) + manifest/CHANGELOG/snapshot/limitations/
+  E2E-docs/panel updates.
+- **Honest scope:** provenance records are declared metadata plus
+  deterministic fingerprints — integrity aids only; not a regulatory audit
+  trail, not tamper-proof, not an enterprise data catalog, not proof of data
+  correctness, and not investment, trading, or risk advice. No live data,
+  no provider calls, frozen outputs and screenshots untouched.
+
 ### Phase 48.0 — Research Experiment Registry & Reproducibility Dashboard v1 ✅
 
 - **Product + research-infrastructure phase:** a local-first, single-user

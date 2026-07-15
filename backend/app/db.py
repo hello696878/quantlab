@@ -190,6 +190,148 @@ def init_db() -> None:
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_exp_reg_demo_key ON experiment_registry(demo_key)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Data Provenance & Dataset Lineage registry (Phase 49.0).
+        # Dataset identity + immutable versions + lineage edges + quality
+        # results + experiment links.  Filter/status/fingerprint fields are
+        # explicit columns; only genuinely varying structures are JSON.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS datasets (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at         TEXT    NOT NULL,
+                updated_at         TEXT    NOT NULL,
+                name               TEXT    NOT NULL,
+                description        TEXT    NOT NULL DEFAULT '',
+                domain             TEXT    NOT NULL,
+                dataset_type       TEXT    NOT NULL,
+                source_type        TEXT    NOT NULL,
+                provider           TEXT,
+                source_reference   TEXT,
+                license_name       TEXT,
+                license_url        TEXT,
+                symbol_scope       TEXT,
+                asset_class        TEXT,
+                frequency          TEXT,
+                timezone           TEXT,
+                format             TEXT    NOT NULL,
+                schema_version     TEXT,
+                current_version_id INTEGER,
+                tags_json          TEXT    NOT NULL DEFAULT '[]',
+                metadata_json      TEXT    NOT NULL DEFAULT '{}',
+                notes              TEXT    NOT NULL DEFAULT '',
+                is_demo            INTEGER NOT NULL DEFAULT 0,
+                is_active          INTEGER NOT NULL DEFAULT 1,
+                provenance_status  TEXT    NOT NULL DEFAULT 'unknown',
+                demo_key           TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dataset_versions (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataset_id           INTEGER NOT NULL REFERENCES datasets(id),
+                version_label        TEXT    NOT NULL,
+                created_at           TEXT    NOT NULL,
+                effective_from       TEXT,
+                effective_to         TEXT,
+                row_count            INTEGER,
+                column_count         INTEGER,
+                start_time           TEXT,
+                end_time             TEXT,
+                content_fingerprint  TEXT,
+                manifest_fingerprint TEXT    NOT NULL,
+                schema_fingerprint   TEXT,
+                source_fingerprint   TEXT,
+                file_size_bytes      INTEGER,
+                format               TEXT    NOT NULL,
+                compression          TEXT,
+                storage_locator_type TEXT    NOT NULL,
+                storage_locator      TEXT    NOT NULL,
+                ingestion_method     TEXT    NOT NULL DEFAULT 'manual',
+                deterministic        INTEGER NOT NULL DEFAULT 0,
+                quality_status       TEXT    NOT NULL DEFAULT 'unknown',
+                validation_status    TEXT    NOT NULL DEFAULT 'unknown',
+                schema_snapshot_json TEXT    NOT NULL DEFAULT '{}',
+                statistics_json      TEXT    NOT NULL DEFAULT '{}',
+                provenance_json      TEXT    NOT NULL DEFAULT '{}',
+                invalidated_at       TEXT,
+                invalidation_reason  TEXT,
+                demo_key             TEXT,
+                UNIQUE (dataset_id, version_label)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dataset_lineage (
+                id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+                parent_version_id      INTEGER NOT NULL REFERENCES dataset_versions(id),
+                child_version_id       INTEGER NOT NULL REFERENCES dataset_versions(id),
+                relationship_type      TEXT    NOT NULL,
+                transformation_name    TEXT    NOT NULL,
+                transformation_version TEXT,
+                parameters_json        TEXT    NOT NULL DEFAULT '{}',
+                code_reference         TEXT,
+                git_commit             TEXT,
+                created_at             TEXT    NOT NULL,
+                notes                  TEXT    NOT NULL DEFAULT '',
+                UNIQUE (parent_version_id, child_version_id,
+                        relationship_type, transformation_name)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS dataset_quality_results (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                dataset_version_id INTEGER NOT NULL REFERENCES dataset_versions(id),
+                check_name         TEXT    NOT NULL,
+                check_category     TEXT    NOT NULL,
+                status             TEXT    NOT NULL,
+                severity           TEXT    NOT NULL,
+                observed_value     TEXT,
+                expected_value     TEXT,
+                message            TEXT    NOT NULL DEFAULT '',
+                checked_at         TEXT    NOT NULL,
+                checker_version    TEXT    NOT NULL,
+                details_json       TEXT    NOT NULL DEFAULT '{}'
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS experiment_dataset_links (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                experiment_id      INTEGER NOT NULL REFERENCES experiment_registry(id),
+                dataset_version_id INTEGER NOT NULL REFERENCES dataset_versions(id),
+                role               TEXT    NOT NULL,
+                created_at         TEXT    NOT NULL,
+                notes              TEXT    NOT NULL DEFAULT '',
+                UNIQUE (experiment_id, dataset_version_id, role)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_ds_source_type ON datasets(source_type)",
+            "CREATE INDEX IF NOT EXISTS idx_ds_domain ON datasets(domain)",
+            "CREATE INDEX IF NOT EXISTS idx_ds_provenance ON datasets(provenance_status)",
+            "CREATE INDEX IF NOT EXISTS idx_ds_active ON datasets(is_active)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_ds_demo_key ON datasets(demo_key)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_ds_name ON datasets(name)",
+            "CREATE INDEX IF NOT EXISTS idx_dsv_dataset ON dataset_versions(dataset_id)",
+            "CREATE INDEX IF NOT EXISTS idx_dsv_quality ON dataset_versions(quality_status)",
+            "CREATE INDEX IF NOT EXISTS idx_dsv_manifest_fp ON dataset_versions(manifest_fingerprint)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_dsv_demo_key ON dataset_versions(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_dsl_parent ON dataset_lineage(parent_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_dsl_child ON dataset_lineage(child_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_dsq_version ON dataset_quality_results(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_edl_experiment ON experiment_dataset_links(experiment_id)",
+            "CREATE INDEX IF NOT EXISTS idx_edl_version ON experiment_dataset_links(dataset_version_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

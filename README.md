@@ -56,7 +56,9 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   walkthroughs + module health), Portfolio Showcase, Scenario Studio
   (cross-lab stress + report builder), Research Workspace (presets +
   experiment journal), Experiment Registry (reproducibility metadata +
-  fingerprints + comparison), Data Reliability Center, QA Command Center.
+  fingerprints + comparison), Dataset Lineage (dataset versions, provenance,
+  transformation lineage, quality checks), Data Reliability Center,
+  QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -261,6 +263,13 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   selection, a neutral two-experiment comparison, JSON export, and idempotent
   demo records. Integrity aids only — not scientific-reproducibility proof, an
   audit trail, or advice.
+- **Dataset Lineage (49.0)** — a local-first dataset registry and provenance
+  layer: immutable dataset versions with schema/manifest fingerprints,
+  privacy-safe logical storage locators (absolute paths never stored),
+  transformation lineage with cycle rejection and a bounded SVG graph,
+  metadata-driven quality checks, neutral schema-drift comparison, and links
+  to Experiment Registry records. Declared metadata + fingerprints —
+  integrity aids only, not a tamper-proof ledger or data catalog.
 - **Demo Center (34.0)** — eight guided demo paths with deep links, a
   21-module health dashboard, a capability matrix, and an audience-aware demo
   script builder.

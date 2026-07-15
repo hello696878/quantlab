@@ -134,12 +134,24 @@ test.describe("experiment registry", () => {
     ];
     for (const control of controls) {
       const bg = await control.evaluate((el) => getComputedStyle(el).backgroundColor);
-      const m = bg.match(/rgba?\(([^)]+)\)/);
-      expect(m, `background '${bg}' should be an rgb(a) colour`).not.toBeNull();
-      const [r, g, b] = m![1].split(",").map((v) => Number.parseFloat(v));
-      // Relative luminance — a dark surface sits well below 0.5; pure white is 1.
-      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-      expect(luminance, `control background ${bg} should be dark, not white`).toBeLessThan(0.5);
+      // Browsers differ in how they serialize color-mix() results: older
+      // engines resolve to rgb(a), newer ones keep oklch(L C H) — where the
+      // leading L is already a 0..1 lightness. Same assertion either way:
+      // the surface must be dark, never the browser-default white.
+      const rgb = bg.match(/rgba?\(([^)]+)\)/);
+      if (rgb) {
+        const [r, g, b] = rgb[1].split(",").map((v) => Number.parseFloat(v));
+        // Relative luminance — a dark surface sits well below 0.5; pure white is 1.
+        const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+        expect(luminance, `control background ${bg} should be dark, not white`).toBeLessThan(0.5);
+      } else {
+        const oklch = bg.match(/oklch\(\s*([\d.]+)/);
+        expect(oklch, `background '${bg}' should be rgb(a) or oklch()`).not.toBeNull();
+        expect(
+          Number.parseFloat(oklch![1]),
+          `control background ${bg} should be dark, not white`,
+        ).toBeLessThan(0.5);
+      }
     }
   });
 
@@ -151,16 +163,21 @@ test.describe("experiment registry", () => {
     const firstRow = page.locator("tbody tr").first();
     const nameCell = firstRow.locator("td").nth(1);
     const moduleCell = firstRow.locator("td").nth(2);
-    const nameBox = await nameCell.boundingBox();
-    const moduleBox = await moduleCell.boundingBox();
-    const btnBox = await nameCell.getByRole("button").boundingBox();
-    expect(nameBox).not.toBeNull();
-    expect(moduleBox).not.toBeNull();
-    expect(btnBox).not.toBeNull();
-    // The rendered name stays within its own cell (truncation works).
-    expect(btnBox!.x + btnBox!.width).toBeLessThanOrEqual(nameBox!.x + nameBox!.width + 2);
-    // Cells tile left-to-right without overlapping the Module column.
-    expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(moduleBox!.x + 2);
+    // The post-seed refetch briefly swaps the table for the loading skeleton,
+    // and boundingBox() does not auto-wait — reading mid-swap yields nulls.
+    // Retry the whole geometry read until the table has settled.
+    await expect(async () => {
+      const nameBox = await nameCell.boundingBox();
+      const moduleBox = await moduleCell.boundingBox();
+      const btnBox = await nameCell.getByRole("button").boundingBox();
+      expect(nameBox).not.toBeNull();
+      expect(moduleBox).not.toBeNull();
+      expect(btnBox).not.toBeNull();
+      // The rendered name stays within its own cell (truncation works).
+      expect(btnBox!.x + btnBox!.width).toBeLessThanOrEqual(nameBox!.x + nameBox!.width + 2);
+      // Cells tile left-to-right without overlapping the Module column.
+      expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(moduleBox!.x + 2);
+    }).toPass({ timeout: 20_000 });
     await assertNoHorizontalOverflow(page);
     assertNoFailedLocalRequests(failures);
   });

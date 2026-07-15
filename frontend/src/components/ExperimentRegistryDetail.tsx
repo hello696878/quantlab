@@ -14,6 +14,10 @@ import {
 } from "@/lib/experimentRegistry";
 import { notifyBackendOffline, toast } from "@/lib/toast";
 import {
+  type ExperimentLink,
+  listExperimentDatasets,
+} from "@/lib/datasetRegistry";
+import {
   BaselineBadge,
   CopyValue,
   DetailSection,
@@ -42,6 +46,7 @@ export default function ExperimentRegistryDetail({
   const exp = experiment;
   const [assessment, setAssessment] = useState<ReproducibilityAssessment | null>(null);
   const [assessError, setAssessError] = useState<string | null>(null);
+  const [datasetLinks, setDatasetLinks] = useState<ExperimentLink[]>([]);
   const [busy, setBusy] = useState(false);
   const [showJson, setShowJson] = useState(false);
 
@@ -56,6 +61,13 @@ export default function ExperimentRegistryDetail({
       .catch((err) => {
         if (!cancelled) setAssessError(classifyApiError(err).message);
       });
+    setDatasetLinks([]);
+    // Dataset links are best-effort context — a failure here never blocks the detail.
+    listExperimentDatasets(exp.id)
+      .then((links) => {
+        if (!cancelled) setDatasetLinks(links);
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -277,6 +289,33 @@ export default function ExperimentRegistryDetail({
             </div>
           )}
           {exp.notes && <p className="whitespace-pre-wrap text-sm text-slate-600">{exp.notes}</p>}
+        </DetailSection>
+      )}
+
+      {/* Linked dataset versions (Phase 49.0 — Dataset Lineage registry) */}
+      {datasetLinks.length > 0 && (
+        <DetailSection title="Linked datasets">
+          <ul className="space-y-1.5">
+            {datasetLinks.map((l) => (
+              <li key={l.id} className="flex flex-wrap items-center gap-2 text-sm">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs text-slate-600">
+                  {l.role}
+                </span>
+                <span className="font-medium text-slate-800">
+                  {l.dataset_name ?? "dataset"} · {l.version_label ?? `version #${l.dataset_version_id}`}
+                </span>
+                {l.fingerprint_match === true && (
+                  <span className="text-xs text-emerald-600">fingerprint match</span>
+                )}
+                {l.fingerprint_match === false && (
+                  <span className="text-xs text-amber-600">fingerprint mismatch</span>
+                )}
+              </li>
+            ))}
+          </ul>
+          <p className="mt-2 text-xs text-slate-400">
+            Recorded in the Dataset Lineage registry — open the Dataset Lineage view for versions, quality, and lineage.
+          </p>
         </DetailSection>
       )}
 

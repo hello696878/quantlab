@@ -53,6 +53,14 @@ Dataset identity is, in order of strength: a supplied SHA-256 `dataset_fingerpri
 (weakest — "identity match by name only"). When only the name matches, the best
 achievable status is `partially_reproducible`.
 
+Since Phase 49.0, an experiment can additionally be **linked to an exact
+dataset version** in the Dataset Lineage registry
+([`DATA_PROVENANCE_POLICY.md`](DATA_PROVENANCE_POLICY.md)); the link reports
+whether the experiment's recorded fingerprint matches the version's, which
+strengthens (or honestly contradicts) the dataset-identity claim. Links are
+optional context — the assessment above still operates on the experiment's own
+recorded fields.
+
 ## Random seeds
 
 For stochastic workflows, the seed is part of the configuration fingerprint. If
