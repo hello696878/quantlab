@@ -330,7 +330,7 @@ export default function ExperimentRegistryPanel() {
               value={filters.query ?? ""}
               onChange={(e) => updateFilter("query", e.target.value)}
               placeholder="name or description"
-              className="w-48 rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+              className="ql-input w-48 px-2 py-1.5 text-sm"
             />
           </div>
           <label className="flex items-center gap-1.5 pb-1.5 text-sm text-slate-600">
@@ -458,7 +458,7 @@ function FilterSelect({
         id={id}
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="rounded-md border border-slate-200 px-2 py-1.5 text-sm"
+        className="ql-input min-w-[7rem] px-2 py-1.5 text-sm"
       >
         <option value="">All</option>
         {options.map((o) => (
@@ -528,7 +528,10 @@ function ExperimentTable({
   return (
     <div className="card overflow-hidden">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm">
+        {/* Data-heavy desktop table: a min-width keeps every column readable and
+            lets this container scroll horizontally (contained by the card's
+            overflow-hidden) instead of crushing columns into each other. */}
+        <table className="w-full min-w-[1120px] text-sm">
           <thead>
             <tr className="border-b border-slate-100 bg-slate-50 text-xs">
               <th scope="col" className="px-3 py-3 text-center">Cmp</th>
@@ -569,7 +572,8 @@ function ExperimentTable({
                   <button
                     type="button"
                     onClick={() => onView(row.id)}
-                    className="truncate text-left font-medium text-slate-800 hover:text-blue-700"
+                    title={row.name}
+                    className="block max-w-full truncate text-left font-medium text-slate-800 hover:text-blue-700"
                   >
                     {row.name}
                   </button>

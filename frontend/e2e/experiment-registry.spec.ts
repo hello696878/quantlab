@@ -121,4 +121,47 @@ test.describe("experiment registry", () => {
     await expectNoRawStackTrace(page);
     assertNoFailedLocalRequests(failures);
   });
+
+  // §16.15 — the dark-theme filter-control fix: the selects and the search input
+  // must be dark surfaces, never the browser-default white.
+  test("filter controls use dark theme backgrounds (never white)", async ({ page }) => {
+    const controls = [
+      page.getByLabel("Module"),
+      page.getByLabel("Type"),
+      page.getByLabel("Status"),
+      page.getByLabel("Reproducibility"),
+      page.getByLabel("Search"),
+    ];
+    for (const control of controls) {
+      const bg = await control.evaluate((el) => getComputedStyle(el).backgroundColor);
+      const m = bg.match(/rgba?\(([^)]+)\)/);
+      expect(m, `background '${bg}' should be an rgb(a) colour`).not.toBeNull();
+      const [r, g, b] = m![1].split(",").map((v) => Number.parseFloat(v));
+      // Relative luminance — a dark surface sits well below 0.5; pure white is 1.
+      const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+      expect(luminance, `control background ${bg} should be dark, not white`).toBeLessThan(0.5);
+    }
+  });
+
+  // §16.16 — the table-density fix: a long experiment name must truncate inside
+  // its own cell and never render over the adjacent Module column.
+  test("table name column truncates and does not overlap the next column", async ({ page }) => {
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await seedDemo(page);
+    const firstRow = page.locator("tbody tr").first();
+    const nameCell = firstRow.locator("td").nth(1);
+    const moduleCell = firstRow.locator("td").nth(2);
+    const nameBox = await nameCell.boundingBox();
+    const moduleBox = await moduleCell.boundingBox();
+    const btnBox = await nameCell.getByRole("button").boundingBox();
+    expect(nameBox).not.toBeNull();
+    expect(moduleBox).not.toBeNull();
+    expect(btnBox).not.toBeNull();
+    // The rendered name stays within its own cell (truncation works).
+    expect(btnBox!.x + btnBox!.width).toBeLessThanOrEqual(nameBox!.x + nameBox!.width + 2);
+    // Cells tile left-to-right without overlapping the Module column.
+    expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(moduleBox!.x + 2);
+    await assertNoHorizontalOverflow(page);
+    assertNoFailedLocalRequests(failures);
+  });
 });
