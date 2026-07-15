@@ -10,6 +10,11 @@ engine, renderers, and CLI land in later commits.  This layer performs no
 filesystem access and mints no hashes.
 """
 
+from app.experiment_audit.audit import (
+    audit_experiment_run,
+    audit_experiment_store,
+    summarize_audit_result,
+)
 from app.experiment_audit.models import (
     CANONICAL_ARTIFACT_KEYS,
     CANONICAL_FRAME_NAMES,
@@ -17,6 +22,7 @@ from app.experiment_audit.models import (
     AuditCode,
     AuditError,
     AuditFinding,
+    AuditLevel,
     AuditOverallStatus,
     AuditRunStatus,
     AuditSeverity,
@@ -35,11 +41,13 @@ from app.experiment_audit.models import (
 )
 
 __all__ = [
+    # models
     "AuditError",
     "AuditSeverity",
     "AuditCode",
     "AuditRunStatus",
     "AuditOverallStatus",
+    "AuditLevel",
     "AuditFinding",
     "ExperimentRunAudit",
     "ExperimentStoreAuditResult",
@@ -56,4 +64,8 @@ __all__ = [
     "CANONICAL_ARTIFACT_KEYS",
     "CANONICAL_FRAME_NAMES",
     "IGNORED_OS_FILES",
+    # engine
+    "audit_experiment_run",
+    "audit_experiment_store",
+    "summarize_audit_result",
 ]

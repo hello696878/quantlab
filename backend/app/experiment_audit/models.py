@@ -30,6 +30,7 @@ __all__ = [
     "AuditCode",
     "AuditRunStatus",
     "AuditOverallStatus",
+    "AuditLevel",
     "AuditFinding",
     "ExperimentRunAudit",
     "ExperimentStoreAuditResult",
@@ -113,6 +114,14 @@ class AuditOverallStatus(str, Enum):
     OK = "ok"
     WARNING = "warning"
     FAILED = "failed"
+
+
+class AuditLevel(str, Enum):
+    """How deep the audit inspects each run (metadata-only < standard < deep)."""
+
+    METADATA_ONLY = "metadata-only"
+    STANDARD = "standard"
+    DEEP = "deep"
 
 
 # --------------------------------------------------------------------------- #
