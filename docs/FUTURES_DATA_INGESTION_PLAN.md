@@ -427,6 +427,16 @@ that phase, not here.
 > live data, and no real-data acquisition** (all remain out of scope and **not
 > implemented**). See `docs/AI_QUANT_ARCHITECTURE.md` **Appendix M (§M.13
 > as-built)** for details.
+>
+> **Planned (Phase 13, design only):** a **local read-only ExperimentStore
+> structural integrity audit** over saved experiment artifacts — enumerate and
+> classify every store entry, tolerantly validate metadata / `artifact_paths`, and
+> report missing / malformed / orphaned / unsafe content as deterministic findings
+> (exported only to explicit output paths). It **repairs, deletes, and modifies
+> nothing** (the store is left byte-identical), runs and retrains nothing, and adds
+> **no vendor fetch (I5), no live data, and no real-data acquisition** (all remain
+> out of scope and **not implemented**). See `docs/AI_QUANT_ARCHITECTURE.md`
+> **Appendix N** for the design.
 
 ### Ingestion Phase 5 (I5) — real vendor integration
 
