@@ -18,17 +18,34 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Post-Publication Verification & Stable Release Baseline v1** (v4.65
-  series): read-only verification of the real v4.64 state (tag local =
-  remote → `2d4bcfe`; CI run 29188597089 ✅ and Browser E2E Preflight run
-  29193708980 ✅ observed on that exact commit; **GitHub Release publication
-  still pending**), a factual publication record, an item-by-item
-  post-publication verification report, the stable post-release baseline
-  document (protected behavior, fixture outputs, change policy, development
-  lanes), evidence-ledger/launch-checklist updates, and a post-publication
-  checksum manifest. Nothing was published, triggered, tagged, or pushed.
+- **Research Experiment Registry & Reproducibility Dashboard v1** (v4.66
+  series): a local-first, single-user SQLite registry of reproducibility
+  metadata for research runs — deterministic SHA-256 configuration/result
+  fingerprints (canonical JSON, NaN/Infinity rejected), a conservative
+  reproducibility assessment (reproducible / partial / not / unknown),
+  baseline selection scoped to `(module, experiment_type, dataset identity)`,
+  a neutral two-experiment comparison, filtering/sorting/pagination, JSON
+  export (no paths/secrets), and idempotent deterministic demo records. New
+  FastAPI routes under `/experiment-registry`, a new **Experiment Registry**
+  frontend view (list/detail/compare) with command-palette entry, an opt-in
+  best-effort integration helper for existing modules (Scenario Studio and
+  KO/PEP endpoints left unmodified to preserve frozen outputs), a Playwright
+  E2E spec, and three new docs (`EXPERIMENT_REGISTRY.md`,
+  `EXPERIMENT_REPRODUCIBILITY_POLICY.md`, `EXPERIMENT_REGISTRY_RUNBOOK.md`).
+  Request validation hardened so non-finite JSON tokens return a stable 422.
+  Fingerprints and the reproducibility check are integrity aids only — not a
+  scientific-reproducibility claim, an audit trail, or investment advice.
 
-## Grouped release areas — v4.8 through v4.64 (post-showcase series)
+## Grouped release areas — v4.8 through v4.65 (post-showcase series)
+
+### Post-publication verification & stable release baseline (v4.65)
+
+- Read-only verification of the real v4.64 state (tag local = remote →
+  `2d4bcfe`; CI run 29188597089 ✅ and Browser E2E Preflight run 29193708980 ✅
+  observed on that exact commit; GitHub Release publication remained pending),
+  a factual publication record, an item-by-item post-publication verification
+  report, the stable post-release baseline document, evidence-ledger/launch-
+  checklist updates, and a post-publication checksum manifest.
 
 ### Public GitHub release launch closure (v4.64)
 
@@ -73,7 +90,7 @@ claimed by an entry here.
   fixture isolation + YM roll coverage, and the frozen freeze record with
   five SHA-256'd production screenshots.
 
-The tags between v4.8.0 and v4.64.0 (local milestone tags; full per-phase
+The tags between v4.8.0 and v4.65.0 (local milestone tags; full per-phase
 detail in `docs/ROADMAP.md`) grouped by area:
 
 ### CI preflight, repository hygiene & security sweep (v4.59)

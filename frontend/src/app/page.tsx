@@ -57,6 +57,7 @@ import AlternativeDataLabPanel from "@/components/AlternativeDataLabPanel";
 import MacroRegimeLabPanel from "@/components/MacroRegimeLabPanel";
 import ScenarioStudioPanel from "@/components/ScenarioStudioPanel";
 import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
+import ExperimentRegistryPanel from "@/components/ExperimentRegistryPanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
@@ -502,6 +503,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Research Workspace & Experiment Journal",
     subtitle:
       "Organize deterministic sample lab runs into saved research presets — stage runs, compare baseline vs stressed reads with change and guarded percentage-change formulas, inspect severity/coverage/reproducibility scores, a workflow timeline, and a methodology checklist, write experiment notes, and export copy-friendly Markdown or JSON summaries (optional browser-local drafts, no accounts, no cloud) — static sample data, no live data, not investment, trading, or asset-allocation advice, not production research or compliance records.",
+  },
+  experimentregistry: {
+    title: "Research Experiment Registry & Reproducibility Dashboard",
+    subtitle:
+      "A local-first, single-user registry of reproducibility metadata for research runs: what was run, with which module / configuration / dataset / seed / Git commit, what metrics resulted, whether it succeeded or failed, and how two runs differ — stored in local SQLite, with deterministic SHA-256 configuration/result fingerprints, a conservative reproducibility check, baseline selection per module/type/dataset scope, neutral two-experiment comparison, and JSON export. Fingerprints and the reproducibility status are integrity aids only — not a scientific-reproducibility claim, an audit trail, or investment, trading, or risk advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1086,6 +1092,7 @@ export default function HomePage() {
     { view: "macroregime", title: "Open Macro Regime Lab", keywords: "macro regime cross asset allocation growth inflation policy liquidity credit stress usd pressure z-score goldilocks stagflation recession risk parity inverse volatility regime tilt" },
     { view: "scenariostudio", title: "Open Scenario Studio", keywords: "scenario studio unified cross lab report builder stress template soft landing inflation growth shock liquidity crunch credit crypto risk off depeg inflow panic severe combo impact score heatmap severity regime markdown report" },
     { view: "researchworkspace", title: "Open Research Workspace", keywords: "research workspace experiment journal saved presets run comparison baseline stressed severity coverage reproducibility methodology checklist workflow timeline notes markdown json export local drafts" },
+    { view: "experimentregistry", title: "Open Experiment Registry", keywords: "experiment registry reproducibility dashboard research run provenance fingerprint sha256 configuration result dataset random seed git commit metrics baseline compare diff status completed failed invalidated reproducible partially not reproducible lineage parent export json demo records local sqlite" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
@@ -2257,6 +2264,8 @@ export default function HomePage() {
         {view === "scenariostudio" && <ScenarioStudioPanel />}
 
         {view === "researchworkspace" && <ResearchWorkspacePanel />}
+
+        {view === "experimentregistry" && <ExperimentRegistryPanel />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

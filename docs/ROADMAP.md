@@ -1677,6 +1677,54 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 48.0 — Research Experiment Registry & Reproducibility Dashboard v1 ✅
+
+- **Product + research-infrastructure phase:** a local-first, single-user
+  SQLite registry of reproducibility metadata for research runs, with an
+  interactive frontend dashboard. Distinct from the existing file-based ML
+  `app/experiments` store — this is a broad catalogue for any module's run.
+- **Backend:** new `app/experiment_registry` package —
+  `fingerprints.py` (deterministic SHA-256 over canonical JSON: sorted keys,
+  whole-float normalization, **NaN/Infinity rejected**, unsupported types
+  rejected; configuration/result/dataset fingerprints), `provenance.py`
+  (cached, best-effort git commit + `VERSION`), `store.py` (parameterised
+  SQLite CRUD, filtering, bounded pagination, baseline-scope transaction),
+  `assessment.py` (conservative reproducible/partial/not/unknown rules),
+  `comparison.py` (neutral two-experiment diff, guarded percentage change),
+  `service.py` (status-transition + baseline-eligibility rules), `demo.py`
+  (six idempotent demo records), `integration.py` (opt-in best-effort helper).
+  Router `experiment_registry_routes.py` mounted at `/experiment-registry`
+  (summary/list/create/get/patch/delete/complete/fail/mark-baseline/
+  invalidate/reproducibility/compare/export/demo-seed). New
+  `experiment_registry` table added idempotently and non-destructively in
+  `db.init_db()` (indexes + UNIQUE `demo_key`). Request validation hardened
+  app-wide so non-standard `NaN`/`Infinity` JSON tokens return a stable 422
+  instead of a 500.
+- **Frontend:** new **Experiment Registry** view (Product Workflow group +
+  command palette) — `ExperimentRegistryPanel` (summary cards, filter bar,
+  sortable/paginated table, empty/loading/error states, demo-seed, JSON
+  export), `ExperimentRegistryDetail` (fingerprints with copy, reproducibility
+  assessment, provenance/lineage, parameters/metrics, raw JSON), and
+  `ExperimentRegistryCompare` (grouped neutral diffs), plus a typed API client.
+- **Integration decision:** Scenario Studio and KO/PEP endpoints left
+  unmodified (pure endpoints with frozen outputs; auto-recording per request
+  would be unacceptable coupling). Both flagship workflows are represented by
+  demo records; modules opt in via the best-effort helper.
+- **Tests:** five backend test files (fingerprints, store, service, api,
+  integration) on isolated temporary SQLite DBs, plus
+  `frontend/e2e/experiment-registry.spec.ts` (6 tests). Backend suite green;
+  `npx tsc --noEmit` clean; the registry E2E ran **6/6 passed** against the
+  running dev servers (idempotent demo-seed + read-only interactions; the dev
+  registry was restored to empty afterward). No frontend build run.
+- **Docs:** `EXPERIMENT_REGISTRY.md`, `EXPERIMENT_REPRODUCIBILITY_POLICY.md`,
+  `EXPERIMENT_REGISTRY_RUNBOOK.md`; VERSION `4.65.0-dev` → `4.66.0-dev`
+  (v4.65 tag exists; 112 tags), plus VERSION_MANIFEST / CHANGELOG rotation /
+  PROJECT_SNAPSHOT / RELEASE_ASSET_MANIFEST / limitations / CI-docs updates.
+- **Honest scope:** fingerprints and the reproducibility status are integrity
+  aids only — not scientific-reproducibility proof, not an audit trail, not
+  tamper-proof security, and not investment, trading, or risk advice.
+  Frozen Scenario Studio / KO-PEP outputs and screenshots unchanged.
+
 ### Phase 47.0 — Post-Publication Verification & Stable Release Baseline v1 ✅
 
 - **Read-only verification + evidence-recording phase (no product changes,

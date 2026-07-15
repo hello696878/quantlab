@@ -19,10 +19,12 @@ artifacts. Companions: [`CI.md`](CI.md) (the main preflight) ·
 ## 1. Purpose
 
 Run the existing browser regression guard (frozen demo route, Scenario
-Studio severe combo, KO/PEP pairs fixture, responsive geometry) against a
-**freshly built, isolated** QuantLab instance — proving the guard doesn't
-secretly depend on anything on the maintainer's machine, and producing
-downloadable evidence (logs, traces, HTML report) per run.
+Studio severe combo, KO/PEP pairs fixture, responsive geometry, and the
+Phase 48.0 Experiment Registry spec) against a **freshly built, isolated**
+QuantLab instance — proving the guard doesn't secretly depend on anything on
+the maintainer's machine, and producing downloadable evidence (logs, traces,
+HTML report) per run. The Experiment Registry spec seeds only the idempotent,
+clearly-marked demo records and otherwise reads — it never mutates real data.
 
 ## 2. Workflow identity
 

@@ -42,6 +42,10 @@ evidence commit `7cf9708` (tag `v4.60.0-public-release-candidate-demo-freeze-v1`
 | Post-publication verification | `docs/POST_PUBLICATION_VERIFICATION_v4.64.md` | doc | 20-item expected/observed verification table | Tracked | v4.65 series | release-existence item FAILS until published |
 | Post-release baseline | `docs/POST_RELEASE_BASELINE_v4.64.md` | doc | Stable dev baseline: protected behavior/outputs, change policy, lanes | Tracked | v4.65 series | anchored to the verified tag `2d4bcfe` |
 | Post-publication checksum manifest | `docs/POST_PUBLICATION_CHECKSUMS_v4.64.sha256` | manifest | SHA-256 of the Phase 47 record set + the release-time manifest | Tracked | v4.65 series | release-time manifest preserved separately |
+| Experiment Registry doc | `docs/EXPERIMENT_REGISTRY.md` | doc | Registry data model, fingerprints, API, workflow, integration, limits | Living doc | v4.66 series (Phase 48.0) | local-first; integrity aids only, not an audit trail |
+| Reproducibility policy | `docs/EXPERIMENT_REPRODUCIBILITY_POLICY.md` | doc | What reproducibility means / does not mean; the four-state rules | Living doc | v4.66 series | explicitly not scientific/audit/regulatory reproducibility |
+| Experiment Registry runbook | `docs/EXPERIMENT_REGISTRY_RUNBOOK.md` | doc | Start / seed demo / view / filter / compare / baseline / export / test | Living doc | v4.66 series | demo seeding is idempotent; never deletes real records |
+| Experiment Registry E2E spec | `frontend/e2e/experiment-registry.spec.ts` | test | Playwright coverage of the registry view | Source | v4.66 series | idempotent demo-seed + read-only; no baseline/delete mutation |
 
 ## Policies (binding)
 

@@ -44,6 +44,7 @@ const ICONS: Record<string, string> = {
   macroregime: "M3 21h18M5 21V10l4 3 4-6 4 4 3-5v15M12 3v2M12 3l-2 1.5M12 3l2 1.5",
   scenariostudio: "M4 6h16M4 12h16M4 18h16M9 4v4M15 10v4M7 16v4",
   researchworkspace: "M5 4h13a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1H5V4Zm0 0v16M9 9h6M9 13h6M9 17h3",
+  experimentregistry: "M9 3h6M10 3v5l-4.5 8A2 2 0 0 0 7.3 19h9.4a2 2 0 0 0 1.8-3l-4.5-8V3M8 14h8",
   democenter: "M4 5h16v11H4V5Zm6 3.5 4 2-4 2v-4ZM8 21l4-3 4 3",
   datareliability: "M12 3 4 7v5c0 4.5 3.4 8 8 9 4.6-1 8-4.5 8-9V7l-8-4ZM8 12h2l1.5-3 2 5 1.5-2h1",
   qacommandcenter: "M5 4h14v16H5V4ZM8 8.5l1.5 1.5L12 7.5M8 14.5l1.5 1.5L12 13.5M14 9h3M14 15h3",
@@ -152,6 +153,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
     items: [
       { id: "scenariostudio", label: "Scenario Studio", icon: "scenariostudio" },
       { id: "researchworkspace", label: "Research Workspace", icon: "researchworkspace" },
+      { id: "experimentregistry", label: "Experiment Registry", icon: "experimentregistry" },
       { id: "datareliability", label: "Data Reliability Center", icon: "datareliability" },
       { id: "qacommandcenter", label: "QA Command Center", icon: "qacommandcenter" },
       { id: "releasenotes", label: "Release Notes Center", icon: "releasenotes" },
