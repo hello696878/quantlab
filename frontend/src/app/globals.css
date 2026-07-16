@@ -267,6 +267,19 @@
     color: var(--text-faint);
     opacity: 0.75;
   }
+  /* Visible hover affordance (border lifts toward the accent) — applies to
+     every ql-input control app-wide, and to the Experiment Registry filter
+     selects / search that now reuse this primitive. */
+  .ql-input:hover:not(:disabled):not(:focus) {
+    border-color: color-mix(in oklch, var(--accent) 32%, var(--line-strong));
+  }
+  /* Native <select> dropdown options: keep them on a dark surface where the
+     browser renders <option> from author styles. color-scheme:dark (above)
+     handles the popup + arrow on the browsers that ignore option colors. */
+  .ql-input option {
+    background-color: var(--bg-elev);
+    color: var(--text-hi);
+  }
 
   .ql-segmented {
     display: inline-flex;

@@ -1,7 +1,7 @@
-# QuantLab — Project Snapshot (Phase 47.0)
+# QuantLab — Project Snapshot (Phase 49.0)
 
 A one-page handoff doc. Facts verified against the repo when written
-(version label `4.65.0-dev`); counts drift as phases land — re-verify before
+(version label `4.67.0-dev`); counts drift as phases land — re-verify before
 public use.
 
 ## Summary
@@ -18,9 +18,9 @@ trading/risk/compliance infrastructure.
 
 - **Start Here:** Home, Demo Center, Portfolio Showcase, Developer
   Onboarding, Global Markets Globe.
-- **Product Workflow:** Scenario Studio, Research Workspace, Data
-  Reliability Center, QA Command Center, Release Notes Center, Public
-  Release Candidate.
+- **Product Workflow:** Scenario Studio, Research Workspace, Experiment
+  Registry, Dataset Lineage, Data Reliability Center, QA Command Center,
+  Release Notes Center, Public Release Candidate.
 - **Backtesting:** Backtest, Strategy Comparison, Portfolio Backtest, CSV
   Backtest, Strategy Builder, Parameter Sweep, Train/Test, Walk-Forward.
 - **Strategy Knowledge:** Strategy Library, Paper Replications, Quant
@@ -66,9 +66,10 @@ the in-app Data Reliability Center.
 ~2,900+ deterministic backend tests (2,968 green at the v4.60 freeze — see
 the ROADMAP entry per phase for each milestone's count); strict finiteness
 guarantees at the API boundary; wording contracts as tests;
-`npx tsc --noEmit` for the frontend; a 12-test Playwright browser E2E guard
-for the frozen demo path (local-first, plus a manually triggered CI
-workflow — `CI_BROWSER_E2E.md`); **no frontend unit-test framework yet**.
+`npx tsc --noEmit` for the frontend; a Playwright browser E2E guard covering
+the frozen demo path, the Experiment Registry, and the Dataset Lineage views
+(local-first, plus a manually triggered CI workflow — `CI_BROWSER_E2E.md`);
+**no frontend unit-test framework yet**.
 Verification is run locally by the user (helper wrappers in
 `scripts\*.ps1`).
 

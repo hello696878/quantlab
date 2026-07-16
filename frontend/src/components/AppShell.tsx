@@ -32,6 +32,8 @@ export type View =
   | "macroregime"
   | "scenariostudio"
   | "researchworkspace"
+  | "experimentregistry"
+  | "datasetlineage"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

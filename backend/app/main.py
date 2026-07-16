@@ -43,8 +43,11 @@ from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.encoders import jsonable_encoder
+from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from pydantic import ValidationError
 
 from app.backtest import (
@@ -83,6 +86,8 @@ from app.research_workspace_routes import router as research_workspace_router
 from app.demo_center_routes import router as demo_center_router
 from app.data_reliability_routes import router as data_reliability_router
 from app.qa_command_center_routes import router as qa_command_center_router
+from app.experiment_registry_routes import router as experiment_registry_router
+from app.dataset_registry_routes import router as dataset_registry_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -386,6 +391,37 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+def _sanitize_non_finite(obj):
+    """Replace non-finite floats (NaN / ±Infinity) with their string form.
+
+    Python's ``json.loads`` accepts the non-standard ``NaN`` / ``Infinity``
+    tokens, so a request body can carry them into a validation error's echoed
+    ``input``.  The default handler then fails to serialise that echo (strict
+    JSON forbids non-finite floats), turning a clean 422 into a 500.  We stringify
+    them so validation errors always render as a stable 422 with no stack trace.
+    Finite values pass through unchanged, so normal error responses are identical.
+    """
+    import math
+
+    if isinstance(obj, float):
+        return obj if math.isfinite(obj) else repr(obj)
+    if isinstance(obj, dict):
+        return {k: _sanitize_non_finite(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize_non_finite(v) for v in obj]
+    return obj
+
+
+@app.exception_handler(RequestValidationError)
+async def _validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
+    """Render request-validation errors as a stable 422, safe against non-finite
+    floats in the echoed input (see :func:`_sanitize_non_finite`)."""
+    return JSONResponse(
+        status_code=422,
+        content={"detail": _sanitize_non_finite(jsonable_encoder(exc.errors()))},
+    )
+
 # Global Markets Globe data layer (Phase 20.2) — static sample dossier API.
 app.include_router(globe_router)
 
@@ -436,6 +472,12 @@ app.include_router(data_reliability_router)
 
 # Release Readiness, Smoke Test Matrix & QA Command Center (Phase 36.0) — static QA metadata API.
 app.include_router(qa_command_center_router)
+
+# Research Experiment Registry & Reproducibility Dashboard (Phase 48.0) — local SQLite registry.
+app.include_router(experiment_registry_router)
+
+# Data Provenance & Dataset Lineage Dashboard (Phase 49.0) — local SQLite dataset registry.
+app.include_router(dataset_registry_router)
 
 
 # ---------------------------------------------------------------------------

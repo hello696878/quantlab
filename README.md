@@ -43,9 +43,9 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
 - **Risk-aware product language** — every module states its data mode,
   simplifications, and limitations in the UI and docs.
 - **Testing & QA workflow** — a large deterministic backend test suite
-  (2,975 green as of Phase 45.0), CI preflight (backend tests + frontend
-  typecheck/build), a 12-test Playwright browser guard for the frozen demo
-  path with a manually triggered CI workflow, a QA Command Center, and a
+  (3,000+ tests), CI preflight (backend tests + frontend typecheck/build), a
+  Playwright browser guard covering the frozen demo path and the Experiment
+  Registry with a manually triggered CI workflow, a QA Command Center, and a
   Data Reliability Center.
 - **Documentation discipline** — per-phase roadmap entries, limitations
   ledger, demo scripts, and this launch pack.
@@ -55,7 +55,10 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
 - **Start Here / Product Workflow** — Home dashboard, Demo Center (guided
   walkthroughs + module health), Portfolio Showcase, Scenario Studio
   (cross-lab stress + report builder), Research Workspace (presets +
-  experiment journal), Data Reliability Center, QA Command Center.
+  experiment journal), Experiment Registry (reproducibility metadata +
+  fingerprints + comparison), Dataset Lineage (dataset versions, provenance,
+  transformation lineage, quality checks), Data Reliability Center,
+  QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -254,6 +257,19 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
 - **Research Workspace (33.0)** — saved research packs, an experiment journal
   with severity/coverage/reproducibility scores, Markdown/JSON exports, and
   optional browser-local drafts (localStorage only).
+- **Experiment Registry (48.0)** — a local-first SQLite registry of
+  reproducibility metadata: deterministic SHA-256 configuration/result
+  fingerprints, a conservative reproducibility assessment, per-scope baseline
+  selection, a neutral two-experiment comparison, JSON export, and idempotent
+  demo records. Integrity aids only — not scientific-reproducibility proof, an
+  audit trail, or advice.
+- **Dataset Lineage (49.0)** — a local-first dataset registry and provenance
+  layer: immutable dataset versions with schema/manifest fingerprints,
+  privacy-safe logical storage locators (absolute paths never stored),
+  transformation lineage with cycle rejection and a bounded SVG graph,
+  metadata-driven quality checks, neutral schema-drift comparison, and links
+  to Experiment Registry records. Declared metadata + fingerprints —
+  integrity aids only, not a tamper-proof ledger or data catalog.
 - **Demo Center (34.0)** — eight guided demo paths with deep links, a
   21-module health dashboard, a capability matrix, and an audience-aware demo
   script builder.

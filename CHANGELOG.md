@@ -18,17 +18,48 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Post-Publication Verification & Stable Release Baseline v1** (v4.65
-  series): read-only verification of the real v4.64 state (tag local =
-  remote → `2d4bcfe`; CI run 29188597089 ✅ and Browser E2E Preflight run
-  29193708980 ✅ observed on that exact commit; **GitHub Release publication
-  still pending**), a factual publication record, an item-by-item
-  post-publication verification report, the stable post-release baseline
-  document (protected behavior, fixture outputs, change policy, development
-  lanes), evidence-ledger/launch-checklist updates, and a post-publication
-  checksum manifest. Nothing was published, triggered, tagged, or pushed.
+- **Data Provenance & Dataset Lineage Dashboard v1** (v4.67 series): a
+  local-first SQLite dataset registry — dataset identity with immutable
+  versions, deterministic SHA-256 schema/manifest fingerprints (content
+  fingerprints only via explicit operations, never per-request file hashing),
+  privacy-safe logical storage locators (absolute paths/credentials rejected
+  and never stored), transformation lineage with cycle rejection and bounded
+  traversal, metadata-driven quality checks with worst-of rollup, neutral
+  schema-drift comparison (none / compatible / potentially_breaking /
+  breaking / unknown), version invalidation that preserves lineage and links,
+  bidirectional Experiment Registry links with fingerprint match flags, JSON
+  export (no paths/secrets), and an idempotent three-chain demo lineage. New
+  FastAPI routes (`/datasets`, `/dataset-versions`, `/dataset-lineage`,
+  `/dataset-links`), a new **Dataset Lineage** frontend view (dark-theme
+  `ql-input` filters, SVG lineage graph with tabular fallback, version
+  comparison), a "Linked datasets" section in the Experiment Registry detail,
+  a 9-test Playwright spec, and three docs (`DATASET_REGISTRY.md`,
+  `DATA_PROVENANCE_POLICY.md`, `DATASET_LINEAGE_RUNBOOK.md`). Provenance
+  records are declared metadata plus fingerprints — integrity aids only, not
+  an audit trail, not tamper-proof, not proof of data correctness.
 
-## Grouped release areas — v4.8 through v4.64 (post-showcase series)
+## Grouped release areas — v4.8 through v4.66 (post-showcase series)
+
+### Research experiment registry & reproducibility dashboard (v4.66)
+
+- Local-first SQLite registry of reproducibility metadata: deterministic
+  SHA-256 configuration/result fingerprints (canonical JSON, NaN/Infinity
+  rejected), a conservative reproducibility assessment, per-scope baseline
+  selection, neutral two-experiment comparison, JSON export, idempotent demo
+  records, an opt-in best-effort integration helper (Scenario Studio / KO-PEP
+  endpoints unmodified), the Experiment Registry frontend view, a Playwright
+  spec, and app-wide 422 hardening for non-finite JSON tokens. The review
+  pass added the dark-theme `ql-input` filter controls and the min-width
+  table-density fix with E2E guards for both.
+
+### Post-publication verification & stable release baseline (v4.65)
+
+- Read-only verification of the real v4.64 state (tag local = remote →
+  `2d4bcfe`; CI run 29188597089 ✅ and Browser E2E Preflight run 29193708980 ✅
+  observed on that exact commit; GitHub Release publication remained pending),
+  a factual publication record, an item-by-item post-publication verification
+  report, the stable post-release baseline document, evidence-ledger/launch-
+  checklist updates, and a post-publication checksum manifest.
 
 ### Public GitHub release launch closure (v4.64)
 
@@ -73,7 +104,7 @@ claimed by an entry here.
   fixture isolation + YM roll coverage, and the frozen freeze record with
   five SHA-256'd production screenshots.
 
-The tags between v4.8.0 and v4.64.0 (local milestone tags; full per-phase
+The tags between v4.8.0 and v4.66.0 (local milestone tags; full per-phase
 detail in `docs/ROADMAP.md`) grouped by area:
 
 ### CI preflight, repository hygiene & security sweep (v4.59)
