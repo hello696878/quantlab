@@ -12,6 +12,7 @@ Parity tests prove the audit-scoped path helpers agree with the **public**
 from __future__ import annotations
 
 import dataclasses
+import importlib.util
 import io
 import json
 from datetime import date
@@ -1170,8 +1171,33 @@ def test_export_json_stable_top_level_keys():
         "disclaimers", "overall_status", "runs_discovered", "runs_valid",
         "runs_with_warnings", "runs_invalid", "non_run_entries", "findings_total",
         "findings_by_severity", "findings_by_code", "audited_run_hashes",
-        "run_audits", "findings",
+        "run_audits", "findings", "displayed_findings_total", "findings_filtered",
     }
+
+
+def test_export_json_unfiltered_view_flags():
+    result = _render_result()
+    payload = json.loads(export_audit_json(result))  # no override
+    assert payload["findings_filtered"] is False
+    assert payload["displayed_findings_total"] == payload["findings_total"]
+    assert payload["displayed_findings_total"] == len(payload["findings"])
+    # an explicit override equal to the canonical findings is still "unfiltered"
+    same = json.loads(export_audit_json(result, findings=list(result.findings)))
+    assert same["findings_filtered"] is False
+
+
+def test_export_json_filtered_view_flags():
+    result = _render_result()
+    errors = [f for f in result.findings if f.severity == AuditSeverity.ERROR]
+    assert len(errors) == 1
+    payload = json.loads(export_audit_json(result, findings=errors))
+    assert payload["findings_filtered"] is True
+    assert payload["findings_total"] == 3            # canonical count preserved
+    assert payload["displayed_findings_total"] == 1  # == len(exported findings)
+    assert payload["displayed_findings_total"] < payload["findings_total"]
+    assert len(payload["findings"]) == 1
+    # original finding id preserved (not renumbered)
+    assert payload["findings"][0]["finding_id"] == errors[0].finding_id
 
 
 def test_export_json_content_and_order():
@@ -1282,6 +1308,24 @@ def test_export_markdown_all_disclaimers_present():
         assert f"- {disclaimer}" in text
 
 
+def test_export_markdown_shows_both_counts_and_filtered_note():
+    result = _render_result()
+    # unfiltered: both counts present, no filtered-view note
+    full = export_audit_markdown(result)
+    assert "| findings_total | 3 |" in full
+    assert "| findings_displayed | 3 |" in full
+    assert "filtered view" not in full
+    # filtered: displayed count differs and the factual note appears
+    errors = [f for f in result.findings if f.severity == AuditSeverity.ERROR]
+    filtered = export_audit_markdown(result, findings=errors)
+    assert "| findings_total | 3 |" in filtered          # canonical preserved
+    assert "| findings_displayed | 1 |" in filtered
+    assert (
+        "The findings table is a filtered view; summary counts describe the "
+        "complete audit result." in filtered
+    )
+
+
 def test_export_markdown_zero_findings_renders_all_sections():
     text = export_audit_markdown(_empty_result())
     for heading in (
@@ -1367,3 +1411,366 @@ def test_renderers_create_no_repo_artifacts():
     export_audit_csv(result)
     export_audit_markdown(result)
     assert _repo_snapshot() == before
+
+
+# --------------------------------------------------------------------------- #
+# CLI — scripts/audit_experiment_store.py
+# --------------------------------------------------------------------------- #
+
+_AUDIT_CLI_PATH = _REPO_ROOT / "scripts" / "audit_experiment_store.py"
+
+
+def _load_audit_cli():
+    spec = importlib.util.spec_from_file_location("audit_cli", _AUDIT_CLI_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _warning_store(tmp_path) -> ExperimentStore:
+    store = _valid_store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "extra.json").write_text("{}", encoding="utf-8")  # orphan -> warning
+    return store
+
+
+def _error_store(tmp_path) -> ExperimentStore:
+    store = _valid_store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "predictions.csv").unlink()  # missing referenced -> error
+    return store
+
+
+def _critical_store(tmp_path) -> ExperimentStore:
+    store = _valid_store(tmp_path, ("run_a",))
+    _rewrite_metadata(
+        store, "run_a", lambda d: d["artifact_paths"].__setitem__("predictions", "../evil.csv")
+    )  # path traversal -> critical
+    return store
+
+
+def _cli(store, *extra):
+    return [*("--artifacts-dir", str(store.base_dir)), *extra]
+
+
+# ---- success + status/exit matrix ---- #
+
+
+def test_cli_clean_store_ok(tmp_path, capsys):
+    store = _valid_store(tmp_path, ("run_a", "run_b"))
+    code = _load_audit_cli().main(_cli(store, "--no-parquet"))
+    out = capsys.readouterr().out
+    assert code == 0 and "RESULT: OK" in out
+    assert "overall_status=ok runs_discovered=2 runs_valid=2" in out
+    assert "findings_total=0" in out
+
+
+def test_cli_warning_default_fail_on(tmp_path, capsys):
+    store = _warning_store(tmp_path)
+    code = _load_audit_cli().main(_cli(store, "--no-parquet"))
+    out = capsys.readouterr().out
+    assert code == 0 and "RESULT: WARNING" in out  # warning-only, default fail-on=error -> exit 0
+
+
+def test_cli_warning_fail_on_warning(tmp_path, capsys):
+    store = _warning_store(tmp_path)
+    code = _load_audit_cli().main(_cli(store, "--no-parquet", "--fail-on", "warning"))
+    out = capsys.readouterr().out
+    assert code == 1 and "RESULT: WARNING" in out  # RESULT reflects status; exit reflects fail-on
+
+
+def test_cli_error_default_fail_on(tmp_path, capsys):
+    store = _error_store(tmp_path)
+    code = _load_audit_cli().main(_cli(store, "--no-parquet"))
+    out = capsys.readouterr().out
+    assert code == 1 and "RESULT: FAIL" in out
+    assert "MISSING_REFERENCED_ARTIFACT" in out
+
+
+@pytest.mark.parametrize("fail_on", ["warning", "error", "critical"])
+def test_cli_critical_exits_1_for_all_thresholds(tmp_path, capsys, fail_on):
+    store = _critical_store(tmp_path)
+    code = _load_audit_cli().main(_cli(store, "--no-parquet", "--fail-on", fail_on))
+    out = capsys.readouterr().out
+    assert code == 1 and "RESULT: FAIL" in out
+    assert "PATH_TRAVERSAL" in out
+
+
+@pytest.mark.parametrize("level", ["metadata-only", "standard", "deep"])
+def test_cli_level_dispatch(tmp_path, capsys, level):
+    store = _valid_store(tmp_path, ("run_a",))
+    code = _load_audit_cli().main(_cli(store, "--no-parquet", "--level", level))
+    assert code == 0 and "RESULT: OK" in capsys.readouterr().out
+
+
+def test_cli_single_run(tmp_path, capsys):
+    store = _valid_store(tmp_path, ("run_a", "run_b"))
+    code = _load_audit_cli().main(_cli(store, "--no-parquet", "--run-hash", "run_a"))
+    out = capsys.readouterr().out
+    assert code == 0 and "RESULT: OK" in out
+    assert "runs_discovered=1" in out  # only the one run
+
+
+# ---- severity filter + non-run behavior ---- #
+
+
+def test_cli_severity_filters_display_but_not_exit(tmp_path, capsys):
+    # store has an info UNEXPECTED_FILE + an error MISSING_REFERENCED_ARTIFACT
+    store = _error_store(tmp_path)
+    (store.base_dir / "run_a" / "notes.txt").write_text("x", encoding="utf-8")  # info
+    code = _load_audit_cli().main(_cli(store, "--no-parquet", "--severity", "error"))
+    out = capsys.readouterr().out
+    assert code == 1  # error still triggers default fail-on
+    assert "MISSING_REFERENCED_ARTIFACT" in out
+    assert "UNEXPECTED_FILE" not in out  # info filtered from display
+    assert "RESULT: FAIL" in out  # canonical status unaffected by the display filter
+
+
+def test_cli_filtered_findings_keep_original_ids(tmp_path, capsys):
+    store = _error_store(tmp_path)
+    (store.base_dir / "run_a" / "notes.txt").write_text("x", encoding="utf-8")
+    # unfiltered: capture the id of the error finding
+    _load_audit_cli().main(_cli(store, "--no-parquet"))
+    full = capsys.readouterr().out
+    err_line = next(ln for ln in full.splitlines() if "MISSING_REFERENCED_ARTIFACT" in ln)
+    err_id = err_line.split("]")[0].lstrip("[")
+    # filtered: the same finding keeps the same id (no renumbering)
+    _load_audit_cli().main(_cli(store, "--no-parquet", "--severity", "error"))
+    filtered = capsys.readouterr().out
+    assert f"[{err_id}]" in filtered
+
+
+def test_cli_non_run_info_hidden_by_default(tmp_path, capsys):
+    store = _valid_store(tmp_path, ("run_a",))
+    (store.base_dir / "stray.txt").write_text("x", encoding="utf-8")  # ROOT_LEVEL_FILE (info)
+    _load_audit_cli().main(_cli(store, "--no-parquet"))
+    default_out = capsys.readouterr().out
+    assert "ROOT_LEVEL_FILE" not in default_out  # hidden by default
+    _load_audit_cli().main(_cli(store, "--no-parquet", "--include-non-run-entries"))
+    included_out = capsys.readouterr().out
+    assert "ROOT_LEVEL_FILE" in included_out
+
+
+def test_cli_console_shows_both_counts(tmp_path, capsys):
+    # store with an info UNEXPECTED_FILE (hidden by --severity error) + an error
+    store = _error_store(tmp_path)
+    (store.base_dir / "run_a" / "notes.txt").write_text("x", encoding="utf-8")
+    _load_audit_cli().main(_cli(store, "--no-parquet", "--severity", "error"))
+    out = capsys.readouterr().out
+    summary = next(ln for ln in out.splitlines() if ln.startswith("overall_status="))
+    assert "findings_total=" in summary and "displayed_findings_total=" in summary
+    # displayed is filtered below the canonical total (the info finding is hidden)
+    total = int(summary.split("findings_total=")[1].split()[0])
+    displayed = int(summary.split("displayed_findings_total=")[1].split()[0])
+    assert displayed < total
+
+
+def test_cli_output_json_records_filtered_view(tmp_path, capsys):
+    store = _error_store(tmp_path)
+    (store.base_dir / "run_a" / "notes.txt").write_text("x", encoding="utf-8")
+    out_path = tmp_path / "audit.json"
+    _load_audit_cli().main(
+        _cli(store, "--no-parquet", "--severity", "error", "--output-json", str(out_path))
+    )
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    assert payload["findings_filtered"] is True
+    assert payload["displayed_findings_total"] == len(payload["findings"])
+    assert payload["displayed_findings_total"] < payload["findings_total"]
+
+
+def test_cli_missing_metadata_warning_never_hidden(tmp_path, capsys):
+    store = _valid_store(tmp_path, ("run_a",))
+    half = store.base_dir / "half_run"
+    half.mkdir()
+    (half / "metrics.json").write_text("{}", encoding="utf-8")  # MISSING_METADATA (warning)
+    _load_audit_cli().main(_cli(store, "--no-parquet"))  # no --include-non-run-entries
+    out = capsys.readouterr().out
+    assert "MISSING_METADATA" in out  # warnings are never hidden
+
+
+# ---- output files ---- #
+
+
+def test_cli_output_json(tmp_path, capsys):
+    store = _error_store(tmp_path)
+    out_path = tmp_path / "reports" / "audit.json"
+    code = _load_audit_cli().main(_cli(store, "--no-parquet", "--output-json", str(out_path)))
+    out = capsys.readouterr().out
+    assert code == 1 and f"[JSON] path={out_path}" in out
+    assert out_path.exists()
+    payload = json.loads(out_path.read_text(encoding="utf-8"))
+    json.dumps(payload, allow_nan=False)
+    assert payload["overall_status"] == "failed"
+    assert [p.name for p in (tmp_path / "reports").iterdir()] == ["audit.json"]
+
+
+def test_cli_output_csv(tmp_path, capsys):
+    store = _error_store(tmp_path)
+    out_path = tmp_path / "audit.csv"
+    code = _load_audit_cli().main(_cli(store, "--no-parquet", "--output-csv", str(out_path)))
+    assert code == 1
+    assert out_path.read_text(encoding="utf-8").splitlines()[0].startswith("finding_id,severity,code,")
+
+
+def test_cli_output_markdown_has_disclaimers(tmp_path, capsys):
+    from app.experiment_audit import AUDIT_DISCLAIMERS
+
+    store = _valid_store(tmp_path, ("run_a",))
+    out_path = tmp_path / "audit.md"
+    _load_audit_cli().main(_cli(store, "--no-parquet", "--output-markdown", str(out_path)))
+    text = out_path.read_text(encoding="utf-8")
+    assert "## Scope & Safety" in text
+    for disclaimer in AUDIT_DISCLAIMERS:
+        assert disclaimer in text
+
+
+def test_cli_multiple_outputs_and_determinism(tmp_path, capsys):
+    store = _warning_store(tmp_path)
+    j, c, m = tmp_path / "a.json", tmp_path / "a.csv", tmp_path / "a.md"
+    _load_audit_cli().main(
+        _cli(store, "--no-parquet", "--output-json", str(j), "--output-csv", str(c), "--output-markdown", str(m))
+    )
+    out = capsys.readouterr().out
+    assert all(x in out for x in ("[JSON] path=", "[CSV] path=", "[MARKDOWN] path="))
+
+    def _read3():
+        return (
+            j.read_text(encoding="utf-8"),
+            c.read_text(encoding="utf-8"),
+            m.read_text(encoding="utf-8"),
+        )
+
+    first = _read3()
+    _load_audit_cli().main(
+        _cli(store, "--no-parquet", "--output-json", str(j), "--output-csv", str(c), "--output-markdown", str(m))
+    )
+    assert _read3() == first  # deterministic
+
+
+def test_cli_no_outputs_writes_nothing_outside_store(tmp_path):
+    store = _valid_store(tmp_path, ("run_a",))
+    before = sorted(str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*"))
+    _load_audit_cli().main(_cli(store, "--no-parquet"))
+    after = sorted(str(p.relative_to(tmp_path)) for p in tmp_path.rglob("*"))
+    assert after == before  # no files created
+
+
+# ---- runtime failures -> exit 3 (no traceback) ---- #
+
+
+def test_cli_missing_root_exit_3(tmp_path, capsys):
+    code = _load_audit_cli().main(["--artifacts-dir", str(tmp_path / "nope")])
+    out = capsys.readouterr().out
+    assert code == 3 and "RESULT: FAIL" in out and "Traceback" not in out
+
+
+def test_cli_root_is_file_exit_3(tmp_path, capsys):
+    f = tmp_path / "afile"
+    f.write_text("x", encoding="utf-8")
+    code = _load_audit_cli().main(["--artifacts-dir", str(f)])
+    assert code == 3 and "RESULT: FAIL" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("bad", ["../run_a", "a/b", r"C:\run_a"])
+def test_cli_unsafe_run_hash_exit_3(tmp_path, capsys, bad):
+    store = _valid_store(tmp_path, ("run_a",))
+    code = _load_audit_cli().main(_cli(store, "--run-hash", bad))
+    assert code == 3 and "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_missing_run_hash_exit_3(tmp_path, capsys):
+    store = _valid_store(tmp_path, ("run_a",))
+    code = _load_audit_cli().main(_cli(store, "--run-hash", "no_such_run"))
+    assert code == 3 and "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_non_run_run_hash_exit_3(tmp_path, capsys):
+    store = _valid_store(tmp_path, ("run_a",))
+    (store.base_dir / "notes").mkdir()
+    code = _load_audit_cli().main(_cli(store, "--run-hash", "notes"))
+    assert code == 3 and "RESULT: FAIL" in capsys.readouterr().out
+
+
+def test_cli_unwritable_output_exit_3(tmp_path, capsys):
+    store = _valid_store(tmp_path, ("run_a",))
+    blocker = tmp_path / "blocker"
+    blocker.write_text("x", encoding="utf-8")  # a file where a parent dir is expected
+    bad_out = blocker / "sub" / "audit.json"
+    code = _load_audit_cli().main(_cli(store, "--no-parquet", "--output-json", str(bad_out)))
+    assert code == 3 and "RESULT: FAIL" in capsys.readouterr().out
+
+
+# ---- argparse usage -> SystemExit 2 ---- #
+
+
+@pytest.mark.parametrize(
+    "argv",
+    [
+        [],  # missing --artifacts-dir
+        ["--artifacts-dir", "x", "--level", "bogus"],
+        ["--artifacts-dir", "x", "--severity", "bogus"],
+        ["--artifacts-dir", "x", "--fail-on", "bogus"],
+    ],
+)
+def test_cli_argparse_usage_exit_2(argv):
+    cli = _load_audit_cli()
+    with pytest.raises(SystemExit) as excinfo:
+        cli.main(argv)
+    assert excinfo.value.code == 2
+
+
+# ---- read-only + boundaries ---- #
+
+
+@pytest.mark.parametrize("level", ["metadata-only", "standard", "deep"])
+def test_cli_leaves_store_byte_identical(tmp_path, level):
+    store = _warning_store(tmp_path)
+    before = _store_snapshot(store.base_dir)
+    _load_audit_cli().main(
+        _cli(store, "--no-parquet", "--level", level, "--output-json", str(tmp_path / "o.json"))
+    )
+    assert _store_snapshot(store.base_dir) == before  # audited store unchanged
+
+
+def test_cli_creates_no_repo_artifacts(tmp_path, capsys):
+    before = _repo_snapshot()
+    store = _valid_store(tmp_path, ("run_a",))
+    _load_audit_cli().main(_cli(store, "--no-parquet"))
+    assert _repo_snapshot() == before
+
+
+def test_cli_module_no_forbidden_imports_or_advice():
+    import re as _re
+
+    src = Path(_AUDIT_CLI_PATH).read_text(encoding="utf-8")
+    for private in ("_ABSOLUTE_PATH", "_FRAME_NAMES", "_is_relative_path"):
+        assert not _re.search(rf"\b{private}\b", src)
+    forbidden = [
+        "app.local_pipeline",
+        "app.batch_experiments",
+        "app.reporting",
+        "app.experiment_catalog",
+        "run_local_futures_ml_experiment",
+        "train_model",
+        "build_feature_matrix",
+        "build_label_matrix",
+        "hashlib",
+        "sha256",
+        "compute_config_hash",
+        "urllib",
+        "httpx",
+        "socket",
+        "yfinance",
+        "ibkr",
+        "sklearn",
+        "xgboost",
+        "lightgbm",
+        "torch",
+        "tensorflow",
+        "rmtree",
+        ".unlink",
+        "shutil",
+    ]
+    for token in forbidden:
+        assert token not in src, f"CLI must not reference {token!r}"
+    lowered = src.lower()
+    for token in ("buy", "sell", "allocate", "deploy"):
+        assert token not in lowered, f"advice token {token!r} in CLI source"

@@ -53,13 +53,25 @@ _CSV_HEADER: tuple[str, ...] = (
 _MD_NA = "n/a"
 
 
-def export_audit_json(result: ExperimentStoreAuditResult) -> str:
+def export_audit_json(result: ExperimentStoreAuditResult, *, findings=None) -> str:
     """Strict, deterministic JSON (sorted keys, 2-space indent, trailing newline).
 
     Object key order is normalized by ``sort_keys``; list order (``findings`` /
     ``run_audits``) is preserved.  ``None`` becomes ``null``; there are no
-    ``NaN`` / ``Infinity`` values, timestamps, or host paths."""
+    ``NaN`` / ``Infinity`` values, timestamps, or host paths.
+
+    ``findings`` optionally overrides the rendered findings list (e.g. a severity
+    filter) while the canonical summary counts are preserved — the caller keeps
+    the original finding ids; nothing is renumbered.  Two explicit fields make a
+    filtered view unambiguous: ``displayed_findings_total`` (len of the rendered
+    findings) and ``findings_filtered`` (``True`` when the rendered findings differ
+    from the canonical ``result.findings``).  The canonical ``findings_total`` is
+    always the complete audit count."""
+    rendered = list(result.findings if findings is None else findings)
     payload = {"disclaimers": list(AUDIT_DISCLAIMERS), **result.to_dict()}
+    payload["findings"] = [f.to_dict() for f in rendered]
+    payload["displayed_findings_total"] = len(rendered)
+    payload["findings_filtered"] = rendered != list(result.findings)
     return json.dumps(payload, allow_nan=False, sort_keys=True, indent=2) + "\n"
 
 
@@ -67,16 +79,17 @@ def _csv_cell(value) -> str:
     return "" if value is None else str(value)
 
 
-def export_audit_csv(result: ExperimentStoreAuditResult) -> str:
+def export_audit_csv(result: ExperimentStoreAuditResult, *, findings=None) -> str:
     """Deterministic CSV findings table: fixed header + one row per finding.
 
     ``None`` becomes an empty cell; the stdlib ``csv`` module quotes / escapes
     commas, quotes, and newlines.  Zero findings yields the header row only (no
-    summary pseudo-row)."""
+    summary pseudo-row).  ``findings`` optionally overrides the rendered rows."""
+    rows = result.findings if findings is None else findings
     buf = io.StringIO()
     writer = csv.writer(buf, lineterminator="\n")
     writer.writerow(_CSV_HEADER)
-    for finding in result.findings:
+    for finding in rows:
         data = finding.to_dict()
         writer.writerow([_csv_cell(data[column]) for column in _CSV_HEADER])
     return buf.getvalue()
@@ -97,12 +110,18 @@ def _md_table(header: list[str], rows: list[list[str]]) -> list[str]:
     return lines
 
 
-def export_audit_markdown(result: ExperimentStoreAuditResult) -> str:
+def export_audit_markdown(result: ExperimentStoreAuditResult, *, findings=None) -> str:
     """Deterministic, human-readable Markdown report (all sections always present).
 
     Renders the overall status, a summary table, findings-by-severity and
     findings-by-code tables, an audited-runs table, a findings table, and a
-    Scope & Safety section listing every :data:`AUDIT_DISCLAIMERS` entry."""
+    Scope & Safety section listing every :data:`AUDIT_DISCLAIMERS` entry.  The
+    summary / by-severity / by-code / audited-runs tables always reflect the
+    canonical ``result``; ``findings`` optionally overrides only the findings
+    table (e.g. a severity filter)."""
+    rendered = list(result.findings if findings is None else findings)
+    filtered = rendered != list(result.findings)
+
     lines: list[str] = ["# ExperimentStore Integrity Audit", ""]
     lines.append(f"**Overall status:** {result.overall_status.value}")
     lines.append("")
@@ -119,6 +138,7 @@ def export_audit_markdown(result: ExperimentStoreAuditResult) -> str:
                 ["runs_invalid", str(result.runs_invalid)],
                 ["non_run_entries", str(result.non_run_entries)],
                 ["findings_total", str(result.findings_total)],
+                ["findings_displayed", str(len(rendered))],
             ],
         )
     )
@@ -151,6 +171,12 @@ def export_audit_markdown(result: ExperimentStoreAuditResult) -> str:
 
     lines.append("## Findings")
     lines.append("")
+    if filtered:
+        lines.append(
+            "The findings table is a filtered view; summary counts describe the "
+            "complete audit result."
+        )
+        lines.append("")
     finding_header = [
         "finding_id", "severity", "code", "run_directory",
         "artifact_name", "relative_path", "expected", "actual", "message",
@@ -167,7 +193,7 @@ def export_audit_markdown(result: ExperimentStoreAuditResult) -> str:
             _md_cell(f.actual),
             _md_cell(f.message),
         ]
-        for f in result.findings
+        for f in rendered
     ]
     lines.extend(_md_table(finding_header, finding_rows))
     lines.append("")
