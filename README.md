@@ -57,8 +57,8 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   (cross-lab stress + report builder), Research Workspace (presets +
   experiment journal), Experiment Registry (reproducibility metadata +
   fingerprints + comparison), Dataset Lineage (dataset versions, provenance,
-  transformation lineage, quality checks), Data Reliability Center,
-  QA Command Center.
+  transformation lineage, quality checks), Model Validation Lab (purged CV,
+  embargo, CPCV + leakage audit), Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -270,6 +270,13 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Model Validation Lab (50.0)** — purged K-fold, embargo, and CPCV for
+  time-dependent samples with information intervals: interval-based purging,
+  a from-scratch leakage audit on every split, a temporal split-timeline
+  visualization, neutral fold metrics, deterministic fingerprints, and links
+  to the Experiment Registry and Dataset Lineage. Standard K-fold is included
+  only as an explicitly-warned leakage reference. Methodology and audit only —
+  no profitability claims, no model recommendations.
 - **Demo Center (34.0)** — eight guided demo paths with deep links, a
   21-module health dashboard, a capability matrix, and an audience-aware demo
   script builder.

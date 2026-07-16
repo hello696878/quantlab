@@ -41,6 +41,15 @@ protected and why).
   covered by the backend tests on isolated databases. The review pass added
   guards for the dark-theme `ql-input` filter controls (rgb & oklch
   serializations) and table-column overlap geometry.
+- **Model Validation Lab** (Phase 50.0, `model-validation.spec.ts`): the lab
+  opens with its leakage-prevention disclaimer, the seven-run demo seeds
+  idempotently, method filters work, the purged K-fold detail shows separate
+  purge/embargo counts with zero remaining overlap and the split-timeline SVG,
+  the standard K-fold reference shows its leakage warning, the CPCV run lists
+  its combinations, run comparison stays neutral, the linked dataset/
+  experiment records open, dark-theme controls and column geometry hold, and
+  1024/768 have no page overflow. Only writes: the idempotent demo seeds
+  (which cascade to the other registries' idempotent demo loaders).
 - **Dataset Lineage** (Phase 49.0, `dataset-lineage.spec.ts`): the view opens
   with its provenance disclaimer, the demo lineage seeds idempotently (re-seed
   duplicates nothing), filters narrow the table, a dataset detail shows

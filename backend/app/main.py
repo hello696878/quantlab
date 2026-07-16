@@ -88,6 +88,7 @@ from app.data_reliability_routes import router as data_reliability_router
 from app.qa_command_center_routes import router as qa_command_center_router
 from app.experiment_registry_routes import router as experiment_registry_router
 from app.dataset_registry_routes import router as dataset_registry_router
+from app.model_validation_routes import router as model_validation_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -478,6 +479,9 @@ app.include_router(experiment_registry_router)
 
 # Data Provenance & Dataset Lineage Dashboard (Phase 49.0) — local SQLite dataset registry.
 app.include_router(dataset_registry_router)
+
+# Purged CV / Embargo / CPCV Model Validation Lab (Phase 50.0) — local SQLite validation lab.
+app.include_router(model_validation_router)
 
 
 # ---------------------------------------------------------------------------

@@ -95,7 +95,17 @@ not an enterprise data catalog, and not a regulatory audit trail. Quality
 checks validate declared structural properties only — passing checks does not
 mean the data is financially or scientifically correct.
 
-## 14. Future improvements (openly planned)
+## 14. Model validation audits intervals, not everything
+
+The Model Validation Lab's purged K-fold, embargo, and CPCV remove and audit
+temporal leakage **through the declared information intervals** of the
+supplied samples. The audit cannot see leakage through features computed from
+wider windows, preprocessing that spans folds, or repeated hyperparameter
+selection on the same data. A "leakage-clean" run is a methodology check —
+not proof of model quality or profitability, and the lab never recommends or
+ranks models.
+
+## 15. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

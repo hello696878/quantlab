@@ -257,7 +257,15 @@ reciprocal list is available at
 context — historical experiments that recorded only
 `dataset_name`/`dataset_fingerprint` keep working unchanged.
 
-## 18. Future extensions
+## 18. Model Validation Lab records (Phase 50.0)
+
+Executed validation runs from the Model Validation Lab
+([`MODEL_VALIDATION_LAB.md`](MODEL_VALIDATION_LAB.md)) can create experiment
+records here (module `model_validation`, type = validation method, split/
+leakage metrics) — idempotently: a run creates at most one record, and
+re-execution reuses it.
+
+## 19. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

@@ -1677,6 +1677,70 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 50.0 — Purged CV, Embargo & CPCV Model Validation Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first model-validation lab for
+  time-dependent research, emphasizing leakage prevention and validation
+  integrity over performance metrics.
+- **Backend:** new `app/model_validation` package — `events.py`
+  (temporal-event samples with **closed** information intervals
+  [prediction_time, evaluation_time]; timezone-consistency, unique ids,
+  finite values, deterministic tie-broken sorting, explicit-only
+  missing-evaluation policy, 4–2000 samples), `engine.py` (standard K-fold
+  reference with shuffle-off default + seed-required shuffle; walk-forward
+  expanding/rolling with **boundary purging on by default**; purged K-fold
+  with interval-based purge + per-id overlap reasons; CPCV with deterministic
+  C(N,k) combinations bounded at 100, N ≤ 12; embargo as duration-days or
+  ≤0.2 span-fraction with start-exclusive/end-inclusive windows merged per
+  disjoint test block, reported separately from purging; eager
+  `validate_config` so bad configs 422 at creation; and `audit_split` — a
+  from-scratch leakage audit whose invariant marks any split with remaining
+  train/test interval overlap, duplicate assignment, or chronology violation
+  as invalid, never silently valid), `metrics.py` (dependency-light, no
+  sklearn: accuracy/balanced-accuracy/precision/recall/F1, rank-based ROC
+  AUC, log loss, MAE/MSE/RMSE/R², return stats incl. a clearly-labeled
+  simplified `sharpe_like`; undefined metrics → null **with reasons**, never
+  Infinity or zero-coercion; mean/median/std/min/max/valid-fold aggregation),
+  `fingerprints.py` (deterministic configuration/split/result SHA-256 over
+  the shared canonical JSON), `store.py` + two new idempotent tables
+  (`validation_runs`, `validation_splits`; bounded JSON memberships —
+  documented v1 decision), `service.py` (execution lifecycle with honest
+  failed runs, idempotent Experiment Registry creation, Dataset Lineage links
+  with invalidation warnings, leakage-clean-only baselines scoped per
+  (method, dataset version), neutral comparison, export), `demo.py` (seven
+  deterministic runs incl. the K-fold leakage reference, an honest failed
+  configuration, and a linked baseline candidate), and
+  `model_validation_routes.py` at `/model-validation`. The interval/overlap/
+  embargo semantics deliberately mirror `app/finml/cv.py` (AFML ch. 7),
+  generalized from bar indices to timestamps — the frozen finml demo is
+  untouched.
+- **Frontend:** new **Model Validation Lab** view (Product Workflow group +
+  command palette) — summary cards, dark `ql-input` filters, min-width runs
+  table with leakage pills, run detail (leakage-audit stats, K-fold warning
+  banner, linked dataset/experiment cards with open actions + invalidated-
+  dataset warning, aggregate-metrics table, per-split table, and a **split
+  timeline** SVG on a true temporal axis with color+pattern coding,
+  400-row bound, accessible label, and a membership-table fallback), and a
+  neutral run comparison with split integrity above metrics.
+- **Tests:** 48 backend tests across two files (interval/boundary/purge
+  cases incl. containment/boundary-contact/disjoint-blocks/long-horizon,
+  embargo modes + final-boundary, audit invariant, CPCV determinism +
+  explosion limits, fingerprints, metrics incl. undefined-metric reasons;
+  persistence/migration, lifecycle, idempotent experiment linking, baseline
+  scope, links, comparison, export privacy, demo idempotence, adversarial
+  API paths) on temporary SQLite; `npx tsc --noEmit` clean; an 11-test
+  Playwright spec — full local suite **40/40 passed** against the running
+  dev servers, dev DB demo rows removed afterward.
+- **Docs:** `MODEL_VALIDATION_LAB.md`, `PURGED_CV_AND_EMBARGO_POLICY.md`,
+  `CPCV_RUNBOOK.md`; VERSION `4.67.0-dev` → `4.68.0-dev` (v4.67 tag exists;
+  114 tags) + manifest/CHANGELOG rotation/snapshot/limitations/E2E-docs/
+  panel updates.
+- **Honest scope:** methodology and audit only — the leakage audit covers
+  the represented intervals; no profitability claims, no model
+  recommendations or rankings, not scientific certification or regulatory
+  validation, and not investment, trading, or risk advice. Frozen outputs
+  and screenshots untouched.
+
 ### Phase 49.0 — Data Provenance & Dataset Lineage Dashboard v1 ✅
 
 - **Research-infrastructure phase:** a local-first dataset registry and

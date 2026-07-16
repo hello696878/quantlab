@@ -218,7 +218,14 @@ and `source_reference`/`code_reference` reject absolute paths and credentials;
 `license_url` rejects embedded credentials; exports never carry paths or
 secrets. Strict bounded validation everywhere; parameterised SQL only.
 
-## 18. Limitations
+## 18. Model Validation Lab links (Phase 50.0)
+
+Validation runs ([`MODEL_VALIDATION_LAB.md`](MODEL_VALIDATION_LAB.md)) may
+bind a `dataset_version_id`; the run detail shows the version's fingerprints,
+provenance, and quality states, warns visibly when the version was
+invalidated, and always preserves the recorded identity on historical runs.
+
+## 19. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks

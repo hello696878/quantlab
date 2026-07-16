@@ -59,6 +59,7 @@ import ScenarioStudioPanel from "@/components/ScenarioStudioPanel";
 import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
 import ExperimentRegistryPanel from "@/components/ExperimentRegistryPanel";
 import DatasetLineagePanel from "@/components/DatasetLineagePanel";
+import ModelValidationPanel from "@/components/ModelValidationPanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
@@ -514,6 +515,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Data Provenance & Dataset Lineage",
     subtitle:
       "A local-first registry of dataset identity and provenance: which dataset and exact version a research run used, where it came from (deterministic fixture, local file, generated, derived, or opt-in provider), its schema and date range, the transformations and parent versions that produced it, metadata-driven quality checks, neutral schema-drift comparison between versions, and links to Experiment Registry records — stored in local SQLite with deterministic SHA-256 schema/manifest fingerprints and privacy-safe logical storage locators (absolute local paths are never stored). Provenance records are declared metadata plus fingerprints over that metadata — integrity aids only, not a regulatory audit trail, not tamper-proof, not proof of data correctness, and not investment, trading, or risk advice.",
+  },
+  modelvalidation: {
+    title: "Purged CV, Embargo & CPCV Model Validation Lab",
+    subtitle:
+      "A local-first model-validation lab for time-dependent research: samples carry information intervals [prediction time → evaluation time], and the lab generates standard K-fold (reference only — it leaks with overlapping labels and the audit says so), chronological walk-forward, purged K-fold, and Combinatorial Purged CV splits with interval-based purging, a configurable embargo (duration or fraction), a from-scratch leakage audit on every split, neutral fold-level metrics, deterministic SHA-256 configuration/split/result fingerprints, and links to Experiment Registry and Dataset Lineage records — all in local SQLite. Methodology and audit only: no profitability claims, no model recommendations, not scientific certification or regulatory validation, and not investment, trading, or risk advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1100,6 +1106,7 @@ export default function HomePage() {
     { view: "researchworkspace", title: "Open Research Workspace", keywords: "research workspace experiment journal saved presets run comparison baseline stressed severity coverage reproducibility methodology checklist workflow timeline notes markdown json export local drafts" },
     { view: "experimentregistry", title: "Open Experiment Registry", keywords: "experiment registry reproducibility dashboard research run provenance fingerprint sha256 configuration result dataset random seed git commit metrics baseline compare diff status completed failed invalidated reproducible partially not reproducible lineage parent export json demo records local sqlite" },
     { view: "datasetlineage", title: "Open Dataset Lineage", keywords: "dataset lineage data provenance registry version schema drift fingerprint manifest content source quality checks transformation parent child derived fixture local file generated provider license storage locator experiment links compare versions invalidated export json demo lineage sqlite" },
+    { view: "modelvalidation", title: "Open Model Validation Lab", keywords: "model validation purged cross validation cv cpcv combinatorial embargo leakage audit walk forward k-fold kfold fold split train test overlap information interval prediction evaluation time purge baseline fingerprint compare runs afml lopez de prado deterministic demo" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
@@ -2275,6 +2282,8 @@ export default function HomePage() {
         {view === "experimentregistry" && <ExperimentRegistryPanel />}
 
         {view === "datasetlineage" && <DatasetLineagePanel />}
+
+        {view === "modelvalidation" && <ModelValidationPanel onNav={(route) => handleNav(route as View)} />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

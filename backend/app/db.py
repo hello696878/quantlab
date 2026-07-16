@@ -332,6 +332,80 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_edl_version ON experiment_dataset_links(dataset_version_id)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Purged CV / CPCV Model Validation Lab (Phase 50.0).
+        # Runs + per-split records.  Sample payloads and split memberships are
+        # bounded validated JSON (≤ 2000 samples per run — documented in
+        # docs/MODEL_VALIDATION_LAB.md §Persistence); everything used for
+        # filtering / status / fingerprints / links is an explicit column.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS validation_runs (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                TEXT    NOT NULL,
+                updated_at                TEXT    NOT NULL,
+                name                      TEXT    NOT NULL,
+                description               TEXT    NOT NULL DEFAULT '',
+                method                    TEXT    NOT NULL,
+                status                    TEXT    NOT NULL DEFAULT 'pending',
+                configuration_json        TEXT    NOT NULL DEFAULT '{}',
+                samples_json              TEXT    NOT NULL DEFAULT '[]',
+                configuration_fingerprint TEXT    NOT NULL,
+                result_fingerprint        TEXT,
+                sample_count              INTEGER NOT NULL DEFAULT 0,
+                split_count               INTEGER NOT NULL DEFAULT 0,
+                valid_split_count         INTEGER NOT NULL DEFAULT 0,
+                invalid_split_count       INTEGER NOT NULL DEFAULT 0,
+                leakage_clean             INTEGER,
+                aggregate_metrics_json    TEXT    NOT NULL DEFAULT '{}',
+                leakage_summary_json      TEXT    NOT NULL DEFAULT '{}',
+                started_at                TEXT,
+                completed_at              TEXT,
+                duration_ms               INTEGER,
+                experiment_id             INTEGER REFERENCES experiment_registry(id),
+                dataset_version_id        INTEGER REFERENCES dataset_versions(id),
+                random_seed               INTEGER,
+                app_version               TEXT,
+                git_commit                TEXT,
+                is_baseline               INTEGER NOT NULL DEFAULT 0,
+                notes                     TEXT    NOT NULL DEFAULT '',
+                error_message             TEXT,
+                demo_key                  TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS validation_splits (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                validation_run_id  INTEGER NOT NULL REFERENCES validation_runs(id),
+                split_index        INTEGER NOT NULL,
+                split_label        TEXT    NOT NULL,
+                split_fingerprint  TEXT    NOT NULL,
+                status             TEXT    NOT NULL,
+                train_ids_json     TEXT    NOT NULL DEFAULT '[]',
+                test_ids_json      TEXT    NOT NULL DEFAULT '[]',
+                purged_ids_json    TEXT    NOT NULL DEFAULT '[]',
+                embargoed_ids_json TEXT    NOT NULL DEFAULT '[]',
+                diagnostics_json   TEXT    NOT NULL DEFAULT '{}',
+                metrics_json       TEXT    NOT NULL DEFAULT '{}',
+                UNIQUE (validation_run_id, split_index)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_vr_created ON validation_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_vr_method ON validation_runs(method)",
+            "CREATE INDEX IF NOT EXISTS idx_vr_status ON validation_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_vr_experiment ON validation_runs(experiment_id)",
+            "CREATE INDEX IF NOT EXISTS idx_vr_dataset ON validation_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_vr_config_fp ON validation_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_vr_baseline ON validation_runs(is_baseline)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_vr_demo_key ON validation_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_vs_run ON validation_splits(validation_run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

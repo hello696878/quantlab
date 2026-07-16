@@ -18,27 +18,43 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Data Provenance & Dataset Lineage Dashboard v1** (v4.67 series): a
-  local-first SQLite dataset registry — dataset identity with immutable
-  versions, deterministic SHA-256 schema/manifest fingerprints (content
-  fingerprints only via explicit operations, never per-request file hashing),
-  privacy-safe logical storage locators (absolute paths/credentials rejected
-  and never stored), transformation lineage with cycle rejection and bounded
-  traversal, metadata-driven quality checks with worst-of rollup, neutral
-  schema-drift comparison (none / compatible / potentially_breaking /
-  breaking / unknown), version invalidation that preserves lineage and links,
-  bidirectional Experiment Registry links with fingerprint match flags, JSON
-  export (no paths/secrets), and an idempotent three-chain demo lineage. New
-  FastAPI routes (`/datasets`, `/dataset-versions`, `/dataset-lineage`,
-  `/dataset-links`), a new **Dataset Lineage** frontend view (dark-theme
-  `ql-input` filters, SVG lineage graph with tabular fallback, version
-  comparison), a "Linked datasets" section in the Experiment Registry detail,
-  a 9-test Playwright spec, and three docs (`DATASET_REGISTRY.md`,
-  `DATA_PROVENANCE_POLICY.md`, `DATASET_LINEAGE_RUNBOOK.md`). Provenance
-  records are declared metadata plus fingerprints — integrity aids only, not
-  an audit trail, not tamper-proof, not proof of data correctness.
+- **Purged Cross-Validation, Embargo & CPCV Model Validation Lab v1** (v4.68
+  series): a local-first validation lab for time-dependent research —
+  temporal-event samples with closed information intervals
+  [prediction_time, evaluation_time]; standard K-fold as an explicitly-warned
+  leakage reference (shuffle off by default, seed required to enable);
+  chronological walk-forward (expanding/rolling) with boundary purging on by
+  default; purged K-fold with interval-based purging and per-id overlap
+  reasons; CPCV with deterministic C(N,k) combinations bounded at 100; a
+  configurable embargo (duration-days or ≤0.2 span-fraction, start-exclusive/
+  end-inclusive windows merged per disjoint test block, reported separately
+  from purging); a from-scratch leakage audit that marks any split with
+  remaining overlap invalid; dependency-light neutral metrics (undefined →
+  null with reasons, never Infinity or zero-coercion); deterministic
+  configuration/split/result fingerprints; SQLite persistence
+  (validation_runs + validation_splits); idempotent Experiment Registry
+  linking and Dataset Lineage version links with invalidation warnings;
+  leakage-clean-only baselines scoped per (method, dataset version); neutral
+  run comparison; JSON export; a seven-run deterministic demo; a new **Model
+  Validation Lab** frontend view (dark ql-input controls, temporal split
+  timeline SVG with membership fallback); an 11-test Playwright spec; and
+  three docs (`MODEL_VALIDATION_LAB.md`, `PURGED_CV_AND_EMBARGO_POLICY.md`,
+  `CPCV_RUNBOOK.md`). Methodology and audit only — no profitability claims,
+  no model recommendations, not certification, not investment advice.
 
-## Grouped release areas — v4.8 through v4.66 (post-showcase series)
+## Grouped release areas — v4.8 through v4.67 (post-showcase series)
+
+### Data provenance & dataset lineage dashboard (v4.67)
+
+- Local-first SQLite dataset registry: dataset identity with immutable
+  versions, deterministic schema/manifest fingerprints (content fingerprints
+  only via explicit operations), privacy-safe logical storage locators
+  (absolute paths/credentials rejected), cycle-safe transformation lineage
+  with bounded traversal, metadata-driven quality checks, neutral schema-drift
+  comparison, invalidation that preserves lineage and links, bidirectional
+  Experiment Registry links with fingerprint-match flags, JSON export, an
+  idempotent three-chain demo, the Dataset Lineage frontend view (SVG lineage
+  graph + tabular fallback), and a 9-test Playwright spec.
 
 ### Research experiment registry & reproducibility dashboard (v4.66)
 
@@ -104,7 +120,7 @@ claimed by an entry here.
   fixture isolation + YM roll coverage, and the frozen freeze record with
   five SHA-256'd production screenshots.
 
-The tags between v4.8.0 and v4.66.0 (local milestone tags; full per-phase
+The tags between v4.8.0 and v4.67.0 (local milestone tags; full per-phase
 detail in `docs/ROADMAP.md`) grouped by area:
 
 ### CI preflight, repository hygiene & security sweep (v4.59)

@@ -34,6 +34,7 @@ export type View =
   | "researchworkspace"
   | "experimentregistry"
   | "datasetlineage"
+  | "modelvalidation"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"
