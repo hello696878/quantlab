@@ -4199,3 +4199,498 @@ order unless a ranking flag is given.
   never bypasses or re-implements it.
 - Local / synthetic results are **not investment advice** and **not a live
   performance guarantee**.
+
+---
+
+## Appendix N — Phase 13 Local ExperimentStore Integrity Audit Plan
+
+> **Status: as-built (Phase 13 shipped, Commits 0–5).** Sections N.1–N.16 are the
+> approved design; **§N.17 records the shipped result.** Phase 13
+> is a **local-only, read-only structural integrity audit** over persisted
+> `ExperimentStore` artifacts: enumerate every root entry, classify run / non-run,
+> tolerantly validate metadata and `artifact_paths`, detect missing / malformed /
+> orphaned / unsafe content, and export deterministic findings — **without ever
+> writing to, repairing, deleting, quarantining, or migrating the store.** It runs
+> nothing, retrains nothing, mints **no hashes**, claims **no cryptographic /
+> content verification**, and **changes no Phase 2–12 behavior**. Local artifacts
+> only; deterministic; not investment advice.
+
+### N.1 Current persistence contract
+
+Observed `ExperimentStore` run layout (`backend/app/experiments/store.py`,
+`registry.save_experiment_run`):
+
+```text
+<base_dir>/<train_run_hash>/
+├── metadata.json                       # ExperimentRun.to_canonical_json()
+├── model_params.json                   # JSON-safe params (no pickle)
+├── metrics.json                        # canonical JSON
+├── predictions.parquet | predictions.csv
+├── signal.parquet      | signal.csv
+└── backtest.parquet    | backtest.csv
+```
+
+- **`metadata.json` is structurally required** — it is the only file that makes a
+  directory a run, and it carries the identity, windows, metrics, hash chain, and
+  `artifact_paths`.
+- **`artifact_paths` is the authoritative referenced-artifact mapping.**
+  `save_experiment_run` writes six keys — `metadata`, `model_params`, `metrics`,
+  `predictions`, `signal`, `backtest` — each a **relative bare filename**
+  (`Path.name`, no subdirectories); the `metadata` key references `metadata.json`
+  itself.
+- **Paths are expected to be relative.** `read_metadata` rejects any
+  `artifact_paths` value that is absolute (drive-letter / UNC / leading slash) or
+  contains `..`; the `ExperimentRun` schema re-checks the same at construction, so
+  a schema-valid run already has safe paths — **only hand-tampered metadata can
+  carry an unsafe path, which is exactly what the audit reads raw to catch.**
+- **Frame storage may use parquet or a CSV fallback** — one extension per frame
+  (`predictions`, `signal`, `backtest`); the loader prefers parquet, else CSV.
+- **`list_experiments` skips entries without `metadata.json` but aborts** (raises
+  `ExperimentError` / `ValidationError`) the moment a discovered run has malformed
+  metadata — one corrupt run stops whole-store discovery.
+- **`load_experiment_run` fails on the first missing referenced artifact.**
+- **Phase 10 and Phase 12 assume loadable runs** — neither surveys the store
+  tolerantly, and neither reports orphan / unexpected / conflicting-format files.
+- **Missing capability:** a tolerant whole-store survey that **collects all
+  findings instead of stopping at the first failure**.
+
+**Artifact-key contract (do not over-claim):** the six keys above are the
+**canonical set normally written by `save_experiment_run`**, and the
+**authoritative required set for a given run is whatever that run's own
+`artifact_paths` references** (that is exactly what `load_experiment_run`
+enforces). The audit therefore distinguishes: (a) *referenced* artifacts — every
+value in `artifact_paths`, whose absence is an **error**; (b) *canonical-but-not-
+referenced* keys — a canonical key missing from `artifact_paths`, a **warning**
+(`MISSING_EXPECTED_ARTIFACT`), not an error, since the schema does not force all
+six; (c) *optional / legacy* files — anything else on disk, surfaced as orphan /
+unexpected rather than assumed required.
+
+### N.2 Core design decision
+
+Phase 13 is a **local-only, read-only structural integrity audit**. It **must**:
+
+- enumerate every `ExperimentStore` root entry;
+- classify run and non-run entries;
+- validate raw metadata JSON;
+- validate `ExperimentRun` schema where possible;
+- validate directory-name / `train_run_hash` consistency;
+- validate artifact-path safety;
+- validate referenced-artifact existence;
+- detect orphan and unexpected content;
+- optionally inspect frame readability (deep);
+- collect deterministic findings;
+- produce deterministic summaries and exports.
+
+It **must not**: repair, delete, rename, quarantine, or rewrite artifacts; migrate
+schemas; run or retrain experiments; execute Phase 9 or Phase 11; alter the
+`ExperimentRun` schema; claim cryptographic content verification; or modify
+Phase 2–12 behavior.
+
+### N.3 Proposed package — `backend/app/experiment_audit/`
+
+```text
+backend/app/experiment_audit/
+├── __init__.py     # public exports
+├── models.py       # AuditError, AuditSeverity, AuditCode, AuditFinding,
+│                   #   ExperimentRunAudit, ExperimentStoreAuditResult
+├── audit.py        # path-safety helpers, tolerant metadata reader,
+│                   #   audit_experiment_run, audit_experiment_store, summarize_audit_result
+└── render.py       # export_audit_json / _csv / _markdown + AUDIT_DISCLAIMERS
+```
+
+Components: **`AuditError`** (audit-usage failure — e.g. a missing / non-directory
+root), **`AuditSeverity`** (`info`/`warning`/`error`/`critical`), **`AuditCode`**
+(stable machine-readable codes — §N.5), **`AuditFinding`** (§N.4),
+**`ExperimentRunAudit`** / **`ExperimentStoreAuditResult`** (§N.10),
+**`audit_experiment_run`** / **`audit_experiment_store`** /
+**`summarize_audit_result`** (§N.9), **`export_audit_json` / `_csv` / `_markdown`**
++ **`AUDIT_DISCLAIMERS`** (§N.12).
+
+**Package boundaries**
+
+- separate from `ExperimentStore`, Phase 10 reporting, and the Phase 12 catalog;
+- **no `local_pipeline` import; no `batch_experiments` import**; no experiment
+  execution; no ML internals; no network / vendor imports; **no hash creation**;
+- **`models.py` / `audit.py` / `render.py` perform zero filesystem writes**;
+- **renderers return strings only**;
+- **only the future CLI may write reports, and only to explicit output paths.**
+
+**Private-symbol rule (approved constraint):** do **not** depend on private
+`ExperimentStore` symbols such as `_ABSOLUTE_PATH` or `_FRAME_NAMES`. Use public
+helpers if available; otherwise define **audit-scoped** path / frame constants and
+helpers inside `experiment_audit` and **prove parity** with the current
+`ExperimentStore` contract through tests. Do **not** modify `experiments/` merely
+to expose private internals unless implementation later proves it necessary.
+
+### N.4 Finding model
+
+`AuditFinding` (frozen, strict-JSON-safe), deterministic field order:
+
+- `finding_id`, `severity`, `code`, `message`, `train_run_hash`, `run_directory`,
+  `artifact_name`, `relative_path`, `expected`, `actual`.
+
+Severity ∈ {`info`, `warning`, `error`, `critical`}.
+
+**Rules:** stable machine-readable `code`s; **no timestamps** in the deterministic
+finding identity; **no absolute paths**; `run_directory` and artifact paths are
+**store-relative** (root-level findings use `"."`); findings are **ordered
+deterministically before `finding_id`s are assigned** (index ids
+`finding_0000`, ...); messages are descriptive with **no auto-repair commands**;
+strict-JSON-safe fields only (`train_run_hash` / `artifact_name` /
+`relative_path` / `expected` / `actual` are `None` when not applicable).
+
+### N.5 Finding-code strategy
+
+Candidate codes, grounded in §N.1 (default severity in parentheses):
+
+- **Entry classification** — `EMPTY_STORE` (info), `NON_RUN_DIRECTORY` (info),
+  `ROOT_LEVEL_FILE` (info), `EMPTY_DIRECTORY` (info), `IGNORED_OS_FILE` (info),
+  `SYMLINK_ENTRY` (warning).
+- **Metadata** — `MISSING_METADATA` (warning), `MALFORMED_METADATA_JSON` (error),
+  `INVALID_EXPERIMENT_RUN_SCHEMA` (error), `DIRECTORY_HASH_MISMATCH` (error).
+- **Artifact paths** — `ABSOLUTE_ARTIFACT_PATH` (error), `PATH_TRAVERSAL`
+  (critical), `INVALID_ARTIFACT_PATH` (error), `DUPLICATE_ARTIFACT_REFERENCE`
+  (warning), `ARTIFACT_NOT_A_FILE` (error).
+- **Artifact existence / layout** — `MISSING_REFERENCED_ARTIFACT` (error),
+  `MISSING_EXPECTED_ARTIFACT` (warning), `ORPHAN_ARTIFACT` (warning),
+  `UNEXPECTED_FILE` (info), `CONFLICTING_FRAME_FORMAT` (warning).
+- **Deep readability** — `UNREADABLE_ARTIFACT` (error), `INVALID_FRAME_FORMAT`
+  (error), `FRAME_ROW_COUNT_IMPLAUSIBLE` (info).
+- **Hash chain** — `HASH_CHAIN_FIELD_MISSING` (error), `HASH_CHAIN_FIELD_FORMAT`
+  (info / opt-in).
+
+**Clarifications:** final codes may be adjusted slightly during implementation
+after exercising the real persistence contract; **`HASH_CHAIN_FIELD_FORMAT` is
+soft / opt-in** because hash formatting is **not** schema-enforced (real hashes
+are sha256, but the schema only requires non-empty strings); **`FRAME_ROW_COUNT_
+IMPLAUSIBLE` is informational**, a plausibility signal, **not** proof of
+corruption.
+
+### N.6 Entry classification
+
+Every root entry resolves to exactly one branch — **nothing is silently dropped**:
+
+| Entry | Classification |
+|---|---|
+| directory **with** `metadata.json` | audited as a run (§N.8) |
+| directory with recognized artifacts but **no** `metadata.json` | non-run + `MISSING_METADATA` (warning) |
+| unrelated directory (no metadata, no recognized artifacts) | `NON_RUN_DIRECTORY` (info) |
+| empty directory | `EMPTY_DIRECTORY` (info) |
+| regular file directly under root | `ROOT_LEVEL_FILE` (info) |
+| OS-cruft file (`.DS_Store` / `Thumbs.db` / `desktop.ini`) | `IGNORED_OS_FILE` (info) |
+| symlink (dir or file) | `SYMLINK_ENTRY` (warning) — recorded, **never followed** |
+| metadata `train_run_hash` ≠ directory name | run + `DIRECTORY_HASH_MISMATCH` (error) |
+| referenced artifact missing | `MISSING_REFERENCED_ARTIFACT` (error) |
+| file present but unreferenced | `ORPHAN_ARTIFACT` (warning) |
+
+**Rules:** no root entry is silently dropped; symlinks are recorded and never
+followed; malformed entries still appear in the store-level result; **unsafe
+artifact paths are reported before any filesystem access**.
+
+### N.7 Artifact-path safety
+
+Checks over each `artifact_paths` value (read **raw**, before any filesystem
+touch): Windows drive-letter absolute paths; POSIX absolute paths; UNC paths;
+leading slash / backslash; `..` traversal (critical); empty path; a path separator
+where the contract allows only a bare filename; duplicate references; a value that
+resolves to a directory instead of a regular file; a missing target; case-only
+mismatches on Windows; symlinks.
+
+**Rules:** unsafe paths must **never be opened or `stat`-followed** outside the
+audit root; do not use path resolution that follows symlinks outside the store;
+paths in findings / reports remain relative; behavior should **match the current
+`ExperimentStore` path contract through parity tests, without importing its
+private constants** (§N.3). A case-only mismatch on Windows surfaces as
+`MISSING_REFERENCED_ARTIFACT` + `ORPHAN_ARTIFACT` rather than a silent pass.
+
+### N.8 Metadata and structural validation
+
+Verifiable **without recomputation**: JSON parsing; `ExperimentRun` schema
+validation (which transitively re-checks `feature__` / `label__` column prefixes,
+window ordering `train_start < train_end < validation_start < validation_end`,
+non-negative `n_oos_rows` / `n_scored_rows`, non-empty `model_type` / `task_type` /
+`created_at`); directory name equals persisted `train_run_hash`; required
+hash-chain fields present / non-empty; `artifact_paths` structure and safety;
+referenced files exist; `created_at` and window fields pass the existing schema;
+`feature_columns` / `label_column` present; `model_type` / `task_type` pass the
+existing schema.
+
+**Explicitly not verifiable:** whether a persisted hash equals the sha256 of the
+original (unpersisted) configuration content; whether model predictions are
+statistically correct; whether the underlying data is economically valid; whether
+model quality or investment performance is acceptable; any content hash the
+existing format does not persist. **The audit reports structural integrity, never
+content correctness — and the reports say so (§N.12).**
+
+The tolerant reader walks a ladder, emitting a finding at each rung and continuing
+where possible: metadata present → JSON parses → schema validates (but **still run
+raw-dict path-safety** even when the schema is invalid, since a bad file can still
+leak an unsafe path) → dir/hash consistency → hash-chain presence →
+`artifact_paths` safety.
+
+### N.9 Audit levels
+
+- **metadata-only** — root-entry classification; metadata presence; raw JSON
+  parse; `ExperimentRun` schema validation; directory / hash consistency;
+  artifact-path safety. **No artifact existence checks; no frame reads.**
+- **standard (default)** — all metadata-only checks; referenced-file existence;
+  regular-file checks; orphan / unexpected detection; conflicting
+  parquet / CSV detection. **No frame parsing.**
+- **deep** — all standard checks; frame readability using the existing safe loader
+  behavior; invalid / corrupt-frame reporting; soft empty / implausible row-count
+  context.
+
+**Rules:** sequential only; **no parallelism**; no mutation; deep is opt-in; **no
+strict `n_oos_rows` / `n_scored_rows` relationship** is asserted unless the
+existing schema defines one (it does not — only a 0-row / obviously-empty frame is
+flagged, at `info`).
+
+### N.10 Store-level result
+
+`ExperimentStoreAuditResult`: `runs_discovered`, `runs_valid`,
+`runs_with_warnings`, `runs_invalid`, `non_run_entries`, `findings_total`,
+`findings_by_severity`, `findings_by_code`, `audited_run_hashes`, `run_audits`,
+`findings`, `overall_status`.
+
+`ExperimentRunAudit`: `run_directory`, `train_run_hash`, `status`, `findings`.
+
+Run `status` ∈ {`valid`, `warning`, `invalid`}. **`overall_status`:** `failed` if
+any `error` / `critical` exists; `warning` if a `warning` exists and no
+`error` / `critical`; `ok` otherwise. Errors are **never masked** by valid runs.
+
+- **Empty store** (root exists, no entries): audit succeeds structurally;
+  `runs_discovered = 0`; emits an `EMPTY_STORE` informational finding;
+  `overall_status = ok` (unless implementation later finds a stronger repo
+  convention).
+- **Missing or non-directory audit root:** a **hard usage failure**
+  (`AuditError` → CLI exit 3), not an empty result.
+
+Deterministic counts / ordering; strict JSON-safe; **no `NaN` / `Infinity`; no
+absolute paths**.
+
+### N.11 CLI design — `scripts/audit_experiment_store.py`
+
+**Future thin script — documented here, not implemented in Commit 0.** Flags:
+`--artifacts-dir`, `--level metadata-only|standard|deep` (default `standard`),
+`--run-hash`, `--severity info|warning|error|critical`,
+`--fail-on warning|error|critical` (default `error`), `--include-non-run-entries`,
+`--output-json`, `--output-csv`, `--output-markdown`, `--no-parquet`.
+
+**Rules:** read-only; local files only; sequential; no network; no
+execution / retraining; no repair / delete / quarantine / migration; writes only
+to explicit output paths; expected audit findings produce **no traceback**;
+output summary includes `RESULT: OK` / `WARNING` / `FAIL`.
+
+**Exit codes (approved):**
+
+| Code | Meaning |
+|---|---|
+| **0** | audit ran and **no** finding met the `--fail-on` threshold |
+| **1** | audit ran and **≥1** finding met `--fail-on` |
+| **2** | argparse usage error |
+| **3** | audit could not run (missing / non-directory root, unwritable output, runtime usage failure) |
+
+**Clarifications:** the `RESULT:` line reflects the overall **structural** status
+(`overall_status`); the **exit code reflects the configured `--fail-on`
+threshold** (severity-ordered `info < warning < error < critical`); default
+`--fail-on error` means a warning-only audit may print `RESULT: WARNING` and exit
+**0**.
+
+### N.12 Export design
+
+String-returning `export_audit_json` / `export_audit_csv` /
+`export_audit_markdown` (no renderer writes files):
+
+- **JSON** — strict `allow_nan=False`, deterministic keys / order; summary +
+  findings + run audits.
+- **CSV** — stable columns: `finding_id`, `severity`, `code`, `run_directory`,
+  `train_run_hash`, `artifact_name`, `relative_path`, `expected`, `actual`,
+  `message`; deterministic finding order; `None` → `""`.
+- **Markdown** — deterministic summary; findings table; a **Scope & Safety**
+  section stating the audit is **read-only** (modified nothing), that structural
+  integrity is **not** content / model correctness, that passing is **not** a
+  performance guarantee, and that results are **not investment advice**
+  (`AUDIT_DISCLAIMERS`, distinct from Phase 10's market disclaimers though it
+  repeats the not-investment-advice line).
+
+No absolute-path leakage; no investment-advice language.
+
+### N.13 Safety rules
+
+- Tests use `tmp_path` only; **never audit repo-root artifacts** in tests; no
+  repo-root `data/` or `artifacts/` writes.
+- No network / vendor support; no new ML dependencies.
+- No `local_pipeline` import; no `batch_experiments` import; no model-training
+  imports.
+- **No repair / delete / rename / quarantine / migrate APIs**; no automatic schema
+  migration.
+- No absolute paths in committed tests / docs.
+- Symlinks recorded and **not followed**; unsafe paths checked **before** access.
+- **A full audit leaves the store byte-identical** (cornerstone test).
+- No investment-advice language.
+
+### N.14 Test plan
+
+`backend/tests/test_experiment_audit.py` — hand-built stores under `tmp_path`
+(valid runs via `ExperimentRun` + `store.write_metadata` + tiny frame writes),
+then **deliberately tampered copies**. Covers: valid 2–3-run store; deterministic
+discovery and finding ordering; empty store; missing audit root; root-level
+regular file; unrelated directory; empty directory; OS cruft; symlink entry;
+missing metadata; malformed JSON; schema-invalid metadata; directory /
+`train_run_hash` mismatch; missing referenced artifact; a canonical expected key
+absent from `artifact_paths`; absolute artifact path; UNC path; path traversal;
+duplicate artifact reference; artifact path pointing to a directory; orphan
+artifact; unexpected file; conflicting frame formats; unreadable frame in deep
+mode; metadata-only vs standard vs deep behavior; strict JSON; deterministic CSV /
+Markdown; no absolute-path leakage; severity filtering; `--fail-on` exit codes
+0 / 1 / 3; single-run audit; full-store audit; CLI output-path behavior;
+**read-only byte-for-byte store proof**; no repo-root artifacts; no forbidden
+imports; **no private `ExperimentStore` symbol dependency**; no retraining / batch
+execution; no repair / deletion API.
+
+### N.15 Commit plan
+
+- **Commit 0** — Appendix N doc-only plan (this section).
+- **Commit 1** — audit models and audit-scoped path-safety helpers (`models.py`).
+- **Commit 2** — run / store audit engine and level behavior (`audit.py`).
+- **Commit 3** — deterministic JSON / CSV / Markdown renderers (`render.py`).
+- **Commit 4** — thin CLI and exit-code tests
+  (`scripts/audit_experiment_store.py`).
+- **Commit 5** — integrated e2e and Appendix N as-built docs.
+
+### N.16 Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| Auditor **modifying** artifacts | package does **zero writes**; guard test bans write / delete verbs; e2e asserts the store is byte-identical before / after |
+| **Unsafe path escape** | path-safety runs before any `stat` / open; unsafe paths flagged, never touched; symlinks recorded, never followed; no `.resolve()` escape outside the run dir |
+| **Private `ExperimentStore` coupling** | audit-scoped path / frame constants with **parity tests**; no import of `_ABSOLUTE_PATH` / `_FRAME_NAMES`; no edits to `experiments/` to expose internals |
+| **Falsely claiming cryptographic verification** | the auditor computes **no content hashes**; reports state "structural only"; hex-format check is soft / opt-in and labeled |
+| **Malformed entries silently skipped** | tolerant ladder emits a finding at every rung; nothing dropped; errors aggregate into `overall_status = failed` |
+| **Unrelated directories mistaken for runs** | run ⇔ has `metadata.json`; everything else classified explicitly (§N.6) |
+| **Large deep-mode artifact loads** | deep is opt-in; frames are small local files; a future `--max-frame-bytes` escape hatch is noted; no parallelism |
+| **Windows path / case behavior** | reuse the documented relative-path contract via parity tests; case mismatch surfaces as missing + orphan, not a silent pass |
+| **Symlink handling** | `SYMLINK_ENTRY` recorded and never followed |
+| **False positives from non-enforced hash format** | `HASH_CHAIN_FIELD_FORMAT` / `FRAME_ROW_COUNT_IMPLAUSIBLE` default to info / off; `--severity` filtering; only `artifact_paths`-referenced files are "required" |
+| **Coupling audit logic into `ExperimentStore`** | separate `experiment_audit/` package; reuses only read-safe behavior; zero edits to `experiments/` |
+| **Repair / migration scope creep** | no repair / delete / quarantine / migrate functions exist; commit plan + guard tests enforce it |
+| **Absolute-path leakage** | all finding paths store-relative; e2e greps outputs for drive letters / tmp names |
+| **Audit success mistaken for model-quality validation** | Markdown / JSON carry the explicit "passing ≠ model correctness / not investment advice" disclaimer |
+
+### N.17 As-built (Phase 13 shipped)
+
+Implemented across Commits 1–4 exactly as designed above; tests are synthetic +
+`tmp_path` only, no network, and the full backend suite stays green.  The audit is
+**local-only, read-only, and never touches the network, a vendor, or live data**;
+it repairs / deletes / quarantines / migrates nothing, and its reports are **not
+investment advice**.
+
+**Shipped components**
+
+- `backend/app/experiment_audit/models.py` — `AuditError`, `AuditSeverity`
+  (`info`/`warning`/`error`/`critical`), the 25-member `AuditCode`, `AuditRunStatus`,
+  `AuditOverallStatus`, `AuditLevel`, the frozen `AuditFinding` /
+  `ExperimentRunAudit` / `ExperimentStoreAuditResult` (statuses **derived** from
+  findings, so an inconsistent result cannot be constructed), the deterministic
+  finding utilities (`finding_sort_key`, `sort_and_number_findings`,
+  `severity_rank` / `severity_at_least`), and the **audit-scoped** path / frame
+  contract helpers.  It imports nothing from `app.*` and touches no filesystem.
+- `backend/app/experiment_audit/audit.py` — `audit_experiment_run`,
+  `audit_experiment_store`, `summarize_audit_result`: a tolerant, sequential,
+  read-only engine using only public `ExperimentRun` / `ExperimentStore` /
+  `ExperimentError`.
+- `backend/app/experiment_audit/render.py` — `AUDIT_DISCLAIMERS` +
+  `export_audit_json` / `_csv` / `_markdown` (**strings only**, zero writes).
+- `backend/app/experiment_audit/__init__.py` — public exports.
+- `scripts/audit_experiment_store.py` — the thin CLI (the only component that
+  writes, and only to explicit `--output-*` paths).
+- `backend/tests/test_experiment_audit.py` — 168 tests (models, path/frame parity
+  against the **public** contract, engine, renderers, CLI, guard rails, and one
+  integrated end-to-end pass over real Phase 9 / 11 runs plus tampered copies).
+
+**Behavior**
+
+- **Tolerant whole-store discovery** — every immediate root entry is enumerated in
+  sorted order and classified; a malformed run emits findings at each failing rung
+  of the ladder (read → JSON parse → raw path safety → hash-chain presence → schema
+  → dir/hash → existence/orphan/deep) and **never aborts** auditing of the valid
+  runs.
+- **Classification** — run (has `metadata.json`) vs non-run (`NON_RUN_DIRECTORY`,
+  `ROOT_LEVEL_FILE`, `EMPTY_DIRECTORY`, `IGNORED_OS_FILE`, `MISSING_METADATA`,
+  `SYMLINK_ENTRY`, `EMPTY_STORE`); nothing is silently dropped.
+- **Levels** — `metadata-only` (classification, metadata ladder, path safety, hash
+  chain), `standard` (default; + referenced existence, regular-file checks,
+  missing canonical keys, orphan / unexpected, conflicting parquet+csv), `deep`
+  (+ frame readability via the public loader, soft empty-frame context).
+- **Deterministic findings and statuses** — findings globally sorted then numbered
+  `finding_0000…`; runs are `valid` / `warning` / `invalid`; overall is `failed` if
+  any error/critical, `warning` if any warning, else `ok`.  Errors are never masked.
+- **Exports** — deterministic JSON (`allow_nan=False`, sorted keys) / CSV (stable
+  10-column header) / Markdown (summary, by-severity, by-code, audited runs,
+  findings, Scope & Safety).
+- **CLI severity filtering** — `--severity` and `--include-non-run-entries` affect
+  **display / export only**; info-level non-run findings are hidden by default while
+  warning/error findings (e.g. `MISSING_METADATA`) are never hidden.
+- **`--fail-on` thresholds** — always evaluated against the **complete** audit
+  result, never the filtered view.
+- **Exit codes 0 / 1 / 2 / 3** — 0 = ran, nothing met `--fail-on`; 1 = ran, a finding
+  met `--fail-on`; 2 = argparse usage; 3 = the audit could not run (missing /
+  non-directory root, unsafe / missing `--run-hash`, unwritable output).  The
+  `RESULT:` line reflects the canonical status, so a warning-only audit prints
+  `RESULT: WARNING` and still exits **0** under the default `--fail-on error`.
+- **Explicit filtered-view counts** — reports carry the canonical `findings_total`
+  **plus** `displayed_findings_total` and `findings_filtered` (JSON), a
+  `findings_displayed` row and a factual filtered-view note (Markdown), and both
+  counts on the console; filtered findings keep their **original ids**.
+- **Read-only, byte-identical proof** — a test snapshots the whole store
+  byte-for-byte before/after metadata-only, standard, deep, and every CLI
+  invocation (including exports) and asserts it is unchanged; reports are written
+  outside the audited store.
+- **Symlinks are recorded and never followed**; **unsafe artifact paths are
+  reported before any filesystem access** (the offending value appears only in the
+  descriptive `actual` field, never in a path field, and is never opened).
+
+**CLI usage**
+
+```bat
+cd C:\quantlab
+```
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\audit_experiment_store.py ^
+  --artifacts-dir artifacts\experiments
+
+.\backend\venv\Scripts\python.exe .\scripts\audit_experiment_store.py ^
+  --artifacts-dir artifacts\experiments ^
+  --level deep ^
+  --fail-on warning
+
+.\backend\venv\Scripts\python.exe .\scripts\audit_experiment_store.py ^
+  --artifacts-dir artifacts\experiments ^
+  --severity error ^
+  --output-json reports\audit.json ^
+  --output-csv reports\audit.csv ^
+  --output-markdown reports\audit.md
+```
+
+Other flags: `--run-hash <name>` (audit one run directory),
+`--include-non-run-entries`, `--no-parquet`.
+
+**Known limitations**
+
+- **Structural integrity only** — the audit does not validate data, model, or
+  metric correctness.
+- **No cryptographic content verification** — the auditor computes **no hashes**;
+  it cannot prove a persisted hash matches the original configuration content.
+- **No artifact repair, deletion, quarantine, or migration** — by design; no such
+  API exists.
+- **Deep mode reads complete persisted frames** (no size cap yet; local per-run
+  frames are small).
+- **Symlink tests skip on Windows without symlink privileges**; the engine still
+  records and refuses to follow symlinks wherever they exist.
+- **Hash-format validation remains soft / not enabled by default**
+  (`HASH_CHAIN_FIELD_FORMAT`), because the `ExperimentRun` schema requires only
+  non-empty hash strings; `FRAME_ROW_COUNT_IMPLAUSIBLE` is likewise informational.
+- **A passing audit does not prove** data correctness, model correctness,
+  reproducibility, or any investment / live-trading performance.
+- Local / synthetic results are **not investment advice**.
