@@ -4204,8 +4204,8 @@ order unless a ranking flag is given.
 
 ## Appendix N — Phase 13 Local ExperimentStore Integrity Audit Plan
 
-> **Status: design only (Phase 13 not implemented).** Sections N.1–N.16 are the
-> approved plan; **no code, script, test, data, or artifact exists yet.** Phase 13
+> **Status: as-built (Phase 13 shipped, Commits 0–5).** Sections N.1–N.16 are the
+> approved design; **§N.17 records the shipped result.** Phase 13
 > is a **local-only, read-only structural integrity audit** over persisted
 > `ExperimentStore` artifacts: enumerate every root entry, classify run / non-run,
 > tolerantly validate metadata and `artifact_paths`, detect missing / malformed /
@@ -4576,3 +4576,121 @@ execution; no repair / deletion API.
 | **Repair / migration scope creep** | no repair / delete / quarantine / migrate functions exist; commit plan + guard tests enforce it |
 | **Absolute-path leakage** | all finding paths store-relative; e2e greps outputs for drive letters / tmp names |
 | **Audit success mistaken for model-quality validation** | Markdown / JSON carry the explicit "passing ≠ model correctness / not investment advice" disclaimer |
+
+### N.17 As-built (Phase 13 shipped)
+
+Implemented across Commits 1–4 exactly as designed above; tests are synthetic +
+`tmp_path` only, no network, and the full backend suite stays green.  The audit is
+**local-only, read-only, and never touches the network, a vendor, or live data**;
+it repairs / deletes / quarantines / migrates nothing, and its reports are **not
+investment advice**.
+
+**Shipped components**
+
+- `backend/app/experiment_audit/models.py` — `AuditError`, `AuditSeverity`
+  (`info`/`warning`/`error`/`critical`), the 25-member `AuditCode`, `AuditRunStatus`,
+  `AuditOverallStatus`, `AuditLevel`, the frozen `AuditFinding` /
+  `ExperimentRunAudit` / `ExperimentStoreAuditResult` (statuses **derived** from
+  findings, so an inconsistent result cannot be constructed), the deterministic
+  finding utilities (`finding_sort_key`, `sort_and_number_findings`,
+  `severity_rank` / `severity_at_least`), and the **audit-scoped** path / frame
+  contract helpers.  It imports nothing from `app.*` and touches no filesystem.
+- `backend/app/experiment_audit/audit.py` — `audit_experiment_run`,
+  `audit_experiment_store`, `summarize_audit_result`: a tolerant, sequential,
+  read-only engine using only public `ExperimentRun` / `ExperimentStore` /
+  `ExperimentError`.
+- `backend/app/experiment_audit/render.py` — `AUDIT_DISCLAIMERS` +
+  `export_audit_json` / `_csv` / `_markdown` (**strings only**, zero writes).
+- `backend/app/experiment_audit/__init__.py` — public exports.
+- `scripts/audit_experiment_store.py` — the thin CLI (the only component that
+  writes, and only to explicit `--output-*` paths).
+- `backend/tests/test_experiment_audit.py` — 168 tests (models, path/frame parity
+  against the **public** contract, engine, renderers, CLI, guard rails, and one
+  integrated end-to-end pass over real Phase 9 / 11 runs plus tampered copies).
+
+**Behavior**
+
+- **Tolerant whole-store discovery** — every immediate root entry is enumerated in
+  sorted order and classified; a malformed run emits findings at each failing rung
+  of the ladder (read → JSON parse → raw path safety → hash-chain presence → schema
+  → dir/hash → existence/orphan/deep) and **never aborts** auditing of the valid
+  runs.
+- **Classification** — run (has `metadata.json`) vs non-run (`NON_RUN_DIRECTORY`,
+  `ROOT_LEVEL_FILE`, `EMPTY_DIRECTORY`, `IGNORED_OS_FILE`, `MISSING_METADATA`,
+  `SYMLINK_ENTRY`, `EMPTY_STORE`); nothing is silently dropped.
+- **Levels** — `metadata-only` (classification, metadata ladder, path safety, hash
+  chain), `standard` (default; + referenced existence, regular-file checks,
+  missing canonical keys, orphan / unexpected, conflicting parquet+csv), `deep`
+  (+ frame readability via the public loader, soft empty-frame context).
+- **Deterministic findings and statuses** — findings globally sorted then numbered
+  `finding_0000…`; runs are `valid` / `warning` / `invalid`; overall is `failed` if
+  any error/critical, `warning` if any warning, else `ok`.  Errors are never masked.
+- **Exports** — deterministic JSON (`allow_nan=False`, sorted keys) / CSV (stable
+  10-column header) / Markdown (summary, by-severity, by-code, audited runs,
+  findings, Scope & Safety).
+- **CLI severity filtering** — `--severity` and `--include-non-run-entries` affect
+  **display / export only**; info-level non-run findings are hidden by default while
+  warning/error findings (e.g. `MISSING_METADATA`) are never hidden.
+- **`--fail-on` thresholds** — always evaluated against the **complete** audit
+  result, never the filtered view.
+- **Exit codes 0 / 1 / 2 / 3** — 0 = ran, nothing met `--fail-on`; 1 = ran, a finding
+  met `--fail-on`; 2 = argparse usage; 3 = the audit could not run (missing /
+  non-directory root, unsafe / missing `--run-hash`, unwritable output).  The
+  `RESULT:` line reflects the canonical status, so a warning-only audit prints
+  `RESULT: WARNING` and still exits **0** under the default `--fail-on error`.
+- **Explicit filtered-view counts** — reports carry the canonical `findings_total`
+  **plus** `displayed_findings_total` and `findings_filtered` (JSON), a
+  `findings_displayed` row and a factual filtered-view note (Markdown), and both
+  counts on the console; filtered findings keep their **original ids**.
+- **Read-only, byte-identical proof** — a test snapshots the whole store
+  byte-for-byte before/after metadata-only, standard, deep, and every CLI
+  invocation (including exports) and asserts it is unchanged; reports are written
+  outside the audited store.
+- **Symlinks are recorded and never followed**; **unsafe artifact paths are
+  reported before any filesystem access** (the offending value appears only in the
+  descriptive `actual` field, never in a path field, and is never opened).
+
+**CLI usage**
+
+```bat
+cd C:\quantlab
+```
+
+```bat
+.\backend\venv\Scripts\python.exe .\scripts\audit_experiment_store.py ^
+  --artifacts-dir artifacts\experiments
+
+.\backend\venv\Scripts\python.exe .\scripts\audit_experiment_store.py ^
+  --artifacts-dir artifacts\experiments ^
+  --level deep ^
+  --fail-on warning
+
+.\backend\venv\Scripts\python.exe .\scripts\audit_experiment_store.py ^
+  --artifacts-dir artifacts\experiments ^
+  --severity error ^
+  --output-json reports\audit.json ^
+  --output-csv reports\audit.csv ^
+  --output-markdown reports\audit.md
+```
+
+Other flags: `--run-hash <name>` (audit one run directory),
+`--include-non-run-entries`, `--no-parquet`.
+
+**Known limitations**
+
+- **Structural integrity only** — the audit does not validate data, model, or
+  metric correctness.
+- **No cryptographic content verification** — the auditor computes **no hashes**;
+  it cannot prove a persisted hash matches the original configuration content.
+- **No artifact repair, deletion, quarantine, or migration** — by design; no such
+  API exists.
+- **Deep mode reads complete persisted frames** (no size cap yet; local per-run
+  frames are small).
+- **Symlink tests skip on Windows without symlink privileges**; the engine still
+  records and refuses to follow symlinks wherever they exist.
+- **Hash-format validation remains soft / not enabled by default**
+  (`HASH_CHAIN_FIELD_FORMAT`), because the `ExperimentRun` schema requires only
+  non-empty hash strings; `FRAME_ROW_COUNT_IMPLAUSIBLE` is likewise informational.
+- **A passing audit does not prove** data correctness, model correctness,
+  reproducibility, or any investment / live-trading performance.
+- Local / synthetic results are **not investment advice**.

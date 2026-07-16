@@ -1774,3 +1774,262 @@ def test_cli_module_no_forbidden_imports_or_advice():
     lowered = src.lower()
     for token in ("buy", "sell", "allocate", "deploy"):
         assert token not in lowered, f"advice token {token!r} in CLI source"
+
+
+# --------------------------------------------------------------------------- #
+# integrated end-to-end: real Phase 9/11 runs + tampered copies -> audit -> reports
+# --------------------------------------------------------------------------- #
+
+
+def test_e2e_experiment_store_audit_over_real_and_tampered_runs(tmp_path, capsys):
+    """Full Phase 13 path: synthetic ES raw -> a real Phase 11 batch of 3 Phase 9
+    runs in a tmp ExperimentStore -> the store audits cleanly at every level ->
+    deliberately tampered copies (still under tmp_path) surface every anomaly class
+    without aborting valid-run auditing -> the CLI reports deterministically and
+    exports JSON/CSV/Markdown to explicit paths only -> every audited store stays
+    byte-identical throughout."""
+    import shutil  # test-only: copy real runs into a tampered store under tmp_path
+
+    from app.batch_experiments import expand_grid, run_local_experiment_batch
+    from app.datastore.store import RawFuturesStore
+    from app.local_pipeline import LocalExperimentConfig
+    from app.research_cli.config import ExperimentConfig
+    from app.research_cli.synthetic import generate_synthetic_es_raw
+
+    repo_before = _repo_snapshot()
+    cli = _load_audit_cli()
+
+    # --- 1. real runs produced by the existing Phase 9 / Phase 11 path ---------- #
+    raw_store = RawFuturesStore(tmp_path / "raw", prefer_parquet=False)
+    raw_store.write_raw(generate_synthetic_es_raw(ExperimentConfig()))
+    clean = ExperimentStore(tmp_path / "clean_exp", prefer_parquet=False)
+    configs = expand_grid(LocalExperimentConfig(source="synthetic"), {"random_seed": [0, 1, 2]})
+    batch = run_local_experiment_batch(raw_store, configs, experiment_store=clean)
+    assert batch.n_ok == 3
+    hashes = sorted(batch.train_run_hashes)
+    assert len(set(hashes)) == 3  # three distinct real train_run_hashes
+
+    # the untouched real store audits cleanly at every level, and stays byte-identical
+    clean_before = _store_snapshot(clean.base_dir)
+    for level in (AuditLevel.METADATA_ONLY, AuditLevel.STANDARD, AuditLevel.DEEP):
+        result = audit_experiment_store(clean, level=level)
+        assert result.overall_status == AuditOverallStatus.OK
+        assert (result.runs_discovered, result.runs_valid, result.runs_invalid) == (3, 3, 0)
+        assert result.findings_total == 0 and result.non_run_entries == 0
+        assert sorted(result.audited_run_hashes) == hashes
+        assert _store_snapshot(clean.base_dir) == clean_before
+
+    # --- 2. CLI over the clean store ------------------------------------------- #
+    assert cli.main(_cli(clean, "--no-parquet", "--level", "deep")) == 0
+    out = capsys.readouterr().out
+    assert "RESULT: OK" in out
+    assert "runs_discovered=3" in out and "findings_total=0" in out
+    assert "displayed_findings_total=0" in out
+    assert _store_snapshot(clean.base_dir) == clean_before
+
+    # single-run audit of a real run
+    assert cli.main(_cli(clean, "--no-parquet", "--run-hash", hashes[0])) == 0
+    out = capsys.readouterr().out
+    assert "RESULT: OK" in out and "runs_discovered=1" in out
+
+    # unsafe / unrelated single-run arguments -> exit 3, no traceback
+    for bad in ("../escape", "no_such_run"):
+        assert cli.main(_cli(clean, "--no-parquet", "--run-hash", bad)) == 3
+        out = capsys.readouterr().out
+        assert "RESULT: FAIL" in out and "Traceback" not in out
+
+    # --- 3. tampered store: real runs copied under tmp_path, then broken -------- #
+    tampered_dir = tmp_path / "tampered_exp"
+    shutil.copytree(clean.base_dir, tampered_dir)
+    tampered = ExperimentStore(tampered_dir, prefer_parquet=False)
+    h_valid, h_warn, h_bad = hashes  # deterministic (sorted)
+
+    def _set_hash(new_hash):
+        def _mutate(data):
+            data["train_run_hash"] = new_hash
+
+        return _mutate
+
+    def _traversal(data):
+        data["train_run_hash"] = "traversal_run"
+        data["artifact_paths"]["predictions"] = "../evil.csv"
+
+    # (a) h_valid: untouched -> a valid run is retained
+    # (b) h_warn: orphan artifact -> warning-only
+    (tampered_dir / h_warn / "extra.json").write_text("{}", encoding="utf-8")
+    # (c) h_bad: malformed metadata.json -> error
+    (tampered_dir / h_bad / "metadata.json").write_text("{ not valid json", encoding="utf-8")
+    # (d) directory / train_run_hash mismatch -> error
+    shutil.copytree(clean.base_dir / h_valid, tampered_dir / "mismatch_run")
+    # (e) unsafe raw artifact path in schema-invalid metadata -> critical
+    shutil.copytree(clean.base_dir / h_valid, tampered_dir / "traversal_run")
+    _rewrite_metadata(tampered, "traversal_run", _traversal)
+    # (f) missing referenced frame -> error
+    shutil.copytree(clean.base_dir / h_valid, tampered_dir / "missing_frame_run")
+    _rewrite_metadata(tampered, "missing_frame_run", _set_hash("missing_frame_run"))
+    (tampered_dir / "missing_frame_run" / "predictions.csv").unlink()
+    # (g) unreadable frame for deep mode
+    shutil.copytree(clean.base_dir / h_valid, tampered_dir / "badframe_run")
+    _rewrite_metadata(tampered, "badframe_run", _set_hash("badframe_run"))
+    (tampered_dir / "badframe_run" / "predictions.parquet").write_bytes(b"garbage-not-parquet")
+    # (h) non-run entries: a root-level file and a metadata-less artifact directory
+    (tampered_dir / "stray.txt").write_text("x", encoding="utf-8")
+    (tampered_dir / "half_run").mkdir()
+    (tampered_dir / "half_run" / "metrics.json").write_text("{}", encoding="utf-8")
+
+    tampered_before = _store_snapshot(tampered_dir)
+
+    # --- 4. engine behavior over the tampered store ---------------------------- #
+    standard = audit_experiment_store(tampered, level=AuditLevel.STANDARD)
+    assert standard.overall_status == AuditOverallStatus.FAILED
+    assert standard.runs_discovered == 7  # 3 real + 4 tampered copies
+    assert standard.non_run_entries == 2  # stray.txt + half_run
+    assert standard.runs_valid + standard.runs_with_warnings + standard.runs_invalid == 7
+
+    # a malformed run does NOT abort auditing of the valid runs
+    by_dir = {ra.run_directory: ra for ra in standard.run_audits}
+    assert by_dir[h_valid].status == AuditRunStatus.VALID
+    assert by_dir[h_valid].train_run_hash == h_valid
+    assert by_dir[h_warn].status == AuditRunStatus.WARNING
+    assert by_dir[h_bad].status == AuditRunStatus.INVALID
+    assert by_dir[h_bad].train_run_hash is None  # unparseable metadata -> no hash
+    assert h_valid in standard.audited_run_hashes
+
+    codes = _codes(standard)
+    assert {
+        "MALFORMED_METADATA_JSON",
+        "DIRECTORY_HASH_MISMATCH",
+        "PATH_TRAVERSAL",
+        "MISSING_REFERENCED_ARTIFACT",
+        "ORPHAN_ARTIFACT",
+        "ROOT_LEVEL_FILE",
+        "MISSING_METADATA",
+        "INVALID_EXPERIMENT_RUN_SCHEMA",
+    } <= codes
+
+    # unsafe raw path: reported before any filesystem access, value only in `actual`
+    traversal = next(f for f in standard.findings if f.code == AuditCode.PATH_TRAVERSAL)
+    assert traversal.actual == "../evil.csv" and traversal.relative_path is None
+    assert traversal.severity == AuditSeverity.CRITICAL
+    assert not (tmp_path / "evil.csv").exists()  # never created / followed
+
+    # deterministic ordering + numbering, stable across repeated audits
+    assert [f.finding_id for f in standard.findings] == [
+        f"finding_{i:04d}" for i in range(standard.findings_total)
+    ]
+    assert audit_experiment_store(tampered, level=AuditLevel.STANDARD).to_dict() == standard.to_dict()
+    assert [ra.run_directory for ra in standard.run_audits] == sorted(
+        ra.run_directory for ra in standard.run_audits
+    )
+
+    # level differences
+    meta_only = audit_experiment_store(tampered, level=AuditLevel.METADATA_ONLY)
+    meta_codes = _codes(meta_only)
+    assert "PATH_TRAVERSAL" in meta_codes  # path safety is metadata-only
+    assert "MISSING_REFERENCED_ARTIFACT" not in meta_codes  # no existence checks
+    assert "ORPHAN_ARTIFACT" not in meta_codes
+    assert "INVALID_FRAME_FORMAT" not in meta_codes
+    assert "INVALID_FRAME_FORMAT" not in codes  # standard does not parse frames
+    deep = audit_experiment_store(tampered, level=AuditLevel.DEEP)
+    assert "INVALID_FRAME_FORMAT" in _codes(deep)  # deep reads the garbage frame
+    assert _codes_for(deep, "badframe_run") >= {"INVALID_FRAME_FORMAT", "CONFLICTING_FRAME_FORMAT"}
+
+    # every level left the audited store byte-identical
+    assert _store_snapshot(tampered_dir) == tampered_before
+
+    # --- 5. CLI over the tampered store ---------------------------------------- #
+    assert cli.main(_cli(tampered, "--no-parquet", "--level", "deep")) == 1  # fail-on error
+    out = capsys.readouterr().out
+    assert "RESULT: FAIL" in out and "Traceback" not in out
+    assert "runs_discovered=7" in out and "runs_valid=1" in out  # valid run still counted
+
+    # severity filtering hides low-severity findings but never changes fail-on
+    assert cli.main(_cli(tampered, "--no-parquet", "--severity", "error")) == 1
+    filtered_out = capsys.readouterr().out
+    summary = next(ln for ln in filtered_out.splitlines() if ln.startswith("overall_status="))
+    total = int(summary.split(" findings_total=")[1].split()[0])
+    displayed = int(summary.split("displayed_findings_total=")[1].split()[0])
+    assert displayed < total  # warnings/info hidden from display
+    assert "ORPHAN_ARTIFACT" not in filtered_out  # a warning, filtered out
+    assert "MALFORMED_METADATA_JSON" in filtered_out  # an error, still shown
+    # original finding IDs survive filtering
+    err_id = next(
+        f.finding_id for f in standard.findings if f.code == AuditCode.MALFORMED_METADATA_JSON
+    )
+    assert f"[{err_id}]" in filtered_out
+
+    # include-non-run behavior
+    assert cli.main(_cli(tampered, "--no-parquet")) == 1
+    default_out = capsys.readouterr().out
+    assert "ROOT_LEVEL_FILE" not in default_out  # info non-run hidden by default
+    assert "MISSING_METADATA" in default_out  # a warning non-run is never hidden
+    assert cli.main(_cli(tampered, "--no-parquet", "--include-non-run-entries")) == 1
+    assert "ROOT_LEVEL_FILE" in capsys.readouterr().out
+
+    # --- 6. warning-only store: RESULT WARNING, exit depends on --fail-on ------- #
+    warn_dir = tmp_path / "warn_exp"
+    shutil.copytree(clean.base_dir, warn_dir)
+    (warn_dir / h_warn / "extra.json").write_text("{}", encoding="utf-8")  # orphan -> warning
+    warn_store = ExperimentStore(warn_dir, prefer_parquet=False)
+    assert cli.main(_cli(warn_store, "--no-parquet")) == 0  # default fail-on=error
+    assert "RESULT: WARNING" in capsys.readouterr().out
+    assert cli.main(_cli(warn_store, "--no-parquet", "--fail-on", "warning")) == 1
+    assert "RESULT: WARNING" in capsys.readouterr().out
+
+    # --- 7. exports: explicit paths only, deterministic bytes ------------------- #
+    reports = tmp_path / "reports"
+    j, c, m = reports / "audit.json", reports / "audit.csv", reports / "audit.md"
+    export_argv = _cli(
+        tampered, "--no-parquet", "--level", "deep", "--severity", "error",
+        "--output-json", str(j), "--output-csv", str(c), "--output-markdown", str(m),
+    )
+    assert cli.main(export_argv) == 1
+    export_out = capsys.readouterr().out
+    assert f"[JSON] path={j}" in export_out
+    assert f"[CSV] path={c}" in export_out
+    assert f"[MARKDOWN] path={m}" in export_out
+    assert sorted(p.name for p in reports.iterdir()) == ["audit.csv", "audit.json", "audit.md"]
+
+    json_text = j.read_text(encoding="utf-8")
+    csv_text = c.read_text(encoding="utf-8")
+    md_text = m.read_text(encoding="utf-8")
+
+    payload = json.loads(json_text)  # strict parse
+    json.dumps(payload, allow_nan=False)
+    assert payload["disclaimers"] == list(AUDIT_DISCLAIMERS)
+    assert payload["overall_status"] == "failed"
+    assert payload["findings_filtered"] is True
+    assert payload["displayed_findings_total"] == len(payload["findings"])
+    assert payload["displayed_findings_total"] < payload["findings_total"]  # canonical preserved
+    assert payload["run_audits"] and payload["findings"]
+
+    csv_lines = csv_text.strip().splitlines()
+    assert csv_lines[0].startswith("finding_id,severity,code,")
+    assert len(csv_lines) - 1 == payload["displayed_findings_total"]  # one row per displayed
+    assert err_id in csv_text  # filtered IDs preserved in CSV
+
+    assert "**Overall status:** failed" in md_text
+    assert f"| findings_total | {payload['findings_total']} |" in md_text
+    assert f"| findings_displayed | {payload['displayed_findings_total']} |" in md_text
+    assert "The findings table is a filtered view" in md_text
+    for disclaimer in AUDIT_DISCLAIMERS:
+        assert disclaimer in md_text
+
+    # no absolute path / NaN / Infinity leakage in any report
+    for text in (json_text, csv_text, md_text):
+        assert tmp_path.name not in text
+        assert ":\\" not in text and ":/" not in text
+        assert "NaN" not in text and "Infinity" not in text
+
+    # re-running the same export is byte-identical
+    assert cli.main(export_argv) == 1
+    capsys.readouterr()
+    assert (j.read_text(encoding="utf-8"), c.read_text(encoding="utf-8"), m.read_text(encoding="utf-8")) == (
+        json_text, csv_text, md_text,
+    )
+
+    # --- 8. read-only proof + repository cleanliness ---------------------------- #
+    assert _store_snapshot(tampered_dir) == tampered_before  # audited store untouched
+    assert _store_snapshot(clean.base_dir) == clean_before
+    assert not (tampered_dir / "reports").exists()  # reports written outside the store
+    assert _repo_snapshot() == repo_before  # no repo-root data/ or artifacts/
