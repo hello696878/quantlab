@@ -318,6 +318,45 @@ def test_audit_detects_duplicates_and_unassigned():
     assert not audit["valid"]
 
 
+def test_audit_rejects_empty_required_set():
+    # A split that purged away its entire training set has no remaining overlap
+    # only because nothing is left — it must NOT be reported valid/leakage-clean.
+    samples = make(10, horizon=0)
+    empty_train = {
+        "split_label": "degenerate", "train_pos": [], "test_pos": [5, 6],
+        "purged_pos": [0, 1, 2, 3, 4, 7, 8, 9], "embargoed_pos": [],
+        "purge_reasons": {}, "embargo_windows": [],
+    }
+    audit = engine.audit_split(samples, empty_train, "purged_kfold")
+    assert audit["remaining_overlap_count"] == 0
+    assert audit["empty_train"] is True
+    assert not audit["valid"]
+
+    empty_test = {
+        "split_label": "degenerate2", "train_pos": [0, 1, 2], "test_pos": [],
+        "purged_pos": [], "embargoed_pos": [], "purge_reasons": {}, "embargo_windows": [],
+    }
+    audit2 = engine.audit_split(samples, empty_test, "purged_kfold")
+    assert audit2["empty_test"] is True
+    assert not audit2["valid"]
+
+
+def test_embargo_fraction_span_uses_latest_evaluation_time():
+    # Irregular horizons: the sample with the LATEST prediction time has a short
+    # horizon, while an earlier sample carries the latest evaluation time. The
+    # fraction span must run to that latest eval time (per the documented policy),
+    # not to the last-by-prediction sample's eval time.
+    samples = events.normalize_samples([
+        raw(0, start_day=0, end_day=1),     # pred 0,  eval 1
+        raw(1, start_day=2, end_day=40),    # pred 2,  eval 40  ← latest eval
+        raw(2, start_day=5, end_day=6),     # pred 5,  eval 6   ← last by prediction
+        raw(3, start_day=3, end_day=4),
+    ])
+    delta = engine.resolve_embargo_delta(samples, {"mode": "fraction", "value": 0.1})
+    # earliest pred = day 0, latest eval = day 40 → span 40d → 10% = 4 days.
+    assert delta == timedelta(days=4)
+
+
 # ---------------------------------------------------------------------------
 # Fingerprints
 # ---------------------------------------------------------------------------

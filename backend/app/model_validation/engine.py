@@ -121,7 +121,12 @@ def resolve_embargo_delta(
         return timedelta(days=value)
     if value > MAX_EMBARGO_FRACTION:
         raise SplitConfigError(f"embargo fraction must be at most {MAX_EMBARGO_FRACTION}")
-    span = samples[-1]["eval_dt"] - samples[0]["pred_dt"]
+    # Documented span: earliest prediction time → latest evaluation time. The
+    # sort orders by prediction_time, so the last sample's eval_dt is NOT
+    # necessarily the maximum under irregular label horizons — take the true max.
+    earliest_pred = min(s["pred_dt"] for s in samples)
+    latest_eval = max(s["eval_dt"] for s in samples)
+    span = latest_eval - earliest_pred
     return timedelta(seconds=span.total_seconds() * value)
 
 
@@ -435,6 +440,10 @@ def audit_split(
     interval may overlap any test interval**.  Any remaining overlap marks the
     split ``invalid`` — expected for the standard K-fold reference, fatal for
     purged methods.
+
+    A required set being empty is also fatal: an all-purged training set has no
+    remaining overlap simply because nothing is left to overlap, so emptiness is
+    checked explicitly rather than being read as "leakage-clean".
     """
     train_pos, test_pos = split["train_pos"], split["test_pos"]
     remaining_overlaps: List[Dict[str, str]] = []
@@ -487,10 +496,24 @@ def audit_split(
 
     groups = {samples[p]["group"] for p in test_pos if samples[p]["group"]}
 
-    valid = not remaining_overlaps and duplicates == 0 and chronology_violations == 0
+    # A degenerate split proves nothing: with no retained training samples the
+    # overlap scan trivially finds nothing, so emptiness must never read as
+    # leakage-clean.
+    empty_train = not train_pos
+    empty_test = not test_pos
+
+    valid = (
+        not remaining_overlaps
+        and duplicates == 0
+        and chronology_violations == 0
+        and not empty_train
+        and not empty_test
+    )
     return {
         "train_count": len(train_pos),
         "test_count": len(test_pos),
+        "empty_train": empty_train,
+        "empty_test": empty_test,
         "purged_count": len(split["purged_pos"]),
         "embargoed_count": len(split["embargoed_pos"]),
         "train_prediction_range": _time_range(samples, train_pos, "pred_dt"),
