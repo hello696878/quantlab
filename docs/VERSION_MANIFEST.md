@@ -13,18 +13,18 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.68.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
+**`4.69.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
 expected tag on completion of the current phase's review is
-`v4.68.0-purged-cv-cpcv-model-validation-v1` — "expected" because
+`v4.69.0-meta-labeling-calibration-threshold-lab-v1` — "expected" because
 tags are created by the user after review, never automatically.
 
 ## 2. Release family
 
 The **v4.x productization / platformization series**: v4.0.0 (local-first
 research terminal) → v4.7.0 (showcase candidate) → v4.8+ (one milestone tag
-per feature phase). 114 local tags existed when this manifest was last
-updated (Phase 50.0); the latest verified tag is
-`v4.67.0-data-provenance-dataset-lineage-v1` (the frozen
+per feature phase). 115 local tags existed when this manifest was last
+updated (Phase 51.0); the latest verified tag is
+`v4.68.0-purged-cv-cpcv-model-validation-v1` (the frozen
 release-candidate tag is
 `v4.60.0-public-release-candidate-demo-freeze-v1`).
 

@@ -18,31 +18,42 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Purged Cross-Validation, Embargo & CPCV Model Validation Lab v1** (v4.68
-  series): a local-first validation lab for time-dependent research —
-  temporal-event samples with closed information intervals
-  [prediction_time, evaluation_time]; standard K-fold as an explicitly-warned
-  leakage reference (shuffle off by default, seed required to enable);
-  chronological walk-forward (expanding/rolling) with boundary purging on by
-  default; purged K-fold with interval-based purging and per-id overlap
-  reasons; CPCV with deterministic C(N,k) combinations bounded at 100; a
-  configurable embargo (duration-days or ≤0.2 span-fraction, start-exclusive/
-  end-inclusive windows merged per disjoint test block, reported separately
-  from purging); a from-scratch leakage audit that marks any split with
-  remaining overlap invalid; dependency-light neutral metrics (undefined →
-  null with reasons, never Infinity or zero-coercion); deterministic
-  configuration/split/result fingerprints; SQLite persistence
-  (validation_runs + validation_splits); idempotent Experiment Registry
-  linking and Dataset Lineage version links with invalidation warnings;
-  leakage-clean-only baselines scoped per (method, dataset version); neutral
-  run comparison; JSON export; a seven-run deterministic demo; a new **Model
-  Validation Lab** frontend view (dark ql-input controls, temporal split
-  timeline SVG with membership fallback); an 11-test Playwright spec; and
-  three docs (`MODEL_VALIDATION_LAB.md`, `PURGED_CV_AND_EMBARGO_POLICY.md`,
-  `CPCV_RUNBOOK.md`). Methodology and audit only — no profitability claims,
-  no model recommendations, not certification, not investment advice.
+- **Meta-Labeling, Probability Calibration & Decision Threshold Lab v1**
+  (v4.69 series): a local-first secondary-signal lab — meta-labels whether the
+  primary side (−1/0/1; side 0 abstains, never a failed signal) was correct
+  under a documented strict-inequality outcome rule; dependency-light Platt
+  sigmoid and isotonic (PAV) calibration fitted on training data only, with
+  **verified out-of-fold** calibration per linked Model Validation split
+  memberships (leakage-clean runs only; membership mismatches fail honestly)
+  and declared/not-out-of-fold statuses disclosed rather than trusted;
+  Brier / log loss / ROC AUC / PR AUC / reliability bins / ECE / MCE with
+  undefined metrics null+reason; a bounded neutral threshold grid (coverage
+  prominent, optional abstention band, no "optimal" selection ever); saved
+  research threshold policies with per-run baselines (rejected on failed or
+  not-OOF runs); deterministic configuration/result/policy fingerprints;
+  four new SQLite tables; idempotent Experiment Registry linking and Dataset
+  Lineage links with invalidation warnings; a new **Meta-Labeling Lab** view
+  (reliability + threshold SVG charts with accessible table fallbacks, dark
+  `ql-input` controls); a 7-run demo with policies; a 10-test Playwright
+  spec; 28 backend tests; and three docs (`META_LABELING_LAB.md`,
+  `PROBABILITY_CALIBRATION_POLICY.md`, `META_LABELING_RUNBOOK.md`). Also
+  fixed a fingerprint-row overflow in the Phase 50/51 detail views.
+  Meta-label 1 means the research condition was met — never profitability.
 
-## Grouped release areas — v4.8 through v4.67 (post-showcase series)
+## Grouped release areas — v4.8 through v4.68 (post-showcase series)
+
+### Purged CV, embargo & CPCV model validation lab (v4.68)
+
+- Local-first validation lab: temporal-event samples with closed information
+  intervals, standard K-fold as an explicitly-warned leakage reference,
+  boundary-purged walk-forward, purged K-fold with per-id overlap reasons,
+  CPCV bounded at 100 combinations, duration/fraction embargo per disjoint
+  test block, a from-scratch leakage audit (any remaining overlap or empty
+  training set marks the split invalid), dependency-light neutral metrics,
+  deterministic fingerprints, leakage-clean-only baselines, the Model
+  Validation Lab frontend with a temporal split timeline, an 11-test
+  Playwright spec, and three docs.
+
 
 ### Data provenance & dataset lineage dashboard (v4.67)
 
@@ -120,7 +131,7 @@ claimed by an entry here.
   fixture isolation + YM roll coverage, and the frozen freeze record with
   five SHA-256'd production screenshots.
 
-The tags between v4.8.0 and v4.67.0 (local milestone tags; full per-phase
+The tags between v4.8.0 and v4.68.0 (local milestone tags; full per-phase
 detail in `docs/ROADMAP.md`) grouped by area:
 
 ### CI preflight, repository hygiene & security sweep (v4.59)

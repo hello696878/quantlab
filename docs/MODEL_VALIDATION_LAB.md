@@ -199,7 +199,15 @@ scope, links, comparison, export privacy, demo idempotence, adversarial
 paths, registry coexistence) on temporary SQLite; `npx tsc --noEmit`;
 `frontend/e2e/model-validation.spec.ts` (11 tests).
 
-## 20. Limitations
+## 20. Meta-Labeling Lab integration (Phase 51.0)
+
+The Meta-Labeling Lab ([`META_LABELING_LAB.md`](META_LABELING_LAB.md)) uses a
+completed, leakage-clean validation run's recorded split memberships as
+out-of-fold evidence for probability calibration — fitting per split on train
+members and applying only to held-out test members. Split fingerprints are
+never modified by that use.
+
+## 21. Limitations
 
 Sample membership is stored as bounded JSON arrays (≤2000 samples/run —
 documented persistence decision for v1); CPCV emits the combination split set

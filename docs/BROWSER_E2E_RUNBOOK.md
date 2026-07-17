@@ -50,6 +50,15 @@ protected and why).
   experiment records open, dark-theme controls and column geometry hold, and
   1024/768 have no page overflow. Only writes: the idempotent demo seeds
   (which cascade to the other registries' idempotent demo loaders).
+- **Meta-Labeling Lab** (Phase 51.0, `meta-labeling.spec.ts`): the lab opens
+  with its calibration disclaimer, the 7-run demo seeds idempotently, method
+  filters work, the verified-OOF run shows its validation/dataset links and
+  raw-vs-calibrated metrics with the reliability chart + bin-table fallback,
+  manual threshold selection updates coverage with no "optimal" wording
+  anywhere, comparison stays neutral, the one-class failure and
+  invalidated-dataset warning render honestly, dark-theme controls and column
+  geometry hold, and 1024/768 have no page overflow (list AND detail). Only
+  writes: the idempotent demo seeds.
 - **Dataset Lineage** (Phase 49.0, `dataset-lineage.spec.ts`): the view opens
   with its provenance disclaimer, the demo lineage seeds idempotently (re-seed
   duplicates nothing), filters narrow the table, a dataset detail shows

@@ -105,7 +105,16 @@ selection on the same data. A "leakage-clean" run is a methodology check —
 not proof of model quality or profitability, and the lab never recommends or
 ranks models.
 
-## 15. Future improvements (openly planned)
+## 15. Calibration quality is not profitability
+
+The Meta-Labeling Lab's calibration metrics (Brier, ECE, reliability curves)
+measure how well predicted probabilities match observed label frequencies
+under a documented research outcome rule. They say nothing about costs,
+capacity, or future regimes; meta-label 1 is a research condition, not a
+profitable trade; and the lab never selects a best model or recommends a
+threshold — saved threshold policies are the user's own research records.
+
+## 16. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

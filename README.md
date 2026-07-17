@@ -58,7 +58,8 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   experiment journal), Experiment Registry (reproducibility metadata +
   fingerprints + comparison), Dataset Lineage (dataset versions, provenance,
   transformation lineage, quality checks), Model Validation Lab (purged CV,
-  embargo, CPCV + leakage audit), Data Reliability Center, QA Command Center.
+  embargo, CPCV + leakage audit), Meta-Labeling Lab (calibration +
+  thresholds), Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -270,6 +271,12 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Meta-Labeling Lab (51.0)** — a secondary meta-label layer: documented
+  outcome-rule labeling, Platt/isotonic probability calibration fitted on
+  training data only (out-of-fold via Model Validation splits), reliability
+  curves with Brier/ECE/MCE, and neutral decision-threshold trade-offs with
+  user-saved research policies. Never selects a model or recommends a
+  threshold; calibration quality is not profitability.
 - **Model Validation Lab (50.0)** — purged K-fold, embargo, and CPCV for
   time-dependent samples with information intervals: interval-based purging,
   a from-scratch leakage audit on every split, a temporal split-timeline

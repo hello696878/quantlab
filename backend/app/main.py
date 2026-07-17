@@ -89,6 +89,7 @@ from app.qa_command_center_routes import router as qa_command_center_router
 from app.experiment_registry_routes import router as experiment_registry_router
 from app.dataset_registry_routes import router as dataset_registry_router
 from app.model_validation_routes import router as model_validation_router
+from app.meta_labeling_routes import router as meta_labeling_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -482,6 +483,9 @@ app.include_router(dataset_registry_router)
 
 # Purged CV / Embargo / CPCV Model Validation Lab (Phase 50.0) — local SQLite validation lab.
 app.include_router(model_validation_router)
+
+# Meta-Labeling / Calibration / Threshold Lab (Phase 51.0) — local SQLite research lab.
+app.include_router(meta_labeling_router)
 
 
 # ---------------------------------------------------------------------------

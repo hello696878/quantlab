@@ -406,6 +406,122 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_vs_run ON validation_splits(validation_run_id)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Meta-Labeling / Calibration / Threshold Lab (Phase 51.0).
+        # Observations and reliability bins are normalized rows (bounded:
+        # ≤2000 observations per run — documented in docs/META_LABELING_LAB.md);
+        # threshold analysis (≤101 grid rows) lives in run JSON.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS meta_label_runs (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                TEXT    NOT NULL,
+                updated_at                TEXT    NOT NULL,
+                name                      TEXT    NOT NULL,
+                description               TEXT    NOT NULL DEFAULT '',
+                status                    TEXT    NOT NULL DEFAULT 'pending',
+                label_policy_json         TEXT    NOT NULL DEFAULT '{}',
+                calibration_method        TEXT    NOT NULL DEFAULT 'none',
+                oof_status                TEXT    NOT NULL DEFAULT 'unknown',
+                validation_run_id         INTEGER REFERENCES validation_runs(id),
+                dataset_version_id        INTEGER REFERENCES dataset_versions(id),
+                experiment_id             INTEGER REFERENCES experiment_registry(id),
+                configuration_json        TEXT    NOT NULL DEFAULT '{}',
+                configuration_fingerprint TEXT    NOT NULL,
+                result_fingerprint        TEXT,
+                observation_count         INTEGER NOT NULL DEFAULT 0,
+                labeled_count             INTEGER NOT NULL DEFAULT 0,
+                positive_count            INTEGER NOT NULL DEFAULT 0,
+                abstained_count           INTEGER NOT NULL DEFAULT 0,
+                raw_metrics_json          TEXT    NOT NULL DEFAULT '{}',
+                calibrated_metrics_json   TEXT    NOT NULL DEFAULT '{}',
+                calibration_params_json   TEXT    NOT NULL DEFAULT '{}',
+                threshold_analysis_json   TEXT    NOT NULL DEFAULT '{}',
+                completed_at              TEXT,
+                duration_ms               INTEGER,
+                app_version               TEXT,
+                git_commit                TEXT,
+                notes                     TEXT    NOT NULL DEFAULT '',
+                error_message             TEXT,
+                demo_key                  TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS meta_label_observations (
+                id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                 INTEGER NOT NULL REFERENCES meta_label_runs(id),
+                sample_id              TEXT    NOT NULL,
+                prediction_time        TEXT    NOT NULL,
+                evaluation_time        TEXT    NOT NULL,
+                primary_side           INTEGER NOT NULL,
+                primary_score          REAL,
+                raw_probability        REAL,
+                calibrated_probability REAL,
+                realized_outcome       REAL,
+                meta_label             INTEGER,
+                abstained              INTEGER NOT NULL DEFAULT 0,
+                sample_weight          REAL,
+                split_label            TEXT,
+                metadata_json          TEXT    NOT NULL DEFAULT '{}',
+                UNIQUE (run_id, sample_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS calibration_bins (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id             INTEGER NOT NULL REFERENCES meta_label_runs(id),
+                source             TEXT    NOT NULL,
+                bin_index          INTEGER NOT NULL,
+                lower_bound        REAL,
+                upper_bound        REAL,
+                sample_count       INTEGER NOT NULL,
+                mean_probability   REAL,
+                observed_frequency REAL,
+                calibration_gap    REAL,
+                UNIQUE (run_id, source, bin_index)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS threshold_policies (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                TEXT    NOT NULL,
+                updated_at                TEXT    NOT NULL,
+                run_id                    INTEGER NOT NULL REFERENCES meta_label_runs(id),
+                name                      TEXT    NOT NULL,
+                threshold                 REAL    NOT NULL,
+                abstention_json           TEXT,
+                configuration_fingerprint TEXT    NOT NULL,
+                observed_coverage         REAL,
+                observed_precision        REAL,
+                observed_recall           REAL,
+                observed_f1               REAL,
+                is_baseline               INTEGER NOT NULL DEFAULT 0,
+                notes                     TEXT    NOT NULL DEFAULT ''
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_mlr_created ON meta_label_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_mlr_status ON meta_label_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_mlr_method ON meta_label_runs(calibration_method)",
+            "CREATE INDEX IF NOT EXISTS idx_mlr_oof ON meta_label_runs(oof_status)",
+            "CREATE INDEX IF NOT EXISTS idx_mlr_vrun ON meta_label_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_mlr_dataset ON meta_label_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_mlr_config_fp ON meta_label_runs(configuration_fingerprint)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_mlr_demo_key ON meta_label_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_mlo_run ON meta_label_observations(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cb_run ON calibration_bins(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_tp_run ON threshold_policies(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_tp_baseline ON threshold_policies(is_baseline)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

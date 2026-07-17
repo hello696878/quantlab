@@ -60,6 +60,7 @@ import ResearchWorkspacePanel from "@/components/ResearchWorkspacePanel";
 import ExperimentRegistryPanel from "@/components/ExperimentRegistryPanel";
 import DatasetLineagePanel from "@/components/DatasetLineagePanel";
 import ModelValidationPanel from "@/components/ModelValidationPanel";
+import MetaLabelingPanel from "@/components/MetaLabelingPanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
@@ -520,6 +521,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Purged CV, Embargo & CPCV Model Validation Lab",
     subtitle:
       "A local-first model-validation lab for time-dependent research: samples carry information intervals [prediction time → evaluation time], and the lab generates standard K-fold (reference only — it leaks with overlapping labels and the audit says so), chronological walk-forward, purged K-fold, and Combinatorial Purged CV splits with interval-based purging, a configurable embargo (duration or fraction), a from-scratch leakage audit on every split, neutral fold-level metrics, deterministic SHA-256 configuration/split/result fingerprints, and links to Experiment Registry and Dataset Lineage records — all in local SQLite. Methodology and audit only: no profitability claims, no model recommendations, not scientific certification or regulatory validation, and not investment, trading, or risk advice.",
+  },
+  metalabeling: {
+    title: "Meta-Labeling, Calibration & Threshold Lab",
+    subtitle:
+      "A local-first secondary-signal research lab: meta-labels whether the primary signal's direction was correct under a documented outcome rule (side −1/0/1; side 0 abstains), calibrates predicted probabilities with Platt sigmoid or isotonic regression fitted on training data only — out-of-fold via linked Model Validation split memberships, with verified/declared/not-out-of-fold status honestly recorded — and reports reliability curves (Brier, log loss, ECE, MCE, calibration bins) plus neutral decision-threshold trade-offs (coverage, precision, recall, confusion counts) with user-saved research threshold policies. Meta-label 1 means the research outcome condition was met — not that a trade is profitable; no best-model or best-threshold selection, no position sizing, no execution, not certification, and not investment, trading, or risk advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1107,6 +1113,7 @@ export default function HomePage() {
     { view: "experimentregistry", title: "Open Experiment Registry", keywords: "experiment registry reproducibility dashboard research run provenance fingerprint sha256 configuration result dataset random seed git commit metrics baseline compare diff status completed failed invalidated reproducible partially not reproducible lineage parent export json demo records local sqlite" },
     { view: "datasetlineage", title: "Open Dataset Lineage", keywords: "dataset lineage data provenance registry version schema drift fingerprint manifest content source quality checks transformation parent child derived fixture local file generated provider license storage locator experiment links compare versions invalidated export json demo lineage sqlite" },
     { view: "modelvalidation", title: "Open Model Validation Lab", keywords: "model validation purged cross validation cv cpcv combinatorial embargo leakage audit walk forward k-fold kfold fold split train test overlap information interval prediction evaluation time purge baseline fingerprint compare runs afml lopez de prado deterministic demo" },
+    { view: "metalabeling", title: "Open Meta-Labeling Lab", keywords: "meta labeling meta-label secondary signal probability calibration platt sigmoid isotonic reliability curve brier log loss ece mce expected calibration error decision threshold coverage precision recall abstention out of fold oof primary side outcome policy threshold policy baseline compare export demo" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
@@ -2284,6 +2291,8 @@ export default function HomePage() {
         {view === "datasetlineage" && <DatasetLineagePanel />}
 
         {view === "modelvalidation" && <ModelValidationPanel onNav={(route) => handleNav(route as View)} />}
+
+        {view === "metalabeling" && <MetaLabelingPanel onNav={(route) => handleNav(route as View)} />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

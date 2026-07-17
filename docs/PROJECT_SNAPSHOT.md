@@ -1,7 +1,7 @@
-# QuantLab — Project Snapshot (Phase 50.0)
+# QuantLab — Project Snapshot (Phase 51.0)
 
 A one-page handoff doc. Facts verified against the repo when written
-(version label `4.68.0-dev`); counts drift as phases land — re-verify before
+(version label `4.69.0-dev`); counts drift as phases land — re-verify before
 public use.
 
 ## Summary
@@ -19,7 +19,7 @@ trading/risk/compliance infrastructure.
 - **Start Here:** Home, Demo Center, Portfolio Showcase, Developer
   Onboarding, Global Markets Globe.
 - **Product Workflow:** Scenario Studio, Research Workspace, Experiment
-  Registry, Dataset Lineage, Model Validation Lab, Data Reliability Center,
+  Registry, Dataset Lineage, Model Validation Lab, Meta-Labeling Lab, Data Reliability Center,
   QA Command Center, Release Notes Center, Public Release Candidate.
 - **Backtesting:** Backtest, Strategy Comparison, Portfolio Backtest, CSV
   Backtest, Strategy Builder, Parameter Sweep, Train/Test, Walk-Forward.
@@ -67,8 +67,8 @@ the in-app Data Reliability Center.
 the ROADMAP entry per phase for each milestone's count); strict finiteness
 guarantees at the API boundary; wording contracts as tests;
 `npx tsc --noEmit` for the frontend; a Playwright browser E2E guard covering
-the frozen demo path, the Experiment Registry, Dataset Lineage, and Model
-Validation Lab views (local-first, plus a manually triggered CI workflow —
+the frozen demo path, the Experiment Registry, Dataset Lineage, Model
+Validation Lab, and Meta-Labeling Lab views (local-first, plus a manually triggered CI workflow —
 `CI_BROWSER_E2E.md`); **no frontend unit-test framework yet**.
 Verification is run locally by the user (helper wrappers in
 `scripts\*.ps1`).

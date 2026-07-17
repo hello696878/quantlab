@@ -1677,6 +1677,37 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 51.0 — Meta-Labeling, Calibration & Threshold Lab v1 ✅
+
+- **Research-infrastructure phase:** a secondary meta-label layer over a
+  primary signal — outcome-rule labeling (side −1/0/1; side 0 abstains;
+  strict-inequality threshold; outcomes never invented), dependency-light
+  Platt sigmoid + isotonic (PAV) calibration fitted on training data only
+  (no sklearn dependency added; parameters stored as plain floats — never
+  pickle/joblib), **verified out-of-fold** calibration per linked Model
+  Validation split memberships (leakage-clean runs only; membership
+  mismatch, train/test overlap, and one-class data all fail honestly) with
+  declared/not-out-of-fold statuses disclosed; Brier / log loss / ROC AUC /
+  PR AUC / reliability bins (equal-width or equal-frequency; empty bins
+  kept) / count-weighted ECE / MCE with undefined metrics null+reason; a
+  bounded neutral threshold grid (≤101 points, boundary-inclusive accept,
+  optional abstention band, zero-denominator-safe, coverage prominent, no
+  "optimal" selection); saved research threshold policies with per-run
+  transactional baselines rejected on failed/not-OOF runs; deterministic
+  configuration/result/policy fingerprints; four idempotent SQLite tables
+  (observations + bins normalized rows, ≤2000 observations documented);
+  /meta-labeling routes; a 7-run deterministic demo (+3 policies, 1
+  baseline) cascading the other registries' idempotent loaders; the
+  **Meta-Labeling Lab** view (reliability + threshold SVG charts with
+  accessible table fallbacks, click-to-select threshold with live coverage,
+  dark ql-input controls, linked-record cards with invalidated-dataset
+  warnings); 28 backend tests + a 10-test Playwright spec — full local
+  suite **50/50 passed**, dev DB restored afterward. Also fixed a
+  fingerprint-row page-overflow defect found during browser verification
+  (Phase 50/51 detail views). Honest scope: meta-label 1 = documented
+  research condition met — never profitability; no best-model/threshold
+  selection, no sizing, no execution, not certification, not advice.
+
 ### Phase 50.0 — Purged CV, Embargo & CPCV Model Validation Lab v1 ✅
 
 - **Research-infrastructure phase:** a local-first model-validation lab for

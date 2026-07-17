@@ -356,7 +356,7 @@ function FpRow({ label, value }: { label: string; value: string | null }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <dt className="shrink-0 text-slate-500">{label}</dt>
-      <dd className="min-w-0"><CopyValue value={value} /></dd>
+      <dd className="min-w-0 overflow-hidden"><CopyValue value={value} className="max-w-full" /></dd>
     </div>
   );
 }
