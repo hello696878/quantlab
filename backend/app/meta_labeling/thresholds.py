@@ -3,9 +3,12 @@ Decision-threshold analysis.
 
 Acceptance rule (documented boundary): an observation is **accepted** when
 ``calibrated_probability >= threshold`` (greater-or-equal — a probability
-exactly at the threshold is accepted).  An optional abstention band rejects
-observations whose probability falls strictly inside ``(lower, upper)`` before
-thresholding; ``lower > upper`` is invalid.
+exactly at the threshold is accepted).  An optional abstention band **sets
+aside** observations whose probability falls strictly inside ``(lower, upper)``:
+they are excluded from the confusion matrix entirely (never counted as false
+negatives or true negatives), so the confusion counts describe the decision
+population only, while ``coverage`` stays measured over all observations;
+``lower > upper`` is invalid.
 
 Grid rules: thresholds in [0, 1], deduplicated, stably sorted ascending,
 bounded at 101 points.  Nothing is ever selected as a "best" threshold and no
@@ -77,9 +80,16 @@ def analyze_threshold(
     threshold: float,
     abstention: Optional[Dict[str, float]] = None,
 ) -> Dict[str, Any]:
-    """Confusion + coverage stats at one threshold (accept iff p >= threshold)."""
+    """Confusion + coverage stats at one threshold (accept iff p >= threshold).
+
+    Band-abstained observations are set aside: the confusion matrix is computed
+    over the *decision population* (accepted + rejected) only, so an abstained
+    positive is never counted as a false negative.  ``coverage`` is still
+    measured over all observations.
+    """
     total = len(probs)
     accepted_idx: List[int] = []
+    rejected_idx: List[int] = []
     band_abstained = 0
     for i, p in enumerate(probs):
         if abstention and abstention["lower"] < p < abstention["upper"]:
@@ -87,12 +97,14 @@ def analyze_threshold(
             continue
         if p >= threshold:
             accepted_idx.append(i)
+        else:
+            rejected_idx.append(i)
     accepted = len(accepted_idx)
-    rejected = total - accepted
+    rejected = len(rejected_idx)
 
     tp = sum(1 for i in accepted_idx if labels[i] == 1)
     fp = accepted - tp
-    fn = sum(1 for i in range(total) if labels[i] == 1) - tp
+    fn = sum(1 for i in rejected_idx if labels[i] == 1)
     tn = rejected - fn
 
     precision = _rate(tp, tp + fp)

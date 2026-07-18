@@ -219,6 +219,23 @@ def test_threshold_grid_bounds_and_abstention():
     assert row["band_abstained"] == 1 and row["accepted"] == 2
 
 
+def test_abstained_observations_excluded_from_confusion_matrix():
+    # p=0.5 is band-abstained (a POSITIVE); p=0.2 and p=0.8 are decisions.
+    # At threshold 0.9 both decisions are rejected: the abstained positive must
+    # NOT be counted as a false negative, and the confusion matrix must cover
+    # only the decision population (accepted + rejected == total - abstained).
+    row = thr.analyze_threshold([0.5, 0.2, 0.8], [1, 0, 1], [None] * 3, 0.9,
+                                {"lower": 0.4, "upper": 0.6})
+    assert row["band_abstained"] == 1
+    assert row["accepted"] == 0 and row["rejected"] == 2
+    assert row["false_negatives"] == 1  # only the rejected 0.8 positive, not 0.5
+    assert row["true_negatives"] == 1   # the rejected 0.2 negative
+    assert (row["true_positives"] + row["false_positives"]
+            + row["true_negatives"] + row["false_negatives"]) == 2
+    # Coverage is still measured over ALL observations (0 accepted of 3).
+    assert row["coverage"] == 0.0
+
+
 # ---------------------------------------------------------------------------
 # Fingerprints (§11)
 # ---------------------------------------------------------------------------

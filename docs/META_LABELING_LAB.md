@@ -77,8 +77,11 @@ bounded grid (≤101 points, [0,1], deduplicated, sorted). Each row reports
 accepted/rejected counts, coverage, confusion counts, precision, recall,
 specificity, F1, balanced accuracy, accepted-positive rate, and optional
 descriptive accepted-outcome statistics — zero denominators yield null. An
-optional abstention band rejects probabilities strictly inside
-`(lower, upper)`; `lower > upper` is invalid. **No threshold is ever selected
+optional abstention band **sets aside** probabilities strictly inside
+`(lower, upper)`: those observations are excluded from the confusion matrix
+(never counted as false negatives or true negatives), so precision/recall
+describe the decision population only, while coverage stays measured over all
+observations; `lower > upper` is invalid. **No threshold is ever selected
 as best or recommended** — the user picks; coverage stays prominent.
 
 ## 11. Threshold-policy baselines
