@@ -439,6 +439,16 @@ that phase, not here.
 > data**, and adds **no vendor fetch (I5), no live data, and no real-data
 > acquisition** (all remain out of scope and **not implemented**). See
 > `docs/AI_QUANT_ARCHITECTURE.md` **Appendix N (§N.17 as-built)** for details.
+>
+> **Planned (Phase 14, design only):** a **local read-only experiment evidence-pack**
+> layer that aggregates existing Phase 10 / 12 / 13 evidence for selected
+> `train_run_hash`es into one deterministic review bundle with an explicit
+> evidence-completeness status, exported (JSON / CSV / Markdown) only to explicit
+> output paths. It **creates no new analytical evidence**, runs and retrains
+> nothing, opens **no database** (registry / dataset-lineage integration is
+> deferred), and adds **no vendor fetch (I5), no live data, and no real-data
+> acquisition** (all remain out of scope and **not implemented**). See
+> `docs/AI_QUANT_ARCHITECTURE.md` **Appendix O** for the design.
 
 ### Ingestion Phase 5 (I5) — real vendor integration
 

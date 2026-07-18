@@ -4694,3 +4694,417 @@ Other flags: `--run-hash <name>` (audit one run directory),
 - **A passing audit does not prove** data correctness, model correctness,
   reproducibility, or any investment / live-trading performance.
 - Local / synthetic results are **not investment advice**.
+
+---
+
+## Appendix O — Phase 14 Local Experiment Evidence Pack Plan
+
+> **Status: design only (Phase 14 not implemented).** Sections O.1–O.20 are the
+> approved plan; **no code, script, test, data, artifact, report, or database file
+> exists yet.** Phase 14 is a **local-only, read-only evidence-pack layer** that
+> **aggregates existing Phase 10 / 12 / 13 evidence** for one or more selected
+> `train_run_hash` values into a single deterministic review bundle with an explicit
+> **evidence-completeness** status. It **creates no new analytical evidence**, runs
+> nothing, retrains nothing, mints **no new hashes**, opens **no database**, and
+> makes **no deployment / trading / investment recommendation**. Registry and
+> dataset-lineage integration are **deferred** (§O.2). Local artifacts only;
+> deterministic; not investment advice.
+
+### O.1 Current-state evidence sources
+
+**`ExperimentStore` / `ExperimentRun`** (Phase 5) persists, per run
+`<base>/<train_run_hash>/`: the `train_run_hash` identity; the six-field hash chain
+(`train_run_hash`, `continuous_config_hash`, `feature_config_hash`,
+`label_config_hash`, `dataset_config_hash`, `model_config_hash`);
+`model_type` / `task_type`; `feature_columns` / `label_column`; the four windows
+(`train_start` / `train_end` / `validation_start` / `validation_end`); `metrics` /
+`backtest_metrics` / `baseline_metrics`; `created_at`; optional `git_commit` /
+`code_version`; relative `artifact_paths`; and the canonical artifacts
+(`metadata.json`, `model_params.json`, `metrics.json`, and the
+`predictions` / `signal` / `backtest` frames). **`root_symbol` / `source` /
+`raw_data_version_hash` are not persisted and must not be invented.**
+
+**Phase 10** (`app.reporting`) — deterministic single-run summaries and
+compatible-run comparison via `compare_experiment_runs`, which enforces the
+same-`(validation_start, validation_end, label_column, dataset_config_hash)`
+comparison **guard**, returns comparison rows with output `train_run_hash`es and
+standing disclaimers, and makes **no model approval or investment recommendation**.
+
+**Phase 12** (`app.experiment_catalog`) — deterministic discovery
+(`build_experiment_catalog`), filters, compatibility grouping
+(`group_compatible_runs`, a strict superset of the Phase 10 guard), and
+**descriptive ranking only when a metric is explicitly selected**
+(`rank_experiment_catalog`); there is **no implicit ranking metric**.
+
+**Phase 13** (`app.experiment_audit`) — metadata-only / standard / deep **structural
+integrity** audit with stable finding codes, path-safety and artifact-existence
+checks, and proven read-only (byte-identical) behavior. **Structural integrity is
+not model correctness.**
+
+**Exact current gap:** to review runs today a user must **run three separate CLIs**
+(`report_local_futures_experiments`, `catalog_local_futures_experiments`,
+`audit_experiment_store`) and **manually combine** their outputs. **Phase 14
+aggregates this existing evidence into one deterministic review pack** and
+**creates no new analytical evidence**.
+
+### O.2 Registry and dataset-lineage feasibility
+
+**Observed reality** (from `backend/app/db.py`, `app.experiment_registry`,
+`app.dataset_registry`):
+
+- `experiment_registry` is **SQLite-backed** (`backend/data/quantlab.db`).
+- It is **deliberately separate** from the `train_run_hash`-keyed
+  `ExperimentStore` — its own package docstring says so; it catalogues *any*
+  module's research run (Scenario Studio, Pairs, etc.).
+- There is **no persisted `train_run_hash` column** and **no reliable shared
+  identifier**; the registry's `configuration_fingerprint` / `result_fingerprint` /
+  `dataset_fingerprint` are a **different identity scheme** (sha256 over
+  `{module, experiment_type, parameters, random_seed, dataset{...}}`).
+- **Phase 9 / 11 runs are not automatically registered there** (only `main.py` /
+  FastAPI routes and the write-only `integration.py` helpers touch it).
+- `dataset_registry` links **registry experiment ids** (integers) to
+  `dataset_version_id`s — **not** `ExperimentStore` `train_run_hash`es.
+- Registry reads currently go through `app.db.get_connection()`, which
+  **`mkdir`s `backend/data/` and creates `quantlab.db` if absent** — an implicit
+  database-creation path.
+- Matching records by similar names or hashes would **invent provenance**.
+
+**Decision — registry and dataset-lineage integration are deferred from Phase 14
+v1.** Phase 14 v1 **must not import** `app.experiment_registry`,
+`app.dataset_registry`, or `app.db`; **must not** open `quantlab.db`, create a DB,
+run migrations, query registry tables, expose registry CLI flags, or claim
+registry / dataset-lineage linkage.
+
+The evidence-pack model **may reserve neutral optional fields**
+`registry_context_status = "not_collected"` and
+`dataset_lineage_context_status = "not_collected"`. These are **neutral**: they
+generate **no finding**, **do not downgrade completeness**, and **do not count as
+missing required evidence**. The v1 CLI **must not** include
+`--include-registry-context` or `--database-path`.
+
+A future adapter may be designed only after: an explicit existing database path is
+**required**; a public **read-only** connection API exists (no implicit creation);
+a persisted `train_run_hash` link (or another authoritative bridge) exists; and
+byte-identical DB behavior is **proven**.
+
+### O.3 Phase 14 scope
+
+**Given** an `ExperimentStore` root and **at least one** selected `train_run_hash`,
+**produce** a deterministic `ExperimentEvidencePack` containing: selected run
+identities; loadability; Phase 13 integrity evidence; `ExperimentRun` metadata; the
+persisted hash chain; windows; feature / label metadata; model / task metadata;
+metrics and baseline metrics; a referenced artifact inventory; Phase 12
+compatibility-group context; **optional descriptive ranking only when a metric is
+explicitly provided**; a Phase 10 comparison for compatible multi-run selections;
+explicit missing / unavailable evidence; per-run and top-level evidence
+completeness; deterministic JSON / CSV / Markdown outputs; and evidence-specific
+disclaimers.
+
+**Explicitly not in scope:** retraining; experiment execution; batch execution; new
+metrics; new features / labels; new model families; new backtests; purged CV; CPCV;
+walk-forward; registry writes; database creation or migration; artifact
+repair / delete / quarantine / migration; model promotion; deployment approval;
+trading decisions; portfolio construction; frontend changes; network / vendor /
+live data; real-money trading.
+
+### O.4 Package design
+
+```text
+backend/app/experiment_review/
+├── __init__.py     # public exports
+├── models.py       # ExperimentEvidencePack, ExperimentRunEvidence, EvidenceFinding, enums
+├── collect.py      # collect_experiment_evidence_pack (+ read-only helpers)
+└── render.py       # export_evidence_pack_json / _csv / _markdown + EVIDENCE_DISCLAIMERS
+```
+
+Future CLI: `scripts/build_experiment_evidence_pack.py`. Future tests:
+`backend/tests/test_experiment_review.py`.
+
+**Package boundaries:** purely additive; read-only; sequential; deterministic;
+**zero filesystem writes** from `models.py` / `collect.py` / `render.py`; renderers
+return **strings only**; **only the CLI** writes explicit output paths; no network;
+**no registry / DB imports**; no `local_pipeline` import; no `batch_experiments`
+import; no experiment execution; no ML internals; **no new hashes**; no private
+`ExperimentStore` symbols; **no approval / deployment / trading vocabulary**.
+
+### O.5 Core models
+
+Frozen, strict-JSON-safe.
+
+**`ExperimentEvidencePack`:** `selected_run_hashes`, `runs`, `comparison`,
+`catalog_context`, `integrity_summary`, `registry_context_status`
+(`"not_collected"` in v1), `dataset_lineage_context_status` (`"not_collected"`),
+`evidence_summary`, `findings`, `disclaimers`.
+
+**`ExperimentRunEvidence`:** `train_run_hash`, `run_directory`, `load_status`,
+`completeness`, `audit_status`, `audit_findings`, `created_at`, `train_start`,
+`train_end`, `validation_start`, `validation_end`, `feature_columns`,
+`label_column`, `model_type`, `task_type`, `metrics`, `baseline_metrics`,
+`hash_chain`, `artifact_inventory`, `catalog_group`, `catalog_rank`,
+`missing_evidence`.
+
+**Rules:** **no Phase-14-generated timestamp** (a persisted `created_at` may be
+reported); **no absolute paths**; **no `NaN` / `Infinity`**; unavailable data is
+`null` or `"not recorded"`; **no invented provenance**; **no new identity hash**;
+deterministic ordering; **duplicate selected run hashes deduplicated with first
+occurrence preserved**.
+
+### O.6 Evidence findings
+
+**Phase 13 findings are preserved unchanged**, including their original ids and
+codes. **Phase 14 aggregation findings use a separate namespace** — `evidence_0000`,
+`evidence_0001`, ... Candidate Phase 14 codes: `RUN_NOT_FOUND`, `RUN_UNLOADABLE`,
+`COMPARISON_UNAVAILABLE`, `INCOMPATIBLE_SELECTED_RUNS`, `REQUESTED_METRIC_MISSING`,
+`CATALOG_CONTEXT_UNAVAILABLE`, `EVIDENCE_INCOMPLETE`. (`RUN_NOT_SELECTED` is **not**
+used unless implementation later demonstrates a real need.)
+
+**Rules:** **no duplicate codes with Phase 13**; deterministic ordering **before**
+assigning evidence ids; descriptive messages only; no remediation commands; no
+advice language; no absolute paths; no timestamps.
+
+### O.7 Completeness semantics
+
+**Per-run statuses:**
+
+- **complete** — the run loads; Phase 13 has **no warning / error / critical**
+  finding; required persisted metadata exists; referenced artifacts are verified
+  present at the selected audit level.
+- **warning** — evidence is usable but Phase 13 has **warning** findings; no
+  required evidence is structurally missing.
+- **incomplete** — Phase 13 has **error / critical** findings, or required persisted
+  evidence is missing, or an explicitly requested metric is unavailable.
+- **unavailable** — the selected run is not found, or its metadata cannot be parsed
+  sufficiently to construct run evidence.
+
+**Top-level statuses:**
+
+- **COMPLETE** — all selected runs complete and no selection-level
+  warning / incomplete finding.
+- **WARNING** — at least one warning, but no incomplete / unavailable run.
+- **INCOMPLETE** — at least one run incomplete; **or** at least one run unavailable
+  while other run evidence remains constructible; **or** an explicitly requested
+  metric is unavailable.
+- **UNAVAILABLE** — no selected run can produce usable evidence, or the pack cannot
+  be constructed at all after the store root was accepted.
+
+Registry / dataset-lineage `not_collected` is **neutral** and never downgrades
+completeness. Catalog context disabled by configuration is **neutral**. **No metric
+selected** means: no ranking is performed, **no missing-metric finding**, and
+completeness is unchanged.
+
+**Completeness explicitly does not mean** model correctness, statistical validity,
+reproducibility proof, profitability, deployment readiness, or trading safety.
+
+### O.8 Phase 13 integration
+
+`audit_experiment_run` is the **source of truth for structural findings**. Default
+audit level = **standard**; **deep** remains explicit and opt-in. Phase 14 **does
+not duplicate** path safety or artifact-existence checks; original Phase 13 findings
+and ids remain unchanged; **error / critical findings are never suppressed**; audit
+status is **not** model-quality status.
+
+### O.9 Artifact inventory
+
+Deterministic fields: `artifact_name`, `relative_path`, `exists`, `regular_file`,
+`format`, `audit_finding_codes`. Tri-state: `exists` ∈ `true | false | null`;
+`regular_file` ∈ `true | false | null`.
+
+- **metadata-only** — `exists` / `regular_file` are **`null`** (not checked).
+- **standard / deep** — existence / type may be **derived from Phase 13 audit
+  findings and persisted `artifact_paths`**; do **not** repeat unsafe-path
+  validation; do **not** `stat` / open unsafe paths.
+- **unsafe path** — `relative_path = null`, `exists` / `regular_file` = `null`; the
+  raw unsafe value remains **only** in the Phase 13 finding's `actual` field.
+
+Do **not** compute content hashes. Do **not** perform a second independent
+structural audit. Ordering is by `artifact_name` / `relative_path`.
+
+### O.10 Phase 12 integration
+
+Perform **one** deterministic store-level catalog pass. Provide: compatibility group
+identity; group size; **sorted** peer hashes; metric availability; and optional rank
+and direction. **Ranking** is performed **only when a metric is explicitly
+supplied**, **only within compatible peers**, and is **descriptive only** — no
+winner / best / recommended wording, no implicit metric; a missing requested metric
+becomes `REQUESTED_METRIC_MISSING` and **incomplete**. If catalog context is
+intentionally disabled: status is `not_collected`, **no finding**, **no completeness
+downgrade**.
+
+### O.11 Phase 10 comparison semantics
+
+- **One selected run** — comparison status = **`not_applicable`**; **no**
+  `COMPARISON_UNAVAILABLE` finding; **no** completeness downgrade.
+- **Multiple compatible selected runs** — run `compare_experiment_runs`; **do not
+  bypass** its compatibility guard; **never** set `allow_different_windows`; preserve
+  the comparison disclaimers; **no automatic best-run selection**.
+- **Multiple incompatible selected runs** — comparison status = **`unavailable`**;
+  emit `INCOMPATIBLE_SELECTED_RUNS` and `COMPARISON_UNAVAILABLE`; **keep all per-run
+  evidence**; default completeness impact = **warning** (comparison was not
+  explicitly required). *(A future explicit require-comparison mode could make
+  incompatibility `incomplete`; it is **not** implemented in v1.)*
+- **Explicitly requested metric missing** — `REQUESTED_METRIC_MISSING`; top-level
+  **incomplete**.
+
+### O.12 Collection API
+
+```python
+collect_experiment_evidence_pack(
+    store: ExperimentStore,
+    train_run_hashes: Sequence[str],
+    *,
+    metric: str | None = None,
+    maximize: bool = True,
+    include_catalog_context: bool = True,
+    audit_level: AuditLevel = AuditLevel.STANDARD,
+) -> ExperimentEvidencePack
+```
+
+**Rules:** at least one hash; **preserve first-occurrence user order**;
+deterministic; sequential; no writes; no experiment execution; no retraining; **no
+registry / DB access**; **one** catalog pass; **per-selected-run** Phase 13 audit;
+Phase 10 comparison **only for compatible selections**; tolerant missing / unloadable
+run handling; **missing evidence is always explicit**; no parallelism; no network.
+
+### O.13 Renderer design
+
+String-returning: `export_evidence_pack_json` / `_csv` / `_markdown`.
+
+- **JSON** — strict `allow_nan=False`, `sort_keys=True`, the full nested pack; Phase
+  13 and Phase 14 findings remain **distinguishable**; **no** generated timestamp /
+  host / store-root information.
+- **CSV** — a **stable fixed run-summary schema**: `train_run_hash`, `load_status`,
+  `audit_status`, `completeness`, `model_type`, `task_type`, `train_start`,
+  `train_end`, `validation_start`, `validation_end`, `catalog_group`,
+  `catalog_rank`, `requested_metric`, `requested_metric_value`, `metrics_json`,
+  `baseline_metrics_json`, `missing_evidence`. One row per selected run; stable
+  header; `metrics_json` / `baseline_metrics_json` use compact deterministic JSON;
+  **no dynamic metric columns**; structural findings are **not** flattened
+  misleadingly; zero runs → header only (if a model permits that state).
+- **Markdown** — evidence summary; selected runs; integrity; comparison; catalog
+  context; registry / dataset-lineage **clearly marked not collected**; missing
+  evidence; **Scope & Safety** disclaimers.
+
+`EVIDENCE_DISCLAIMERS` (Phase-14-specific): read-only aggregation of existing
+evidence; **evidence completeness is not model correctness, reproducibility, or
+performance**; structural integrity ≠ model quality; no deployment / trading
+recommendation; local / synthetic, not investment advice.
+
+### O.14 CLI design — `scripts/build_experiment_evidence_pack.py`
+
+**Future thin script — not implemented in Commit 0.** Arguments: `--artifacts-dir`,
+`--run-hash` (repeatable), `--run-hashes-file`,
+`--audit-level metadata-only|standard|deep`, `--metric`, `--maximize`,
+`--minimize`, `--include-catalog-context`, `--no-catalog-context`,
+`--output-json`, `--output-csv`, `--output-markdown`, `--fail-on warning|incomplete`,
+`--severity`. **No registry / database arguments in v1.**
+
+**Rules:** at least one selected hash; explicit input order preserved (first
+duplicate wins); no implicit files; **only explicit outputs may be written**; parent
+directories created **only** for explicit outputs; **no implicit DB access**;
+expected missing / incompatible evidence produces **no traceback**; display
+filtering does **not** change canonical completeness or the exit code.
+
+**RESULT words:** `RESULT: COMPLETE` / `RESULT: WARNING` / `RESULT: INCOMPLETE` /
+`RESULT: UNAVAILABLE`. **Never** `APPROVED` / `REJECTED` / `DEPLOY` / `TRADE`.
+
+### O.15 Exit codes
+
+| Code | Meaning |
+|---|---|
+| **0** | evidence pack constructed; canonical status does **not** meet `--fail-on` |
+| **1** | evidence pack constructed; canonical status **meets** `--fail-on` |
+| **2** | argparse usage error |
+| **3** | pack could not run (store root / hashes-file / output I/O failure) |
+
+Default `--fail-on incomplete`: **WARNING** exits **0**; **INCOMPLETE** exits **1**;
+**UNAVAILABLE** exits **1**. `--fail-on warning` makes
+**WARNING / INCOMPLETE / UNAVAILABLE** exit **1**. Display filtering **never**
+changes the exit code.
+
+### O.16 Determinism
+
+Selected runs preserve **first-occurrence input order**; Phase 14 findings globally
+sorted then evidence-numbered; Phase 13 findings preserve their original ids / order;
+artifacts sorted by artifact name / path; peers sorted by `train_run_hash`; metrics
+dictionaries sorted during serialization; JSON keys sorted; CSV fixed headers;
+Markdown fixed sections; unavailable fields explicit; repeated equivalent calls
+produce **byte-identical** outputs. **No generated timestamp, no UUID, no new hash.**
+
+### O.17 Safety and boundaries
+
+`models.py` / `collect.py` / `render.py` perform **zero filesystem writes**;
+renderers return **strings only**; **only the CLI** writes explicit outputs; tests
+use `tmp_path` only; the store remains **byte-identical**; **no** repo-root
+`data/` / `artifacts/` / `reports/`; **no `app.db`**; **no registry /
+`dataset_registry` imports**; no database creation; no migrations; no registry
+writes; no frontend; no network / vendor / live data; no `local_pipeline` / batch
+imports; no experiment execution / retraining; no new ML frameworks; **no new
+hashes**; no private `ExperimentStore` symbols; no repair / delete / quarantine /
+migration; **no approval / deployment / trading language**; symlinks not followed;
+unsafe paths never accessed.
+
+### O.18 Test plan
+
+`backend/tests/test_experiment_review.py` will cover — **Models:** immutability;
+strict JSON; duplicate-selection handling; per-run / top-level completeness
+invariants; **separate `evidence_` and Phase 13 finding ids**; no absolute paths; no
+`NaN` / `Infinity`. **Collection:** one valid run + comparison `not_applicable`;
+multiple compatible runs + comparison available; incompatible runs + warning-level
+comparison unavailable; missing run alongside valid runs → top-level incomplete; all
+runs missing → top-level unavailable; malformed run; warning audit; error / critical
+audit; metric absent and no rank requested; explicitly requested metric missing →
+incomplete; catalog enabled / disabled neutral semantics; rank only with explicit
+metric; **no invented provenance**; registry context neutral `not_collected`;
+deterministic repeated results. **Artifact inventory:** metadata-only tri-state
+`null`; standard / deep true / false; missing artifact; non-file artifact; unsafe
+path represented **only** through Phase 13; relative paths only; no content hashing.
+**Renderers:** strict deterministic JSON; fixed CSV header; deterministic
+`metrics_json`; Markdown sections and disclaimers; no timestamp / host / store path;
+no `NaN` / `Infinity`; no advice; strings only; zero writes. **CLI:** one / multiple
+run hashes; `--run-hashes-file`; missing hashes usage failure;
+COMPLETE / WARNING / INCOMPLETE / UNAVAILABLE; `--fail-on` behavior; display-filter
+independence; explicit outputs only; no output flags → no files; exit codes
+0 / 1 / 2 / 3; expected failures have no traceback. **Integrated e2e:** ≥3 real Phase
+9 / 11 runs under `tmp_path`; Phase 13 audit evidence; Phase 12 grouping / rank with
+an explicit metric; Phase 10 comparison; one tampered run; complete and incomplete
+packs; deterministic exports; `ExperimentStore` byte-identical; **no DB created**; no
+repo-root generated files. **Boundary tests:** no Phase 9–13 production
+modifications; **no registry / dataset / db imports**; no frontend; no
+network / vendor / ML frameworks; no execution / retraining; no hashing; no repair
+or approval language.
+
+### O.19 Commit plan
+
+Six independently testable commits (Commit 0 through Commit 5):
+
+- **Commit 0** — Appendix O doc-only plan (this section).
+- **Commit 1** — evidence models and Phase 14 aggregation findings (`models.py`).
+- **Commit 2** — read-only collector using Phase 10 / 12 / 13 (`collect.py`).
+- **Commit 3** — deterministic renderers (`render.py`).
+- **Commit 4** — thin CLI and exit-code tests
+  (`scripts/build_experiment_evidence_pack.py`).
+- **Commit 5** — integrated e2e and Appendix O as-built docs.
+
+**Registry and dataset-lineage integration are deferred and not part of this commit
+plan.**
+
+### O.20 Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| **Duplicating Phase 10 / 12 / 13 logic** | the package only *calls* their public APIs; guard tests forbid re-implementing compare / rank / path-safety |
+| **Confusing evidence completeness with correctness** | status is named *completeness*, never approval; every renderer states completeness ≠ model correctness / reproducibility / performance |
+| **Phase 13 / Phase 14 finding-id collision** | separate namespaces (`finding_0000…` vs `evidence_0000…`); disjoint code sets; a test asserts no overlap |
+| **Incorrect artifact-existence inference at metadata-only** | `exists` / `regular_file` are `null` at metadata-only (not checked); true / false only at standard / deep from Phase 13 findings |
+| **Rank interpreted as a recommendation** | rank only with an explicit `--metric`, only within a compatibility group, descriptive; no best / winner / deploy language |
+| **Incompatible comparisons** | pre-checked via the Phase 12 group; never `allow_different_windows`; incompatible → explicit `COMPARISON_UNAVAILABLE` / `INCOMPATIBLE_SELECTED_RUNS` |
+| **Optional context incorrectly lowering completeness** | registry / lineage `not_collected` and disabled catalog context are neutral — no finding, no downgrade |
+| **Inventing registry / lineage links** | v1 imports no registry module and claims no linkage; only persisted shared identifiers would justify a link, and none exist |
+| **Implicit DB creation** | v1 never imports `app.db` / registry modules and opens no connection; a byte-identical + no-DB-created test guards it |
+| **Dynamic CSV schema** | a single fixed run-summary header; metrics as compact JSON columns, never per-metric columns |
+| **Absolute-path leakage** | store-relative only; unsafe values confined to the Phase 13 finding `actual`; e2e greps outputs for drive letters / tmp names |
+| **Large deep-audit reads** | deep is opt-in, off by default; standard does no frame parsing |
+| **Concurrent main-automation changes** | purely additive new package; touches no existing module; re-fetch before merge |
+| **Overlap with purged-CV / CPCV** | Phase 14 touches none of those modules and adds no validation method |
+| **Output becoming a deployment gate** | no APPROVE / DEPLOY / TRADE vocabulary or exit semantics; RESULT words are completeness-only |
+| **Repair / retraining scope creep** | no such API exists; commit plan + guard tests enforce read-only aggregation |
