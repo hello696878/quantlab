@@ -114,7 +114,18 @@ capacity, or future regimes; meta-label 1 is a research condition, not a
 profitable trade; and the lab never selects a best model or recommends a
 threshold — saved threshold policies are the user's own research records.
 
-## 16. Future improvements (openly planned)
+## 16. Feature importance is sensitivity, not causality
+
+The Feature Diagnostics Lab's permutation importance measures how much one
+metric degrades when one feature column is shuffled on held-out samples —
+under one model, one metric, and the supplied data. It is not causal
+evidence, not a profitability signal, and not feature selection: correlated
+features can split or mask importance, native/coefficient references are
+training-data derived (labelled as such), drift classifications describe
+data changes rather than model failure, and the lab never deletes features,
+retrains user models, or recommends anything.
+
+## 17. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

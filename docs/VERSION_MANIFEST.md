@@ -13,17 +13,20 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.69.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
-expected tag on completion of the current phase's review is
-`v4.69.0-meta-labeling-calibration-threshold-lab-v1` — "expected" because
-tags are created by the user after review, never automatically.
+**`4.70.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
+expected tags on completion of the pending reviews are
+`v4.69.0-meta-labeling-calibration-threshold-lab-v1` (Phase 51, committed
+and awaiting its tag) and then
+`v4.70.0-feature-importance-stability-drift-lab-v1` (Phase 52) —
+"expected" because tags are created by the user after review, never
+automatically.
 
 ## 2. Release family
 
 The **v4.x productization / platformization series**: v4.0.0 (local-first
 research terminal) → v4.7.0 (showcase candidate) → v4.8+ (one milestone tag
 per feature phase). 115 local tags existed when this manifest was last
-updated (Phase 51.0); the latest verified tag is
+updated (Phase 52.0); the latest verified tag is
 `v4.68.0-purged-cv-cpcv-model-validation-v1` (the frozen
 release-candidate tag is
 `v4.60.0-public-release-candidate-demo-freeze-v1`).

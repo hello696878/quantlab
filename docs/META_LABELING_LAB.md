@@ -112,7 +112,11 @@ provenance/quality states, and a visible invalidation warning; recorded
 identity preserved. **Model Validation:** the OOF evidence link — method,
 leakage status, and configuration fingerprint displayed; leakage-failed runs
 cannot produce verified status; split fingerprints are never modified.
-Bidirectional navigation throughout.
+Bidirectional navigation throughout. **Feature Diagnostics** (Phase 52.0,
+[`FEATURE_DIAGNOSTICS_LAB.md`](FEATURE_DIAGNOSTICS_LAB.md)) may link a
+meta-label run for context when feature analysis targets meta-label
+predictions — the link displays this lab's OOF status, calibration method
+and result fingerprint exactly as recorded and never recomputes calibration.
 
 ## 16. Demo fixture
 

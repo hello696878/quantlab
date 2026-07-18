@@ -59,7 +59,8 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   fingerprints + comparison), Dataset Lineage (dataset versions, provenance,
   transformation lineage, quality checks), Model Validation Lab (purged CV,
   embargo, CPCV + leakage audit), Meta-Labeling Lab (calibration +
-  thresholds), Data Reliability Center, QA Command Center.
+  thresholds), Feature Diagnostics (importance, stability + drift),
+  Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -271,6 +272,13 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Feature Diagnostics (52.0)** — held-out permutation importance
+  (deterministic in-process estimators fitted per Model Validation split;
+  positive importance = held-out performance got worse), caveated
+  model-native and coefficient references, rank stability across folds,
+  correlated-feature groups, and feature distribution / importance drift
+  with documented PSI/KS thresholds. Importance is measured sensitivity —
+  never causality, profitability, or feature selection.
 - **Meta-Labeling Lab (51.0)** — a secondary meta-label layer: documented
   outcome-rule labeling, Platt/isotonic probability calibration fitted on
   training data only (out-of-fold via Model Validation splits), reliability

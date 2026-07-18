@@ -17,9 +17,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.69.0-dev";
+const VERSION_LABEL = "4.70.0-dev";
 const LATEST_VERIFIED_TAG = "v4.68.0-purged-cv-cpcv-model-validation-v1";
-const EXPECTED_NEXT_TAG = "v4.69.0-meta-labeling-calibration-threshold-lab-v1";
+const EXPECTED_NEXT_TAG = "v4.70.0-feature-importance-stability-drift-lab-v1";
 
 const RC_STATUS_CARDS: { title: string; status: string; tone: "ok" | "warn"; text: string }[] = [
   {

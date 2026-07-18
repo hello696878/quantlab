@@ -18,6 +18,31 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Feature Importance, Stability & Drift Diagnostics Lab v1** (v4.70
+  series): a local-first feature-diagnostics lab — held-out permutation
+  importance as the primary method (deterministic in-process estimators:
+  L2 logistic, closed-form ridge, bounded CART — no scikit-learn or SHAP
+  added, never pickle/joblib), fitted per linked Model Validation split on
+  train members only and evaluated on held-out test members
+  (leakage-clean runs required; membership mismatches and leakage-failed
+  links fail honestly), with declared splits recorded as declarations and
+  no-split runs disclosed as not held-out; direction-normalized importance
+  (positive = permuting worsened the held-out metric) with bounded
+  deterministic repeats and honest negative values; model-native impurity
+  and standardized-coefficient references with fixed caveats (drop-column
+  omitted, documented); rank stability (Spearman/Kendall, top-k overlap,
+  transparent score + thresholds); deterministic correlated-feature groups
+  (no automatic removal); distribution drift with explicit
+  reference/comparison sets, PSI (explicit bins, ε=1e-6) + KS + documented
+  configurable thresholds; importance drift with neutral wording;
+  target-leakage rejection; config/result/baseline fingerprints; six new
+  SQLite tables; scope-transactional held-out-only baselines; sample-free
+  JSON export; a 4-run deterministic demo; the **Feature Diagnostics**
+  view (importance bars with zero line + negative-in-color, stability
+  matrix, correlation groups, drift tables); 37 backend tests; a 15-test
+  Playwright spec; four docs. Importance is measured sensitivity — never
+  causality, profitability, or a recommendation.
+
 - **Meta-Labeling, Probability Calibration & Decision Threshold Lab v1**
   (v4.69 series): a local-first secondary-signal lab — meta-labels whether the
   primary side (−1/0/1; side 0 abstains, never a failed signal) was correct

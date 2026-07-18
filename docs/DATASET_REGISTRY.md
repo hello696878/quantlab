@@ -225,7 +225,17 @@ bind a `dataset_version_id`; the run detail shows the version's fingerprints,
 provenance, and quality states, warns visibly when the version was
 invalidated, and always preserves the recorded identity on historical runs.
 
-## 19. Limitations
+## 19. Feature Diagnostics links (Phase 52.0)
+
+Feature-diagnostics runs
+([`FEATURE_DIAGNOSTICS_LAB.md`](FEATURE_DIAGNOSTICS_LAB.md)) may bind a
+`dataset_version_id`; the run detail shows the version's fingerprints,
+provenance and quality states and warns visibly when the version was
+invalidated. Feature `source_column`s are checked against the version's
+schema snapshot — a missing column produces a recorded warning, never a
+fabricated mapping.
+
+## 20. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks

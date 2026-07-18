@@ -59,6 +59,23 @@ protected and why).
   invalidated-dataset warning render honestly, dark-theme controls and column
   geometry hold, and 1024/768 have no page overflow (list AND detail). Only
   writes: the idempotent demo seeds.
+- **Feature Diagnostics** (Phase 52.0, `feature-diagnostics.spec.ts`): the
+  lab opens with its held-out / non-causality disclaimer, the 4-run demo
+  seeds idempotently, method/integrity filters work, the verified held-out
+  permutation run shows its validation/dataset links, the importance chart
+  with honest negative values and its accessible full table, the
+  rank-stability matrix + pairwise correlations + transparent score formula,
+  the correlated pair group (with no deletion suggestion), distribution
+  drift (high for the drifting feature) and importance drift
+  (importance-drift-without-data-drift rendered honestly), the
+  leakage-failed link fails honestly, the flagship baseline star renders and
+  a not-held-out run's baseline attempt is rejected with a 409 (the one
+  deliberate non-2xx in the suite — asserted as the only failed request),
+  comparison stays neutral, the export JSON is path/credential/sample-free,
+  no "causal"/"best"/"recommended" wording, dark-theme controls and column
+  geometry hold, and 1024/768 have no page overflow (list AND detail). Only
+  writes: the idempotent demo seeds (plus that rejected baseline attempt,
+  which writes nothing).
 - **Dataset Lineage** (Phase 49.0, `dataset-lineage.spec.ts`): the view opens
   with its provenance disclaimer, the demo lineage seeds idempotently (re-seed
   duplicates nothing), filters narrow the table, a dataset detail shows
@@ -72,7 +89,8 @@ protected and why).
   *wording* on the QA/RC pages is a documented exception), no raw stack
   traces, no failed local `/api/*` requests (dev-mode StrictMode
   `ERR_ABORTED` duplicate-mount fetches are a documented, ignored exception —
-  each is followed by a 200).
+  each is followed by a 200; the feature-diagnostics baseline-rejection test
+  deliberately provokes exactly one 409 and asserts nothing else failed).
 
 ## 2. What it does NOT check
 

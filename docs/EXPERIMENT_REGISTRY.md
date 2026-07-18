@@ -265,7 +265,17 @@ records here (module `model_validation`, type = validation method, split/
 leakage metrics) — idempotently: a run creates at most one record, and
 re-execution reuses it.
 
-## 19. Future extensions
+## 19. Feature Diagnostics records (Phase 52.0)
+
+Executed feature-diagnostics runs
+([`FEATURE_DIAGNOSTICS_LAB.md`](FEATURE_DIAGNOSTICS_LAB.md)) can create
+experiment records here (module `feature_diagnostics`, type =
+`importance_<method>`, held-out integrity + top feature names as descriptive
+parameters, stability/drift summary metrics) — idempotently: a run creates
+at most one record and re-execution reuses it. No recommendation is ever
+recorded.
+
+## 20. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

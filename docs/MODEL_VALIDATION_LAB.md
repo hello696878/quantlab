@@ -207,6 +207,14 @@ out-of-fold evidence for probability calibration — fitting per split on train
 members and applying only to held-out test members. Split fingerprints are
 never modified by that use.
 
+The Feature Diagnostics Lab
+([`FEATURE_DIAGNOSTICS_LAB.md`](FEATURE_DIAGNOSTICS_LAB.md), Phase 52.0)
+consumes the same memberships for **verified held-out permutation
+importance**: its estimators fit per split on recorded train members and
+evaluate importance only on held-out test members, requiring a completed,
+leakage-clean run with all splits valid; membership mismatches fail honestly
+and split fingerprints are carried through unchanged.
+
 ## 21. Limitations
 
 Sample membership is stored as bounded JSON arrays (≤2000 samples/run —

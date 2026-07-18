@@ -36,6 +36,7 @@ export type View =
   | "datasetlineage"
   | "modelvalidation"
   | "metalabeling"
+  | "featurediagnostics"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

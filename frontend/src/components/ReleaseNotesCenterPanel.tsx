@@ -19,8 +19,8 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.69.0-dev";
-const EXPECTED_NEXT_TAG = "v4.69.0-meta-labeling-calibration-threshold-lab-v1";
+const VERSION_LABEL = "4.70.0-dev";
+const EXPECTED_NEXT_TAG = "v4.70.0-feature-importance-stability-drift-lab-v1";
 const LATEST_VERIFIED_TAG = "v4.68.0-purged-cv-cpcv-model-validation-v1";
 
 const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
@@ -32,7 +32,8 @@ const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
 ];
 
 const CHANGELOG_CARDS: { tag: string; title: string; text: string }[] = [
-  { tag: "v4.69 (next)", title: "Meta-labeling lab", text: "Outcome-rule meta-labels, Platt/isotonic calibration with out-of-fold integrity via validation splits, reliability curves (Brier/ECE), and neutral threshold trade-offs with user-saved policies. Never a recommendation." },
+  { tag: "v4.70 (next)", title: "Feature diagnostics lab", text: "Held-out permutation importance via validation-split memberships, caveated native/coefficient references, rank stability, correlated-feature groups, and PSI/KS distribution + importance drift. Sensitivity, never causality." },
+  { tag: "v4.69 (pending tag)", title: "Meta-labeling lab", text: "Outcome-rule meta-labels, Platt/isotonic calibration with out-of-fold integrity via validation splits, reliability curves (Brier/ECE), and neutral threshold trade-offs with user-saved policies. Never a recommendation." },
   { tag: "v4.68", title: "Model validation lab", text: "Purged K-fold, embargo, and CPCV over information intervals with a from-scratch leakage audit, temporal split timeline, neutral metrics, and registry links. Methodology only — no profitability claims." },
   { tag: "v4.67", title: "Dataset lineage", text: "Local-first dataset registry: immutable versions with schema/manifest fingerprints, privacy-safe locators, cycle-safe transformation lineage, quality checks, neutral schema drift, and experiment links. Integrity aids only." },
   { tag: "v4.66", title: "Experiment registry", text: "Local-first SQLite registry of reproducibility metadata: deterministic fingerprints, a conservative reproducibility check, baseline scope, neutral comparison, JSON export, and demo records. Integrity aids only." },

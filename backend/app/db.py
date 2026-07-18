@@ -522,6 +522,177 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_tp_baseline ON threshold_policies(is_baseline)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Feature Importance / Stability / Drift Diagnostics Lab (Phase 52.0).
+        # Samples, aggregate + split-level results, correlation groups and
+        # drift rows are normalized (bounded: ≤2000 samples, ≤32 features,
+        # ≤20 permutation repeats per run — docs/FEATURE_DIAGNOSTICS_LAB.md);
+        # stability summaries and split status lists live in bounded run JSON.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feature_runs (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                TEXT    NOT NULL,
+                updated_at                TEXT    NOT NULL,
+                name                      TEXT    NOT NULL,
+                description               TEXT    NOT NULL DEFAULT '',
+                status                    TEXT    NOT NULL DEFAULT 'pending',
+                method                    TEXT    NOT NULL,
+                model_type                TEXT    NOT NULL,
+                target_type               TEXT    NOT NULL,
+                metric                    TEXT    NOT NULL,
+                metric_direction          TEXT    NOT NULL,
+                split_source              TEXT    NOT NULL,
+                integrity_status          TEXT    NOT NULL DEFAULT 'unknown',
+                validation_run_id         INTEGER REFERENCES validation_runs(id),
+                dataset_version_id        INTEGER REFERENCES dataset_versions(id),
+                experiment_id             INTEGER REFERENCES experiment_registry(id),
+                meta_label_run_id         INTEGER REFERENCES meta_label_runs(id),
+                configuration_json        TEXT    NOT NULL DEFAULT '{}',
+                configuration_fingerprint TEXT    NOT NULL,
+                result_fingerprint        TEXT,
+                baseline_fingerprint      TEXT,
+                sample_count              INTEGER NOT NULL DEFAULT 0,
+                feature_count             INTEGER NOT NULL DEFAULT 0,
+                split_count               INTEGER NOT NULL DEFAULT 0,
+                valid_split_count         INTEGER NOT NULL DEFAULT 0,
+                invalid_split_count       INTEGER NOT NULL DEFAULT 0,
+                splits_json               TEXT    NOT NULL DEFAULT '[]',
+                stability_summary_json    TEXT    NOT NULL DEFAULT '{}',
+                importance_drift_json     TEXT    NOT NULL DEFAULT '{}',
+                references_json           TEXT    NOT NULL DEFAULT '{}',
+                drift_context_json        TEXT    NOT NULL DEFAULT '{}',
+                warnings_json             TEXT    NOT NULL DEFAULT '[]',
+                is_baseline               INTEGER NOT NULL DEFAULT 0,
+                baseline_scope            TEXT,
+                completed_at              TEXT,
+                duration_ms               INTEGER,
+                app_version               TEXT,
+                git_commit                TEXT,
+                notes                     TEXT    NOT NULL DEFAULT '',
+                error_message             TEXT,
+                demo_key                  TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feature_samples (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id        INTEGER NOT NULL REFERENCES feature_runs(id),
+                sample_id     TEXT    NOT NULL,
+                timestamp     TEXT    NOT NULL,
+                target        REAL    NOT NULL,
+                features_json TEXT    NOT NULL DEFAULT '{}',
+                UNIQUE (run_id, sample_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feature_results (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                  INTEGER NOT NULL REFERENCES feature_runs(id),
+                feature_name            TEXT    NOT NULL,
+                definition_json         TEXT    NOT NULL DEFAULT '{}',
+                rank                    REAL,
+                mean_importance         REAL,
+                median_importance       REAL,
+                std_importance          REAL,
+                min_importance          REAL,
+                max_importance          REAL,
+                quantile_json           TEXT,
+                mean_rank               REAL,
+                median_rank             REAL,
+                rank_std                REAL,
+                rank_range              REAL,
+                positive_split_fraction REAL,
+                negative_split_fraction REAL,
+                valid_split_count       INTEGER NOT NULL DEFAULT 0,
+                stability_score         REAL,
+                stability_classification TEXT   NOT NULL DEFAULT 'unknown',
+                sign_consistency        REAL,
+                sign_changed            INTEGER NOT NULL DEFAULT 0,
+                warning                 TEXT,
+                UNIQUE (run_id, feature_name)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feature_split_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL REFERENCES feature_runs(id),
+                split_id            TEXT    NOT NULL,
+                split_index         INTEGER NOT NULL,
+                feature_name        TEXT    NOT NULL,
+                baseline_score      REAL,
+                mean_importance     REAL,
+                median_importance   REAL,
+                std_importance      REAL,
+                min_importance      REAL,
+                max_importance      REAL,
+                positive_repeats    INTEGER NOT NULL DEFAULT 0,
+                negative_repeats    INTEGER NOT NULL DEFAULT 0,
+                valid_repeats       INTEGER NOT NULL DEFAULT 0,
+                permutation_repeats INTEGER NOT NULL DEFAULT 0,
+                rank                REAL,
+                status              TEXT    NOT NULL DEFAULT 'ok',
+                warning             TEXT,
+                UNIQUE (run_id, split_id, feature_name)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feature_correlation_groups (
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                   INTEGER NOT NULL REFERENCES feature_runs(id),
+                group_id                 TEXT    NOT NULL,
+                size                     INTEGER NOT NULL,
+                max_abs_correlation      REAL,
+                members_json             TEXT    NOT NULL DEFAULT '[]',
+                pairs_json               TEXT    NOT NULL DEFAULT '[]',
+                combined_mean_importance REAL,
+                UNIQUE (run_id, group_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS feature_drift_results (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id         INTEGER NOT NULL REFERENCES feature_runs(id),
+                feature_name   TEXT    NOT NULL,
+                kind           TEXT    NOT NULL,
+                classification TEXT    NOT NULL DEFAULT 'unknown',
+                psi            REAL,
+                ks_statistic   REAL,
+                detail_json    TEXT    NOT NULL DEFAULT '{}',
+                UNIQUE (run_id, feature_name, kind)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_fr_created ON feature_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_fr_status ON feature_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_fr_method ON feature_runs(method)",
+            "CREATE INDEX IF NOT EXISTS idx_fr_metric ON feature_runs(metric)",
+            "CREATE INDEX IF NOT EXISTS idx_fr_integrity ON feature_runs(integrity_status)",
+            "CREATE INDEX IF NOT EXISTS idx_fr_vrun ON feature_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fr_dataset ON feature_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fr_config_fp ON feature_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_fr_baseline ON feature_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_fr_scope ON feature_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_fr_demo_key ON feature_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_fs_run ON feature_samples(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fres_run ON feature_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fsr_run ON feature_split_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fcg_run ON feature_correlation_groups(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_run ON feature_drift_results(run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

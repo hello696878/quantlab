@@ -1677,6 +1677,49 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 52.0 — Feature Importance, Stability & Drift Diagnostics Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first feature-diagnostics lab —
+  **held-out permutation importance** as the primary method (deterministic
+  in-process numpy estimators: L2 logistic regression, closed-form ridge,
+  bounded deterministic CART; no scikit-learn/SHAP dependency added, no
+  pickle/joblib ever), fitted per linked Model Validation split on recorded
+  train members only and evaluated on held-out test members (leakage-clean
+  completed runs with all splits valid required; membership mismatch,
+  train/test overlap, and leakage-failed links all fail honestly), with
+  caller-**declared** splits recorded as declarations and no-split runs
+  disclosed as `not_held_out`; direction-normalized importance (positive =
+  permuting worsened the held-out metric; formula stored in configuration),
+  bounded deterministic repeats/seeds, negative importance kept honest;
+  model-native impurity and standardized-coefficient **references** with
+  fixed caveats (never the trusted method; drop-column omitted and
+  documented); rank stability across splits (average-tie ranks, pairwise
+  Spearman/Kendall + top-k overlap bounded at 12 splits, transparent
+  stability score `1−min(1, rank_std/((n−1)/2))` with documented
+  thresholds); deterministic correlated-feature groups (Pearson/Spearman,
+  validated threshold, constant features excluded with warnings, no
+  automatic removal); feature-distribution drift with explicit reference/
+  comparison sets (early-vs-late or first-vs-last-split), PSI over explicit
+  reference-anchored bins (ε=1e-6) + asymptotic KS + quantile/std/range
+  changes with documented configurable thresholds and small-sample
+  warnings; importance drift (earlier vs later split halves, neutral
+  wording only); target-leakage rejection (feature = exact affine transform
+  of target); config/result/baseline SHA-256 fingerprints; six idempotent
+  SQLite tables; scope-transactional baselines (verified/declared held-out
+  only — never selected automatically); /feature-diagnostics routes;
+  neutral per-feature comparison; sample-free JSON export; a 4-run
+  deterministic demo (stable dominant + correlated pair + unstable noise +
+  distribution drift, importance-drift-without-data-drift over declared
+  splits linked to the verified-OOF meta demo, native-tree reference,
+  honest leakage failure) cascading the other registries' idempotent
+  loaders; the **Feature Diagnostics** view (importance bars with zero
+  line/whiskers/negative-in-color + full table, rank-stability matrix,
+  correlation groups, drift tables with classification pills, caveated
+  references, dark ql-input controls); 37 backend tests + a 15-test
+  Playwright spec; three policy docs + a runbook. Honest scope: importance
+  is measured sensitivity — never causality, profitability, feature
+  selection, or a recommendation.
+
 ### Phase 51.0 — Meta-Labeling, Calibration & Threshold Lab v1 ✅
 
 - **Research-infrastructure phase:** a secondary meta-label layer over a
