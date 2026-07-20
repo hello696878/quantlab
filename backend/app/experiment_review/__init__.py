@@ -11,6 +11,7 @@ verbatim.  This layer performs no filesystem access, opens no database, and mint
 hashes; the collector, renderers, and CLI land in later commits.
 """
 
+from app.experiment_review.collect import collect_experiment_evidence_pack
 from app.experiment_review.models import (
     ArtifactInventoryEntry,
     CatalogRunContext,
@@ -63,4 +64,6 @@ __all__ = [
     "evidence_severity_at_least",
     "derive_run_completeness",
     "derive_pack_completeness",
+    # collector
+    "collect_experiment_evidence_pack",
 ]

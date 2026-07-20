@@ -46,6 +46,12 @@ from app.experiment_review import (
     thaw_json_value,
 )
 from app.experiment_review import models as models_module
+from app.experiment_review.models import (
+    EVIDENCE_REDACTED_PATH,
+    is_host_absolute_path,
+    redact_host_absolute_text,
+    safe_audit_finding_dict,
+)
 
 _BACKEND = Path(__file__).resolve().parents[1]
 _REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -606,3 +612,900 @@ def test_models_create_no_repo_artifacts():
     _pack()
     sort_and_number_evidence_findings((_ev_finding(),))
     assert _repo_snapshot() == before
+
+
+# --------------------------------------------------------------------------- #
+# collector fixtures (real ExperimentStore under tmp_path)
+# --------------------------------------------------------------------------- #
+
+import hashlib  # noqa: E402  (test-only, for the byte-identical read-only proof)
+from datetime import date  # noqa: E402
+
+import pandas as pd  # noqa: E402
+
+from app.experiment_audit import AuditLevel  # noqa: E402
+from app.experiment_review import collect as collect_module  # noqa: E402
+from app.experiment_review import collect_experiment_evidence_pack  # noqa: E402
+from app.experiments import ExperimentRun, ExperimentStore  # noqa: E402
+
+_ARTIFACTS = {
+    "metadata": "metadata.json",
+    "model_params": "model_params.json",
+    "metrics": "metrics.json",
+    "predictions": "predictions.csv",
+    "signal": "signal.csv",
+    "backtest": "backtest.csv",
+}
+
+
+def _run_kwargs(name: str, **overrides) -> dict:
+    base = dict(
+        train_run_hash=name,
+        continuous_config_hash=f"cch_{name}",
+        feature_config_hash=f"fch_{name}",
+        label_config_hash=f"lch_{name}",
+        dataset_config_hash="dch_shared",
+        model_config_hash=f"mch_{name}",
+        model_type="ridge_regression",
+        task_type="regression",
+        feature_columns=("feature__return_20",),
+        label_column="label__forward_return_1",
+        train_start=date(2024, 4, 1),
+        train_end=date(2024, 6, 5),
+        validation_start=date(2024, 6, 6),
+        validation_end=date(2024, 9, 15),
+        metrics={"mse": 0.1},
+        backtest_metrics={"sharpe": 1.0, "total_return": 0.2},
+        baseline_metrics={"no_trade": {"sharpe": 0.0}},
+        created_at="2026-07-18T00:00:00+00:00",
+        artifact_paths=dict(_ARTIFACTS),
+    )
+    base.update(overrides)
+    return base
+
+
+def _write_run(store: ExperimentStore, name: str, **overrides) -> None:
+    store.write_metadata(ExperimentRun(**_run_kwargs(name, **overrides)))
+    store.write_model_params(name, {"a": 1})
+    store.write_metrics(name, {"m": 1.0})
+    df = pd.DataFrame({"x": [1, 2, 3]})
+    for frame in ("predictions", "signal", "backtest"):
+        store.write_frame(name, frame, df)
+
+
+def _store(tmp_path, names=("run_a", "run_b"), **overrides) -> ExperimentStore:
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    for name in names:
+        _write_run(store, name, **overrides)
+    return store
+
+
+def _snapshot(base: Path) -> dict:
+    out = {}
+    for p in sorted(base.rglob("*")):
+        rel = str(p.relative_to(base)).replace("\\", "/")
+        out[rel] = "DIR" if p.is_dir() else hashlib.sha256(p.read_bytes()).hexdigest()
+    return out
+
+
+def _codes(pack) -> set:
+    return {f.code.value for f in pack.findings}
+
+
+def _run_of(pack, hash_):
+    return next(r for r in pack.runs if r.train_run_hash == hash_)
+
+
+# --------------------------------------------------------------------------- #
+# selection
+# --------------------------------------------------------------------------- #
+
+
+def test_collect_rejects_empty_selection(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    with pytest.raises(EvidenceError):
+        collect_experiment_evidence_pack(store, [])
+
+
+def test_collect_dedupes_and_preserves_order(tmp_path):
+    store = _store(tmp_path, ("run_a", "run_b"))
+    pack = collect_experiment_evidence_pack(store, ["run_b", "run_a", "run_b"])
+    assert pack.selected_run_hashes == ("run_b", "run_a")
+    assert [r.train_run_hash for r in pack.runs] == ["run_b", "run_a"]  # not sorted
+
+
+def test_collect_rejects_invalid_audit_level(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    with pytest.raises(EvidenceError):
+        collect_experiment_evidence_pack(store, ["run_a"], audit_level="bogus")
+
+
+# --------------------------------------------------------------------------- #
+# single clean run
+# --------------------------------------------------------------------------- #
+
+
+def test_collect_single_clean_run(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    pack = collect_experiment_evidence_pack(store, ["run_a"])
+    run = pack.runs[0]
+    assert run.load_status == EvidenceLoadStatus.LOADED
+    assert run.completeness == EvidenceCompleteness.COMPLETE
+    assert run.audit_status == "valid"
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.COMPLETE
+    # single run -> comparison not applicable, and no comparison finding
+    assert pack.comparison.status == EvidenceComparisonStatus.NOT_APPLICABLE
+    assert pack.comparison.rows == () and pack.comparison.unavailable_reason is None
+    assert "COMPARISON_UNAVAILABLE" not in _codes(pack)
+    # neutral registry / lineage context
+    assert pack.registry_context_status == EvidenceContextStatus.NOT_COLLECTED
+    assert pack.dataset_lineage_context_status == EvidenceContextStatus.NOT_COLLECTED
+
+
+def test_collect_metadata_and_hash_chain_exact(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    assert run.created_at == "2026-07-18T00:00:00+00:00"
+    assert (run.train_start, run.validation_end) == ("2024-04-01", "2024-09-15")
+    assert run.feature_columns == ("feature__return_20",)
+    assert run.label_column == "label__forward_return_1"
+    assert run.model_type == "ridge_regression" and run.task_type == "regression"
+    chain = thaw_json_value(run.hash_chain)
+    assert chain == {
+        "train_run_hash": "run_a", "continuous_config_hash": "cch_run_a",
+        "feature_config_hash": "fch_run_a", "label_config_hash": "lch_run_a",
+        "dataset_config_hash": "dch_shared", "model_config_hash": "mch_run_a",
+    }
+
+
+def test_collect_merged_metrics_and_separate_baselines(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    metrics = thaw_json_value(run.metrics)
+    assert metrics["mse"] == 0.1                      # task metric preserved
+    assert metrics["sharpe"] == 1.0                   # backtest metric merged in
+    assert thaw_json_value(run.baseline_metrics) == {"no_trade": {"sharpe": 0.0}}  # separate
+
+
+def test_collect_invents_no_provenance(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    d = collect_experiment_evidence_pack(store, ["run_a"]).runs[0].to_dict()
+    for absent in ("root_symbol", "source", "raw_data_version_hash"):
+        assert absent not in d
+
+
+# --------------------------------------------------------------------------- #
+# missing / unloadable runs
+# --------------------------------------------------------------------------- #
+
+
+def test_collect_missing_run(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    pack = collect_experiment_evidence_pack(store, ["ghost"])
+    run = pack.runs[0]
+    assert run.load_status == EvidenceLoadStatus.UNAVAILABLE
+    assert run.completeness == EvidenceCompleteness.UNAVAILABLE
+    assert run.audit_status == "unavailable"
+    assert run.metrics is None and run.artifact_inventory == ()
+    assert "RUN_NOT_FOUND" in _codes(pack)
+    assert "run_not_found" in run.missing_evidence
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.UNAVAILABLE
+
+
+def test_collect_missing_plus_valid_is_incomplete(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    pack = collect_experiment_evidence_pack(store, ["run_a", "ghost"])
+    assert _run_of(pack, "run_a").completeness == EvidenceCompleteness.COMPLETE
+    assert _run_of(pack, "ghost").completeness == EvidenceCompleteness.UNAVAILABLE
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.INCOMPLETE
+    # comparison not attempted with a missing hash
+    assert pack.comparison.status == EvidenceComparisonStatus.UNAVAILABLE
+    assert "COMPARISON_UNAVAILABLE" in _codes(pack)
+
+
+def test_collect_all_missing_is_unavailable(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    pack = collect_experiment_evidence_pack(store, ["ghost1", "ghost2"])
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.UNAVAILABLE
+
+
+def test_collect_malformed_run_does_not_abort_valid_run(tmp_path):
+    store = _store(tmp_path, ("run_a", "run_bad"))
+    (store.base_dir / "run_bad" / "metadata.json").write_text("{ not json", encoding="utf-8")
+    pack = collect_experiment_evidence_pack(store, ["run_bad", "run_a"])
+    bad, good = _run_of(pack, "run_bad"), _run_of(pack, "run_a")
+    assert bad.load_status == EvidenceLoadStatus.UNLOADABLE
+    assert bad.completeness == EvidenceCompleteness.UNAVAILABLE
+    assert bad.metrics is None  # no invented metadata
+    assert "RUN_UNLOADABLE" in _codes(pack) and "run_unloadable" in bad.missing_evidence
+    # the valid run still produced full evidence
+    assert good.load_status == EvidenceLoadStatus.LOADED and good.metrics is not None
+    # Phase 13 still audited the malformed run and its findings are preserved
+    assert any(f.code.value == "MALFORMED_METADATA_JSON" for f in bad.audit_findings)
+    assert bad.audit_status == "invalid"
+
+
+def test_collect_preserves_phase13_finding_ids(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "extra.json").write_text("{}", encoding="utf-8")  # orphan -> warning
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    assert run.audit_findings, "expected Phase 13 findings"
+    for f in run.audit_findings:
+        assert f.finding_id.startswith("finding_")  # never renumbered to evidence_*
+
+
+# --------------------------------------------------------------------------- #
+# audit-driven completeness
+# --------------------------------------------------------------------------- #
+
+
+def test_collect_warning_only_run(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "extra.json").write_text("{}", encoding="utf-8")  # ORPHAN warning
+    pack = collect_experiment_evidence_pack(store, ["run_a"])
+    assert pack.runs[0].completeness == EvidenceCompleteness.WARNING
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.WARNING
+
+
+def test_collect_error_run_is_incomplete(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "predictions.csv").unlink()  # MISSING_REFERENCED_ARTIFACT
+    pack = collect_experiment_evidence_pack(store, ["run_a"])
+    run = pack.runs[0]
+    assert run.completeness == EvidenceCompleteness.INCOMPLETE
+    assert "required_artifact_missing" in run.missing_evidence
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.INCOMPLETE
+
+
+def test_collect_critical_run_is_incomplete(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    path = store.base_dir / "run_a" / "metadata.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["artifact_paths"]["predictions"] = "../evil.csv"  # PATH_TRAVERSAL (critical)
+    path.write_text(json.dumps(data), encoding="utf-8")
+    pack = collect_experiment_evidence_pack(store, ["run_a"])
+    # schema rejects the unsafe path -> unloadable, but Phase 13 evidence is kept
+    run = pack.runs[0]
+    assert any(f.code.value == "PATH_TRAVERSAL" for f in run.audit_findings)
+    assert run.completeness == EvidenceCompleteness.UNAVAILABLE
+    assert not (tmp_path / "evil.csv").exists()  # never followed
+
+
+# --------------------------------------------------------------------------- #
+# artifact inventory
+# --------------------------------------------------------------------------- #
+
+
+def test_inventory_standard_all_canonical_present(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    names = [a.artifact_name for a in run.artifact_inventory]
+    assert names == sorted(names)  # deterministic ordering
+    assert set(names) == set(_ARTIFACTS)
+    for entry in run.artifact_inventory:
+        assert entry.exists is True and entry.regular_file is True
+        assert entry.relative_path == _ARTIFACTS[entry.artifact_name]
+        assert entry.format in {"json", "csv"}
+
+
+def test_inventory_metadata_only_is_tristate_none(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    run = collect_experiment_evidence_pack(
+        store, ["run_a"], audit_level=AuditLevel.METADATA_ONLY
+    ).runs[0]
+    for entry in run.artifact_inventory:
+        assert entry.exists is None and entry.regular_file is None
+
+
+def test_inventory_missing_referenced_artifact(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "predictions.csv").unlink()
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    entry = next(a for a in run.artifact_inventory if a.artifact_name == "predictions")
+    assert entry.exists is False and entry.regular_file is False
+    assert "MISSING_REFERENCED_ARTIFACT" in entry.audit_finding_codes
+
+
+def test_inventory_artifact_not_a_file(tmp_path):
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a", artifact_paths=dict(_ARTIFACTS, predictions="pred_dir"))
+    (store.base_dir / "run_a" / "predictions.csv").unlink()
+    (store.base_dir / "run_a" / "pred_dir").mkdir()
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    entry = next(a for a in run.artifact_inventory if a.artifact_name == "predictions")
+    assert entry.exists is True and entry.regular_file is False
+    assert "ARTIFACT_NOT_A_FILE" in entry.audit_finding_codes
+
+
+def test_inventory_orphan_entry_from_phase13(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "extra.json").write_text("{}", encoding="utf-8")
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    orphan = next(a for a in run.artifact_inventory if a.artifact_name.startswith("orphan:"))
+    assert orphan.relative_path == "extra.json"
+    assert orphan.exists is True and orphan.regular_file is None  # presence only
+    assert orphan.audit_finding_codes == ("ORPHAN_ARTIFACT",)
+
+
+def test_inventory_never_contains_absolute_or_unsafe_paths(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    for entry in run.artifact_inventory:
+        assert entry.relative_path is None or not entry.relative_path.startswith(("/", "\\"))
+        assert entry.relative_path is None or ":" not in entry.relative_path
+
+
+# --------------------------------------------------------------------------- #
+# catalog context
+# --------------------------------------------------------------------------- #
+
+
+def test_catalog_context_collected(tmp_path):
+    store = _store(tmp_path, ("run_a", "run_b"))
+    pack = collect_experiment_evidence_pack(store, ["run_a", "run_b"])
+    assert pack.catalog_context_status == EvidenceContextStatus.COLLECTED
+    ctx = _run_of(pack, "run_a").catalog_context
+    assert ctx.status == EvidenceContextStatus.COLLECTED
+    assert ctx.compatibility_group == "group_0000"  # deterministic Phase 12 label
+    assert ctx.group_size == 2
+    assert ctx.peer_train_run_hashes == ("run_a", "run_b")  # sorted, includes self
+    assert ctx.requested_metric is None and ctx.rank is None  # no implicit ranking
+
+
+def test_catalog_single_pass_only(tmp_path, monkeypatch):
+    store = _store(tmp_path, ("run_a", "run_b", "run_c"))
+    calls = {"n": 0}
+    original = collect_module.build_experiment_catalog
+
+    def counting(*args, **kwargs):
+        calls["n"] += 1
+        return original(*args, **kwargs)
+
+    monkeypatch.setattr(collect_module, "build_experiment_catalog", counting)
+    collect_experiment_evidence_pack(store, ["run_a", "run_b", "run_c"])
+    assert calls["n"] == 1  # one store-level pass, not one per run
+
+
+def test_catalog_disabled_is_neutral(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    pack = collect_experiment_evidence_pack(store, ["run_a"], include_catalog_context=False)
+    assert pack.catalog_context_status == EvidenceContextStatus.NOT_COLLECTED
+    assert pack.runs[0].catalog_context.status == EvidenceContextStatus.NOT_COLLECTED
+    assert "CATALOG_CONTEXT_UNAVAILABLE" not in _codes(pack)
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.COMPLETE  # no downgrade
+
+
+def test_catalog_unavailable_from_unrelated_malformed_entry(tmp_path):
+    store = _store(tmp_path, ("run_a", "run_bad"))
+    (store.base_dir / "run_bad" / "metadata.json").write_text("{ not json", encoding="utf-8")
+    pack = collect_experiment_evidence_pack(store, ["run_a"])  # run_bad NOT selected
+    assert pack.catalog_context_status == EvidenceContextStatus.UNAVAILABLE
+    assert "CATALOG_CONTEXT_UNAVAILABLE" in _codes(pack)
+    run = _run_of(pack, "run_a")
+    # selected-run evidence survives the catalog failure
+    assert run.load_status == EvidenceLoadStatus.LOADED and run.metrics is not None
+    assert run.catalog_context.status == EvidenceContextStatus.UNAVAILABLE
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.WARNING  # not incomplete
+
+
+def test_catalog_run_absent_from_successful_catalog(tmp_path, monkeypatch):
+    store = _store(tmp_path, ("run_a", "run_b"))
+    original = collect_module.build_experiment_catalog
+    monkeypatch.setattr(
+        collect_module, "build_experiment_catalog",
+        lambda *a, **k: tuple(r for r in original(*a, **k) if r.train_run_hash != "run_a"),
+    )
+    pack = collect_experiment_evidence_pack(store, ["run_a"])
+    run = pack.runs[0]
+    assert run.catalog_context.status == EvidenceContextStatus.UNAVAILABLE
+    assert "CATALOG_CONTEXT_UNAVAILABLE" in _codes(pack)
+    # optional context, so it is never listed as missing *required* run evidence...
+    assert run.missing_evidence == ()
+    # ...and a run whose own evidence is intact stays complete, while the pack warns
+    assert run.completeness == EvidenceCompleteness.COMPLETE
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.WARNING
+
+
+# --------------------------------------------------------------------------- #
+# explicit metric + ranking
+# --------------------------------------------------------------------------- #
+
+
+def test_metric_rank_maximize_and_minimize(tmp_path):
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a", backtest_metrics={"sharpe": 2.0})
+    _write_run(store, "run_b", backtest_metrics={"sharpe": 1.0})
+    top = collect_experiment_evidence_pack(store, ["run_a", "run_b"], metric="sharpe")
+    assert _run_of(top, "run_a").catalog_context.rank == 1
+    assert _run_of(top, "run_b").catalog_context.rank == 2
+    assert _run_of(top, "run_a").catalog_context.requested_metric_value == 2.0
+    low = collect_experiment_evidence_pack(store, ["run_a", "run_b"], metric="sharpe", maximize=False)
+    assert _run_of(low, "run_a").catalog_context.rank == 2
+    assert _run_of(low, "run_b").catalog_context.rank == 1
+    # selected order is unaffected by rank
+    assert low.selected_run_hashes == ("run_a", "run_b")
+
+
+def test_metric_missing_makes_incomplete(tmp_path):
+    store = _store(tmp_path, ("run_a", "run_b"))  # no "information_coefficient" persisted
+    pack = collect_experiment_evidence_pack(store, ["run_a"], metric="information_coefficient")
+    run = pack.runs[0]
+    assert run.completeness == EvidenceCompleteness.INCOMPLETE
+    assert run.catalog_context.requested_metric == "information_coefficient"
+    assert run.catalog_context.requested_metric_value is None and run.catalog_context.rank is None
+    assert "REQUESTED_METRIC_MISSING" in _codes(pack)
+    assert "requested_metric_missing" in run.missing_evidence
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.INCOMPLETE
+
+
+def test_no_metric_means_no_ranking_and_no_finding(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    pack = collect_experiment_evidence_pack(store, ["run_a"])
+    ctx = pack.runs[0].catalog_context
+    assert ctx.requested_metric is None and ctx.requested_metric_value is None and ctx.rank is None
+    assert "REQUESTED_METRIC_MISSING" not in _codes(pack)
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.COMPLETE
+
+
+# --------------------------------------------------------------------------- #
+# Phase 10 comparison
+# --------------------------------------------------------------------------- #
+
+
+def test_comparison_available_for_compatible_runs(tmp_path):
+    store = _store(tmp_path, ("run_a", "run_b"))
+    pack = collect_experiment_evidence_pack(store, ["run_a", "run_b"])
+    comp = pack.comparison
+    assert comp.status == EvidenceComparisonStatus.AVAILABLE
+    rows = comp.to_dict()["rows"]
+    assert [r["train_run_hash"] for r in rows] == ["run_a", "run_b"]  # Phase 10 order preserved
+    assert comp.disclaimers  # Phase 10 disclaimers retained
+    assert "COMPARISON_UNAVAILABLE" not in _codes(pack)
+    assert "best" not in comp.to_dict() and "winner" not in comp.to_dict()
+
+
+def test_comparison_incompatible_runs_is_warning(tmp_path):
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a")
+    _write_run(store, "run_b", validation_end=date(2024, 9, 30))  # different OOS window
+    pack = collect_experiment_evidence_pack(store, ["run_a", "run_b"])
+    assert pack.comparison.status == EvidenceComparisonStatus.UNAVAILABLE
+    assert pack.comparison.unavailable_reason
+    assert {"INCOMPATIBLE_SELECTED_RUNS", "COMPARISON_UNAVAILABLE"} <= _codes(pack)
+    # per-run evidence intact; incompatibility is a selection warning, not incomplete
+    assert all(r.load_status == EvidenceLoadStatus.LOADED for r in pack.runs)
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.WARNING
+
+
+def test_comparison_guard_not_bypassed(tmp_path, monkeypatch):
+    store = _store(tmp_path, ("run_a", "run_b"))
+    seen = {}
+
+    original = collect_module.compare_experiment_runs
+
+    def spy(hashes, **kwargs):
+        seen.update(kwargs)
+        return original(hashes, **kwargs)
+
+    monkeypatch.setattr(collect_module, "compare_experiment_runs", spy)
+    collect_experiment_evidence_pack(store, ["run_a", "run_b"])
+    assert seen.get("allow_different_windows") in (None, False)  # never bypassed
+
+
+# --------------------------------------------------------------------------- #
+# findings, summary, determinism
+# --------------------------------------------------------------------------- #
+
+
+def test_findings_use_evidence_namespace_and_are_disjoint(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "extra.json").write_text("{}", encoding="utf-8")
+    pack = collect_experiment_evidence_pack(store, ["run_a", "ghost"])
+    pack_ids = {f.finding_id for f in pack.findings}
+    assert pack_ids and all(i.startswith("evidence_") for i in pack_ids)
+    audit_ids = {f.finding_id for r in pack.runs for f in r.audit_findings}
+    assert all(i.startswith("finding_") for i in audit_ids)
+    assert pack_ids.isdisjoint(audit_ids)
+
+
+def test_summary_counts_match_runs_and_findings(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    pack = collect_experiment_evidence_pack(store, ["run_a", "ghost"])
+    s = pack.evidence_summary
+    assert s.selected_runs_total == 2
+    assert s.runs_complete + s.runs_with_warnings + s.runs_incomplete + s.runs_unavailable == 2
+    assert s.phase14_findings_total == len(pack.findings)
+    assert s.phase13_findings_total == sum(len(r.audit_findings) for r in pack.runs)
+
+
+def test_collect_deterministic_and_strict_json(tmp_path):
+    store = _store(tmp_path, ("run_a", "run_b"))
+    a = collect_experiment_evidence_pack(store, ["run_a", "run_b"], metric="sharpe")
+    b = collect_experiment_evidence_pack(store, ["run_a", "run_b"], metric="sharpe")
+    assert a.to_dict() == b.to_dict()
+    text = json.dumps(a.to_dict(), allow_nan=False, sort_keys=True)
+    assert "NaN" not in text and "Infinity" not in text
+
+
+def test_collect_no_absolute_path_leakage_anywhere_in_serialization(tmp_path):
+    """The COMPLETE pack serialization carries no host-absolute path — including
+    Phase 13 finding fields, which are preserved verbatim in memory but projected
+    through the evidence-safe serialization."""
+    store = _store(tmp_path, ("run_a", "run_bad"))
+    (store.base_dir / "run_bad" / "metadata.json").write_text("{ not json", encoding="utf-8")
+    path = store.base_dir / "run_a" / "metadata.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["artifact_paths"]["predictions"] = "C:\\secret\\predictions.csv"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    pack = collect_experiment_evidence_pack(store, ["run_a", "run_bad", "ghost"])
+    text = json.dumps(pack.to_dict(), allow_nan=False, sort_keys=True)  # nothing popped
+    assert tmp_path.name not in text
+    assert "C:\\secret" not in text and "C:\\\\secret" not in text
+    assert "secret" not in text
+    assert ":\\" not in text and ":/" not in text
+    assert EVIDENCE_REDACTED_PATH in text
+
+
+# --------------------------------------------------------------------------- #
+# evidence-safe serialization of Phase 13 findings
+# --------------------------------------------------------------------------- #
+
+_HOST_ABSOLUTE = [
+    "C:\\secret\\x.csv",
+    "C:/secret/x.csv",
+    "/tmp/secret.csv",
+    "\\\\server\\share\\secret.csv",
+    "//server/share/secret.csv",
+    "\\secret\\x.csv",
+]
+_STORE_RELATIVE = ["predictions.csv", "nested/frame.csv", "../evil.csv", "a\\b.csv"]
+
+
+@pytest.mark.parametrize("value", _HOST_ABSOLUTE)
+def test_host_absolute_values_are_redacted(value):
+    assert is_host_absolute_path(value)
+    assert redact_host_absolute_text(value) == EVIDENCE_REDACTED_PATH
+
+
+@pytest.mark.parametrize("value", _STORE_RELATIVE)
+def test_store_relative_values_are_never_redacted(value):
+    """Traversal is unsafe for filesystem access but is not a host-path leak, so it
+    stays as factual declared evidence."""
+    assert not is_host_absolute_path(value)
+    assert redact_host_absolute_text(value) == value
+
+
+@pytest.mark.parametrize("value", _HOST_ABSOLUTE)
+def test_host_absolute_paths_embedded_in_messages_are_neutralized(value):
+    out = redact_host_absolute_text(f"artifact {value} could not be read")
+    assert EVIDENCE_REDACTED_PATH in out
+    assert "secret" not in out
+    assert out.startswith("artifact ") and out.endswith(" could not be read")
+
+
+def test_redaction_marker_is_stable_and_adds_no_metadata():
+    a = redact_host_absolute_text("/tmp/secret.csv")
+    b = redact_host_absolute_text("/tmp/other.csv")
+    assert a == b == EVIDENCE_REDACTED_PATH  # identical marker every time
+    assert "20" not in EVIDENCE_REDACTED_PATH  # no timestamp / host metadata
+
+
+def test_safe_projection_preserves_phase13_identity_and_field_order():
+    finding = AuditFinding(
+        finding_id="finding_0007",
+        severity=AuditSeverity.CRITICAL,
+        code=AuditCode.ABSOLUTE_ARTIFACT_PATH,
+        message="artifact 'predictions' declares C:\\secret\\x.csv",
+        train_run_hash="run_a",
+        run_directory="run_a",
+        artifact_name="predictions",
+        relative_path="predictions.csv",
+        expected="/tmp/expected.csv",
+        actual="C:\\secret\\x.csv",
+    )
+    raw, safe = finding.to_dict(), safe_audit_finding_dict(finding)
+    assert list(safe) == list(raw)  # identical deterministic field ordering
+    assert safe["finding_id"] == "finding_0007"
+    assert safe["severity"] == raw["severity"] and safe["code"] == raw["code"]
+    assert safe["train_run_hash"] == "run_a" and safe["run_directory"] == "run_a"
+    assert safe["artifact_name"] == "predictions"
+    assert safe["relative_path"] == "predictions.csv"  # safe evidence untouched
+    assert safe["actual"] == EVIDENCE_REDACTED_PATH
+    assert safe["expected"] == EVIDENCE_REDACTED_PATH
+    assert "secret" not in safe["message"] and EVIDENCE_REDACTED_PATH in safe["message"]
+    # the source object is untouched
+    assert finding.actual == "C:\\secret\\x.csv"
+    assert finding.expected == "/tmp/expected.csv"
+    assert finding.to_dict() == raw
+
+
+def test_phase13_findings_unchanged_in_memory_after_pack_serialization(tmp_path):
+    """Serialization is a projection, not a mutation: the original public Phase 13
+    objects keep their ids, codes, severities and raw values."""
+    store = _store(tmp_path, ("run_a",))
+    path = store.base_dir / "run_a" / "metadata.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["artifact_paths"]["predictions"] = "C:\\secret\\predictions.csv"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    pack = collect_experiment_evidence_pack(store, ["run_a"])
+    findings = pack.runs[0].audit_findings
+    assert findings, "expected Phase 13 findings"
+    before = [dataclasses.astuple(f) for f in findings]
+    pack.to_dict()
+    pack.to_dict()
+    assert [dataclasses.astuple(f) for f in findings] == before  # value-equal
+    assert all(f.finding_id.startswith("finding_") for f in findings)
+    # the raw declared host path is still present on the in-memory object
+    assert any(f.actual and "C:\\secret" in f.actual for f in findings)
+    # ...but never in the serialization
+    assert "C:\\secret" not in json.dumps(pack.to_dict(), allow_nan=False)
+
+
+def test_redacted_serialization_is_deterministic_and_strict_json(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    path = store.base_dir / "run_a" / "metadata.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["artifact_paths"]["predictions"] = "\\\\server\\share\\predictions.csv"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    pack = collect_experiment_evidence_pack(store, ["run_a"])
+    first = json.dumps(pack.to_dict(), allow_nan=False, sort_keys=True)
+    second = json.dumps(pack.to_dict(), allow_nan=False, sort_keys=True)
+    assert first == second
+    assert "server" not in first and EVIDENCE_REDACTED_PATH in first
+
+
+def test_namespaces_stay_disjoint_after_redaction(tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    path = store.base_dir / "run_a" / "metadata.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["artifact_paths"]["predictions"] = "/tmp/secret.csv"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    d = collect_experiment_evidence_pack(store, ["run_a"]).to_dict()
+    audit_ids = {f["finding_id"] for r in d["runs"] for f in r["audit_findings"]}
+    pack_ids = {f["finding_id"] for f in d["findings"]}
+    assert all(i.startswith("finding_") for i in audit_ids)
+    assert all(i.startswith("evidence_") for i in pack_ids)
+    assert audit_ids.isdisjoint(pack_ids)
+
+
+def test_redaction_needs_no_renderer(tmp_path):
+    """The safety property holds at the model layer — no renderer or CLI exists yet."""
+    assert not (_BACKEND / "app" / "experiment_review" / "render.py").exists()
+    store = _store(tmp_path, ("run_a",))
+    path = store.base_dir / "run_a" / "metadata.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["artifact_paths"]["predictions"] = "C:/secret/x.csv"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    assert "secret" not in json.dumps(run.to_dict(), allow_nan=False)
+
+
+# --------------------------------------------------------------------------- #
+# regressions found by adversarial review
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("unsafe", ["../evil", "C:/evil", "/evil", "a/b", "..\\evil"])
+def test_unsafe_hash_does_not_abort_the_pack(tmp_path, unsafe):
+    """One unsafe selection entry must not destroy every other run's evidence."""
+    store = _store(tmp_path, ("run_a",))
+    pack = collect_experiment_evidence_pack(store, ["run_a", unsafe])
+    assert _run_of(pack, "run_a").completeness == EvidenceCompleteness.COMPLETE
+    bad = _run_of(pack, unsafe)
+    assert bad.load_status == EvidenceLoadStatus.UNAVAILABLE
+    assert bad.run_directory is None  # unsafe value never enters a path field
+    assert "RUN_NOT_FOUND" in _codes(pack)
+    json.dumps(pack.to_dict(), allow_nan=False, sort_keys=True)  # still serializable
+
+
+def test_catalog_failure_does_not_fabricate_missing_metric(tmp_path):
+    """A store-level catalog failure is not evidence that a run lacks the metric."""
+    store = _store(tmp_path, ("run_a", "run_bad"))
+    (store.base_dir / "run_bad" / "metadata.json").write_text("{ not json", encoding="utf-8")
+    pack = collect_experiment_evidence_pack(store, ["run_a"], metric="sharpe")
+    run = pack.runs[0]
+    assert pack.catalog_context_status == EvidenceContextStatus.UNAVAILABLE
+    # run_a really does persist sharpe, so claiming otherwise would contradict the pack
+    assert thaw_json_value(run.metrics)["sharpe"] == 1.0
+    assert "REQUESTED_METRIC_MISSING" not in _codes(pack)
+    assert "requested_metric_missing" not in run.missing_evidence
+    assert run.completeness == EvidenceCompleteness.COMPLETE
+    # degraded to a warning, matching the metric=None behaviour for the same store
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.WARNING
+    assert "CATALOG_CONTEXT_UNAVAILABLE" in _codes(pack)
+
+
+def test_catalog_failure_is_warning_regardless_of_metric(tmp_path):
+    store = _store(tmp_path, ("run_a", "run_bad"))
+    (store.base_dir / "run_bad" / "metadata.json").write_text("{ not json", encoding="utf-8")
+    without = collect_experiment_evidence_pack(store, ["run_a"])
+    with_metric = collect_experiment_evidence_pack(store, ["run_a"], metric="sharpe")
+    assert without.evidence_summary.completeness == with_metric.evidence_summary.completeness
+
+
+@pytest.mark.parametrize("bad_metric", ["", "   ", 123, 1.5, ["sharpe"], {"m": 1}])
+def test_invalid_metric_argument_is_rejected_cleanly(tmp_path, bad_metric):
+    """An unusable metric argument fails fast as EvidenceError — never as an
+    AttributeError/TypeError escaping from a Phase 12 internal."""
+    store = _store(tmp_path, ("run_a", "run_b"))
+    with pytest.raises(EvidenceError):
+        collect_experiment_evidence_pack(store, ["run_a"], metric=bad_metric)
+
+
+def test_metric_without_catalog_context_is_rejected(tmp_path):
+    """A metric request cannot be silently dropped when ranking evidence is disabled."""
+    store = _store(tmp_path, ("run_a",))
+    with pytest.raises(EvidenceError):
+        collect_experiment_evidence_pack(
+            store, ["run_a"], metric="sharpe", include_catalog_context=False
+        )
+
+
+def test_comparison_preserved_when_only_training_window_differs(tmp_path):
+    """Phase 12 groups on the *training* window too, so it is strictly narrower than
+    the Phase 10 guard.  Compatibility must be decided by Phase 10 alone."""
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a", train_start=date(2024, 4, 1))
+    _write_run(store, "run_b", train_start=date(2024, 5, 1))  # same OOS window/label/dataset
+    groups = {
+        _run_of(collect_experiment_evidence_pack(store, ["run_a", "run_b"]), h)
+        .catalog_context.compatibility_group
+        for h in ("run_a", "run_b")
+    }
+    assert len(groups) == 2, "fixture must span two Phase 12 groups to be meaningful"
+    pack = collect_experiment_evidence_pack(store, ["run_a", "run_b"])
+    assert pack.comparison.status == EvidenceComparisonStatus.AVAILABLE
+    assert "INCOMPATIBLE_SELECTED_RUNS" not in _codes(pack)
+    assert pack.evidence_summary.completeness == EvidenceCompleteness.COMPLETE
+
+
+def test_missing_artifact_is_not_reported_as_incompatibility(tmp_path):
+    """Two window-compatible runs stay compatible even if one has a missing artifact —
+    the pack must not contradict its own MISSING_REFERENCED_ARTIFACT evidence."""
+    store = _store(tmp_path, ("run_a", "run_b"))  # identical OOS window / label / dataset
+    (store.base_dir / "run_a" / "predictions.csv").unlink()
+    pack = collect_experiment_evidence_pack(store, ["run_a", "run_b"])
+    assert "required_artifact_missing" in _run_of(pack, "run_a").missing_evidence
+    assert "INCOMPATIBLE_SELECTED_RUNS" not in _codes(pack)
+    assert pack.comparison.status == EvidenceComparisonStatus.AVAILABLE
+
+
+def test_requested_metric_appears_in_comparison_rows(tmp_path):
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a", backtest_metrics={"calmar": 1.2})
+    _write_run(store, "run_b", backtest_metrics={"calmar": 0.8})
+    pack = collect_experiment_evidence_pack(store, ["run_a", "run_b"], metric="calmar")
+    assert _run_of(pack, "run_a").catalog_context.rank == 1
+    for row in pack.comparison.to_dict()["rows"]:
+        assert "calmar" in row["metrics"], "a reported rank must be backed by a comparison row"
+
+
+def test_unusable_artifact_is_recorded_in_missing_evidence(tmp_path):
+    """An INCOMPLETE run must explain itself via missing_evidence, not just via severity."""
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a", artifact_paths=dict(_ARTIFACTS, predictions="pred_dir"))
+    (store.base_dir / "run_a" / "predictions.csv").unlink()
+    (store.base_dir / "run_a" / "pred_dir").mkdir()
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    assert run.completeness == EvidenceCompleteness.INCOMPLETE
+    assert "required_artifact_missing" in run.missing_evidence
+
+
+def test_blank_artifact_key_stays_visible(tmp_path):
+    """A declared artifact must never vanish from the inventory: Phase 13 validates
+    artifact_paths values but not keys, so nothing else would report it."""
+    store = _store(tmp_path, ("run_a",))
+    path = store.base_dir / "run_a" / "metadata.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["artifact_paths"][""] = "stray.csv"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    (store.base_dir / "run_a" / "stray.csv").write_text("x\n", encoding="utf-8")
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    paths = {a.relative_path for a in run.artifact_inventory}
+    assert "stray.csv" in paths
+    assert all(a.artifact_name.strip() for a in run.artifact_inventory)
+
+
+def test_malformed_artifact_key_does_not_abort_the_pack(tmp_path):
+    store = _store(tmp_path, ("run_a", "run_odd"))
+    path = store.base_dir / "run_odd" / "metadata.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["artifact_paths"][""] = "stray.csv"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    pack = collect_experiment_evidence_pack(store, ["run_a", "run_odd"])
+    assert _run_of(pack, "run_a").completeness == EvidenceCompleteness.COMPLETE
+    assert all(a.artifact_name.strip() for a in _run_of(pack, "run_odd").artifact_inventory)
+
+
+def test_artifact_format_uses_filename_not_dotted_directory(tmp_path):
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a", artifact_paths=dict(_ARTIFACTS, predictions="v1.2/predictions.csv"))
+    (store.base_dir / "run_a" / "predictions.csv").unlink()
+    (store.base_dir / "run_a" / "v1.2").mkdir()
+    (store.base_dir / "run_a" / "v1.2" / "predictions.csv").write_text("x\n", encoding="utf-8")
+    run = collect_experiment_evidence_pack(store, ["run_a"]).runs[0]
+    entry = next(a for a in run.artifact_inventory if a.artifact_name == "predictions")
+    assert entry.format == "csv"  # not "2/predictions.csv"
+
+
+def test_comparison_failure_reason_is_neutral(tmp_path):
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a")
+    _write_run(store, "run_b", validation_end=date(2024, 9, 30))
+    pack = collect_experiment_evidence_pack(store, ["run_a", "run_b"])
+    assert "guard" not in (pack.comparison.unavailable_reason or "")
+
+
+# --------------------------------------------------------------------------- #
+# read-only proof + boundaries
+# --------------------------------------------------------------------------- #
+
+
+@pytest.mark.parametrize("level", ["metadata-only", "standard", "deep"])
+def test_collect_leaves_store_byte_identical(tmp_path, level):
+    store = _store(tmp_path, ("run_a", "run_b"))
+    (store.base_dir / "run_a" / "extra.json").write_text("{}", encoding="utf-8")
+    before = _snapshot(store.base_dir)
+    collect_experiment_evidence_pack(store, ["run_a", "run_b", "ghost"], metric="sharpe", audit_level=level)
+    assert _snapshot(store.base_dir) == before
+
+
+def test_collect_creates_no_repo_artifacts_or_db(tmp_path):
+    before = _repo_snapshot()
+    store = _store(tmp_path, ("run_a",))
+    collect_experiment_evidence_pack(store, ["run_a"])
+    assert _repo_snapshot() == before
+    assert not (_BACKEND / "data" / "quantlab.db").exists()  # no registry DB created
+
+
+def test_collect_module_no_forbidden_imports():
+    src = Path(collect_module.__file__).read_text(encoding="utf-8")
+    forbidden = [
+        "app.experiment_registry",
+        "app.dataset_registry",
+        "app.db",
+        "sqlite3",
+        "get_connection",
+        "quantlab.db",
+        "app.local_pipeline",
+        "app.batch_experiments",
+        "run_local_futures_ml_experiment",
+        "train_model",
+        "build_feature_matrix",
+        "build_label_matrix",
+        "hashlib",
+        "sha256",
+        "compute_config_hash",
+        "import requests",
+        "urllib",
+        "httpx",
+        "socket",
+        "yfinance",
+        "ibkr",
+        "sklearn",
+        "xgboost",
+        "lightgbm",
+        "torch",
+        "tensorflow",
+    ]
+    for token in forbidden:
+        assert token not in src, f"collect.py must not reference {token!r}"
+
+
+def test_collect_module_no_mutation_or_advice():
+    src = Path(collect_module.__file__).read_text(encoding="utf-8")
+    for token in (".write_text", ".write_bytes", "open(", ".mkdir", ".touch", ".unlink",
+                  ".rmdir", ".rename", "rmtree", "shutil", "to_csv", "to_parquet", "os.remove"):
+        assert token not in src, f"collect.py must not contain mutation call {token!r}"
+    lowered = src.lower()
+    for token in ("approved", "deployable", "buy", "sell", "allocate", "deploy"):
+        assert token not in lowered, f"collect.py must not contain {token!r}"
+
+
+def test_collect_module_uses_no_private_symbols():
+    import re as _re
+
+    src = Path(collect_module.__file__).read_text(encoding="utf-8")
+    for private in ("_ABSOLUTE_PATH", "_FRAME_NAMES", "_is_relative_path", "_window_key",
+                    "_compat_key", "_resolve_run", "_metric_value"):
+        assert not _re.search(rf"\b{private}\b", src), f"collect.py must not use {private!r}"

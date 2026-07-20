@@ -54,6 +54,10 @@ __all__ = [
     "evidence_severity_at_least",
     "derive_run_completeness",
     "derive_pack_completeness",
+    "EVIDENCE_REDACTED_PATH",
+    "is_host_absolute_path",
+    "redact_host_absolute_text",
+    "safe_audit_finding_dict",
 ]
 
 
@@ -117,6 +121,59 @@ _ALLOWED_AUDIT_STATUSES: frozenset[str] = frozenset(
 _AUDIT_BLOCKING_SEVERITIES: frozenset[str] = frozenset({"error", "critical"})
 
 _ABSOLUTE_PATH_RE = re.compile(r"^[A-Za-z]:[\\/]|^[\\/]")
+
+
+# --------------------------------------------------------------------------- #
+# evidence-safe serialization of Phase 13 findings
+# --------------------------------------------------------------------------- #
+
+#: Deterministic stand-in for a host-absolute path removed from serialized evidence.
+EVIDENCE_REDACTED_PATH = "<redacted-absolute-path>"
+
+#: A host-absolute path *embedded* in a longer string (message / exception-derived
+#: text).  Ordered so drive and UNC forms win before the single-root form.  A
+#: store-relative value (``predictions.csv``, ``nested/frame.csv``, ``../evil.csv``)
+#: matches none of these: the root alternative requires the separator to start the
+#: token, which a relative or traversal path never does.
+_EMBEDDED_HOST_PATH_RE = re.compile(
+    r"[A-Za-z]:[\\/][^\s'\"<>|,;)]*"          # C:\secret\x.csv  /  C:/secret/x.csv
+    r"|(?:\\\\|//)[^\s'\"<>|,;)]+"            # \\server\share   /  //server/share
+    r"|(?<![\w.~])[\\/](?![\\/])[^\s'\"<>|,;)]*[\\/.][^\s'\"<>|,;)]*"  # /tmp/x, \secret\x.csv
+)
+
+
+def is_host_absolute_path(value: Any) -> bool:
+    """True for a value that is *itself* a host-absolute path.
+
+    Recognizes Windows drive paths, POSIX absolute paths, UNC paths, and
+    leading-backslash root paths.  Purely textual — nothing is resolved, stat-ed,
+    opened, or hashed."""
+    return isinstance(value, str) and bool(_ABSOLUTE_PATH_RE.match(value))
+
+
+def redact_host_absolute_text(value: Any) -> Any:
+    """Replace host-absolute paths in a string with :data:`EVIDENCE_REDACTED_PATH`.
+
+    A value that *is* an absolute path becomes the marker outright; absolute paths
+    embedded in longer text are replaced in place so the surrounding wording stays
+    readable.  Store-relative evidence is returned unchanged — a traversal value such
+    as ``../evil.csv`` is unsafe for filesystem *access* but is not a host-path leak,
+    so it remains factual declared evidence.  Non-strings pass through."""
+    if not isinstance(value, str):
+        return value
+    if is_host_absolute_path(value):
+        return EVIDENCE_REDACTED_PATH
+    return _EMBEDDED_HOST_PATH_RE.sub(EVIDENCE_REDACTED_PATH, value)
+
+
+def safe_audit_finding_dict(finding: Any) -> dict:
+    """Evidence-safe serialization projection for one public Phase 13 finding.
+
+    Delegates to the finding's own ``to_dict()`` (so field order, ``finding_id``,
+    ``code`` and ``severity`` are exactly Phase 13's), then redacts host-absolute
+    paths from its string values.  The finding object itself is never touched:
+    ``to_dict()`` returns a fresh mapping, so this is a projection, not a mutation."""
+    return {key: redact_host_absolute_text(val) for key, val in finding.to_dict().items()}
 
 
 # --------------------------------------------------------------------------- #
@@ -417,7 +474,9 @@ class ExperimentRunEvidence:
     Phase 14 generates no timestamp."""
 
     train_run_hash: str
-    run_directory: str
+    # ``None`` when the selection named no locatable run directory (a missing entry,
+    # or a caller-supplied hash that is not a safe store-relative name at all).
+    run_directory: Optional[str] = None
     load_status: EvidenceLoadStatus
     completeness: EvidenceCompleteness
     audit_status: str
@@ -441,9 +500,10 @@ class ExperimentRunEvidence:
     def __post_init__(self) -> None:
         if not isinstance(self.train_run_hash, str) or not self.train_run_hash.strip():
             raise EvidenceError("train_run_hash must be a non-empty string")
-        if not isinstance(self.run_directory, str) or not self.run_directory:
-            raise EvidenceError("run_directory must be a non-empty string")
-        _require_report_safe_path(self.run_directory, "run_directory")
+        if self.run_directory is not None:
+            if not isinstance(self.run_directory, str) or not self.run_directory:
+                raise EvidenceError("run_directory must be a non-empty string when provided")
+            _require_report_safe_path(self.run_directory, "run_directory")
         try:
             object.__setattr__(self, "load_status", EvidenceLoadStatus(self.load_status))
             object.__setattr__(self, "completeness", EvidenceCompleteness(self.completeness))
@@ -471,7 +531,9 @@ class ExperimentRunEvidence:
             "load_status": self.load_status.value,
             "completeness": self.completeness.value,
             "audit_status": self.audit_status,
-            "audit_findings": [f.to_dict() for f in self.audit_findings],
+            # Phase 13 findings are preserved verbatim in memory; only this
+            # serialization projection strips host-absolute paths.
+            "audit_findings": [safe_audit_finding_dict(f) for f in self.audit_findings],
             "created_at": self.created_at,
             "train_start": self.train_start,
             "train_end": self.train_end,
