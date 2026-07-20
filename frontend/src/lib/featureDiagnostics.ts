@@ -175,6 +175,8 @@ export interface DriftRow {
   classification: string;
   psi: number | null;
   ks_statistic: number | null;
+  /** Set when either side of the comparison is below the small-sample floor. */
+  small_sample_warning?: string | null;
   detail: Record<string, unknown>;
 }
 

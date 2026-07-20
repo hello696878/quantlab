@@ -53,13 +53,53 @@ def classify_stability(score: Optional[float]) -> str:
     return "unstable"
 
 
+def _is_constant(v: np.ndarray) -> bool:
+    """Exact constant test — element equality, the same test scipy applies.
+
+    A dispersion test such as ``np.std(v) == 0.0`` is NOT reliable here: for
+    values that are not exactly representable in binary floating point, the
+    computed mean differs from the (identical) elements, so the deviations are
+    not exactly zero.  ``np.std([0.1, 0.1, 0.1])`` is ``1.39e-17``, not ``0.0``
+    — a constant vector that a ``== 0.0`` guard would wave through to scipy,
+    which then emits ConstantInputWarning and returns NaN.
+    """
+    return bool(v.size > 0 and np.all(v == v[0]))
+
+
+def _undefined_reason(a: np.ndarray, b: np.ndarray) -> Optional[str]:
+    """Why a pair's rank correlation is undefined, or None when it is defined.
+
+    A constant vector has no ranks to correlate, so the correlation is
+    *undefined* — deliberately not reported as 0.0, which would read as
+    "measured no association".
+    """
+    if len(a) < 2 or len(b) < 2:
+        return "fewer than 2 shared defined features"
+    a_const, b_const = _is_constant(a), _is_constant(b)
+    if a_const and b_const:
+        return ("rank correlation undefined: both splits' shared importance "
+                "vectors are constant")
+    if a_const:
+        return ("rank correlation undefined: split A's shared importance "
+                "vector is constant")
+    if b_const:
+        return ("rank correlation undefined: split B's shared importance "
+                "vector is constant")
+    return None
+
+
 def _corr(a: np.ndarray, b: np.ndarray, kind: str) -> Optional[float]:
-    if len(a) < 2 or float(np.std(a)) == 0.0 or float(np.std(b)) == 0.0:
+    # Undefined inputs never reach scipy: calling it with a constant vector
+    # emits ConstantInputWarning and yields NaN.  Tied-but-varying vectors are
+    # defined and are passed through (scipy's average-tie handling applies).
+    if _undefined_reason(a, b) is not None:
         return None
     if kind == "spearman":
         value = sp_stats.spearmanr(a, b).statistic
     else:
         value = sp_stats.kendalltau(a, b).statistic
+    # Belt-and-braces: no NaN/Infinity may escape into the API, persistence,
+    # export, or frontend.
     return float(value) if value is not None and math.isfinite(value) else None
 
 
@@ -88,8 +128,9 @@ def stability_summary(
                       if vec_i[n] is not None and vec_j[n] is not None]
             a = np.array([vec_i[n] for n in shared], dtype=np.float64)
             b = np.array([vec_j[n] for n in shared], dtype=np.float64)
-            spearman = _corr(a, b, "spearman") if len(shared) >= 2 else None
-            kendall = _corr(a, b, "kendall") if len(shared) >= 2 else None
+            undefined_reason = _undefined_reason(a, b)
+            spearman = _corr(a, b, "spearman") if undefined_reason is None else None
+            kendall = _corr(a, b, "kendall") if undefined_reason is None else None
             overlap = None
             if k > 0 and shared:
                 inter = _top_k(vec_i, k) & _top_k(vec_j, k)
@@ -98,8 +139,14 @@ def stability_summary(
                 "split_a": used[i]["split_id"], "split_b": used[j]["split_id"],
                 "spearman": spearman, "kendall": kendall,
                 "top_k_overlap": overlap,
-                "note": None if len(shared) >= 2
-                else "fewer than 2 shared defined features",
+                # Every undefined correlation carries its reason: too few
+                # shared features, or which vector(s) are constant.
+                "note": (
+                    undefined_reason
+                    if undefined_reason is not None
+                    else ("rank correlation undefined for this split pair"
+                          if spearman is None and kendall is None else None)
+                ),
             }
             pairs.append(entry)
             if spearman is not None:

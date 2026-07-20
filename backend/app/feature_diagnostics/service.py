@@ -570,8 +570,23 @@ def execute_run(run_id: int, *, create_experiment: bool = False) -> Dict[str, An
                 "feature_name": name, "kind": "distribution",
                 "classification": row["classification"],
                 "psi": row.get("psi"), "ks_statistic": row.get("ks_statistic"),
+                # Promoted out of `detail` so the small-sample caveat is
+                # surfaced alongside the statistic it qualifies.
+                "small_sample_warning": row.get("small_sample_warning"),
                 "detail": row,
             })
+        # Documented in FEATURE_STABILITY_AND_DRIFT_POLICY.md §9: small-sample
+        # warnings propagate into the run's warning list as well as the UI.
+        small_sample_features = [
+            d["feature_name"] for d in distribution_drift if d.get("small_sample_warning")
+        ]
+        if small_sample_features:
+            warnings.append(
+                f"distribution drift computed on a small sample for "
+                f"{len(small_sample_features)} feature(s) "
+                f"(e.g. {sorted(small_sample_features)[:3]}) — indicative only"
+            )
+
         imp_drift = drift_mod.importance_drift(split_records, feature_names)
         importance_drift_rows = [
             {"feature_name": f["feature_name"], "kind": "importance",
@@ -602,12 +617,27 @@ def execute_run(run_id: int, *, create_experiment: bool = False) -> Dict[str, An
     except (FeatureDiagnosticsError, FeatureInputError, estimators.EstimatorError,
             metrics_mod.MetricUnavailable, corr_mod.CorrelationError,
             drift_mod.DriftError) as exc:
+        # A failed (re-)execution must not leave the PREVIOUS execution's derived
+        # state behind: otherwise a run reported as failed / unknown-integrity
+        # would still serve a result fingerprint, stale per-feature rows, and —
+        # worst — remain the active baseline of its scope, a state mark_baseline
+        # itself would refuse to create.
         store.update_run(run_id, {
             "status": "failed", "error_message": str(exc),
             "integrity_status": "unknown",
+            "result_fingerprint": None,
+            "is_baseline": 0, "baseline_fingerprint": None, "baseline_scope": None,
+            "split_count": 0, "valid_split_count": 0, "invalid_split_count": 0,
+            "splits_json": "[]", "stability_summary_json": "{}",
+            "importance_drift_json": "{}", "references_json": "{}",
+            "drift_context_json": "{}",
             "completed_at": _now(),
             "duration_ms": int((time.monotonic() - t0) * 1000),
         })
+        store.replace_results(run_id, [])
+        store.replace_split_results(run_id, [])
+        store.replace_correlation_groups(run_id, [])
+        store.replace_drift_results(run_id, [])
         return get_run(run_id)
 
     split_rows = []

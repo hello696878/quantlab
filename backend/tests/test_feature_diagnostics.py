@@ -822,3 +822,185 @@ def test_demo_seed_idempotent_and_expected_shapes(client):
     summary = client.get(f"{BASE}/summary").json()
     assert summary["runs"] == 4 and summary["baselines"] == 1
     assert summary["held_out_verified"] == 1
+
+
+# ---------------------------------------------------------------------------
+# Phase 52 review fixes (regression)
+# ---------------------------------------------------------------------------
+
+
+def test_pr_auc_tie_grouping_is_row_order_invariant():
+    """Average precision must depend only on the (label, score) multiset."""
+    y = np.array([1.0, 0.0, 1.0, 0.0])
+    p = np.array([0.5, 0.5, 0.5, 0.5])
+    # A fully uninformative constant predictor scores its base rate, not more.
+    assert metrics_mod.score("pr_auc", y, p) == pytest.approx(0.5)
+    # Reordering identical (label, score) rows must not change the metric.
+    y2 = np.array([0.0, 1.0, 0.0, 1.0])
+    p2 = np.array([0.5, 0.5, 0.5, 0.5])
+    assert metrics_mod.score("pr_auc", y2, p2) == pytest.approx(
+        metrics_mod.score("pr_auc", y, p)
+    )
+    # A perfect ranking still scores 1.0 (tie grouping did not break the normal case).
+    assert metrics_mod.score(
+        "pr_auc", np.array([1.0, 1.0, 0.0, 0.0]), np.array([0.9, 0.8, 0.7, 0.6])
+    ) == pytest.approx(1.0)
+
+
+def test_sample_timestamps_are_canonical_and_text_sortable():
+    """Persisted timestamps must sort lexicographically in chronological order.
+
+    Samples are read back with an ``ORDER BY timestamp`` TEXT sort, so the
+    stored string must be canonical — otherwise the read-back order diverges
+    from the order the configuration fingerprint was computed over, and the
+    early-vs-late drift partition is split at the wrong point.
+    """
+    from datetime import datetime, timedelta, timezone
+
+    base = datetime(2024, 1, 5, tzinfo=timezone.utc)
+    raw = []
+    for i in range(20):
+        instant = base + timedelta(hours=i)
+        # Alternate the WRITTEN offset; the instants stay strictly increasing.
+        shown = (instant.astimezone(timezone(timedelta(hours=-5))).isoformat()
+                 if i % 2 else instant.isoformat())
+        raw.append({"sample_id": f"s{i:03d}", "timestamp": shown,
+                    "features": {"f0": float(i)}, "target": float(i % 2)})
+
+    # Precondition: as written, the raw strings do NOT sort chronologically —
+    # this is exactly the input that used to corrupt the read-back ordering.
+    raw_ts = [r["timestamp"] for r in raw]
+    assert raw_ts != sorted(raw_ts)
+
+    out = core.normalize_samples(raw, ["f0"], "binary_classification")
+    ts = [s["timestamp"] for s in out]
+    assert ts == sorted(ts), "canonical timestamps must be lexicographically ordered"
+    assert all(t.endswith("+00:00") for t in ts)
+    # Chronological order is preserved through canonicalization.
+    assert [s["sample_id"] for s in out] == [f"s{i:03d}" for i in range(20)]
+
+
+def test_ks_statistic_defined_for_two_different_constants():
+    """Two different constants are maximal drift, not an unavailable statistic."""
+    ref = np.zeros(40)
+    cmp_ = np.ones(40)
+    row = drift_mod.numeric_distribution_drift(
+        ref, cmp_, 10, {"moderate": 0.1, "major": 0.25})
+    assert row["ks_statistic"] == pytest.approx(1.0)
+    assert row["ks_pvalue"] is not None
+    # Two EQUAL constants are zero drift, also defined.
+    same = drift_mod.numeric_distribution_drift(
+        np.zeros(40), np.zeros(40), 10, {"moderate": 0.1, "major": 0.25})
+    assert same["ks_statistic"] == pytest.approx(0.0)
+
+
+def test_stability_note_explains_constant_importance_vector():
+    """An undefined rank correlation must carry its reason, not a bare null."""
+    # Both splits share >= 2 features, but split B's importances are constant,
+    # so Spearman/Kendall are undefined for reasons other than "too few shared".
+    records = _stab_records([
+        {"f0": 0.30, "f1": 0.20, "f2": 0.10},
+        {"f0": 0.10, "f1": 0.10, "f2": 0.10},
+    ])
+    summary = stab_mod.stability_summary(records, ["f0", "f1", "f2"])
+    pair = summary["pairs"][0]
+    assert pair["spearman"] is None and pair["kendall"] is None
+    assert pair["note"] and "constant" in pair["note"]
+
+
+def test_failed_reexecution_clears_stale_baseline_and_results(client, monkeypatch):
+    """A failed re-execution must not leave an active baseline + stale rows."""
+    created = client.post(f"{BASE}/runs", json=_payload(
+        name="stale-baseline",
+        declared_splits=[{"split_id": "d1",
+                          "train_sample_ids": [f"s{i:03d}" for i in range(40)],
+                          "test_sample_ids": [f"s{i:03d}" for i in range(40, 60)]}])).json()
+    done = client.post(f"{BASE}/runs/{created['id']}/execute", json={}).json()
+    assert done["status"] == "completed" and done["result_fingerprint"]
+    marked = client.post(f"{BASE}/runs/{done['id']}/mark-baseline", json={}).json()
+    assert marked["is_baseline"] is True
+    assert client.get(f"{BASE}/runs/{done['id']}/features").json()["items"]
+
+    def _boom(*_a, **_k):
+        raise corr_mod.CorrelationError("forced failure for regression test")
+
+    monkeypatch.setattr(service.corr_mod, "correlation_diagnostics", _boom)
+    failed = client.post(f"{BASE}/runs/{done['id']}/execute", json={}).json()
+
+    assert failed["status"] == "failed"
+    assert failed["integrity_status"] == "unknown"
+    # The dangerous part: a failed / unknown-integrity run must not remain the
+    # active baseline, nor keep a result fingerprint or stale per-feature rows.
+    assert failed["is_baseline"] is False
+    assert failed["result_fingerprint"] is None
+    assert failed["baseline_fingerprint"] is None
+    assert client.get(f"{BASE}/runs/{done['id']}/features").json()["items"] == []
+
+
+def test_constant_vectors_never_reach_scipy_and_carry_precise_notes():
+    """Constant importance vectors must be detected BEFORE scipy is called.
+
+    A dispersion guard (``np.std(v) == 0.0``) is unreliable for values that are
+    not exactly representable in binary floating point: ``np.std([0.1]*3)`` is
+    1.39e-17, so such a vector used to reach scipy, emit ConstantInputWarning
+    and return NaN (silently rescued by the isfinite fallback).
+
+    ConstantInputWarning is escalated to an error *inside this test only* —
+    no global warning filter is added anywhere.
+    """
+    import warnings
+
+    from scipy.stats import ConstantInputWarning
+
+    def pair_for(vec_a, vec_b):
+        names = sorted(set(vec_a) | set(vec_b))
+        recs = _stab_records([vec_a, vec_b])
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", ConstantInputWarning)
+            return stab_mod.stability_summary(recs, names)["pairs"][0]
+
+    varying = {"f0": 0.30, "f1": 0.20, "f2": 0.10}
+    # 0.1 is NOT exactly representable — precisely the case that used to warn.
+    constant = {"f0": 0.10, "f1": 0.10, "f2": 0.10}
+
+    # (a) split B constant
+    p = pair_for(varying, constant)
+    assert p["spearman"] is None and p["kendall"] is None
+    assert "constant" in p["note"] and "split B" in p["note"]
+
+    # (b) split A constant
+    p = pair_for(constant, varying)
+    assert p["spearman"] is None and p["kendall"] is None
+    assert "constant" in p["note"] and "split A" in p["note"]
+
+    # (c) both constant (at different levels)
+    p = pair_for(constant, {"f0": 0.7, "f1": 0.7, "f2": 0.7})
+    assert p["spearman"] is None and p["kendall"] is None
+    assert "both" in p["note"] and "constant" in p["note"]
+
+    # (d) fewer than two paired observations
+    p = pair_for({"f0": 0.5}, {"f0": 0.9})
+    assert p["spearman"] is None and p["kendall"] is None
+    assert "fewer than 2" in p["note"]
+
+    # (e) normal non-constant vectors stay DEFINED (perfectly reversed = -1)
+    p = pair_for(varying, {"f0": 0.05, "f1": 0.25, "f2": 0.45})
+    assert p["spearman"] == pytest.approx(-1.0)
+    assert p["note"] is None
+
+    # (f) tied but NOT constant is still defined (scipy average-tie handling)
+    p = pair_for({"f0": 0.1, "f1": 0.1, "f2": 0.4},
+                 {"f0": 0.2, "f1": 0.5, "f2": 0.5})
+    assert p["spearman"] is not None and math.isfinite(p["spearman"])
+    assert p["note"] is None
+
+    # An undefined correlation is never reported as zero ("no association").
+    for a_vec, b_vec in ((varying, constant), (constant, varying)):
+        p = pair_for(a_vec, b_vec)
+        assert p["spearman"] is not p and p["spearman"] != 0.0
+        assert p["kendall"] != 0.0
+
+    # No NaN/Infinity may reach persistence, export, or the frontend.
+    full = stab_mod.stability_summary(
+        _stab_records([varying, constant]), ["f0", "f1", "f2"])
+    json.dumps(full, allow_nan=False)  # raises if any NaN/Infinity leaked

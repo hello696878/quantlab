@@ -50,7 +50,11 @@ Explicit v1 policies (recorded in every run's configuration):
   target (or an exact affine transform of it, |correlation| = 1) is rejected
   as target leakage at creation.
 * Samples sort deterministically by (timestamp, sample_id); features keep
-  the declared order.
+  the declared order.  Timestamps are stored **canonicalised** — timezone-aware
+  values are normalised to UTC, naive values to a single ISO form — so the
+  persisted read-back order is always the chronological order the
+  configuration fingerprint was computed over (and therefore the order the
+  `early_vs_late` drift split is derived from).
 
 ## 3. Held-out permutation importance (primary method)
 

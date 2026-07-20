@@ -14,7 +14,7 @@ Policies (explicit, recorded in run configuration):
 from __future__ import annotations
 
 import math
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Sequence, Tuple
 
 import numpy as np
@@ -157,9 +157,17 @@ def normalize_samples(
             raise FeatureInputError(
                 f"sample {sid}: binary_classification targets must be 0 or 1"
             )
+        # Persist a CANONICAL timestamp, not the caller's raw string: samples
+        # are read back with a lexicographic TEXT sort, and only a canonical
+        # form makes that text order equal the chronological order this list is
+        # sorted (and fingerprinted) in.  Aware timestamps normalize to UTC so
+        # differing offsets cannot reorder; naive ones normalize the separator.
+        canonical_ts = (
+            parsed.astimezone(timezone.utc).isoformat() if aware else parsed.isoformat()
+        )
         normalized.append({
             "sample_id": sid,
-            "timestamp": s["timestamp"],
+            "timestamp": canonical_ts,
             "_sort_key": (parsed, sid),
             "features": values,
             "target": target,

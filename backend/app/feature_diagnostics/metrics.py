@@ -74,10 +74,26 @@ def _pr_auc(y: np.ndarray, p: np.ndarray) -> float:
         raise MetricUnavailable("pr_auc is undefined with no positive samples")
     order = np.argsort(-p, kind="stable")
     ys = y[order]
-    tp = np.cumsum(ys)
-    precision = tp / np.arange(1, len(ys) + 1)
-    # average precision: mean of precision at each positive hit
-    return float(precision[ys == 1].mean())
+    ps = p[order]
+    # Average precision with TIE GROUPING: every row sharing a score forms one
+    # recall/precision step, so the result depends only on the (label, score)
+    # multiset and never on the incoming row order.  Without grouping, a stable
+    # sort breaks ties by original index and a constant predictor would score
+    # above its base rate.  Mirrors _roc_auc's tie handling above.
+    ap = 0.0
+    tp = 0
+    i = 0
+    n = len(ys)
+    while i < n:
+        j = i
+        while j + 1 < n and ps[j + 1] == ps[i]:
+            j += 1
+        group_tp = int(ys[i:j + 1].sum())
+        tp += group_tp
+        if group_tp:
+            ap += group_tp * (tp / (j + 1))
+        i = j + 1
+    return float(ap / pos)
 
 
 def score(metric: str, y: np.ndarray, pred: np.ndarray) -> float:

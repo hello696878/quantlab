@@ -393,7 +393,7 @@ function ImportanceChart({ features, topN, onTopN, method, metric }: {
                 </rect>
                 {f.min_importance !== null && f.max_importance !== null && f.min_importance !== f.max_importance && (
                   <line x1={x(f.min_importance)} y1={yTop + BAR_H / 2} x2={x(f.max_importance)} y2={yTop + BAR_H / 2}
-                    stroke="#334155" strokeWidth={1.5} />
+                    stroke="#a6afc4" strokeWidth={1.5} />
                 )}
                 <text x={x(Math.max(v, 0)) + 4} y={yTop + BAR_H / 2 + 3} fontSize={10} fill="#64748b">
                   {fmt(f.mean_importance, 4)}
@@ -679,7 +679,14 @@ function DriftView({ rows, context, kind, importanceMeta }: {
               return (
                 <tr key={r.feature_name} className="border-b border-slate-50 font-mono last:border-0">
                   <td className="px-2 py-1">{r.feature_name}</td>
-                  <td className="px-2 py-1"><DriftPill classification={r.classification} /></td>
+                  <td className="px-2 py-1">
+                    <DriftPill classification={r.classification} />
+                    {r.small_sample_warning && (
+                      <span className="ml-1.5 text-[10px] text-amber-600" title={r.small_sample_warning}>
+                        ⚠ small sample
+                      </span>
+                    )}
+                  </td>
                   {kind === "distribution" ? (
                     <>
                       <td className="px-2 py-1 text-right">{r.psi === null ? "unavailable" : fmt(r.psi)}</td>

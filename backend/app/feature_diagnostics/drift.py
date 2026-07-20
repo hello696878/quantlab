@@ -127,14 +127,15 @@ def numeric_distribution_drift(
             np.mean((cmp_ < ref.min()) | (cmp_ > ref.max()))
         ),
     })
-    if ref_std > 0.0 or cmp_std > 0.0:
-        # asymptotic method: deterministic and defined for tied samples
-        ks = sp_stats.ks_2samp(ref, cmp_, method="asymp")
-        out["ks_statistic"] = float(ks.statistic)
-        out["ks_pvalue"] = float(ks.pvalue)
-    else:
-        out["ks_statistic"] = None
-        out["ks_pvalue"] = None
+    # Asymptotic method: deterministic and defined for tied samples.  The
+    # two-sample KS statistic is defined for ANY two non-empty samples —
+    # including the degenerate case where both sides are internally constant:
+    # two DIFFERENT constants give the maximal statistic 1.0 (the strongest
+    # possible distribution shift), two equal constants give 0.0.  Suppressing
+    # it there would report maximal drift as "unavailable".
+    ks = sp_stats.ks_2samp(ref, cmp_, method="asymp")
+    out["ks_statistic"] = float(ks.statistic)
+    out["ks_pvalue"] = float(ks.pvalue)
     psi_block = _psi(ref, cmp_, bins)
     if psi_block is None:
         out["psi"] = None

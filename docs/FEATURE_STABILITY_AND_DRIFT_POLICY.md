@@ -63,6 +63,12 @@ sample counts:
 Empty sets make the diagnostic unavailable; fewer than 30 samples on either
 side attaches a small-sample warning ("indicative only").
 
+The two-sample KS statistic is reported for any two non-empty sets, including
+the degenerate case where both sides are internally constant: two *different*
+constants are the strongest possible shift and score 1.0, two equal constants
+score 0.0.  (PSI, by contrast, is genuinely undefined for a constant
+reference — see §5 — and is reported as unavailable there.)
+
 ## 5. PSI definition
 
 Population Stability Index over explicit equal-width bins anchored on the
