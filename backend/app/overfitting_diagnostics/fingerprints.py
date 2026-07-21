@@ -27,7 +27,16 @@ def universe_fingerprint(
     timestamps: Sequence[str],
     returns_matrix: Sequence[Sequence[float]],
     alignment_policy: str,
+    nominal_p_values: Optional[Sequence[Optional[float]]] = None,
 ) -> str:
+    """Identity of the candidate universe.
+
+    ``nominal_p_values`` are declared per-candidate inputs that change the
+    persisted multiple-testing results, so they belong to the universe
+    identity: without them two runs that produce provably different
+    Bonferroni/Holm/BH outputs would share a fingerprint and be presented as
+    reproducibility evidence for one another.
+    """
     payload = {
         "fp_version": UNIVERSE_FP_VERSION,
         "candidate_ids": list(candidate_ids),
@@ -35,6 +44,10 @@ def universe_fingerprint(
         "timestamps": list(timestamps),
         "returns": [[round(v, 12) for v in row] for row in returns_matrix],
         "alignment_policy": alignment_policy,
+        "nominal_p_values": (
+            None if nominal_p_values is None
+            else [None if p is None else round(float(p), 12) for p in nominal_p_values]
+        ),
     }
     return sha256_hex(payload)
 

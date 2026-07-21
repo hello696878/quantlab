@@ -154,6 +154,7 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
         timestamps=timestamps,
         returns_matrix=[c["returns"] for c in candidates],
         alignment_policy=ALIGNMENT_POLICY,
+        nominal_p_values=[c.get("nominal_p_value") for c in candidates],
     )
     cscv_policy = {
         "s_min": cscv_mod.S_MIN, "s_max": cscv_mod.S_MAX,

@@ -68,13 +68,21 @@ class _UnionFind:
 CONSTANT_STD_EPS = 1e-12
 
 
-def _is_constant(column: np.ndarray) -> bool:
+def is_constant_series(column: np.ndarray) -> bool:
     """True for constant (ptp == 0 exactly — scale-free) or numerically
     quasi-constant columns.  A truly constant series can carry a tiny non-zero
     float std (e.g. [0.1]*24 → std ≈ 2.8e-17), so exact ``std == 0`` is NOT a
     safe predicate; this check runs before any correlation call so no numpy/
-    scipy warning can ever be emitted for a constant candidate."""
+    scipy warning can ever be emitted for a constant candidate.
+
+    Shared across the package (CSCV aggregate correlations reuse it) so every
+    correlation entry point applies the same proven predicate.
+    """
     return float(np.ptp(column)) == 0.0 or float(column.std()) <= CONSTANT_STD_EPS
+
+
+# Backwards-compatible private alias.
+_is_constant = is_constant_series
 
 
 def dependence_diagnostics(
@@ -145,5 +153,5 @@ def dependence_diagnostics(
 __all__ = [
     "MIN_DEPENDENCE_THRESHOLD", "MAX_DEPENDENCE_THRESHOLD",
     "DEFAULT_DEPENDENCE_THRESHOLD", "CONSTANT_STD_EPS", "DependenceError",
-    "validate_dependence_config", "dependence_diagnostics",
+    "is_constant_series", "validate_dependence_config", "dependence_diagnostics",
 ]

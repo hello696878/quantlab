@@ -16,8 +16,9 @@ Four runs cover the ten spec cases:
    ranking (never called robust), linked to the KO/PEP features dataset
    version and the clean purged+embargo validation demo run, recorded in the
    Experiment Registry, and marked baseline (a comparison reference only).
-3. ``demo:od:constant-short`` — a 48-observation short track record (visible
-   small-sample warnings), a constant-return candidate whose Sharpe
+3. ``demo:od:constant-short`` — a 28-observation short track record (below
+   the 30-observation small-sample threshold, so the warnings are visible),
+   a constant-return candidate whose Sharpe
    diagnostics are honestly unavailable, and a manual one-trial policy so DSR
    is unavailable with the one-trial note while PSR stands alone.
 4. ``demo:od:invalid-config`` — every candidate constant under

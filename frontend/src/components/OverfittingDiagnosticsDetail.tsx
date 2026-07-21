@@ -369,6 +369,13 @@ function LambdaHistogram({ splits, totalValid, pbo, invalid }: {
         <span className="inline-flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5" style={{ background: "#60a5fa" }} /> λ &gt; 0</span>
         <span>Fraction below zero (PBO): {prob(pbo)} · invalid splits excluded: {invalid}</span>
       </div>
+      {lambdas.length < totalValid && (
+        <p className="text-xs text-amber-600">
+          ⚠ Histogram drawn from the {lambdas.length} valid split(s) on the loaded page, not all{" "}
+          {totalValid} — it redraws as you page the split table below. The PBO shown above is
+          always computed over all {totalValid} valid splits.
+        </p>
+      )}
     </div>
   );
 }

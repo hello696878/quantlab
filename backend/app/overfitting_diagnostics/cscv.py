@@ -37,6 +37,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 import numpy as np
 from scipy import stats as sp_stats
 
+from app.overfitting_diagnostics.dependence import is_constant_series
 from app.overfitting_diagnostics.metrics import matrix_metrics
 
 S_MIN = 4
@@ -158,8 +159,16 @@ def run_cscv(
 
 
 def _safe_corr(a: np.ndarray, b: np.ndarray, kind: str) -> Optional[float]:
-    """Pre-checked correlation (no scipy ConstantInputWarning possible)."""
-    if len(a) < 3 or float(np.std(a)) == 0.0 or float(np.std(b)) == 0.0:
+    """Pre-checked correlation (no scipy/numpy constant-input warning possible).
+
+    Constancy is tested with the package's shared predicate, which uses an
+    exact scale-free range check.  A dispersion test such as
+    ``np.std(v) == 0.0`` is NOT safe: a genuinely constant series whose value
+    is not exactly representable carries a tiny non-zero float std
+    (``np.std([0.1] * 6)`` is ``1.39e-17``), so such a vector would slip past
+    the guard into scipy, raise ConstantInputWarning and return NaN.
+    """
+    if len(a) < 3 or is_constant_series(a) or is_constant_series(b):
         return None
     if kind == "pearson":
         value = float(np.corrcoef(a, b)[0, 1])

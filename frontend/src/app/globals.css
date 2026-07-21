@@ -466,6 +466,9 @@
    ============================================================================ */
 .bg-white      { background-color: var(--bg-panel) !important; }
 .bg-white\/60  { background-color: rgba(12, 17, 32, 0.6) !important; }
+/* `hover:bg-white` compiles to its own selector, which the rule above does NOT
+   match — without this a hovered button flashed pure white in the dark theme. */
+.hover\:bg-white:hover { background-color: var(--bg-elev) !important; }
 
 /* ============================================================================
    Accent reach — route the app's `blue-*` utilities through the accent tokens

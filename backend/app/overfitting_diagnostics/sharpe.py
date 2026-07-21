@@ -86,13 +86,33 @@ def sharpe_moments(returns: np.ndarray) -> Dict[str, Any]:
         out["note"] = f"needs at least {MIN_SHARPE_OBSERVATIONS} observations"
         return out
     std = float(r.std(ddof=1))
+    # ``std <= 1e-12`` is False for a NaN or infinite std, so the magnitude of
+    # the moments must be checked explicitly: element-level validation
+    # guarantees finite inputs, not finite moments (extreme magnitudes overflow
+    # the squared/cubed sums inside skew and kurtosis).  Without this, a run
+    # returned status "ok" carrying NaN skewness/kurtosis, which then failed
+    # strict JSON encoding on export.
+    if not math.isfinite(std):
+        out["status"] = "unavailable"
+        out["note"] = "return standard deviation is not finite (extreme magnitudes)"
+        return out
     if std <= 1e-12:
         out["status"] = "unavailable"
         out["note"] = "return standard deviation is zero (constant returns)"
         return out
-    out["sharpe"] = float(r.mean() / std)
-    out["skewness"] = float(sp_stats.skew(r, bias=True))
-    out["kurtosis"] = float(sp_stats.kurtosis(r, fisher=False, bias=True))
+    sharpe = float(r.mean() / std)
+    skewness = float(sp_stats.skew(r, bias=True))
+    kurtosis = float(sp_stats.kurtosis(r, fisher=False, bias=True))
+    if not (math.isfinite(sharpe) and math.isfinite(skewness) and math.isfinite(kurtosis)):
+        out["status"] = "unavailable"
+        out["note"] = (
+            "the Sharpe moment estimates are not finite (numeric overflow from "
+            "extreme return magnitudes)"
+        )
+        return out
+    out["sharpe"] = sharpe
+    out["skewness"] = skewness
+    out["kurtosis"] = kurtosis
     if t < SMALL_SAMPLE_T:
         out["small_sample_warning"] = (
             f"only {t} observations — moment estimates and PSR carry "

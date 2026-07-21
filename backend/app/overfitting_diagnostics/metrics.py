@@ -18,6 +18,7 @@ volatility) return None with a note — never zero, never NaN/Infinity.
 
 from __future__ import annotations
 
+import math
 from typing import Dict, Optional, Tuple
 
 import numpy as np
@@ -47,21 +48,44 @@ def metric_value(metric: str, returns: np.ndarray) -> Tuple[Optional[float], Opt
     r = np.asarray(returns, dtype=np.float64)
     if len(r) < MIN_METRIC_OBSERVATIONS:
         return None, f"needs at least {MIN_METRIC_OBSERVATIONS} observations"
+    # Element-level validation guarantees finite INPUTS, but not finite
+    # aggregates: extreme magnitudes can overflow a sum/variance to ±inf or
+    # NaN.  The documented contract is "never zero, never NaN/Infinity", so
+    # every aggregate is checked before it leaves this module.
     if metric == "mean_return":
-        return float(r.mean()), None
+        return _finite_or_unavailable(float(r.mean()), "mean")
     if metric == "median_return":
-        return float(np.median(r)), None
+        return _finite_or_unavailable(float(np.median(r)), "median")
     if metric == "sharpe_like":
         std = float(r.std(ddof=1))
+        if not math.isfinite(std):
+            return None, "return standard deviation is not finite (extreme magnitudes)"
         if std <= ZERO_STD_EPS:
             return None, "return standard deviation is zero (constant returns)"
-        return float(r.mean() / std), None
+        return _finite_or_unavailable(float(r.mean() / std), "sharpe_like")
     raise MetricError(f"metric must be one of {RANKING_METRICS}")
 
 
-def cumulative_return(returns: np.ndarray) -> float:
-    """Descriptive compound return (never a ranking metric)."""
-    return float(np.prod(1.0 + np.asarray(returns, dtype=np.float64)) - 1.0)
+def _finite_or_unavailable(value: float, label: str) -> Tuple[Optional[float], Optional[str]]:
+    if not math.isfinite(value):
+        return None, (
+            f"the {label} of these returns is not finite (numeric overflow from "
+            "extreme return magnitudes)"
+        )
+    return value, None
+
+
+def cumulative_return(returns: np.ndarray) -> Optional[float]:
+    """Descriptive compound return, or None when it is not finite.
+
+    ``prod(1 + r)`` compounds, so a long series of large returns overflows to
+    ±inf even though every input element is finite (2000 periods of +100%
+    gives 2**2000).  Returning None keeps the documented "never NaN/Infinity"
+    guarantee — an Infinity here would be persisted and then serialised as the
+    non-standard JSON literal ``Infinity``, breaking strict JSON consumers.
+    """
+    value = float(np.prod(1.0 + np.asarray(returns, dtype=np.float64)) - 1.0)
+    return value if math.isfinite(value) else None
 
 
 def matrix_metrics(metric: str, matrix: np.ndarray) -> Tuple[np.ndarray, Dict[int, str]]:

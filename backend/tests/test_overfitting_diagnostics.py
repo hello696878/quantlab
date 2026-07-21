@@ -663,3 +663,97 @@ def test_demo_seed_idempotent_and_expected_shapes(client):
     assert by_key  # sanity
     summary = client.get(f"{BASE}/summary").json()
     assert summary["runs"] == 4 and summary["baselines"] == 1
+
+
+def test_pbo_aggregate_constant_is_metric_emits_no_warning():
+    """CSCV aggregate correlations must pre-detect constants like dependence does.
+
+    ``np.std([0.1] * 6)`` is 1.39e-17, not 0.0, so a dispersion guard
+    (``std == 0.0``) would let a genuinely constant vector reach scipy, raise
+    ConstantInputWarning and return NaN.  The shared exact predicate prevents
+    that.  Warnings are escalated to errors *inside this test only* — no global
+    filter is added anywhere.
+    """
+    def record(i, is_metric, oos_metric, lam):
+        return {
+            "split_id": f"cscv-{i:04d}", "split_index": i, "status": "valid",
+            "warning": None, "selected_candidate_id": "a",
+            "is_metric": is_metric, "oos_metric": oos_metric,
+            "oos_rank": 2.0, "oos_defined_count": 3, "relative_rank": 0.5,
+            "lambda": lam, "degradation": is_metric - oos_metric,
+            "rank_degradation": 1.0,
+            "tie_in_sample": False, "tie_out_of_sample": False,
+        }
+
+    # in-sample metric is exactly constant at a non-representable value
+    records = [record(i, 0.1, oos, lam) for i, (oos, lam) in enumerate(
+        [(0.05, -0.4), (0.2, 0.3), (-0.1, -0.7), (0.15, 0.1), (0.0, -0.2), (0.3, 0.6)])]
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")  # any warning fails the test
+        agg = cscv.aggregate_pbo(records, ["a", "b"])
+
+    # Undefined correlation is reported as null with a reason — never NaN, never 0.
+    assert agg["is_oos_correlation"]["pearson"] is None
+    assert agg["is_oos_correlation"]["spearman"] is None
+    assert "constant" in agg["is_oos_correlation"]["note"]
+    # The rest of the aggregate stays defined and finite.
+    assert agg["pbo_estimate"] == pytest.approx(3 / 6)
+    json.dumps(agg, allow_nan=False)  # no NaN/Infinity may escape
+
+    # Sanity: a non-constant in-sample vector still produces a real correlation.
+    varied = [record(i, 0.1 + 0.01 * i, oos, lam) for i, (oos, lam) in enumerate(
+        [(0.05, -0.4), (0.2, 0.3), (-0.1, -0.7), (0.15, 0.1), (0.0, -0.2), (0.3, 0.6)])]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        agg2 = cscv.aggregate_pbo(varied, ["a", "b"])
+    assert agg2["is_oos_correlation"]["pearson"] is not None
+    assert math.isfinite(agg2["is_oos_correlation"]["pearson"])
+
+
+def test_non_finite_aggregates_are_unavailable_not_infinity():
+    """Finite INPUTS do not guarantee finite aggregates.
+
+    core validation checks each element with math.isfinite but sets no
+    magnitude bound, so compounding/squaring can overflow.  An Infinity or NaN
+    escaping here would be persisted and then emitted as the non-standard JSON
+    literal ``Infinity``/``NaN``, breaking the documented export guarantee.
+    """
+    # 2000 periods of +100% compounds to 2**2000 -> +inf.
+    exploding = np.full(2000, 1.0)
+    assert all(math.isfinite(v) for v in exploding)          # inputs are valid
+    # Extreme magnitudes also overflow the moment estimators (skew/kurtosis).
+    huge = np.full(24, 1e200)
+    huge[0] = -1e200
+    # Numeric overflow is the POINT of this test, so numpy/scipy's overflow
+    # notices are expected and silenced here only — locally scoped, never a
+    # global filter.
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", RuntimeWarning)
+        cumulative = metrics_mod.cumulative_return(exploding)
+        mom = sharpe_mod.sharpe_moments(huge)
+        val, reason = metrics_mod.metric_value("sharpe_like", huge)
+    assert cumulative is None                                 # not +Infinity
+    # A normal series still returns a real number.
+    assert metrics_mod.cumulative_return(np.array([0.1, 0.1])) == pytest.approx(0.21)
+    assert mom["status"] == "unavailable"
+    assert mom["sharpe"] is None and mom["skewness"] is None and mom["kurtosis"] is None
+    assert "finite" in (mom["note"] or "")
+    json.dumps(mom, allow_nan=False)  # nothing non-finite may escape
+    # The ranking metric refuses rather than ranking on a non-finite value.
+    assert val is None and reason
+
+
+def test_universe_fingerprint_covers_declared_p_values():
+    """Declared p-values change the multiple-testing results, so they must
+    change the universe fingerprint — otherwise two runs with provably
+    different corrections would present as identical reproducibility evidence."""
+    kwargs = dict(candidate_ids=["a", "b"], candidate_config_fps=[None, None],
+                  timestamps=_timestamps(24),
+                  returns_matrix=[[0.01] * 24, [0.02] * 24],
+                  alignment_policy="strict")
+    base = fp_mod.universe_fingerprint(**kwargs, nominal_p_values=[0.01, 0.20])
+    assert base == fp_mod.universe_fingerprint(**kwargs, nominal_p_values=[0.01, 0.20])
+    assert base != fp_mod.universe_fingerprint(**kwargs, nominal_p_values=[0.04, 0.20])
+    assert base != fp_mod.universe_fingerprint(**kwargs, nominal_p_values=[None, 0.20])
+    assert base != fp_mod.universe_fingerprint(**kwargs)  # absent != declared
