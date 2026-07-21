@@ -18,6 +18,37 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Market Regime Robustness & Conditional Performance Lab v1** (v4.72
+  series): a local-first regime-diagnostics lab — candidate outcomes
+  conditioned on explicitly defined market regimes (volatility, trend,
+  liquidity from an explicitly named feature, drawdown state from the
+  trailing peak only, user-supplied categorical states with provenance,
+  pairwise combined regimes) under a strict adversarially-tested
+  no-look-ahead contract: trailing windows only, effective labels lagged
+  ≥ 1 period, centered windows and negative/zero lags rejected; four
+  threshold-fitting modes with distinct integrity states (fixed/expanding
+  causal, training-only fitted on a leakage-clean validation split's
+  recorded membership, full-sample always flagged descriptive and never
+  leakage-safe; centered declarations invalid); conditional
+  candidate×regime metrics with observation counts prominent and rare
+  regimes honestly withheld; robustness classifications, warning-free
+  rank stability (rank-reversal demo), concentration diagnostics with
+  mixed-sign honesty, and transition before/after differences with no
+  significance claims and no fabricated p-values; universe/definition/
+  threshold/configuration/result fingerprints; three new SQLite tables;
+  verified-or-declared-only scope-transactional baselines; a 5-run
+  deterministic demo (11 spec cases); the **Regime Diagnostics** view
+  (per-definition regime timeline strips with interval-table fallbacks,
+  coverage/conditional/robustness/rank/concentration/transition tables);
+  25 backend tests verified by a 4-agent adversarial mutation-attack pass
+  (339 checks; 5 findings fixed); a 16-test Playwright spec; five docs.
+  Regimes are descriptive states — never predictions, causality,
+  profitability, or switching advice.
+
+## Grouped release areas — v4.71 (selection-bias series)
+
+### Backtest overfitting, PBO & multiple testing diagnostics lab (v4.71)
+
 - **Backtest Overfitting, PBO & Multiple Testing Diagnostics Lab v1**
   (v4.71 series): a local-first selection-bias diagnostics lab — CSCV over
   a strictly-aligned bounded candidate universe with the Probability of

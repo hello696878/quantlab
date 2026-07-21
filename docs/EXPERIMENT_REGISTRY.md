@@ -285,7 +285,16 @@ fingerprints as parameters) — idempotently: a run creates at most one record
 and re-execution reuses it.  No recommendation is stored and no candidate is
 ever marked as selected for deployment.
 
-## 21. Future extensions
+## 21. Regime Diagnostics records (Phase 54.0)
+
+Executed regime-diagnostic runs
+([`REGIME_DIAGNOSTICS_LAB.md`](REGIME_DIAGNOSTICS_LAB.md)) can create
+experiment records here (module `regime_diagnostics`, dimensions +
+integrity status as parameters, coverage/stability counts as metrics, both
+fingerprints) — idempotently: a run creates at most one record and
+re-execution reuses it.  No recommendation is stored.
+
+## 22. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

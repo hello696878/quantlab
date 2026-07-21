@@ -154,6 +154,10 @@ runs display method, split counts, leakage status and fingerprints; the
 card states explicitly that PBO complements and never replaces split-level
 validation.  **Feature Diagnostics** — optional context link displaying the
 run name and held-out integrity status; records are never rewritten.
+**Regime Diagnostics** (Phase 54.0,
+[`REGIME_DIAGNOSTICS_LAB.md`](REGIME_DIAGNOSTICS_LAB.md)) may link a run
+from this lab to show its candidate universe alongside PBO/PSR/DSR — this
+lab's records are never rewritten by that link.
 
 ## 17. Demo fixture
 

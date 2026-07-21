@@ -244,7 +244,15 @@ shows the version's fingerprints, provenance and quality states and warns
 visibly when the version was invalidated.  Dataset metadata is never mutated
 by a diagnostic run.
 
-## 21. Limitations
+## 21. Regime Diagnostics links (Phase 54.0)
+
+Regime-diagnostic runs
+([`REGIME_DIAGNOSTICS_LAB.md`](REGIME_DIAGNOSTICS_LAB.md)) may bind a
+`dataset_version_id`; the run detail shows the version's fingerprints,
+provenance and quality states and warns visibly when the version was
+invalidated.  Dataset metadata is never mutated by a diagnostic run.
+
+## 22. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks

@@ -63,6 +63,7 @@ import ModelValidationPanel from "@/components/ModelValidationPanel";
 import MetaLabelingPanel from "@/components/MetaLabelingPanel";
 import FeatureDiagnosticsPanel from "@/components/FeatureDiagnosticsPanel";
 import OverfittingDiagnosticsPanel from "@/components/OverfittingDiagnosticsPanel";
+import RegimeDiagnosticsPanel from "@/components/RegimeDiagnosticsPanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
@@ -538,6 +539,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Backtest Overfitting, PBO & Multiple Testing Diagnostics Lab",
     subtitle:
       "A local-first selection-bias diagnostics lab: Combinatorially Symmetric Cross-Validation over a bounded candidate universe estimates the Probability of Backtest Overfitting (how often the in-sample-selected candidate ranks in the bottom half out of sample, under a fixed documented rank/logit convention with deterministic tie handling), the Probabilistic and Deflated Sharpe Ratios deflate the highest observed Sharpe for the number of effectively independent trials (explicit skewness / non-excess-kurtosis conventions, expected-maximum-Sharpe benchmark, Minimum Track Record Length), Bonferroni / Holm / Benjamini–Hochberg corrections adjust declared p-values with provenance, and bounded dependence diagnostics show how correlated the trials were — all in local SQLite with deterministic SHA-256 fingerprints and links to the Experiment Registry, Dataset Lineage, Model Validation and Feature Diagnostics records. Every number is a research statistic under stated assumptions — never proof of profitability, robustness, or safety; no candidate is selected, recommended, or allocated capital; not certification, and not investment, trading, or risk advice.",
+  },
+  regimediagnostics: {
+    title: "Market Regime Robustness & Conditional Performance Lab",
+    subtitle:
+      "A local-first regime-diagnostics lab: candidate outcomes are conditioned on explicitly defined market regimes — volatility, trend, liquidity, drawdown state (trailing peak only), user-supplied categorical states, and bounded combined regimes — under a strict no-look-ahead policy: every label is formed from trailing windows with an explicit availability lag (centered windows and negative lags are rejected outright), and threshold-fitting subsets carry distinct integrity states (verified causal rule, verified from a validation split's recorded training membership, declared, full-sample descriptive — never called leakage-safe). Conditional metrics keep observation counts prominent, rare regimes are honestly withheld with low-coverage warnings, rank stability / concentration / transition differences are measured observations, and everything persists in local SQLite with deterministic SHA-256 fingerprints and links to the Experiment Registry, Dataset Lineage, Model Validation, Overfitting and Feature Diagnostics records. Regimes are never predictions; nothing here proves causality or profitability, switches strategies, or constitutes investment, trading, or risk advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1128,6 +1134,7 @@ export default function HomePage() {
     { view: "metalabeling", title: "Open Meta-Labeling Lab", keywords: "meta labeling meta-label secondary signal probability calibration platt sigmoid isotonic reliability curve brier log loss ece mce expected calibration error decision threshold coverage precision recall abstention out of fold oof primary side outcome policy threshold policy baseline compare export demo" },
     { view: "featurediagnostics", title: "Open Feature Diagnostics", keywords: "feature importance permutation importance held out held-out stability rank stability spearman kendall top-k overlap correlated features correlation groups multicollinearity distribution drift psi population stability index ks statistic importance drift impurity native importance coefficient decision tree logistic regression baseline compare export demo" },
     { view: "overfittingdiagnostics", title: "Open Overfitting Diagnostics", keywords: "backtest overfitting pbo probability of backtest overfitting cscv combinatorially symmetric cross validation selection bias deflated sharpe probabilistic sharpe psr dsr minimum track record mintrl multiple testing bonferroni holm benjamini hochberg false discovery rate fwer fdr p-value trials expected maximum sharpe candidate dependence lambda logit baseline compare export demo" },
+    { view: "regimediagnostics", title: "Open Regime Diagnostics", keywords: "market regime volatility regime trend regime liquidity regime drawdown state combined regime conditional performance no look-ahead lookahead trailing window lag threshold quantile training-only full-sample coverage rank stability concentration herfindahl hhi entropy regime transition timeline effective label integrity baseline compare export demo" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
@@ -2309,6 +2316,7 @@ export default function HomePage() {
         {view === "metalabeling" && <MetaLabelingPanel onNav={(route) => handleNav(route as View)} />}
         {view === "featurediagnostics" && <FeatureDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
         {view === "overfittingdiagnostics" && <OverfittingDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
+        {view === "regimediagnostics" && <RegimeDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

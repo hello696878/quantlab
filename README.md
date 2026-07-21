@@ -61,6 +61,7 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   embargo, CPCV + leakage audit), Meta-Labeling Lab (calibration +
   thresholds), Feature Diagnostics (importance, stability + drift),
   Overfitting Diagnostics (PBO, deflated Sharpe + multiple testing),
+  Regime Diagnostics (conditional performance + no-look-ahead regimes),
   Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
@@ -273,6 +274,13 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Regime Diagnostics (54.0)** — conditional performance across explicitly
+  defined market regimes (volatility, trend, liquidity, drawdown state,
+  categorical, combined) formed under a strict no-look-ahead contract:
+  trailing windows, lagged effective labels, threshold-fitting subsets with
+  distinct integrity states, honest withholding of rare regimes, rank
+  stability, concentration, and transition differences. Regimes are
+  descriptive states — never predictions, causality, or switching advice.
 - **Overfitting Diagnostics (53.0)** — selection-bias diagnostics: CSCV/PBO
   (how often the in-sample-selected candidate ranks in the bottom half out
   of sample, under a fixed documented rank convention), Probabilistic and

@@ -223,6 +223,15 @@ chronological subperiods **without interval purging** — PBO complements, and
 never replaces, this lab's split-level validation; linked records are never
 rewritten.
 
+The Regime Diagnostics Lab
+([`REGIME_DIAGNOSTICS_LAB.md`](REGIME_DIAGNOSTICS_LAB.md), Phase 54.0) uses
+a completed, leakage-clean run's **exact recorded training membership** of a
+named split to fit training-only regime thresholds
+(`verified_from_validation_split` integrity): held-out observations never
+affect the thresholds, unknown memberships and invalid or leakage-failed
+splits fail honestly, and split memberships/fingerprints are never
+modified.
+
 ## 21. Limitations
 
 Sample membership is stored as bounded JSON arrays (≤2000 samples/run —

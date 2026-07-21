@@ -59,6 +59,24 @@ protected and why).
   invalidated-dataset warning render honestly, dark-theme controls and column
   geometry hold, and 1024/768 have no page overflow (list AND detail). Only
   writes: the idempotent demo seeds.
+- **Regime Diagnostics** (Phase 54.0, `regime-diagnostics.spec.ts`): the lab
+  opens with its no-look-ahead disclaimer, the 5-run demo seeds idempotently,
+  integrity filters work, the training-verified run shows its
+  verified-from-validation-split pill with lookback/lag/threshold detail and
+  the validation link, the full-sample run is warned and never called
+  verified while its drawdown definition stays verified-causal, coverage
+  with unassigned counts and the rare-regime "low sample" withholding
+  render, the rank-reversal matrix and its no-winner note render, the
+  concentration/robustness classifications stay neutral (no best/
+  recommended/profitable-regime wording — asserted), the per-definition
+  regime timeline strips render with combined labels and the transitions
+  table with measured (never causal) differences, the invalid
+  centered-labels definition shows its honest state next to a valid causal
+  one, the invalid-definition run's baseline attempt is rejected with a 409
+  (asserted as the only failed request), comparison warns that universes
+  differ, export is path/credential-free, dark-theme controls and column
+  geometry hold, and 1024/768 have no page overflow. Only writes: the
+  idempotent demo seeds.
 - **Overfitting Diagnostics** (Phase 53.0, `overfitting-diagnostics.spec.ts`):
   the lab opens with its selection-bias disclaimer, the 4-run demo seeds
   idempotently, metric/status filters work, the high-PBO noise demo shows

@@ -1677,6 +1677,51 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 54.0 — Market Regime Robustness & Conditional Performance Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first regime-diagnostics lab —
+  candidate outcomes conditioned on explicitly defined market regimes
+  (volatility = trailing sample std, trend = trailing mean, liquidity from
+  an explicitly named feature only, drawdown state from the **trailing
+  peak only**, user-supplied categorical states with provenance, and
+  pairwise combined regimes bounded at 12 labels with no silent merging)
+  under a strict **no-look-ahead contract**: trailing windows only, the
+  label effective at i uses the statistic at i − lag with lag ≥ 1
+  (zero/negative lags and centered windows rejected outright), expanding
+  thresholds use strictly prior statistics with minimum history, and the
+  property is proven by adversarial future-data mutation tests. Four
+  threshold-fitting modes with distinct integrity states (fixed/expanding
+  → verified_causal_rule; training_quantile fitted only on a named
+  leakage-clean validation split's recorded training membership →
+  verified_from_validation_split; full_sample_quantile →
+  full_sample_descriptive, always warned, never leakage-safe; declared
+  categorical labels never auto-verified; centered declarations →
+  invalid), run integrity = least-trusted valid definition; conditional
+  candidate×regime metrics with observation counts kept prominent and
+  rare regimes honestly withheld below min_observations; robustness
+  classifications (documented thresholds, normalized-HHI concentration
+  guard), warning-free rank stability across regimes (rank reversal
+  demo'd), concentration diagnostics (obs/positive HHI, effective regime
+  count, entropy, signed shares honestly unavailable under mixed signs),
+  deterministic interval/transition diagnostics with measured
+  before/after differences and explicitly no significance test (no
+  p-values fabricated — the multiple-comparison decision is recorded in
+  every configuration); universe/definition/threshold/configuration/
+  result SHA-256 fingerprints; three idempotent SQLite tables;
+  scope-transactional verified-or-declared-only baselines;
+  /regime-diagnostics routes; neutral comparison with comparability
+  warnings; a 5-run demo covering all eleven spec cases; the **Regime
+  Diagnostics** view (per-definition regime timeline strips with legends
+  and interval-table fallbacks, coverage/conditional/robustness/rank/
+  concentration/transition tables, integrity pills, dark ql-input
+  controls); 25 backend tests + a 16-test Playwright spec; four policy
+  docs + a runbook. A four-agent adversarial verification workflow (339
+  first-principles checks, including mutation attacks on the causality
+  contract) ran before the tests; its five findings were fixed and
+  regression-covered. Honest scope: regimes are descriptive states —
+  never predictions; conditional statistics are never causality,
+  profitability, or switching advice.
+
 ### Phase 53.0 — Backtest Overfitting, PBO & Multiple Testing Diagnostics Lab v1 ✅
 
 - **Research-infrastructure phase:** a local-first selection-bias lab —

@@ -1,7 +1,7 @@
-# QuantLab — Project Snapshot (Phase 53.0)
+# QuantLab — Project Snapshot (Phase 54.0)
 
 A one-page handoff doc. Facts verified against the repo when written
-(version label `4.71.0-dev`); counts drift as phases land — re-verify before
+(version label `4.72.0-dev`); counts drift as phases land — re-verify before
 public use.
 
 ## Summary
@@ -20,8 +20,9 @@ trading/risk/compliance infrastructure.
   Onboarding, Global Markets Globe.
 - **Product Workflow:** Scenario Studio, Research Workspace, Experiment
   Registry, Dataset Lineage, Model Validation Lab, Meta-Labeling Lab,
-  Feature Diagnostics, Overfitting Diagnostics, Data Reliability Center,
-  QA Command Center, Release Notes Center, Public Release Candidate.
+  Feature Diagnostics, Overfitting Diagnostics, Regime Diagnostics,
+  Data Reliability Center, QA Command Center, Release Notes Center,
+  Public Release Candidate.
 - **Backtesting:** Backtest, Strategy Comparison, Portfolio Backtest, CSV
   Backtest, Strategy Builder, Parameter Sweep, Train/Test, Walk-Forward.
 - **Strategy Knowledge:** Strategy Library, Paper Replications, Quant
@@ -69,8 +70,8 @@ the ROADMAP entry per phase for each milestone's count); strict finiteness
 guarantees at the API boundary; wording contracts as tests;
 `npx tsc --noEmit` for the frontend; a Playwright browser E2E guard covering
 the frozen demo path, the Experiment Registry, Dataset Lineage, Model
-Validation Lab, Meta-Labeling Lab, Feature Diagnostics, and Overfitting
-Diagnostics views (local-first, plus a manually triggered CI workflow —
+Validation Lab, Meta-Labeling Lab, Feature Diagnostics, Overfitting
+Diagnostics, and Regime Diagnostics views (local-first, plus a manually triggered CI workflow —
 `CI_BROWSER_E2E.md`); **no frontend unit-test framework yet**.
 Verification is run locally by the user (helper wrappers in
 `scripts\*.ps1`).

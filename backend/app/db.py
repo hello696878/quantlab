@@ -847,6 +847,138 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_mtr_run ON multiple_testing_results(run_id)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Market Regime Robustness / Conditional Performance Lab (Phase 54.0).
+        # Definitions carry their per-period effective-label arrays as bounded
+        # JSON (≤2000 periods, ≤6 definitions — the documented v1 form of the
+        # regime_assignments entity); conditional results are explicit rows;
+        # robustness/rank/concentration/coverage summaries live in bounded run
+        # JSON — docs/REGIME_DIAGNOSTICS_LAB.md.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS regime_diagnostic_runs (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                TEXT    NOT NULL,
+                updated_at                TEXT    NOT NULL,
+                name                      TEXT    NOT NULL,
+                description               TEXT    NOT NULL DEFAULT '',
+                status                    TEXT    NOT NULL DEFAULT 'pending',
+                candidate_count           INTEGER NOT NULL DEFAULT 0,
+                observation_count         INTEGER NOT NULL DEFAULT 0,
+                period_count              INTEGER NOT NULL DEFAULT 0,
+                frequency                 TEXT    NOT NULL DEFAULT '',
+                regime_definition_count   INTEGER NOT NULL DEFAULT 0,
+                observed_regime_count     INTEGER NOT NULL DEFAULT 0,
+                invalid_definition_count  INTEGER NOT NULL DEFAULT 0,
+                low_coverage_warning_count INTEGER NOT NULL DEFAULT 0,
+                integrity_status          TEXT    NOT NULL DEFAULT 'unknown',
+                universe_fingerprint      TEXT    NOT NULL,
+                configuration_json        TEXT    NOT NULL DEFAULT '{}',
+                configuration_fingerprint TEXT    NOT NULL,
+                result_fingerprint        TEXT,
+                timestamps_json           TEXT    NOT NULL DEFAULT '[]',
+                candidates_json           TEXT    NOT NULL DEFAULT '[]',
+                market_features_json      TEXT    NOT NULL DEFAULT '{}',
+                sample_ids_json           TEXT,
+                coverage_json             TEXT    NOT NULL DEFAULT '{}',
+                robustness_json           TEXT    NOT NULL DEFAULT '[]',
+                rank_stability_json       TEXT    NOT NULL DEFAULT '{}',
+                concentration_json        TEXT    NOT NULL DEFAULT '[]',
+                warnings_json             TEXT    NOT NULL DEFAULT '[]',
+                dataset_version_id        INTEGER REFERENCES dataset_versions(id),
+                validation_run_id         INTEGER REFERENCES validation_runs(id),
+                overfitting_run_id        INTEGER
+                                          REFERENCES overfitting_diagnostic_runs(id),
+                feature_diagnostics_run_id INTEGER REFERENCES feature_runs(id),
+                meta_label_run_id         INTEGER REFERENCES meta_label_runs(id),
+                experiment_id             INTEGER REFERENCES experiment_registry(id),
+                is_baseline               INTEGER NOT NULL DEFAULT 0,
+                baseline_scope            TEXT,
+                completed_at              TEXT,
+                duration_ms               INTEGER,
+                app_version               TEXT,
+                git_commit                TEXT,
+                notes                     TEXT    NOT NULL DEFAULT '',
+                error_message             TEXT,
+                demo_key                  TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS regime_definitions (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                INTEGER NOT NULL
+                                      REFERENCES regime_diagnostic_runs(id),
+                definition_id         TEXT    NOT NULL,
+                name                  TEXT    NOT NULL,
+                description           TEXT    NOT NULL DEFAULT '',
+                dimension             TEXT    NOT NULL,
+                source_feature        TEXT,
+                lookback              INTEGER,
+                lag                   INTEGER,
+                threshold_mode        TEXT,
+                min_observations      INTEGER NOT NULL DEFAULT 8,
+                integrity_status      TEXT    NOT NULL DEFAULT 'unknown',
+                status                TEXT    NOT NULL DEFAULT 'pending',
+                definition_json       TEXT    NOT NULL DEFAULT '{}',
+                definition_fingerprint TEXT   NOT NULL,
+                thresholds_used_json  TEXT,
+                threshold_fingerprint TEXT,
+                assignments_json      TEXT    NOT NULL DEFAULT '[]',
+                unavailable_count     INTEGER NOT NULL DEFAULT 0,
+                distinct_label_count  INTEGER NOT NULL DEFAULT 0,
+                interval_summary_json TEXT    NOT NULL DEFAULT '{}',
+                transition_json       TEXT    NOT NULL DEFAULT '{}',
+                warnings_json         TEXT    NOT NULL DEFAULT '[]',
+                UNIQUE (run_id, definition_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS regime_conditional_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES regime_diagnostic_runs(id),
+                candidate_id        TEXT    NOT NULL,
+                definition_id       TEXT    NOT NULL,
+                regime_label        TEXT    NOT NULL,
+                observation_count   INTEGER NOT NULL DEFAULT 0,
+                coverage            REAL,
+                mean                REAL,
+                median              REAL,
+                std                 REAL,
+                minimum             REAL,
+                maximum             REAL,
+                positive_rate       REAL,
+                negative_rate       REAL,
+                cumulative          REAL,
+                sharpe_like         REAL,
+                downside_deviation  REAL,
+                status              TEXT    NOT NULL DEFAULT 'ok',
+                note                TEXT,
+                UNIQUE (run_id, candidate_id, definition_id, regime_label)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_rdr_created ON regime_diagnostic_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_rdr_status ON regime_diagnostic_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_rdr_integrity ON regime_diagnostic_runs(integrity_status)",
+            "CREATE INDEX IF NOT EXISTS idx_rdr_dataset ON regime_diagnostic_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_rdr_vrun ON regime_diagnostic_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_rdr_orun ON regime_diagnostic_runs(overfitting_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_rdr_config_fp ON regime_diagnostic_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_rdr_baseline ON regime_diagnostic_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_rdr_scope ON regime_diagnostic_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_rdr_demo_key ON regime_diagnostic_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_rd_run ON regime_definitions(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_rcr_run ON regime_conditional_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_rcr_candidate ON regime_conditional_results(run_id, candidate_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

@@ -17,9 +17,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.71.0-dev";
-const LATEST_VERIFIED_TAG = "v4.70.0-feature-importance-stability-drift-lab-v1";
-const EXPECTED_NEXT_TAG = "v4.71.0-backtest-overfitting-multiple-testing-diagnostics-v1";
+const VERSION_LABEL = "4.72.0-dev";
+const LATEST_VERIFIED_TAG = "v4.71.0-backtest-overfitting-multiple-testing-diagnostics-v1";
+const EXPECTED_NEXT_TAG = "v4.72.0-market-regime-robustness-conditional-performance-v1";
 
 const RC_STATUS_CARDS: { title: string; status: string; tone: "ok" | "warn"; text: string }[] = [
   {

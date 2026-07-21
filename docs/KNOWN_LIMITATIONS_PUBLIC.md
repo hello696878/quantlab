@@ -137,7 +137,20 @@ approximation; and declared p-values are recorded, never verified. A low
 PBO is not robustness, a high DSR is not proof against overfitting, and the
 lab never selects, recommends, or allocates to any candidate.
 
-## 18. Future improvements (openly planned)
+## 18. Regime labels are descriptive states, not predictions
+
+The Regime Diagnostics Lab conditions results on regimes formed by explicit
+causal rules (trailing windows, lagged effective labels, documented
+threshold-fitting subsets). That contract covers the lab's own label
+construction — it cannot audit how the supplied market features were
+produced upstream. Conditioning is stratification, not causal
+identification: a regime can proxy for anything correlated with it, rare
+regimes are honestly withheld rather than estimated, full-sample-fitted
+thresholds are always flagged as descriptive, and no significance testing
+exists in v1. The lab never predicts regimes, never switches strategies,
+and never calls a regime profitable or safe.
+
+## 19. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

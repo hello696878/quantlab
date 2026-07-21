@@ -38,6 +38,7 @@ export type View =
   | "metalabeling"
   | "featurediagnostics"
   | "overfittingdiagnostics"
+  | "regimediagnostics"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"
