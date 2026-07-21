@@ -275,7 +275,17 @@ parameters, stability/drift summary metrics) — idempotently: a run creates
 at most one record and re-execution reuses it. No recommendation is ever
 recorded.
 
-## 20. Future extensions
+## 20. Overfitting Diagnostics records (Phase 53.0)
+
+Executed overfitting-diagnostic runs
+([`BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md`](BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md))
+can create experiment records here (module `overfitting_diagnostics`, type =
+`cscv_pbo_<metric>`, PBO/PSR/DSR + trial-count assumptions as metrics, both
+fingerprints as parameters) — idempotently: a run creates at most one record
+and re-execution reuses it.  No recommendation is stored and no candidate is
+ever marked as selected for deployment.
+
+## 21. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

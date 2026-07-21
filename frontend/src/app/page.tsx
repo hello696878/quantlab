@@ -62,6 +62,7 @@ import DatasetLineagePanel from "@/components/DatasetLineagePanel";
 import ModelValidationPanel from "@/components/ModelValidationPanel";
 import MetaLabelingPanel from "@/components/MetaLabelingPanel";
 import FeatureDiagnosticsPanel from "@/components/FeatureDiagnosticsPanel";
+import OverfittingDiagnosticsPanel from "@/components/OverfittingDiagnosticsPanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
@@ -532,6 +533,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Feature Importance, Stability & Drift Diagnostics Lab",
     subtitle:
       "A local-first feature-diagnostics research lab: held-out permutation importance (deterministic in-process estimators fitted per Model Validation split on training members only, one feature permuted at a time within the held-out samples, direction-normalized so positive importance means held-out performance got worse), model-native impurity and standardized-coefficient references shown with their caveats, rank stability across folds (Spearman/Kendall, top-k overlap, transparent stability score), bounded correlated-feature grouping, and feature distribution / importance drift with documented PSI and KS thresholds — all in local SQLite with deterministic SHA-256 fingerprints and links to the Experiment Registry, Dataset Lineage, Model Validation and Meta-Labeling records. Importance is a measured sensitivity under one method and one metric — not causality, not profitability, no automatic feature selection or deletion, no model recommendations, not certification, and not investment, trading, or risk advice.",
+  },
+  overfittingdiagnostics: {
+    title: "Backtest Overfitting, PBO & Multiple Testing Diagnostics Lab",
+    subtitle:
+      "A local-first selection-bias diagnostics lab: Combinatorially Symmetric Cross-Validation over a bounded candidate universe estimates the Probability of Backtest Overfitting (how often the in-sample-selected candidate ranks in the bottom half out of sample, under a fixed documented rank/logit convention with deterministic tie handling), the Probabilistic and Deflated Sharpe Ratios deflate the highest observed Sharpe for the number of effectively independent trials (explicit skewness / non-excess-kurtosis conventions, expected-maximum-Sharpe benchmark, Minimum Track Record Length), Bonferroni / Holm / Benjamini–Hochberg corrections adjust declared p-values with provenance, and bounded dependence diagnostics show how correlated the trials were — all in local SQLite with deterministic SHA-256 fingerprints and links to the Experiment Registry, Dataset Lineage, Model Validation and Feature Diagnostics records. Every number is a research statistic under stated assumptions — never proof of profitability, robustness, or safety; no candidate is selected, recommended, or allocated capital; not certification, and not investment, trading, or risk advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1121,6 +1127,7 @@ export default function HomePage() {
     { view: "modelvalidation", title: "Open Model Validation Lab", keywords: "model validation purged cross validation cv cpcv combinatorial embargo leakage audit walk forward k-fold kfold fold split train test overlap information interval prediction evaluation time purge baseline fingerprint compare runs afml lopez de prado deterministic demo" },
     { view: "metalabeling", title: "Open Meta-Labeling Lab", keywords: "meta labeling meta-label secondary signal probability calibration platt sigmoid isotonic reliability curve brier log loss ece mce expected calibration error decision threshold coverage precision recall abstention out of fold oof primary side outcome policy threshold policy baseline compare export demo" },
     { view: "featurediagnostics", title: "Open Feature Diagnostics", keywords: "feature importance permutation importance held out held-out stability rank stability spearman kendall top-k overlap correlated features correlation groups multicollinearity distribution drift psi population stability index ks statistic importance drift impurity native importance coefficient decision tree logistic regression baseline compare export demo" },
+    { view: "overfittingdiagnostics", title: "Open Overfitting Diagnostics", keywords: "backtest overfitting pbo probability of backtest overfitting cscv combinatorially symmetric cross validation selection bias deflated sharpe probabilistic sharpe psr dsr minimum track record mintrl multiple testing bonferroni holm benjamini hochberg false discovery rate fwer fdr p-value trials expected maximum sharpe candidate dependence lambda logit baseline compare export demo" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
@@ -2301,6 +2308,7 @@ export default function HomePage() {
 
         {view === "metalabeling" && <MetaLabelingPanel onNav={(route) => handleNav(route as View)} />}
         {view === "featurediagnostics" && <FeatureDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
+        {view === "overfittingdiagnostics" && <OverfittingDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

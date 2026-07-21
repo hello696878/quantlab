@@ -59,6 +59,23 @@ protected and why).
   invalidated-dataset warning render honestly, dark-theme controls and column
   geometry hold, and 1024/768 have no page overflow (list AND detail). Only
   writes: the idempotent demo seeds.
+- **Overfitting Diagnostics** (Phase 53.0, `overfitting-diagnostics.spec.ts`):
+  the lab opens with its selection-bias disclaimer, the 4-run demo seeds
+  idempotently, metric/status filters work, the high-PBO noise demo shows
+  the PBO estimate, the λ histogram with its labelled zero boundary and the
+  block/combination counts, selection frequency and IS/OOS degradation
+  render neutrally (no best/winning/recommended/optimal/safe strategy
+  wording — asserted), the Sharpe diagnostics show observed Sharpe /
+  non-excess kurtosis / trial counts / E[maxSR] / DSR with the
+  no-future-profit disclaimer, the multiple-testing table separates
+  Bonferroni/Holm/BH with the FWER-vs-FDR explanation and declared
+  provenance, the dependence section shows the correlated pair and the
+  approximate effective trials, the constant/one-trial demo shows honest
+  unavailability and small-sample warnings, the invalid-config demo fails
+  honestly with no baseline action, comparison warns that universes differ
+  and stays neutral, export is path/credential-free, dark-theme controls
+  and column geometry hold, and 1024/768 have no page overflow.  Only
+  writes: the idempotent demo seeds.
 - **Feature Diagnostics** (Phase 52.0, `feature-diagnostics.spec.ts`): the
   lab opens with its held-out / non-causality disclaimer, the 4-run demo
   seeds idempotently, method/integrity filters work, the verified held-out

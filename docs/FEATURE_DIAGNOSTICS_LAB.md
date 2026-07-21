@@ -292,6 +292,14 @@ adversarial API paths.  `frontend/e2e/feature-diagnostics.spec.ts` (15
 Playwright tests) covers the browser workflow — see
 [`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md).
 
+## 19b. Overfitting Diagnostics link (Phase 53.0)
+
+An overfitting-diagnostic run
+([`BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md`](BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md))
+may link a feature-diagnostics run for context; the link displays this lab's
+run name and held-out integrity status exactly as recorded and never
+rewrites anything here.
+
 ## 20. Limitations (v1)
 
 Numeric features only (categoricals must be pre-encoded upstream); three

@@ -1677,6 +1677,46 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 53.0 — Backtest Overfitting, PBO & Multiple Testing Diagnostics Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first selection-bias lab —
+  **CSCV/PBO** (2–24 strictly-aligned candidates over 24–2000 shared
+  timestamps; S even chronological blocks 4–12 via array_split with sizes
+  differing ≤1 and recorded boundaries; ALL C(S,S/2) combinations in
+  lexicographic order, hard cap 924, no sampling/truncation; fixed rank
+  convention rank 1 = worst OOS with average ties, ω = rank/(N+1),
+  λ = ln(ω/(1−ω)); PBO = fraction of valid splits with λ < 0, λ = 0 in the
+  denominator but never overfit; exact IS ties → smallest candidate_id,
+  recorded; invalid splits excluded with reasons, all-invalid runs fail
+  honestly); λ distribution/quantiles, pre-checked IS↔OOS correlation,
+  OOS-loss fraction, degradation and per-candidate selection-frequency
+  diagnostics with neutral wording only; **PSR/DSR/MinTRL** (per-period
+  ddof=1 Sharpe, population skew, NON-excess kurtosis, positive
+  variance-expansion guard, T ≥ 12 with <30 warnings; expected-max-Sharpe
+  benchmark with Euler–Mascheroni constant; explicit raw/manual/
+  dependence-adjusted trial policies bounded to the raw count; one-trial
+  and zero-variance cases honestly unavailable; MinTRL with the
+  PSR(T=MinTRL)≡confidence identity tested); **Bonferroni/Holm/BH** with
+  documented FWER-vs-FDR distinction, m = valid p-values only, stable tie
+  ordering, monotonicity enforcement, declared-only provenance (nothing
+  fabricated from Sharpe); bounded candidate-dependence diagnostics with
+  scale-free constant detection BEFORE any correlation call and an
+  approximate K_eff = 1+(K−1)(1−mean|ρ|); universe/configuration/result
+  SHA-256 fingerprints; four idempotent SQLite tables; scope-transactional
+  baselines (never auto-selected by lowest PBO); comparison with explicit
+  comparability warnings; sample-inclusive JSON export; a 4-run demo
+  covering all ten spec cases; the **Overfitting Diagnostics** view
+  (λ histogram with labelled zero line, selection-frequency + split tables,
+  Sharpe assumptions on display, FWER/FDR-annotated multiple-testing table,
+  dark ql-input controls); 26 backend tests + a 14-test Playwright spec;
+  four policy docs + a runbook. A five-agent adversarial verification
+  workflow (303 hand-computed reference checks against the canonical
+  Bailey–López de Prado formulas) ran before the tests; its three findings
+  (exact-equality constant detection, invalid-p contamination, fingerprint
+  quantization disclosure) were fixed and regression-tested. Honest scope:
+  every value is a research statistic under stated assumptions — never
+  profitability, robustness, safety, selection, or advice.
+
 ### Phase 52.0 — Feature Importance, Stability & Drift Diagnostics Lab v1 ✅
 
 - **Research-infrastructure phase:** a local-first feature-diagnostics lab —

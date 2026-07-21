@@ -60,6 +60,7 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   transformation lineage, quality checks), Model Validation Lab (purged CV,
   embargo, CPCV + leakage audit), Meta-Labeling Lab (calibration +
   thresholds), Feature Diagnostics (importance, stability + drift),
+  Overfitting Diagnostics (PBO, deflated Sharpe + multiple testing),
   Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
@@ -272,6 +273,13 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Overfitting Diagnostics (53.0)** — selection-bias diagnostics: CSCV/PBO
+  (how often the in-sample-selected candidate ranks in the bottom half out
+  of sample, under a fixed documented rank convention), Probabilistic and
+  Deflated Sharpe Ratios with explicit trial-count assumptions, Minimum
+  Track Record Length, Bonferroni/Holm/Benjamini–Hochberg corrections, and
+  candidate-dependence diagnostics. Research statistics under stated
+  assumptions — never profitability, robustness, or a strategy selection.
 - **Feature Diagnostics (52.0)** — held-out permutation importance
   (deterministic in-process estimators fitted per Model Validation split;
   positive importance = held-out performance got worse), caveated

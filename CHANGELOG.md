@@ -18,6 +18,37 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Backtest Overfitting, PBO & Multiple Testing Diagnostics Lab v1**
+  (v4.71 series): a local-first selection-bias diagnostics lab — CSCV over
+  a strictly-aligned bounded candidate universe with the Probability of
+  Backtest Overfitting under a fixed documented rank/logit convention
+  (rank 1 = worst OOS, ω = rank/(N+1), λ = ln(ω/(1−ω)), PBO = fraction of
+  valid splits with λ < 0, deterministic tie handling, all C(S,S/2)
+  combinations with a hard 924 cap and no sampling); λ-distribution,
+  IS↔OOS degradation and selection-frequency diagnostics in neutral
+  wording; Probabilistic and Deflated Sharpe Ratios with explicit
+  conventions (per-period ddof=1 Sharpe, population skew, NON-excess
+  kurtosis, expected-maximum-Sharpe benchmark, explicit raw/manual/
+  dependence-adjusted trial-count policies, honest one-trial and
+  zero-variance handling) plus Minimum Track Record Length; Bonferroni /
+  Holm / Benjamini–Hochberg corrections with the FWER-vs-FDR distinction,
+  declared-only p-value provenance and stable tie ordering; bounded
+  candidate-dependence diagnostics with warning-free constant detection
+  and an approximate effective trial count; universe/configuration/result
+  fingerprints; four new SQLite tables; scope-transactional baselines;
+  comparison with explicit comparability warnings; JSON export; a 4-run
+  deterministic demo; the **Overfitting Diagnostics** view (λ histogram
+  with labelled zero line, Sharpe assumptions on display, multiple-testing
+  table); 26 backend tests verified by a 5-agent adversarial
+  reference-check pass (303 checks; 3 findings fixed); a 14-test
+  Playwright spec; five docs. Every value is a research statistic under
+  stated assumptions — never profitability, robustness, safety, or a
+  recommendation.
+
+## Grouped release areas — v4.69/v4.70 (research-diagnostics series)
+
+### Feature importance, stability & drift diagnostics lab (v4.70)
+
 - **Feature Importance, Stability & Drift Diagnostics Lab v1** (v4.70
   series): a local-first feature-diagnostics lab — held-out permutation
   importance as the primary method (deterministic in-process estimators:
@@ -42,6 +73,8 @@ claimed by an entry here.
   matrix, correlation groups, drift tables); 37 backend tests; a 15-test
   Playwright spec; four docs. Importance is measured sensitivity — never
   causality, profitability, or a recommendation.
+
+### Meta-labeling, calibration & threshold lab (v4.69 series — untagged; included in the v4.70 tag history)
 
 - **Meta-Labeling, Probability Calibration & Decision Threshold Lab v1**
   (v4.69 series): a local-first secondary-signal lab — meta-labels whether the

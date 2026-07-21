@@ -91,6 +91,7 @@ from app.dataset_registry_routes import router as dataset_registry_router
 from app.model_validation_routes import router as model_validation_router
 from app.meta_labeling_routes import router as meta_labeling_router
 from app.feature_diagnostics_routes import router as feature_diagnostics_router
+from app.overfitting_diagnostics_routes import router as overfitting_diagnostics_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -488,6 +489,7 @@ app.include_router(model_validation_router)
 # Meta-Labeling / Calibration / Threshold Lab (Phase 51.0) — local SQLite research lab.
 app.include_router(meta_labeling_router)
 app.include_router(feature_diagnostics_router)
+app.include_router(overfitting_diagnostics_router)
 
 
 # ---------------------------------------------------------------------------

@@ -215,6 +215,14 @@ evaluate importance only on held-out test members, requiring a completed,
 leakage-clean run with all splits valid; membership mismatches fail honestly
 and split fingerprints are carried through unchanged.
 
+The Overfitting Diagnostics Lab
+([`BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md`](BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md),
+Phase 53.0) may link a validation run for display context (method, split
+counts, leakage status, fingerprints).  Its CSCV blocks are contiguous
+chronological subperiods **without interval purging** — PBO complements, and
+never replaces, this lab's split-level validation; linked records are never
+rewritten.
+
 ## 21. Limitations
 
 Sample membership is stored as bounded JSON arrays (≤2000 samples/run —

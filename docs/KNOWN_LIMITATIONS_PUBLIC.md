@@ -125,7 +125,19 @@ training-data derived (labelled as such), drift classifications describe
 data changes rather than model failure, and the lab never deletes features,
 retrains user models, or recommends anything.
 
-## 17. Future improvements (openly planned)
+## 17. PBO and Sharpe deflation are estimates, not verdicts
+
+The Overfitting Diagnostics Lab estimates how often an in-sample-selected
+candidate ranked poorly out of sample (PBO via CSCV) and deflates the
+highest observed Sharpe for the number of trials attempted (PSR/DSR). Both
+are research statistics under explicit assumptions: PBO depends on the
+chosen universe, metric and block count; PSR/DSR inherit distributional
+assumptions and small-sample fragility; the effective trial count is an
+approximation; and declared p-values are recorded, never verified. A low
+PBO is not robustness, a high DSR is not proof against overfitting, and the
+lab never selects, recommends, or allocates to any candidate.
+
+## 18. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

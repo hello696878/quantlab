@@ -37,6 +37,7 @@ export type View =
   | "modelvalidation"
   | "metalabeling"
   | "featurediagnostics"
+  | "overfittingdiagnostics"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

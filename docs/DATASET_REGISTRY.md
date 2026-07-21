@@ -235,7 +235,16 @@ invalidated. Feature `source_column`s are checked against the version's
 schema snapshot — a missing column produces a recorded warning, never a
 fabricated mapping.
 
-## 20. Limitations
+## 20. Overfitting Diagnostics links (Phase 53.0)
+
+Overfitting-diagnostic runs
+([`BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md`](BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md))
+may bind a `dataset_version_id` (run-level and per-candidate); the run detail
+shows the version's fingerprints, provenance and quality states and warns
+visibly when the version was invalidated.  Dataset metadata is never mutated
+by a diagnostic run.
+
+## 21. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks

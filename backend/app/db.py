@@ -693,6 +693,160 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_fdr_run ON feature_drift_results(run_id)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Backtest Overfitting / PBO / Deflated Sharpe / Multiple Testing Lab
+        # (Phase 53.0).  Candidates (with bounded return arrays ≤2000 obs),
+        # CSCV split results (≤924 combinations) and multiple-testing rows are
+        # normalized; aggregates/blocks/diagnostics live in bounded run JSON —
+        # docs/BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS overfitting_diagnostic_runs (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                TEXT    NOT NULL,
+                updated_at                TEXT    NOT NULL,
+                name                      TEXT    NOT NULL,
+                description               TEXT    NOT NULL DEFAULT '',
+                status                    TEXT    NOT NULL DEFAULT 'pending',
+                metric                    TEXT    NOT NULL,
+                block_count               INTEGER NOT NULL,
+                candidate_count           INTEGER NOT NULL DEFAULT 0,
+                observation_count         INTEGER NOT NULL DEFAULT 0,
+                combination_count         INTEGER NOT NULL DEFAULT 0,
+                valid_split_count         INTEGER NOT NULL DEFAULT 0,
+                invalid_split_count       INTEGER NOT NULL DEFAULT 0,
+                pbo_estimate              REAL,
+                psr                       REAL,
+                dsr                       REAL,
+                benchmark_sharpe          REAL,
+                effective_trial_count     REAL,
+                universe_fingerprint      TEXT    NOT NULL,
+                configuration_json        TEXT    NOT NULL DEFAULT '{}',
+                configuration_fingerprint TEXT    NOT NULL,
+                result_fingerprint        TEXT,
+                timestamps_json           TEXT    NOT NULL DEFAULT '[]',
+                blocks_json               TEXT    NOT NULL DEFAULT '[]',
+                pbo_aggregate_json        TEXT    NOT NULL DEFAULT '{}',
+                sharpe_diagnostics_json   TEXT    NOT NULL DEFAULT '{}',
+                dependence_json           TEXT    NOT NULL DEFAULT '{}',
+                warnings_json             TEXT    NOT NULL DEFAULT '[]',
+                dataset_version_id        INTEGER REFERENCES dataset_versions(id),
+                validation_run_id         INTEGER REFERENCES validation_runs(id),
+                experiment_id             INTEGER REFERENCES experiment_registry(id),
+                feature_diagnostics_run_id INTEGER REFERENCES feature_runs(id),
+                is_baseline               INTEGER NOT NULL DEFAULT 0,
+                baseline_scope            TEXT,
+                completed_at              TEXT,
+                duration_ms               INTEGER,
+                app_version               TEXT,
+                git_commit                TEXT,
+                notes                     TEXT    NOT NULL DEFAULT '',
+                error_message             TEXT,
+                demo_key                  TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS overfitting_candidates (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                    INTEGER NOT NULL
+                                          REFERENCES overfitting_diagnostic_runs(id),
+                candidate_id              TEXT    NOT NULL,
+                name                      TEXT    NOT NULL,
+                description               TEXT    NOT NULL DEFAULT '',
+                candidate_group           TEXT,
+                experiment_id             INTEGER REFERENCES experiment_registry(id),
+                validation_run_id         INTEGER REFERENCES validation_runs(id),
+                dataset_version_id        INTEGER REFERENCES dataset_versions(id),
+                configuration_fingerprint TEXT,
+                result_fingerprint        TEXT,
+                returns_json              TEXT    NOT NULL DEFAULT '[]',
+                nominal_p_value           REAL,
+                p_value_provenance_json   TEXT,
+                metadata_json             TEXT    NOT NULL DEFAULT '{}',
+                raw_sharpe                REAL,
+                skewness                  REAL,
+                kurtosis                  REAL,
+                psr                       REAL,
+                sharpe_status             TEXT,
+                sharpe_note               TEXT,
+                mean_return               REAL,
+                cumulative_return         REAL,
+                selection_frequency       REAL,
+                mean_oos_rank             REAL,
+                status                    TEXT    NOT NULL DEFAULT 'ok',
+                UNIQUE (run_id, candidate_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS pbo_split_results (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                INTEGER NOT NULL
+                                      REFERENCES overfitting_diagnostic_runs(id),
+                split_id              TEXT    NOT NULL,
+                split_index           INTEGER NOT NULL,
+                is_block_ids_json     TEXT    NOT NULL DEFAULT '[]',
+                oos_block_ids_json    TEXT    NOT NULL DEFAULT '[]',
+                selected_candidate_id TEXT,
+                is_metric             REAL,
+                oos_metric            REAL,
+                oos_rank              REAL,
+                oos_defined_count     INTEGER,
+                relative_rank         REAL,
+                lambda                REAL,
+                degradation           REAL,
+                rank_degradation      REAL,
+                tie_in_sample         INTEGER NOT NULL DEFAULT 0,
+                tie_out_of_sample     INTEGER NOT NULL DEFAULT 0,
+                status                TEXT    NOT NULL DEFAULT 'valid',
+                warning               TEXT,
+                UNIQUE (run_id, split_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS multiple_testing_results (
+                id                 INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id             INTEGER NOT NULL
+                                   REFERENCES overfitting_diagnostic_runs(id),
+                candidate_id       TEXT    NOT NULL,
+                raw_p_value        REAL,
+                bonferroni         REAL,
+                holm               REAL,
+                bh                 REAL,
+                provenance_status  TEXT    NOT NULL DEFAULT 'unavailable',
+                provenance_json    TEXT,
+                state_raw          TEXT    NOT NULL DEFAULT 'unavailable',
+                state_bonferroni   TEXT    NOT NULL DEFAULT 'unavailable',
+                state_holm         TEXT    NOT NULL DEFAULT 'unavailable',
+                state_bh           TEXT    NOT NULL DEFAULT 'unavailable',
+                UNIQUE (run_id, candidate_id)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_odr_created ON overfitting_diagnostic_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_status ON overfitting_diagnostic_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_metric ON overfitting_diagnostic_runs(metric)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_pbo ON overfitting_diagnostic_runs(pbo_estimate)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_dataset ON overfitting_diagnostic_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_vrun ON overfitting_diagnostic_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_experiment ON overfitting_diagnostic_runs(experiment_id)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_config_fp ON overfitting_diagnostic_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_universe_fp ON overfitting_diagnostic_runs(universe_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_baseline ON overfitting_diagnostic_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_odr_scope ON overfitting_diagnostic_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_odr_demo_key ON overfitting_diagnostic_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_oc_run ON overfitting_candidates(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_psr_run ON pbo_split_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_mtr_run ON multiple_testing_results(run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()
