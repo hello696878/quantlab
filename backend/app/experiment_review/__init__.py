@@ -1,14 +1,17 @@
 """Phase 14 — read-only local experiment evidence pack.
 
-Commit 1 ships the models layer only: the evidence-pack dataclasses
-(``ExperimentEvidencePack`` / ``ExperimentRunEvidence`` / ``ComparisonEvidence`` /
-``CatalogRunContext`` / ``ArtifactInventoryEntry`` / ``EvidenceSummary``), the
-Phase 14 aggregation ``EvidenceFinding`` (``evidence_`` namespace, distinct from
-Phase 13's ``finding_`` findings), the completeness / status enums, the JSON-safety
-helpers (``freeze_json_value`` / ``thaw_json_value`` / ``sanitize_json_value``), and
-the completeness-derivation utilities.  Phase 13 ``AuditFinding`` objects are stored
-verbatim.  This layer performs no filesystem access, opens no database, and mints no
-hashes; the collector, renderers, and CLI land in later commits.
+The models layer supplies the evidence-pack dataclasses (``ExperimentEvidencePack`` /
+``ExperimentRunEvidence`` / ``ComparisonEvidence`` / ``CatalogRunContext`` /
+``ArtifactInventoryEntry`` / ``EvidenceSummary``), the Phase 14 aggregation
+``EvidenceFinding`` (``evidence_`` namespace, distinct from Phase 13's ``finding_``
+findings), the completeness / status enums, the JSON-safety and evidence-safe
+serialization helpers, and the completeness-derivation utilities.  Phase 13 findings
+are stored verbatim in memory and made evidence-safe only on serialization.
+
+``collect_experiment_evidence_pack`` builds a pack read-only from an existing store;
+the renderers turn one into deterministic JSON / CSV / Markdown strings.  Nothing in
+this package writes to the filesystem, opens a database, or mints a hash — only the
+CLI, in a later commit, writes to explicit output paths.
 """
 
 from app.experiment_review.collect import collect_experiment_evidence_pack
@@ -38,6 +41,12 @@ from app.experiment_review.models import (
     sort_and_number_evidence_findings,
     thaw_json_value,
 )
+from app.experiment_review.render import (
+    EVIDENCE_DISCLAIMERS,
+    export_evidence_pack_csv,
+    export_evidence_pack_json,
+    export_evidence_pack_markdown,
+)
 
 __all__ = [
     "EvidenceError",
@@ -66,4 +75,9 @@ __all__ = [
     "derive_pack_completeness",
     # collector
     "collect_experiment_evidence_pack",
+    # renderers
+    "EVIDENCE_DISCLAIMERS",
+    "export_evidence_pack_json",
+    "export_evidence_pack_csv",
+    "export_evidence_pack_markdown",
 ]

@@ -1269,8 +1269,8 @@ def test_namespaces_stay_disjoint_after_redaction(tmp_path):
 
 
 def test_redaction_needs_no_renderer(tmp_path):
-    """The safety property holds at the model layer — no renderer or CLI exists yet."""
-    assert not (_BACKEND / "app" / "experiment_review" / "render.py").exists()
+    """The safety property holds at the model layer: ``to_dict()`` alone is safe, with
+    no renderer involved, so every consumer inherits it rather than re-implementing it."""
     store = _store(tmp_path, ("run_a",))
     path = store.base_dir / "run_a" / "metadata.json"
     data = json.loads(path.read_text(encoding="utf-8"))
@@ -1509,3 +1509,597 @@ def test_collect_module_uses_no_private_symbols():
     for private in ("_ABSOLUTE_PATH", "_FRAME_NAMES", "_is_relative_path", "_window_key",
                     "_compat_key", "_resolve_run", "_metric_value"):
         assert not _re.search(rf"\b{private}\b", src), f"collect.py must not use {private!r}"
+
+
+# --------------------------------------------------------------------------- #
+# commit 3 — renderers (hand-built model fixtures; no real store is scanned)
+# --------------------------------------------------------------------------- #
+
+import csv as _csv  # noqa: E402
+import io as _io  # noqa: E402
+
+from app.experiment_review import render as render_module  # noqa: E402
+from app.experiment_review import (  # noqa: E402
+    EVIDENCE_DISCLAIMERS,
+    export_evidence_pack_csv,
+    export_evidence_pack_json,
+    export_evidence_pack_markdown,
+)
+
+_CSV_HEADER = [
+    "train_run_hash", "load_status", "audit_status", "completeness", "model_type",
+    "task_type", "train_start", "train_end", "validation_start", "validation_end",
+    "catalog_group", "catalog_rank", "requested_metric", "requested_metric_value",
+    "metrics_json", "baseline_metrics_json", "missing_evidence",
+]
+
+_MD_SECTIONS = [
+    "# Local Experiment Evidence Pack",
+    "## Evidence summary",
+    "## Selected runs",
+    "## Structural integrity",
+    "## Comparison",
+    "## Catalog context",
+    "## Missing or unavailable evidence",
+    "## Registry and dataset-lineage context",
+    "## Phase 14 aggregation findings",
+    "## Scope & Safety",
+]
+
+
+def _render_audit_finding(**kw):
+    base = dict(
+        finding_id="finding_0003",
+        severity=AuditSeverity.ERROR,
+        code=AuditCode.MISSING_REFERENCED_ARTIFACT,
+        message="referenced artifact is missing",
+        train_run_hash="run_a",
+        run_directory="run_a",
+        artifact_name="predictions",
+        relative_path="predictions.csv",
+    )
+    base.update(kw)
+    return AuditFinding(**base)
+
+
+def _run_evidence(hash_="run_a", **kw):
+    base = dict(
+        train_run_hash=hash_,
+        run_directory=hash_,
+        load_status=EvidenceLoadStatus.LOADED,
+        completeness=EvidenceCompleteness.COMPLETE,
+        audit_status="valid",
+        audit_findings=(),
+        created_at="2026-07-18T00:00:00+00:00",
+        train_start="2024-04-01",
+        train_end="2024-06-05",
+        validation_start="2024-06-06",
+        validation_end="2024-09-15",
+        feature_columns=("feature__x",),
+        label_column="label__y",
+        model_type="ridge_regression",
+        task_type="regression",
+        metrics={"sharpe": 1.5, "mse": 0.1},
+        baseline_metrics={"no_trade": {"sharpe": 0.0}},
+        hash_chain={"train_run_hash": hash_},
+        catalog_context=CatalogRunContext(status=EvidenceContextStatus.NOT_COLLECTED),
+    )
+    base.update(kw)
+    return ExperimentRunEvidence(**base)
+
+
+def _summary(runs, findings=(), completeness=EvidenceCompleteness.COMPLETE):
+    def count(c):
+        return sum(1 for r in runs if r.completeness == c)
+
+    return EvidenceSummary(
+        completeness=completeness,
+        selected_runs_total=len(runs),
+        runs_complete=count(EvidenceCompleteness.COMPLETE),
+        runs_with_warnings=count(EvidenceCompleteness.WARNING),
+        runs_incomplete=count(EvidenceCompleteness.INCOMPLETE),
+        runs_unavailable=count(EvidenceCompleteness.UNAVAILABLE),
+        phase14_findings_total=len(findings),
+        phase13_findings_total=sum(len(r.audit_findings) for r in runs),
+    )
+
+
+def _render_pack(runs=None, comparison=None, findings=(), **kw):
+    runs = tuple(runs if runs is not None else (_run_evidence(),))
+    hashes = tuple(r.train_run_hash for r in runs)
+    if comparison is None:
+        comparison = ComparisonEvidence(
+            status=EvidenceComparisonStatus.NOT_APPLICABLE
+            if len(hashes) == 1
+            else EvidenceComparisonStatus.AVAILABLE,
+            selected_run_hashes=hashes,
+            rows=()
+            if len(hashes) == 1
+            else tuple({"train_run_hash": h, "metrics": {"sharpe": 1.0}} for h in hashes),
+            disclaimers=() if len(hashes) == 1 else ("Not investment advice.",),
+        )
+    base = dict(
+        selected_run_hashes=hashes,
+        runs=runs,
+        comparison=comparison,
+        evidence_summary=_summary(runs, findings, kw.pop("completeness", EvidenceCompleteness.COMPLETE)),
+        findings=tuple(findings),
+    )
+    base.update(kw)
+    return ExperimentEvidencePack(**base)
+
+
+def _csv_rows(text):
+    return list(_csv.reader(_io.StringIO(text)))
+
+
+_FORBIDDEN_LANGUAGE = [
+    "winner", "best run", "recommended", "approved", "rejected",
+    "deploy-ready", "should buy", "should sell", "allocate to",
+]
+
+
+# --- JSON ------------------------------------------------------------------ #
+
+
+def test_json_is_strict_and_round_trips():
+    text = export_evidence_pack_json(_render_pack())
+    assert isinstance(text, str) and text.endswith("\n")
+    data = json.loads(text)
+    assert data["selected_run_hashes"] == ["run_a"]
+    assert "NaN" not in text and "Infinity" not in text
+
+
+def test_json_is_deterministic():
+    pack = _render_pack()
+    assert export_evidence_pack_json(pack) == export_evidence_pack_json(pack)
+
+
+def test_json_top_level_keys_are_stable():
+    data = json.loads(export_evidence_pack_json(_render_pack()))
+    assert set(data) == {
+        "disclaimers", "selected_run_hashes", "runs", "comparison",
+        "registry_context_status", "dataset_lineage_context_status",
+        "catalog_context_status", "evidence_summary", "findings",
+    }
+
+
+def test_json_contains_every_disclaimer():
+    data = json.loads(export_evidence_pack_json(_render_pack()))
+    assert data["disclaimers"] == list(EVIDENCE_DISCLAIMERS)
+
+
+def test_json_preserves_selected_run_order():
+    runs = (_run_evidence("run_z"), _run_evidence("run_a"))
+    data = json.loads(export_evidence_pack_json(_render_pack(runs)))
+    assert data["selected_run_hashes"] == ["run_z", "run_a"]  # not sorted
+    assert [r["train_run_hash"] for r in data["runs"]] == ["run_z", "run_a"]
+
+
+def test_json_preserves_both_finding_namespaces_disjointly():
+    run = _run_evidence(audit_findings=(_render_audit_finding(),))
+    findings = sort_and_number_evidence_findings((_ev_finding(),))
+    data = json.loads(export_evidence_pack_json(_render_pack((run,), findings=findings)))
+    audit_ids = {f["finding_id"] for r in data["runs"] for f in r["audit_findings"]}
+    pack_ids = {f["finding_id"] for f in data["findings"]}
+    assert audit_ids == {"finding_0003"}  # not renumbered
+    assert all(i.startswith("evidence_") for i in pack_ids)
+    assert audit_ids.isdisjoint(pack_ids)
+
+
+def test_json_none_becomes_null():
+    run = _run_evidence("ghost", run_directory=None, model_type=None, metrics=None,
+                        load_status=EvidenceLoadStatus.UNAVAILABLE,
+                        completeness=EvidenceCompleteness.UNAVAILABLE, audit_status="unavailable")
+    text = export_evidence_pack_json(
+        _render_pack((run,), completeness=EvidenceCompleteness.UNAVAILABLE))
+    data = json.loads(text)
+    assert data["runs"][0]["model_type"] is None and data["runs"][0]["metrics"] is None
+    assert ": null" in text
+
+
+def test_json_has_no_timestamp_or_host_metadata():
+    text = export_evidence_pack_json(_render_pack())
+    for token in ("timestamp", "generated_at", "hostname", "machine",
+                  "store_root", "base_dir", "cwd"):
+        assert token not in text.lower()
+
+
+def test_json_registry_and_lineage_remain_not_collected():
+    data = json.loads(export_evidence_pack_json(_render_pack()))
+    assert data["registry_context_status"] == "not_collected"
+    assert data["dataset_lineage_context_status"] == "not_collected"
+
+
+@pytest.mark.parametrize("unsafe", _HOST_ABSOLUTE)
+def test_json_redacts_every_host_absolute_form(unsafe):
+    run = _run_evidence(audit_findings=(_render_audit_finding(actual=unsafe, expected=unsafe,
+                                                       message="declared " + unsafe),))
+    text = export_evidence_pack_json(_render_pack((run,)))
+    assert "secret" not in text and "server" not in text
+    assert EVIDENCE_REDACTED_PATH in text
+
+
+def test_json_preserves_safe_and_traversal_evidence():
+    run = _run_evidence(audit_findings=(
+        _render_audit_finding(relative_path="nested/frame.csv", actual="../evil.csv",
+                       message="declares a traversal value"),))
+    data = json.loads(export_evidence_pack_json(_render_pack((run,))))
+    finding = data["runs"][0]["audit_findings"][0]
+    assert finding["relative_path"] == "nested/frame.csv"
+    assert finding["actual"] == "../evil.csv"  # factual, not a host-path leak
+    assert EVIDENCE_REDACTED_PATH not in json.dumps(finding)
+
+
+def test_renderers_do_not_mutate_pack_or_raw_findings():
+    finding = _render_audit_finding(actual="C:\\secret\\x.csv")
+    run = _run_evidence(audit_findings=(finding,))
+    pack = _render_pack((run,))
+    before_pack, before_finding = pack.to_dict(), dataclasses.astuple(finding)
+    export_evidence_pack_json(pack)
+    export_evidence_pack_csv(pack)
+    export_evidence_pack_markdown(pack)
+    assert pack.to_dict() == before_pack
+    assert dataclasses.astuple(finding) == before_finding
+    assert finding.actual == "C:\\secret\\x.csv"  # raw value intact in memory
+    assert pack.disclaimers == ()  # renderer overlay did not leak back into the model
+
+
+# --- CSV ------------------------------------------------------------------- #
+
+
+def test_csv_header_is_exact_and_fixed():
+    rows = _csv_rows(export_evidence_pack_csv(_render_pack()))
+    assert rows[0] == _CSV_HEADER
+
+
+def test_csv_is_deterministic():
+    pack = _render_pack()
+    assert export_evidence_pack_csv(pack) == export_evidence_pack_csv(pack)
+
+
+def test_csv_one_row_per_run_in_selection_order():
+    runs = (_run_evidence("run_z"), _run_evidence("run_a"))
+    rows = _csv_rows(export_evidence_pack_csv(_render_pack(runs)))
+    assert len(rows) == 3
+    assert [r[0] for r in rows[1:]] == ["run_z", "run_a"]
+
+
+def test_csv_has_no_dynamic_metric_columns():
+    runs = (_run_evidence("run_a", metrics={"sharpe": 1.0}),
+            _run_evidence("run_b", metrics={"calmar": 2.0, "sortino": 3.0}))
+    rows = _csv_rows(export_evidence_pack_csv(_render_pack(runs)))
+    assert rows[0] == _CSV_HEADER  # unchanged despite differing metric keys
+    assert all(len(r) == len(_CSV_HEADER) for r in rows)
+
+
+def test_csv_metrics_json_is_compact_and_sorted():
+    run = _run_evidence(metrics={"sharpe": 1.5, "mse": 0.1},
+                        baseline_metrics={"b": 2.0, "a": 1.0})
+    rows = _csv_rows(export_evidence_pack_csv(_render_pack((run,))))
+    assert rows[1][_CSV_HEADER.index("metrics_json")] == '{"mse":0.1,"sharpe":1.5}'
+    assert rows[1][_CSV_HEADER.index("baseline_metrics_json")] == '{"a":1.0,"b":2.0}'
+
+
+def test_csv_none_becomes_empty_string():
+    run = _run_evidence("ghost", run_directory=None, model_type=None, task_type=None,
+                        train_start=None, metrics=None, baseline_metrics=None,
+                        load_status=EvidenceLoadStatus.UNAVAILABLE,
+                        completeness=EvidenceCompleteness.UNAVAILABLE, audit_status="unavailable")
+    row = _csv_rows(export_evidence_pack_csv(
+        _render_pack((run,), completeness=EvidenceCompleteness.UNAVAILABLE)))[1]
+    for column in ("model_type", "task_type", "train_start", "metrics_json", "catalog_rank"):
+        assert row[_CSV_HEADER.index(column)] == ""
+
+
+def test_csv_missing_evidence_is_deterministically_joined():
+    run = _run_evidence(missing_evidence=("required_artifact_missing", "run_unloadable"),
+                        completeness=EvidenceCompleteness.INCOMPLETE)
+    row = _csv_rows(export_evidence_pack_csv(
+        _render_pack((run,), completeness=EvidenceCompleteness.INCOMPLETE)))[1]
+    assert row[_CSV_HEADER.index("missing_evidence")] == "required_artifact_missing;run_unloadable"
+
+
+def test_csv_metric_columns_come_from_catalog_context():
+    ctx = CatalogRunContext(status=EvidenceContextStatus.COLLECTED, compatibility_group="group_0000",
+                            group_size=2, requested_metric="sharpe", requested_metric_value=1.5, rank=1)
+    row = _csv_rows(export_evidence_pack_csv(_render_pack((_run_evidence(catalog_context=ctx),))))[1]
+    assert row[_CSV_HEADER.index("catalog_group")] == "group_0000"
+    assert row[_CSV_HEADER.index("catalog_rank")] == "1"
+    assert row[_CSV_HEADER.index("requested_metric")] == "sharpe"
+    assert row[_CSV_HEADER.index("requested_metric_value")] == "1.5"
+
+
+def test_csv_escapes_commas_quotes_and_newlines():
+    run = _run_evidence(model_type='ridge,"odd"\nname')
+    text = export_evidence_pack_csv(_render_pack((run,)))
+    assert _csv_rows(text)[1][_CSV_HEADER.index("model_type")] == 'ridge,"odd"\nname'
+
+
+def test_csv_contains_no_findings_or_disclaimers():
+    run = _run_evidence(audit_findings=(_render_audit_finding(),))
+    findings = sort_and_number_evidence_findings((_ev_finding(),))
+    text = export_evidence_pack_csv(_render_pack((run,), findings=findings))
+    assert "finding_0003" not in text and "evidence_0000" not in text
+    assert "MISSING_REFERENCED_ARTIFACT" not in text
+    for disclaimer in EVIDENCE_DISCLAIMERS:
+        assert disclaimer not in text
+    assert len(_csv_rows(text)) == 2  # header + one run row, no pseudo-row
+
+
+@pytest.mark.parametrize("unsafe", _HOST_ABSOLUTE)
+def test_csv_has_no_absolute_paths_or_nonfinite(unsafe):
+    run = _run_evidence(audit_findings=(_render_audit_finding(actual=unsafe),))
+    text = export_evidence_pack_csv(_render_pack((run,)))
+    assert "secret" not in text and "server" not in text
+    assert "NaN" not in text and "Infinity" not in text
+
+
+# --- Markdown -------------------------------------------------------------- #
+
+
+def test_markdown_is_deterministic_and_returns_str():
+    pack = _render_pack()
+    text = export_evidence_pack_markdown(pack)
+    assert isinstance(text, str)
+    assert text == export_evidence_pack_markdown(pack)
+
+
+def test_markdown_section_order_is_exact():
+    text = export_evidence_pack_markdown(_render_pack())
+    positions = [text.index(s) for s in _MD_SECTIONS]
+    assert positions == sorted(positions)
+    assert len(set(positions)) == len(_MD_SECTIONS)
+
+
+def test_markdown_shows_completeness_and_summary_counts():
+    text = export_evidence_pack_markdown(_render_pack())
+    assert "**Evidence completeness:** complete" in text
+    for key in ("selected_runs_total", "runs_complete", "runs_with_warnings",
+                "runs_incomplete", "runs_unavailable",
+                "phase14_findings_total", "phase13_findings_total"):
+        assert "| " + key + " |" in text
+
+
+def test_markdown_selected_runs_table():
+    text = export_evidence_pack_markdown(_render_pack())
+    assert "| train_run_hash | load_status | audit_status | completeness |" in text
+    assert "2024-06-06 to 2024-09-15" in text
+
+
+def test_markdown_structural_section_preserves_phase13_ids():
+    run = _run_evidence(audit_findings=(_render_audit_finding(),))
+    text = export_evidence_pack_markdown(_render_pack((run,)))
+    integrity = text.split("## Structural integrity")[1].split("## Comparison")[0]
+    assert "finding_0003" in integrity
+    assert "MISSING_REFERENCED_ARTIFACT" in integrity and "error" in integrity
+
+
+def test_markdown_clean_run_states_no_structural_findings():
+    text = export_evidence_pack_markdown(_render_pack())
+    integrity = text.split("## Structural integrity")[1].split("## Comparison")[0]
+    assert "No structural findings were recorded for this run." in integrity
+
+
+def test_markdown_namespaces_are_visually_separated():
+    run = _run_evidence(audit_findings=(_render_audit_finding(),))
+    findings = sort_and_number_evidence_findings((_ev_finding(),))
+    text = export_evidence_pack_markdown(_render_pack((run,), findings=findings))
+    integrity = text.split("## Structural integrity")[1].split("## Comparison")[0]
+    phase14 = text.split("## Phase 14 aggregation findings")[1].split("## Scope & Safety")[0]
+    assert "finding_0003" in integrity and "evidence_0000" not in integrity
+    assert "evidence_0000" in phase14 and "finding_0003" not in phase14
+
+
+def test_markdown_comparison_available():
+    runs = (_run_evidence("run_a"), _run_evidence("run_b"))
+    text = export_evidence_pack_markdown(_render_pack(runs))
+    section = text.split("## Comparison")[1].split("## Catalog context")[0]
+    assert "**Status:** available" in section
+    assert "run_a" in section and "run_b" in section and "sharpe" in section
+    assert "Inherited comparison disclaimers:" in section
+
+
+def test_markdown_comparison_not_applicable_has_no_warning_language():
+    section = export_evidence_pack_markdown(_render_pack()).split(
+        "## Comparison")[1].split("## Catalog context")[0]
+    assert "**Status:** not_applicable" in section
+    assert "single selected run" in section
+    for word in ("warning", "failed", "rejected", "error"):
+        assert word not in section.lower()
+
+
+def test_markdown_comparison_unavailable_is_factual():
+    runs = (_run_evidence("run_a"), _run_evidence("run_b"))
+    comparison = ComparisonEvidence(
+        status=EvidenceComparisonStatus.UNAVAILABLE,
+        selected_run_hashes=("run_a", "run_b"),
+        unavailable_reason="one or more selected runs are missing or unloadable",
+    )
+    section = export_evidence_pack_markdown(_render_pack(runs, comparison=comparison)).split(
+        "## Comparison")[1].split("## Catalog context")[0]
+    assert "**Status:** unavailable" in section
+    assert "one or more selected runs are missing or unloadable" in section
+    for word in ("rejected", "failed validation", "invalid"):
+        assert word not in section.lower()
+
+
+def test_markdown_catalog_collected_and_not_collected():
+    ctx = CatalogRunContext(status=EvidenceContextStatus.COLLECTED, compatibility_group="group_0000",
+                            group_size=2, peer_train_run_hashes=("run_a", "run_b"),
+                            requested_metric="sharpe", requested_metric_value=1.5, rank=1)
+    collected = export_evidence_pack_markdown(
+        _render_pack((_run_evidence(catalog_context=ctx),),
+                     catalog_context_status=EvidenceContextStatus.COLLECTED)
+    ).split("## Catalog context")[1].split("## Missing")[0]
+    assert "**Status:** collected" in collected
+    assert "group_0000" in collected and "run_b" in collected and "sharpe" in collected
+    assert "descriptive ordering" in collected
+
+    default = export_evidence_pack_markdown(_render_pack()).split(
+        "## Catalog context")[1].split("## Missing")[0]
+    assert "**Status:** not_collected" in default
+
+
+def test_markdown_registry_section_is_neutral():
+    section = export_evidence_pack_markdown(_render_pack()).split(
+        "## Registry and dataset-lineage context")[1].split("## Phase 14")[0]
+    assert "**Registry context:** not_collected" in section
+    assert "**Dataset-lineage context:** not_collected" in section
+    assert "was not queried" in section and "no database was opened" in section
+    assert "not missing evidence" in section  # explicitly NOT called missing evidence
+
+
+def test_markdown_missing_evidence_section():
+    run = _run_evidence(missing_evidence=("required_artifact_missing",),
+                        completeness=EvidenceCompleteness.INCOMPLETE)
+    section = export_evidence_pack_markdown(
+        _render_pack((run,), completeness=EvidenceCompleteness.INCOMPLETE)
+    ).split("## Missing or unavailable evidence")[1].split("## Registry")[0]
+    assert "required_artifact_missing" in section
+
+
+def test_markdown_contains_every_disclaimer():
+    text = export_evidence_pack_markdown(_render_pack())
+    scope = text.split("## Scope & Safety")[1]
+    for disclaimer in EVIDENCE_DISCLAIMERS:
+        assert "- " + disclaimer in scope
+    assert "not investment advice" in scope.lower()
+    assert "does not approve deployment" in scope
+
+
+def test_markdown_escapes_pipes_and_collapses_newlines():
+    run = _run_evidence(model_type="a|b", task_type="line1\nline2")
+    text = export_evidence_pack_markdown(_render_pack((run,)))
+    assert "a\\|b" in text
+    assert "line1 line2" in text
+    for line in text.splitlines():
+        if line.startswith("|"):
+            assert line.endswith("|")  # no row broken by an embedded newline
+
+
+@pytest.mark.parametrize("unsafe", _HOST_ABSOLUTE)
+def test_markdown_redacts_host_absolute_forms(unsafe):
+    run = _run_evidence(audit_findings=(_render_audit_finding(actual=unsafe, expected=unsafe,
+                                                       message="declared " + unsafe),))
+    text = export_evidence_pack_markdown(_render_pack((run,)))
+    assert "secret" not in text and "server" not in text
+    assert EVIDENCE_REDACTED_PATH in text
+
+
+def test_markdown_has_no_timestamp_host_or_nonfinite():
+    text = export_evidence_pack_markdown(_render_pack())
+    assert "NaN" not in text and "Infinity" not in text
+    for token in ("timestamp", "generated at", "hostname", "store_root", "base_dir"):
+        assert token not in text.lower()
+
+
+@pytest.mark.parametrize("phrase", _FORBIDDEN_LANGUAGE)
+def test_markdown_uses_no_recommendation_language(phrase):
+    ctx = CatalogRunContext(status=EvidenceContextStatus.COLLECTED, compatibility_group="group_0000",
+                            group_size=1, requested_metric="sharpe",
+                            requested_metric_value=1.5, rank=1)
+    runs = (_run_evidence("run_a", catalog_context=ctx), _run_evidence("run_b"))
+    text = export_evidence_pack_markdown(_render_pack(runs)).lower()
+    assert phrase not in text
+
+
+def test_markdown_run_heading_is_escaped():
+    """A newline in a hash must not inject a heading and break the fixed section set."""
+    hostile = "run_a\n## Comparison"
+    run = _run_evidence(hostile, run_directory=None,
+                        load_status=EvidenceLoadStatus.UNAVAILABLE,
+                        completeness=EvidenceCompleteness.UNAVAILABLE,
+                        audit_status="unavailable")
+    text = export_evidence_pack_markdown(
+        _render_pack((run,), completeness=EvidenceCompleteness.UNAVAILABLE))
+    assert text.count("\n## Comparison\n") == 1  # exactly the real section
+    headings = [ln for ln in text.splitlines() if ln.startswith("#")]
+    assert len(headings) == len(_MD_SECTIONS) + 1  # 10 fixed sections + one run heading
+
+
+def test_markdown_comparison_header_cells_are_escaped():
+    """The comparison header is the only data-derived header, so it needs escaping."""
+    rows = ({"train_run_hash": "run_a", "metrics": {"pnl|net": 1.0}},
+            {"train_run_hash": "run_b", "metrics": {"pnl|net": 2.0}})
+    comparison = ComparisonEvidence(
+        status=EvidenceComparisonStatus.AVAILABLE,
+        selected_run_hashes=("run_a", "run_b"), rows=rows)
+    text = export_evidence_pack_markdown(
+        _render_pack((_run_evidence("run_a"), _run_evidence("run_b")), comparison=comparison))
+    section = text.split("## Comparison")[1].split("## Catalog context")[0]
+    table = [ln for ln in section.splitlines() if ln.startswith("|")]
+    assert "pnl\\|net" in table[0]
+    widths = {len(ln.split(" | ")) for ln in table}
+    assert len(widths) == 1, "header, separator, and body rows must have equal cell counts"
+
+
+def test_disclaimers_are_ascii_and_deterministic():
+    """ASCII-only, like the Phase 10 / Phase 13 disclaimers, so a console-bound CLI
+    cannot mangle them on a non-UTF-8 code page."""
+    assert isinstance(EVIDENCE_DISCLAIMERS, tuple) and len(EVIDENCE_DISCLAIMERS) == 8
+    for disclaimer in EVIDENCE_DISCLAIMERS:
+        disclaimer.encode("ascii")  # raises if a non-ASCII character sneaks in
+        assert disclaimer.endswith(".")
+
+
+def test_disclaimers_carry_no_advice_or_remediation():
+    joined = " ".join(EVIDENCE_DISCLAIMERS).lower()
+    for token in ("run ", "rerun", "delete", "repair", "fix ", "you should",
+                  "buy", "sell", "allocate", "promote"):
+        assert token not in joined
+    # "deployment" may appear only in a negative statement
+    for disclaimer in EVIDENCE_DISCLAIMERS:
+        if "deployment" in disclaimer.lower():
+            assert "does not approve" in disclaimer.lower()
+    assert not any("creates new evidence" in d.lower() for d in EVIDENCE_DISCLAIMERS)
+
+
+# --- boundaries ------------------------------------------------------------ #
+
+
+def test_all_renderers_return_str_and_touch_no_repo_artifacts():
+    before = _repo_snapshot()
+    pack = _render_pack()
+    for renderer in (export_evidence_pack_json, export_evidence_pack_csv,
+                     export_evidence_pack_markdown):
+        assert isinstance(renderer(pack), str)
+    assert _repo_snapshot() == before
+    assert not (_BACKEND / "data" / "quantlab.db").exists()
+
+
+def test_render_module_has_no_forbidden_imports():
+    src = Path(render_module.__file__).read_text(encoding="utf-8")
+    for token in ("app.experiment_audit", "app.experiments", "app.reporting",
+                  "app.experiment_catalog", "app.experiment_registry",
+                  "app.dataset_registry", "app.db", "sqlite3", "get_connection",
+                  "local_pipeline", "batch_experiments", "hashlib", "sha256",
+                  "import requests", "urllib", "httpx", "socket", "yfinance",
+                  "sklearn", "xgboost", "lightgbm", "torch", "tensorflow",
+                  "ExperimentStore", "AuditFinding", "pandas", "numpy"):
+        assert token not in src, "render.py must not reference " + repr(token)
+
+
+def test_render_module_performs_no_filesystem_access():
+    src = Path(render_module.__file__).read_text(encoding="utf-8")
+    for token in ("open(", ".write_text", ".write_bytes", ".mkdir", ".touch",
+                  ".unlink", ".rmdir", ".rename", "rmtree", "shutil", "to_csv",
+                  "to_parquet", "os.remove", "Path(", "pathlib", ".exists()",
+                  ".stat(", ".resolve(", ".glob("):
+        assert token not in src, "render.py must not contain filesystem call " + repr(token)
+
+
+def test_render_module_never_bypasses_the_model_projection():
+    """Nested output must come from the pack mapping, not raw finding objects."""
+    src = Path(render_module.__file__).read_text(encoding="utf-8")
+    for token in (".audit_findings", "audit_finding_dict", ".actual", ".expected",
+                  "AuditFinding", "redact_host_absolute_text", "is_host_absolute_path"):
+        assert token not in src, "render.py must not use " + repr(token) + " directly"
+    assert "pack.to_dict()" in src
+
+
+def test_render_module_has_no_repair_or_advice_language():
+    src = Path(render_module.__file__).read_text(encoding="utf-8").lower()
+    for token in ("repair", "quarantine", "migrate", "delete the", "buy ", "sell ",
+                  "allocate", "uuid"):
+        assert token not in src, "render.py must not contain " + repr(token)
