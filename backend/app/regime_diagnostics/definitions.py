@@ -265,7 +265,16 @@ def drawdown_series(values: np.ndarray) -> np.ndarray:
     return level / peak - 1.0
 
 
-def _classify(stat: float, t1: float, t2: float, labels: Sequence[str]) -> str:
+def _classify(stat: float, t1: float, t2: float, labels: Sequence[str]) -> Optional[str]:
+    """Bucket a statistic, or None when it is not finite.
+
+    Every comparison against NaN is False, so without this guard a NaN
+    statistic would fall through to the final ``return labels[2]`` and be
+    published as a confident *most extreme* regime label (e.g. the deepest
+    drawdown) rather than as honestly unavailable.
+    """
+    if not math.isfinite(stat):
+        return None
     if stat < t1:
         return labels[0]
     if stat < t2:
@@ -373,6 +382,11 @@ def assign_labels(
             return _invalid(definition, n_periods,
                             "too few defined statistics to fit full-sample thresholds")
         t1, t2 = float(np.quantile(defined, q1)), float(np.quantile(defined, q2))
+        if not t1 < t2:
+            return _invalid(definition, n_periods,
+                            "fitted quantile thresholds are not strictly ascending "
+                            f"({t1} >= {t2}) — the statistic distribution is degenerate "
+                            "or heavily tied, so the middle band is unreachable")
         for i in range(n_periods):
             j = i - lag
             if j < lookback - 1:
@@ -392,14 +406,43 @@ def assign_labels(
             return _invalid(definition, n_periods,
                             "training_quantile requires a resolved validation split "
                             "training membership")
-        train_stats = [float(stat[j]) for j in train_indices
-                       if 0 <= j < n_periods and not np.isnan(stat[j])]
+        # A statistic at index j spans the trailing window
+        # values[j - lookback + 1 … j].  Taking stat[j] merely because j is a
+        # training index is NOT sufficient: under a purged/interleaved split
+        # geometry that window can reach back across the boundary into
+        # held-out, purged or embargoed periods, so their raw values would
+        # move the fitted thresholds.  That contradicts the contract in
+        # REGIME_NO_LOOKAHEAD_POLICY.md §1 ("held-out observations never touch
+        # them").  Fit only on statistics whose ENTIRE window is training-only.
+        train_set = {int(j) for j in train_indices}
+        eligible = [
+            j for j in train_indices
+            if 0 <= j < n_periods and not np.isnan(stat[j])
+            and all(k in train_set for k in range(j - lookback + 1, j + 1))
+        ]
+        train_stats = [float(stat[j]) for j in eligible]
+        contaminated = sum(
+            1 for j in train_indices
+            if 0 <= j < n_periods and not np.isnan(stat[j]) and j not in set(eligible)
+        )
         if len(train_stats) < definition["min_observations"]:
             return _invalid(definition, n_periods,
-                            "too few defined training statistics to fit thresholds")
+                            "too few training statistics whose trailing window lies "
+                            "entirely inside the split's training membership")
+        if contaminated:
+            warnings.append(
+                f"definition {definition['definition_id']}: {contaminated} training "
+                "statistic(s) were excluded from threshold fitting because their "
+                "trailing window overlapped held-out, purged or embargoed periods"
+            )
         q1, q2 = definition["quantiles"]
         t1 = float(np.quantile(np.array(train_stats), q1))
         t2 = float(np.quantile(np.array(train_stats), q2))
+        if not t1 < t2:
+            return _invalid(definition, n_periods,
+                            "fitted quantile thresholds are not strictly ascending "
+                            f"({t1} >= {t2}) — the training statistic distribution is "
+                            "degenerate or heavily tied, so the middle band is unreachable")
         for i in range(n_periods):
             j = i - lag
             if j < lookback - 1:
@@ -417,6 +460,7 @@ def assign_labels(
         q1, q2 = definition["quantiles"]
         min_history = definition["min_history"]
         last_values: Optional[List[float]] = None
+        degenerate_periods = 0
         for i in range(n_periods):
             j = i - lag
             if j < lookback - 1:
@@ -427,8 +471,20 @@ def assign_labels(
                 continue  # honestly unavailable until enough history exists
             t1 = float(np.quantile(defined, q1))
             t2 = float(np.quantile(defined, q2))
+            if not t1 < t2:
+                # Degenerate history (heavily tied statistics) collapses the
+                # middle band; leave the period honestly unavailable rather
+                # than emitting a label from an unreachable bucketing.
+                degenerate_periods += 1
+                continue
             last_values = [t1, t2]
             labels_out[i] = _classify(float(stat[j]), t1, t2, labels_cfg)
+        if degenerate_periods:
+            warnings.append(
+                f"definition {definition['definition_id']}: {degenerate_periods} "
+                "period(s) left unavailable because the expanding quantile "
+                "thresholds were not strictly ascending (tied statistics)"
+            )
         integrity = "verified_causal_rule"
         thresholds_used = {"mode": "expanding_quantile", "quantiles": [q1, q2],
                            "min_history": min_history,

@@ -478,12 +478,30 @@ def execute_run(run_id: int, *, create_experiment: bool = False) -> Dict[str, An
             warnings=warnings, integrity_status=integrity,
         )
     except (RegimeError, RegimeInputError, def_mod.RegimeDefinitionError) as exc:
+        # A failed (re-)execution must not leave the PREVIOUS execution's
+        # derived state behind: otherwise a run reported as failed /
+        # unknown-integrity would still advertise a result fingerprint, stale
+        # coverage/robustness/rank/concentration blocks and definition +
+        # conditional child rows, and — worst — remain the active baseline of
+        # its scope, a state mark_baseline itself would refuse to create.
         store.update_run(run_id, {
             "status": "failed", "error_message": str(exc),
             "integrity_status": "unknown",
+            "result_fingerprint": None,
+            "is_baseline": 0, "baseline_scope": None,
+            "observed_regime_count": 0, "invalid_definition_count": 0,
+            "low_coverage_warning_count": 0,
+            # Empty shapes must match the response-model types:
+            # coverage/rank_stability are objects, robustness/concentration
+            # /warnings are arrays.
+            "coverage_json": "{}", "robustness_json": "[]",
+            "rank_stability_json": "{}", "concentration_json": "[]",
+            "warnings_json": "[]",
             "completed_at": _now(),
             "duration_ms": int((time.monotonic() - t0) * 1000),
         })
+        store.replace_definitions(run_id, [])
+        store.replace_conditional_results(run_id, [])
         return get_run(run_id)
 
     definition_records = []

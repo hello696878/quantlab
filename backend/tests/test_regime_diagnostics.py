@@ -242,10 +242,30 @@ def test_training_quantile_requires_membership():
     fitted = def_mod.assign_labels(d, features, 80,
                                    train_indices=list(range(10, 50)))
     assert fitted["integrity_status"] == "verified_from_validation_split"
+    # Thresholds are fitted ONLY on statistics whose entire trailing window
+    # lies inside the training membership: a window that reaches across the
+    # split boundary would let held-out values move the thresholds, which
+    # REGIME_NO_LOOKAHEAD_POLICY.md §1 forbids ("held-out observations never
+    # touch them").  train = [10, 50), lookback 10 -> j must satisfy j-9 >= 10.
     stat = def_mod.trailing_stat(np.asarray(features["mkt"]), 10, "std")
-    train_stats = [stat[j] for j in range(10, 50) if not np.isnan(stat[j])]
+    train_set = set(range(10, 50))
+    train_stats = [stat[j] for j in range(10, 50)
+                   if not np.isnan(stat[j])
+                   and all(k in train_set for k in range(j - 9, j + 1))]
     assert fitted["thresholds_used"]["values"][0] == pytest.approx(
         float(np.quantile(np.array(train_stats), 1 / 3)))
+    assert fitted["thresholds_used"]["fitted_on"] == len(train_stats)
+
+    # Adversarial: mutating ONLY held-out observations must not move the
+    # thresholds or their fingerprint (purged/interleaved geometry).
+    held_out = list(range(50, 62))
+    mutated = list(features["mkt"])
+    for k in held_out:
+        mutated[k] = mutated[k] * 1000.0
+    after = def_mod.assign_labels(d, {"mkt": mutated}, 80,
+                                  train_indices=list(range(10, 50)))
+    assert after["thresholds_used"]["values"] == fitted["thresholds_used"]["values"]
+    assert after["threshold_fingerprint"] == fitted["threshold_fingerprint"]
 
 
 def test_categorical_and_invalid_centered():
@@ -634,3 +654,59 @@ def test_demo_seed_idempotent_and_expected_shapes(client):
     assert centered["integrity_status"] == "invalid"
     summary = client.get(f"{BASE}/summary").json()
     assert summary["runs"] == 5 and summary["baselines"] == 1
+
+
+def test_failed_reexecution_clears_stale_baseline_and_children(client, monkeypatch):
+    """A failed re-execution must not leave the prior run's derived state.
+
+    Otherwise a run reported as failed / unknown-integrity still advertises a
+    result fingerprint, stale coverage/robustness blocks and definition +
+    conditional child rows, and remains the active baseline of its scope — a
+    state mark_baseline itself would refuse to create.
+    """
+    run = client.post(f"{BASE}/runs", json=_payload(name="stale")).json()
+    done = client.post(f"{BASE}/runs/{run['id']}/execute", json={}).json()
+    assert done["status"] == "completed" and done["result_fingerprint"]
+    marked = client.post(f"{BASE}/runs/{run['id']}/mark-baseline", json={}).json()
+    assert marked["is_baseline"] is True
+    assert client.get(f"{BASE}/runs/{run['id']}/definitions").json()["items"]
+
+    def _boom(*_a, **_k):
+        raise service.RegimeError("forced failure for regression test")
+
+    monkeypatch.setattr(service.def_mod, "assign_labels", _boom)
+    failed = client.post(f"{BASE}/runs/{run['id']}/execute", json={}).json()
+
+    assert failed["status"] == "failed"
+    assert failed["integrity_status"] == "unknown"
+    assert failed["is_baseline"] is False
+    assert failed["result_fingerprint"] is None
+    assert client.get(f"{BASE}/runs/{run['id']}/definitions").json()["items"] == []
+
+
+def test_conditional_metrics_never_publish_non_finite_or_fake_compounding():
+    """Undefined aggregates must be null with a reason — never fabricated.
+
+    Element-wise finite outcomes do not guarantee finite aggregates, and
+    compounding is undefined once an observation reaches -100%.
+    """
+    # (a) two -200% observations: prod(1+x) = +1 -> a bogus 0% "cumulative"
+    ruin = cond_mod.conditional_metrics(np.array([-2.0, -2.0]), [0, 1], 2, 2, "return")
+    assert ruin["cumulative"] is None
+    assert "-100%" in (ruin["note"] or "")
+
+    # (b) squares overflow: std / downside must not become Infinity, and
+    #     sharpe_like must not be silently zeroed via mean/inf.
+    with np.errstate(all="ignore"):
+        blown = cond_mod.conditional_metrics(
+            np.array([1e200, -1e200] * 4), list(range(8)), 8, 2, "score")
+    assert blown["std"] is None and blown["downside_deviation"] is None
+    assert blown["sharpe_like"] is None
+    json.dumps(blown, allow_nan=False)  # strict JSON must accept the payload
+
+    # (c) an ordinary series is untouched
+    ok = cond_mod.conditional_metrics(
+        np.array([0.01, -0.02, 0.03, 0.005]), [0, 1, 2, 3], 4, 2, "return")
+    assert ok["cumulative"] == pytest.approx(
+        float(np.prod(1.0 + np.array([0.01, -0.02, 0.03, 0.005])) - 1.0))
+    assert ok["sharpe_like"] is not None and ok["note"] is None

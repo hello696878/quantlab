@@ -69,17 +69,45 @@ def conditional_metrics(
     out["maximum"] = float(values.max())
     out["positive_rate"] = float((values > 0).sum() / n)
     out["negative_rate"] = float((values < 0).sum() / n)
-    out["cumulative"] = (float(np.prod(1.0 + values) - 1.0)
-                         if outcome_kind == "return" else float(values.sum()))
+    if outcome_kind == "return":
+        # Compounding is only defined while every factor (1 + x) is positive:
+        # an observation at or below -100% makes prod(1+x) meaningless (two
+        # -200% periods multiply to +1, reporting a 0% cumulative return).
+        if float(values.min()) <= -1.0:
+            out["cumulative"] = None
+            _add_note(out, "cumulative unavailable: an observation at or below "
+                           "-100% has no compound interpretation")
+        else:
+            out["cumulative"] = float(np.prod(1.0 + values) - 1.0)
+    else:
+        out["cumulative"] = float(values.sum())
     if out["std"] is not None and out["std"] > 1e-12:
         out["sharpe_like"] = float(values.mean() / values.std(ddof=1))
     else:
-        out["note"] = "sharpe_like unavailable: zero outcome dispersion"
+        _add_note(out, "sharpe_like unavailable: zero outcome dispersion")
     downside = values[values < 0]
     out["downside_deviation"] = (
         float(np.sqrt((downside ** 2).sum() / n)) if len(downside) else 0.0
     )
+    # Element-wise finite outcomes do NOT guarantee finite aggregates: squaring
+    # and compounding can overflow, which would publish Infinity/NaN (breaking
+    # strict JSON) and silently zero sharpe_like via mean/inf.  Undefined must
+    # be null with a reason, never a fabricated number.
+    for key in ("mean", "median", "std", "minimum", "maximum", "cumulative",
+                "sharpe_like", "downside_deviation"):
+        value = out.get(key)
+        if isinstance(value, float) and not math.isfinite(value):
+            out[key] = None
+            _add_note(out, f"{key} unavailable: the aggregate is not finite "
+                           "(numeric overflow from extreme outcome magnitudes)")
+    if out["std"] is None and out["sharpe_like"] is not None:
+        out["sharpe_like"] = None
     return out
+
+
+def _add_note(out: Dict[str, Any], message: str) -> None:
+    """Append a reason without discarding an earlier one."""
+    out["note"] = f"{out['note']}; {message}" if out.get("note") else message
 
 
 def candidate_robustness(
