@@ -2103,3 +2103,709 @@ def test_render_module_has_no_repair_or_advice_language():
     for token in ("repair", "quarantine", "migrate", "delete the", "buy ", "sell ",
                   "allocate", "uuid"):
         assert token not in src, "render.py must not contain " + repr(token)
+
+
+# --------------------------------------------------------------------------- #
+# commit 4 — CLI (scripts/build_experiment_evidence_pack.py)
+# --------------------------------------------------------------------------- #
+
+import importlib.util  # noqa: E402
+
+_REPO_ROOT = _BACKEND.parent
+_PACK_CLI_PATH = _REPO_ROOT / "scripts" / "build_experiment_evidence_pack.py"
+
+
+def _load_pack_cli():
+    spec = importlib.util.spec_from_file_location("evidence_pack_cli", _PACK_CLI_PATH)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+
+def _cli_run(capsys, *argv):
+    """Run the CLI in-process; returns (exit_code, stdout)."""
+    mod = _load_pack_cli()
+    try:
+        code = mod.main([str(a) for a in argv])
+    except SystemExit as exc:  # argparse usage error
+        code = exc.code if isinstance(exc.code, int) else 2
+    return code, capsys.readouterr().out
+
+
+def _cli_store(tmp_path, names=("run_a",), **overrides):
+    return _store(tmp_path, names, **overrides)
+
+
+def _warning_pack_store(tmp_path):
+    """One valid run plus an orphan artifact -> audit warning -> pack WARNING."""
+    store = _store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "extra.json").write_text("{}", encoding="utf-8")
+    return store
+
+
+def _incomplete_pack_store(tmp_path):
+    """A missing referenced artifact -> audit error -> pack INCOMPLETE."""
+    store = _store(tmp_path, ("run_a",))
+    (store.base_dir / "run_a" / "predictions.csv").unlink()
+    return store
+
+
+def _out(tmp_path, name):
+    return tmp_path / "cli_out" / name
+
+
+# --- arguments ------------------------------------------------------------- #
+
+
+def test_cli_help_exits_zero(capsys):
+    code, out = _cli_run(capsys, "--help")
+    assert code == 0
+    assert "read-only" in out and "not investment advice" in out
+    for claim in ("approved", "deployment ready", "profitab", "safe to trade"):
+        assert claim not in out.lower()
+
+
+def test_cli_help_marks_severity_console_only(capsys):
+    _, out = _cli_run(capsys, "--help")
+    assert "Console display only" in out or "console display only" in out.lower()
+
+
+def test_cli_missing_artifacts_dir_is_usage_error(capsys):
+    code, _ = _cli_run(capsys, "--run-hash", "run_a")
+    assert code == 2
+
+
+def test_cli_missing_run_hashes_is_usage_error(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    code, _ = _cli_run(capsys, "--artifacts-dir", store.base_dir)
+    assert code == 2
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ("--audit-level", "bogus"),
+        ("--fail-on", "bogus"),
+        ("--severity", "bogus"),
+        ("--maximize", "--minimize"),
+        ("--include-catalog-context", "--no-catalog-context"),
+    ],
+)
+def test_cli_invalid_argument_combinations_exit_two(capsys, tmp_path, extra):
+    store = _cli_store(tmp_path)
+    code, _ = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a", *extra)
+    assert code == 2
+
+
+def test_cli_rejects_forbidden_v1_arguments(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    for flag in ("--include-registry-context", "--database-path", "--allow-different-windows"):
+        code, _ = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a", flag)
+        assert code == 2, flag + " must not be a v1 argument"
+
+
+# --- run selection --------------------------------------------------------- #
+
+
+def test_cli_repeated_run_hash_preserves_order(capsys, tmp_path):
+    store = _cli_store(tmp_path, ("run_a", "run_b"))
+    out_json = _out(tmp_path, "p.json")
+    code, _ = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                       "--run-hash", "run_b", "--run-hash", "run_a",
+                       "--output-json", out_json)
+    assert code == 0
+    data = json.loads(out_json.read_text(encoding="utf-8"))
+    assert data["selected_run_hashes"] == ["run_b", "run_a"]  # not sorted
+
+
+def test_cli_hashes_file_with_comments_and_blanks(capsys, tmp_path):
+    store = _cli_store(tmp_path, ("run_a", "run_b"))
+    listing = tmp_path / "sel.txt"
+    listing.write_text("# a comment\n\n  run_b  \n\t# indented comment\nrun_a\n\n",
+                       encoding="utf-8")
+    out_json = _out(tmp_path, "p.json")
+    code, _ = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                       "--run-hashes-file", listing, "--output-json", out_json)
+    assert code == 0
+    assert json.loads(out_json.read_text(encoding="utf-8"))["selected_run_hashes"] == ["run_b", "run_a"]
+
+
+def test_cli_hashes_combine_cli_then_file_with_first_occurrence_kept(capsys, tmp_path):
+    store = _cli_store(tmp_path, ("run_a", "run_b", "run_c"))
+    listing = tmp_path / "sel.txt"
+    listing.write_text("run_a\nrun_c\n", encoding="utf-8")  # run_a duplicates the CLI value
+    out_json = _out(tmp_path, "p.json")
+    code, _ = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                       "--run-hash", "run_b", "--run-hash", "run_a",
+                       "--run-hashes-file", listing, "--output-json", out_json)
+    assert code == 0
+    assert json.loads(out_json.read_text(encoding="utf-8"))["selected_run_hashes"] == [
+        "run_b", "run_a", "run_c"]
+
+
+def test_cli_whitespace_only_hash_is_usage_error(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    code, _ = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "   ")
+    assert code == 2
+
+
+def test_cli_comment_only_hashes_file_is_usage_error(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    listing = tmp_path / "sel.txt"
+    listing.write_text("# nothing selected\n\n", encoding="utf-8")
+    code, _ = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hashes-file", listing)
+    assert code == 2
+
+
+def test_cli_missing_hashes_file_exits_three(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                         "--run-hashes-file", tmp_path / "nope.txt")
+    assert code == 3
+    assert "ERROR:" in out and "Traceback" not in out
+    assert tmp_path.name not in out
+
+
+def test_cli_directory_as_hashes_file_exits_three(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                         "--run-hashes-file", tmp_path)
+    assert code == 3
+    assert "not a regular file" in out and "Traceback" not in out
+
+
+def test_cli_invalid_utf8_hashes_file_exits_three(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    listing = tmp_path / "sel.txt"
+    listing.write_bytes(b"run_a\n\xff\xfe\x00invalid\n")
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hashes-file", listing)
+    assert code == 3
+    assert "UTF-8" in out and "Traceback" not in out
+    assert tmp_path.name not in out
+
+
+# --- store root ------------------------------------------------------------ #
+
+
+def test_cli_missing_store_root_exits_three(capsys, tmp_path):
+    code, out = _cli_run(capsys, "--artifacts-dir", tmp_path / "nope", "--run-hash", "run_a")
+    assert code == 3
+    assert "does not exist" in out and "Traceback" not in out
+    assert tmp_path.name not in out
+
+
+def test_cli_file_as_store_root_exits_three(capsys, tmp_path):
+    target = tmp_path / "a_file.txt"
+    target.write_text("x", encoding="utf-8")
+    code, out = _cli_run(capsys, "--artifacts-dir", target, "--run-hash", "run_a")
+    assert code == 3
+    assert "not a directory" in out and "Traceback" not in out
+
+
+def test_cli_does_not_create_the_store_root(capsys, tmp_path):
+    missing = tmp_path / "nope"
+    _cli_run(capsys, "--artifacts-dir", missing, "--run-hash", "run_a")
+    assert not missing.exists()
+
+
+def test_cli_empty_store_with_missing_hash_is_unavailable(capsys, tmp_path):
+    root = tmp_path / "empty_store"
+    root.mkdir()
+    code, out = _cli_run(capsys, "--artifacts-dir", root, "--run-hash", "ghost")
+    assert code == 1  # UNAVAILABLE meets the default --fail-on incomplete
+    assert "RESULT: UNAVAILABLE" in out
+    assert "Traceback" not in out
+    assert str(root) not in out and tmp_path.name not in out
+
+
+# --- RESULT and thresholds ------------------------------------------------- #
+
+
+@pytest.mark.parametrize(
+    "maker,word,default_code,warning_code",
+    [
+        (lambda p: _store(p, ("run_a",)), "COMPLETE", 0, 0),
+        (_warning_pack_store, "WARNING", 0, 1),
+        (_incomplete_pack_store, "INCOMPLETE", 1, 1),
+    ],
+)
+def test_cli_result_and_exit_codes(capsys, tmp_path, maker, word, default_code, warning_code):
+    store = maker(tmp_path)
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a")
+    assert f"RESULT: {word}" in out
+    assert code == default_code
+    code2, out2 = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                           "--fail-on", "warning")
+    assert f"RESULT: {word}" in out2
+    assert code2 == warning_code
+
+
+def test_cli_unavailable_exits_one_under_both_thresholds(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    for extra in ((), ("--fail-on", "warning")):
+        code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "ghost", *extra)
+        assert "RESULT: UNAVAILABLE" in out and code == 1
+
+
+def test_cli_prints_exactly_one_result_line(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    _, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a")
+    assert len([ln for ln in out.splitlines() if ln.startswith("RESULT: ")]) == 1
+
+
+def test_cli_never_prints_approval_or_trading_words(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    _, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a")
+    for banned in ("APPROVED", "REJECTED", "DEPLOYABLE", "PRODUCTION READY",
+                   "SAFE TO TRADE", "BUY", "SELL"):
+        assert banned not in out
+
+
+# --- console summary ------------------------------------------------------- #
+
+
+def test_cli_summary_has_every_canonical_count_in_order(capsys, tmp_path):
+    store = _cli_store(tmp_path, ("run_a", "run_b"))
+    _, out = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                      "--run-hash", "run_a", "--run-hash", "run_b", "--run-hash", "ghost")
+    line = next(ln for ln in out.splitlines() if ln.startswith("SUMMARY "))
+    assert line == (
+        "SUMMARY selected_runs_total=3 runs_complete=2 runs_with_warnings=0 "
+        "runs_incomplete=0 runs_unavailable=1 phase14_findings_total=2 "
+        "phase13_findings_total=0"
+    )
+
+
+def test_cli_console_has_no_timestamp_host_or_store_path(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    _, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a")
+    assert str(store.base_dir) not in out and tmp_path.name not in out
+    assert ":\\" not in out and ":/" not in out
+    for token in ("timestamp", "generated at", "hostname", "username"):
+        assert token not in out.lower()
+
+
+# --- detailed findings ----------------------------------------------------- #
+
+
+def test_cli_detailed_findings_preserve_both_namespaces(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    _, out = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                      "--run-hash", "run_a", "--run-hash", "ghost")
+    audit_lines = [ln for ln in out.splitlines() if ln.startswith("AUDIT_FINDING ")]
+    evidence_lines = [ln for ln in out.splitlines() if ln.startswith("EVIDENCE_FINDING ")]
+    assert audit_lines and evidence_lines
+    assert all("id=finding_" in ln for ln in audit_lines)
+    assert all("id=evidence_" in ln for ln in evidence_lines)
+    assert all("id=evidence_" not in ln for ln in audit_lines)
+
+
+def test_cli_findings_are_deterministic(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    _, first = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                        "--run-hash", "run_a", "--run-hash", "ghost")
+    _, second = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                         "--run-hash", "run_a", "--run-hash", "ghost")
+    assert first == second
+
+
+def test_cli_finding_lines_hide_raw_paths_and_collapse_newlines(capsys, tmp_path):
+    store = _store(tmp_path, ("run_a",))
+    path = store.base_dir / "run_a" / "metadata.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data["artifact_paths"]["predictions"] = "C:\\secret\\x.csv"
+    path.write_text(json.dumps(data), encoding="utf-8")
+    _, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a")
+    assert "secret" not in out
+    for line in out.splitlines():
+        if line.startswith(("AUDIT_FINDING ", "EVIDENCE_FINDING ")):
+            assert "\t" not in line
+            assert "actual=" not in line and "expected=" not in line
+
+
+@pytest.mark.parametrize(
+    "threshold,expect_info,expect_warning,expect_error",
+    [(None, True, True, True), ("info", True, True, True), ("warning", False, True, True),
+     ("error", False, False, True), ("critical", False, False, False)],
+)
+def test_cli_severity_filters_only_detailed_lines(capsys, tmp_path, threshold,
+                                                  expect_info, expect_warning, expect_error):
+    store = _warning_pack_store(tmp_path)          # warning-severity audit finding
+    (store.base_dir / "run_b").mkdir()             # non-run entry is not selected
+    argv = ["--artifacts-dir", store.base_dir, "--run-hash", "run_a", "--run-hash", "ghost"]
+    if threshold:
+        argv += ["--severity", threshold]
+    code, out = _cli_run(capsys, *argv)
+    detailed = [ln for ln in out.splitlines()
+                if ln.startswith(("AUDIT_FINDING ", "EVIDENCE_FINDING "))]
+    assert any("severity=warning" in ln for ln in detailed) is expect_warning
+    assert any("severity=error" in ln for ln in detailed) is expect_error
+    # canonical output is untouched by the display filter
+    assert "RESULT: INCOMPLETE" in out
+    assert "phase14_findings_total=2" in out and "phase13_findings_total=1" in out
+    assert code == 1
+
+
+def test_cli_displayed_counts_match_printed_lines(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    _, out = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                      "--run-hash", "run_a", "--run-hash", "ghost", "--severity", "error")
+    line = next(ln for ln in out.splitlines() if ln.startswith("DISPLAYED "))
+    printed14 = len([ln for ln in out.splitlines() if ln.startswith("EVIDENCE_FINDING ")])
+    printed13 = len([ln for ln in out.splitlines() if ln.startswith("AUDIT_FINDING ")])
+    assert line == (f"DISPLAYED phase14_findings={printed14} "
+                    f"phase13_findings={printed13} severity_threshold=error")
+
+
+def test_cli_severity_does_not_change_result_summary_or_exit_code(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    base_code, base_out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a")
+    filt_code, filt_out = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                                   "--run-hash", "run_a", "--severity", "critical")
+    assert base_code == filt_code
+    def canonical(text):
+        return [ln for ln in text.splitlines() if ln.startswith(("RESULT: ", "SUMMARY "))]
+    assert canonical(base_out) == canonical(filt_out)
+
+
+def test_cli_severity_does_not_change_exports(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    a, b = _out(tmp_path, "a.json"), _out(tmp_path, "b.json")
+    _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a", "--output-json", a)
+    _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+             "--output-json", b, "--severity", "critical")
+    assert a.read_bytes() == b.read_bytes()
+
+
+# --- collector delegation -------------------------------------------------- #
+
+
+def test_cli_calls_collector_exactly_once_with_the_right_arguments(capsys, tmp_path, monkeypatch):
+    store = _cli_store(tmp_path, ("run_a", "run_b"))
+    mod = _load_pack_cli()
+    calls = []
+    original = mod.collect_experiment_evidence_pack
+
+    def spy(store_arg, hashes, **kwargs):
+        calls.append((list(hashes), kwargs))
+        return original(store_arg, hashes, **kwargs)
+
+    monkeypatch.setattr(mod, "collect_experiment_evidence_pack", spy)
+    out_json, out_csv, out_md = (_out(tmp_path, n) for n in ("p.json", "p.csv", "p.md"))
+    code = mod.main([
+        "--artifacts-dir", str(store.base_dir), "--run-hash", "run_b", "--run-hash", "run_a",
+        "--metric", "sharpe", "--minimize", "--audit-level", "deep",
+        "--output-json", str(out_json), "--output-csv", str(out_csv), "--output-markdown", str(out_md),
+    ])
+    assert code in (0, 1)
+    assert len(calls) == 1, "the collector must run once for all three outputs"
+    hashes, kwargs = calls[0]
+    assert hashes == ["run_b", "run_a"]          # explicit order preserved
+    assert kwargs["audit_level"] == "deep"
+    assert kwargs["include_catalog_context"] is True
+    assert kwargs["maximize"] is False
+    assert kwargs["metric"] == "sharpe"
+
+    calls.clear()  # the catalog flag is threaded through too (without a metric)
+    assert mod.main(["--artifacts-dir", str(store.base_dir), "--run-hash", "run_a",
+                     "--no-catalog-context"]) in (0, 1)
+    assert calls[0][1]["include_catalog_context"] is False
+
+
+def test_cli_renders_each_requested_format_once(capsys, tmp_path, monkeypatch):
+    store = _cli_store(tmp_path)
+    mod = _load_pack_cli()
+    counts = {"json": 0, "csv": 0, "md": 0}
+    for key, name in (("json", "export_evidence_pack_json"), ("csv", "export_evidence_pack_csv"),
+                      ("md", "export_evidence_pack_markdown")):
+        original = getattr(mod, name)
+
+        def counting(pack, _k=key, _o=original):
+            counts[_k] += 1
+            return _o(pack)
+
+        monkeypatch.setattr(mod, name, counting)
+    mod.main(["--artifacts-dir", str(store.base_dir), "--run-hash", "run_a",
+              "--output-json", str(_out(tmp_path, "p.json")),
+              "--output-csv", str(_out(tmp_path, "p.csv")),
+              "--output-markdown", str(_out(tmp_path, "p.md"))])
+    assert counts == {"json": 1, "csv": 1, "md": 1}
+
+
+def test_cli_module_does_not_import_phase_10_12_13_internals():
+    src = _PACK_CLI_PATH.read_text(encoding="utf-8")
+    for token in ("app.experiment_audit", "app.experiment_catalog", "app.reporting",
+                  "app.experiment_registry", "app.dataset_registry", "app.db", "sqlite3",
+                  "get_connection", "local_pipeline", "batch_experiments", "hashlib", "sha256",
+                  "audit_experiment_run", "audit_experiment_store", "build_experiment_catalog",
+                  "rank_experiment_catalog", "compare_experiment_runs",
+                  "run_local_futures_ml_experiment", "train_model", "build_feature_matrix",
+                  "import requests", "urllib", "httpx", "socket", "yfinance",
+                  "sklearn", "xgboost", "lightgbm", "torch", "tensorflow"):
+        assert token not in src, "the CLI must not reference " + repr(token)
+
+
+def test_cli_module_never_reads_raw_audit_findings():
+    src = _PACK_CLI_PATH.read_text(encoding="utf-8")
+    for token in ("AuditFinding", ".audit_findings", "safe_audit_finding_dict"):
+        assert token not in src, "the CLI must not use " + repr(token)
+    assert "pack.to_dict()" in src
+
+
+def test_cli_module_writes_only_in_the_explicit_output_helper():
+    src = _PACK_CLI_PATH.read_text(encoding="utf-8")
+    assert src.count(".write_text(") == 1 and src.count(".mkdir(") == 1
+    body = src.split("def _write_output")[1].split("\ndef ")[0]
+    assert ".write_text(" in body and ".mkdir(" in body
+    for token in (".write_bytes", ".unlink", ".rmdir", ".rename", "rmtree", "shutil",
+                  "to_csv", "to_parquet", "os.remove"):
+        assert token not in src, "the CLI must not contain " + repr(token)
+
+
+def test_cli_module_has_no_repair_or_advice_language():
+    src = _PACK_CLI_PATH.read_text(encoding="utf-8").lower()
+    for token in ("repair", "quarantine", "migrate", "deploy-ready", "approve the",
+                  "promote", "profitab"):
+        assert token not in src, "the CLI must not contain " + repr(token)
+
+
+# --- outputs --------------------------------------------------------------- #
+
+
+def test_cli_writes_nothing_without_output_flags(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    before = _snapshot(store.base_dir)
+    entries_before = sorted(p.name for p in tmp_path.iterdir())
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a")
+    assert code == 0 and "WROTE:" not in out
+    assert sorted(p.name for p in tmp_path.iterdir()) == entries_before
+    assert _snapshot(store.base_dir) == before
+
+
+@pytest.mark.parametrize("flag,name,filename", [("--output-json", "JSON", "p.json"),
+                                                ("--output-csv", "CSV", "p.csv"),
+                                                ("--output-markdown", "MARKDOWN", "p.md")])
+def test_cli_writes_only_the_requested_format(capsys, tmp_path, flag, name, filename):
+    store = _cli_store(tmp_path)
+    target = _out(tmp_path, filename)
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         flag, target)
+    assert code == 0
+    assert f"WROTE: {name}" in out
+    assert sorted(p.name for p in target.parent.iterdir()) == [filename]
+    assert str(target) not in out and target.name not in out  # path-neutral message
+
+
+def test_cli_writes_all_three_outputs(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    paths = [_out(tmp_path, n) for n in ("p.json", "p.csv", "p.md")]
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--output-json", paths[0], "--output-csv", paths[1],
+                         "--output-markdown", paths[2])
+    assert code == 0
+    assert [ln for ln in out.splitlines() if ln.startswith("WROTE:")] == [
+        "WROTE: JSON", "WROTE: CSV", "WROTE: MARKDOWN"]
+    assert all(p.exists() for p in paths)
+
+
+def test_cli_outputs_are_byte_identical_across_runs(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    first, second = _out(tmp_path, "a.md"), _out(tmp_path, "b.md")
+    _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+             "--output-markdown", first)
+    _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+             "--output-markdown", second)
+    assert first.read_bytes() == second.read_bytes()
+
+
+def test_cli_creates_parent_only_for_the_explicit_output(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    target = tmp_path / "deep" / "nested" / "p.json"
+    _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+             "--output-json", target)
+    assert target.exists()
+    assert not (tmp_path / "reports").exists()
+    assert not (_REPO_ROOT / "reports").exists()
+
+
+def test_cli_rejects_output_inside_the_store(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    target = store.base_dir / "leaked.json"
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--output-json", target)
+    assert code == 3
+    assert "inside the audited ExperimentStore" in out
+    assert not target.exists() and "Traceback" not in out
+
+
+def test_cli_rejects_store_root_as_output(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--output-json", store.base_dir)
+    assert code == 3
+    assert "ExperimentStore root" in out or "existing directory" in out
+
+
+def test_cli_rejects_directory_as_output(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    target = tmp_path / "a_dir"
+    target.mkdir()
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--output-json", target)
+    assert code == 3 and "existing directory" in out
+
+
+def test_cli_rejects_equivalent_output_destinations(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    target = _out(tmp_path, "same.txt")
+    equivalent = target.parent / "." / "same.txt"
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--output-json", target, "--output-csv", equivalent)
+    assert code == 3 and "duplicates" in out
+    assert not target.exists()  # nothing written before validation completed
+
+
+def test_cli_rejects_symlink_output_into_the_store(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    link = tmp_path / "link_into_store"
+    try:
+        link.symlink_to(store.base_dir, target_is_directory=True)
+    except (OSError, NotImplementedError):
+        pytest.skip("symlink creation is not permitted on this platform")
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--output-json", link / "leaked.json")
+    assert code == 3
+    assert "inside the audited ExperimentStore" in out
+    assert not (store.base_dir / "leaked.json").exists()
+
+
+def test_cli_validates_all_outputs_before_writing_any(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    good = _out(tmp_path, "good.json")
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--output-json", good, "--output-csv", store.base_dir / "bad.csv")
+    assert code == 3
+    assert not good.exists(), "no output may be written when another path is invalid"
+    assert "WROTE:" not in out
+
+
+def test_cli_output_write_failure_exits_three(capsys, tmp_path, monkeypatch):
+    store = _cli_store(tmp_path)
+    mod = _load_pack_cli()
+
+    def boom(path_str, text):
+        raise OSError(f"disk error at {path_str}")
+
+    monkeypatch.setattr(mod, "_write_output", boom)
+    target = _out(tmp_path, "p.json")
+    code = mod.main(["--artifacts-dir", str(store.base_dir), "--run-hash", "run_a",
+                     "--output-json", str(target)])
+    out = capsys.readouterr().out
+    assert code == 3
+    assert "could not be written" in out and "WROTE:" not in out
+    assert "Traceback" not in out and str(target) not in out
+
+
+def test_cli_leaves_the_store_byte_identical(capsys, tmp_path):
+    store = _warning_pack_store(tmp_path)
+    before = _snapshot(store.base_dir)
+    _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+             "--run-hash", "ghost", "--audit-level", "deep",
+             "--output-json", _out(tmp_path, "p.json"),
+             "--output-csv", _out(tmp_path, "p.csv"),
+             "--output-markdown", _out(tmp_path, "p.md"))
+    assert _snapshot(store.base_dir) == before
+
+
+def test_cli_traversal_output_path_never_mkdirs_inside_the_store(capsys, tmp_path):
+    """The write target must be the path containment was validated against.
+
+    A lexical parent containing '..' through a non-existent component would otherwise
+    make mkdir(parents=True) recurse and create a directory inside the store."""
+    store = _cli_store(tmp_path)
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    target = store.base_dir / "x" / ".." / ".." / "outside" / "p.json"
+    before = _snapshot(store.base_dir)
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--output-json", target)
+    assert not (store.base_dir / "x").exists(), "no directory may be created in the store"
+    assert _snapshot(store.base_dir) == before
+    if code == 0:
+        assert (outside / "p.json").exists()  # written to the validated resolved path
+        assert "WROTE: JSON" in out
+    else:
+        assert code == 3 and "Traceback" not in out
+
+
+def test_cli_output_write_uses_the_validated_resolved_path(capsys, tmp_path, monkeypatch):
+    store = _cli_store(tmp_path)
+    mod = _load_pack_cli()
+    seen = []
+    original = mod._write_output
+
+    def spy(path, text):
+        seen.append(path)
+        return original(path, text)
+
+    monkeypatch.setattr(mod, "_write_output", spy)
+    target = tmp_path / "sub" / ".." / "sub2" / "p.json"
+    (tmp_path / "sub2").mkdir()
+    mod.main(["--artifacts-dir", str(store.base_dir), "--run-hash", "run_a",
+              "--output-json", str(target)])
+    assert len(seen) == 1
+    assert seen[0] == Path(target).resolve()  # resolved, not the raw lexical string
+    assert ".." not in seen[0].parts
+
+
+# --- expected selected-run problems ---------------------------------------- #
+
+
+def test_cli_malformed_run_produces_a_pack_not_a_runtime_error(capsys, tmp_path):
+    store = _store(tmp_path, ("run_a", "run_bad"))
+    (store.base_dir / "run_bad" / "metadata.json").write_text("{ not json", encoding="utf-8")
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                         "--run-hash", "run_a", "--run-hash", "run_bad")
+    assert code == 1 and "RESULT: INCOMPLETE" in out
+    assert "ERROR:" not in out and "Traceback" not in out
+
+
+def test_cli_incompatible_runs_produce_a_warning_result(capsys, tmp_path):
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a")
+    _write_run(store, "run_b", validation_end=date(2024, 9, 30))
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir,
+                         "--run-hash", "run_a", "--run-hash", "run_b")
+    assert "RESULT: WARNING" in out and code == 0
+    assert "INCOMPATIBLE_SELECTED_RUNS" in out and "Traceback" not in out
+
+
+def test_cli_missing_requested_metric_produces_incomplete(capsys, tmp_path):
+    store = _cli_store(tmp_path)
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--metric", "information_coefficient")
+    assert "RESULT: INCOMPLETE" in out and code == 1
+    assert "REQUESTED_METRIC_MISSING" in out and "Traceback" not in out
+
+
+def test_cli_metric_ranking_is_descriptive_only(capsys, tmp_path):
+    store = ExperimentStore(tmp_path / "exp", prefer_parquet=False)
+    _write_run(store, "run_a", backtest_metrics={"sharpe": 2.0})
+    _write_run(store, "run_b", backtest_metrics={"sharpe": 1.0})
+    out_md = _out(tmp_path, "p.md")
+    code, out = _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+                         "--run-hash", "run_b", "--metric", "sharpe", "--output-markdown", out_md)
+    assert code == 0 and "RESULT: COMPLETE" in out
+    text = out_md.read_text(encoding="utf-8").lower()
+    for banned in ("winner", "best run", "recommended", "approved", "deploy-ready"):
+        assert banned not in text
+
+
+def test_cli_creates_no_database_or_repo_artifacts(capsys, tmp_path):
+    before = _repo_snapshot()
+    store = _cli_store(tmp_path)
+    _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
+             "--output-json", _out(tmp_path, "p.json"))
+    assert _repo_snapshot() == before
+    assert not (_BACKEND / "data" / "quantlab.db").exists()
+    assert not (_REPO_ROOT / "quantlab.db").exists()
