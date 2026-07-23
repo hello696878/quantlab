@@ -19,9 +19,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.72.0-dev";
-const EXPECTED_NEXT_TAG = "v4.72.0-market-regime-robustness-conditional-performance-v1";
-const LATEST_VERIFIED_TAG = "v4.71.0-backtest-overfitting-multiple-testing-diagnostics-v1";
+const VERSION_LABEL = "4.73.0-dev";
+const EXPECTED_NEXT_TAG = "v4.73.0-transaction-cost-slippage-capacity-diagnostics-v1";
+const LATEST_VERIFIED_TAG = "v4.72.0-market-regime-robustness-conditional-performance-v1";
 
 const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
   { title: "Quant research labs", text: "Portfolio/macro, derivatives & volatility, crypto/DeFi/on-chain/alt-data, microstructure, real assets & credit, rates/FX — deterministic educational models with formulas beside the numbers.", route: "risklab" },
@@ -32,7 +32,8 @@ const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
 ];
 
 const CHANGELOG_CARDS: { tag: string; title: string; text: string }[] = [
-  { tag: "v4.72 (next)", title: "Regime diagnostics lab", text: "Conditional performance across no-look-ahead market regimes (trailing windows, lagged labels, integrity-stated threshold fitting), rank stability, concentration, and transition differences. Descriptive states — never predictions or switching advice." },
+  { tag: "v4.73 (next)", title: "Cost & capacity diagnostics lab", text: "Unit-safe commission/spread/slippage/square-root-impact estimates on supplied observations with a no-look-ahead liquidity-input policy, exact gross-to-net reconciliation (missing inputs stay unavailable — never zero), break-even, sensitivity, and capacity scaling with participation warnings. Estimates under configured assumptions — never fill predictions or size advice." },
+  { tag: "v4.72", title: "Regime diagnostics lab", text: "Conditional performance across no-look-ahead market regimes (trailing windows, lagged labels, integrity-stated threshold fitting), rank stability, concentration, and transition differences. Descriptive states — never predictions or switching advice." },
   { tag: "v4.71", title: "Overfitting diagnostics lab", text: "CSCV/PBO selection-bias estimates with a fixed rank convention, deflated Sharpe (PSR/DSR) under explicit trial-count assumptions, MinTRL, and Bonferroni/Holm/BH corrections. Research statistics — never robustness or a strategy pick." },
   { tag: "v4.70", title: "Feature diagnostics lab", text: "Held-out permutation importance via validation-split memberships, caveated native/coefficient references, rank stability, correlated-feature groups, and PSI/KS distribution + importance drift. Sensitivity, never causality." },
   { tag: "v4.69 (untagged)", title: "Meta-labeling lab", text: "Outcome-rule meta-labels, Platt/isotonic calibration with out-of-fold integrity via validation splits, reliability curves (Brier/ECE), and neutral threshold trade-offs with user-saved policies. Never a recommendation." },

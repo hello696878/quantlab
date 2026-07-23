@@ -159,6 +159,12 @@ invalid splits fail honestly); split fingerprints never modified.
 **Overfitting Diagnostics** — optional candidate-universe link displaying
 PBO/PSR/DSR and the universe fingerprint; Phase 53 records never rewritten.
 **Feature Diagnostics / Meta-Labeling** — optional contextual links only.
+**Cost Diagnostics** (Phase 55.0,
+[`TRANSACTION_COST_DIAGNOSTICS_LAB.md`](TRANSACTION_COST_DIAGNOSTICS_LAB.md))
+— a cost-diagnostic run may join this lab's **stored** effective
+assignments of one named definition by exact timestamp to condition cost
+estimates on regimes; assignments are never recomputed and this lab's
+fingerprints and results are never modified by that join.
 
 ## 13. Demo fixture
 

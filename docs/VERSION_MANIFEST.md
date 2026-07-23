@@ -13,9 +13,9 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.72.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
+**`4.73.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
 expected tag on completion of the current phase's review is
-`v4.72.0-market-regime-robustness-conditional-performance-v1` (Phase 54) —
+`v4.73.0-transaction-cost-slippage-capacity-diagnostics-v1` (Phase 55) —
 "expected" because tags are created by the user after review, never
 automatically. Note: the v4.69 meta-labeling tag was never created; that
 work is included in the `v4.70.0` tag's history (a recorded convention
@@ -25,9 +25,9 @@ deviation, not repaired since tags are never moved).
 
 The **v4.x productization / platformization series**: v4.0.0 (local-first
 research terminal) → v4.7.0 (showcase candidate) → v4.8+ (one milestone tag
-per feature phase). 117 local tags existed when this manifest was last
-updated (Phase 54.0); the latest verified tag is
-`v4.71.0-backtest-overfitting-multiple-testing-diagnostics-v1` (the frozen
+per feature phase). 118 local tags existed when this manifest was last
+updated (Phase 55.0); the latest verified tag is
+`v4.72.0-market-regime-robustness-conditional-performance-v1` (the frozen
 release-candidate tag is
 `v4.60.0-public-release-candidate-demo-freeze-v1`).
 

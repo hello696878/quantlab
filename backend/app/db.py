@@ -979,6 +979,183 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_rcr_candidate ON regime_conditional_results(run_id, candidate_id)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Transaction Cost / Slippage / Capacity Diagnostics Lab (Phase 55.0).
+        # Runs keep their normalized input observations as bounded JSON
+        # (≤2000 observations); per-observation reconciliation, sensitivity
+        # scenarios and capacity scales are explicit rows; the cost model is
+        # one row per run — docs/TRANSACTION_COST_DIAGNOSTICS_LAB.md.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cost_diagnostic_runs (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                TEXT    NOT NULL,
+                updated_at                TEXT    NOT NULL,
+                name                      TEXT    NOT NULL,
+                description               TEXT    NOT NULL DEFAULT '',
+                status                    TEXT    NOT NULL DEFAULT 'pending',
+                observation_type          TEXT    NOT NULL,
+                candidate_count           INTEGER NOT NULL DEFAULT 0,
+                observation_count         INTEGER NOT NULL DEFAULT 0,
+                currency                  TEXT,
+                integrity_status          TEXT    NOT NULL DEFAULT 'unknown',
+                completeness_status       TEXT    NOT NULL DEFAULT 'invalid',
+                gross_total               REAL,
+                net_total                 REAL,
+                total_cost                REAL,
+                participation_warning_count INTEGER NOT NULL DEFAULT 0,
+                unavailable_input_count   INTEGER NOT NULL DEFAULT 0,
+                universe_fingerprint      TEXT    NOT NULL,
+                cost_model_fingerprint    TEXT    NOT NULL,
+                configuration_json        TEXT    NOT NULL DEFAULT '{}',
+                configuration_fingerprint TEXT    NOT NULL,
+                result_fingerprint        TEXT,
+                observations_json         TEXT    NOT NULL DEFAULT '[]',
+                aggregates_json           TEXT,
+                breakeven_json            TEXT,
+                regimes_json              TEXT,
+                warnings_json             TEXT    NOT NULL DEFAULT '[]',
+                dataset_version_id        INTEGER REFERENCES dataset_versions(id),
+                validation_run_id         INTEGER REFERENCES validation_runs(id),
+                overfitting_run_id        INTEGER
+                                          REFERENCES overfitting_diagnostic_runs(id),
+                regime_run_id             INTEGER
+                                          REFERENCES regime_diagnostic_runs(id),
+                regime_definition_id      TEXT,
+                feature_diagnostics_run_id INTEGER REFERENCES feature_runs(id),
+                meta_label_run_id         INTEGER REFERENCES meta_label_runs(id),
+                experiment_id             INTEGER REFERENCES experiment_registry(id),
+                is_baseline               INTEGER NOT NULL DEFAULT 0,
+                baseline_scope            TEXT,
+                completed_at              TEXT,
+                duration_ms               INTEGER,
+                app_version               TEXT,
+                git_commit                TEXT,
+                notes                     TEXT    NOT NULL DEFAULT '',
+                error_message             TEXT,
+                demo_key                  TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cost_models (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                INTEGER NOT NULL
+                                      REFERENCES cost_diagnostic_runs(id),
+                commission_json       TEXT    NOT NULL DEFAULT '{}',
+                spread_json           TEXT    NOT NULL DEFAULT '{}',
+                slippage_json         TEXT    NOT NULL DEFAULT '{}',
+                impact_json           TEXT    NOT NULL DEFAULT '{}',
+                liquidity_policy_json TEXT    NOT NULL DEFAULT '{}',
+                fingerprint           TEXT    NOT NULL,
+                created_at            TEXT    NOT NULL,
+                UNIQUE (run_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cost_observation_results (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id               INTEGER NOT NULL
+                                     REFERENCES cost_diagnostic_runs(id),
+                observation_id       TEXT    NOT NULL,
+                candidate_id         TEXT    NOT NULL,
+                timestamp            TEXT    NOT NULL,
+                side                 TEXT,
+                quantity             REAL,
+                traded_notional      REAL,
+                turnover             REAL,
+                gross_value          REAL    NOT NULL,
+                gross_return         REAL,
+                commission_cost      REAL,
+                spread_cost          REAL,
+                slippage_cost        REAL,
+                impact_cost          REAL,
+                total_cost           REAL,
+                net_value            REAL,
+                net_return           REAL,
+                completeness         TEXT    NOT NULL DEFAULT 'invalid',
+                participation        REAL,
+                participation_status TEXT,
+                breakeven_bps        REAL,
+                regime_label         TEXT,
+                unavailable_json     TEXT    NOT NULL DEFAULT '[]',
+                warnings_json        TEXT    NOT NULL DEFAULT '[]',
+                UNIQUE (run_id, observation_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cost_sensitivity_results (
+                id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                 INTEGER NOT NULL
+                                       REFERENCES cost_diagnostic_runs(id),
+                scenario_index         INTEGER NOT NULL,
+                is_base                INTEGER NOT NULL DEFAULT 0,
+                commission_multiplier  REAL    NOT NULL,
+                spread_multiplier      REAL    NOT NULL,
+                slippage_multiplier    REAL    NOT NULL,
+                impact_multiplier      REAL    NOT NULL,
+                total_cost             REAL,
+                net_total              REAL,
+                net_positive_rate      REAL,
+                gross_positive_net_nonpositive_count INTEGER NOT NULL DEFAULT 0,
+                unavailable_cost_count INTEGER NOT NULL DEFAULT 0,
+                fingerprint            TEXT    NOT NULL,
+                UNIQUE (run_id, scenario_index)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS cost_capacity_results (
+                id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                      INTEGER NOT NULL
+                                            REFERENCES cost_diagnostic_runs(id),
+                scale                       REAL    NOT NULL,
+                is_base                     INTEGER NOT NULL DEFAULT 0,
+                traded_notional             REAL,
+                mean_participation          REAL,
+                max_participation           REAL,
+                above_threshold_count       INTEGER NOT NULL DEFAULT 0,
+                commission_total            REAL,
+                spread_total                REAL,
+                slippage_total              REAL,
+                impact_total                REAL,
+                total_cost                  REAL,
+                gross_total                 REAL,
+                net_total                   REAL,
+                unavailable_liquidity_count INTEGER NOT NULL DEFAULT 0,
+                excluded_count              INTEGER NOT NULL DEFAULT 0,
+                UNIQUE (run_id, scale)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_cdr_created ON cost_diagnostic_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_status ON cost_diagnostic_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_integrity ON cost_diagnostic_runs(integrity_status)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_completeness ON cost_diagnostic_runs(completeness_status)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_dataset ON cost_diagnostic_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_vrun ON cost_diagnostic_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_orun ON cost_diagnostic_runs(overfitting_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_rrun ON cost_diagnostic_runs(regime_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_config_fp ON cost_diagnostic_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_universe_fp ON cost_diagnostic_runs(universe_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_baseline ON cost_diagnostic_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_cdr_scope ON cost_diagnostic_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_cdr_demo_key ON cost_diagnostic_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_cm_run ON cost_models(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cor_run ON cost_observation_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cor_candidate ON cost_observation_results(run_id, candidate_id)",
+            "CREATE INDEX IF NOT EXISTS idx_csr_run ON cost_sensitivity_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ccr_run ON cost_capacity_results(run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

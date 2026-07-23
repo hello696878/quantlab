@@ -62,6 +62,7 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   thresholds), Feature Diagnostics (importance, stability + drift),
   Overfitting Diagnostics (PBO, deflated Sharpe + multiple testing),
   Regime Diagnostics (conditional performance + no-look-ahead regimes),
+  Cost & Capacity (execution-cost, impact + capacity diagnostics),
   Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
@@ -274,6 +275,16 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Cost & Capacity (55.0)** — execution-cost diagnostics under explicitly
+  configured assumptions: unit-safe commission / spread / slippage /
+  square-root market-impact estimates on supplied trade or period
+  observations, a no-look-ahead policy for liquidity inputs (trailing
+  windows with lag ≥ 1; centered windows rejected), exact gross-to-net
+  reconciliation where missing inputs stay unavailable — never zero —
+  plus break-even, bounded cost-sensitivity and capacity-scaling
+  estimates with participation warnings. Estimates under configured
+  assumptions — never fill predictions, capacity guarantees, size/broker
+  recommendations, or execution advice.
 - **Regime Diagnostics (54.0)** — conditional performance across explicitly
   defined market regimes (volatility, trend, liquidity, drawdown state,
   categorical, combined) formed under a strict no-look-ahead contract:

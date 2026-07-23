@@ -18,6 +18,49 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Transaction Cost, Slippage, Market Impact & Capacity Diagnostics Lab
+  v1** (v4.73 series): a local-first execution-cost diagnostics lab —
+  explicitly configured commission / spread / slippage / square-root
+  market-impact assumptions applied to supplied trade-level (monetary) or
+  period-level (return-space) observations with unit-safe conversions
+  (1 bp = 0.0001, explicit percent, tick/price/per-contract/per-unit/
+  per-order units, one currency per run, no silent FX conversion);
+  per-side round-trip semantics with floor-then-cap fee bounds, an
+  explicitly configured spread fraction (no silent half-spread), a
+  never-favourable modelled-slippage stress multiplier with supplied
+  realized slippage passed through un-stressed, and a documented
+  `coefficient × volatility × √participation` impact approximation with
+  explicit participation modes and unit-matched ADV; an adversarially
+  verified execution-input no-look-ahead policy (trailing windows with
+  lag ≥ 1 only, chronologically validated series, centered windows and
+  negative lags rejected, no silent fallback from trailing derivation to
+  unclassified supplied inputs, mutation-proven future-data invariance)
+  with seven provenance-based integrity states; exact gross-to-net
+  reconciliation where missing inputs stay unavailable — never zero —
+  with complete/partial/gross-only completeness; aggregates with neutral
+  wording, break-even diagnostics (bps of notional, max cost multiplier,
+  per-component multipliers, impact-coefficient linearity), a bounded
+  deduplicated sensitivity grid with a marked base scenario, capacity
+  scaling where fixed fees stay fixed and impact scales as scale^1.5
+  (optional integer-contract policy with reported exclusions), and
+  participation-threshold warnings; costs conditioned on stored Phase 54
+  regime assignments (never recomputed); gross + cost-adjusted candidate-
+  matrix fingerprints beside read-only Phase 53 links; five new SQLite
+  tables; scope-transactional baselines gated on completeness and
+  integrity; a 6-run deterministic demo (12 spec cases); the **Cost &
+  Capacity** view (gross-to-net waterfall, composition, break-even,
+  sensitivity, capacity curve with printed values, regime cost table);
+  43 backend tests verified by a 5-agent adversarial pass (197
+  hand-computed checks; every finding fixed with a regression); an
+  18-test Playwright spec; five docs. Everything is an estimate under
+  configured assumptions — no fill prediction, capacity guarantee, order
+  execution, size/broker recommendation, profitability proof, or
+  investment/execution advice.
+
+## Grouped release areas — v4.72 (conditional-performance series)
+
+### Market regime robustness & conditional performance lab (v4.72)
+
 - **Market Regime Robustness & Conditional Performance Lab v1** (v4.72
   series): a local-first regime-diagnostics lab — candidate outcomes
   conditioned on explicitly defined market regimes (volatility, trend,

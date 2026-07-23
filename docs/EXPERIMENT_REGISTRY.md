@@ -294,7 +294,17 @@ integrity status as parameters, coverage/stability counts as metrics, both
 fingerprints) — idempotently: a run creates at most one record and
 re-execution reuses it.  No recommendation is stored.
 
-## 22. Future extensions
+## 22. Cost Diagnostics records (Phase 55.0)
+
+Executed cost-diagnostic runs
+([`TRANSACTION_COST_DIAGNOSTICS_LAB.md`](TRANSACTION_COST_DIAGNOSTICS_LAB.md))
+can create experiment records here (module `transaction_cost_diagnostics`,
+cost-model choices + integrity/completeness states as parameters,
+gross/net/cost totals and participation-warning counts as metrics, both
+fingerprints) — idempotently: a run creates at most one record and
+re-execution reuses it.  No recommendation is stored.
+
+## 23. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

@@ -158,6 +158,13 @@ run name and held-out integrity status; records are never rewritten.
 [`REGIME_DIAGNOSTICS_LAB.md`](REGIME_DIAGNOSTICS_LAB.md)) may link a run
 from this lab to show its candidate universe alongside PBO/PSR/DSR — this
 lab's records are never rewritten by that link.
+**Cost Diagnostics** (Phase 55.0,
+[`TRANSACTION_COST_DIAGNOSTICS_LAB.md`](TRANSACTION_COST_DIAGNOSTICS_LAB.md))
+may likewise link a run read-only and records both a gross and a
+cost-adjusted (net) candidate-matrix fingerprint; a PBO comparison for net
+returns requires a **new explicitly executed** run in this lab on the net
+matrix — stored PBO values are never reused or rewritten for net returns,
+and costs are never claimed to eliminate or prove overfitting.
 
 ## 17. Demo fixture
 

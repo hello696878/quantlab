@@ -64,6 +64,7 @@ import MetaLabelingPanel from "@/components/MetaLabelingPanel";
 import FeatureDiagnosticsPanel from "@/components/FeatureDiagnosticsPanel";
 import OverfittingDiagnosticsPanel from "@/components/OverfittingDiagnosticsPanel";
 import RegimeDiagnosticsPanel from "@/components/RegimeDiagnosticsPanel";
+import CostDiagnosticsPanel from "@/components/CostDiagnosticsPanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
@@ -544,6 +545,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Market Regime Robustness & Conditional Performance Lab",
     subtitle:
       "A local-first regime-diagnostics lab: candidate outcomes are conditioned on explicitly defined market regimes — volatility, trend, liquidity, drawdown state (trailing peak only), user-supplied categorical states, and bounded combined regimes — under a strict no-look-ahead policy: every label is formed from trailing windows with an explicit availability lag (centered windows and negative lags are rejected outright), and threshold-fitting subsets carry distinct integrity states (verified causal rule, verified from a validation split's recorded training membership, declared, full-sample descriptive — never called leakage-safe). Conditional metrics keep observation counts prominent, rare regimes are honestly withheld with low-coverage warnings, rank stability / concentration / transition differences are measured observations, and everything persists in local SQLite with deterministic SHA-256 fingerprints and links to the Experiment Registry, Dataset Lineage, Model Validation, Overfitting and Feature Diagnostics records. Regimes are never predictions; nothing here proves causality or profitability, switches strategies, or constitutes investment, trading, or risk advice.",
+  },
+  costdiagnostics: {
+    title: "Transaction Cost, Slippage & Capacity Diagnostics Lab",
+    subtitle:
+      "A local-first execution-cost diagnostics lab: explicitly configured commission, spread, slippage and square-root market-impact assumptions are applied to supplied historical trade-level or period-level observations, with every cost input declaring its unit (basis points, percent, ticks, price units, per contract, per order — 1 bp = 0.0001, no ambiguous percentages, no silent FX conversion), a strict no-look-ahead policy for spread / volatility / ADV inputs (trailing windows with lag ≥ 1 only; centered windows and negative lags are rejected outright; full-sample averages stay descriptive), and transparent gross-to-net reconciliation where total cost equals the exact component sum, net equals gross minus total cost, and a missing input stays unavailable — never zero. Break-even levels, a bounded deterministic cost-sensitivity grid, capacity scaling (fixed fees stay fixed, per-unit fees scale, impact responds through participation) and participation-threshold warnings are estimates under configured assumptions, persisted in local SQLite with deterministic SHA-256 fingerprints and read-only links to prior registries. Nothing here executes orders, predicts real fills, guarantees market capacity, recommends trade sizes or brokers, proves profitability, or constitutes investment or execution advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1135,6 +1141,7 @@ export default function HomePage() {
     { view: "featurediagnostics", title: "Open Feature Diagnostics", keywords: "feature importance permutation importance held out held-out stability rank stability spearman kendall top-k overlap correlated features correlation groups multicollinearity distribution drift psi population stability index ks statistic importance drift impurity native importance coefficient decision tree logistic regression baseline compare export demo" },
     { view: "overfittingdiagnostics", title: "Open Overfitting Diagnostics", keywords: "backtest overfitting pbo probability of backtest overfitting cscv combinatorially symmetric cross validation selection bias deflated sharpe probabilistic sharpe psr dsr minimum track record mintrl multiple testing bonferroni holm benjamini hochberg false discovery rate fwer fdr p-value trials expected maximum sharpe candidate dependence lambda logit baseline compare export demo" },
     { view: "regimediagnostics", title: "Open Regime Diagnostics", keywords: "market regime volatility regime trend regime liquidity regime drawdown state combined regime conditional performance no look-ahead lookahead trailing window lag threshold quantile training-only full-sample coverage rank stability concentration herfindahl hhi entropy regime transition timeline effective label integrity baseline compare export demo" },
+    { view: "costdiagnostics", title: "Open Cost & Capacity", keywords: "transaction cost commission fee spread slippage market impact square root impact capacity notional scaling participation rate adv average daily volume liquidity turnover gross net reconciliation waterfall break-even breakeven basis points bps ticks per contract per order sensitivity grid stress multiplier fill execution cost diagnostics baseline compare export demo" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
@@ -2317,6 +2324,7 @@ export default function HomePage() {
         {view === "featurediagnostics" && <FeatureDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
         {view === "overfittingdiagnostics" && <OverfittingDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
         {view === "regimediagnostics" && <RegimeDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
+        {view === "costdiagnostics" && <CostDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

@@ -77,6 +77,27 @@ protected and why).
   differ, export is path/credential-free, dark-theme controls and column
   geometry hold, and 1024/768 have no page overflow. Only writes: the
   idempotent demo seeds.
+- **Cost & Capacity** (Phase 55.0, `cost-diagnostics.spec.ts`): the lab
+  opens with its explicit-assumptions and no-execution disclaimers, the
+  6-run demo seeds idempotently, completeness filters work, the flagship
+  run's waterfall reconciles exactly (component sum = total cost and
+  net = gross − total, asserted numerically through the same API the page
+  uses), the partial-input run keeps missing spread/ADV unavailable —
+  never zero — with the missing components named per observation, the
+  high-turnover run reports its gross-positive→net-nonpositive count with
+  no "failed trades" wording, the sensitivity grid marks the base scenario
+  with no optimal-scenario wording (banned-wording regex asserted), the
+  capacity results show participation rising monotonically with scale and
+  fixed per-order fees constant while per-contract slippage scales 5× at
+  5× (asserted numerically), the participation-threshold warning renders,
+  the regime-linked run's cost table joins stored assignments with
+  never-recomputed wording, the invalid future-looking run's baseline
+  attempt is rejected with a 409 (asserted as the only failed request),
+  an eligible run marks baseline as a comparison reference, comparison
+  stays neutral, export is path/credential/NaN-free, dark-theme controls
+  and explicit units hold, and 1024/768 have no page overflow. Only
+  writes: the idempotent demo seeds plus the deliberate baseline marking
+  on a demo run.
 - **Overfitting Diagnostics** (Phase 53.0, `overfitting-diagnostics.spec.ts`):
   the lab opens with its selection-bias disclaimer, the 4-run demo seeds
   idempotently, metric/status filters work, the high-PBO noise demo shows

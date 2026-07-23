@@ -232,6 +232,12 @@ affect the thresholds, unknown memberships and invalid or leakage-failed
 splits fail honestly, and split memberships/fingerprints are never
 modified.
 
+The Cost Diagnostics Lab
+([`TRANSACTION_COST_DIAGNOSTICS_LAB.md`](TRANSACTION_COST_DIAGNOSTICS_LAB.md),
+Phase 55.0) may link a validation run to display its method, leakage status
+and fingerprints beside a cost-diagnostic run; cost evaluation is read-only
+— split memberships and fingerprints are never changed.
+
 ## 21. Limitations
 
 Sample membership is stored as bounded JSON arrays (≤2000 samples/run —

@@ -150,7 +150,21 @@ thresholds are always flagged as descriptive, and no significance testing
 exists in v1. The lab never predicts regimes, never switches strategies,
 and never calls a regime profitable or safe.
 
-## 19. Future improvements (openly planned)
+## 19. Cost estimates are configured assumptions, not fills
+
+The Cost Diagnostics Lab applies explicitly configured commission, spread,
+slippage and square-root market-impact assumptions to supplied historical
+observations. Every output is an estimate under those assumptions: modelled
+slippage predicts no actual fill, the impact model is a bounded research
+approximation with a caller-chosen coefficient, and capacity scaling assumes
+historical per-unit results scale with size while saying nothing about fill
+availability — it is never executable capacity or a size recommendation.
+Missing inputs stay honestly unavailable (never zero), full-sample liquidity
+averages stay descriptive, break-even levels describe the measured sample
+only, and the lab never executes orders, recommends brokers or sizes,
+proves profitability, or certifies execution quality.
+
+## 20. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

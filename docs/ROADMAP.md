@@ -1677,6 +1677,64 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 55.0 — Transaction Cost, Slippage, Market Impact & Capacity Diagnostics Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first execution-cost
+  diagnostics lab (`backend/app/cost_diagnostics/`) applying explicitly
+  configured cost assumptions to supplied trade-level (monetary) or
+  period-level (return-space) observations. Unit-safe cost policy
+  (1 bp = 0.0001, explicit percent, ticks requiring a tick size,
+  price-units/per-contract/per-unit/per-order, one currency per run, no
+  silent FX conversion, original value + unit always stored); commission
+  models with explicit entry/exit order counts, per-side per-contract/
+  per-unit semantics and floor-then-cap minimum/maximum; spread cost at
+  an **explicitly configured fraction** of the quoted spread (no silent
+  half-spread) with explicit sides; deterministic slippage with a
+  never-favourable stress multiplier that never touches supplied realized
+  slippage (the only permitted favourable channel); and a documented
+  square-root market-impact approximation
+  (`coefficient × volatility × √participation` per side, explicit
+  quantity/notional participation modes, unit-matched ADV, zero at zero
+  participation, unavailable — never zero — on missing inputs).
+- **Execution-input no-look-ahead policy:** trailing ADV/volatility
+  derivation uses `values[j−lag−lookback+1 … j−lag]` with lag ≥ 1 only;
+  liquidity-series timestamps are parsed and chronologically validated;
+  centered windows and negative lags are rejected; a configured trailing
+  derivation never silently falls back to unclassified supplied inputs;
+  seven provenance-based integrity states with least-trusted run
+  aggregation; future-data mutation tests prove invariance at engine and
+  service level.
+- **Diagnostics:** exact gross-to-net reconciliation (total = component
+  sum, net = gross − total, missing inputs stay unavailable with
+  complete/partial/gross-only states), neutral aggregates (gross-positive
+  becoming net-nonpositive — never "failed trades"), break-even levels
+  with documented formulas, a bounded deduplicated sensitivity grid
+  (base scenario marked, realized slippage never scaled, no scenario
+  called optimal), capacity scaling (fixed fees fixed, per-unit fees
+  scaling, impact ∝ scale^1.5, optional integer-contract exclusions,
+  "estimated under configured assumptions" labelling), participation
+  thresholds with visible >100% warnings, and costs conditioned on stored
+  Phase 54 regime assignments (joined by exact timestamp, never
+  recomputed). Delay/adverse-price stress honestly omitted in v1 (no
+  per-bar price paths) with the decision recorded per run.
+- **Infrastructure:** four SHA-256 fingerprints plus per-scenario
+  fingerprints; five new SQLite tables with idempotent migration;
+  scope-transactional baselines gated on completeness + integrity;
+  read-only integrations (Experiment Registry record, Dataset Lineage,
+  Model Validation, Regime, Overfitting with gross + net candidate-matrix
+  fingerprints and immutable stored PBO); 13-route API; the **Cost &
+  Capacity** view (waterfall, composition, aggregates, break-even,
+  observations, sensitivity, capacity curve with printed values, regime
+  table; dark controls, explicit units, responsive); 6-run deterministic
+  demo covering the 12 spec cases; export `cost_diagnostics_export_v1`.
+- **Verification:** 43 backend tests (**3616 passed** full suite) with a
+  5-agent adversarial verification workflow (197 hand-computed checks —
+  every finding fixed with a regression test); 18-test Playwright spec
+  (full suite **113 passed**); `npx tsc --noEmit` clean; five new docs.
+  **Estimates under configured assumptions — no fill prediction, capacity
+  guarantee, order execution, size/broker recommendation, profitability
+  proof, or investment/execution advice.**
+
 ### Phase 54.0 — Market Regime Robustness & Conditional Performance Lab v1 ✅
 
 - **Research-infrastructure phase:** a local-first regime-diagnostics lab —
