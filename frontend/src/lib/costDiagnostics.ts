@@ -55,6 +55,10 @@ export interface ComponentTotals {
 export interface Aggregates {
   observation_count: number;
   gross_total: number;
+  // gross summed over the costed observations only — the basis net_total and
+  // the break-even diagnostics reconcile against; equals gross_total when every
+  // observation is costed (optional for backward compatibility with old runs).
+  gross_total_costed?: number | null;
   net_total: number | null;
   total_cost: number | null;
   component_totals: ComponentTotals;
@@ -93,6 +97,10 @@ export interface RegimeRow {
   regime_label: string;
   observation_count: number;
   gross_total: number;
+  // gross over the costed observations in this regime group; net reconciles
+  // against this (net = gross_total_costed − total_cost), not the whole-group
+  // gross_total, when the group contains gross-only/partial members.
+  gross_total_costed?: number | null;
   total_cost: number;
   net_total: number | null;
   spread_total: number | null;

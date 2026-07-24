@@ -576,6 +576,94 @@ def test_breakeven_diagnostics_hand_computed():
     assert be2["component_breakeven_multipliers"]["commission"]["multiplier"] is None
 
 
+def test_aggregate_reconciles_over_costed_subset_with_gross_only():
+    # A gross_only observation contributes gross but neither cost nor net; the
+    # published triple net_total == gross_total_costed - total_cost must hold
+    # over the COSTED subset, never over the whole-run gross (which would leave
+    # net_total unreconcilable against gross_total - total_cost).
+    costed = _obs_result("a", 100.0, {"commission": 20.0}, notional=1000.0)
+    gross_only = _obs_result("b", 1000.0, {}, notional=5000.0)
+    assert gross_only["net_value"] is None  # helper builds a true gross_only row
+    agg = agg_mod.aggregate_results([costed, gross_only])
+    assert agg["gross_total"] == pytest.approx(1100.0)      # whole run
+    assert agg["gross_total_costed"] == pytest.approx(100.0)  # costed subset
+    assert agg["total_cost"] == pytest.approx(20.0)
+    assert agg["net_total"] == pytest.approx(80.0)
+    # the identity reconciles against the costed gross, NOT the whole-run gross
+    assert agg["net_total"] == pytest.approx(
+        agg["gross_total_costed"] - agg["total_cost"])
+    assert agg["net_total"] != pytest.approx(
+        agg["gross_total"] - agg["total_cost"])
+    # cost ratios pair the costed cost with the costed gross / notional
+    assert agg["cost_fraction_of_gross_magnitude"] == pytest.approx(20.0 / 100.0)
+    assert agg["cost_fraction_of_traded_notional"] == pytest.approx(20.0 / 1000.0)
+    # break-even uses the costed gross and the costed observation count
+    be = agg_mod.breakeven_diagnostics(agg, impact_coefficient=None)
+    assert be["mean_breakeven_cost_per_observation"] == pytest.approx(100.0)
+    assert be["max_cost_multiplier"] == pytest.approx(100.0 / 20.0)
+    # when every observation is costed the costed gross equals the whole gross
+    full = agg_mod.aggregate_results([costed, _obs_result("c", 40.0,
+                                                          {"commission": 5.0})])
+    assert full["gross_total_costed"] == pytest.approx(full["gross_total"])
+
+
+def test_aggregate_identity_period_type_with_gross_only():
+    # period runs pair the turnover basis with the costed subset; a gross_only
+    # period observation must not leak its gross or turnover into the reconciled
+    # net / break-even basis.
+    def prow(oid, gross, comps, turnover):
+        vals = {n: comps.get(n) for n in ("commission", "spread",
+                                          "slippage", "impact")}
+        avail = {n: v for n, v in vals.items() if v is not None}
+        total = sum(avail.values()) if avail else None
+        return {
+            "observation_id": oid, "candidate_id": "a", "timestamp": _ts(0),
+            "gross_value": gross, "component_values": vals,
+            "total_cost": total,
+            "net_value": (gross - total) if total is not None else None,
+            "completeness": "complete" if avail else "gross_only",
+            "unavailable_components": [], "traded_notional": None,
+            "turnover": turnover, "participation": None,
+        }
+    rows = [prow("a", 0.01, {"commission": 0.002}, 0.5),
+            prow("b", 0.05, {}, 0.4)]  # b is gross_only
+    agg = agg_mod.aggregate_results(rows, observation_type="period")
+    assert agg["gross_total"] == pytest.approx(0.06)
+    assert agg["gross_total_costed"] == pytest.approx(0.01)
+    assert agg["total_cost"] == pytest.approx(0.002)
+    assert agg["net_total"] == pytest.approx(0.008)
+    assert agg["net_total"] == pytest.approx(
+        agg["gross_total_costed"] - agg["total_cost"])
+    # basis is the COSTED turnover (0.5), never the gross_only obs's 0.4
+    assert agg["notional_basis_total"] == pytest.approx(0.5)
+    be = agg_mod.breakeven_diagnostics(agg, impact_coefficient=None)
+    assert be["status"] == "available"
+    # 0.01 / 0.5 / 0.0001 = 200 bps; mean over the single costed obs = 0.01
+    assert be["aggregate_breakeven_bps_of_notional"] == pytest.approx(200.0)
+    assert be["mean_breakeven_cost_per_observation"] == pytest.approx(0.01)
+
+
+def test_aggregate_identity_partial_completeness():
+    # a PARTIAL observation (some components unavailable) stays costed; the
+    # identity holds over the costed set and break-even's per-component "others"
+    # math must handle an unavailable component correctly.
+    partial = _obs_result("p", 100.0, {"commission": 10.0})
+    partial["unavailable_components"] = ["spread"]
+    partial["completeness"] = "partial"
+    complete = _obs_result("c", 50.0, {"commission": 5.0, "spread": 2.0})
+    agg = agg_mod.aggregate_results([partial, complete])
+    assert agg["partial_result_count"] == 1
+    assert agg["gross_total_costed"] == pytest.approx(150.0)
+    assert agg["total_cost"] == pytest.approx(17.0)  # 10 + 5 + 2
+    assert agg["net_total"] == pytest.approx(133.0)
+    assert agg["net_total"] == pytest.approx(
+        agg["gross_total_costed"] - agg["total_cost"])
+    be = agg_mod.breakeven_diagnostics(agg, impact_coefficient=None)
+    # commission base 15, others = spread 2: (150 - 2) / 15
+    assert be["component_breakeven_multipliers"]["commission"]["multiplier"] \
+        == pytest.approx((150.0 - 2.0) / 15.0)
+
+
 # ---------------------------------------------------------------------------
 # Sensitivity + capacity
 # ---------------------------------------------------------------------------
@@ -784,6 +872,32 @@ def test_fingerprint_material_changes_and_nan_rejection():
         fp_mod.cost_model_fingerprint({"v": float("nan")}, {}, {}, {}, {})
 
 
+def test_fingerprint_covers_ticksize_costinputs_and_liquidity_series():
+    # These three inputs change results and feed the baseline scope; two runs
+    # that differ only in one of them must NOT collide on a fingerprint.
+    none = {"model": "none"}
+    # tick_size is a cost-model parameter (prices tick-denominated costs)
+    cm_a = fp_mod.cost_model_fingerprint(none, none, none, none, {}, 0.25)
+    cm_b = fp_mod.cost_model_fingerprint(none, none, none, none, {}, 0.50)
+    assert cm_a != cm_b
+    assert cm_a == fp_mod.cost_model_fingerprint(none, none, none, none, {}, 0.25)
+    # per-observation supplied execution inputs are hashed into the universe
+    trades, currency = core.normalize_trades(_trades(2))
+    with_inputs, _ = core.normalize_trades(
+        [_trade(0, cost_inputs={"realized_slippage": {"value": -0.5}}),
+         _trade(1)])
+    base_fp = fp_mod.observation_universe_fingerprint(trades, "trade", currency, None)
+    inputs_fp = fp_mod.observation_universe_fingerprint(
+        with_inputs, "trade", currency, None)
+    assert base_fp != inputs_fp
+    # the run-level liquidity series is hashed into the universe as well
+    series_fp = fp_mod.observation_universe_fingerprint(
+        trades, "trade", currency, None, {"volume": [1.0, 2.0]})
+    assert series_fp != base_fp
+    assert series_fp != fp_mod.observation_universe_fingerprint(
+        trades, "trade", currency, None, {"volume": [1.0, 3.0]})
+
+
 def test_reexecution_is_deterministic():
     run = service.create_run(_payload())
     first = service.execute_run(run["id"])
@@ -840,6 +954,58 @@ def test_regime_integration_uses_stored_assignments():
             spread={"model": "none"}, slippage={"model": "none"},
             impact={"model": "none"},
             regime_run_id=regime_id, regime_definition_id="nope"))
+
+
+def test_regime_rows_reconcile_over_costed_subset():
+    # A regime group containing a gross_only observation must expose
+    # gross_total_costed so net_total == gross_total_costed - total_cost, exactly
+    # like aggregate_results — the whole-group gross is reported separately.
+    from collections import Counter
+    from app.regime_diagnostics.demo import seed_demo_regime_diagnostics
+    from app.regime_diagnostics import store as rd_store
+    seed_demo_regime_diagnostics()
+    regime_id = rd_store.run_demo_key_id("demo:rd:volatility-trend")
+    rrun = rd_store.get_run(regime_id)
+    stamps = rrun["timestamps"]
+    definition = next(d for d in rd_store.list_definitions(regime_id)
+                      if d["definition_id"] == "vol")
+    # a label that appears at least twice, so one group holds a costed AND a
+    # gross_only observation
+    label = next(lbl for lbl, c in Counter(definition["assignments"]).items()
+                 if lbl is not None and c >= 2)
+    idxs = [i for i, a in enumerate(definition["assignments"]) if a == label][:2]
+
+    def orow(oid, ts, gross, comps):
+        vals = {n: comps.get(n) for n in ("commission", "spread",
+                                          "slippage", "impact")}
+        avail = {n: v for n, v in vals.items() if v is not None}
+        total = sum(avail.values()) if avail else None
+        return {
+            "observation_id": oid, "candidate_id": "a", "timestamp": ts,
+            "gross_value": gross, "component_values": vals,
+            "total_cost": total,
+            "net_value": (gross - total) if total is not None else None,
+            "completeness": "complete" if avail else "gross_only",
+            "unavailable_components": [], "participation": None,
+        }
+    obs_results = [
+        orow("c0", stamps[idxs[0]], 100.0, {"commission": 20.0}),
+        orow("g0", stamps[idxs[1]], 1000.0, {}),  # gross_only, same regime
+    ]
+    block = service._regime_join(
+        {"regime_run_id": regime_id, "regime_definition_id": "vol"},
+        obs_results)
+    row = next(r for r in block["rows"] if r["regime_label"] == label)
+    assert row["gross_total"] == pytest.approx(1100.0)        # whole group
+    assert row["gross_total_costed"] == pytest.approx(100.0)  # costed subset
+    assert row["total_cost"] == pytest.approx(20.0)
+    assert row["net_total"] == pytest.approx(80.0)
+    assert row["net_total"] == pytest.approx(
+        row["gross_total_costed"] - row["total_cost"])
+    assert row["net_total"] != pytest.approx(
+        row["gross_total"] - row["total_cost"])
+    # the regime run itself is never mutated by the join
+    assert rd_store.get_run(regime_id)["updated_at"] == rrun["updated_at"]
 
 
 # ---------------------------------------------------------------------------
@@ -1159,6 +1325,45 @@ def test_failed_execution_is_recorded_not_stuck_running(monkeypatch):
     stored = cd_store.get_run(run["id"])
     assert stored["status"] == "failed"
     assert "boom" in stored["error_message"]
+
+
+def test_failed_reexecution_clears_stale_derived_state(monkeypatch):
+    # A previously-successful (and baselined) run that later fails re-execution
+    # must not keep its baseline flag, result fingerprint, aggregates or child
+    # rows — otherwise a "failed" run would still advertise stale results.
+    run = service.create_run(_payload())
+    service.execute_run(run["id"])
+    service.mark_baseline(run["id"])
+    before = cd_store.get_run(run["id"])
+    assert before["is_baseline"] and before["result_fingerprint"]
+    assert before["aggregates"] and cd_store.list_observation_results(
+        run["id"])["items"]
+    assert cd_store.list_sensitivity_results(run["id"])
+    assert cd_store.list_capacity_results(run["id"])
+    assert before["duration_ms"] is not None
+
+    monkeypatch.setattr(service.agg_mod, "aggregate_results",
+                        lambda *a, **k: (_ for _ in ()).throw(
+                            RuntimeError("boom")))
+    with pytest.raises(service.CostDiagnosticsError, match="execution failed"):
+        service.execute_run(run["id"])
+
+    after = cd_store.get_run(run["id"])
+    assert after["status"] == "failed"
+    assert after["is_baseline"] is False
+    assert after["baseline_scope"] is None
+    assert after["result_fingerprint"] is None
+    assert after["duration_ms"] is None  # prior success's elapsed time cleared
+    assert not after["aggregates"] and not after["breakeven"]
+    # regimes stays an (empty) dict — the Optional[Dict] field must never be
+    # cleared to a list, which is the exact shape that trips Pydantic loading
+    assert not after["regimes"]
+    assert not isinstance(after["regimes"], list)
+    assert after["gross_total"] is None and after["net_total"] is None
+    # child result rows are cleared, not left stale
+    assert cd_store.list_observation_results(run["id"])["items"] == []
+    assert cd_store.list_sensitivity_results(run["id"]) == []
+    assert cd_store.list_capacity_results(run["id"]) == []
 
 
 # ---------------------------------------------------------------------------

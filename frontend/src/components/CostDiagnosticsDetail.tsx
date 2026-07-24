@@ -361,8 +361,21 @@ function LinkCard({ title, lines, fp, warning, action, actionLabel }: {
 // ---------------------------------------------------------------------------
 
 function Waterfall({ aggregates, unit }: { aggregates: Aggregates; unit: Unit }) {
+  // net_total reconciles against the gross of the COSTED observations, not the
+  // whole-run gross (which may include uncosted gross_only observations). Anchor
+  // the waterfall on the costed gross so "gross − costs = net" holds visually;
+  // falls back to gross_total when nothing is gross_only or on older runs.
+  const grossCosted = aggregates.gross_total_costed ?? aggregates.gross_total;
+  const uncosted = aggregates.gross_total_costed != null
+    ? aggregates.gross_total - aggregates.gross_total_costed
+    : 0;
+  const hasUncosted = Math.abs(uncosted) > 1e-9 && aggregates.gross_only_count > 0;
   const rows: { label: string; value: number | null; kind: "gross" | "cost" | "net" }[] = [
-    { label: "Gross result", value: aggregates.gross_total, kind: "gross" },
+    {
+      label: hasUncosted ? "Gross result (costed observations)" : "Gross result",
+      value: grossCosted,
+      kind: "gross",
+    },
     ...COMPONENTS.map((c) => ({
       label: COMPONENT_LABELS[c],
       value: aggregates.component_totals[c],
@@ -379,11 +392,18 @@ function Waterfall({ aggregates, unit }: { aggregates: Aggregates; unit: Unit })
       <div className="space-y-1.5">
         {rows.map((r) => {
           const width = r.value === null ? 0 : Math.min(100, (Math.abs(r.value) / maxAbs) * 100);
+          // a negative cost component is a credit (e.g. favourable realized
+          // slippage): subtracting it ADDS to net, so it reads "+ |amount|"
+          // rather than the misleading double negative "− −amount".
+          const isCost = r.kind === "cost" && r.value !== null;
+          const credit = isCost && (r.value as number) < 0;
+          const prefix = isCost ? (credit ? "+ " : "− ") : "";
+          const shown = isCost ? Math.abs(r.value as number) : r.value;
           const barCls =
             r.kind === "gross" ? "bg-slate-400"
               : r.kind === "net"
                 ? (r.value !== null && r.value < 0 ? "bg-red-400" : "bg-emerald-500")
-                : "bg-amber-400";
+                : credit ? "bg-emerald-400" : "bg-amber-400";
           return (
             <div key={r.label} className="flex items-center gap-2 text-sm">
               <span className="w-32 shrink-0 text-xs font-medium text-slate-600">{r.label}</span>
@@ -393,15 +413,24 @@ function Waterfall({ aggregates, unit }: { aggregates: Aggregates; unit: Unit })
                 )}
               </div>
               <span className="w-44 shrink-0 text-right font-mono text-xs text-slate-700">
-                {r.kind === "cost" && r.value !== null ? "− " : ""}{fmtValue(r.value, unit)}
+                {prefix}{fmtValue(shown, unit)}
               </span>
             </div>
           );
         })}
       </div>
+      {hasUncosted && (
+        <p className="mt-2 text-xs text-slate-400">
+          Excludes {aggregates.gross_only_count} gross-only observation
+          {aggregates.gross_only_count === 1 ? "" : "s"} contributing {fmtValue(uncosted, unit)} of
+          uncosted gross; the whole-run gross total ({fmtValue(aggregates.gross_total, unit)}) is
+          shown under aggregate diagnostics.
+        </p>
+      )}
       <p className="mt-2 text-xs text-slate-400">
         Net equals gross minus the sum of available components; an unavailable component is
-        excluded and disclosed — it is never treated as zero.
+        excluded and disclosed — it is never treated as zero. A negative component is a credit
+        (e.g. favourable realized slippage) and adds back to net.
       </p>
     </div>
   );
@@ -456,6 +485,14 @@ function AggregatesView({ aggregates, unit, run }: { aggregates: Aggregates; uni
   const rows: [string, string][] = [
     ["Observations", String(s.observation_count)],
     ["Gross total", fmtValue(s.gross_total, unit)],
+    // when gross-only observations exist, net/cost/ratios reconcile against the
+    // costed gross, not the whole-run gross — surface it so "Cost / |gross|"
+    // has a visible, consistent denominator
+    ...(s.gross_total_costed != null
+      && Math.abs(s.gross_total_costed - s.gross_total) > 1e-9
+      ? ([["Gross total (costed observations)",
+          fmtValue(s.gross_total_costed, unit)]] as [string, string][])
+      : []),
     ["Total estimated cost", fmtValue(s.total_cost, unit)],
     ["Net total", fmtValue(s.net_total, unit)],
     ["Cost / |gross|", fmtShare(s.cost_fraction_of_gross_magnitude, 2)],
@@ -662,6 +699,7 @@ function SensitivityTable({ rows, unit }: { rows: SensitivityRow[]; unit: Unit }
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-400">
+        Cost and net values in {unit.kind === "money" ? unit.currency : "return fractions"}.
         The base scenario is highlighted for reference only; scenarios are deterministic assumption
         variations — none is selected, preferred, or labelled anything beyond its multipliers.
         Realized (supplied) slippage is a historical fact and is never scaled by a multiplier.
@@ -671,13 +709,29 @@ function SensitivityTable({ rows, unit }: { rows: SensitivityRow[]; unit: Unit }
 }
 
 function CapacityView({ rows, unit }: { rows: CapacityRow[]; unit: Unit }) {
-  const parts = rows.map((r) => r.max_participation ?? 0);
-  const maxPart = Math.max(0.0001, ...parts);
+  // A missing max_participation is unavailable, never zero — it must not be
+  // coerced to 0 (which would draw a false dip to the axis) nor interpolated
+  // across. Scale the axis to available points only and break the curve into
+  // contiguous non-null segments; unavailable scales show "n/a" at the axis.
+  const nonNull = rows
+    .map((r) => r.max_participation)
+    .filter((p): p is number => p !== null);
+  const maxPart = Math.max(0.0001, ...nonNull);
   const W = 560;
   const H = 120;
   const x = (i: number) => 40 + (i * (W - 60)) / Math.max(1, rows.length - 1);
   const y = (p: number) => H - 18 - (p / maxPart) * (H - 40);
-  const hasCurve = rows.some((r) => r.max_participation !== null);
+  const hasCurve = nonNull.length > 0;
+  const segments: string[][] = [];
+  let seg: string[] = [];
+  rows.forEach((r, i) => {
+    if (r.max_participation === null) {
+      if (seg.length) { segments.push(seg); seg = []; }
+    } else {
+      seg.push(`${x(i)},${y(r.max_participation)}`);
+    }
+  });
+  if (seg.length) segments.push(seg);
   return (
     <div>
       {hasCurve && (
@@ -685,17 +739,22 @@ function CapacityView({ rows, unit }: { rows: CapacityRow[]; unit: Unit }) {
           <svg viewBox={`0 0 ${W} ${H}`} className="w-full max-w-[640px]" role="img"
             aria-label="Maximum participation by notional scale">
             <line x1="40" y1={H - 18} x2={W - 20} y2={H - 18} stroke="#cbd5e1" strokeWidth="1" />
-            <polyline
-              fill="none" stroke="#0ea5e9" strokeWidth="2"
-              points={rows.map((r, i) => `${x(i)},${y(r.max_participation ?? 0)}`).join(" ")}
-            />
+            {segments.map((pts, si) => (
+              <polyline key={si} fill="none" stroke="#0ea5e9" strokeWidth="2" points={pts.join(" ")} />
+            ))}
             {rows.map((r, i) => (
               <g key={r.scale}>
-                <circle cx={x(i)} cy={y(r.max_participation ?? 0)} r="3" fill="#0ea5e9" />
+                {r.max_participation !== null && (
+                  <circle cx={x(i)} cy={y(r.max_participation)} r="3" fill="#0ea5e9" />
+                )}
                 <text x={x(i)} y={H - 5} textAnchor="middle" fontSize="9" fill="#64748b">{r.scale}×</text>
-                <text x={x(i)} y={y(r.max_participation ?? 0) - 6} textAnchor="middle" fontSize="8" fill="#334155">
-                  {r.max_participation === null ? "n/a" : `${((r.max_participation ?? 0) * 100).toFixed(1)}%`}
-                </text>
+                {r.max_participation !== null ? (
+                  <text x={x(i)} y={y(r.max_participation) - 6} textAnchor="middle" fontSize="8" fill="#334155">
+                    {(r.max_participation * 100).toFixed(1)}%
+                  </text>
+                ) : (
+                  <text x={x(i)} y={H - 32} textAnchor="middle" fontSize="8" fill="#94a3b8">n/a</text>
+                )}
               </g>
             ))}
             <text x="40" y="12" fontSize="9" fill="#64748b">max participation (% of configured volume denominator) by scale</text>
@@ -743,6 +802,8 @@ function CapacityView({ rows, unit }: { rows: CapacityRow[]; unit: Unit }) {
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-400">
+        Traded notional in {unit.kind === "money" ? unit.currency : "capital units"}; cost and net
+        values in {unit.kind === "money" ? unit.currency : "return fractions"}.
         Scaling multiplies observation size, never historical prices. Results are estimates under
         configured assumptions — no assumption is made that fills remain available at scale, and no
         scale is recommended or called executable capacity.
@@ -752,6 +813,14 @@ function CapacityView({ rows, unit }: { rows: CapacityRow[]; unit: Unit }) {
 }
 
 function RegimesView({ block, unit }: { block: RegimeBlock; unit: Unit }) {
+  // a regime group whose costed gross differs from its whole-group gross has
+  // gross-only members; Net reconciles against the costed gross, so show that
+  // (marked *) rather than a whole-group gross that would not satisfy
+  // gross − cost = net. No-op when every member is costed.
+  const anyUncosted = block.rows.some(
+    (r) => r.gross_total_costed != null
+      && Math.abs((r.gross_total_costed as number) - r.gross_total) > 1e-9,
+  );
   return (
     <div>
       <p className="mb-2 text-xs text-slate-500">
@@ -783,7 +852,17 @@ function RegimesView({ block, unit }: { block: RegimeBlock; unit: Unit }) {
                   )}
                 </td>
                 <td className="px-2 py-1.5 text-right">{r.observation_count}</td>
-                <td className="px-2 py-1.5 text-right">{cellValue(r.gross_total, unit)}</td>
+                <td className="px-2 py-1.5 text-right">
+                  {r.gross_total_costed != null
+                    && Math.abs(r.gross_total_costed - r.gross_total) > 1e-9 ? (
+                    <span title={`whole-group gross ${cellValue(r.gross_total, unit)} includes gross-only observations; Net reconciles against the costed gross`}>
+                      {cellValue(r.gross_total_costed, unit)}
+                      <span className="text-slate-400">*</span>
+                    </span>
+                  ) : (
+                    cellValue(r.gross_total, unit)
+                  )}
+                </td>
                 <td className="px-2 py-1.5 text-right">{cellValue(r.total_cost, unit)}</td>
                 <td className="px-2 py-1.5 text-right">{cellValue(r.net_total, unit)}</td>
                 <td className="px-2 py-1.5 text-right">{cellValue(r.spread_total, unit)}</td>
@@ -797,6 +876,9 @@ function RegimesView({ block, unit }: { block: RegimeBlock; unit: Unit }) {
         </table>
       </div>
       <p className="mt-2 text-xs text-slate-400">
+        Cost and net values in {unit.kind === "money" ? unit.currency : "return fractions"}.
+        {anyUncosted ? " Gross marked * is over the costed observations in that regime (the group also"
+          + " contains gross-only observations); Net = costed Gross − Total cost." : ""}
         Cost differences across regimes are measured under this configuration — no regime is
         cheapest, most profitable, or recommended.
       </p>

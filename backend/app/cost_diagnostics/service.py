@@ -308,11 +308,12 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
             "negative lags are rejected"),
     }
     cost_model_fp = fp_mod.cost_model_fingerprint(
-        commission, spread, slippage, impact, liquidity_policy)
+        commission, spread, slippage, impact, liquidity_policy, tick_size)
     universe_fp = fp_mod.observation_universe_fingerprint(
         observations, observation_type, currency,
         {"dataset_version_id": links.get("dataset_version_id"),
-         "manifest_fingerprint": links.get("dataset_manifest_fingerprint")})
+         "manifest_fingerprint": links.get("dataset_manifest_fingerprint")},
+        liquidity["series"])
     linked_identity = {k: links.get(k) for k in (
         "dataset_version_id", "validation_run_id", "overfitting_run_id",
         "regime_run_id", "regime_definition_id")}
@@ -660,7 +661,12 @@ def _regime_join(run: Dict[str, Any],
     rows = []
     for label in sorted(groups):
         members = groups[label]
-        nets = [m["net_value"] for m in members if m["net_value"] is not None]
+        # costed members = those that produced a net; the gross/cost/net triple
+        # reconciles over this subset only (net_total == gross_total_costed -
+        # total_cost), exactly as in aggregate_results — the whole-group
+        # gross_total may include uncosted gross_only members.
+        costed = [m for m in members if m["net_value"] is not None]
+        nets = [m["net_value"] for m in costed]
         parts = [m["participation"] for m in members
                  if m["participation"] is not None]
         comp_totals = {}
@@ -672,7 +678,9 @@ def _regime_join(run: Dict[str, Any],
             "regime_label": label,
             "observation_count": len(members),
             "gross_total": float(sum(m["gross_value"] for m in members)),
-            "total_cost": float(sum(m["total_cost"] for m in members
+            "gross_total_costed": (float(sum(m["gross_value"] for m in costed))
+                                   if costed else None),
+            "total_cost": float(sum(m["total_cost"] for m in costed
                                     if m["total_cost"] is not None)),
             "net_total": float(sum(nets)) if nets else None,
             "spread_total": comp_totals["spread"],
@@ -738,10 +746,28 @@ def execute_run(run_id: int, *, create_experiment: bool = False) -> Dict[str, An
     except (NotFoundError, ConflictError):
         raise
     except Exception as exc:
-        # a failed execution is recorded honestly — never left as 'running'
-        store.update_run(run_id, {"status": "failed",
-                                  "error_message": str(exc),
-                                  "completed_at": _now()})
+        # A failed (re-)execution is recorded honestly AND must not leave the
+        # previous successful execution's derived state behind: a failed run
+        # must not keep its baseline flag, result fingerprint, aggregates or
+        # any observation/sensitivity/capacity child rows — a stale baseline
+        # is a state mark_baseline itself would refuse to create.
+        store.update_run(run_id, {
+            "status": "failed", "error_message": str(exc), "completed_at": _now(),
+            "integrity_status": "unknown", "completeness_status": "invalid",
+            "result_fingerprint": None,
+            "is_baseline": 0, "baseline_scope": None,
+            "gross_total": None, "net_total": None, "total_cost": None,
+            # duration_ms is a per-execution derived value; a failed re-execution
+            # must not keep the prior successful run's elapsed time
+            "duration_ms": None,
+            "participation_warning_count": 0, "unavailable_input_count": 0,
+            # aggregates/breakeven/regimes are Optional[Dict]; warnings is a list
+            "aggregates_json": "{}", "breakeven_json": "{}",
+            "regimes_json": "{}", "warnings_json": "[]",
+        })
+        store.replace_observation_results(run_id, [])
+        store.replace_sensitivity_results(run_id, [])
+        store.replace_capacity_results(run_id, [])
         raise CostDiagnosticsError(f"execution failed: {exc}")
 
 
@@ -819,6 +845,12 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
             "slippage_total": comp_totals["slippage"],
             "impact_total": comp_totals["impact"],
             "total_cost": float(sum(scale_costs)) if scale_costs else None,
+            # NOTE: gross_total sums ALL scaled rows while total_cost/net_total
+            # cover the costed subset; the two reconcile only when no scaled row
+            # is gross_only/partial.  A per-scale gross_total_costed (as added
+            # for aggregate and regime rows) would require a new typed column on
+            # cost_capacity_results; deferred (see review report) because there
+            # is no additive-column migration path and the value is not rendered.
             "gross_total": float(sum(r["gross_value"] for r in scaled_results)),
             "net_total": float(sum(nets)) if nets else None,
             "unavailable_liquidity_count": sum(

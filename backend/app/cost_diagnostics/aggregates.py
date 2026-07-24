@@ -78,10 +78,20 @@ def aggregate_results(obs_results: List[Dict[str, Any]],
     """
     n = len(obs_results)
     gross_values = [r["gross_value"] for r in obs_results]
-    net_values = [r["net_value"] for r in obs_results if r["net_value"] is not None]
     gross_total = float(sum(gross_values)) if gross_values else 0.0
+    # The reconciliation identity net = gross - cost only holds over the
+    # *costed* observations (those that produced a net); a gross_only
+    # observation contributes gross but neither cost nor net.  Summing
+    # gross over ALL observations while summing net/cost over the costed
+    # subset would break the published triple whenever any observation is
+    # gross_only.  So the reconciliation basis is the costed-observation
+    # gross, exposed separately from the whole-run gross_total.
+    costed = [r for r in obs_results if r["net_value"] is not None]
+    gross_total_costed = (float(sum(r["gross_value"] for r in costed))
+                          if costed else None)
+    net_values = [r["net_value"] for r in costed]
     net_total = float(sum(net_values)) if net_values else None
-    cost_present = [r["total_cost"] for r in obs_results
+    cost_present = [r["total_cost"] for r in costed
                     if r["total_cost"] is not None]
     total_cost = float(sum(cost_present)) if cost_present else None
     component_totals: Dict[str, Optional[float]] = {}
@@ -100,17 +110,22 @@ def aggregate_results(obs_results: List[Dict[str, Any]],
                      if r.get("turnover") is not None]
     total_turnover = float(sum(turnover_vals)) if turnover_vals else None
 
-    # the denominator for "per unit of traded notional" ratios: currency
-    # notional for trade runs; turnover for period runs (return space) —
-    # only when it covers every observation, so partial coverage can never
-    # silently inflate a ratio
+    # the denominator for "per unit of traded notional" ratios pairs with the
+    # costed-cost numerator, so it is summed over the COSTED observations and
+    # required to cover all of them — partial coverage can never silently
+    # inflate a ratio, and a full-sample denominator can never be paired with
+    # a subset-only cost numerator.
+    costed_notional = [r.get("traded_notional") for r in costed
+                       if r.get("traded_notional") is not None]
+    costed_turnover = [r.get("turnover") for r in costed
+                       if r.get("turnover") is not None]
     if observation_type == "period":
-        basis_total = (total_turnover
-                       if len(turnover_vals) == n and (total_turnover or 0) > 0
+        ct = float(sum(costed_turnover)) if costed_turnover else 0.0
+        basis_total = (ct if len(costed_turnover) == len(costed) and ct > 0
                        else None)
     else:
-        basis_total = (total_notional
-                       if len(notional_vals) == n and (total_notional or 0) > 0
+        cn = float(sum(costed_notional)) if costed_notional else 0.0
+        basis_total = (cn if len(costed_notional) == len(costed) and cn > 0
                        else None)
 
     gp_nn = sum(1 for r in obs_results
@@ -123,9 +138,12 @@ def aggregate_results(obs_results: List[Dict[str, Any]],
     gross_only_count = sum(1 for r in obs_results
                            if r["completeness"] == "gross_only")
 
+    # Ratios pair the costed-cost numerator with a costed-gross denominator so
+    # numerator and denominator always cover the same observation set.
     cost_fraction_of_gross = None
-    if abs(gross_total) > 0 and total_cost is not None:
-        cost_fraction_of_gross = total_cost / abs(gross_total)
+    if (gross_total_costed is not None and abs(gross_total_costed) > 0
+            and total_cost is not None):
+        cost_fraction_of_gross = total_cost / abs(gross_total_costed)
     cost_fraction_of_notional = None
     if basis_total is not None and total_cost is not None:
         cost_fraction_of_notional = total_cost / basis_total
@@ -133,6 +151,11 @@ def aggregate_results(obs_results: List[Dict[str, Any]],
     return {
         "observation_count": n,
         "gross_total": gross_total,
+        # gross summed over the costed observations only — the basis against
+        # which net_total and the break-even diagnostics reconcile
+        # (net_total == gross_total_costed - total_cost).  Equals gross_total
+        # when every observation is costed.
+        "gross_total_costed": gross_total_costed,
         "net_total": net_total,
         "total_cost": total_cost,
         "component_totals": component_totals,
@@ -157,13 +180,23 @@ def aggregate_results(obs_results: List[Dict[str, Any]],
 def breakeven_diagnostics(aggregates: Dict[str, Any],
                           impact_coefficient: Optional[float]
                           ) -> Dict[str, Any]:
-    """Break-even diagnostics from run aggregates (formulas in module doc)."""
-    gross_total = aggregates["gross_total"]
+    """Break-even diagnostics from run aggregates (formulas in module doc).
+
+    Every diagnostic reconciles the KNOWN cost against the gross of the
+    observations that produced that cost, so the whole-run ``gross_total``
+    (which may include uncosted gross_only observations) is never paired with
+    the subset ``total_cost``.
+    """
+    # gross over the costed observations, so break-even reconciles net_total
+    # (falls back to the whole-run gross only when nothing was gross_only).
+    gross_total = aggregates.get("gross_total_costed")
+    if gross_total is None:
+        gross_total = aggregates["gross_total"]
     total_cost = aggregates["total_cost"]
     # currency notional for trade runs, turnover for period runs; None when
-    # the denominator does not cover every observation
+    # the denominator does not cover every costed observation
     basis_total = aggregates.get("notional_basis_total")
-    n = aggregates["observation_count"]
+    n = aggregates["net_observation_count"] or aggregates["observation_count"]
     out: Dict[str, Any] = {
         "note": ("break-even values describe the measured sample under "
                  "configured assumptions and are not claimed to be "

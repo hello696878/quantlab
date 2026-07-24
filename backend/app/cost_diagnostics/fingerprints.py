@@ -38,7 +38,8 @@ def _clean(obj: Any) -> Any:
 def observation_universe_fingerprint(observations: List[Dict[str, Any]],
                                      observation_type: str,
                                      currency: Optional[str],
-                                     dataset_identity: Optional[Dict[str, Any]]
+                                     dataset_identity: Optional[Dict[str, Any]],
+                                     liquidity_series: Optional[Dict[str, Any]] = None
                                      ) -> str:
     rows = []
     for o in observations:
@@ -47,6 +48,11 @@ def observation_universe_fingerprint(observations: List[Dict[str, Any]],
             "candidate_id": o["candidate_id"],
             "timestamp": o.get("timestamp"),
             "gross": o.get("gross_pnl", o.get("gross_return")),
+            # per-observation supplied execution inputs (realized slippage,
+            # supplied spread/ADV/volume/volatility) are result-changing
+            # observed data — omitting them would let two materially different
+            # runs collide on the universe fingerprint (and thus baseline scope)
+            "cost_inputs": o.get("cost_inputs"),
         }
         if observation_type == "trade":
             row.update({
@@ -70,12 +76,18 @@ def observation_universe_fingerprint(observations: List[Dict[str, Any]],
         "currency": currency,
         "observations": rows,
         "dataset": dataset_identity or None,
+        # the run-level liquidity series (trailing ADV / volatility source the
+        # liquidity policy consumes) is observed market data that changes
+        # results; hashing it here keeps two runs over different liquidity
+        # series from colliding on the universe fingerprint / baseline scope
+        "liquidity_series": liquidity_series or None,
     }))
 
 
 def cost_model_fingerprint(commission: Dict[str, Any], spread: Dict[str, Any],
                            slippage: Dict[str, Any], impact: Dict[str, Any],
-                           liquidity_policy: Dict[str, Any]) -> str:
+                           liquidity_policy: Dict[str, Any],
+                           tick_size: Optional[float] = None) -> str:
     return sha256_hex(_clean({
         "kind": "cost_diagnostics_cost_model_v1",
         "commission": commission,
@@ -83,6 +95,10 @@ def cost_model_fingerprint(commission: Dict[str, Any], spread: Dict[str, Any],
         "slippage": slippage,
         "impact": impact,
         "liquidity_policy": liquidity_policy,
+        # tick_size converts a tick-denominated slippage/spread into currency,
+        # so it is a cost-model parameter — two models differing only in
+        # tick_size must not share a fingerprint (they price ticks differently)
+        "tick_size": tick_size,
     }))
 
 
