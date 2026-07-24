@@ -40,6 +40,7 @@ export type View =
   | "overfittingdiagnostics"
   | "regimediagnostics"
   | "costdiagnostics"
+  | "portfoliodiagnostics"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

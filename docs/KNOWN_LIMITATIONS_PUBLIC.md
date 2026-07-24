@@ -164,7 +164,21 @@ averages stay descriptive, break-even levels describe the measured sample
 only, and the lab never executes orders, recommends brokers or sizes,
 proves profitability, or certifies execution quality.
 
-## 20. Future improvements (openly planned)
+## 20. Portfolio weights are measurements, not allocations
+
+The Portfolio Diagnostics Lab constructs weights under explicit
+covariance, constraint and risk-budget assumptions with a strict
+no-look-ahead estimation contract. Every output is a research
+measurement: sample covariances carry estimation error the lab does not
+model, solvers report convergence but optimize an in-sample estimate
+under one assumption set, risk-budget deviation and diversification
+ratios are descriptive, and constraint satisfaction is verified — never
+optimized around. The lab never applies weights to any system,
+recommends an allocation, identifies an optimal or safest portfolio,
+guarantees diversification, risk reduction or performance, or certifies
+portfolio risk.
+
+## 21. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

@@ -65,6 +65,7 @@ import FeatureDiagnosticsPanel from "@/components/FeatureDiagnosticsPanel";
 import OverfittingDiagnosticsPanel from "@/components/OverfittingDiagnosticsPanel";
 import RegimeDiagnosticsPanel from "@/components/RegimeDiagnosticsPanel";
 import CostDiagnosticsPanel from "@/components/CostDiagnosticsPanel";
+import PortfolioDiagnosticsPanel from "@/components/PortfolioDiagnosticsPanel";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
@@ -550,6 +551,11 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Transaction Cost, Slippage & Capacity Diagnostics Lab",
     subtitle:
       "A local-first execution-cost diagnostics lab: explicitly configured commission, spread, slippage and square-root market-impact assumptions are applied to supplied historical trade-level or period-level observations, with every cost input declaring its unit (basis points, percent, ticks, price units, per contract, per order — 1 bp = 0.0001, no ambiguous percentages, no silent FX conversion), a strict no-look-ahead policy for spread / volatility / ADV inputs (trailing windows with lag ≥ 1 only; centered windows and negative lags are rejected outright; full-sample averages stay descriptive), and transparent gross-to-net reconciliation where total cost equals the exact component sum, net equals gross minus total cost, and a missing input stays unavailable — never zero. Break-even levels, a bounded deterministic cost-sensitivity grid, capacity scaling (fixed fees stay fixed, per-unit fees scale, impact responds through participation) and participation-threshold warnings are estimates under configured assumptions, persisted in local SQLite with deterministic SHA-256 fingerprints and read-only links to prior registries. Nothing here executes orders, predicts real fills, guarantees market capacity, recommends trade sizes or brokers, proves profitability, or constitutes investment or execution advice.",
+  },
+  portfoliodiagnostics: {
+    title: "Portfolio Construction & Risk Budgeting Diagnostics Lab",
+    subtitle:
+      "A local-first portfolio-construction diagnostics lab: weights are built and evaluated under explicit covariance assumptions (sample / diagonal reference / fixed shrinkage with a declared alpha — never data-driven; PSD validation with minimum eigenvalue, condition number, near-singular warnings and a never-silent explicit repair policy), a strict no-look-ahead estimation contract (windows end at least one period before each rebalance decision; centered windows and negative lags are rejected outright; training-only estimation uses a leakage-clean validation split's exact recorded membership; full-sample estimation stays descriptive and is never called leakage-safe), deterministic transparent solvers (equal weight, inverse volatility with a visible floor, equal-risk-contribution via the log-barrier convex formulation, SLSQP minimum variance) whose convergence status and residuals are always shown, independent post-solve constraint checks with no silent relaxation, marginal / component / percentage risk contributions reconciled against portfolio volatility, concentration and diversification descriptions, half-L1 turnover with cost-aware rebalance estimates from linked Phase 55 cost models, and regime-conditioned summaries from stored Phase 54 assignments. Nothing here applies weights anywhere, recommends an allocation, identifies an optimal or safest portfolio, guarantees diversification, risk reduction or performance, or constitutes investment, trading, or risk-management advice.",
   },
   scanner: {
     title: "Cross-Sectional Scanner",
@@ -1142,6 +1148,7 @@ export default function HomePage() {
     { view: "overfittingdiagnostics", title: "Open Overfitting Diagnostics", keywords: "backtest overfitting pbo probability of backtest overfitting cscv combinatorially symmetric cross validation selection bias deflated sharpe probabilistic sharpe psr dsr minimum track record mintrl multiple testing bonferroni holm benjamini hochberg false discovery rate fwer fdr p-value trials expected maximum sharpe candidate dependence lambda logit baseline compare export demo" },
     { view: "regimediagnostics", title: "Open Regime Diagnostics", keywords: "market regime volatility regime trend regime liquidity regime drawdown state combined regime conditional performance no look-ahead lookahead trailing window lag threshold quantile training-only full-sample coverage rank stability concentration herfindahl hhi entropy regime transition timeline effective label integrity baseline compare export demo" },
     { view: "costdiagnostics", title: "Open Cost & Capacity", keywords: "transaction cost commission fee spread slippage market impact square root impact capacity notional scaling participation rate adv average daily volume liquidity turnover gross net reconciliation waterfall break-even breakeven basis points bps ticks per contract per order sensitivity grid stress multiplier fill execution cost diagnostics baseline compare export demo" },
+    { view: "portfoliodiagnostics", title: "Open Portfolio Diagnostics", keywords: "portfolio construction risk budgeting risk budget equal risk contribution erc inverse volatility minimum variance weight constraint group cap weight cap gross net exposure leverage turnover cap rebalance covariance shrinkage eigenvalue floor psd positive semidefinite condition number marginal component percentage risk contribution diversification ratio effective positions herfindahl concentration no look-ahead estimation window solver convergence baseline compare export demo" },
     { view: "democenter", title: "Open Demo Center", keywords: "demo center product walkthrough guided tour showcase presentation module health capability matrix readiness demo script builder audience founder investor recruiter portfolio" },
     { view: "datareliability", title: "Open Data Reliability Center", keywords: "data reliability center data mode registry offline fixtures provider registry yfinance fred test safety deterministic fallback external exposure reliability score" },
     { view: "qacommandcenter", title: "Open QA Command Center", keywords: "qa command center release readiness smoke test matrix regression checklist release notes commands pytest typecheck build known limitations release decision" },
@@ -2325,6 +2332,7 @@ export default function HomePage() {
         {view === "overfittingdiagnostics" && <OverfittingDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
         {view === "regimediagnostics" && <RegimeDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
         {view === "costdiagnostics" && <CostDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
+        {view === "portfoliodiagnostics" && <PortfolioDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

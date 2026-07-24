@@ -18,6 +18,52 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Portfolio Construction, Risk Budgeting, Diversification & Constraint
+  Diagnostics Lab v1** (v4.74 series): a local-first portfolio-research
+  diagnostics lab — strictly aligned 2–20-asset universes with parsed
+  chronological timelines; a no-look-ahead estimation contract (windows
+  end at i−lag with lag ≥ 1; centered windows and negative lags rejected;
+  training-only estimation on a leakage-clean validation split's exact
+  recorded membership; full-sample permanently descriptive and never
+  promotable — adversarially mutation-tested); explicit covariance policy
+  (sample ddof=1 / diagonal reference / fixed shrinkage with a declared
+  alpha and stored target; Ledoit-Wolf honestly deferred without adding
+  scikit-learn) with PSD/eigenvalue/condition validation and a
+  never-silent explicit eigenvalue-floor repair; deterministic
+  transparent methods (user-supplied with provenance-based integrity,
+  equal weight, inverse volatility with a visible fingerprinted floor and
+  recorded clamps, ERC via the log-barrier convex formulation with
+  residual-based convergence and an absolutely capped loose band, SLSQP
+  minimum variance with equality-residual + objective-value reporting;
+  max-diversification and mean-variance deferred with reasons, no
+  placeholders); constraints with eager structural-infeasibility 422s and
+  an independent post-solve re-check (asset-id-structured violations, no
+  silent relaxation); exact MCR/CCR/PCR risk contributions with verified
+  ΣCCR=σ and ΣPCR=1 identities, neutral risk-budget deviation states,
+  concentration/diversification descriptions with clipped correlations;
+  half-L1 turnover with explicit initial-book policies; descriptive
+  rebalance costs from linked Phase 55 models where trade-level config
+  fields (one-sided spreads, monetary fee floors, order counts) are
+  honestly unavailable instead of silently dropped; regime-conditioned
+  summaries from stored Phase 54 assignments (never recomputed); bounded
+  one-at-a-time sensitivity with create-time applicability checks and
+  scenario failures that never void the run; seven fingerprint kinds; six
+  new SQLite tables; baselines gated on integrity + solver success + zero
+  violations + fully completed rebalance histories; an 11-run
+  deterministic demo (15 spec cases); the **Portfolio Diagnostics** view
+  (weight bars with bounds, target-vs-measured risk contributions,
+  printed-value correlation matrix, rebalance/cost table, sensitivity
+  with a neutral base marker, regime table); 22 backend tests verified by
+  a 5-agent adversarial pass (128 hand-verified checks; every finding —
+  3 major, ~12 minor — fixed); an 18-test Playwright spec; six docs.
+  Nothing applies weights anywhere, recommends an allocation, identifies
+  an optimal/safest portfolio, or guarantees diversification, risk
+  reduction, or performance.
+
+## Grouped release areas — v4.73 (execution-cost series)
+
+### Transaction cost, slippage, impact & capacity diagnostics lab (v4.73)
+
 - **Transaction Cost, Slippage, Market Impact & Capacity Diagnostics Lab
   v1** (v4.73 series): a local-first execution-cost diagnostics lab —
   explicitly configured commission / spread / slippage / square-root

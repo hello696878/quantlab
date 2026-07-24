@@ -1677,6 +1677,60 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 56.0 — Portfolio Construction, Risk Budgeting & Constraint Diagnostics Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first portfolio-construction
+  diagnostics lab (`backend/app/portfolio_diagnostics/`) building and
+  evaluating weights under explicit assumptions. Universe: 2–20 assets,
+  24–2000 identically aligned observations on a parsed chronological
+  tz-consistent timeline, one currency, benchmark kept out of the asset
+  matrix, canonical supplied ordering. **No-look-ahead estimation:**
+  rolling `returns[i−lag−lookback+1 … i−lag]` / expanding / full-sample
+  (permanently `full_sample_descriptive`, never promotable — the
+  validation-split combination is rejected at create), lag ≥ 1, centered
+  windows and negative lags rejected, training-only estimation on a
+  leakage-clean split's exact recorded membership
+  (`verified_from_validation_split`), future-outlier weight invariance
+  mutation-tested. **Covariance:** sample ddof=1 / diagonal reference /
+  fixed shrinkage (declared α, stored diagonal or scaled-identity target;
+  Ledoit-Wolf deferred — scikit-learn is not a dependency), PSD /
+  minimum-eigenvalue / condition-number validation with distinct
+  singular vs non-PSD warnings, and a never-silent explicit
+  eigenvalue-floor repair retaining original + repaired eigenvalues;
+  correlation/volatility stresses clamp to [−1,1] and re-validate under
+  the same explicit policy. **Methods:** user-supplied (provenance-based
+  integrity; centered claims invalid), equal weight, inverse volatility
+  (visible fingerprinted floor; clamps and per-asset unavailability
+  recorded in solver output + run warnings), ERC (log-barrier convex
+  formulation, residual-based convergence with an absolutely capped
+  loose band; structurally conflicting constraint configs rejected
+  eagerly), SLSQP minimum variance (equality residual + objective value
+  reported); max-diversification and mean-variance deferred with reasons.
+  **Constraints:** eager structural-infeasibility 422s + an independent
+  post-solve re-check with asset-id-structured violations; `0.5 × Σ|Δw|`
+  turnover with explicit initial-book policies and eager schedule caps.
+  **Diagnostics:** MCR/CCR/PCR with verified ΣCCR=σ / ΣPCR=1 identities,
+  neutral risk-budget deviation states, concentration + diversification
+  ratio (clipped correlations, |w| conventions documented), bounded
+  one-at-a-time sensitivity (inapplicable dimensions rejected; failing
+  scenarios never void the run; the vacuous cost-notional dimension
+  deliberately omitted), descriptive rebalance costs from linked Phase 55
+  models with trade-level fields honestly unavailable rather than
+  silently dropped, and regime-conditioned summaries from stored Phase 54
+  assignments. **Infrastructure:** seven fingerprint kinds; six SQLite
+  tables + 19 indexes; baselines gated on integrity + solver success +
+  zero violations + fully completed rebalance histories (failed
+  re-executions clear the flag); idempotent Experiment Registry records;
+  13-route API; the **Portfolio Diagnostics** view; an 11-run demo (15
+  spec cases); export `portfolio_diagnostics_export_v1` with a truncation
+  flag. **Verification:** 22 backend tests (**3644 passed** full suite)
+  with a 5-agent adversarial workflow (128 hand-verified checks — 3
+  major + ~12 minor findings all fixed); 18-test Playwright spec (full
+  suite **131 passed**); `npx tsc --noEmit` clean; six new docs.
+  **Research measurements under configured assumptions — never an
+  allocation recommendation, an optimal/safest portfolio, a
+  diversification or performance guarantee, or investment advice.**
+
 ### Phase 55.0 — Transaction Cost, Slippage, Market Impact & Capacity Diagnostics Lab v1 ✅
 
 - **Research-infrastructure phase:** a local-first execution-cost

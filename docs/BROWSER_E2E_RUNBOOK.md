@@ -98,6 +98,25 @@ protected and why).
   and explicit units hold, and 1024/768 have no page overflow. Only
   writes: the idempotent demo seeds plus the deliberate baseline marking
   on a demo run.
+- **Portfolio Diagnostics** (Phase 56.0, `portfolio-diagnostics.spec.ts`):
+  the lab opens with its no-look-ahead and no-allocation disclaimers, the
+  11-run demo seeds idempotently, method filters work, equal-weight sums
+  to the configured normalization and inverse-volatility ordering is
+  asserted numerically through the same API the page uses, the ERC run's
+  risk contributions reconcile exactly (ΣPCR = 1, ΣCCR = σ) with target
+  and measured budgets both visible and the run marked baseline, the
+  correlation matrix renders with printed values and singularity
+  warnings, the degenerate-covariance run fails honestly while the
+  eigenvalue-floor run shows its recorded repair, weight/group caps are
+  verified satisfied, the turnover-cap violation blocks baseline with the
+  deliberate 409 filtered, linked cost estimates stay partial with
+  impact honestly unavailable, the regime table joins stored assignments
+  with never-recomputed wording, sensitivity shows a neutral base marker
+  with banned-wording asserted absent, full-sample is warned and the
+  future-looking run is invalid, comparison stays neutral, export is
+  path/credential/NaN-free, dark controls and units hold, and desktop/
+  1024/768 have no page overflow. Only writes: the idempotent demo
+  seeds.
 - **Overfitting Diagnostics** (Phase 53.0, `overfitting-diagnostics.spec.ts`):
   the lab opens with its selection-bias disclaimer, the 4-run demo seeds
   idempotently, metric/status filters work, the high-PBO noise demo shows

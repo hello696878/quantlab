@@ -165,6 +165,10 @@ PBO/PSR/DSR and the universe fingerprint; Phase 53 records never rewritten.
 assignments of one named definition by exact timestamp to condition cost
 estimates on regimes; assignments are never recomputed and this lab's
 fingerprints and results are never modified by that join.
+**Portfolio Diagnostics** (Phase 56.0,
+[`PORTFOLIO_DIAGNOSTICS_LAB.md`](PORTFOLIO_DIAGNOSTICS_LAB.md)) joins the
+same stored assignments the same read-only way to summarize portfolio
+returns, turnover and cost completeness per regime.
 
 ## 13. Demo fixture
 

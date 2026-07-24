@@ -304,7 +304,18 @@ gross/net/cost totals and participation-warning counts as metrics, both
 fingerprints) — idempotently: a run creates at most one record and
 re-execution reuses it.  No recommendation is stored.
 
-## 23. Future extensions
+## 23. Portfolio Diagnostics records (Phase 56.0)
+
+Executed portfolio-diagnostic runs
+([`PORTFOLIO_DIAGNOSTICS_LAB.md`](PORTFOLIO_DIAGNOSTICS_LAB.md)) can
+create experiment records here (module `portfolio_diagnostics`,
+construction/covariance methods + integrity/solver states as parameters,
+portfolio volatility / effective positions / budget deviation / turnover
+/ violation counts as metrics, both fingerprints) — idempotently: a run
+creates at most one record and re-execution reuses it.  No recommendation
+or preferred allocation is stored.
+
+## 24. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

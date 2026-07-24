@@ -262,7 +262,15 @@ version was invalidated.  Execution inputs claiming `dataset_lineage`
 provenance without a linked version degrade honestly to `declared` with a
 warning.  Dataset metadata is never mutated by a diagnostic run.
 
-## 23. Limitations
+## 23. Portfolio Diagnostics links (Phase 56.0)
+
+Portfolio-diagnostic runs
+([`PORTFOLIO_DIAGNOSTICS_LAB.md`](PORTFOLIO_DIAGNOSTICS_LAB.md)) may bind
+a `dataset_version_id`; the run detail shows the version's fingerprints,
+provenance and quality states and warns visibly when the version was
+invalidated.  Dataset metadata is never mutated by a diagnostic run.
+
+## 24. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks

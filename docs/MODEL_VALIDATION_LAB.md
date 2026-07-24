@@ -238,6 +238,17 @@ Phase 55.0) may link a validation run to display its method, leakage status
 and fingerprints beside a cost-diagnostic run; cost evaluation is read-only
 — split memberships and fingerprints are never changed.
 
+The Portfolio Diagnostics Lab
+([`PORTFOLIO_DIAGNOSTICS_LAB.md`](PORTFOLIO_DIAGNOSTICS_LAB.md), Phase
+56.0) uses a completed, leakage-clean run's **exact recorded training
+membership** of a named valid split to restrict covariance-estimation
+windows to training observations only
+(`verified_from_validation_split` integrity): held-out observations never
+affect training-only estimates, unknown memberships and invalid or
+leakage-failed splits fail honestly, full-sample estimation cannot be
+combined with a split link, and split memberships / purge / embargo /
+fingerprints are never modified.
+
 ## 21. Limitations
 
 Sample membership is stored as bounded JSON arrays (≤2000 samples/run —

@@ -63,6 +63,7 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   Overfitting Diagnostics (PBO, deflated Sharpe + multiple testing),
   Regime Diagnostics (conditional performance + no-look-ahead regimes),
   Cost & Capacity (execution-cost, impact + capacity diagnostics),
+  Portfolio Diagnostics (construction, risk budgeting + constraints),
   Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
@@ -275,6 +276,17 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Portfolio Diagnostics (56.0)** — portfolio construction under explicit
+  assumptions: equal weight, inverse volatility (visible floor), equal
+  risk contribution and SLSQP minimum variance on validated covariances
+  (sample / diagonal / fixed shrinkage, PSD checks, never-silent explicit
+  repair) with a no-look-ahead estimation contract, independent
+  post-solve constraint checks, reconciled marginal/component/percentage
+  risk contributions, concentration + diversification descriptions,
+  half-L1 turnover with descriptive Phase 55 cost estimates, and
+  regime-conditioned summaries. Research measurements — never an
+  allocation recommendation, an optimal/safest portfolio, or a
+  diversification guarantee.
 - **Cost & Capacity (55.0)** — execution-cost diagnostics under explicitly
   configured assumptions: unit-safe commission / spread / slippage /
   square-root market-impact estimates on supplied trade or period

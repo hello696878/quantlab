@@ -173,6 +173,13 @@ callers with genuinely tested p-values.
   analysis — stored PBO values are never reused or rewritten, and costs
   are never claimed to eliminate or prove overfitting.
 - **Feature Diagnostics / Meta-Labeling** — optional context links only.
+- **Portfolio Diagnostics** (Phase 56.0,
+  [`PORTFOLIO_DIAGNOSTICS_LAB.md`](PORTFOLIO_DIAGNOSTICS_LAB.md)) — a
+  portfolio run may link a run from this lab read-only to estimate
+  descriptive rebalance costs from its STORED cost model (only
+  turnover-proportional components apply; trade-level fields are
+  honestly unavailable there); this lab's rows and fingerprints are
+  never mutated, and generated weights are never submitted here.
 
 ## 8. Fingerprints
 

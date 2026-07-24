@@ -1156,6 +1156,198 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_ccr_run ON cost_capacity_results(run_id)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Portfolio Construction / Risk Budgeting Diagnostics Lab (Phase 56.0).
+        # Runs keep their normalized universe as bounded JSON (≤20 assets,
+        # ≤2000 observations); rebalances, weight results, risk contributions
+        # and sensitivity scenarios are explicit rows —
+        # docs/PORTFOLIO_DIAGNOSTICS_LAB.md.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_diagnostic_runs (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                TEXT    NOT NULL,
+                updated_at                TEXT    NOT NULL,
+                name                      TEXT    NOT NULL,
+                description               TEXT    NOT NULL DEFAULT '',
+                status                    TEXT    NOT NULL DEFAULT 'pending',
+                method                    TEXT    NOT NULL,
+                covariance_method         TEXT    NOT NULL,
+                asset_count               INTEGER NOT NULL DEFAULT 0,
+                observation_count         INTEGER NOT NULL DEFAULT 0,
+                rebalance_count           INTEGER NOT NULL DEFAULT 0,
+                integrity_status          TEXT    NOT NULL DEFAULT 'unknown',
+                solver_status             TEXT,
+                portfolio_volatility      REAL,
+                effective_positions       REAL,
+                max_budget_deviation      REAL,
+                mean_turnover             REAL,
+                constraint_violation_count INTEGER NOT NULL DEFAULT 0,
+                universe_fingerprint      TEXT    NOT NULL,
+                constraint_fingerprint    TEXT    NOT NULL,
+                configuration_json        TEXT    NOT NULL DEFAULT '{}',
+                configuration_fingerprint TEXT    NOT NULL,
+                result_fingerprint        TEXT,
+                universe_json             TEXT    NOT NULL DEFAULT '{}',
+                risk_json                 TEXT,
+                budget_json               TEXT,
+                concentration_json        TEXT,
+                covariance_json           TEXT,
+                regimes_json              TEXT,
+                warnings_json             TEXT    NOT NULL DEFAULT '[]',
+                dataset_version_id        INTEGER REFERENCES dataset_versions(id),
+                validation_run_id         INTEGER REFERENCES validation_runs(id),
+                regime_run_id             INTEGER
+                                          REFERENCES regime_diagnostic_runs(id),
+                regime_definition_id      TEXT,
+                cost_diagnostic_run_id    INTEGER
+                                          REFERENCES cost_diagnostic_runs(id),
+                overfitting_run_id        INTEGER
+                                          REFERENCES overfitting_diagnostic_runs(id),
+                experiment_id             INTEGER REFERENCES experiment_registry(id),
+                is_baseline               INTEGER NOT NULL DEFAULT 0,
+                baseline_scope            TEXT,
+                completed_at              TEXT,
+                duration_ms               INTEGER,
+                app_version               TEXT,
+                git_commit                TEXT,
+                notes                     TEXT    NOT NULL DEFAULT '',
+                error_message             TEXT,
+                demo_key                  TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_assets (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id        INTEGER NOT NULL
+                              REFERENCES portfolio_diagnostic_runs(id),
+                asset_index   INTEGER NOT NULL,
+                asset_id      TEXT    NOT NULL,
+                name          TEXT    NOT NULL,
+                asset_type    TEXT    NOT NULL,
+                grp           TEXT,
+                currency      TEXT,
+                volatility    REAL,
+                metadata_json TEXT    NOT NULL DEFAULT '{}',
+                UNIQUE (run_id, asset_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_rebalances (
+                id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                     INTEGER NOT NULL
+                                           REFERENCES portfolio_diagnostic_runs(id),
+                rebalance_id               INTEGER NOT NULL,
+                decision_timestamp         TEXT    NOT NULL,
+                effective_timestamp        TEXT,
+                window_start               INTEGER,
+                window_end                 INTEGER,
+                turnover                   REAL,
+                gross_change               REAL,
+                solver_status              TEXT,
+                constraint_violation_count INTEGER NOT NULL DEFAULT 0,
+                covariance_fingerprint     TEXT,
+                weight_fingerprint         TEXT,
+                weights_json               TEXT,
+                prior_weights_json         TEXT,
+                solver_json                TEXT    NOT NULL DEFAULT '{}',
+                violations_json            TEXT    NOT NULL DEFAULT '[]',
+                cost_json                  TEXT,
+                status                     TEXT    NOT NULL DEFAULT 'completed',
+                reason                     TEXT,
+                UNIQUE (run_id, rebalance_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_weight_results (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id            INTEGER NOT NULL
+                                  REFERENCES portfolio_diagnostic_runs(id),
+                asset_index       INTEGER NOT NULL,
+                asset_id          TEXT    NOT NULL,
+                raw_weight        REAL,
+                weight            REAL,
+                lower_bound       REAL,
+                upper_bound       REAL,
+                grp               TEXT,
+                constraint_status TEXT    NOT NULL DEFAULT 'ok',
+                UNIQUE (run_id, asset_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_risk_contributions (
+                id                INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id            INTEGER NOT NULL
+                                  REFERENCES portfolio_diagnostic_runs(id),
+                asset_index       INTEGER NOT NULL,
+                asset_id          TEXT    NOT NULL,
+                weight            REAL,
+                mcr               REAL,
+                ccr               REAL,
+                pcr               REAL,
+                target_budget     REAL,
+                abs_difference    REAL,
+                signed_difference REAL,
+                state             TEXT    NOT NULL DEFAULT 'unavailable',
+                UNIQUE (run_id, asset_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_sensitivity_results (
+                id                         INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                     INTEGER NOT NULL
+                                           REFERENCES portfolio_diagnostic_runs(id),
+                scenario_index             INTEGER NOT NULL,
+                dimension                  TEXT    NOT NULL,
+                value                      REAL,
+                is_base                    INTEGER NOT NULL DEFAULT 0,
+                portfolio_volatility       REAL,
+                effective_positions        REAL,
+                max_budget_deviation       REAL,
+                turnover                   REAL,
+                solver_status              TEXT,
+                constraint_violation_count INTEGER NOT NULL DEFAULT 0,
+                cost_return                REAL,
+                status                     TEXT    NOT NULL DEFAULT 'completed',
+                reason                     TEXT,
+                fingerprint                TEXT    NOT NULL,
+                UNIQUE (run_id, scenario_index)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_pdr_created ON portfolio_diagnostic_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_status ON portfolio_diagnostic_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_method ON portfolio_diagnostic_runs(method)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_integrity ON portfolio_diagnostic_runs(integrity_status)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_solver ON portfolio_diagnostic_runs(solver_status)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_dataset ON portfolio_diagnostic_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_vrun ON portfolio_diagnostic_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_rrun ON portfolio_diagnostic_runs(regime_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_crun ON portfolio_diagnostic_runs(cost_diagnostic_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_config_fp ON portfolio_diagnostic_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_universe_fp ON portfolio_diagnostic_runs(universe_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_baseline ON portfolio_diagnostic_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_pdr_scope ON portfolio_diagnostic_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_pdr_demo_key ON portfolio_diagnostic_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_pa_run ON portfolio_assets(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_pr_run ON portfolio_rebalances(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_pwr_run ON portfolio_weight_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_prc_run ON portfolio_risk_contributions(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_psr_run ON portfolio_sensitivity_results(run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()
