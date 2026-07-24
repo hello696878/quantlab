@@ -34,9 +34,10 @@ design not a stored run.)
 1. `POST /portfolio-diagnostics/runs` — universe + method + estimation +
    covariance + constraints (+ budgets/rebalance/solver/sensitivity/
    links). Eager validation returns 422s with exact reasons.
-2. `POST /runs/{id}/execute` — deterministic; re-execution replaces child
-   rows and reproduces the result fingerprint; failures are recorded as
-   `failed` (clearing any baseline flag) — never left running.
+2. `POST /runs/{id}/execute` — deterministic; re-execution atomically replaces
+   the parent execution snapshot plus all child rows and reproduces the result
+   fingerprint. Failures are recorded as `failed` (clearing any baseline flag)
+   — never left running with a partially committed replacement.
 3. Inspect `/runs/{id}` plus `/assets`, `/weights`,
    `/risk-contributions`, `/rebalances`, `/sensitivity`, `/regimes`.
 4. `POST /runs/{id}/mark-baseline` — completed + acceptable integrity +
@@ -70,8 +71,10 @@ never touched. The experiment-name allowlist includes
   SLSQP non-convergence; the reason is stored per rebalance. Fix the
   input or choose an explicit repair policy.
 - **Constraint violations** — the independent post-solve check found the
-  solver output outside a configured bound (often the turnover cap);
-  violations are listed per rebalance and block baselines.
+  solver output outside a configured bound. Turnover compares each target to
+  the prior target after it has drifted through intervening returns; in v1 a
+  minimum-variance turnover cap is diagnostic rather than solver-enforced.
+  Violations are listed per rebalance and block baselines.
 - **`unavailable` rebalances** — insufficient history before the
   estimation cutoff; expected for early fixed timestamps.
 - **Regime rows missing** — portfolio timestamps must exactly match the

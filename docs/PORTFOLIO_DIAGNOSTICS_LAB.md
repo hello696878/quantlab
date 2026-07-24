@@ -34,18 +34,19 @@ frequency, 2–20 assets with identically aligned finite return series
 (strict identical alignment; no forward fill, no fabricated timestamps),
 optional benchmark returns kept separate from the asset matrix, optional
 prior weights (assets absent from the prior map are 0.0 — the documented
-"not held" convention), optional aligned sample ids for validation-linked
-runs, per-asset name/type/group/currency (one currency per universe; no
-silent conversion), 24–2000 observations. The supplied asset order is
-canonical and fingerprinted.
+"not held" convention), optional aligned unique sample ids, and bounded JSON per-asset metadata
+plus name/type/group/currency (one currency per universe; no silent
+conversion), 24–2000 observations. The supplied asset order is canonical
+and fingerprinted; malformed metadata is rejected rather than discarded.
 
 ## 2. No-look-ahead estimation
 
 At a rebalance with decision index i the estimation window is
 ``returns[i-lag-lookback+1 .. i-lag]`` (rolling) or ``returns[0 .. i-lag]``
 (expanding, with a minimum history), with **lag ≥ 1 enforced** — the
-period being traded never informs its own weights, and realized portfolio
-returns apply the weights from index i onward only. Centered windows and
+period being traded never informs its own weights. A target becomes effective
+at index i and then drifts with asset returns until the next rebalance; the
+engine does not imply daily rebalancing between scheduled decisions. Centered windows and
 negative lags are rejected outright. Early rebalances with insufficient
 history are honestly unavailable. Training-only estimation restricts the
 permitted window to a leakage-clean validation split's exact recorded
@@ -114,9 +115,11 @@ ratio guarantees nothing.
 
 Schedules: one-time, every N, fixed timeline timestamps (never
 fabricated), bounded at 60 (checked eagerly at create). Turnover
-convention: ``one_way_turnover = 0.5 × Σ|Δw|`` with an explicit
-initial-turnover policy (none / zero_book / supplied — supplied requires
-prior weights). Linked Phase 55 cost models produce descriptive
+convention: ``one_way_turnover = 0.5 × Σ|target weight − drifted pre-trade
+weight|``. The prior target is drifted through intervening realized returns;
+cash is the visible residual and earns zero in v1. The initial-turnover policy
+is explicit (none / zero_book / supplied — supplied requires prior weights).
+Linked Phase 55 cost models produce descriptive
 rebalance-cost estimates from ``2 × turnover`` (both legs) on the
 period-cost path — only turnover-proportional components apply; monetary
 fixed fees, one-sided spread configs, order counts and liquidity-dependent
@@ -146,11 +149,18 @@ or optimal.
 
 Universe / covariance / constraint / configuration / result / scenario /
 weight SHA-256 fingerprints over canonical JSON (12-dp quantization,
-NaN/Infinity rejected, no db ids/timestamps/durations/paths). Six SQLite
-tables (idempotent migration, no drops, prior registries preserved, no
-startup insertion, deterministic child replacement, 19 indexes). Failed
-executions are recorded as failed (clearing any baseline flag) — never
-left running. Baselines: completed + integrity ∈ {verified_*, declared} +
+NaN/Infinity rejected, no db ids/timestamps/durations/paths). Universe identity
+includes aligned observation ids, prior weights and bounded asset metadata;
+configuration identity includes normalization, floor, notional, user weights
+and immutable linked fingerprints. Each rebalance covariance fingerprint uses
+only its permitted causal estimation observations, so a future-only mutation
+cannot alter an earlier covariance identity. Result identity includes full
+solver, constraint, cost, covariance, regime and sensitivity diagnostics. Six
+SQLite tables use idempotent migration with no drops, preserve prior registries,
+insert no startup demos, and atomically replace the parent execution snapshot
+and every child table. Failed executions are recorded as failed (clearing any
+baseline flag) — never left running. Baselines: completed + integrity ∈
+{verified_*, declared} +
 solver ∈ {closed_form, converged, converged_loose (capped)} + zero
 constraint violations + every scheduled rebalance completed + result
 fingerprint; scope = universe|dataset|method|covariance-policy|
@@ -165,16 +175,17 @@ order submission). Sidebar view **Portfolio Diagnostics** (command
 palette registered): six live cards, dark filters, runs table; detail
 with fingerprints + baseline action, warnings, linked-record cards,
 weight bars with bounds and constraint status, risk-contribution table
-with target-vs-measured reconciliation, concentration metrics, correlation
-matrix with printed values (shading is a reading aid — never the only
-signal), rebalance/turnover/cost table, sensitivity table with a neutral
-base marker, and per-regime table. Responsive 1440/1024/768. Deterministic
-idempotent demo (11 runs, 15 spec cases, seeds 56xxx, ``demo:pd:*``).
-Export ``portfolio_diagnostics_export_v1`` with a truncation flag and no
-paths/credentials/models. 22 backend tests including future-outlier
-invariance plus an 18-test Playwright spec; an adversarial verification
-workflow (5 reviewers, 128 hand-verified checks) audited the engine —
-every finding fixed.
+with target-vs-measured reconciliation, concentration metrics, covariance and
+correlation matrices with printed values (shading is a reading aid — never the
+only signal), and a rebalance table exposing decision/effective dates, solver
+residuals, constraint details, causal fingerprints, drift-aware turnover and
+cost-unavailability reasons. Sensitivity and per-regime tables remain neutral.
+Responsive 1440/1024/768. Deterministic idempotent demo (11 runs, 15 spec cases,
+seeds 56xxx, ``demo:pd:*``). Export ``portfolio_diagnostics_export_v1`` has a
+truncation flag and no paths/credentials/models. The focused backend suite
+includes adversarial future-outlier, malformed-input, drifted-book,
+fingerprint-materiality and transactional-rollback coverage; the 18-test
+Playwright spec remains the browser workflow.
 
 ## 10. Limitations
 
@@ -183,7 +194,10 @@ allocations; covariance estimates are sample statistics with estimation
 error the lab does not model; ERC is long-only and constraint-free beyond
 sum-to-one in v1 (structurally conflicting configs are rejected eagerly);
 no cardinality optimization, no expected-return optimization, no
-Ledoit-Wolf, no integer-lot enforcement in construction; sensitivity is
-one-at-a-time around the final rebalance; cost estimates cover only
+Ledoit-Wolf, no integer-lot enforcement in construction. In minimum-variance
+long-short mode, non-smooth gross/group constraints and turnover caps are
+post-solve diagnostics rather than SLSQP constraints; violations remain
+visible and baseline-blocking. Sensitivity is one-at-a-time around the final
+rebalance; cost estimates cover only
 turnover-proportional components; upstream quality of supplied returns is
 the caller's responsibility.

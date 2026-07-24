@@ -48,6 +48,8 @@ def _guard(fn: Callable[[], T]) -> T:
         raise HTTPException(status_code=404, detail=str(exc))
     except service.ConflictError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+    except service.InternalExecutionError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
     except (service.PortfolioDiagnosticsError, PortfolioInputError,
             CovarianceError, ConstraintError, MethodError, ValueError) as exc:
         raise HTTPException(status_code=422, detail=str(exc))

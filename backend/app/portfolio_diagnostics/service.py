@@ -21,6 +21,7 @@ honestly and block baselines.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import time
 from datetime import datetime, timezone
@@ -54,8 +55,15 @@ from app.portfolio_diagnostics.core import (
 )
 
 
+logger = logging.getLogger(__name__)
+
+
 class PortfolioDiagnosticsError(ValueError):
     """Invalid input/config (HTTP 422)."""
+
+
+class InternalExecutionError(RuntimeError):
+    """Sanitized unexpected execution failure (HTTP 500)."""
 
 
 class NotFoundError(LookupError):
@@ -103,6 +111,8 @@ def _validate_budgets(raw: Any, assets: List[Dict[str, Any]],
         f = float(v)
         if not math.isfinite(f):
             raise PortfolioInputError("risk budgets must be finite")
+        if f < 0:
+            raise PortfolioInputError("risk budgets must be non-negative")
         out[k] = f
     total = sum(out.values())
     if abs(total - 1.0) > 1e-6:
@@ -119,9 +129,12 @@ def _validate_budgets(raw: Any, assets: List[Dict[str, Any]],
 
 
 def _validate_solver_config(raw: Any) -> Dict[str, Any]:
-    cfg = dict(raw or {})
-    if not isinstance(cfg, dict):
+    if raw is None:
+        cfg: Dict[str, Any] = {}
+    elif not isinstance(raw, dict):
         raise PortfolioInputError("solver configuration must be an object")
+    else:
+        cfg = dict(raw)
     tol = cfg.get("tolerance", methods_mod.ERC_DEFAULT_TOLERANCE)
     try:
         tol = float(tol)
@@ -152,6 +165,23 @@ def _validate_links(payload: Dict[str, Any]) -> Dict[str, Any]:
             raise PortfolioDiagnosticsError(
                 f"validation run {payload['validation_run_id']} not found")
         links["validation_run_id"] = vrun["id"]
+        links["validation_configuration_fingerprint"] = \
+            vrun["configuration_fingerprint"]
+        links["validation_result_fingerprint"] = vrun.get("result_fingerprint")
+        split_label = payload.get("validation_split_label")
+        if split_label is not None:
+            if vrun["status"] != "completed" \
+                    or vrun.get("leakage_clean") is not True:
+                raise PortfolioDiagnosticsError(
+                    "training-only estimation requires a completed, "
+                    "leakage-clean validation run")
+            split = next(
+                (s for s in validation_store.list_splits(vrun["id"])
+                 if s["split_label"] == split_label), None)
+            if split is None or split["status"] != "valid":
+                raise PortfolioDiagnosticsError(
+                    f"validation split {split_label!r} not found or not valid")
+            links["validation_split_fingerprint"] = split["split_fingerprint"]
     if payload.get("regime_run_id") is not None:
         rrun = regime_store.get_run(payload["regime_run_id"])
         if rrun is None:
@@ -164,14 +194,20 @@ def _validate_links(payload: Dict[str, Any]) -> Dict[str, Any]:
         if not definition_id:
             raise PortfolioDiagnosticsError(
                 "regime integration requires regime_definition_id")
-        defs = {d["definition_id"]
-                for d in regime_store.list_definitions(rrun["id"])}
-        if definition_id not in defs:
+        definition = next(
+            (d for d in regime_store.list_definitions(rrun["id"])
+             if d["definition_id"] == definition_id), None)
+        if definition is None:
             raise PortfolioDiagnosticsError(
                 f"regime definition {definition_id!r} not found in run "
                 f"{rrun['id']}")
         links["regime_run_id"] = rrun["id"]
         links["regime_definition_id"] = definition_id
+        links["regime_configuration_fingerprint"] = \
+            rrun["configuration_fingerprint"]
+        links["regime_result_fingerprint"] = rrun.get("result_fingerprint")
+        links["regime_definition_fingerprint"] = \
+            definition["definition_fingerprint"]
     elif payload.get("regime_definition_id"):
         raise PortfolioDiagnosticsError(
             "regime_definition_id requires regime_run_id")
@@ -185,12 +221,20 @@ def _validate_links(payload: Dict[str, Any]) -> Dict[str, Any]:
             raise PortfolioDiagnosticsError(
                 "the linked cost-diagnostic run stores no cost model")
         links["cost_diagnostic_run_id"] = crun["id"]
+        links["cost_model_fingerprint"] = crun["cost_model_fingerprint"]
+        links["cost_configuration_fingerprint"] = \
+            crun["configuration_fingerprint"]
+        links["cost_result_fingerprint"] = crun.get("result_fingerprint")
     if payload.get("overfitting_run_id") is not None:
         orun = overfitting_store.get_run(payload["overfitting_run_id"])
         if orun is None:
             raise PortfolioDiagnosticsError(
                 f"overfitting run {payload['overfitting_run_id']} not found")
         links["overfitting_run_id"] = orun["id"]
+        links["overfitting_universe_fingerprint"] = orun["universe_fingerprint"]
+        links["overfitting_configuration_fingerprint"] = \
+            orun["configuration_fingerprint"]
+        links["overfitting_result_fingerprint"] = orun.get("result_fingerprint")
     if payload.get("experiment_id") is not None:
         exp = experiment_store.get_experiment(payload["experiment_id"])
         if exp is None:
@@ -281,7 +325,14 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
                     or not math.isfinite(float(v)):
                 raise PortfolioDiagnosticsError("weights must be finite numbers")
             user_weights[k] = float(v)
-        provenance = dict(payload.get("weight_provenance") or {})
+        raw_provenance = payload.get("weight_provenance")
+        if raw_provenance is None:
+            provenance: Dict[str, Any] = {}
+        elif not isinstance(raw_provenance, dict):
+            raise PortfolioDiagnosticsError(
+                "weight_provenance must be an object")
+        else:
+            provenance = dict(raw_provenance)
         basis = provenance.get("basis", "unknown")
         if basis not in USER_PROVENANCE_BASES:
             raise PortfolioDiagnosticsError(
@@ -314,6 +365,17 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
                 "training-only estimation cannot use full_sample mode — a "
                 "whole-sample window would let traded periods inform their "
                 "own weights; use rolling or expanding estimation")
+    if sample_ids is not None:
+        if not isinstance(sample_ids, list) or len(sample_ids) != n_periods:
+            raise PortfolioDiagnosticsError(
+                "sample_ids must be a list aligned to the timeline")
+        if any(not isinstance(sample_id, str) or not sample_id.strip()
+               for sample_id in sample_ids):
+            raise PortfolioDiagnosticsError(
+                "sample_ids must contain non-empty strings")
+        sample_ids = [sample_id.strip() for sample_id in sample_ids]
+        if len(set(sample_ids)) != len(sample_ids):
+            raise PortfolioDiagnosticsError("sample_ids must be unique")
     # cross-checks the eager-validation contract requires
     if rebalance_policy["initial_turnover_policy"] == "supplied" \
             and prior_weights is None:
@@ -369,17 +431,20 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
         "assets": assets,
         "benchmark_returns": benchmark,
         "prior_weights": prior_weights,
-        "sample_ids": sample_ids if split_label is not None else None,
+        "sample_ids": sample_ids,
     }
     universe_fp = fp_mod.universe_fingerprint(
         assets, timeline["timestamps"], timeline["frequency"], benchmark,
         {"dataset_version_id": links.get("dataset_version_id"),
-         "manifest_fingerprint": links.get("dataset_manifest_fingerprint")})
+         "manifest_fingerprint": links.get("dataset_manifest_fingerprint")},
+        candidate_fingerprints=(
+            [links["overfitting_universe_fingerprint"]]
+            if links.get("overfitting_universe_fingerprint") else None),
+        sample_ids=universe["sample_ids"], prior_weights=prior_weights)
     constraint_fp = fp_mod.constraint_fingerprint(constraints)
-    linked_identity = {k: links.get(k) for k in (
-        "dataset_version_id", "validation_run_id", "regime_run_id",
-        "regime_definition_id", "cost_diagnostic_run_id",
-        "overfitting_run_id")}
+    linked_identity = {
+        k: v for k, v in links.items() if k != "experiment_id"
+    }
     configuration = {
         "method": method,
         "covariance": cov_config,
@@ -396,6 +461,7 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
         "user_weights": user_weights,
         "user_provenance": user_provenance,
         "deferred_methods": methods_mod.DEFERRED_METHODS,
+        "linked_fingerprints": linked_identity,
         "turnover_convention": "one_way_turnover = 0.5 x sum |w_new - w_old|",
         "no_lookahead_policy": (
             "weights effective for period i use returns through i - lag "
@@ -404,7 +470,15 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
     }
     config_fp = fp_mod.configuration_fingerprint(
         universe_fp, method, cov_config, estimation, constraint_fp, budgets,
-        rebalance_policy, solver_config, sensitivity_config, linked_identity)
+        rebalance_policy, solver_config, sensitivity_config, linked_identity,
+        execution_inputs={
+            "normalization": normalization,
+            "volatility_floor": volatility_floor,
+            "cost_notional": notional,
+            "validation_split_label": split_label,
+            "user_weights": user_weights,
+            "user_provenance": user_provenance,
+        })
 
     run = store.insert_run({
         "name": name, "description": payload.get("description", ""),
@@ -575,6 +649,10 @@ def _construct_at(run: Dict[str, Any], decision_index: int,
                               "permitted window",
                     "weights": None, "solver": {"status": "unavailable"}}
     window_data = matrix[:, indices].T  # obs x assets
+    estimation_input_fp = fp_mod.estimation_input_fingerprint(
+        asset_ids, run["universe"]["timestamps"], indices,
+        matrix.tolist())
+
 
     try:
         cov = cov_mod.estimate_covariance(window_data, cov_config)
@@ -663,6 +741,7 @@ def _construct_at(run: Dict[str, Any], decision_index: int,
         "repair": repair,
         "window": [start, end],
         "window_indices_used": len(indices),
+        "estimation_input_fingerprint": estimation_input_fp,
         "constraints_used": constraints,
         "unavailable_assets": result.get("unavailable_assets"),
         "floored_assets": result.get("floored_assets"),
@@ -682,14 +761,26 @@ def execute_run(run_id: int, *, create_experiment: bool = False) -> Dict[str, An
         return _execute_body(run_id, run, t0, create_experiment)
     except (NotFoundError, ConflictError):
         raise
-    except Exception as exc:
-        # a failed re-execution can no longer satisfy the baseline gates
+    except (PortfolioDiagnosticsError, PortfolioInputError,
+            cov_mod.CovarianceError, cons_mod.ConstraintError,
+            methods_mod.MethodError, fp_mod.FingerprintError) as exc:
+        # A failed re-execution can no longer satisfy the baseline gates.
         store.update_run(run_id, {"status": "failed",
                                   "error_message": str(exc),
                                   "is_baseline": 0,
                                   "completed_at": _now()})
-        raise PortfolioDiagnosticsError(f"execution failed: {exc}")
-
+        raise PortfolioDiagnosticsError(f"execution failed: {exc}") from exc
+    except Exception as exc:
+        logger.exception("unexpected portfolio-diagnostics execution failure")
+        message = "execution failed due to an internal computation or persistence error"
+        try:
+            store.update_run(run_id, {"status": "failed",
+                                      "error_message": message,
+                                      "is_baseline": 0,
+                                      "completed_at": _now()})
+        except Exception:
+            logger.exception("could not persist portfolio-diagnostics failure state")
+        raise InternalExecutionError(message) from exc
 
 def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
                   create_experiment: bool) -> Dict[str, Any]:
@@ -722,6 +813,7 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
     prior = universe.get("prior_weights") \
         if config["rebalance"]["initial_turnover_policy"] == "supplied" else None
     prev_weights: Optional[Dict[str, float]] = prior
+    prev_effective_index: Optional[int] = None
     last_success: Optional[Dict[str, Any]] = None
     for rb_id, i in enumerate(indices):
         record = _construct_at(run, i, matrix, asset_ids, assets,
@@ -739,10 +831,20 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
         turnover = None
         violations: List[Dict[str, Any]] = []
         cost = None
+        pre_trade_weights = prev_weights
+        if prev_weights is not None and prev_effective_index is not None:
+            pre_trade_weights = reb_mod.drift_weights(
+                prev_weights, asset_ids, matrix, prev_effective_index, i)
+            if pre_trade_weights is None:
+                warnings.append(
+                    f"rebalance {rb_id}: pre-trade weights are unavailable "
+                    "because the prior book reached a non-positive or "
+                    "non-finite value; turnover and cost remain unavailable")
         if record.get("weights") is not None:
-            turnover = reb_mod.one_way_turnover(
-                prev_weights, record["weights"],
-                config["rebalance"]["initial_turnover_policy"])
+            if pre_trade_weights is not None or prev_weights is None:
+                turnover = reb_mod.one_way_turnover(
+                    pre_trade_weights, record["weights"],
+                    config["rebalance"]["initial_turnover_policy"])
             violations = cons_mod.check_weights(
                 record["weights"], config["constraints"], assets,
                 turnover=turnover)
@@ -757,7 +859,7 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
             "window_start": record.get("window", [None, None])[0],
             "window_end": record.get("window", [None, None])[1],
             "weights": record.get("weights"),
-            "prior_weights": prev_weights,
+            "prior_weights": pre_trade_weights,
             "turnover": turnover,
             "gross_change": (2.0 * turnover if turnover is not None else None),
             "solver": record.get("solver", {}),
@@ -766,7 +868,8 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
                 run["universe_fingerprint"], config["estimation"],
                 config["covariance"], record.get("window"),
                 [[round(float(v), 12) for v in row]
-                 for row in record["covariance"]])
+                 for row in record["covariance"]],
+                record.get("estimation_input_fingerprint"))
                 if record.get("covariance") is not None else None),
             "weight_fingerprint": (fp_mod.weight_fingerprint(record["weights"])
                                    if record.get("weights") else None),
@@ -786,6 +889,7 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
         if record.get("weights") is not None:
             prev_weights = record["weights"]
             last_success = {**record, "rebalance": rb}
+            prev_effective_index = i
 
     solver_status = (last_success["solver"].get("status")
                      if last_success else "failed")
@@ -938,44 +1042,49 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
     }
     result_fp = fp_mod.result_fingerprint(
         run["configuration_fingerprint"], rebalances,
-        risk or {}, budget or {}, concentration or {},
-        [{k: s.get(k) for k in ("dimension", "value", "portfolio_volatility",
-                                "turnover", "solver_status")}
-         for s in sensitivity_rows],
+        risk or {}, budget or {}, concentration or {}, sensitivity_rows,
         [{"rebalance_id": r["rebalance_id"],
-          "violations": len(r["constraint_violations"])} for r in rebalances],
-        warnings, integrity, solver_status or "failed")
+          "violations": r["constraint_violations"]} for r in rebalances],
+        warnings, integrity, solver_status or "failed",
+        covariance=covariance_block, regimes=regimes)
 
-    store.replace_assets(run_id, [
-        {**a, "volatility": (float(np.std(matrix[i], ddof=1))
-                             if n_periods >= 2 else None),
-         "metadata": {}} for i, a in enumerate(assets)])
-    store.replace_rebalances(run_id, rebalances)
-    store.replace_weight_results(run_id, weight_rows)
-    store.replace_risk_contributions(run_id, contribution_rows)
-    store.replace_sensitivity_results(run_id, sensitivity_rows)
-    store.update_run(run_id, {
-        "status": "completed",
-        "integrity_status": integrity,
-        "solver_status": solver_status or "failed",
-        "rebalance_count": len(rebalances),
-        "portfolio_volatility": aggregates["portfolio_volatility"],
-        "effective_positions": aggregates["effective_positions"],
-        "max_budget_deviation": aggregates["max_budget_deviation"],
-        "mean_turnover": aggregates["mean_turnover"],
-        "constraint_violation_count": violation_count,
-        "result_fingerprint": result_fp,
-        "risk_json": json.dumps(risk) if risk else None,
-        "budget_json": json.dumps(budget) if budget else None,
-        "concentration_json": json.dumps(concentration) if concentration else None,
-        "covariance_json": json.dumps(covariance_block) if covariance_block else None,
-        "regimes_json": json.dumps(regimes) if regimes else None,
-        "warnings_json": json.dumps(warnings),
-        "completed_at": _now(),
-        "duration_ms": int((time.monotonic() - t0) * 1000),
-        "error_message": None,
-    })
-
+    asset_rows = [
+        {**asset, "volatility": (float(np.std(matrix[i], ddof=1))
+                                  if n_periods >= 2 else None),
+         "metadata": asset.get("metadata", {})}
+        for i, asset in enumerate(assets)
+    ]
+    store.replace_execution_results(
+        run_id,
+        assets=asset_rows,
+        rebalances=rebalances,
+        weights=weight_rows,
+        contributions=contribution_rows,
+        sensitivity=sensitivity_rows,
+        run_updates={
+            "status": "completed",
+            "integrity_status": integrity,
+            "solver_status": solver_status or "failed",
+            "rebalance_count": len(rebalances),
+            "portfolio_volatility": aggregates["portfolio_volatility"],
+            "effective_positions": aggregates["effective_positions"],
+            "max_budget_deviation": aggregates["max_budget_deviation"],
+            "mean_turnover": aggregates["mean_turnover"],
+            "constraint_violation_count": violation_count,
+            "result_fingerprint": result_fp,
+            "risk_json": json.dumps(risk) if risk else None,
+            "budget_json": json.dumps(budget) if budget else None,
+            "concentration_json": (json.dumps(concentration)
+                                   if concentration else None),
+            "covariance_json": (json.dumps(covariance_block)
+                                 if covariance_block else None),
+            "regimes_json": json.dumps(regimes) if regimes else None,
+            "warnings_json": json.dumps(warnings),
+            "completed_at": _now(),
+            "duration_ms": int((time.monotonic() - t0) * 1000),
+            "error_message": None,
+        },
+    )
     run = store.get_run(run_id)
     assert run is not None
     if create_experiment and not run.get("experiment_id"):
@@ -1260,7 +1369,7 @@ def export(filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
 
 __all__ = [
     "BASELINE_ACCEPTABLE_INTEGRITY", "BASELINE_ACCEPTABLE_SOLVER",
-    "PortfolioDiagnosticsError", "NotFoundError", "ConflictError",
+    "PortfolioDiagnosticsError", "InternalExecutionError", "NotFoundError", "ConflictError",
     "create_run", "get_run", "list_runs", "lab_summary", "execute_run",
     "invalidate_run", "mark_baseline", "compare_runs", "export",
 ]

@@ -130,27 +130,37 @@ def test_estimation_no_lookahead_windows():
 
 
 def test_future_outlier_invariance():
-    """Mutating returns after the estimation cutoff never moves weights."""
+    """Future data cannot change an earlier decision's causal artifacts."""
     base = _payload(method="erc")
     run_a = service.create_run(base)
-    service.execute_run(run_a["id"])
+    executed_a = service.execute_run(run_a["id"])
     mutated = _payload(method="erc")
-    # one_time rebalance decides at the first feasible index (41 with
-    # lookback 40, lag 1) using returns[0..40]; mutate everything after 60
-    for a in mutated["assets"]:
-        for k in range(60, len(a["returns"])):
-            a["returns"][k] = 0.5
+    # The one-time rebalance decides at the first feasible index using only
+    # returns[0..40]; mutate observations strictly after that cutoff.
+    for asset in mutated["assets"]:
+        for k in range(60, len(asset["returns"])):
+            asset["returns"][k] = 0.5
     mutated["name"] = "mutated"
     run_b = service.create_run(mutated)
-    service.execute_run(run_b["id"])
-    w_a = {w["asset_id"]: w["weight"]
-           for w in pd_store.list_weight_results(run_a["id"])}
-    w_b = {w["asset_id"]: w["weight"]
-           for w in pd_store.list_weight_results(run_b["id"])}
-    assert w_a == w_b
+    executed_b = service.execute_run(run_b["id"])
+    weights_a = {w["asset_id"]: w["weight"]
+                 for w in pd_store.list_weight_results(run_a["id"])}
+    weights_b = {w["asset_id"]: w["weight"]
+                 for w in pd_store.list_weight_results(run_b["id"])}
+    rebalances_a = pd_store.list_rebalances(run_a["id"])
+    rebalances_b = pd_store.list_rebalances(run_b["id"])
+    assert weights_a == weights_b
+    assert rebalances_a[0]["covariance_fingerprint"] == \
+        rebalances_b[0]["covariance_fingerprint"]
+    assert rebalances_a[0]["weight_fingerprint"] == \
+        rebalances_b[0]["weight_fingerprint"]
+    assert executed_a["covariance"]["matrix"] == \
+        executed_b["covariance"]["matrix"]
+    assert executed_a["risk"] == executed_b["risk"]
+    # Full-universe identities still differ because the stored inputs differ.
+    assert run_a["universe_fingerprint"] != run_b["universe_fingerprint"]
     assert service.get_run(run_a["id"])["integrity_status"] == \
         "verified_causal_rolling"
-
 
 # ---------------------------------------------------------------------------
 # Methods
@@ -192,6 +202,36 @@ def test_erc_hits_equal_risk_contributions():
     assert failed["weights"] is None
     assert failed["solver"]["status"] == "failed"
 
+
+def test_erc_independent_reference_and_failure_cases():
+    covariance = np.diag([0.04, 0.01])
+    equal = methods.erc(covariance, ["a", "b"])
+    assert equal["solver"]["status"] == "converged"
+    assert equal["weights"]["a"] == pytest.approx(1 / 3, abs=1e-6)
+    assert equal["weights"]["b"] == pytest.approx(2 / 3, abs=1e-6)
+
+    unequal = methods.erc(
+        covariance, ["a", "b"], {"a": 0.8, "b": 0.2})
+    unequal_weights = np.array([
+        unequal["weights"]["a"], unequal["weights"]["b"]])
+    variance = float(unequal_weights @ covariance @ unequal_weights)
+    measured = unequal_weights * (covariance @ unequal_weights) / variance
+    assert measured == pytest.approx([0.8, 0.2], abs=1e-6)
+
+    highly_correlated = np.array([[0.04, 0.039], [0.039, 0.04]])
+    correlated = methods.erc(highly_correlated, ["a", "b"])
+    assert correlated["weights"] == pytest.approx({"a": 0.5, "b": 0.5})
+
+    singular = np.array([[0.04, 0.04], [0.04, 0.04]])
+    singular_result = methods.erc(singular, ["a", "b"])
+    assert singular_result["solver"]["status"] == "converged"
+    assert singular_result["weights"] == pytest.approx({"a": 0.5, "b": 0.5})
+
+    non_converged = methods.erc(
+        covariance, ["a", "b"], {"a": 0.9, "b": 0.1},
+        tolerance=1e-12, max_iterations=0)
+    assert non_converged["weights"] is None
+    assert non_converged["solver"]["status"] == "failed"
 
 def test_min_variance_and_normalization():
     cov = np.array([[0.04, 0.0], [0.0, 0.01]])
@@ -242,6 +282,16 @@ def test_covariance_estimation_shrinkage_and_validation():
     assert cov_mod.validate_matrix(asym)["valid"] is False
 
 
+def test_small_negative_eigenvalue_uses_psd_tolerance_wording():
+    near_psd = np.array([[1.0, 1.0 + 5e-11], [1.0 + 5e-11, 1.0]])
+    report = cov_mod.validate_matrix(near_psd)
+    assert report["valid"] is True
+    assert report["psd"] is True
+    assert any("within the documented PSD tolerance" in warning
+               for warning in report["warnings"])
+    assert not any("non-PSD covariance" in warning
+                   for warning in report["warnings"])
+
 def test_covariance_repair_explicit_only():
     bad = np.array([[1.0, 2.0], [2.0, 1.0]])
     none = cov_mod.repair_matrix(
@@ -282,6 +332,57 @@ def test_constraint_validation_and_infeasibility():
     assert not cons_mod.check_weights({"a": 0.3, "b": 0.3, "c": 0.4},
                                       cons, assets, turnover=0.05)
 
+
+def test_structured_input_validation_and_short_feasibility(client):
+    assets = [{"asset_id": asset_id, "group": group}
+              for asset_id, group in (("a", "g1"), ("b", "g1"), ("c", "g2"))]
+    with pytest.raises(cons_mod.ConstraintError, match="object"):
+        cons_mod.validate_constraints([], assets)
+    with pytest.raises(cons_mod.ConstraintError, match="boolean"):
+        cons_mod.validate_constraints({"long_only": "false"}, assets)
+    with pytest.raises(cons_mod.ConstraintError, match="group_caps"):
+        cons_mod.validate_constraints({"group_caps": []}, assets)
+    with pytest.raises(cons_mod.ConstraintError, match="excluded_assets"):
+        cons_mod.validate_constraints({"excluded_assets": "a"}, assets)
+    with pytest.raises(cons_mod.ConstraintError, match="cannot reach"):
+        cons_mod.validate_constraints(
+            {"long_only": False, "min_weight": -0.2, "max_weight": 0.1,
+             "net_exposure_target": 1.0}, assets)
+    with pytest.raises(cons_mod.ConstraintError, match="gross_exposure_limit"):
+        cons_mod.validate_constraints(
+            {"long_only": False, "min_weight": -1.0, "max_weight": 1.0,
+             "net_exposure_target": 1.0, "gross_exposure_limit": 0.5}, assets)
+    with pytest.raises(cons_mod.ConstraintError, match="group 'g1'"):
+        cons_mod.validate_constraints(
+            {"long_only": False, "min_weight": -1.0, "max_weight": 1.0,
+             "excluded_assets": ["a", "b"],
+             "group_minimums": {"g1": 0.1}}, assets)
+    with pytest.raises(cons_mod.ConstraintError, match="frozen weights alone"):
+        cons_mod.validate_constraints(
+            {"long_only": False, "min_weight": -1.0, "max_weight": 1.0,
+             "net_exposure_target": 0.0, "gross_exposure_limit": 0.5,
+             "frozen_weights": {"a": 0.6}}, assets)
+    with pytest.raises(cons_mod.ConstraintError, match="frozen weights in group"):
+        cons_mod.validate_constraints(
+            {"max_weight": 1.0, "group_caps": {"g1": 0.3},
+             "frozen_weights": {"a": 0.4}}, assets)
+
+    malformed = [
+        _payload(constraints=[]),
+        _payload(constraints={"long_only": "false"}),
+        _payload(solver=[]),
+        _payload(rebalance={"kind": "fixed_timestamps", "timestamps": [[1]]}),
+        _payload(method="user_supplied", weights={"a": 0.4, "b": 0.3, "c": 0.3},
+                 weight_provenance=[]),
+        _payload(risk_budgets={"a": -0.1, "b": 0.6, "c": 0.5}),
+        _payload(sample_ids=["duplicate"] * 100),
+    ]
+    bad_metadata = _payload()
+    bad_metadata["assets"][0]["metadata"] = []
+    malformed.append(bad_metadata)
+    for payload in malformed:
+        response = client.post(f"{BASE}/runs", json=payload)
+        assert response.status_code == 422, response.text
 
 # ---------------------------------------------------------------------------
 # Risk identities + concentration
@@ -341,6 +442,23 @@ def test_turnover_and_schedules():
     # first feasible: start = i - lag - lookback + 1 >= 0 => i >= 10
     assert idx[0] == 10 and idx[1] == 30
 
+
+def test_weight_drift_drives_turnover_and_realized_returns():
+    asset_ids = ["a", "b"]
+    returns_matrix = [[0.10, 0.0], [0.0, 0.10]]
+    target = {"a": 0.5, "b": 0.5}
+    drifted = reb_mod.drift_weights(
+        target, asset_ids, returns_matrix, start=0, end=1)
+    assert drifted == pytest.approx({"a": 0.55 / 1.05, "b": 0.5 / 1.05})
+    turnover = reb_mod.one_way_turnover(drifted, target, "none")
+    assert turnover == pytest.approx(
+        0.5 * (abs(0.55 / 1.05 - 0.5) + abs(0.5 / 1.05 - 0.5)))
+
+    realized = reb_mod.portfolio_returns(
+        [{"decision_index": 0, "weights": target}], asset_ids,
+        returns_matrix, n_periods=2)
+    assert realized[0] == pytest.approx(0.05)
+    assert realized[1] == pytest.approx((0.5 / 1.05) * 0.10)
 
 def test_service_rebalances_and_turnover_cap(client):
     run = service.create_run(_payload(
@@ -479,6 +597,58 @@ def test_fingerprints_material_changes():
     assert first["result_fingerprint"] == second["result_fingerprint"]
 
 
+def test_fingerprints_cover_execution_inputs_and_causal_windows():
+    provenance = {"basis": "declared", "lag": 1}
+    supplied_a = service.create_run(_payload(
+        method="user_supplied", weights={"a": 0.6, "b": 0.3, "c": 0.1},
+        weight_provenance=provenance))
+    supplied_b = service.create_run(_payload(
+        method="user_supplied", weights={"a": 0.4, "b": 0.4, "c": 0.2},
+        weight_provenance=provenance))
+    assert supplied_a["configuration_fingerprint"] != \
+        supplied_b["configuration_fingerprint"]
+
+    floor_a = service.create_run(_payload(
+        method="inverse_volatility", volatility_floor=0.001))
+    floor_b = service.create_run(_payload(
+        method="inverse_volatility", volatility_floor=0.002))
+    assert floor_a["configuration_fingerprint"] != \
+        floor_b["configuration_fingerprint"]
+
+    assets = core.normalize_assets(_assets(), 100)
+    universe_a = fp_mod.universe_fingerprint(
+        assets, _ts(100), "daily", None, None,
+        prior_weights={"a": 0.5, "b": 0.3, "c": 0.2})
+    universe_b = fp_mod.universe_fingerprint(
+        assets, _ts(100), "daily", None, None,
+        prior_weights={"a": 0.2, "b": 0.3, "c": 0.5})
+    assert universe_a != universe_b
+
+    matrix = [asset["returns"] for asset in assets]
+    causal_a = fp_mod.estimation_input_fingerprint(
+        ["a", "b", "c"], _ts(100), list(range(20)), matrix)
+    mutated = [row[:] for row in matrix]
+    mutated[0][90] = 0.9
+    causal_b = fp_mod.estimation_input_fingerprint(
+        ["a", "b", "c"], _ts(100), list(range(20)), mutated)
+    assert causal_a == causal_b
+
+    rebalance = {
+        "rebalance_id": 0, "decision_timestamp": _ts(1)[0],
+        "effective_timestamp": _ts(1)[0], "weights": {"a": 0.5, "b": 0.5},
+        "prior_weights": None, "turnover": None, "gross_change": None,
+        "solver": {"status": "converged", "residual": 1e-9},
+        "constraint_violations": [], "cost": None, "status": "completed",
+    }
+    result_a = fp_mod.result_fingerprint(
+        "cfg", [rebalance], {}, {}, {}, [], [], [], "declared", "converged")
+    changed = {**rebalance,
+               "solver": {"status": "converged", "residual": 1e-5},
+               "cost": {"total_cost_return": 0.001}}
+    result_b = fp_mod.result_fingerprint(
+        "cfg", [changed], {}, {}, {}, [], [], [], "declared", "converged")
+    assert result_a != result_b
+
 def test_migration_and_registries_preserved():
     db_module.init_db()
     db_module.init_db()
@@ -498,6 +668,52 @@ def test_migration_and_registries_preserved():
                   "validation_runs"):
             assert conn.execute(
                 f"SELECT COUNT(*) AS c FROM {t}").fetchone()["c"] == 0
+
+
+def test_execution_snapshot_replacement_is_atomic(monkeypatch):
+    run = service.create_run(_payload())
+    service.execute_run(run["id"])
+    before_run = service.get_run(run["id"])
+    before_assets = pd_store.list_assets(run["id"])
+    before_rebalances = pd_store.list_rebalances(run["id"])
+
+    def fail_mid_transaction(*_args, **_kwargs):
+        raise RuntimeError("injected child write failure")
+
+    monkeypatch.setattr(
+        pd_store, "_replace_weight_results_in_connection", fail_mid_transaction)
+    with pytest.raises(RuntimeError, match="injected"):
+        pd_store.replace_execution_results(
+            run["id"], assets=[], rebalances=[], weights=[], contributions=[],
+            sensitivity=[], run_updates={"status": "pending"})
+
+    after_run = service.get_run(run["id"])
+    assert pd_store.list_assets(run["id"]) == before_assets
+    assert pd_store.list_rebalances(run["id"]) == before_rebalances
+    assert after_run["status"] == before_run["status"]
+    assert after_run["result_fingerprint"] == before_run["result_fingerprint"]
+
+
+def test_unexpected_execution_error_is_sanitized(monkeypatch, client):
+    run = service.create_run(_payload())
+
+    def explode(*_args, **_kwargs):
+        raise RuntimeError("sqlite secret C:/private/data.db")
+
+    monkeypatch.setattr(pd_store, "replace_execution_results", explode)
+    with pytest.raises(service.InternalExecutionError) as caught:
+        service.execute_run(run["id"])
+    assert "sqlite secret" not in str(caught.value)
+    stored = service.get_run(run["id"])
+    assert stored["status"] == "failed"
+    assert "sqlite secret" not in stored["error_message"]
+    api_run = service.create_run(_payload(name="api internal failure"))
+    response = client.post(
+        f"{BASE}/runs/{api_run['id']}/execute",
+        json={"create_experiment": False})
+    assert response.status_code == 500
+    assert response.json()["detail"] == str(caught.value)
+    assert "sqlite secret" not in response.text
 
 
 def test_baseline_policy_and_scope():

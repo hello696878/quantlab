@@ -118,30 +118,39 @@ def run_demo_key_id(demo_key: str) -> Optional[int]:
     return int(row["id"]) if row else None
 
 
-def update_run(run_id: int, columns: Dict[str, Any]) -> Optional[Dict[str, Any]]:
-    allowed = {
-        "status", "integrity_status", "solver_status", "rebalance_count",
-        "portfolio_volatility", "effective_positions", "max_budget_deviation",
-        "mean_turnover", "constraint_violation_count", "result_fingerprint",
-        "risk_json", "budget_json", "concentration_json", "covariance_json",
-        "regimes_json", "warnings_json", "is_baseline", "baseline_scope",
-        "completed_at", "duration_ms", "experiment_id", "error_message",
-        "notes",
-    }
-    updates = {k: v for k, v in columns.items() if k in allowed}
-    if not updates:
-        return get_run(run_id)
-    set_clause = ", ".join(f"{c} = ?" for c in updates)
-    with get_connection() as conn:
-        cur = conn.execute(
-            f"UPDATE portfolio_diagnostic_runs SET {set_clause}, updated_at = ? WHERE id = ?",
-            [*updates.values(), _now(), run_id],
-        )
-        conn.commit()
-        if cur.rowcount == 0:
-            return None
-    return get_run(run_id)
+RUN_UPDATE_COLUMNS = frozenset({
+    "status", "integrity_status", "solver_status", "rebalance_count",
+    "portfolio_volatility", "effective_positions", "max_budget_deviation",
+    "mean_turnover", "constraint_violation_count", "result_fingerprint",
+    "risk_json", "budget_json", "concentration_json", "covariance_json",
+    "regimes_json", "warnings_json", "is_baseline", "baseline_scope",
+    "completed_at", "duration_ms", "experiment_id", "error_message", "notes",
+})
 
+
+def _update_run_in_connection(conn: Any, run_id: int,
+                              columns: Dict[str, Any]) -> int:
+    updates = {k: v for k, v in columns.items() if k in RUN_UPDATE_COLUMNS}
+    if not updates:
+        return 0
+    set_clause = ", ".join(f"{column} = ?" for column in updates)
+    cur = conn.execute(
+        f"UPDATE portfolio_diagnostic_runs SET {set_clause}, updated_at = ? "
+        "WHERE id = ?",
+        [*updates.values(), _now(), run_id],
+    )
+    return int(cur.rowcount)
+
+
+def update_run(run_id: int, columns: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    if not any(key in RUN_UPDATE_COLUMNS for key in columns):
+        return get_run(run_id)
+    with get_connection() as conn:
+        rowcount = _update_run_in_connection(conn, run_id, columns)
+        conn.commit()
+    if rowcount == 0:
+        return None
+    return get_run(run_id)
 
 def _where(filters: Dict[str, Any]) -> Tuple[str, List[Any]]:
     clauses: List[str] = []
@@ -194,23 +203,27 @@ def list_runs(*, filters=None, sort_by="created_at", sort_dir="desc",
 # --- child rows (deterministic replacement) --------------------------------
 
 
+def _replace_assets_in_connection(conn: Any, run_id: int,
+                                  rows_in: List[Dict[str, Any]]) -> None:
+    conn.execute("DELETE FROM portfolio_assets WHERE run_id = ?", (run_id,))
+    for i, asset in enumerate(rows_in):
+        conn.execute(
+            """
+            INSERT INTO portfolio_assets (
+                run_id, asset_index, asset_id, name, asset_type,
+                grp, currency, volatility, metadata_json
+            ) VALUES (?,?,?,?,?,?,?,?,?)
+            """,
+            (run_id, i, asset["asset_id"], asset["name"], asset["asset_type"],
+             asset.get("group"), asset.get("currency"), asset.get("volatility"),
+             json.dumps(asset.get("metadata", {}))),
+        )
+
+
 def replace_assets(run_id: int, rows_in: List[Dict[str, Any]]) -> None:
     with get_connection() as conn:
-        conn.execute("DELETE FROM portfolio_assets WHERE run_id = ?", (run_id,))
-        for i, a in enumerate(rows_in):
-            conn.execute(
-                """
-                INSERT INTO portfolio_assets (
-                    run_id, asset_index, asset_id, name, asset_type,
-                    grp, currency, volatility, metadata_json
-                ) VALUES (?,?,?,?,?,?,?,?,?)
-                """,
-                (run_id, i, a["asset_id"], a["name"], a["asset_type"],
-                 a.get("group"), a.get("currency"), a.get("volatility"),
-                 json.dumps(a.get("metadata", {}))),
-            )
+        _replace_assets_in_connection(conn, run_id, rows_in)
         conn.commit()
-
 
 def list_assets(run_id: int) -> List[Dict[str, Any]]:
     with get_connection() as conn:
@@ -225,39 +238,40 @@ def list_assets(run_id: int) -> List[Dict[str, Any]]:
     } for r in rows]
 
 
+def _replace_rebalances_in_connection(conn: Any, run_id: int,
+                                      rows_in: List[Dict[str, Any]]) -> None:
+    conn.execute("DELETE FROM portfolio_rebalances WHERE run_id = ?", (run_id,))
+    for row in rows_in:
+        conn.execute(
+            """
+            INSERT INTO portfolio_rebalances (
+                run_id, rebalance_id, decision_timestamp,
+                effective_timestamp, window_start, window_end,
+                turnover, gross_change, solver_status,
+                constraint_violation_count, covariance_fingerprint,
+                weight_fingerprint, weights_json, prior_weights_json,
+                solver_json, violations_json, cost_json, status, reason
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (run_id, row["rebalance_id"], row["decision_timestamp"],
+             row.get("effective_timestamp"), row.get("window_start"),
+             row.get("window_end"), row.get("turnover"), row.get("gross_change"),
+             row.get("solver", {}).get("status"),
+             len(row.get("constraint_violations") or []),
+             row.get("covariance_fingerprint"), row.get("weight_fingerprint"),
+             json.dumps(row.get("weights")) if row.get("weights") is not None else None,
+             json.dumps(row.get("prior_weights")) if row.get("prior_weights") is not None else None,
+             json.dumps(row.get("solver", {})),
+             json.dumps(row.get("constraint_violations") or []),
+             json.dumps(row.get("cost")) if row.get("cost") is not None else None,
+             row.get("status", "completed"), row.get("reason")),
+        )
+
+
 def replace_rebalances(run_id: int, rows_in: List[Dict[str, Any]]) -> None:
     with get_connection() as conn:
-        conn.execute("DELETE FROM portfolio_rebalances WHERE run_id = ?", (run_id,))
-        for r in rows_in:
-            conn.execute(
-                """
-                INSERT INTO portfolio_rebalances (
-                    run_id, rebalance_id, decision_timestamp,
-                    effective_timestamp, window_start, window_end,
-                    turnover, gross_change, solver_status,
-                    constraint_violation_count, covariance_fingerprint,
-                    weight_fingerprint, weights_json, prior_weights_json,
-                    solver_json, violations_json, cost_json, status, reason
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (run_id, r["rebalance_id"], r["decision_timestamp"],
-                 r.get("effective_timestamp"), r.get("window_start"),
-                 r.get("window_end"), r.get("turnover"),
-                 r.get("gross_change"),
-                 r.get("solver", {}).get("status"),
-                 len(r.get("constraint_violations") or []),
-                 r.get("covariance_fingerprint"),
-                 r.get("weight_fingerprint"),
-                 json.dumps(r.get("weights")) if r.get("weights") is not None else None,
-                 json.dumps(r.get("prior_weights"))
-                 if r.get("prior_weights") is not None else None,
-                 json.dumps(r.get("solver", {})),
-                 json.dumps(r.get("constraint_violations") or []),
-                 json.dumps(r.get("cost")) if r.get("cost") is not None else None,
-                 r.get("status", "completed"), r.get("reason")),
-            )
+        _replace_rebalances_in_connection(conn, run_id, rows_in)
         conn.commit()
-
 
 def list_rebalances(run_id: int) -> List[Dict[str, Any]]:
     with get_connection() as conn:
@@ -284,23 +298,28 @@ def list_rebalances(run_id: int) -> List[Dict[str, Any]]:
     } for r in rows]
 
 
+def _replace_weight_results_in_connection(conn: Any, run_id: int,
+                                          rows_in: List[Dict[str, Any]]) -> None:
+    conn.execute("DELETE FROM portfolio_weight_results WHERE run_id = ?", (run_id,))
+    for i, weight in enumerate(rows_in):
+        conn.execute(
+            """
+            INSERT INTO portfolio_weight_results (
+                run_id, asset_index, asset_id, raw_weight, weight,
+                lower_bound, upper_bound, grp, constraint_status
+            ) VALUES (?,?,?,?,?,?,?,?,?)
+            """,
+            (run_id, i, weight["asset_id"], weight.get("raw_weight"),
+             weight.get("weight"), weight.get("lower_bound"),
+             weight.get("upper_bound"), weight.get("group"),
+             weight.get("constraint_status", "ok")),
+        )
+
+
 def replace_weight_results(run_id: int, rows_in: List[Dict[str, Any]]) -> None:
     with get_connection() as conn:
-        conn.execute("DELETE FROM portfolio_weight_results WHERE run_id = ?", (run_id,))
-        for i, w in enumerate(rows_in):
-            conn.execute(
-                """
-                INSERT INTO portfolio_weight_results (
-                    run_id, asset_index, asset_id, raw_weight, weight,
-                    lower_bound, upper_bound, grp, constraint_status
-                ) VALUES (?,?,?,?,?,?,?,?,?)
-                """,
-                (run_id, i, w["asset_id"], w.get("raw_weight"), w.get("weight"),
-                 w.get("lower_bound"), w.get("upper_bound"), w.get("group"),
-                 w.get("constraint_status", "ok")),
-            )
+        _replace_weight_results_in_connection(conn, run_id, rows_in)
         conn.commit()
-
 
 def list_weight_results(run_id: int) -> List[Dict[str, Any]]:
     with get_connection() as conn:
@@ -315,25 +334,31 @@ def list_weight_results(run_id: int) -> List[Dict[str, Any]]:
     } for r in rows]
 
 
+def _replace_risk_contributions_in_connection(
+        conn: Any, run_id: int, rows_in: List[Dict[str, Any]]) -> None:
+    conn.execute(
+        "DELETE FROM portfolio_risk_contributions WHERE run_id = ?", (run_id,))
+    for i, contribution in enumerate(rows_in):
+        conn.execute(
+            """
+            INSERT INTO portfolio_risk_contributions (
+                run_id, asset_index, asset_id, weight, mcr, ccr, pcr,
+                target_budget, abs_difference, signed_difference, state
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (run_id, i, contribution["asset_id"], contribution.get("weight"),
+             contribution.get("mcr"), contribution.get("ccr"),
+             contribution.get("pcr"), contribution.get("target_budget"),
+             contribution.get("abs_difference"),
+             contribution.get("signed_difference"),
+             contribution.get("state", "unavailable")),
+        )
+
+
 def replace_risk_contributions(run_id: int, rows_in: List[Dict[str, Any]]) -> None:
     with get_connection() as conn:
-        conn.execute(
-            "DELETE FROM portfolio_risk_contributions WHERE run_id = ?", (run_id,))
-        for i, c in enumerate(rows_in):
-            conn.execute(
-                """
-                INSERT INTO portfolio_risk_contributions (
-                    run_id, asset_index, asset_id, weight, mcr, ccr, pcr,
-                    target_budget, abs_difference, signed_difference, state
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (run_id, i, c["asset_id"], c.get("weight"), c.get("mcr"),
-                 c.get("ccr"), c.get("pcr"), c.get("target_budget"),
-                 c.get("abs_difference"), c.get("signed_difference"),
-                 c.get("state", "unavailable")),
-            )
+        _replace_risk_contributions_in_connection(conn, run_id, rows_in)
         conn.commit()
-
 
 def list_risk_contributions(run_id: int) -> List[Dict[str, Any]]:
     with get_connection() as conn:
@@ -348,32 +373,38 @@ def list_risk_contributions(run_id: int) -> List[Dict[str, Any]]:
     } for r in rows]
 
 
+def _replace_sensitivity_results_in_connection(
+        conn: Any, run_id: int, rows_in: List[Dict[str, Any]]) -> None:
+    conn.execute(
+        "DELETE FROM portfolio_sensitivity_results WHERE run_id = ?", (run_id,))
+    for i, scenario in enumerate(rows_in):
+        conn.execute(
+            """
+            INSERT INTO portfolio_sensitivity_results (
+                run_id, scenario_index, dimension, value, is_base,
+                portfolio_volatility, effective_positions,
+                max_budget_deviation, turnover, solver_status,
+                constraint_violation_count, cost_return, status, reason,
+                fingerprint
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+            """,
+            (run_id, i, scenario["dimension"],
+             None if scenario.get("value") is None else float(scenario["value"]),
+             1 if scenario.get("is_base") else 0,
+             scenario.get("portfolio_volatility"),
+             scenario.get("effective_positions"),
+             scenario.get("max_budget_deviation"), scenario.get("turnover"),
+             scenario.get("solver_status"),
+             scenario.get("constraint_violation_count", 0),
+             scenario.get("cost_return"), scenario.get("status", "completed"),
+             scenario.get("reason"), scenario["fingerprint"]),
+        )
+
+
 def replace_sensitivity_results(run_id: int, rows_in: List[Dict[str, Any]]) -> None:
     with get_connection() as conn:
-        conn.execute(
-            "DELETE FROM portfolio_sensitivity_results WHERE run_id = ?", (run_id,))
-        for i, s in enumerate(rows_in):
-            conn.execute(
-                """
-                INSERT INTO portfolio_sensitivity_results (
-                    run_id, scenario_index, dimension, value, is_base,
-                    portfolio_volatility, effective_positions,
-                    max_budget_deviation, turnover, solver_status,
-                    constraint_violation_count, cost_return, status, reason,
-                    fingerprint
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
-                """,
-                (run_id, i, s["dimension"],
-                 None if s.get("value") is None else float(s["value"]),
-                 1 if s.get("is_base") else 0,
-                 s.get("portfolio_volatility"), s.get("effective_positions"),
-                 s.get("max_budget_deviation"), s.get("turnover"),
-                 s.get("solver_status"), s.get("constraint_violation_count", 0),
-                 s.get("cost_return"), s.get("status", "completed"),
-                 s.get("reason"), s["fingerprint"]),
-            )
+        _replace_sensitivity_results_in_connection(conn, run_id, rows_in)
         conn.commit()
-
 
 def list_sensitivity_results(run_id: int) -> List[Dict[str, Any]]:
     with get_connection() as conn:
@@ -392,6 +423,23 @@ def list_sensitivity_results(run_id: int) -> List[Dict[str, Any]]:
         "reason": r["reason"], "fingerprint": r["fingerprint"],
     } for r in rows]
 
+
+def replace_execution_results(
+        run_id: int, *, assets: List[Dict[str, Any]],
+        rebalances: List[Dict[str, Any]], weights: List[Dict[str, Any]],
+        contributions: List[Dict[str, Any]],
+        sensitivity: List[Dict[str, Any]],
+        run_updates: Dict[str, Any]) -> None:
+    """Replace one execution snapshot atomically across parent and children."""
+    with get_connection() as conn:
+        _replace_assets_in_connection(conn, run_id, assets)
+        _replace_rebalances_in_connection(conn, run_id, rebalances)
+        _replace_weight_results_in_connection(conn, run_id, weights)
+        _replace_risk_contributions_in_connection(conn, run_id, contributions)
+        _replace_sensitivity_results_in_connection(conn, run_id, sensitivity)
+        if _update_run_in_connection(conn, run_id, run_updates) == 0:
+            raise LookupError(f"portfolio-diagnostic run {run_id} not found")
+        conn.commit()
 
 # --- baselines + summary ---------------------------------------------------
 

@@ -46,11 +46,17 @@ def _num(cfg: Dict[str, Any], field: str, default=None,
 
 
 def validate_constraints(raw: Any, assets: List[Dict[str, Any]]) -> Dict[str, Any]:
-    cfg = dict(raw or {})
-    if not isinstance(cfg, dict):
+    if raw is None:
+        cfg: Dict[str, Any] = {}
+    elif not isinstance(raw, dict):
         raise ConstraintError("constraints must be an object")
+    else:
+        cfg = dict(raw)
+    for field in ("long_only", "cash_residual_allowed"):
+        if field in cfg and not isinstance(cfg[field], bool):
+            raise ConstraintError(f"{field} must be a boolean")
     out: Dict[str, Any] = {
-        "long_only": bool(cfg.get("long_only", True)),
+        "long_only": cfg.get("long_only", True),
         "tolerance": CONSTRAINT_TOLERANCE,
         "units": "portfolio-weight fractions (1.0 = 100%)",
     }
@@ -70,7 +76,7 @@ def validate_constraints(raw: Any, assets: List[Dict[str, Any]]) -> Dict[str, An
                                       hi=MAX_GROSS_EXPOSURE)
     out["turnover_cap"] = _num(cfg, "turnover_cap", None, lo=0.0,
                                hi=MAX_TURNOVER_CAP)
-    out["cash_residual_allowed"] = bool(cfg.get("cash_residual_allowed", False))
+    out["cash_residual_allowed"] = cfg.get("cash_residual_allowed", False)
 
     known = {a["asset_id"] for a in assets}
     groups_present: Dict[str, int] = {}
@@ -78,14 +84,21 @@ def validate_constraints(raw: Any, assets: List[Dict[str, Any]]) -> Dict[str, An
         if a.get("group"):
             groups_present[a["group"]] = groups_present.get(a["group"], 0) + 1
 
+    raw_group_caps = cfg.get("group_caps")
+    if raw_group_caps is not None and not isinstance(raw_group_caps, dict):
+        raise ConstraintError("group_caps must be an object")
     group_caps: Dict[str, float] = {}
-    for g, cap in dict(cfg.get("group_caps") or {}).items():
+    for g, cap in (raw_group_caps or {}).items():
         if g not in groups_present:
             raise ConstraintError(f"group cap references unknown group {g!r}")
         group_caps[g] = _num({"cap": cap}, "cap", lo=0.0, hi=MAX_GROSS_EXPOSURE)
     out["group_caps"] = group_caps
+    raw_group_minimums = cfg.get("group_minimums")
+    if raw_group_minimums is not None and not isinstance(
+            raw_group_minimums, dict):
+        raise ConstraintError("group_minimums must be an object")
     group_minimums: Dict[str, float] = {}
-    for g, mn in dict(cfg.get("group_minimums") or {}).items():
+    for g, mn in (raw_group_minimums or {}).items():
         if g not in groups_present:
             raise ConstraintError(f"group minimum references unknown group {g!r}")
         group_minimums[g] = _num({"min": mn}, "min", lo=0.0, hi=MAX_GROSS_EXPOSURE)
@@ -95,14 +108,22 @@ def validate_constraints(raw: Any, assets: List[Dict[str, Any]]) -> Dict[str, An
                 "<= upper bound)")
     out["group_minimums"] = group_minimums
 
-    excluded = list(cfg.get("excluded_assets") or [])
+    raw_excluded = cfg.get("excluded_assets")
+    if raw_excluded is not None and not isinstance(raw_excluded, list):
+        raise ConstraintError("excluded_assets must be a list")
+    excluded = list(raw_excluded or [])
     for asset_id in excluded:
+        if not isinstance(asset_id, str):
+            raise ConstraintError("excluded_assets entries must be strings")
         if asset_id not in known:
             raise ConstraintError(f"excluded asset {asset_id!r} is unknown")
     out["excluded_assets"] = sorted(set(excluded))
 
+    raw_frozen = cfg.get("frozen_weights")
+    if raw_frozen is not None and not isinstance(raw_frozen, dict):
+        raise ConstraintError("frozen_weights must be an object")
     frozen: Dict[str, float] = {}
-    for asset_id, w in dict(cfg.get("frozen_weights") or {}).items():
+    for asset_id, w in (raw_frozen or {}).items():
         if asset_id not in known:
             raise ConstraintError(f"frozen asset {asset_id!r} is unknown")
         if asset_id in out["excluded_assets"]:
@@ -132,36 +153,63 @@ def validate_constraints(raw: Any, assets: List[Dict[str, Any]]) -> Dict[str, An
     target_sum = out["net_exposure_target"]
     if target_sum is None:
         target_sum = 1.0
-    if out["long_only"]:
-        frozen_sum = sum(frozen.values())
-        free = [a for a in eligible if a["asset_id"] not in frozen]
-        if len(free) * max_w + frozen_sum < target_sum - CONSTRAINT_TOLERANCE \
-                and not out["cash_residual_allowed"]:
+    frozen_sum = sum(frozen.values())
+    free = [a for a in eligible if a["asset_id"] not in frozen]
+    minimum_sum = len(free) * min_w + frozen_sum
+    maximum_sum = len(free) * max_w + frozen_sum
+    if not out["cash_residual_allowed"]:
+        if maximum_sum < target_sum - CONSTRAINT_TOLERANCE:
             raise ConstraintError(
                 f"infeasible: {len(free)} free assets at max_weight "
                 f"{max_w:g} plus frozen weights cannot reach the required "
                 f"exposure {target_sum:g}")
-        if len(free) * min_w + frozen_sum > target_sum + CONSTRAINT_TOLERANCE:
+        if minimum_sum > target_sum + CONSTRAINT_TOLERANCE:
             raise ConstraintError(
                 "infeasible: minimum weights alone exceed the required "
                 "exposure")
-        for g, mn in group_minimums.items():
-            members = groups_present.get(g, 0)
-            if members * max_w < mn - CONSTRAINT_TOLERANCE:
-                raise ConstraintError(
-                    f"infeasible: group {g!r} cannot reach its minimum "
-                    f"{mn:g} under max_weight {max_w:g}")
+    gross_limit = out["gross_exposure_limit"]
+    if not out["cash_residual_allowed"] and gross_limit is not None \
+            and gross_limit < abs(target_sum) - CONSTRAINT_TOLERANCE:
+        raise ConstraintError(
+            "infeasible: gross_exposure_limit is below the absolute "
+            "required net exposure")
+    frozen_gross = sum(abs(weight) for weight in frozen.values())
+    if gross_limit is not None and frozen_gross > gross_limit + CONSTRAINT_TOLERANCE:
+        raise ConstraintError(
+            "infeasible: frozen weights alone exceed gross_exposure_limit")
+    max_abs_free_weight = max(abs(min_w), abs(max_w))
+    for group in set(group_caps) | set(group_minimums):
+        free_members = sum(
+            1 for asset in eligible
+            if asset.get("group") == group and asset["asset_id"] not in frozen
+        )
+        frozen_group = sum(
+            abs(frozen.get(asset["asset_id"], 0.0)) for asset in eligible
+            if asset.get("group") == group
+        )
+        if group in group_caps and frozen_group > (
+                group_caps[group] + CONSTRAINT_TOLERANCE):
+            raise ConstraintError(
+                f"infeasible: frozen weights in group {group!r} exceed "
+                f"its cap {group_caps[group]:g}")
+        if group in group_minimums and (
+                free_members * max_abs_free_weight + frozen_group
+                < group_minimums[group] - CONSTRAINT_TOLERANCE):
+            raise ConstraintError(
+                f"infeasible: group {group!r} cannot reach its minimum "
+                f"{group_minimums[group]:g} under the configured bounds")
+    if out["long_only"]:
         capped_total = 0.0
         all_capped = True
-        for a in eligible:
-            g = a.get("group")
-            if g and g in group_caps:
+        for asset in eligible:
+            group = asset.get("group")
+            if group and group in group_caps:
                 continue
             all_capped = False
             break
         if all_capped and eligible:
-            capped_total = sum(group_caps[g] for g in
-                               {a["group"] for a in eligible})
+            capped_total = sum(group_caps[group] for group in
+                               {asset["group"] for asset in eligible})
             if capped_total < target_sum - CONSTRAINT_TOLERANCE \
                     and not out["cash_residual_allowed"]:
                 raise ConstraintError(

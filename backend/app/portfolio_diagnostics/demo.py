@@ -1,7 +1,7 @@
 """
 Deterministic demo fixture for the Portfolio Diagnostics Lab (idempotent).
 
-Ten runs cover the fifteen documented demo cases:
+Eleven runs cover the fifteen documented demo cases:
 
 1.  ``demo:pd:equal-weight`` — equal-weight reference (case 1).
 2.  ``demo:pd:inverse-vol`` — inverse volatility with a visible floor; the

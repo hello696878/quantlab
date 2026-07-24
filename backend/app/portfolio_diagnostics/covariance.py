@@ -147,9 +147,13 @@ def validate_matrix(cov: np.ndarray) -> Dict[str, Any]:
                 f"{NEAR_SINGULAR_CONDITION:.0e})")
     else:
         report["condition_number"] = None
-        if min_eig < 0:
+        if min_eig < PSD_TOLERANCE:
             report["warnings"].append(
                 "condition number not reported for a non-PSD covariance")
+        elif min_eig < 0:
+            report["warnings"].append(
+                "covariance has a small negative eigenvalue within the "
+                "documented PSD tolerance; condition number is undefined")
         elif min_eig == 0:
             report["warnings"].append(
                 "covariance is singular (zero minimum eigenvalue); "

@@ -154,7 +154,7 @@ test.describe("portfolio diagnostics lab", () => {
     await seedDemo(page);
     await page.getByRole("button", { name: /Degenerate covariance/ }).click();
     await expect(page.getByText("solver: failed").first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Mark as scope baseline" })).toHaveCount(1);
+    await expect(page.getByRole("button", { name: "Mark as scope baseline" })).toHaveCount(0);
     await page.getByRole("button", { name: "← Back to runs" }).click();
     await page.getByRole("button", { name: /Singular covariance — explicit eigenvalue floor/ }).click();
     await expect(page.getByText(/eigenvalue floor 1e-8|eigenvalue floor 0\.00000001/).first()).toBeVisible();
@@ -180,12 +180,10 @@ test.describe("portfolio diagnostics lab", () => {
     await seedDemo(page);
     await page.getByRole("button", { name: /Rebalancing with turnover cap/ }).click();
     await expect(page.getByRole("heading", { name: /Rebalances & turnover/ })).toBeVisible();
-    await expect(page.getByText(/0\.5 × Σ\|Δw\|/).first()).toBeVisible();
+    await expect(page.getByText(/drifted pre-trade weight/).first()).toBeVisible();
     await expect(page.getByText(/constraint violation/).first()).toBeVisible();
-    await page.getByRole("button", { name: "Mark as scope baseline" }).click();
-    await expect(page.getByText("Baseline rejected")).toBeVisible({ timeout: 15_000 });
-    const unexpected = failures.filter((f) => !f.url.includes("mark-baseline"));
-    assertNoFailedLocalRequests(unexpected);
+    await expect(page.getByRole("button", { name: "Mark as scope baseline" })).toHaveCount(0);
+    assertNoFailedLocalRequests(failures);
   });
 
   test("linked cost estimates stay honest about unavailable components", async ({ page }) => {

@@ -23,8 +23,9 @@ optimizer (none exists in v1).
 
 Checked eagerly at create where decidable, with explicit 422 reasons:
 bound ordering, unknown groups/assets, frozen-vs-excluded conflicts,
-frozen weights outside bounds, long-only reachability of the required
-exposure under the caps and minimums, group-minimum reachability, fully
+frozen weights outside bounds, long-only or short-enabled reachability of the
+required net exposure under per-asset bounds, gross exposure below absolute
+required net exposure, group-minimum reachability after exclusions, fully
 group-capped universes summing below the required exposure, oversized
 rebalance schedules, and sensitivity values conflicting with the
 constraint set (e.g. a scenario weight cap below the configured minimum).

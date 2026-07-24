@@ -102,6 +102,9 @@ def validate_rebalance_policy(raw: Any, timestamps: List[str]) -> Dict[str, Any]
         index = {ts: i for i, ts in enumerate(timestamps)}
         indices = []
         for s in stamps:
+            if not isinstance(s, str):
+                raise PortfolioInputError(
+                    "rebalance timestamps must be strings")
             if s not in index:
                 raise PortfolioInputError(
                     f"rebalance timestamp {s!r} is not on the shared "
@@ -176,6 +179,35 @@ def one_way_turnover(prev: Optional[Dict[str, float]],
     return 0.5 * sum(abs(new.get(k, 0.0) - prev.get(k, 0.0)) for k in keys)
 
 
+def drift_weights(weights: Dict[str, float],
+                  asset_ids: List[str],
+                  returns_matrix: List[List[float]],
+                  start: int,
+                  end: int) -> Optional[Dict[str, float]]:
+    """Drift target weights through periods ``start .. end-1``.
+
+    Cash is the explicit residual ``1 - sum(weights)`` and earns zero in
+    v1. A non-positive or non-finite portfolio value makes the pre-trade
+    book unavailable rather than fabricating normalized weights.
+    """
+    current = {a: float(weights.get(a, 0.0)) for a in asset_ids}
+    for t in range(start, end):
+        period_return = sum(
+            current[a] * returns_matrix[i][t]
+            for i, a in enumerate(asset_ids)
+        )
+        next_value = 1.0 + period_return
+        if not math.isfinite(next_value) or next_value <= 0:
+            return None
+        current = {
+            a: current[a] * (1.0 + returns_matrix[i][t]) / next_value
+            for i, a in enumerate(asset_ids)
+        }
+        if any(not math.isfinite(v) for v in current.values()):
+            return None
+    return current
+
+
 def portfolio_returns(rebalances: List[Dict[str, Any]],
                       asset_ids: List[str],
                       returns_matrix: List[List[float]],
@@ -188,15 +220,26 @@ def portfolio_returns(rebalances: List[Dict[str, Any]],
     rebalance are None (honestly unavailable, never zero-filled).
     """
     out: List[Optional[float]] = [None] * n_periods
-    effective = [(r["decision_index"], r["weights"]) for r in rebalances
-                 if r.get("weights") is not None]
-    effective.sort(key=lambda x: x[0])
-    for j, (start, weights) in enumerate(effective):
-        end = effective[j + 1][0] if j + 1 < len(effective) else n_periods
-        w = [weights.get(a, 0.0) for a in asset_ids]
-        for t in range(start, end):
-            total = 0.0
-            for k in range(len(asset_ids)):
-                total += w[k] * returns_matrix[k][t]
-            out[t] = total
+    targets = {
+        r["decision_index"]: r["weights"] for r in rebalances
+        if r.get("weights") is not None
+    }
+    current: Optional[Dict[str, float]] = None
+    for t in range(n_periods):
+        if t in targets:
+            current = {a: float(targets[t].get(a, 0.0)) for a in asset_ids}
+        if current is None:
+            continue
+        total = sum(
+            current[a] * returns_matrix[k][t]
+            for k, a in enumerate(asset_ids)
+        )
+        if not math.isfinite(total) or 1.0 + total <= 0:
+            current = None
+            continue
+        out[t] = total
+        current = {
+            a: current[a] * (1.0 + returns_matrix[k][t]) / (1.0 + total)
+            for k, a in enumerate(asset_ids)
+        }
     return out

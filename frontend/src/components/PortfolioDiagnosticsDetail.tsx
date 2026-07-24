@@ -22,6 +22,8 @@ import {
 } from "@/lib/portfolioDiagnostics";
 import { notifyBackendOffline, toast } from "@/lib/toast";
 import { CopyValue, DetailSection, KeyValueTable } from "@/components/ExperimentRegistryShared";
+import ErrorState from "@/components/ui/ErrorState";
+import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
 
 interface Props {
   run: RunFull;
@@ -44,22 +46,47 @@ export default function PortfolioDiagnosticsDetail({
   const [rebalances, setRebalances] = useState<RebalanceRow[]>([]);
   const [sensitivity, setSensitivity] = useState<SensitivityRow[]>([]);
   const [busy, setBusy] = useState(false);
+  const [childrenLoading, setChildrenLoading] = useState(false);
+  const [childrenError, setChildrenError] = useState<unknown>(null);
+  const [retryTick, setRetryTick] = useState(0);
+  const childError = childrenError ? classifyApiError(childrenError) : null;
+  const canMarkBaseline = run.status === "completed"
+    && !run.is_baseline
+    && Boolean(run.result_fingerprint)
+    && ["verified_from_validation_split", "verified_causal_rolling", "declared"]
+      .includes(run.integrity_status)
+    && ["closed_form", "converged", "converged_loose"].includes(run.solver_status ?? "")
+    && run.constraint_violation_count === 0
+    && !childrenLoading
+    && rebalances.length === run.rebalance_count
+    && rebalances.every((item) => item.status === "completed");
+
 
   useEffect(() => {
     let cancelled = false;
     if (run.status === "completed") {
-      getWeights(run.id).then((r) => !cancelled && setWeights(r.items)).catch(() => {});
-      getRiskContributions(run.id)
-        .then((r) => !cancelled && setContributions(r.items)).catch(() => {});
-      getRebalances(run.id)
-        .then((r) => !cancelled && setRebalances(r.items)).catch(() => {});
-      getSensitivity(run.id)
-        .then((r) => !cancelled && setSensitivity(r.items)).catch(() => {});
+      setChildrenLoading(true);
+      setChildrenError(null);
+      Promise.allSettled([
+        getWeights(run.id), getRiskContributions(run.id),
+        getRebalances(run.id), getSensitivity(run.id),
+      ]).then((results) => {
+        if (cancelled) return;
+        const [w, c, r, s] = results;
+        if (w.status === "fulfilled") setWeights(w.value.items);
+        if (c.status === "fulfilled") setContributions(c.value.items);
+        if (r.status === "fulfilled") setRebalances(r.value.items);
+        if (s.status === "fulfilled") setSensitivity(s.value.items);
+        const failed = results.find((item) => item.status === "rejected");
+        if (failed?.status === "rejected") setChildrenError(failed.reason);
+      }).finally(() => {
+        if (!cancelled) setChildrenLoading(false);
+      });
     }
     return () => {
       cancelled = true;
     };
-  }, [run.id, run.status]);
+  }, [run.id, run.status, retryTick]);
 
   async function handleBaseline() {
     setBusy(true);
@@ -116,7 +143,7 @@ export default function PortfolioDiagnosticsDetail({
           <FpRow label="Configuration fingerprint" value={run.configuration_fingerprint} />
           <FpRow label="Result fingerprint" value={run.result_fingerprint} />
         </dl>
-        {run.status === "completed" && !run.is_baseline && (
+        {canMarkBaseline && (
           <div className="mt-3 flex flex-wrap items-center gap-2">
             <button type="button" onClick={handleBaseline} disabled={busy}
               className="rounded-md border border-indigo-200 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
@@ -197,6 +224,20 @@ export default function PortfolioDiagnosticsDetail({
             )}
           </div>
         </DetailSection>
+      )}
+
+      {childrenLoading && (
+        <SkeletonTable rows={4} cols={6} caption="Loading portfolio diagnostic results" />
+      )}
+      {childError && (
+        <ErrorState
+          title="Some portfolio diagnostics could not be loaded"
+          message={childError.backendUnavailable
+            ? "Portfolio diagnostics are unavailable while FastAPI is offline."
+            : "The run loaded, but one or more result tables did not."}
+          detail={childError.message}
+          onRetry={() => setRetryTick((value) => value + 1)}
+        />
       )}
 
       {run.status === "completed" && (
@@ -439,6 +480,47 @@ function corrBg(v: number): string {
   return v >= 0 ? `rgba(14, 165, 233, ${a})` : `rgba(239, 68, 68, ${a})`;
 }
 
+function MatrixTable({
+  title, matrix, assetIds, formatter, background,
+}: {
+  title: string;
+  matrix: number[][];
+  assetIds: string[];
+  formatter: (value: number) => string;
+  background?: (value: number) => string;
+}) {
+  return (
+    <div className="min-w-0">
+      <h4 className="mb-1 text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h4>
+      <div className="overflow-x-auto">
+        <table className="min-w-max text-[10px]">
+          <thead>
+            <tr>
+              <th className="px-1.5 py-1" />
+              {assetIds.map((asset) => (
+                <th key={asset} scope="col" className="px-1.5 py-1 text-left font-mono">{asset}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {matrix.map((row, i) => (
+              <tr key={assetIds[i] ?? i}>
+                <th scope="row" className="px-1.5 py-1 text-left font-mono">{assetIds[i] ?? i + 1}</th>
+                {row.map((value, j) => (
+                  <td key={j} className="px-1.5 py-1 text-right font-mono"
+                    style={background && Number.isFinite(value) ? { backgroundColor: background(value) } : undefined}>
+                    {Number.isFinite(value) ? formatter(value) : "unavailable"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function CovarianceView({ cov, assetIds }: { cov: CovarianceBlock; assetIds: string[] }) {
   const report = cov.report;
   return (
@@ -449,100 +531,119 @@ function CovarianceView({ cov, assetIds }: { cov: CovarianceBlock; assetIds: str
         condition number: {report.condition_number === null || report.condition_number === undefined ? "undefined" : Number(report.condition_number).toExponential(2)} ·
         repair: {cov.repair.repaired ? `eigenvalue floor ${cov.repair.floor}` : `${cov.repair.policy} (not applied)`}
       </p>
-      {(report.warnings ?? []).map((w, i) => (
-        <p key={i} className="mb-1 text-xs font-medium text-amber-700">⚠ {w}</p>
+      {(report.warnings ?? []).map((warning, i) => (
+        <p key={i} className="mb-1 text-xs font-medium text-amber-700">⚠ {warning}</p>
       ))}
-      {cov.correlation ? (
-        <div className="overflow-x-auto">
-          <table className="text-[10px]">
-            <thead>
-              <tr>
-                <th className="px-1.5 py-1" />
-                {assetIds.map((a) => (
-                  <th key={a} scope="col" className="px-1.5 py-1 text-left font-mono">{a}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {cov.correlation.map((row, i) => (
-                <tr key={assetIds[i]}>
-                  <th scope="row" className="px-1.5 py-1 text-left font-mono">{assetIds[i]}</th>
-                  {row.map((v, j) => (
-                    <td key={j} className="px-1.5 py-1 text-right font-mono"
-                      style={{ backgroundColor: corrBg(v) }}>
-                      {v.toFixed(2)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      ) : (
-        <p className="text-sm text-slate-500">
-          Correlation unavailable (a zero-variance asset leaves it undefined).
-        </p>
-      )}
+      <div className="grid min-w-0 gap-4 xl:grid-cols-2">
+        <MatrixTable title="Covariance (per period)" matrix={cov.matrix} assetIds={assetIds}
+          formatter={(value) => value.toExponential(3)} />
+        {cov.correlation ? (
+          <MatrixTable title="Correlation" matrix={cov.correlation} assetIds={assetIds}
+            formatter={(value) => value.toFixed(2)} background={corrBg} />
+        ) : (
+          <p className="text-sm text-slate-500">
+            Correlation unavailable (a zero-variance asset leaves it undefined).
+          </p>
+        )}
+      </div>
       <p className="mt-2 text-xs text-slate-400">
-        Correlation values are printed in every cell — shading is a reading aid, never the only
+        Values are printed in every cell — correlation shading is a reading aid, never the only
         signal. Covariance entries are per-period (never annualized).
       </p>
     </div>
   );
 }
-
 function RebalancesView({ rows }: { rows: RebalanceRow[] }) {
   return (
     <div className="overflow-x-auto">
-      <table className="w-full min-w-[900px] text-xs">
+      <table className="w-full min-w-[1380px] text-xs">
         <thead>
           <tr className="border-b border-slate-100 text-left font-semibold uppercase tracking-wide text-slate-500">
             <th scope="col" className="px-2 py-2">#</th>
-            <th scope="col" className="px-2 py-2">Decision timestamp</th>
+            <th scope="col" className="px-2 py-2">Decision / effective</th>
             <th scope="col" className="px-2 py-2 text-right">Window</th>
             <th scope="col" className="px-2 py-2 text-right">One-way turnover</th>
-            <th scope="col" className="px-2 py-2">Solver</th>
+            <th scope="col" className="px-2 py-2">Solver details</th>
             <th scope="col" className="px-2 py-2 text-right">Violations</th>
             <th scope="col" className="px-2 py-2 text-right">Est. cost (return)</th>
             <th scope="col" className="px-2 py-2 text-right">Est. cost (notional)</th>
             <th scope="col" className="px-2 py-2">Cost completeness</th>
+            <th scope="col" className="px-2 py-2">Covariance fingerprint</th>
+            <th scope="col" className="px-2 py-2">Audit detail</th>
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
-            <tr key={r.rebalance_id} className="border-b border-slate-50 font-mono last:border-0">
-              <td className="px-2 py-1.5">{r.rebalance_id}</td>
-              <td className="px-2 py-1.5">{r.decision_timestamp.slice(0, 10)}</td>
-              <td className="px-2 py-1.5 text-right">
-                {r.window_start === null ? "—" : `[${r.window_start}, ${r.window_end}]`}
-              </td>
-              <td className="px-2 py-1.5 text-right">{r.turnover === null ? "unavailable" : pct(r.turnover)}</td>
-              <td className="px-2 py-1.5">{r.solver_status ?? "—"}{r.status === "failed" && r.reason ? ` (${r.reason.slice(0, 40)}…)` : ""}</td>
-              <td className="px-2 py-1.5 text-right">
-                {r.constraint_violation_count > 0
-                  ? <span className="text-red-600">{r.constraint_violation_count}</span> : "0"}
-              </td>
-              <td className="px-2 py-1.5 text-right">
-                {r.cost?.total_cost_return === null || r.cost?.total_cost_return === undefined
-                  ? "—" : pct(r.cost.total_cost_return, 4)}
-              </td>
-              <td className="px-2 py-1.5 text-right">
-                {r.cost?.total_cost_notional === null || r.cost?.total_cost_notional === undefined
-                  ? "—" : r.cost.total_cost_notional.toFixed(2)}
-              </td>
-              <td className="px-2 py-1.5 text-[10px]">{r.cost?.completeness ?? "—"}</td>
-            </tr>
-          ))}
+          {rows.map((r) => {
+            const iterations = typeof r.solver.iterations === "number" ? r.solver.iterations : null;
+            const residual = typeof r.solver.residual === "number" ? r.solver.residual : null;
+            const tolerance = typeof r.solver.tolerance === "number" ? r.solver.tolerance : null;
+            return (
+              <tr key={r.rebalance_id} className="border-b border-slate-50 align-top font-mono last:border-0">
+                <td className="px-2 py-1.5">{r.rebalance_id}</td>
+                <td className="px-2 py-1.5">
+                  <div>{r.decision_timestamp.slice(0, 10)}</div>
+                  <div className="text-[10px] text-slate-400">effective {r.effective_timestamp?.slice(0, 10) ?? "unavailable"}</div>
+                </td>
+                <td className="px-2 py-1.5 text-right">
+                  {r.window_start === null ? "—" : `[${r.window_start}, ${r.window_end}]`}
+                </td>
+                <td className="px-2 py-1.5 text-right">{r.turnover === null ? "unavailable" : pct(r.turnover)}</td>
+                <td className="px-2 py-1.5">
+                  <div>{r.solver_status ?? "—"}</div>
+                  <div className="text-[10px] text-slate-400">
+                    iter {iterations ?? "—"} · residual {residual === null ? "—" : residual.toExponential(2)}
+                    {tolerance === null ? "" : ` · tol ${tolerance.toExponential(2)}`}
+                  </div>
+                </td>
+                <td className="px-2 py-1.5 text-right">
+                  {r.constraint_violation_count > 0
+                    ? <span className="text-red-600">{r.constraint_violation_count}</span> : "0"}
+                </td>
+                <td className="px-2 py-1.5 text-right">
+                  {r.cost?.total_cost_return === null || r.cost?.total_cost_return === undefined
+                    ? "—" : pct(r.cost.total_cost_return, 4)}
+                </td>
+                <td className="px-2 py-1.5 text-right">
+                  {r.cost?.total_cost_notional === null || r.cost?.total_cost_notional === undefined
+                    ? "—" : r.cost.total_cost_notional.toFixed(2)}
+                </td>
+                <td className="px-2 py-1.5 text-[10px]">{r.cost?.completeness ?? "—"}</td>
+                <td className="max-w-40 px-2 py-1.5">
+                  {r.covariance_fingerprint
+                    ? <CopyValue value={r.covariance_fingerprint} display={`${r.covariance_fingerprint.slice(0, 12)}…`} />
+                    : "—"}
+                </td>
+                <td className="px-2 py-1.5">
+                  <details>
+                    <summary className="cursor-pointer text-sky-700">Inspect</summary>
+                    <div className="mt-1 w-80 space-y-1 whitespace-normal text-[10px] text-slate-500">
+                      <p><span className="font-semibold">Status:</span> {r.status}{r.reason ? ` · ${r.reason}` : ""}</p>
+                      <p><span className="font-semibold">Prior weights:</span> {r.prior_weights ? JSON.stringify(r.prior_weights) : "unavailable"}</p>
+                      <p><span className="font-semibold">Target weights:</span> {r.weights ? JSON.stringify(r.weights) : "unavailable"}</p>
+                      {r.constraint_violations.map((violation, i) => (
+                        <p key={`${violation.constraint}-${i}`} className="text-red-600">
+                          {violation.constraint}: {violation.detail} (amount {violation.amount})
+                        </p>
+                      ))}
+                      {Object.entries(r.cost?.component_reasons ?? {}).map(([component, reason]) => (
+                        <p key={component} className="text-amber-700">{component}: {reason}</p>
+                      ))}
+                    </div>
+                  </details>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       <p className="mt-2 text-xs text-slate-400">
-        One-way turnover = 0.5 × Σ|Δw|. Cost estimates are descriptive research calculations from
-        the linked Phase 55 cost model; unavailable components stay unavailable — never zero.
+        One-way turnover = 0.5 × Σ|target weight − drifted pre-trade weight|. Cost estimates are
+        descriptive research calculations from the linked Phase 55 cost model; unavailable
+        components stay unavailable — never zero.
       </p>
     </div>
   );
 }
-
 function SensitivityView({ rows }: { rows: SensitivityRow[] }) {
   return (
     <div>

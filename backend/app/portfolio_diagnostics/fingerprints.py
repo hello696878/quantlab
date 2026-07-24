@@ -38,29 +38,53 @@ def _clean(obj: Any) -> Any:
 def universe_fingerprint(assets: List[Dict[str, Any]], timestamps: List[str],
                          frequency: str, benchmark: Optional[List[float]],
                          dataset_identity: Optional[Dict[str, Any]],
-                         candidate_fingerprints: Optional[List[str]] = None
+                         candidate_fingerprints: Optional[List[str]] = None,
+                         sample_ids: Optional[List[str]] = None,
+                         prior_weights: Optional[Dict[str, float]] = None
                          ) -> str:
     return sha256_hex(_clean({
         "kind": "portfolio_diagnostics_universe_v1",
         "alignment_policy": "strict identical timestamp alignment",
         "frequency": frequency,
         "timestamps": timestamps,
-        "assets": [{"asset_id": a["asset_id"], "asset_type": a["asset_type"],
-                    "group": a.get("group"), "currency": a.get("currency"),
+        "assets": [{"asset_id": a["asset_id"], "name": a.get("name"),
+                    "asset_type": a["asset_type"], "group": a.get("group"),
+                    "currency": a.get("currency"),
+                    "integer_lots": a.get("integer_lots", False),
+                    "metadata": a.get("metadata", {}),
                     "returns": a["returns"]} for a in assets],
         "benchmark": benchmark,
         "dataset": dataset_identity or None,
         "candidate_fingerprints": candidate_fingerprints or None,
+        "sample_ids": sample_ids,
+        "prior_weights": prior_weights,
+    }))
+
+
+def estimation_input_fingerprint(asset_ids: List[str],
+                                 timestamps: List[str],
+                                 indices: List[int],
+                                 matrix: List[List[float]]) -> str:
+    """Identity of only the observations permitted at one decision."""
+    return sha256_hex(_clean({
+        "kind": "portfolio_diagnostics_estimation_input_v1",
+        "asset_ids": asset_ids,
+        "indices": indices,
+        "timestamps": [timestamps[i] for i in indices],
+        "returns": [[row[i] for i in indices] for row in matrix],
     }))
 
 
 def covariance_fingerprint(universe_fp: str, estimation: Dict[str, Any],
                            cov_config: Dict[str, Any],
                            window: Optional[List[int]],
-                           matrix: Optional[List[List[float]]]) -> str:
+                           matrix: Optional[List[List[float]]],
+                           estimation_input_fp: Optional[str] = None) -> str:
     return sha256_hex(_clean({
         "kind": "portfolio_diagnostics_covariance_v1",
-        "universe_fingerprint": universe_fp,
+        "universe_fingerprint": (universe_fp
+                                 if estimation_input_fp is None else None),
+        "estimation_input_fingerprint": estimation_input_fp,
         "estimation": estimation,
         "covariance_config": cov_config,
         "window": window,
@@ -83,7 +107,8 @@ def configuration_fingerprint(universe_fp: str, method: str,
                               rebalance_policy: Dict[str, Any],
                               solver_config: Dict[str, Any],
                               sensitivity_config: Dict[str, Any],
-                              linked: Dict[str, Any]) -> str:
+                              linked: Dict[str, Any],
+                              execution_inputs: Optional[Dict[str, Any]] = None) -> str:
     return sha256_hex(_clean({
         "kind": "portfolio_diagnostics_configuration_v1",
         "universe_fingerprint": universe_fp,
@@ -96,6 +121,7 @@ def configuration_fingerprint(universe_fp: str, method: str,
         "solver_config": solver_config,
         "sensitivity_config": sensitivity_config,
         "linked": linked,
+        "execution_inputs": execution_inputs or {},
     }))
 
 
@@ -107,14 +133,26 @@ def result_fingerprint(configuration_fp: str,
                        sensitivity: List[Dict[str, Any]],
                        constraint_checks: List[Dict[str, Any]],
                        warnings: List[str],
-                       integrity: str, solver_status: str) -> str:
+                       integrity: str, solver_status: str,
+                       covariance: Optional[Dict[str, Any]] = None,
+                       regimes: Optional[Dict[str, Any]] = None) -> str:
     rows = [{
         "rebalance_id": r["rebalance_id"],
         "decision_timestamp": r["decision_timestamp"],
+        "effective_timestamp": r.get("effective_timestamp"),
+        "window_start": r.get("window_start"),
+        "window_end": r.get("window_end"),
         "weights": r.get("weights"),
+        "prior_weights": r.get("prior_weights"),
         "turnover": r.get("turnover"),
-        "solver_status": r.get("solver", {}).get("status"),
-        "constraint_violations": len(r.get("constraint_violations") or []),
+        "gross_change": r.get("gross_change"),
+        "solver": r.get("solver", {}),
+        "constraint_violations": r.get("constraint_violations") or [],
+        "covariance_fingerprint": r.get("covariance_fingerprint"),
+        "weight_fingerprint": r.get("weight_fingerprint"),
+        "cost": r.get("cost"),
+        "status": r.get("status"),
+        "reason": r.get("reason"),
     } for r in rebalances]
     return sha256_hex(_clean({
         "kind": "portfolio_diagnostics_result_v1",
@@ -126,6 +164,8 @@ def result_fingerprint(configuration_fp: str,
         "sensitivity": sensitivity,
         "constraint_checks": constraint_checks,
         "warnings": sorted(warnings),
+        "covariance": covariance,
+        "regimes": regimes,
         "integrity_status": integrity,
         "solver_status": solver_status,
     }))

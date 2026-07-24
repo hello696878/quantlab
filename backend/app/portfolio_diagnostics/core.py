@@ -11,6 +11,7 @@ timestamps, no currency conversion, no expressions.
 
 from __future__ import annotations
 
+import json
 import math
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
@@ -124,6 +125,17 @@ def normalize_assets(raw: Any, n_periods: int) -> List[Dict[str, Any]]:
         integer_lots = a.get("integer_lots", False)
         if not isinstance(integer_lots, bool):
             raise PortfolioInputError(f"{ref}: integer_lots must be a boolean")
+        metadata = a.get("metadata", {})
+        if not isinstance(metadata, dict):
+            raise PortfolioInputError(f"{ref}: metadata must be an object")
+        try:
+            encoded_metadata = json.dumps(metadata, allow_nan=False, sort_keys=True)
+        except (TypeError, ValueError):
+            raise PortfolioInputError(
+                f"{ref}: metadata must contain finite JSON values")
+        if len(encoded_metadata) > 4096:
+            raise PortfolioInputError(
+                f"{ref}: metadata must serialize to at most 4096 characters")
         returns = a.get("returns")
         if not isinstance(returns, list) or len(returns) != n_periods:
             raise PortfolioInputError(
@@ -137,6 +149,7 @@ def normalize_assets(raw: Any, n_periods: int) -> List[Dict[str, Any]]:
             "group": group,
             "currency": currency.strip().upper() if currency else None,
             "integer_lots": integer_lots,
+            "metadata": metadata,
             "returns": values,
         })
     if len(currencies) > 1:
