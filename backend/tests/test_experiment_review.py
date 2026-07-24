@@ -2809,3 +2809,370 @@ def test_cli_creates_no_database_or_repo_artifacts(capsys, tmp_path):
     assert _repo_snapshot() == before
     assert not (_BACKEND / "data" / "quantlab.db").exists()
     assert not (_REPO_ROOT / "quantlab.db").exists()
+
+
+# --------------------------------------------------------------------------- #
+# commit 5 — integrated end-to-end over real Phase 9/11 runs + tampered copies
+# --------------------------------------------------------------------------- #
+
+
+def test_e2e_experiment_evidence_pack_over_real_and_tampered_runs(tmp_path, capsys):
+    """Full Phase 14 path: synthetic ES raw -> a real Phase 11 batch of 3 Phase 9 runs
+    in a tmp ExperimentStore -> the CLI aggregates the already-persisted Phase 13 /
+    Phase 12 / Phase 10 evidence into one deterministic pack -> deliberately tampered
+    copies (still under tmp_path) drive the WARNING / INCOMPLETE / UNAVAILABLE and
+    incompatible-selection paths without erasing valid-run evidence -> JSON / CSV /
+    Markdown export to explicit paths outside every store -> every audited store stays
+    byte-identical and no database is ever created."""
+    import shutil  # test-only: copy real runs into tampered stores under tmp_path
+
+    from app.batch_experiments import expand_grid, run_local_experiment_batch
+    from app.datastore.store import RawFuturesStore
+    from app.local_pipeline import LocalExperimentConfig
+    from app.research_cli.config import ExperimentConfig
+    from app.research_cli.synthetic import generate_synthetic_es_raw
+
+    repo_before = _repo_snapshot()
+    cli = _load_pack_cli()
+    reports = tmp_path / "reports"  # explicit outputs live outside every store
+
+    def run_cli(store, *args):
+        code = cli.main(["--artifacts-dir", str(store.base_dir), *[str(a) for a in args]])
+        return code, capsys.readouterr().out
+
+    # --- 1. real runs produced by the existing Phase 9 / Phase 11 path ---------- #
+    raw_store = RawFuturesStore(tmp_path / "raw", prefer_parquet=False)
+    raw_store.write_raw(generate_synthetic_es_raw(ExperimentConfig()))
+    clean = ExperimentStore(tmp_path / "clean_exp", prefer_parquet=False)
+    configs = expand_grid(LocalExperimentConfig(source="synthetic"), {"random_seed": [0, 1, 2]})
+    batch = run_local_experiment_batch(raw_store, configs, experiment_store=clean)
+    assert batch.n_ok == 3
+    hashes = sorted(batch.train_run_hashes)
+    assert len(set(hashes)) == 3  # three distinct real train_run_hashes
+
+    clean_before = _snapshot(clean.base_dir)
+    metadata = clean.read_metadata(hashes[0])
+    assert "sharpe" in metadata.backtest_metrics  # the explicit metric used below
+    # the real runs share the Phase 10 guard key and the Phase 12 grouping key
+    for other in hashes[1:]:
+        peer = clean.read_metadata(other)
+        assert (peer.validation_start, peer.validation_end, peer.label_column,
+                peer.dataset_config_hash) == (
+            metadata.validation_start, metadata.validation_end,
+            metadata.label_column, metadata.dataset_config_hash)
+
+    # --- 2. COMPLETE: all three real runs, explicit metric, all three exports --- #
+    selected = [hashes[2], hashes[0], hashes[1]]  # deliberately NOT sorted order
+    out_json, out_csv, out_md = (reports / n for n in ("pack.json", "pack.csv", "pack.md"))
+    code, out = run_cli(
+        clean,
+        "--run-hash", selected[0], "--run-hash", selected[1], "--run-hash", selected[2],
+        "--audit-level", "standard", "--metric", "sharpe",
+        "--output-json", out_json, "--output-csv", out_csv, "--output-markdown", out_md,
+    )
+    assert code == 0
+    assert len([ln for ln in out.splitlines() if ln.startswith("RESULT: ")]) == 1
+    assert "RESULT: COMPLETE" in out
+    assert ("SUMMARY selected_runs_total=3 runs_complete=3 runs_with_warnings=0 "
+            "runs_incomplete=0 runs_unavailable=0 phase14_findings_total=0 "
+            "phase13_findings_total=0") in out
+    assert [ln for ln in out.splitlines() if ln.startswith("WROTE:")] == [
+        "WROTE: JSON", "WROTE: CSV", "WROTE: MARKDOWN"]
+    assert _snapshot(clean.base_dir) == clean_before
+
+    pack = json.loads(out_json.read_text(encoding="utf-8"))
+    assert pack["selected_run_hashes"] == selected  # explicit order preserved
+    assert [r["train_run_hash"] for r in pack["runs"]] == selected
+    assert pack["comparison"]["status"] == "available"
+    assert len(pack["comparison"]["rows"]) == 3          # real Phase 10 rows
+    assert pack["catalog_context_status"] == "collected"
+    assert pack["registry_context_status"] == "not_collected"
+    assert pack["dataset_lineage_context_status"] == "not_collected"
+    assert pack["evidence_summary"]["completeness"] == "complete"  # neutral, no downgrade
+    assert not pack["findings"]
+    assert all(not r["audit_findings"] for r in pack["runs"])
+    ranks, values = set(), set()
+    for run in pack["runs"]:
+        ctx = run["catalog_context"]
+        assert ctx["status"] == "collected" and ctx["group_size"] == 3
+        assert ctx["requested_metric"] == "sharpe"
+        assert ctx["requested_metric_value"] is not None
+        ranks.add(ctx["rank"])
+        values.add(ctx["requested_metric_value"])
+    assert ranks == {1, 2, 3}  # descriptive Phase 12 ranking over the real group
+    assert len(values) >= 1
+
+    # --- 3. exports validated against the real pack ----------------------------- #
+    text = json.dumps(pack, allow_nan=False, sort_keys=True)
+    for disclaimer in EVIDENCE_DISCLAIMERS:
+        assert disclaimer in pack["disclaimers"]
+    assert tmp_path.name not in text and ":\\" not in text and ":/" not in text
+    for token in ("timestamp", "hostname", "username", "store_root"):
+        assert token not in text.lower()
+
+    csv_rows = _csv_rows(out_csv.read_text(encoding="utf-8"))
+    assert csv_rows[0] == _CSV_HEADER                    # exact fixed 17 columns
+    assert [r[0] for r in csv_rows[1:]] == selected      # one row per run, in order
+    for row in csv_rows[1:]:
+        assert json.loads(row[_CSV_HEADER.index("metrics_json")])["sharpe"] is not None
+        assert row[_CSV_HEADER.index("requested_metric")] == "sharpe"
+    csv_text = out_csv.read_text(encoding="utf-8")
+    assert "NaN" not in csv_text and "Infinity" not in csv_text
+    assert tmp_path.name not in csv_text
+
+    md = out_md.read_text(encoding="utf-8")
+    positions = [md.index(s) for s in _MD_SECTIONS]
+    assert positions == sorted(positions)                 # exact fixed section order
+    assert "**Evidence completeness:** complete" in md
+    assert "**Registry context:** not_collected" in md and "not missing evidence" in md
+    for disclaimer in EVIDENCE_DISCLAIMERS:
+        assert f"- {disclaimer}" in md
+    for banned in ("winner", "best run", "recommended", "approved", "deploy-ready"):
+        assert banned not in md.lower()
+    assert tmp_path.name not in md
+
+    # deterministic repeated bytes from an equivalent invocation
+    again = reports / "again"
+    run_cli(clean, "--run-hash", selected[0], "--run-hash", selected[1],
+            "--run-hash", selected[2], "--metric", "sharpe",
+            "--output-json", again / "pack.json", "--output-csv", again / "pack.csv",
+            "--output-markdown", again / "pack.md")
+    for name in ("pack.json", "pack.csv", "pack.md"):
+        assert (again / name).read_bytes() == (reports / name).read_bytes()
+    assert _snapshot(clean.base_dir) == clean_before
+
+    # --- 4. single real run: comparison is not applicable, no ranking ----------- #
+    single = reports / "single.json"
+    code, out = run_cli(clean, "--run-hash", hashes[0], "--output-json", single)
+    assert code == 0 and "RESULT: COMPLETE" in out
+    assert "COMPARISON_UNAVAILABLE" not in out
+    one = json.loads(single.read_text(encoding="utf-8"))
+    assert one["comparison"]["status"] == "not_applicable"
+    assert one["comparison"]["unavailable_reason"] is None
+    ctx = one["runs"][0]["catalog_context"]
+    assert ctx["status"] == "collected"                   # catalog context still collected
+    assert ctx["requested_metric"] is None and ctx["rank"] is None  # no metric -> no rank
+    assert one["registry_context_status"] == "not_collected"
+    assert _snapshot(clean.base_dir) == clean_before
+
+    # --- 5. run-hashes file: CLI hashes first, then file order, first wins ------ #
+    listing = tmp_path / "selected_runs.txt"
+    listing.write_text(
+        "# selected runs\n\n"
+        f"  {hashes[0]}  \n"          # duplicate of the CLI hash below
+        f"{hashes[2]}\n"
+        "\t# indented comment\n"
+        f"{hashes[2]}\n"              # duplicate within the file
+        f"{hashes[1]}\n\n",
+        encoding="utf-8",
+    )
+    mixed_json, mixed_csv, mixed_md = (reports / f"mixed.{e}" for e in ("json", "csv", "md"))
+    code, out = run_cli(clean, "--run-hash", hashes[0], "--run-hashes-file", listing,
+                        "--output-json", mixed_json, "--output-csv", mixed_csv,
+                        "--output-markdown", mixed_md)
+    assert code == 0 and "RESULT: COMPLETE" in out
+    expected_order = [hashes[0], hashes[2], hashes[1]]     # CLI first, then file order
+    mixed = json.loads(mixed_json.read_text(encoding="utf-8"))
+    assert mixed["selected_run_hashes"] == expected_order
+    assert [r[0] for r in _csv_rows(mixed_csv.read_text(encoding="utf-8"))[1:]] == expected_order
+    mixed_text = mixed_md.read_text(encoding="utf-8")
+    assert [mixed_text.index(h) for h in expected_order] == sorted(
+        mixed_text.index(h) for h in expected_order)
+
+    # --- 6. WARNING: a tampered copy with an orphan artifact ------------------- #
+    warn_dir = tmp_path / "warning_exp"
+    shutil.copytree(clean.base_dir, warn_dir)
+    warned = ExperimentStore(warn_dir, prefer_parquet=False)
+    (warned.base_dir / hashes[0] / "stray_notes.json").write_text("{}", encoding="utf-8")
+    warn_before = _snapshot(warned.base_dir)
+
+    code, out = run_cli(warned, "--run-hash", hashes[0])
+    assert code == 0 and "RESULT: WARNING" in out          # default --fail-on incomplete
+    assert "ORPHAN_ARTIFACT" in out
+    code, _ = run_cli(warned, "--run-hash", hashes[0], "--fail-on", "warning")
+    assert code == 1                                       # threshold escalates it
+
+    # severity filtering changes only the detailed lines
+    warn_a, warn_b = reports / "warn_a.json", reports / "warn_b.json"
+    plain_code, plain = run_cli(warned, "--run-hash", hashes[0], "--output-json", warn_a)
+    filt_code, filtered = run_cli(warned, "--run-hash", hashes[0], "--severity", "critical",
+                                  "--output-json", warn_b)
+    canonical = lambda t: [ln for ln in t.splitlines() if ln.startswith(("RESULT: ", "SUMMARY "))]
+    assert plain_code == filt_code == 0
+    assert canonical(plain) == canonical(filtered)
+    assert warn_a.read_bytes() == warn_b.read_bytes()      # exports never filtered
+    assert "AUDIT_FINDING" in plain and "AUDIT_FINDING" not in filtered
+    assert "DISPLAYED phase14_findings=0 phase13_findings=0 severity_threshold=critical" in filtered
+    assert _snapshot(warned.base_dir) == warn_before
+
+    # --- 7. INCOMPLETE: a required referenced artifact removed ----------------- #
+    bad_dir = tmp_path / "incomplete_exp"
+    shutil.copytree(clean.base_dir, bad_dir)
+    broken = ExperimentStore(bad_dir, prefer_parquet=False)
+    (broken.base_dir / hashes[1] / "predictions.csv").unlink()
+    bad_before = _snapshot(broken.base_dir)
+
+    inc_json = reports / "incomplete.json"
+    code, out = run_cli(broken, "--run-hash", hashes[0], "--run-hash", hashes[1],
+                        "--output-json", inc_json)
+    assert code == 1 and "RESULT: INCOMPLETE" in out and "Traceback" not in out
+    inc = json.loads(inc_json.read_text(encoding="utf-8"))
+    good, hurt = inc["runs"][0], inc["runs"][1]
+    assert good["completeness"] == "complete"              # a peer keeps full evidence
+    assert good["metrics"] is not None
+    assert hurt["completeness"] == "incomplete"
+    assert "required_artifact_missing" in hurt["missing_evidence"]
+    finding = next(f for f in hurt["audit_findings"]
+                   if f["code"] == "MISSING_REFERENCED_ARTIFACT")
+    assert finding["finding_id"].startswith("finding_")     # Phase 13 id preserved
+    assert finding["severity"] == "error"
+    entry = next(a for a in hurt["artifact_inventory"] if a["artifact_name"] == "predictions")
+    assert entry["exists"] is False and entry["regular_file"] is False
+    assert "MISSING_REFERENCED_ARTIFACT" in entry["audit_finding_codes"]
+    assert _snapshot(broken.base_dir) == bad_before
+
+    # --- 8. UNAVAILABLE: only missing hashes, and a mixed selection ------------- #
+    code, out = run_cli(clean, "--run-hash", "ghost_one", "--run-hash", "ghost_two")
+    assert code == 1 and "RESULT: UNAVAILABLE" in out       # a pack, not a runtime error
+    assert out.count("code=RUN_NOT_FOUND") == 2
+    assert "Traceback" not in out and "ERROR:" not in out
+    assert tmp_path.name not in out and ":\\" not in out
+
+    mixed_missing = reports / "mixed_missing.json"
+    code, out = run_cli(clean, "--run-hash", hashes[0], "--run-hash", "ghost",
+                        "--output-json", mixed_missing)
+    assert code == 1 and "RESULT: INCOMPLETE" in out
+    partial = json.loads(mixed_missing.read_text(encoding="utf-8"))
+    assert partial["runs"][0]["completeness"] == "complete"
+    assert partial["runs"][1]["completeness"] == "unavailable"
+    assert partial["runs"][1]["run_directory"] is None
+    assert partial["comparison"]["status"] == "unavailable"
+    assert partial["comparison"]["unavailable_reason"]
+    assert _snapshot(clean.base_dir) == clean_before
+
+    # --- 9. incompatible selection per Phase 10's real guard -------------------- #
+    incompat_dir = tmp_path / "incompatible_exp"
+    shutil.copytree(clean.base_dir, incompat_dir)
+    incompatible = ExperimentStore(incompat_dir, prefer_parquet=False)
+    shifted = incompatible.base_dir / hashes[1] / "metadata.json"
+    shifted_data = json.loads(shifted.read_text(encoding="utf-8"))
+    shifted_data["validation_end"] = "2024-09-30"           # breaks the Phase 10 guard key
+    shifted.write_text(json.dumps(shifted_data), encoding="utf-8")
+    incompat_before = _snapshot(incompatible.base_dir)
+
+    incompat_json = reports / "incompatible.json"
+    code, out = run_cli(incompatible, "--run-hash", hashes[0], "--run-hash", hashes[1],
+                        "--output-json", incompat_json)
+    assert code == 0 and "RESULT: WARNING" in out           # selection warning only
+    assert "INCOMPATIBLE_SELECTED_RUNS" in out and "COMPARISON_UNAVAILABLE" in out
+    incompat = json.loads(incompat_json.read_text(encoding="utf-8"))
+    assert incompat["comparison"]["status"] == "unavailable"
+    assert all(r["load_status"] == "loaded" for r in incompat["runs"])
+    assert all(r["metrics"] is not None for r in incompat["runs"])  # evidence intact
+    for banned in ("winner", "best", "recommended", "approved"):
+        assert banned not in json.dumps(incompat).lower()
+    assert _snapshot(incompatible.base_dir) == incompat_before
+
+    # --- 10. explicitly requested metric that no real run persists -------------- #
+    metric_json = reports / "metric_missing.json"
+    code, out = run_cli(clean, "--run-hash", hashes[0], "--run-hash", hashes[1],
+                        "--metric", "calmar_ratio", "--output-json", metric_json)
+    assert code == 1 and "RESULT: INCOMPLETE" in out
+    assert "REQUESTED_METRIC_MISSING" in out and "Traceback" not in out
+    missing_metric = json.loads(metric_json.read_text(encoding="utf-8"))
+    assert missing_metric["selected_run_hashes"] == [hashes[0], hashes[1]]  # order kept
+    for run in missing_metric["runs"]:
+        ctx = run["catalog_context"]
+        assert ctx["requested_metric"] == "calmar_ratio"    # recorded, not substituted
+        assert ctx["requested_metric_value"] is None and ctx["rank"] is None
+        assert "requested_metric_missing" in run["missing_evidence"]
+    assert _snapshot(clean.base_dir) == clean_before
+
+    # --- 11. output containment and explicit-write-only behaviour --------------- #
+    quiet_before = sorted(p.name for p in reports.iterdir())
+    code, out = run_cli(clean, "--run-hash", hashes[0])
+    assert code == 0 and "WROTE:" not in out
+    assert sorted(p.name for p in reports.iterdir()) == quiet_before  # nothing new
+
+    for bad_target in (clean.base_dir / "leaked.json", clean.base_dir):
+        code, out = run_cli(clean, "--run-hash", hashes[0], "--output-json", bad_target)
+        assert code == 3 and "Traceback" not in out
+        assert not (clean.base_dir / "leaked.json").exists()
+    assert _snapshot(clean.base_dir) == clean_before        # store never written
+
+    same = reports / "dup.json"
+    code, out = run_cli(clean, "--run-hash", hashes[0], "--output-json", same,
+                        "--output-csv", reports / "." / "dup.json")
+    assert code == 3 and "duplicates" in out
+    assert not same.exists()                               # validation precedes any write
+
+    link = tmp_path / "link_into_store"
+    if _try_symlink_dir(link, clean.base_dir):
+        code, out = run_cli(clean, "--run-hash", hashes[0], "--output-json", link / "leak.json")
+        assert code == 3 and "inside the audited ExperimentStore" in out
+        assert _snapshot(clean.base_dir) == clean_before
+
+    assert not (_REPO_ROOT / "reports").exists()            # no implicit reports dir
+    assert not (_REPO_ROOT / "data").exists()
+    assert not (_REPO_ROOT / "artifacts").exists()
+
+    # --- 12. registry / database and repository-cleanliness proof --------------- #
+    assert not (_BACKEND / "data" / "quantlab.db").exists()
+    assert not (_REPO_ROOT / "quantlab.db").exists()
+    assert list((_BACKEND / "data").iterdir()) == [_BACKEND / "data" / ".gitkeep"]
+    assert not list(tmp_path.rglob("*.db")) and not list(tmp_path.rglob("*.sqlite*"))
+    assert _repo_snapshot() == repo_before
+
+    # every audited store survived the whole scenario byte-identical
+    assert _snapshot(clean.base_dir) == clean_before
+    assert _snapshot(warned.base_dir) == warn_before
+    assert _snapshot(broken.base_dir) == bad_before
+    assert _snapshot(incompatible.base_dir) == incompat_before
+
+
+def _try_symlink_dir(link, target) -> bool:
+    try:
+        link.symlink_to(target, target_is_directory=True)
+        return True
+    except (OSError, NotImplementedError):
+        return False  # unprivileged Windows: the containment check is covered elsewhere
+
+
+def test_phase14_package_and_cli_source_boundaries():
+    """Every Phase 14 shipped file obeys the phase's architectural boundaries."""
+    package = _BACKEND / "app" / "experiment_review"
+    sources = {p.name: p.read_text(encoding="utf-8")
+               for p in (package / "models.py", package / "collect.py",
+                         package / "render.py", package / "__init__.py",
+                         _PACK_CLI_PATH)}
+    assert set(sources) == {"models.py", "collect.py", "render.py", "__init__.py",
+                            "build_experiment_evidence_pack.py"}
+
+    forbidden = ("app.experiment_registry", "app.dataset_registry", "app.db", "sqlite3",
+                 "get_connection", "quantlab.db", "app.local_pipeline",
+                 "app.batch_experiments", "run_local_futures_ml_experiment",
+                 "train_model", "build_feature_matrix", "hashlib", "sha256",
+                 "import requests", "urllib", "httpx", "socket", "yfinance", "ibkr",
+                 "sklearn", "xgboost", "lightgbm", "torch", "tensorflow", "frontend")
+    for name, src in sources.items():
+        for token in forbidden:
+            assert token not in src, f"{name} must not reference {token!r}"
+        lowered = src.lower()
+        for token in ("quarantine", "deploy-ready", "approve the", "promote"):
+            assert token not in lowered, f"{name} must not contain {token!r}"
+
+    # the production package performs zero filesystem writes; only the CLI writes
+    for name in ("models.py", "collect.py", "render.py", "__init__.py"):
+        for token in (".write_text", ".write_bytes", ".mkdir", ".touch", ".unlink",
+                      "rmtree", "shutil", "to_csv", "to_parquet"):
+            assert token not in sources[name], f"{name} must not contain {token!r}"
+    cli_src = sources["build_experiment_evidence_pack.py"]
+    assert cli_src.count(".write_text(") == 1 and cli_src.count(".mkdir(") == 1
+    assert "--database-path" not in cli_src and "--include-registry-context" not in cli_src
+    assert "--allow-different-windows" not in cli_src
+
+    import re as _re
+    for private in ("_ABSOLUTE_PATH", "_FRAME_NAMES", "_window_key", "_compat_key",
+                    "_resolve_run", "_metric_value"):
+        for name, src in sources.items():
+            assert not _re.search(rf"\b{private}\b", src), f"{name} uses {private!r}"
