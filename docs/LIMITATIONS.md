@@ -284,6 +284,25 @@ Strategy Comparison **does** let you adjust the shared market-simulation assumpt
 
 Static Portfolio Optimization and the Efficient Frontier estimate expected returns and the covariance matrix from the **same** historical window they then analyse (252-day annualisation). This is in-sample by construction: it will look good, can overfit, and **does not predict future performance**. Walk-Forward Optimization provides an out-of-sample variant but still relies on historical assumptions. Risk-dashboard, stress-test, and factor-analysis figures are likewise **historical estimates** that may not persist out-of-sample.
 
+### Stress scenarios are assumptions, not forecasts
+
+The Portfolio Stress Lab (Phase 57) applies explicit deterministic
+scenarios to stored Phase 56 weights. Every result is conditional on the
+assumptions the scenario states: **no scenario is a worst case**, a
+measured loss is not a guaranteed or expected loss, and unrun scenarios
+say nothing about the ones that were run. Direct shocks produce P&L;
+volatility/correlation stress changes **risk estimates only** and is never
+mixed into P&L. Stressed covariances that fail PSD validation are reported
+unavailable unless an explicit repair policy is configured. Cost and
+participation figures are reference calculations for a hypothetical
+one-way move of the whole book — not modelled trades. Post-shock drifted
+weights are pure arithmetic drift with **no rebalancing**, and drawdown
+attribution uses a labelled static-weight approximation whose linear sum
+reconciles with the interval's summed arithmetic return, not the geometric
+depth. Nothing here hedges, rebalances, trades, or recommends an action;
+it is not regulatory stress testing, capital-adequacy analysis, or
+risk-management advice.
+
 ### Local SQLite — single-user, no auth
 
 Saved backtests, saved reports, and saved custom-strategy templates persist in a **local SQLite** file (`backend/data/quantlab.db`). There is **no authentication, no multi-user support, and no cloud sync** — anyone with access to the running app can read/modify/delete local records. It is intended for single-user, local research, not a shared or hosted deployment.

@@ -180,6 +180,13 @@ callers with genuinely tested p-values.
   turnover-proportional components apply; trade-level fields are
   honestly unavailable there); this lab's rows and fingerprints are
   never mutated, and generated weights are never submitted here.
+- **Portfolio Stress Lab** (Phase 57.0,
+  [`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md)) — a stress
+  scenario may link a run from this lab read-only and apply explicit
+  liquidity/cost multipliers to a **deep copy** of its STORED cost model.
+  The copy receives its own new fingerprint; this lab's stored model,
+  rows and fingerprints are never modified, and components that need
+  trade sizes or liquidity inputs stay honestly unavailable there too.
 
 ## 8. Fingerprints
 

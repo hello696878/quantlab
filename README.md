@@ -64,7 +64,8 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   Regime Diagnostics (conditional performance + no-look-ahead regimes),
   Cost & Capacity (execution-cost, impact + capacity diagnostics),
   Portfolio Diagnostics (construction, risk budgeting + constraints),
-  Data Reliability Center, QA Command Center.
+  Portfolio Stress Lab (scenario shocks, stressed risk + drawdown
+  attribution), Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -276,6 +277,19 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Portfolio Stress Lab (57.0)** — explicit deterministic scenarios
+  applied to stored Phase 56 weights: historical replays of actual stored
+  observations (ex-ante only when the window ends strictly before the
+  decision cutoff), hypothetical asset/group/global shocks in unambiguous
+  units under a documented precedence, volatility/correlation stress with
+  PSD validation and never-silent explicit repair, liquidity/cost stress
+  on copies of linked Phase 55 models, contribution attribution reconciled
+  to the scenario total, post-shock drifted weights and constraint
+  re-checks, baseline-vs-stressed risk contributions, trailing-peak-only
+  drawdown episodes with per-asset attribution, and bounded sensitivity
+  probes. Scenarios are assumptions, not predictions — no worst case, no
+  guaranteed loss, no hedging, rebalancing, or trading, and never proof of
+  safety or robustness.
 - **Portfolio Diagnostics (56.0)** — portfolio construction under explicit
   assumptions: equal weight, inverse volatility (visible floor), equal
   risk contribution and SLSQP minimum variance on validated covariances

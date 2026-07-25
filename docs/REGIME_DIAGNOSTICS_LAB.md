@@ -169,6 +169,11 @@ fingerprints and results are never modified by that join.
 [`PORTFOLIO_DIAGNOSTICS_LAB.md`](PORTFOLIO_DIAGNOSTICS_LAB.md)) joins the
 same stored assignments the same read-only way to summarize portfolio
 returns, turnover and cost completeness per regime.
+**Portfolio Stress** (Phase 57.0,
+[`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md)) may link a run from
+this lab for **provenance only** — v1 consumes no regime assignment and
+conditions nothing on regimes (its `linked_to_stored_regime` integrity
+state is reserved and unused), so nothing here is read or modified.
 
 ## 13. Demo fixture
 

@@ -1677,6 +1677,86 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 57.0 — Portfolio Stress Testing, Scenario Shock & Drawdown Attribution Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first stress lab
+  (`backend/app/portfolio_stress/`) applying explicit deterministic
+  scenarios to **stored Phase 56 portfolio weights** and attributing the
+  measured effects. **Scenario definitions:** nine types (historical
+  window / single-period replays of actual stored observations,
+  hypothetical asset shock, hypothetical group shock — each with an
+  optional global-shock level — volatility, correlation,
+  liquidity-and-cost, combined, user-supplied descriptive) with
+  unambiguous units (return decimal, percent, bps; absolute price shocks
+  unsupported — stored universes carry returns, not reference prices, and
+  a price is never fabricated), a documented precedence (asset → group →
+  global → explicit missing-shock policy `zero` / `unavailable`) whose
+  resolved source is stored per asset, ±100% shock bounds, unknown
+  top-level keys rejected, and factor shocks deferred with an explicit
+  reason (no run-linked exposure system exists; exposures are never
+  inferred from names). **Integrity:** `verified_historical_window`
+  (ex-ante only when the window ends strictly before the portfolio
+  decision cutoff — otherwise `invalid`), `verified_deterministic_rule`,
+  `supplied_descriptive`, `full_sample_descriptive`, `unknown`, `invalid`;
+  `linked_to_stored_regime` reserved and unused in v1; off-timeline and
+  reversed windows are rejected at create rather than replayed as zeros.
+  **Execution:** a documented, fingerprinted eight-step order (validate →
+  price shocks → volatility → correlation → covariance rebuild/validate →
+  risk → liquidity/cost → reconciliation). **Attribution:**
+  `contribution_i = w_i × shock_i` reconciled to the scenario total, with
+  the cost leg's state / reason / completeness / reference-turnover basis
+  carried inside the triple (a configured-but-uncomputable cost leg is
+  labelled, never silently equal to gross; a partial cost leg degrades the
+  triple to partial); post-shock drifted weights with a SIGNED cash
+  residual (a levered book is unchanged at a zero shock), −100% flooring
+  and honest unavailability for a wiped-out book — **no automatic
+  rebalancing**; independent constraint re-checks on the original and
+  drifted books with breaches attributed per book. **Risk stress:**
+  volatility (multiplicative / additive with disclosed zero-flooring) and
+  correlation (uniform multiplier / additive / toward-one `ρ+α(1−ρ)` /
+  supplied — asymmetric or non-unit-diagonal supplied matrices are
+  rejected, never silently fixed) rebuild `Σ* = D(σ*)·R*·D(σ*)` with PSD
+  validation and a never-silent explicit eigenvalue-floor repair, where
+  the disclosed vols/correlations always describe the repaired matrix
+  actually used (requested values kept separately); baseline-vs-stressed
+  MCR/CCR/PCR with ΔPCR, rank changes and both ΣCCR=σ / ΣPCR=1 identity
+  checks; rows are `available` only when a stressed contribution exists.
+  **Cost stress:** a deep COPY of the linked Phase 55 model with its own
+  new fingerprint (the stored model and fingerprint are never modified),
+  honestly unavailable components (square-root impact on weight-space
+  turnover), and participation only with an explicit base ADV and
+  notional. **Drawdown:** the canonical Phase 56 realized series (weights
+  drift between rebalances), trailing-peak-only wealth from 1.0 where the
+  initial capital counts as a peak, interior gaps and non-positive wealth
+  refused, exhaustive episode detection with recovered/unrecovered states
+  and disclosed deepest-40 persistence, plus per-asset attribution of the
+  deepest episode over the below-peak interval under a labelled
+  static-weight approximation whose arithmetic-vs-geometric gap is
+  disclosed. **Bounded sensitivity** (≤40 scenarios, ≤5 values per
+  dimension) where the base row shares the run's net basis and probes are
+  labelled self-contained scenarios; a failing probe never voids the run.
+  Six fingerprint kinds over content-addressed identity only (no database
+  ids); eight new SQLite tables; baselines gated on verified integrity +
+  complete results + an available stressed covariance; failed executions
+  clear stale results. UI: the **Portfolio Stress Lab** view (contribution
+  waterfall, baseline-vs-stressed PCR bars, drawdown chart + episode
+  table, cost/participation panel, sensitivity table, verbatim scenario
+  definition, neutral compare). A 16-case deterministic idempotent demo
+  (flagship-only experiment record). Verification: 26 new backend tests,
+  a 5-agent adversarial review (188 hand-verified checks; 7 major +
+  ~20 minor findings all fixed), `npx tsc --noEmit` clean, a 17-test
+  Playwright spec green. Docs: `PORTFOLIO_STRESS_LAB.md`,
+  `STRESS_SCENARIO_DEFINITION_POLICY.md`,
+  `PORTFOLIO_STRESS_ATTRIBUTION_POLICY.md`,
+  `DRAWDOWN_AND_EPISODE_ATTRIBUTION_POLICY.md`,
+  `STRESS_COVARIANCE_AND_CORRELATION_POLICY.md`,
+  `PORTFOLIO_STRESS_RUNBOOK.md`. **Scenarios are explicit assumptions, not
+  predictions; no scenario is a worst case; measured losses are not
+  guarantees; nothing hedges, rebalances, trades, recommends an action, or
+  proves safety or robustness. Not regulatory stress testing, not
+  capital-adequacy analysis, not investment, trading, or risk-management
+  advice.**
+
 ### Phase 56.0 — Portfolio Construction, Risk Budgeting & Constraint Diagnostics Lab v1 ✅
 
 - **Research-infrastructure phase:** a local-first portfolio-construction

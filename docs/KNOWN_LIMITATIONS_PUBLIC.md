@@ -178,7 +178,26 @@ recommends an allocation, identifies an optimal or safest portfolio,
 guarantees diversification, risk reduction or performance, or certifies
 portfolio risk.
 
-## 21. Future improvements (openly planned)
+## 21. Stress scenarios are assumptions, not predictions
+
+The Portfolio Stress Lab applies explicit deterministic scenarios to
+stored portfolio weights. Every scenario is a stated assumption chosen by
+whoever configured it: **no scenario is a worst case**, a measured loss is
+not a guaranteed or expected loss, and a scenario that produces a small
+loss says nothing about scenarios that were not run. Historical replays
+reproduce what stored observations did in a specific window, not what will
+happen; volatility and correlation stress change *risk estimates* only and
+are never mixed into P&L; a stressed covariance that is not positive
+semidefinite is reported unavailable rather than silently repaired; cost
+and participation figures are reference calculations for a hypothetical
+full-book move, not modelled trades. Drawdown attribution describes what
+was measured over an interval under a labelled static-weight
+approximation — it never proves why a drawdown occurred. The lab never
+hedges, rebalances, trades, or recommends an action, and it is not
+regulatory stress testing, capital-adequacy analysis, proof of safety or
+robustness, or risk-management advice.
+
+## 22. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

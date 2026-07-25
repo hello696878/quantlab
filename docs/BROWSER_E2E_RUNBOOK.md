@@ -117,6 +117,27 @@ protected and why).
   path/credential/NaN-free, dark controls and units hold, and desktop/
   1024/768 have no page overflow. Only writes: the idempotent demo
   seeds.
+- **Portfolio Stress Lab** (Phase 57.0, `portfolio-stress.spec.ts`): the lab
+  opens with its not-a-prediction / no-worst-case / no-hedging disclaimers
+  and no banned wording, the 16-case demo seeds idempotently, scenario-type
+  and integrity filters work, the flagship's per-asset contributions
+  reconcile to the scenario total through the same API the page uses while
+  P&L and risk effects stay separate, shock units convert exactly
+  (bps/return/percent), the `unavailable` missing-shock policy stays
+  honestly partial with drifted weights withheld, the future-looking
+  ex-ante claim is invalid and its baseline attempt is refused (a
+  deliberate 409), pure volatility stress scales risk with a zero scenario
+  return, the non-PSD supplied correlation is honestly unavailable under
+  repair `none` and visibly repaired under an explicit eigenvalue floor,
+  liquidity/cost stress shows the copied model's new fingerprint with
+  participation above the explicit threshold and impact honestly
+  unavailable, drifted-book constraint breaches appear with no automatic
+  rebalancing, drawdown episodes and deepest-episode attribution render
+  with the labelled approximation, the full-sample window is labelled
+  descriptive, comparison stays neutral, export is downloadable, and the
+  scenario definition shows the execution order plus the deferred factor
+  shocks. Only writes: the idempotent demo seeds plus the deliberately
+  rejected baseline attempt.
 - **Overfitting Diagnostics** (Phase 53.0, `overfitting-diagnostics.spec.ts`):
   the lab opens with its selection-bias disclaimer, the 4-run demo seeds
   idempotently, metric/status filters work, the high-PBO noise demo shows
@@ -144,8 +165,9 @@ protected and why).
   drift (high for the drifting feature) and importance drift
   (importance-drift-without-data-drift rendered honestly), the
   leakage-failed link fails honestly, the flagship baseline star renders and
-  a not-held-out run's baseline attempt is rejected with a 409 (the one
-  deliberate non-2xx in the suite — asserted as the only failed request),
+  a not-held-out run's baseline attempt is rejected with a 409 (one of the
+  suite's deliberate non-2xx responses — asserted as the only failed
+  request tracked by this spec),
   comparison stays neutral, the export JSON is path/credential/sample-free,
   no "causal"/"best"/"recommended" wording, dark-theme controls and column
   geometry hold, and 1024/768 have no page overflow (list AND detail). Only
@@ -164,8 +186,9 @@ protected and why).
   *wording* on the QA/RC pages is a documented exception), no raw stack
   traces, no failed local `/api/*` requests (dev-mode StrictMode
   `ERR_ABORTED` duplicate-mount fetches are a documented, ignored exception —
-  each is followed by a 200; the feature-diagnostics baseline-rejection test
-  deliberately provokes exactly one 409 and asserts nothing else failed).
+  each is followed by a 200; several specs deliberately provoke exactly one
+  409 each (feature diagnostics, portfolio diagnostics, portfolio stress)
+  and assert nothing else failed).
 
 ## 2. What it does NOT check
 

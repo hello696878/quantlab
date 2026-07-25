@@ -95,6 +95,7 @@ from app.overfitting_diagnostics_routes import router as overfitting_diagnostics
 from app.regime_diagnostics_routes import router as regime_diagnostics_router
 from app.cost_diagnostics_routes import router as cost_diagnostics_router
 from app.portfolio_diagnostics_routes import router as portfolio_diagnostics_router
+from app.portfolio_stress_routes import router as portfolio_stress_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -496,6 +497,7 @@ app.include_router(overfitting_diagnostics_router)
 app.include_router(regime_diagnostics_router)
 app.include_router(cost_diagnostics_router)
 app.include_router(portfolio_diagnostics_router)
+app.include_router(portfolio_stress_router)
 
 
 # ---------------------------------------------------------------------------

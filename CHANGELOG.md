@@ -18,6 +18,68 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Portfolio Stress Testing, Scenario Shock & Drawdown Attribution Lab
+  v1** (v4.75 series): a local-first stress lab that applies explicit
+  deterministic scenarios to STORED Phase 56 portfolio weights — nine
+  scenario types (historical window / single period replays of actual
+  stored observations, hypothetical asset shock, hypothetical group shock
+  — each with an optional global-shock level — volatility, correlation,
+  liquidity-and-cost, combined, user-supplied descriptive); unambiguous
+  shock units (return decimal, percent, bps;
+  absolute price shocks unsupported because stored universes carry
+  returns, not reference prices — never fabricated) under a documented
+  precedence (asset → group → global → explicit missing-shock policy) with
+  the resolved source stored per asset; integrity states
+  (`verified_historical_window` — ex-ante only when the window ends
+  strictly before the portfolio decision cutoff, `verified_deterministic_rule`,
+  `supplied_descriptive`, `full_sample_descriptive`, `unknown`, `invalid`;
+  `linked_to_stored_regime` reserved and unused; factor shocks deferred
+  with an explicit reason because no run-linked exposure system exists);
+  a documented, fingerprinted eight-step execution order; contribution
+  attribution reconciled to the scenario total with the cost leg's state,
+  reason, completeness and reference-turnover basis carried inside the
+  triple (a configured-but-uncomputable cost leg is labelled, never
+  silently equal to gross); post-shock drifted weights with a SIGNED cash
+  residual (levered books unchanged at a zero shock) and honest
+  unavailability for a wiped-out book — no automatic rebalancing;
+  independent constraint re-checks on the original and drifted books with
+  breaches attributed per book; volatility/correlation stress
+  (multiplicative / additive with disclosed zero-flooring; uniform
+  multiplier / additive / toward-one / supplied, with asymmetric or
+  non-unit-diagonal supplied matrices rejected rather than silently
+  fixed) rebuilding Σ* = D(σ*)·R*·D(σ*) with PSD validation and
+  never-silent explicit eigenvalue-floor repair, where the disclosed
+  vols/correlations always describe the repaired matrix actually used;
+  baseline-vs-stressed MCR/CCR/PCR with ΔPCR, rank changes and both
+  identity checks; liquidity/cost stress applied to a deep COPY of the
+  linked Phase 55 model with its own new fingerprint (the stored model is
+  never modified) and honestly unavailable components; trailing-peak-only
+  drawdown analysis on the canonical Phase 56 realized series (initial
+  capital counts as a peak; interior gaps and non-positive wealth
+  refused), exhaustive episode detection with recovered/unrecovered
+  states and disclosed deepest-40 persistence, plus per-asset attribution
+  of the deepest episode over the below-peak interval under a labelled
+  static-weight approximation whose arithmetic-vs-geometric gap is
+  disclosed; bounded one-at-a-time sensitivity where the base row shares
+  the run's net basis and probes are labelled self-contained scenarios;
+  six fingerprint kinds (no database ids — a byte-identical configuration
+  reproduces its fingerprint in another database); eight new SQLite
+  tables; baselines gated on verified integrity + complete results + an
+  available stressed covariance; failed executions clear their stale
+  results; a 16-case deterministic demo; the **Portfolio Stress Lab** view
+  (contribution waterfall, baseline-vs-stressed PCR bars, drawdown chart
+  with episode table, cost/participation panel, sensitivity table,
+  verbatim scenario definition); 26 backend tests verified by a 5-agent
+  adversarial pass (188 hand-verified checks; every finding — 7 major,
+  ~20 minor — fixed); a 17-test Playwright spec; six docs. Scenarios are
+  assumptions, not predictions; no scenario is a worst case; measured
+  losses are not guarantees; nothing hedges, rebalances, trades,
+  recommends an action, or proves safety or robustness.
+
+## Grouped release areas — v4.74 (portfolio-construction series)
+
+### Portfolio construction, risk budgeting & constraint diagnostics lab (v4.74)
+
 - **Portfolio Construction, Risk Budgeting, Diversification & Constraint
   Diagnostics Lab v1** (v4.74 series): a local-first portfolio-research
   diagnostics lab — strictly aligned 2–20-asset universes with parsed

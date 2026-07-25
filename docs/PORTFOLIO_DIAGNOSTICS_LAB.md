@@ -187,6 +187,17 @@ includes adversarial future-outlier, malformed-input, drifted-book,
 fingerprint-materiality and transactional-rollback coverage; the 18-test
 Playwright spec remains the browser workflow.
 
+## 9b. Downstream: Portfolio Stress Lab (Phase 57.0)
+
+The Portfolio Stress Lab
+([`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md)) consumes this lab's
+**stored** weights and covariance read-only: a stress run pins the
+selected rebalance's weight and covariance fingerprints at create time and
+refuses to execute if the stored weights changed since (risk stress is
+withheld with an explicit warning if the covariance changed). Nothing in
+this lab's records is recomputed, rewritten, or re-fingerprinted by a
+stress run, and no stressed result is ever written back as an allocation.
+
 ## 10. Limitations
 
 Weights are research measurements under configured assumptions, not

@@ -270,7 +270,18 @@ a `dataset_version_id`; the run detail shows the version's fingerprints,
 provenance and quality states and warns visibly when the version was
 invalidated.  Dataset metadata is never mutated by a diagnostic run.
 
-## 24. Limitations
+## 24. Portfolio Stress links (Phase 57.0)
+
+Portfolio-stress runs
+([`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md)) inherit the linked
+portfolio run's `dataset_version_id` unless one is supplied explicitly;
+the run detail shows the version's fingerprints, provenance and quality
+states and warns visibly when the version was invalidated.  Dataset
+metadata is never mutated by a stress run, and the dataset's manifest
+fingerprint (not its row id) is what enters the run's configuration
+fingerprint.
+
+## 25. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks

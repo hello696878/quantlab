@@ -41,6 +41,7 @@ export type View =
   | "regimediagnostics"
   | "costdiagnostics"
   | "portfoliodiagnostics"
+  | "portfoliostress"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

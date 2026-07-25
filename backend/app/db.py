@@ -1348,6 +1348,226 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_psr_run ON portfolio_sensitivity_results(run_id)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Portfolio Stress / Scenario Shock / Drawdown Attribution Lab
+        # (Phase 57.0).  Stress runs reference STORED Phase 56 weights and
+        # covariance (never mutated); scenario definitions, per-asset shock
+        # results, risk comparisons, constraint checks, drawdown episodes,
+        # attribution rows and sensitivity scenarios are explicit rows —
+        # docs/PORTFOLIO_STRESS_LAB.md.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_stress_runs (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                TEXT    NOT NULL,
+                updated_at                TEXT    NOT NULL,
+                name                      TEXT    NOT NULL,
+                description               TEXT    NOT NULL DEFAULT '',
+                status                    TEXT    NOT NULL DEFAULT 'pending',
+                scenario_type             TEXT    NOT NULL,
+                asset_count               INTEGER NOT NULL DEFAULT 0,
+                scenario_count            INTEGER NOT NULL DEFAULT 0,
+                integrity_status          TEXT    NOT NULL DEFAULT 'unknown',
+                completeness_status       TEXT    NOT NULL DEFAULT 'unavailable',
+                scenario_return           REAL,
+                scenario_pnl              REAL,
+                stressed_volatility       REAL,
+                baseline_volatility       REAL,
+                breach_count              INTEGER NOT NULL DEFAULT 0,
+                episode_count             INTEGER NOT NULL DEFAULT 0,
+                max_drawdown              REAL,
+                configuration_json        TEXT    NOT NULL DEFAULT '{}',
+                configuration_fingerprint TEXT    NOT NULL,
+                result_fingerprint        TEXT,
+                scenario_fingerprint      TEXT    NOT NULL,
+                baseline_weight_fingerprint     TEXT,
+                baseline_covariance_fingerprint TEXT,
+                stressed_covariance_fingerprint TEXT,
+                reconciliation_json       TEXT,
+                risk_summary_json         TEXT,
+                cost_stress_json          TEXT,
+                drawdown_json             TEXT,
+                covariance_stress_json    TEXT,
+                drifted_json              TEXT,
+                warnings_json             TEXT    NOT NULL DEFAULT '[]',
+                portfolio_run_id          INTEGER NOT NULL
+                                          REFERENCES portfolio_diagnostic_runs(id),
+                portfolio_rebalance_id    INTEGER,
+                dataset_version_id        INTEGER REFERENCES dataset_versions(id),
+                regime_run_id             INTEGER
+                                          REFERENCES regime_diagnostic_runs(id),
+                cost_diagnostic_run_id    INTEGER
+                                          REFERENCES cost_diagnostic_runs(id),
+                experiment_id             INTEGER REFERENCES experiment_registry(id),
+                is_baseline               INTEGER NOT NULL DEFAULT 0,
+                baseline_scope            TEXT,
+                completed_at              TEXT,
+                duration_ms               INTEGER,
+                app_version               TEXT,
+                git_commit                TEXT,
+                notes                     TEXT    NOT NULL DEFAULT '',
+                error_message             TEXT,
+                demo_key                  TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stress_scenario_definitions (
+                id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                 INTEGER NOT NULL
+                                       REFERENCES portfolio_stress_runs(id),
+                scenario_definition_id TEXT    NOT NULL,
+                name                   TEXT    NOT NULL,
+                description            TEXT    NOT NULL DEFAULT '',
+                scenario_type          TEXT    NOT NULL,
+                source                 TEXT    NOT NULL DEFAULT 'user',
+                integrity_status       TEXT    NOT NULL DEFAULT 'unknown',
+                fingerprint            TEXT    NOT NULL,
+                definition_json        TEXT    NOT NULL DEFAULT '{}',
+                UNIQUE (run_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stress_asset_results (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id       INTEGER NOT NULL
+                             REFERENCES portfolio_stress_runs(id),
+                asset_index  INTEGER NOT NULL,
+                asset_id     TEXT    NOT NULL,
+                grp          TEXT,
+                weight       REAL,
+                shock        REAL,
+                shock_source TEXT,
+                contribution REAL,
+                abs_share    REAL,
+                drifted_weight REAL,
+                status       TEXT    NOT NULL DEFAULT 'ok',
+                UNIQUE (run_id, asset_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stress_risk_results (
+                id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id       INTEGER NOT NULL
+                             REFERENCES portfolio_stress_runs(id),
+                asset_index  INTEGER NOT NULL,
+                asset_id     TEXT    NOT NULL,
+                baseline_mcr REAL,
+                baseline_ccr REAL,
+                baseline_pcr REAL,
+                stressed_mcr REAL,
+                stressed_ccr REAL,
+                stressed_pcr REAL,
+                pcr_change   REAL,
+                rank_change  INTEGER,
+                state        TEXT    NOT NULL DEFAULT 'available',
+                UNIQUE (run_id, asset_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stress_constraint_results (
+                id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id          INTEGER NOT NULL
+                                REFERENCES portfolio_stress_runs(id),
+                row_index       INTEGER NOT NULL,
+                book            TEXT    NOT NULL,
+                constraint_name TEXT    NOT NULL,
+                detail          TEXT    NOT NULL,
+                amount          REAL,
+                asset_id        TEXT,
+                UNIQUE (run_id, row_index)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS drawdown_episodes (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES portfolio_stress_runs(id),
+                episode_id          INTEGER NOT NULL,
+                peak_timestamp      TEXT    NOT NULL,
+                peak_is_initial_capital INTEGER NOT NULL DEFAULT 0,
+                trough_timestamp    TEXT    NOT NULL,
+                recovery_timestamp  TEXT,
+                depth               REAL    NOT NULL,
+                duration            INTEGER NOT NULL,
+                recovery_duration   INTEGER,
+                status              TEXT    NOT NULL,
+                UNIQUE (run_id, episode_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS drawdown_attribution_results (
+                id             INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id         INTEGER NOT NULL
+                               REFERENCES portfolio_stress_runs(id),
+                asset_index    INTEGER NOT NULL,
+                asset_id       TEXT    NOT NULL,
+                grp            TEXT,
+                episode_id     INTEGER,
+                contribution   REAL,
+                average_weight REAL,
+                abs_share      REAL,
+                UNIQUE (run_id, asset_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS stress_sensitivity_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES portfolio_stress_runs(id),
+                scenario_index      INTEGER NOT NULL,
+                dimension           TEXT    NOT NULL,
+                value               REAL,
+                is_base             INTEGER NOT NULL DEFAULT 0,
+                scenario_return     REAL,
+                stressed_volatility REAL,
+                contribution_hhi    REAL,
+                breach_count        INTEGER,
+                cost_return         REAL,
+                completeness        TEXT,
+                status              TEXT    NOT NULL DEFAULT 'completed',
+                reason              TEXT,
+                fingerprint         TEXT    NOT NULL,
+                UNIQUE (run_id, scenario_index)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_psr2_created ON portfolio_stress_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_status ON portfolio_stress_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_type ON portfolio_stress_runs(scenario_type)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_integrity ON portfolio_stress_runs(integrity_status)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_prun ON portfolio_stress_runs(portfolio_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_dataset ON portfolio_stress_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_rrun ON portfolio_stress_runs(regime_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_crun ON portfolio_stress_runs(cost_diagnostic_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_config_fp ON portfolio_stress_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_baseline ON portfolio_stress_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_psr2_scope ON portfolio_stress_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_psr2_demo_key ON portfolio_stress_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_ssd_run ON stress_scenario_definitions(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sar_run ON stress_asset_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_srr_run ON stress_risk_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_scr_run ON stress_constraint_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_dde_run ON drawdown_episodes(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_dda_run ON drawdown_attribution_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ssr_run ON stress_sensitivity_results(run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

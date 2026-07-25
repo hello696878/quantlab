@@ -249,6 +249,14 @@ leakage-failed splits fail honestly, full-sample estimation cannot be
 combined with a split link, and split memberships / purge / embargo /
 fingerprints are never modified.
 
+The Portfolio Stress Lab
+([`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md), Phase 57.0) does
+not link validation runs directly: it inherits whatever provenance the
+stressed Phase 56 portfolio run recorded, and its own timing discipline is
+scenario-level (a historical window may claim `ex_ante` only when it ends
+strictly before that portfolio's decision cutoff). Nothing in this lab is
+read or modified by a stress run.
+
 ## 21. Limitations
 
 Sample membership is stored as bounded JSON arrays (≤2000 samples/run —

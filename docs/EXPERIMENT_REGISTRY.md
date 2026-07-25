@@ -315,7 +315,19 @@ portfolio volatility / effective positions / budget deviation / turnover
 creates at most one record and re-execution reuses it.  No recommendation
 or preferred allocation is stored.
 
-## 24. Future extensions
+## 24. Portfolio Stress records (Phase 57.0)
+
+Executed portfolio-stress runs
+([`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md)) can create
+experiment records here (module `portfolio_stress_diagnostics`, scenario
+type + linked portfolio run/rebalance + integrity/completeness states and
+both fingerprints as parameters; net scenario return, stressed volatility,
+breach count, episode count and maximum drawdown as metrics) —
+idempotently: a run creates at most one record and re-execution reuses it.
+A stored scenario result is a measurement under stated assumptions, never
+a prediction, a worst case, or a recommended action.
+
+## 25. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from
