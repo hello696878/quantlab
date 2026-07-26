@@ -18,6 +18,72 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Portfolio Performance Attribution, Benchmark & Active Risk Diagnostics
+  Lab v1** (v4.76 series): a local-first attribution lab that decomposes
+  MEASURED performance of STORED Phase 56 portfolio weights — a period/asset
+  observation model built from stored weights and returns where period t
+  spans timestamps[t]→[t+1] and its weights are those known at its start;
+  a beginning-of-period weight contract where a stored rebalance's weights
+  govern period i onward (Phase 56 already guarantees they used data through
+  i−lag with lag ≥ 1) and drift between rebalances by the identical
+  recursion, verified by a test that reproduces Phase 56's canonical
+  realized-return series exactly, with adversarial future-rebalance and
+  future-return invariance tests and `end_of_period` timing accepted only as
+  an explicitly INVALID descriptive declaration; six integrity states
+  (verified_from_stored_rebalance / verified_causal_weights /
+  supplied_descriptive / full_sample_descriptive / unknown / invalid, the
+  last also covering a linked centered weight basis); exact contribution
+  reconciliation (contribution_i = w_i × r_i summing to the portfolio market
+  return, group totals summing to the asset totals with no double counting,
+  a supplied return NEVER forced to match the reconstruction, and cash
+  disclosed as the explicit residual 1 − Σw); explicit benchmark definitions
+  (fixed-weight / per-period / buy-and-hold, from an ordered asset list with
+  declared weights — never auto-selected, never an implicit equal-weight
+  fallback, never silently renormalized, with benchmark-only assets
+  requiring explicit returns and explicit groups); Brinson-Fachler and
+  Brinson-Hood-Beebower single-period decompositions with both formulas
+  documented and hand-computed tests, zero-weight and one-sided groups
+  leaving their terms honestly unavailable, and residuals reported verbatim
+  with stated reasons and NEVER redistributed; multi-period linking by
+  arithmetic summation (with the arithmetic-versus-geometric compounding gap
+  disclosed) or Carinó smoothing (reconciling with the geometric active
+  return, using the exact x=y limit 1/(1+x) rather than an epsilon guard,
+  withheld entirely when a −100% return makes the logarithm undefined, and
+  reporting a closure identity so a non-zero linking residual is provably the
+  scaled single-period residual); a time-weighted return that is only ever
+  LABELLED time-weighted when the inputs support it, with no money-weighted
+  or IRR placeholder; cost attribution from stored Phase 56 rebalance
+  estimates (Phase 55 records read-only) that distinguishes a structural
+  `no_trade` zero from an `unavailable` measurement and nets only over the
+  stated costed basis; active-risk diagnostics with a sample (ddof=1)
+  convention, annualization only under a declared frequency, an information
+  ratio that is unavailable — never infinite — at zero tracking error, hit
+  rates and a relative active drawdown; absolute-contribution concentration
+  with the signed parts separate; stored-regime and stored-drawdown-episode
+  views that never recompute their sources; four fingerprint kinds over
+  content-addressed identity; eight new SQLite tables; baselines gated on
+  verified provenance + complete results + reconciliation; failed executions
+  clearing stale results; a 17-case idempotent demo that seeds its own
+  hand-computable books through the Phase 56 public service; the **Portfolio
+  Attribution** view (reconciliation, benchmark definition, contribution
+  waterfall, group drilldown, Brinson bars + residual, linking, costs,
+  active risk, active-return timeline with a table alternative, regimes,
+  drawdowns, stored policy); 40 backend tests, a 20-test Playwright spec and
+  six docs. Because attribution demo books are ordinary Phase 56 books and
+  therefore share the Portfolio Diagnostics registry, that lab's runs table
+  now pages 25 rows instead of 15 so its own demo set still fits the first
+  page — ordering, filters and every stored record are unchanged. Factor
+  attribution is DEFERRED with a stated reason (no
+  validated exposure/factor-return matrices exist; factors are never
+  inferred from asset names). Nothing here proves alpha or manager skill,
+  recommends a benchmark or a portfolio, guarantees future performance,
+  produces GIPS-compliant reporting, performs tax accounting, executes
+  trades, or constitutes investment advice.
+
+## Grouped release areas — v4.75 (portfolio-stress series)
+
+### Portfolio stress, scenario shock & drawdown attribution lab (v4.75)
+
 - **Portfolio Stress Testing, Scenario Shock & Drawdown Attribution Lab
   v1** (v4.75 series): a local-first stress lab that applies explicit
   deterministic scenarios to STORED Phase 56 portfolio weights — nine

@@ -281,7 +281,19 @@ metadata is never mutated by a stress run, and the dataset's manifest
 fingerprint (not its row id) is what enters the run's configuration
 fingerprint.
 
-## 25. Limitations
+## 25. Portfolio Attribution links (Phase 58.0)
+
+Attribution runs
+([`PORTFOLIO_ATTRIBUTION_LAB.md`](PORTFOLIO_ATTRIBUTION_LAB.md)) inherit the
+linked portfolio run's `dataset_version_id` unless one is supplied
+explicitly; the run detail shows the version's fingerprints, provenance and
+quality states and warns visibly when the version was invalidated.  A
+benchmark definition may declare its own `dataset_version_id` for
+provenance.  Dataset metadata is never mutated by an attribution run, and
+the dataset's manifest and schema fingerprints (not row ids) are what enter
+the run's observation-universe fingerprint.
+
+## 26. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks

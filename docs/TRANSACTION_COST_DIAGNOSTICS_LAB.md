@@ -188,6 +188,15 @@ callers with genuinely tested p-values.
   rows and fingerprints are never modified, and components that need
   trade sizes or liquidity inputs stay honestly unavailable there too.
 
+- **Portfolio Attribution Lab** (Phase 58.0,
+  [`PORTFOLIO_ATTRIBUTION_LAB.md`](PORTFOLIO_ATTRIBUTION_LAB.md)) — reads the
+  per-rebalance cost estimates that a Phase 56 run already recorded from a
+  linked model here, mapping each to the period that starts at its decision
+  timestamp. A period with no rebalance is a structural `no_trade` zero; a
+  rebalance whose cost could not be estimated stays `unavailable`. This
+  lab's rows, models and fingerprints are never modified, nothing is
+  re-estimated, and stressed Phase 57 costs are never mixed in.
+
 ## 8. Fingerprints
 
 Deterministic SHA-256 over canonical JSON (floats quantized to 12 decimal

@@ -327,7 +327,20 @@ idempotently: a run creates at most one record and re-execution reuses it.
 A stored scenario result is a measurement under stated assumptions, never
 a prediction, a worst case, or a recommended action.
 
-## 25. Future extensions
+## 25. Portfolio Attribution records (Phase 58.0)
+
+Executed attribution runs
+([`PORTFOLIO_ATTRIBUTION_LAB.md`](PORTFOLIO_ATTRIBUTION_LAB.md)) can create
+experiment records here (module `portfolio_performance_attribution`, with the
+portfolio and benchmark identity, attribution method, linking method, period
+count, integrity / completeness / reconciliation states and both
+fingerprints as parameters; gross and net portfolio return, benchmark
+return, active return, tracking error and contribution concentration as
+metrics) — idempotently: a run creates at most one record and re-execution
+reuses it.  No claim of alpha, manager skill or a preferred portfolio or
+benchmark is ever stored.
+
+## 26. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

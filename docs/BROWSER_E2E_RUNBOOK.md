@@ -138,6 +138,31 @@ protected and why).
   scenario definition shows the execution order plus the deferred factor
   shocks. Only writes: the idempotent demo seeds plus the deliberately
   rejected baseline attempt.
+- **Portfolio Attribution** (Phase 58.0, `portfolio-attribution.spec.ts`):
+  the lab opens with its beginning-of-period, never-auto-selected-benchmark
+  and no-alpha/no-skill disclaimers (a negation-aware overclaim scan lets the
+  lab's own negated disclaimers pass while any affirmative claim fails), the
+  17-case demo seeds idempotently, method/linking/integrity filters work,
+  the flagship's hand-computed period reconciles exactly (portfolio 1.80%,
+  benchmark 1.50%, active 0.30%, all allocation, residual < 1e-9) through
+  the same API the page uses, asset contributions sum to the portfolio
+  market return and group totals match the asset totals with a working
+  drilldown, the identical-benchmark run shows exactly zero effects with the
+  information ratio honestly unavailable, selection and interaction are
+  separated with the residual visible and never redistributed, portfolio-only
+  and zero-weight groups stay honestly unavailable, a benchmark-only asset
+  carries explicit returns and an explicit group, arithmetic and Carinó
+  linking are labelled distinctly with the compounding gap disclosed and the
+  Carinó residual within tolerance, gross-versus-cost-adjusted keeps costs
+  separate with impact honestly unavailable, active-risk diagnostics render
+  and the unspecified-frequency run withholds its annualized figure,
+  concentration is measured on absolute contributions, the invalid
+  end-of-period run is refused as a baseline (a deliberate 409), the
+  timeline / policy / deferred-factor decision are visible, comparison stays
+  neutral, export honours the active filter and is path-free, filter
+  controls are dark with explicit units, and 1024/768 have no page overflow.
+  Only writes: the idempotent demo seeds plus the deliberately rejected
+  baseline attempt.
 - **Overfitting Diagnostics** (Phase 53.0, `overfitting-diagnostics.spec.ts`):
   the lab opens with its selection-bias disclaimer, the 4-run demo seeds
   idempotently, metric/status filters work, the high-PBO noise demo shows

@@ -65,7 +65,8 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   Cost & Capacity (execution-cost, impact + capacity diagnostics),
   Portfolio Diagnostics (construction, risk budgeting + constraints),
   Portfolio Stress Lab (scenario shocks, stressed risk + drawdown
-  attribution), Data Reliability Center, QA Command Center.
+  attribution), Portfolio Attribution (contribution, benchmark-relative
+  Brinson effects + active risk), Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -277,6 +278,17 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Portfolio Attribution (58.0)** — measured performance attribution of
+  stored portfolio weights: beginning-of-period contributions reconciling
+  exactly with the portfolio return, explicit group totals, an explicitly
+  declared benchmark (never auto-selected), Brinson-Fachler or
+  Brinson-Hood-Beebower allocation/selection/interaction effects with
+  residuals reported verbatim, arithmetic versus Carinó multi-period
+  linking, transaction costs kept separate over a stated costed basis,
+  tracking error / information ratio / active drawdown, contribution
+  concentration, and stored-regime and stored-drawdown views. Measurements
+  under a stated convention — never proof of alpha or manager skill, never a
+  benchmark or portfolio recommendation, never GIPS-compliant reporting.
 - **Portfolio Stress Lab (57.0)** — explicit deterministic scenarios
   applied to stored Phase 56 weights: historical replays of actual stored
   observations (ex-ante only when the window ends strictly before the

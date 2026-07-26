@@ -309,6 +309,29 @@ recommends an action;
 it is not regulatory stress testing, capital-adequacy analysis, or
 risk-management advice.
 
+### Attribution is conditional on the benchmark and the convention
+
+The Portfolio Attribution Lab (Phase 58) decomposes measured performance of
+stored Phase 56 weights. Every figure is conditional on choices the caller
+makes: the benchmark (never auto-selected — a different benchmark generally
+changes every effect), the Brinson variant (Brinson-Fachler and
+Brinson-Hood-Beebower split the same active return differently), the linking
+method (arithmetic sums do not reconcile with compounded active return;
+Carinó does, but is a smoothing convention), and the weight-timing policy.
+Group returns require non-zero group weight; one-sided or empty groups leave
+their terms **unavailable** and push the difference into a visible residual
+that is never redistributed. Costs are the stored per-rebalance estimates
+from a linked Phase 55 model — periods without a trade are a structural
+zero, periods whose cost could not be estimated stay unavailable, and the
+net figure covers only the costed subset. Tracking error uses a sample
+(ddof=1) convention and is annualized only under a declared frequency; a
+zero tracking error leaves the information ratio undefined rather than
+infinite. Factor attribution is deferred: no validated exposure and
+factor-return matrices exist in this repository, and factors are never
+inferred from asset names. Nothing here proves alpha or manager skill,
+recommends a benchmark or portfolio, guarantees performance, or constitutes
+GIPS-compliant reporting, tax accounting or investment advice.
+
 ### Local SQLite — single-user, no auth
 
 Saved backtests, saved reports, and saved custom-strategy templates persist in a **local SQLite** file (`backend/data/quantlab.db`). There is **no authentication, no multi-user support, and no cloud sync** — anyone with access to the running app can read/modify/delete local records. It is intended for single-user, local research, not a shared or hosted deployment.

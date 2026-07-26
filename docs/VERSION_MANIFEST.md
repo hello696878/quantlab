@@ -13,11 +13,11 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.75.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
+**`4.76.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
 expected tag on completion of the current phase's review is
-`v4.75.0-portfolio-stress-scenario-drawdown-attribution-v1` (Phase 57) —
-"expected" because tags are created by the user after review, never
-automatically. Note: the v4.69 meta-labeling tag was never created; that
+`v4.76.0-portfolio-performance-attribution-benchmark-diagnostics-v1`
+(Phase 58) — "expected" because tags are created by the user after review,
+never automatically; no such tag exists yet. Note: the v4.69 meta-labeling tag was never created; that
 work is included in the `v4.70.0` tag's history (a recorded convention
 deviation, not repaired since tags are never moved).
 
@@ -25,9 +25,9 @@ deviation, not repaired since tags are never moved).
 
 The **v4.x productization / platformization series**: v4.0.0 (local-first
 research terminal) → v4.7.0 (showcase candidate) → v4.8+ (one milestone tag
-per feature phase). 120 local tags existed when this manifest was last
-updated (Phase 57.0); the latest verified tag is
-`v4.74.0-portfolio-risk-budget-constraint-diagnostics-v1` (the frozen
+per feature phase). 121 local tags existed when this manifest was last
+updated (Phase 58.0); the latest verified tag is
+`v4.75.0-portfolio-stress-scenario-drawdown-attribution-v1` (the frozen
 release-candidate tag is
 `v4.60.0-public-release-candidate-demo-freeze-v1`).
 

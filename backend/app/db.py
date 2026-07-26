@@ -1568,6 +1568,262 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_ssr_run ON stress_sensitivity_results(run_id)",
         ):
             conn.execute(index_sql)
+        # ------------------------------------------------------------------
+        # Portfolio Performance Attribution, Benchmark and Active Risk Lab
+        # (Phase 58.0).  Attribution runs reference STORED Phase 56 weights
+        # and an EXPLICIT benchmark definition (never auto-selected); period,
+        # asset, group, Brinson, regime and drawdown results are explicit
+        # rows — docs/PORTFOLIO_ATTRIBUTION_LAB.md.
+        # ------------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_attribution_runs (
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at               TEXT    NOT NULL,
+                updated_at               TEXT    NOT NULL,
+                name                     TEXT    NOT NULL,
+                description              TEXT    NOT NULL DEFAULT '',
+                status                   TEXT    NOT NULL DEFAULT 'pending',
+                attribution_method       TEXT    NOT NULL,
+                brinson_variant          TEXT,
+                linking_method           TEXT    NOT NULL,
+                return_convention        TEXT    NOT NULL,
+                return_frequency         TEXT    NOT NULL,
+                weight_timing_policy     TEXT    NOT NULL,
+                benchmark_timing_policy  TEXT    NOT NULL,
+                observation_start        TEXT,
+                observation_end          TEXT,
+                asset_count              INTEGER NOT NULL DEFAULT 0,
+                group_count              INTEGER NOT NULL DEFAULT 0,
+                period_count             INTEGER NOT NULL DEFAULT 0,
+                integrity_status         TEXT    NOT NULL DEFAULT 'unknown',
+                completeness_status      TEXT    NOT NULL DEFAULT 'unavailable',
+                reconciliation_status    TEXT    NOT NULL DEFAULT 'unknown',
+                portfolio_market_return  REAL,
+                portfolio_net_return     REAL,
+                benchmark_return         REAL,
+                active_return            REAL,
+                total_cost_return        REAL,
+                tracking_error           REAL,
+                information_ratio        REAL,
+                configuration_json       TEXT    NOT NULL DEFAULT '{}',
+                observation_fingerprint  TEXT    NOT NULL,
+                policy_fingerprint       TEXT    NOT NULL,
+                configuration_fingerprint TEXT   NOT NULL,
+                result_fingerprint       TEXT,
+                summary_json             TEXT,
+                linking_json             TEXT,
+                cost_json                TEXT,
+                active_risk_json         TEXT,
+                concentration_json       TEXT,
+                warnings_json            TEXT    NOT NULL DEFAULT '[]',
+                portfolio_run_id         INTEGER NOT NULL
+                                         REFERENCES portfolio_diagnostic_runs(id),
+                dataset_version_id       INTEGER REFERENCES dataset_versions(id),
+                cost_diagnostic_run_id   INTEGER REFERENCES cost_diagnostic_runs(id),
+                regime_run_id            INTEGER REFERENCES regime_diagnostic_runs(id),
+                regime_definition_id     TEXT,
+                stress_run_id            INTEGER REFERENCES portfolio_stress_runs(id),
+                validation_run_id        INTEGER REFERENCES validation_runs(id),
+                experiment_id            INTEGER REFERENCES experiment_registry(id),
+                is_baseline              INTEGER NOT NULL DEFAULT 0,
+                baseline_scope           TEXT,
+                completed_at             TEXT,
+                duration_ms              INTEGER,
+                app_version              TEXT,
+                git_commit               TEXT,
+                notes                    TEXT    NOT NULL DEFAULT '',
+                error_message            TEXT,
+                demo_key                 TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attribution_benchmarks (
+                id               INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id           INTEGER NOT NULL
+                                 REFERENCES portfolio_attribution_runs(id),
+                benchmark_id     TEXT    NOT NULL,
+                name             TEXT    NOT NULL,
+                description      TEXT    NOT NULL DEFAULT '',
+                source           TEXT    NOT NULL,
+                kind             TEXT    NOT NULL,
+                return_convention TEXT   NOT NULL,
+                timing_policy    TEXT    NOT NULL,
+                asset_count      INTEGER NOT NULL DEFAULT 0,
+                weight_sum       REAL,
+                definition_json  TEXT    NOT NULL DEFAULT '{}',
+                fingerprint      TEXT    NOT NULL,
+                UNIQUE (run_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attribution_period_results (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                  INTEGER NOT NULL
+                                        REFERENCES portfolio_attribution_runs(id),
+                period_id               INTEGER NOT NULL,
+                period_start            TEXT    NOT NULL,
+                period_end              TEXT    NOT NULL,
+                information_available_at TEXT   NOT NULL,
+                portfolio_market_return REAL,
+                transaction_cost_return REAL,
+                cost_state              TEXT,
+                portfolio_net_return    REAL,
+                benchmark_return        REAL,
+                active_return           REAL,
+                allocation_effect       REAL,
+                selection_effect        REAL,
+                interaction_effect      REAL,
+                residual                REAL,
+                reconciliation_state    TEXT,
+                cash_weight             REAL,
+                regime_label            TEXT,
+                UNIQUE (run_id, period_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attribution_asset_results (
+                id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                 INTEGER NOT NULL
+                                       REFERENCES portfolio_attribution_runs(id),
+                asset_index            INTEGER NOT NULL,
+                asset_id               TEXT    NOT NULL,
+                group_id               TEXT,
+                average_weight         REAL,
+                arithmetic_contribution REAL,
+                linked_contribution    REAL,
+                positive_contribution  REAL,
+                negative_contribution  REAL,
+                absolute_contribution  REAL,
+                absolute_share         REAL,
+                observation_count      INTEGER NOT NULL DEFAULT 0,
+                UNIQUE (run_id, asset_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attribution_group_results (
+                id                     INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                 INTEGER NOT NULL
+                                       REFERENCES portfolio_attribution_runs(id),
+                group_index            INTEGER NOT NULL,
+                group_id               TEXT    NOT NULL,
+                asset_count            INTEGER NOT NULL DEFAULT 0,
+                average_weight         REAL,
+                arithmetic_contribution REAL,
+                positive_contribution  REAL,
+                negative_contribution  REAL,
+                absolute_contribution  REAL,
+                absolute_share         REAL,
+                UNIQUE (run_id, group_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attribution_brinson_results (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                    INTEGER NOT NULL
+                                          REFERENCES portfolio_attribution_runs(id),
+                group_index               INTEGER NOT NULL,
+                group_id                  TEXT    NOT NULL,
+                presence                  TEXT,
+                average_portfolio_weight  REAL,
+                average_benchmark_weight  REAL,
+                allocation_effect         REAL,
+                selection_effect          REAL,
+                interaction_effect        REAL,
+                total_effect              REAL,
+                linked_allocation_effect  REAL,
+                linked_selection_effect   REAL,
+                linked_interaction_effect REAL,
+                unavailable_periods       INTEGER NOT NULL DEFAULT 0,
+                UNIQUE (run_id, group_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attribution_regime_results (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                  INTEGER NOT NULL
+                                        REFERENCES portfolio_attribution_runs(id),
+                row_index               INTEGER NOT NULL,
+                regime_label            TEXT    NOT NULL,
+                observation_count       INTEGER NOT NULL DEFAULT 0,
+                portfolio_market_return REAL,
+                benchmark_return        REAL,
+                active_return           REAL,
+                cost_return             REAL,
+                net_return              REAL,
+                allocation_effect       REAL,
+                selection_effect        REAL,
+                interaction_effect      REAL,
+                tracking_error          REAL,
+                contribution_herfindahl REAL,
+                completeness            TEXT,
+                rare_regime_warning     INTEGER NOT NULL DEFAULT 0,
+                UNIQUE (run_id, regime_label)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS attribution_drawdown_results (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                  INTEGER NOT NULL
+                                        REFERENCES portfolio_attribution_runs(id),
+                episode_id              INTEGER NOT NULL,
+                peak_timestamp          TEXT,
+                trough_timestamp        TEXT,
+                recovery_timestamp      TEXT,
+                period_count            INTEGER NOT NULL DEFAULT 0,
+                portfolio_market_return REAL,
+                benchmark_return        REAL,
+                active_return           REAL,
+                cost_return             REAL,
+                allocation_effect       REAL,
+                selection_effect        REAL,
+                interaction_effect      REAL,
+                residual                REAL,
+                reconciliation_state    TEXT,
+                contributions_json      TEXT,
+                UNIQUE (run_id, episode_id)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_par_created ON portfolio_attribution_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_par_status ON portfolio_attribution_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_par_method ON portfolio_attribution_runs(attribution_method)",
+            "CREATE INDEX IF NOT EXISTS idx_par_integrity ON portfolio_attribution_runs(integrity_status)",
+            "CREATE INDEX IF NOT EXISTS idx_par_recon ON portfolio_attribution_runs(reconciliation_status)",
+            "CREATE INDEX IF NOT EXISTS idx_par_prun ON portfolio_attribution_runs(portfolio_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_par_dataset ON portfolio_attribution_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_par_crun ON portfolio_attribution_runs(cost_diagnostic_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_par_rrun ON portfolio_attribution_runs(regime_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_par_srun ON portfolio_attribution_runs(stress_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_par_vrun ON portfolio_attribution_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_par_config_fp ON portfolio_attribution_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_par_baseline ON portfolio_attribution_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_par_scope ON portfolio_attribution_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_par_demo_key ON portfolio_attribution_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_ab_run ON attribution_benchmarks(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_apr_run ON attribution_period_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_aar_run ON attribution_asset_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_agr_run ON attribution_group_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_abr_run ON attribution_brinson_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_arr_run ON attribution_regime_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_adr_run ON attribution_drawdown_results(run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

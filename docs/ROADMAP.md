@@ -1677,6 +1677,80 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 58.0 — Portfolio Performance Attribution, Benchmark & Active Risk Diagnostics Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first attribution lab
+  (`backend/app/portfolio_attribution/`) decomposing MEASURED performance of
+  **stored Phase 56 portfolio weights** against an **explicitly declared
+  benchmark**. **Observation model:** period `t` spans
+  `timestamps[t] → timestamps[t+1]`, its return is the stored `returns[t]`
+  and its weights are those known at its start (`information_available_at`);
+  periods are strictly increasing and non-overlapping by construction, asset
+  alignment is strict, and a period with no stored book is excluded and
+  disclosed rather than back-filled (≤ 20 assets, ≤ 8 groups, ≤ 2000
+  periods). **Weight timing:** a stored rebalance's weights govern period `i`
+  onward — the Phase 56 contract already guarantees they used data through
+  `i − lag` with `lag ≥ 1` — and drift between rebalances by the identical
+  recursion, verified by a test that reproduces
+  `rebalance.portfolio_returns` exactly (reuse verified, not duplicated),
+  plus adversarial future-rebalance and future-return invariance tests;
+  `end_of_period` timing is accepted only as an explicitly **invalid**
+  descriptive declaration. **Integrity:** `verified_from_stored_rebalance`,
+  `verified_causal_weights`, `supplied_descriptive`,
+  `full_sample_descriptive`, `unknown`, `invalid` (also covering a linked
+  centered weight basis). **Reconciliation:** `contribution_i = w_i × r_i`
+  summing exactly to the portfolio market return; group totals (from
+  explicit stored labels, never inferred from names, never overlapping)
+  summing to the asset totals; a supplied portfolio return compared but
+  **never forced** to match; cash disclosed as the explicit residual
+  `1 − Σw`. **Benchmarks:** fixed-weight / per-period / buy-and-hold from an
+  ordered asset list with declared weights — never auto-selected, never an
+  implicit equal-weight fallback, never silently renormalized (a non-unit
+  sum is disclosed), with benchmark-only assets requiring explicit returns
+  and explicit groups and every universe difference disclosed.
+  **Brinson:** Brinson-Fachler (default) and Brinson-Hood-Beebower with both
+  formulas documented and hand-computed tests; zero-weight and one-sided
+  groups leave their terms honestly unavailable; residuals are reported
+  verbatim with stated reasons and **never redistributed**; window-level
+  group presence reports `mixed` rather than one period's label.
+  **Linking:** arithmetic summation (reconciling with the summed active
+  return, with the arithmetic-versus-geometric compounding gap disclosed) or
+  Carinó smoothing (reconciling with the geometric active return, using the
+  exact `x = y` limit `1/(1+x)` instead of an epsilon guard, withheld
+  entirely when a −100% return makes the logarithm undefined, and reporting
+  a closure identity so a non-zero linking residual is provably the scaled
+  single-period residual); per-group linked effects use the same factors.
+  **TWR** is only ever *labelled* time-weighted when the inputs support it,
+  with no money-weighted/IRR placeholder. **Costs** come from stored Phase 56
+  rebalance estimates (Phase 55 read-only), distinguish a structural
+  `no_trade` zero from an `unavailable` measurement, keep components
+  non-overlapping, and net only over the stated costed basis. **Active
+  risk:** sample (ddof=1) deviation, annualization only under a declared
+  frequency, an information ratio unavailable — never infinite — at zero
+  tracking error, hit rates and a relative active drawdown. Plus
+  absolute-contribution concentration with signed parts separate, stored
+  Phase 54 regime views and stored Phase 57 drawdown-episode views (neither
+  recomputed), Model Validation linkage, four fingerprint kinds over
+  content-addressed identity, eight SQLite tables, baselines gated on
+  verified provenance + completeness + reconciliation, and failed executions
+  clearing stale results. **Factor attribution is deferred** with a stated
+  reason and is not advertised in the UI. UI: the **Portfolio Attribution**
+  view (reconciliation, benchmark definition, contribution waterfall, group
+  drilldown, Brinson bars + residual, linking, costs, active risk,
+  active-return timeline with a table alternative, regimes, drawdowns,
+  stored policy, neutral compare). A 17-case idempotent demo seeds its own
+  hand-computable books through the Phase 56 public service. Verification:
+  40 backend tests, `npx tsc --noEmit` clean, a 20-test Playwright spec
+  green. Docs: `PORTFOLIO_ATTRIBUTION_LAB.md`,
+  `PORTFOLIO_RETURN_CONTRIBUTION_POLICY.md`,
+  `BENCHMARK_AND_ACTIVE_RETURN_POLICY.md`, `BRINSON_ATTRIBUTION_POLICY.md`,
+  `MULTI_PERIOD_ATTRIBUTION_LINKING_POLICY.md`,
+  `PORTFOLIO_ATTRIBUTION_RUNBOOK.md`. **Measured contributions and effects
+  under a stated convention — not proof of alpha or manager skill, not a
+  benchmark or portfolio recommendation, not a performance guarantee, not
+  GIPS-compliant reporting, not tax accounting, not trade execution, and not
+  investment, trading, or performance-reporting advice.**
+
 ### Phase 57.0 — Portfolio Stress Testing, Scenario Shock & Drawdown Attribution Lab v1 ✅
 
 - **Research-infrastructure phase:** a local-first stress lab

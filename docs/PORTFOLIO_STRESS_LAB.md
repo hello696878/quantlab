@@ -103,6 +103,16 @@ asset-results|risk-results|constraint-results|episodes|attribution|sensitivity`,
 documented cases). Validation errors → 422, unknown ids → 404, conflicts →
 409, unexpected execution failures → 500 with a sanitized message.
 
+## Downstream: Portfolio Attribution Lab (Phase 58.0)
+
+The Portfolio Attribution Lab
+([`PORTFOLIO_ATTRIBUTION_LAB.md`](PORTFOLIO_ATTRIBUTION_LAB.md)) may link a
+completed stress run of the **same** portfolio to attribute performance over
+this lab's stored drawdown episodes: the peak→trough interval is reused
+exactly, and this lab's episodes, results and fingerprints are read-only.
+Attribution describes what was measured over that interval — it never
+explains why the drawdown occurred.
+
 ## Related policies
 
 - `STRESS_SCENARIO_DEFINITION_POLICY.md` — types, units, precedence, integrity

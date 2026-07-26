@@ -10,42 +10,46 @@ import {
   type RunFull,
   type RunSummary,
   INTEGRITY_LABELS,
+  LINKING_LABELS,
   METHOD_LABELS,
   compareRuns,
   exportRuns,
+  fmtPct,
   getLabSummary,
   getRun,
   listRuns,
   seedDemo,
   shortFp,
-} from "@/lib/portfolioDiagnostics";
+} from "@/lib/portfolioAttribution";
 import { notifyBackendOffline, toast } from "@/lib/toast";
 import OfflineState from "@/components/ui/OfflineState";
 import ErrorState from "@/components/ui/ErrorState";
 import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
 import { CopyValue } from "@/components/ExperimentRegistryShared";
-import PortfolioDiagnosticsDetail, { IntegrityPill, SolverPill, StatusPill } from "@/components/PortfolioDiagnosticsDetail";
+import PortfolioAttributionDetail from "@/components/PortfolioAttributionDetail";
+import {
+  CompletenessPill,
+  IntegrityPill,
+  ReconciliationPill,
+  StatusPill,
+} from "@/components/PortfolioAttributionShared";
 
 type Mode = "list" | "detail" | "compare";
 type Selected = { id: number; name: string };
 
-// Raised from 15 in Phase 58.0: the Portfolio Attribution Lab stores its own
-// Phase 56 books in this registry (attribution reads stored rebalances), so
-// the demo set no longer fits a 15-row first page.  Listing behaviour,
-// ordering and every stored record are unchanged.
-const PAGE_SIZE = 25;
+const PAGE_SIZE = 20;  // the 17 documented demo cases fit on one page
 const STATUSES = ["pending", "running", "completed", "failed", "invalidated"];
-const INTEGRITY_OPTIONS = ["verified_from_validation_split",
-                           "verified_causal_rolling", "declared",
+const INTEGRITY_OPTIONS = ["verified_from_stored_rebalance",
+                           "verified_causal_weights", "supplied_descriptive",
                            "full_sample_descriptive", "unknown", "invalid"];
-const METHOD_OPTIONS = ["user_supplied", "equal_weight", "inverse_volatility",
-                        "erc", "min_variance"];
+const METHOD_OPTIONS = ["brinson", "contribution_only"];
+const LINKING_OPTIONS = ["arithmetic", "carino"];
 
 const DISCLAIMER =
-  "Local-first portfolio-construction diagnostics: weights are built and evaluated under explicit covariance, risk-budget, exposure, turnover and concentration assumptions with a strict no-look-ahead policy (estimation windows end at least one period before each rebalance decision; centered windows and negative lags are rejected; full-sample estimation stays descriptive), transparent deterministic solvers whose convergence and residuals are visible, independent post-solve constraint checks with no silent relaxation, risk contributions reconciled against portfolio volatility, and cost-aware turnover via linked Phase 55 cost models. Nothing here applies weights anywhere, recommends an allocation, identifies an optimal or safest portfolio, guarantees diversification, risk reduction or performance, or constitutes investment advice.";
+  "Local-first performance-attribution diagnostics: measured contributions of stored portfolio weights (beginning-of-period, known before the period they govern) decomposed against an explicitly declared benchmark — never auto-selected — under a stated simple-return convention, with exact single-period reconciliation, honest residuals that are never redistributed, transaction costs kept separate from market contribution, and arithmetic versus geometric linking distinguished. Nothing here proves alpha or manager skill, recommends a benchmark or a portfolio, guarantees future performance, produces GIPS-compliant reporting, performs tax accounting, executes trades, or constitutes investment advice.";
 
-export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: string) => void }) {
+export default function PortfolioAttributionPanel({ onNav }: { onNav?: (view: string) => void }) {
   const [mode, setMode] = useState<Mode>("list");
   const [summary, setSummary] = useState<LabSummary | null>(null);
   const [list, setList] = useState<{ items: RunSummary[]; total: number; page: number; total_pages: number } | null>(null);
@@ -111,8 +115,8 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
       const res = await seedDemo();
       toast.success(
         "Demo loaded",
-        res.created_runs > 0
-          ? `${res.created_runs} portfolio-diagnostic runs created.`
+        res.created_count > 0
+          ? `${res.created_count} attribution runs created.`
           : "Demo runs already present — nothing duplicated.",
       );
       reload();
@@ -133,7 +137,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `quantlab-portfolio-diagnostics-${new Date().toISOString().slice(0, 10)}.json`;
+      a.download = `quantlab-portfolio-attribution-${new Date().toISOString().slice(0, 10)}.json`;
       document.body.appendChild(a);
       a.click();
       a.remove();
@@ -150,7 +154,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
 
   if (mode === "detail" && detail) {
     return (
-      <PortfolioDiagnosticsDetail
+      <PortfolioAttributionDetail
         run={detail}
         onBack={() => {
           setMode("list");
@@ -158,19 +162,19 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
           reload();
         }}
         onRefresh={(updated) => setDetail(updated)}
-        onOpenValidation={onNav ? () => onNav("modelvalidation") : undefined}
+        onOpenPortfolio={onNav ? () => onNav("portfoliodiagnostics") : undefined}
+        onOpenStress={onNav ? () => onNav("portfoliostress") : undefined}
+        onOpenCost={onNav ? () => onNav("costdiagnostics") : undefined}
+        onOpenRegime={onNav ? () => onNav("regimediagnostics") : undefined}
         onOpenDataset={onNav ? () => onNav("datasetlineage") : undefined}
         onOpenExperiment={onNav ? () => onNav("experimentregistry") : undefined}
-        onOpenRegime={onNav ? () => onNav("regimediagnostics") : undefined}
-        onOpenCost={onNav ? () => onNav("costdiagnostics") : undefined}
-        onOpenOverfitting={onNav ? () => onNav("overfittingdiagnostics") : undefined}
       />
     );
   }
 
   if (mode === "compare" && pair) {
     return (
-      <PortfolioCompare
+      <AttributionCompare
         pair={pair}
         onBack={() => {
           setMode("list");
@@ -188,7 +192,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">Local-first</span>
-              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500">No look-ahead · no allocation advice · SQLite · no cloud</span>
+              <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-xs font-medium text-slate-500">Simple returns · beginning-of-period weights · no skill claims · SQLite</span>
             </div>
             <p className="mt-2 max-w-3xl text-sm text-slate-500">{DISCLAIMER}</p>
           </div>
@@ -211,9 +215,9 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
         <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-6">
           <Card label="Runs" value={summary.runs} />
           <Card label="Completed" value={summary.completed} />
-          <Card label="Assets" value={summary.assets} />
-          <Card label="Constraint violations" value={summary.constraint_violations} />
-          <Card label="Solver failures" value={summary.solver_failures} />
+          <Card label="Periods" value={summary.periods} />
+          <Card label="Benchmarked" value={summary.benchmarked_runs} />
+          <Card label="Reconciled" value={summary.reconciled_runs} />
           <Card label="Baselines" value={summary.baselines} />
         </div>
       )}
@@ -225,12 +229,15 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
           <Select label="Integrity" value={filters.integrity_status ?? ""}
             options={INTEGRITY_OPTIONS} labels={INTEGRITY_LABELS}
             onChange={(v) => updateFilter("integrity_status", v)} />
-          <Select label="Method" value={filters.method ?? ""}
+          <Select label="Method" value={filters.attribution_method ?? ""}
             options={METHOD_OPTIONS} labels={METHOD_LABELS}
-            onChange={(v) => updateFilter("method", v)} />
+            onChange={(v) => updateFilter("attribution_method", v)} />
+          <Select label="Linking" value={filters.linking_method ?? ""}
+            options={LINKING_OPTIONS} labels={LINKING_LABELS}
+            onChange={(v) => updateFilter("linking_method", v)} />
           <div className="flex flex-col gap-1">
-            <label htmlFor="pdx-search" className="text-xs font-medium text-slate-500">Search</label>
-            <input id="pdx-search" type="text" value={filters.query ?? ""}
+            <label htmlFor="pax-search" className="text-xs font-medium text-slate-500">Search</label>
+            <input id="pax-search" type="text" value={filters.query ?? ""}
               onChange={(e) => updateFilter("query", e.target.value)}
               placeholder="name or description" className="ql-input w-48 px-2 py-1.5 text-sm" />
           </div>
@@ -261,7 +268,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
       )}
 
       {loading ? (
-        <SkeletonTable rows={6} cols={8} caption="Loading portfolio-diagnostic runs…" />
+        <SkeletonTable rows={6} cols={8} caption="Loading attribution runs…" />
       ) : error ? (
         classifyApiError(error).backendUnavailable ? (
           <OfflineState detail={classifyApiError(error).message} onRetry={reload} />
@@ -270,27 +277,28 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
         )
       ) : !list || list.total === 0 ? (
         <EmptyState
-          title="No portfolio-diagnostic runs yet"
-          description="Load the deterministic demo to explore equal-weight, inverse-volatility, ERC and minimum-variance construction with reconciled risk contributions, constraint checks and cost-aware turnover — or create runs via the API."
+          title="No attribution runs yet"
+          description="Load the deterministic demo to explore hand-computable allocation, selection and interaction effects, arithmetic versus Carino linking, gross-versus-cost-adjusted attribution, one-sided groups and active-risk diagnostics — or create runs via the API."
           actions={[{ label: seeding ? "Loading…" : "Load demo runs", onClick: handleSeed }]}
         />
       ) : (
         <div className="card overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[1320px] text-sm">
+            <table className="w-full min-w-[1400px] text-sm">
               <thead>
                 <tr className="border-b border-slate-100 bg-slate-50 text-xs font-semibold uppercase tracking-wide text-slate-500">
                   <th scope="col" className="px-3 py-3 text-center">Cmp</th>
                   <th scope="col" className="px-3 py-3 text-left">Name</th>
+                  <th scope="col" className="px-3 py-3 text-left">Benchmark</th>
                   <th scope="col" className="px-3 py-3 text-left">Method</th>
-                  <th scope="col" className="px-3 py-3 text-left">Covariance</th>
-                  <th scope="col" className="px-3 py-3 text-right">Assets</th>
-                  <th scope="col" className="px-3 py-3 text-right">Volatility</th>
-                  <th scope="col" className="px-3 py-3 text-right">Eff. positions</th>
-                  <th scope="col" className="px-3 py-3 text-right">Budget dev.</th>
-                  <th scope="col" className="px-3 py-3 text-right">Turnover</th>
-                  <th scope="col" className="px-3 py-3 text-left">Solver</th>
+                  <th scope="col" className="px-3 py-3 text-right">Periods</th>
+                  <th scope="col" className="px-3 py-3 text-right">Portfolio</th>
+                  <th scope="col" className="px-3 py-3 text-right">Benchmark ret.</th>
+                  <th scope="col" className="px-3 py-3 text-right">Active</th>
+                  <th scope="col" className="px-3 py-3 text-right">Tracking err.</th>
+                  <th scope="col" className="px-3 py-3 text-left">Reconciliation</th>
                   <th scope="col" className="px-3 py-3 text-left">Integrity</th>
+                  <th scope="col" className="px-3 py-3 text-left">Completeness</th>
                   <th scope="col" className="px-3 py-3 text-left">Status</th>
                   <th scope="col" className="px-3 py-3 text-left">Config fp</th>
                   <th scope="col" className="px-3 py-3 text-center">Actions</th>
@@ -309,30 +317,25 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
                         })}
                         aria-label={`Select ${row.name} for comparison`} />
                     </td>
-                    <td className="max-w-[220px] px-3 py-3">
+                    <td className="max-w-[240px] px-3 py-3">
                       <button type="button" onClick={() => openDetail(row.id)} title={row.name}
                         className="block max-w-full truncate text-left font-medium text-slate-800 hover:text-blue-700">
                         {row.name}
                       </button>
                       {row.is_baseline && <span className="text-[10px] font-medium text-indigo-600">★ baseline</span>}
                     </td>
-                    <td className="px-3 py-3 text-xs">{METHOD_LABELS[row.method] ?? row.method}</td>
-                    <td className="px-3 py-3 text-xs">{row.covariance_method}</td>
-                    <td className="px-3 py-3 text-right font-mono text-xs">{row.asset_count}</td>
-                    <td className="px-3 py-3 text-right font-mono text-xs">
-                      {row.portfolio_volatility === null ? "—" : row.portfolio_volatility.toFixed(5)}
+                    <td className="max-w-[150px] truncate px-3 py-3 text-xs" title={row.benchmark_name ?? undefined}>
+                      {row.benchmark_name ?? "— (none configured)"}
                     </td>
-                    <td className="px-3 py-3 text-right font-mono text-xs">
-                      {row.effective_positions === null ? "—" : row.effective_positions.toFixed(1)}
-                    </td>
-                    <td className="px-3 py-3 text-right font-mono text-xs">
-                      {row.max_budget_deviation === null ? "—" : row.max_budget_deviation.toFixed(4)}
-                    </td>
-                    <td className="px-3 py-3 text-right font-mono text-xs">
-                      {row.mean_turnover === null ? "—" : `${(row.mean_turnover * 100).toFixed(1)}%`}
-                    </td>
-                    <td className="px-3 py-3"><SolverPill status={row.solver_status} /></td>
+                    <td className="px-3 py-3 text-xs">{METHOD_LABELS[row.attribution_method] ?? row.attribution_method}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs">{row.period_count}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs">{fmtPct(row.portfolio_market_return)}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs">{fmtPct(row.benchmark_return)}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs">{fmtPct(row.active_return)}</td>
+                    <td className="px-3 py-3 text-right font-mono text-xs">{fmtPct(row.tracking_error, 3)}</td>
+                    <td className="px-3 py-3"><ReconciliationPill status={row.reconciliation_status} /></td>
                     <td className="px-3 py-3"><IntegrityPill status={row.integrity_status} /></td>
+                    <td className="px-3 py-3"><CompletenessPill status={row.completeness_status} /></td>
                     <td className="px-3 py-3"><StatusPill status={row.status} /></td>
                     <td className="px-3 py-3"><CopyValue value={row.configuration_fingerprint} display={shortFp(row.configuration_fingerprint)} /></td>
                     <td className="px-3 py-3 text-center">
@@ -374,7 +377,7 @@ function Select({ label, value, options, labels, onChange }: {
   label: string; value: string; options: string[]; labels?: Record<string, string>;
   onChange: (v: string) => void;
 }) {
-  const id = `pdx-filter-${label.toLowerCase().replace(/\s+/g, "-")}`;
+  const id = `pax-filter-${label.toLowerCase().replace(/\s+/g, "-")}`;
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={id} className="text-xs font-medium text-slate-500">{label}</label>
@@ -387,11 +390,9 @@ function Select({ label, value, options, labels, onChange }: {
   );
 }
 
-const GROUP_LABELS: Record<string, string> = {
-  identity: "Identity",
-};
+const GROUP_LABELS: Record<string, string> = { identity: "Identity" };
 
-function PortfolioCompare({ pair, onBack }: { pair: { a: Selected; b: Selected }; onBack: () => void }) {
+function AttributionCompare({ pair, onBack }: { pair: { a: Selected; b: Selected }; onBack: () => void }) {
   const [data, setData] = useState<RunComparison | null>(null);
   const [error, setError] = useState<unknown>(null);
 
@@ -415,7 +416,7 @@ function PortfolioCompare({ pair, onBack }: { pair: { a: Selected; b: Selected }
         ← Back to runs
       </button>
       <div className="card p-4">
-        <h2 className="text-lg font-bold text-slate-900">Compare portfolio-diagnostic runs</h2>
+        <h2 className="text-lg font-bold text-slate-900">Compare attribution runs</h2>
         <p className="mt-0.5 text-sm text-slate-500">
           A · #{pair.a.id} “{pair.a.name}” vs B · #{pair.b.id} “{pair.b.name}”
         </p>
@@ -428,13 +429,13 @@ function PortfolioCompare({ pair, onBack }: { pair: { a: Selected; b: Selected }
           <div className="mt-3 flex flex-wrap gap-2 text-xs">
             {Object.entries(data.fingerprint_match).map(([name, match]) => (
               <span key={name} className={`rounded-full border px-2 py-0.5 font-medium ${match ? "border-emerald-200 bg-emerald-50 text-emerald-700" : "border-slate-200 bg-slate-50 text-slate-500"}`}>
-                {name} fp: {match ? "match" : "differs"}
+                {name.replace(/_/g, " ")} fp: {match ? "match" : "differs"}
               </span>
             ))}
           </div>
         )}
         <p className="mt-2 text-xs text-slate-400">
-          Differences are reported neutrally — no run is declared a winner, safer, or recommended.
+          Differences are reported neutrally — no run is declared better, superior or recommended.
         </p>
       </div>
       {error ? (
@@ -477,10 +478,47 @@ function PortfolioCompare({ pair, onBack }: { pair: { a: Selected; b: Selected }
               </div>
             );
           })}
-          {data.weights.length > 0 && (
+          {data.brinson.length > 0 && (
             <div className="card overflow-hidden">
               <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
-                Weights ({data.weights.length})
+                Brinson effects by group ({data.brinson.length})
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[760px] text-xs">
+                  <thead>
+                    <tr className="border-b border-slate-100 text-left font-semibold uppercase tracking-wide text-slate-500">
+                      <th scope="col" className="px-3 py-2">Group</th>
+                      <th scope="col" className="px-3 py-2">Availability</th>
+                      <th scope="col" className="px-3 py-2 text-right">A allocation</th>
+                      <th scope="col" className="px-3 py-2 text-right">B allocation</th>
+                      <th scope="col" className="px-3 py-2 text-right">A selection</th>
+                      <th scope="col" className="px-3 py-2 text-right">B selection</th>
+                      <th scope="col" className="px-3 py-2 text-right">A interaction</th>
+                      <th scope="col" className="px-3 py-2 text-right">B interaction</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.brinson.map((r) => (
+                      <tr key={r.group_id} className="border-b border-slate-50 font-mono last:border-0">
+                        <td className="px-3 py-1.5">{r.group_id}</td>
+                        <td className="px-3 py-1.5">{r.availability.replace(/_/g, " ")}</td>
+                        <td className="px-3 py-1.5 text-right">{fmtPct(r.a_allocation, 3)}</td>
+                        <td className="px-3 py-1.5 text-right">{fmtPct(r.b_allocation, 3)}</td>
+                        <td className="px-3 py-1.5 text-right">{fmtPct(r.a_selection, 3)}</td>
+                        <td className="px-3 py-1.5 text-right">{fmtPct(r.b_selection, 3)}</td>
+                        <td className="px-3 py-1.5 text-right">{fmtPct(r.a_interaction, 3)}</td>
+                        <td className="px-3 py-1.5 text-right">{fmtPct(r.b_interaction, 3)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+          {data.contributions.length > 0 && (
+            <div className="card overflow-hidden">
+              <div className="border-b border-slate-100 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700">
+                Asset contributions ({data.contributions.length})
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[560px] text-xs">
@@ -488,19 +526,17 @@ function PortfolioCompare({ pair, onBack }: { pair: { a: Selected; b: Selected }
                     <tr className="border-b border-slate-100 text-left font-semibold uppercase tracking-wide text-slate-500">
                       <th scope="col" className="px-3 py-2">Asset</th>
                       <th scope="col" className="px-3 py-2">Availability</th>
-                      <th scope="col" className="px-3 py-2 text-right">A weight</th>
-                      <th scope="col" className="px-3 py-2 text-right">B weight</th>
-                      <th scope="col" className="px-3 py-2 text-right">Difference</th>
+                      <th scope="col" className="px-3 py-2 text-right">A contribution</th>
+                      <th scope="col" className="px-3 py-2 text-right">B contribution</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {data.weights.map((r) => (
+                    {data.contributions.map((r) => (
                       <tr key={r.asset_id} className="border-b border-slate-50 font-mono last:border-0">
                         <td className="px-3 py-1.5">{r.asset_id}</td>
                         <td className="px-3 py-1.5">{r.availability.replace(/_/g, " ")}</td>
-                        <td className="px-3 py-1.5 text-right">{r.a_weight === null ? "—" : r.a_weight.toFixed(4)}</td>
-                        <td className="px-3 py-1.5 text-right">{r.b_weight === null ? "—" : r.b_weight.toFixed(4)}</td>
-                        <td className="px-3 py-1.5 text-right">{r.difference === null ? "—" : r.difference.toFixed(4)}</td>
+                        <td className="px-3 py-1.5 text-right">{fmtPct(r.a_contribution, 3)}</td>
+                        <td className="px-3 py-1.5 text-right">{fmtPct(r.b_contribution, 3)}</td>
                       </tr>
                     ))}
                   </tbody>

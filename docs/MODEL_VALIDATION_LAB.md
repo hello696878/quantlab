@@ -249,6 +249,14 @@ leakage-failed splits fail honestly, full-sample estimation cannot be
 combined with a split link, and split memberships / purge / embargo /
 fingerprints are never modified.
 
+The Portfolio Attribution Lab
+([`PORTFOLIO_ATTRIBUTION_LAB.md`](PORTFOLIO_ATTRIBUTION_LAB.md), Phase 58.0)
+may link a completed validation run for provenance: its name, leakage state
+and configuration fingerprint are displayed beside the attribution run, and
+attribution always uses the fixed stored weights of the linked portfolio, so
+split memberships, purge/embargo settings and fingerprints here are never
+read for weighting decisions and never modified.
+
 The Portfolio Stress Lab
 ([`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md), Phase 57.0) does
 not link validation runs directly: it inherits whatever provenance the

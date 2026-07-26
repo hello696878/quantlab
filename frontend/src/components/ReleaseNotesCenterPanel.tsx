@@ -19,9 +19,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.75.0-dev";
-const EXPECTED_NEXT_TAG = "v4.75.0-portfolio-stress-scenario-drawdown-attribution-v1";
-const LATEST_VERIFIED_TAG = "v4.74.0-portfolio-risk-budget-constraint-diagnostics-v1";
+const VERSION_LABEL = "4.76.0-dev";
+const EXPECTED_NEXT_TAG = "v4.76.0-portfolio-performance-attribution-benchmark-diagnostics-v1";
+const LATEST_VERIFIED_TAG = "v4.75.0-portfolio-stress-scenario-drawdown-attribution-v1";
 
 const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
   { title: "Quant research labs", text: "Portfolio/macro, derivatives & volatility, crypto/DeFi/on-chain/alt-data, microstructure, real assets & credit, rates/FX — deterministic educational models with formulas beside the numbers.", route: "risklab" },
@@ -32,7 +32,8 @@ const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
 ];
 
 const CHANGELOG_CARDS: { tag: string; title: string; text: string }[] = [
-  { tag: "v4.75 (next)", title: "Portfolio stress lab", text: "Explicit deterministic scenarios on stored portfolio weights: historical replays of stored observations, unit-safe asset/group/global shocks under a documented precedence, volatility/correlation stress with PSD validation and never-silent explicit repair, liquidity/cost stress on copied cost models, reconciled contribution attribution, drifted-book constraint checks, baseline-vs-stressed risk contributions and trailing-peak drawdown attribution. Scenarios are assumptions, not predictions — no worst case, no guaranteed loss, no hedging or trading." },
+  { tag: "v4.76 (next)", title: "Portfolio attribution lab", text: "Measured performance attribution of stored portfolio weights: beginning-of-period contributions reconciling exactly with the portfolio return, explicit group totals, an explicitly declared benchmark (never auto-selected), Brinson-Fachler or Brinson-Hood-Beebower allocation/selection/interaction with residuals reported verbatim, arithmetic versus Carinó linking with the compounding gap disclosed, costs kept separate over a stated costed basis, and tracking error / information ratio / active drawdown. Measurements under a stated convention — never proof of alpha or manager skill, never a benchmark or portfolio recommendation." },
+  { tag: "v4.75", title: "Portfolio stress lab", text: "Explicit deterministic scenarios on stored portfolio weights: historical replays of stored observations, unit-safe asset/group/global shocks under a documented precedence, volatility/correlation stress with PSD validation and never-silent explicit repair, liquidity/cost stress on copied cost models, reconciled contribution attribution, drifted-book constraint checks, baseline-vs-stressed risk contributions and trailing-peak drawdown attribution. Scenarios are assumptions, not predictions — no worst case, no guaranteed loss, no hedging or trading." },
   { tag: "v4.74", title: "Portfolio diagnostics lab", text: "Equal-weight, inverse-volatility, ERC and minimum-variance construction on validated covariances with a no-look-ahead estimation contract, independent constraint checks, reconciled risk contributions, concentration/diversification descriptions and cost-aware turnover. Research measurements — never an allocation recommendation or a diversification guarantee." },
   { tag: "v4.73", title: "Cost & capacity diagnostics lab", text: "Unit-safe commission/spread/slippage/square-root-impact estimates on supplied observations with a no-look-ahead liquidity-input policy, exact gross-to-net reconciliation (missing inputs stay unavailable — never zero), break-even, sensitivity, and capacity scaling with participation warnings. Estimates under configured assumptions — never fill predictions or size advice." },
   { tag: "v4.72", title: "Regime diagnostics lab", text: "Conditional performance across no-look-ahead market regimes (trailing windows, lagged labels, integrity-stated threshold fitting), rank stability, concentration, and transition differences. Descriptive states — never predictions or switching advice." },

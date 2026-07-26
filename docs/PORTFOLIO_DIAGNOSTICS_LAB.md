@@ -198,6 +198,24 @@ withheld with an explicit warning if the covariance changed). Nothing in
 this lab's records is recomputed, rewritten, or re-fingerprinted by a
 stress run, and no stressed result is ever written back as an allocation.
 
+## 9c. Downstream: Portfolio Attribution Lab (Phase 58.0)
+
+The Portfolio Attribution Lab
+([`PORTFOLIO_ATTRIBUTION_LAB.md`](PORTFOLIO_ATTRIBUTION_LAB.md)) consumes
+this lab's **stored** weights, returns and group labels read-only. It
+rebuilds the beginning-of-period weight path with the identical drift
+recursion this lab uses for its realized return series — a Phase 58 test
+asserts the implied per-period return reproduces
+`rebalance.portfolio_returns` exactly — pins this run's configuration
+fingerprint at create time, and refuses to execute if that fingerprint
+changed. Nothing in this lab's records is recomputed, rewritten or
+re-fingerprinted by an attribution run.
+
+Attribution demo books are ordinary Phase 56 books and are listed here
+alongside every other run, so this lab's runs table now pages 25 rows
+instead of 15 (Phase 58.0). Ordering, filters and every stored record are
+unchanged; only the first page holds more rows.
+
 ## 10. Limitations
 
 Weights are research measurements under configured assumptions, not

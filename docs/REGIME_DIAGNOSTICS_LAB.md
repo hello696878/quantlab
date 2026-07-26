@@ -169,6 +169,12 @@ fingerprints and results are never modified by that join.
 [`PORTFOLIO_DIAGNOSTICS_LAB.md`](PORTFOLIO_DIAGNOSTICS_LAB.md)) joins the
 same stored assignments the same read-only way to summarize portfolio
 returns, turnover and cost completeness per regime.
+**Portfolio Attribution** (Phase 58.0,
+[`PORTFOLIO_ATTRIBUTION_LAB.md`](PORTFOLIO_ATTRIBUTION_LAB.md)) joins the
+same stored effective assignments by exact timestamp to report attribution
+by regime (portfolio, benchmark and active return, costs, Brinson effects,
+tracking error, concentration and completeness per label, with rare-regime
+warnings); regimes are never recomputed and no regime is preferred.
 **Portfolio Stress** (Phase 57.0,
 [`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md)) may link a run from
 this lab for **provenance only** — v1 consumes no regime assignment and

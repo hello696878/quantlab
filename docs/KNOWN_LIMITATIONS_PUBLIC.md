@@ -197,7 +197,26 @@ hedges, rebalances, trades, or recommends an action, and it is not
 regulatory stress testing, capital-adequacy analysis, proof of safety or
 robustness, or risk-management advice.
 
-## 22. Future improvements (openly planned)
+## 22. Attribution measures decisions, it does not prove skill
+
+The Portfolio Attribution Lab decomposes measured performance of stored
+weights against an explicitly declared benchmark. Allocation, selection and
+interaction are **arithmetic decompositions of a measured return difference
+under a stated convention** — not evidence that a manager has skill, not
+alpha, and not a reason to prefer one portfolio or benchmark over another.
+The lab never selects a benchmark for you: a different benchmark generally
+produces different effects, and choosing one is a judgement the lab
+deliberately leaves to the reader. Residuals are reported verbatim rather
+than redistributed, so a decomposition that does not close stays visibly
+open. A simple arithmetic sum of single-period effects does not reconcile
+with the compounded active return, and that gap is disclosed rather than
+smoothed away. Time-weighted returns are only labelled as such when the
+inputs support them, and no money-weighted (IRR) figure is offered. The lab
+is not GIPS-compliant reporting, not tax accounting, not live portfolio
+accounting, not a performance guarantee, and not investment, trading or
+performance-reporting advice.
+
+## 23. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.
