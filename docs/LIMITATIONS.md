@@ -332,6 +332,43 @@ inferred from asset names. Nothing here proves alpha or manager skill,
 recommends a benchmark or portfolio, guarantees performance, or constitutes
 GIPS-compliant reporting, tax accounting or investment advice.
 
+### A factor sensitivity is conditional on everything you declared
+
+The Factor Diagnostics Lab (Phase 59) measures how one declared return
+series moved with **supplied** factor and macro observations. Every number
+is conditional on the caller's declarations: the transformation and its
+unit (a basis-point change from a `rate_fraction` source and from a
+`rate_percent` source differ by 100×, which is why the conversion is fixed
+by the declared unit and refused for any other), the integer lag, the
+availability rule, the vintage policy, the intercept and rank policies, the
+estimation window and the factor set itself. Contemporaneous alignment is
+descriptive association only and is never called ex-ante or predictive;
+lagged causal alignment verifies information ORDER, not causation. A
+future-looking alignment exists only because a caller declared it invalid,
+and such a run can never become a baseline.
+
+Standard errors are **classical** (`sigma² (X'X)⁻¹`) and assume
+homoskedastic, serially uncorrelated errors. They are never labelled robust:
+no tested HC or HAC estimator exists in this repository, so none is offered
+and none is simulated. Inference is withheld — never infinite — at zero
+residual variance, at insufficient degrees of freedom, and for every
+rank-deficient design (whose coefficients are a labelled minimum-norm
+solution, not an identified estimate). R-squared for a constant target is
+unavailable rather than 0 or 1; a variance inflation factor under exact
+collinearity is unavailable rather than infinite; the condition-number flag
+is a neutral warning and explicitly not a universal rule. Ridge is a
+research reference only: biased by construction, no p-values, no automatic
+lambda, and no claim of improved prediction.
+
+Cross-sectional factor-return decomposition, winsorisation, and the
+lag/standardisation sensitivity dimensions are **deferred with stated
+reasons** rather than approximated. Measured sensitivities describe the
+supplied sample under the declared specification and nothing else: they do
+not prove causality, prove alpha, prove skill, predict returns, recommend a
+factor exposure, a macro trade or a portfolio, hedge, allocate, execute, or
+constitute investment, trading or risk-management advice. No market or
+macroeconomic data is ever downloaded.
+
 ### Local SQLite — single-user, no auth
 
 Saved backtests, saved reports, and saved custom-strategy templates persist in a **local SQLite** file (`backend/data/quantlab.db`). There is **no authentication, no multi-user support, and no cloud sync** — anyone with access to the running app can read/modify/delete local records. It is intended for single-user, local research, not a shared or hosted deployment.

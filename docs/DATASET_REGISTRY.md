@@ -294,7 +294,20 @@ provenance.  Dataset metadata is never mutated by an attribution run, and
 the dataset's manifest and schema fingerprints (not row ids) are what enter
 the run's observation-universe fingerprint.
 
-## 26. Limitations
+## 26. Factor Diagnostics links (Phase 59.0)
+
+Factor-diagnostic runs
+([`FACTOR_DIAGNOSTICS_LAB.md`](FACTOR_DIAGNOSTICS_LAB.md)) may declare a
+`dataset_version_id` for the run and, separately, one per factor definition
+— factor provenance is per series, because a run routinely mixes sources.
+The run detail shows the version's name, label, schema / manifest / content
+fingerprints, provenance and quality states, and warns visibly when the
+version was invalidated (results are still reported, with their input
+identity marked disputed).  Dataset metadata is never mutated by a
+factor-diagnostic run, and the dataset identity that enters a factor's
+definition fingerprint is the manifest/schema fingerprint, never a row id.
+
+## 27. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks

@@ -163,6 +163,33 @@ protected and why).
   controls are dark with explicit units, and 1024/768 have no page overflow.
   Only writes: the idempotent demo seeds plus the deliberately rejected
   baseline attempt.
+- **Factor Diagnostics** (Phase 59.0, `factor-diagnostics.spec.ts`): the lab
+  opens with its no-causality / no-advice / nothing-downloaded disclaimers (a
+  negation-aware overclaim scan lets the lab's own negated disclaimers pass
+  while any affirmative claim fails), the 20-case demo seeds idempotently,
+  timing / integrity / mode / rank filters work, the exact single-factor case
+  reads 0.600000 through the same API the page uses and every period
+  reconciles to better than 1e-12, the two-factor case shows 1.500000 /
+  -0.500000 with intercept 0.002, the intercept-and-residual case publishes a
+  standard error, a consistent t-statistic and raw plus adjusted p-values
+  with the family stated, an exact fit says the residual variance is zero
+  instead of showing infinity, a constant factor is flagged with an
+  unavailable VIF, duplicate factors report a labelled rank-deficient design,
+  the near-collinear case shows the condition number with its
+  not-a-universal-rule note, a 4-observation run fails honestly with
+  "cannot identify", a constant target leaves R-squared unavailable, the
+  lagged causal run's every aligned observation is knowable before the period
+  it feeds, the contemporaneous run is descriptive and never predictive, the
+  declared-invalid future-looking run is refused as a baseline (a deliberate
+  409), trailing windows read 0.50 then 1.50 with the never-reads-later note
+  and stability metrics, active exposure equals portfolio minus benchmark,
+  stored regimes mark rare buckets, the stress view states the
+  exposure×supplied-shock formula with no hedge implied, the attribution view
+  stays complementary to Brinson, held-out metrics state the TRAINING-mean
+  formula, sensitivity keeps the base exactly once with no best/optimal
+  label, export is path-free, filter controls are dark with visible units,
+  and 1440/1024/768 have no page overflow. Only writes: the idempotent demo
+  seeds plus the deliberately rejected baseline attempt.
 - **Overfitting Diagnostics** (Phase 53.0, `overfitting-diagnostics.spec.ts`):
   the lab opens with its selection-bias disclaimer, the 4-run demo seeds
   idempotently, metric/status filters work, the high-PBO noise demo shows

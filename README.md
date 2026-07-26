@@ -66,7 +66,9 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   Portfolio Diagnostics (construction, risk budgeting + constraints),
   Portfolio Stress Lab (scenario shocks, stressed risk + drawdown
   attribution), Portfolio Attribution (contribution, benchmark-relative
-  Brinson effects + active risk), Data Reliability Center, QA Command Center.
+  Brinson effects + active risk), Factor Diagnostics (factor exposure,
+  return decomposition + macro sensitivity), Data Reliability Center,
+  QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -278,6 +280,18 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Factor Diagnostics (59.0)** — measured sensitivity of one explicitly
+  declared return series to supplied factor and macro observations: explicit
+  units, transformation formulas, lags and availability rules; exact
+  timestamp alignment with nothing resampled or filled; verified causal
+  timing versus descriptive contemporaneous association; SVD least squares
+  with honest rank, condition number, withheld-not-infinite statistics and
+  an explicit ridge reference; contribution reconciliation against the
+  estimator's own residual; trailing rolling exposures a later observation
+  cannot rewrite; benchmark-relative, stored-regime, stored-stress,
+  attribution and held-out validation views. Measurements under stated
+  assumptions — never proof of causality or alpha, never a return
+  prediction, never a factor, macro or portfolio recommendation.
 - **Portfolio Attribution (58.0)** — measured performance attribution of
   stored portfolio weights: beginning-of-period contributions reconciling
   exactly with the portfolio return, explicit group totals, an explicitly

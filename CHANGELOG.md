@@ -18,6 +18,87 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Factor Exposure, Return Decomposition & Macro Sensitivity Diagnostics
+  Lab v1** (v4.77 series): a local-first factor research lab that measures
+  the sensitivity of ONE explicitly declared return series — a stored Phase
+  58 portfolio, benchmark, active or cost-adjusted return, or a supplied
+  descriptive series, never a mixture — to SUPPLIED factor and macro
+  observations. Factor definitions are explicit contracts: category, source
+  unit, one of eight documented transformation formulas (level, simple
+  return, percent change, log change, first difference, basis-point change
+  whose 10 000× / 100× conversion is fixed by a declared rate unit, a
+  STRICTLY trailing z-score whose window ends one observation before the
+  value it standardises, or a supplied transformed series), an integer lag
+  in [0, 60] with negative lags rejected, an availability policy and a
+  missing policy that is only ever `unavailable` — nothing is forward-filled,
+  interpolated or zero-filled, no factor is categorised automatically, and
+  winsorisation is DEFERRED with its reason (every full-sample quantile
+  threshold is look-ahead). Alignment is by EXACT timestamp in the factor's
+  own observation sequence offset by its lag, so history before the target
+  window can satisfy a lag or a differencing transform instead of losing the
+  first period; a period whose factor value is missing leaves the sample with
+  a stated reason. Timing is explicit and enforced: `lagged_causal` verifies
+  that every value used by a period was knowable at or before that period's
+  information cutoff (availability OR the selected vintage's release,
+  whichever is later) and fails the whole run to `invalid` otherwise;
+  `contemporaneous` stays descriptive and is never called ex-ante or
+  predictive; a future-looking alignment exists only when the caller declares
+  `future_looking_invalid` with a lead, is always `invalid`, and can never
+  become a baseline. Macro vintages select `first_release`,
+  `latest_available_as_of_cutoff` (so a later revision can never reach an
+  earlier fit), `supplied_vintage` or `full_sample_latest_descriptive` (which
+  forces a descriptive state), original values are preserved, and a macro
+  factor with no release timestamp gets its availability ASSUMPTION stated as
+  a warning rather than assumed silently. Estimation is closed-form on the
+  approved numpy/scipy stack — statsmodels and scikit-learn are NOT installed
+  and were deliberately not added: OLS by SVD with rank, singular values and
+  the condition number of the CENTRED factor block; an explicit rank policy
+  that either fails honestly or records a labelled minimum-norm solution with
+  every standard error withheld; classical covariance
+  `sigma² (X'X)⁻¹` with its assumptions printed and NEVER called robust (no
+  HC/HAC estimator exists here, so none is advertised); Student-t p-values
+  and confidence intervals withheld — not infinite — at zero residual
+  variance, insufficient degrees of freedom or a rank-deficient design; an
+  R-squared that is UNAVAILABLE rather than 0 or 1 for a constant target; and
+  an explicit ridge reference whose coefficients are labelled regularised,
+  carry no p-values, get no multiple-testing correction and never select
+  their own lambda. Diagnostics: factor correlation with constant factors
+  unavailable, exact duplicate- and constant-column detection, variance
+  inflation that is unavailable rather than infinite under exact
+  collinearity, a neutral condition-number flag stated NOT to be a universal
+  rule, residual mean/std/skewness/excess kurtosis/lag-1
+  autocorrelation/largest absolutes/concentration and an explicitly defined
+  additive cumulative-residual drawdown. Decomposition reconciles every
+  period against the estimator's OWN residual vector rather than assuming the
+  identity, with the cross-check skipped (not mis-aligned) under a
+  training-only fit; supplied asset exposures aggregate with stored Phase 56
+  beginning-of-period weights under signed long/short semantics with nothing
+  normalised and a missing asset exposure left unavailable rather than zero;
+  cross-sectional decomposition is DEFERRED with its reason. Trailing rolling
+  windows never read an observation after their own end index — a test proves
+  a late outlier cannot change an earlier window's fingerprint — and
+  rank-deficient or failed windows stay visible and are never interpolated.
+  Benchmark-relative exposure fits the SAME specification to the linked
+  attribution run's explicitly declared benchmark; stored Phase 54 regimes
+  bucket the periods without ever being recomputed (rare regimes withheld);
+  stored Phase 57 stress records supply factor shocks only EXPLICITLY, in the
+  factor's transformed unit, with the hypothetical residual component
+  reported undefined and no hedge or reallocation implied; stored Phase 58
+  attribution is a complementary view whose cost block is never folded into a
+  factor contribution; a linked Model Validation split fits on training rows
+  only and benchmarks held-out R² against the TRAINING mean. Plus bounded
+  deterministic sensitivity scenarios (base exactly once, duplicates dropped,
+  no "best model" label), the Phase 53 multiple-testing corrections reused on
+  valid p-values with raw values preserved, five content-addressed fingerprint
+  kinds, eight new SQLite tables, baselines gated on verified timing +
+  complete + full rank + reconciled, a 20-case idempotent demo with
+  hand-computable coefficients, the **Factor Diagnostics** view, 81 backend
+  tests, a 30-test Playwright spec and six documents. Nothing here proves
+  causality, proves alpha, proves manager skill, predicts future returns,
+  recommends a factor exposure, a macro trade or a portfolio, hedges,
+  allocates, executes trades, certifies a factor model, or constitutes
+  investment advice — and no market or macroeconomic data is ever downloaded.
+
 - **Portfolio Performance Attribution, Benchmark & Active Risk Diagnostics
   Lab v1** (v4.76 series): a local-first attribution lab that decomposes
   MEASURED performance of STORED Phase 56 portfolio weights — a period/asset

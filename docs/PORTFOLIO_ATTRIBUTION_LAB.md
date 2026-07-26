@@ -105,3 +105,19 @@ the stored policy. Comparison is neutral with comparability warnings.
 - `BRINSON_ATTRIBUTION_POLICY.md` — variants, formulas, group returns, residuals
 - `MULTI_PERIOD_ATTRIBUTION_LINKING_POLICY.md` — arithmetic, Carinó, TWR
 - `PORTFOLIO_ATTRIBUTION_RUNBOOK.md` — operations, demo cases, verification
+
+## Downstream: Factor Diagnostics Lab (Phase 59.0)
+
+The Factor Diagnostics Lab
+([`FACTOR_DIAGNOSTICS_LAB.md`](FACTOR_DIAGNOSTICS_LAB.md)) reads this lab's
+stored period results READ-ONLY as its analysed return series — the
+portfolio market return, the benchmark return, the active return or the
+cost-adjusted return, taken verbatim with this run's own
+`information_available_at` per period — pins this run's configuration and
+result fingerprints at create time, and refuses to execute if either
+changed. It explains the same measured return a second way, by exposure to
+declared factors; the two views are **complementary, not interchangeable**,
+neither overwrites the other, this lab's cost block is never folded into a
+factor contribution, and the factor model's residual is never relabelled
+alpha. Nothing in this lab's records is recomputed, rewritten or
+re-fingerprinted by a factor-diagnostic run.

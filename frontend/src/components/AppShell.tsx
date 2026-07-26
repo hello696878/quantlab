@@ -43,6 +43,7 @@ export type View =
   | "portfoliodiagnostics"
   | "portfoliostress"
   | "portfolioattribution"
+  | "factordiagnostics"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

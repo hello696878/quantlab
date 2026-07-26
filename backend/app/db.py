@@ -1841,6 +1841,299 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_adr_run ON attribution_drawdown_results(run_id)",
         ):
             conn.execute(index_sql)
+
+        # -------------------------------------------------------------
+        # Phase 59.0 — Factor Exposure, Return Decomposition and Macro
+        # Sensitivity Diagnostics Lab v1 (append-only; no existing table,
+        # column or index is altered or dropped).
+        # -------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factor_diagnostic_runs (
+                id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                  TEXT NOT NULL,
+                updated_at                  TEXT NOT NULL,
+                name                        TEXT NOT NULL,
+                description                 TEXT NOT NULL DEFAULT '',
+                status                      TEXT NOT NULL DEFAULT 'pending',
+                analysis_mode               TEXT NOT NULL,
+                regression_method           TEXT NOT NULL DEFAULT 'ols',
+                intercept_policy            TEXT NOT NULL DEFAULT 'include',
+                rank_policy                 TEXT NOT NULL DEFAULT 'fail',
+                timing_policy               TEXT NOT NULL,
+                vintage_policy              TEXT NOT NULL,
+                target_id                   TEXT NOT NULL,
+                target_type                 TEXT NOT NULL,
+                target_source               TEXT NOT NULL,
+                return_convention           TEXT NOT NULL DEFAULT 'simple',
+                return_frequency            TEXT NOT NULL DEFAULT 'daily',
+                currency                    TEXT NOT NULL DEFAULT 'USD',
+                observation_start           TEXT,
+                observation_end             TEXT,
+                factor_count                INTEGER NOT NULL DEFAULT 0,
+                observation_count           INTEGER NOT NULL DEFAULT 0,
+                excluded_period_count       INTEGER NOT NULL DEFAULT 0,
+                integrity_status            TEXT NOT NULL DEFAULT 'unknown',
+                completeness_status         TEXT NOT NULL DEFAULT 'unavailable',
+                rank_status                 TEXT,
+                reconciliation_status       TEXT,
+                r_squared                   REAL,
+                adjusted_r_squared          REAL,
+                root_mean_squared_error     REAL,
+                residual_std                REAL,
+                intercept                   REAL,
+                condition_number            REAL,
+                degrees_of_freedom          INTEGER,
+                held_out_r_squared          REAL,
+                configuration               TEXT NOT NULL,
+                results                     TEXT,
+                target_fingerprint          TEXT NOT NULL,
+                observation_fingerprint     TEXT NOT NULL,
+                model_policy_fingerprint    TEXT NOT NULL,
+                configuration_fingerprint   TEXT NOT NULL,
+                result_fingerprint          TEXT,
+                dataset_version_id          INTEGER,
+                portfolio_run_id            INTEGER,
+                attribution_run_id          INTEGER,
+                validation_run_id           INTEGER,
+                regime_run_id               INTEGER,
+                stress_run_id               INTEGER,
+                experiment_id               INTEGER,
+                is_baseline                 INTEGER NOT NULL DEFAULT 0,
+                baseline_scope              TEXT,
+                app_version                 TEXT,
+                git_commit                  TEXT,
+                notes                       TEXT NOT NULL DEFAULT '',
+                error_message               TEXT,
+                demo_key                    TEXT,
+                started_at                  TEXT,
+                completed_at                TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factor_definitions (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                  INTEGER NOT NULL
+                                        REFERENCES factor_diagnostic_runs(id),
+                factor_index            INTEGER NOT NULL,
+                factor_id               TEXT NOT NULL,
+                name                    TEXT NOT NULL,
+                description             TEXT NOT NULL DEFAULT '',
+                category                TEXT NOT NULL,
+                source                  TEXT NOT NULL,
+                unit                    TEXT NOT NULL,
+                transformed_unit        TEXT NOT NULL,
+                frequency               TEXT NOT NULL,
+                transformation          TEXT NOT NULL,
+                lag                     INTEGER NOT NULL DEFAULT 0,
+                availability_policy     TEXT NOT NULL,
+                missing_policy          TEXT NOT NULL,
+                standardisation_policy  TEXT NOT NULL,
+                standardisation_window  INTEGER,
+                winsorisation_policy    TEXT NOT NULL,
+                dataset_version_id      INTEGER,
+                observation_start       TEXT,
+                observation_end         TEXT,
+                definition_fingerprint  TEXT NOT NULL,
+                metadata_json           TEXT,
+                UNIQUE (run_id, factor_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factor_observations (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                INTEGER NOT NULL
+                                      REFERENCES factor_diagnostic_runs(id),
+                factor_id             TEXT NOT NULL,
+                period_index          INTEGER NOT NULL,
+                observation_id        TEXT NOT NULL,
+                source_timestamp      TEXT NOT NULL,
+                available_at          TEXT,
+                effective_timestamp   TEXT NOT NULL,
+                knowable_at           TEXT,
+                release_timestamp     TEXT,
+                raw_value             REAL,
+                transformed_value     REAL,
+                unit                  TEXT NOT NULL,
+                quality_state         TEXT NOT NULL,
+                vintage_state         TEXT NOT NULL,
+                UNIQUE (run_id, factor_id, period_index)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factor_coefficients (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id               INTEGER NOT NULL
+                                     REFERENCES factor_diagnostic_runs(id),
+                factor_index         INTEGER NOT NULL,
+                factor_id            TEXT NOT NULL,
+                coefficient          REAL,
+                coefficient_unit     TEXT,
+                exposure_state       TEXT NOT NULL,
+                standard_error       REAL,
+                t_statistic          REAL,
+                p_value              REAL,
+                p_bonferroni         REAL,
+                p_holm               REAL,
+                p_bh                 REAL,
+                confidence_lower     REAL,
+                confidence_upper     REAL,
+                contribution_sum     REAL,
+                vif                  REAL,
+                vif_state            TEXT,
+                warning              TEXT,
+                unavailable_reason   TEXT,
+                UNIQUE (run_id, factor_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factor_period_results (
+                id                        INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                    INTEGER NOT NULL
+                                          REFERENCES factor_diagnostic_runs(id),
+                period_index              INTEGER NOT NULL,
+                period_start              TEXT NOT NULL,
+                period_end                TEXT,
+                information_available_at  TEXT,
+                measured_return           REAL,
+                intercept_contribution    REAL,
+                modelled_return           REAL,
+                residual                  REAL,
+                reconciliation_difference REAL,
+                reconciliation_state      TEXT NOT NULL,
+                exposure_state            TEXT NOT NULL,
+                regime_label              TEXT,
+                membership                TEXT,
+                contributions_json        TEXT,
+                exposures_json            TEXT,
+                factor_values_json        TEXT,
+                UNIQUE (run_id, period_index)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factor_rolling_results (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id               INTEGER NOT NULL
+                                     REFERENCES factor_diagnostic_runs(id),
+                window_id            INTEGER NOT NULL,
+                window_start         TEXT NOT NULL,
+                window_end           TEXT NOT NULL,
+                decision_timestamp   TEXT,
+                effective_timestamp  TEXT,
+                observations         INTEGER NOT NULL,
+                intercept            REAL,
+                r_squared            REAL,
+                condition_number     REAL,
+                rank                 INTEGER,
+                rank_status          TEXT,
+                status               TEXT NOT NULL,
+                reason               TEXT,
+                fingerprint          TEXT,
+                coefficients_json    TEXT,
+                UNIQUE (run_id, window_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factor_regime_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES factor_diagnostic_runs(id),
+                regime_label        TEXT NOT NULL,
+                definition_id       TEXT,
+                observations        INTEGER NOT NULL DEFAULT 0,
+                rare                INTEGER NOT NULL DEFAULT 0,
+                r_squared           REAL,
+                condition_number    REAL,
+                rank_status         TEXT,
+                intercept           REAL,
+                residual_mean       REAL,
+                residual_std        REAL,
+                measured_return_sum REAL,
+                modelled_return_sum REAL,
+                residual_sum        REAL,
+                completeness        TEXT NOT NULL DEFAULT 'unavailable',
+                status              TEXT NOT NULL,
+                reason              TEXT,
+                coefficients_json   TEXT,
+                contributions_json  TEXT,
+                UNIQUE (run_id, regime_label)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS factor_sensitivity_results (
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                   INTEGER NOT NULL
+                                         REFERENCES factor_diagnostic_runs(id),
+                scenario_index           INTEGER NOT NULL,
+                label                    TEXT NOT NULL,
+                is_base                  INTEGER NOT NULL DEFAULT 0,
+                description              TEXT NOT NULL DEFAULT '',
+                observations             INTEGER,
+                regression_method        TEXT,
+                intercept                REAL,
+                r_squared                REAL,
+                adjusted_r_squared       REAL,
+                root_mean_squared_error  REAL,
+                residual_std             REAL,
+                condition_number         REAL,
+                rank                     INTEGER,
+                rank_status              TEXT,
+                reconciliation_state     TEXT,
+                held_out_r_squared       REAL,
+                status                   TEXT NOT NULL,
+                reason                   TEXT,
+                fingerprint              TEXT,
+                coefficients_json        TEXT,
+                UNIQUE (run_id, scenario_index)
+            )
+            """
+        )
+        # Added after the first Phase 59 development build: databases created
+        # from the earlier CREATE TABLE need the column too.
+        _ensure_column(conn, "factor_diagnostic_runs", "results", "TEXT")
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_fdr_created ON factor_diagnostic_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_status ON factor_diagnostic_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_mode ON factor_diagnostic_runs(analysis_mode)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_method ON factor_diagnostic_runs(regression_method)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_integrity ON factor_diagnostic_runs(integrity_status)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_rank ON factor_diagnostic_runs(rank_status)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_timing ON factor_diagnostic_runs(timing_policy)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_target ON factor_diagnostic_runs(target_type)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_dataset ON factor_diagnostic_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_prun ON factor_diagnostic_runs(portfolio_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_arun ON factor_diagnostic_runs(attribution_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_vrun ON factor_diagnostic_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_rrun ON factor_diagnostic_runs(regime_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_srun ON factor_diagnostic_runs(stress_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_config_fp ON factor_diagnostic_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_baseline ON factor_diagnostic_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_fdr_scope ON factor_diagnostic_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_fdr_demo_key ON factor_diagnostic_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_fdef_run ON factor_definitions(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fobs_run ON factor_observations(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fobs_factor ON factor_observations(run_id, factor_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fcoef_run ON factor_coefficients(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fper_run ON factor_period_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_froll_run ON factor_rolling_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_freg_run ON factor_regime_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_fsens_run ON factor_sensitivity_results(run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

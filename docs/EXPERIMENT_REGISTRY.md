@@ -340,7 +340,21 @@ metrics) — idempotently: a run creates at most one record and re-execution
 reuses it.  No claim of alpha, manager skill or a preferred portfolio or
 benchmark is ever stored.
 
-## 26. Future extensions
+## 26. Factor Diagnostics records (Phase 59.0)
+
+Executed factor-diagnostic runs
+([`FACTOR_DIAGNOSTICS_LAB.md`](FACTOR_DIAGNOSTICS_LAB.md)) can create
+experiment records here (module `factor_diagnostics`, with the analysis
+mode, regression method, timing and vintage policies, intercept and rank
+policies, the ordered factor ids, the target type, the observation count and
+the configuration fingerprint as parameters; observations, factor count,
+R-squared, adjusted R-squared, residual standard deviation, condition
+number, held-out R-squared, integrity state, rank state and the result
+fingerprint as metrics) — idempotently: a run creates at most one record and
+re-execution reuses it.  No claim of causality, alpha, skill, prediction or
+a recommended factor exposure is ever stored.
+
+## 27. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

@@ -275,3 +275,14 @@ rather than assembled backtest paths; metrics evaluate supplied predictions/
 scores (the lab trains no models); the audit covers only the represented
 intervals — features built from wider windows can still leak outside them; and
 the demo/UI sample series is deterministic synthetic data, not market data.
+
+## Downstream: Factor Diagnostics Lab (Phase 59.0)
+
+The Factor Diagnostics Lab can fit a factor specification on a stored
+split's TRAINING observations only and apply those fixed coefficients to the
+held-out observations. The split's exact membership is used verbatim
+(purged and embargoed periods belong to neither set), the split fingerprint
+is pinned and re-checked, held-out R-squared is benchmarked against the
+TRAINING mean so no held-out information enters the denominator, and a
+linked run that reports leakage withholds the causal-timing claim. Nothing
+is ever refitted on held-out data, and no validation record is modified.

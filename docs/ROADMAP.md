@@ -1677,6 +1677,90 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 59.0 — Factor Exposure, Return Decomposition & Macro Sensitivity Diagnostics Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first factor research lab
+  (`backend/app/factor_diagnostics/`) measuring the sensitivity of **one
+  explicitly declared return series** to **supplied** factor and macro
+  observations. **Target model:** exactly one target per run — a stored
+  Phase 58 `portfolio_return`, `benchmark_return`, `active_return` or
+  `cost_adjusted_portfolio_return` read verbatim from
+  `attribution_period_results` with that run's own `information_available_at`,
+  or a supplied descriptive series with declared type, convention, frequency
+  and currency. No benchmark or factor series is mixed into the target
+  vector, and a convention or frequency mismatch is an error, not a silent
+  conversion.
+- **Factor definitions** (`definitions.py`): category (never assigned
+  automatically), source unit, one of eight documented transformation
+  formulas — `level`, `simple_return`, `percent_change`, `log_change`,
+  `first_difference`, `basis_point_change` (×10 000 from `rate_fraction`,
+  ×100 from `rate_percent`, rejected for any other source unit),
+  `trailing_zscore` whose window ends one observation **before** the value it
+  standardises, `supplied_transformed` — an integer lag in `[0, 60]` with
+  negative lags rejected, an availability policy, a `missing_policy` that is
+  only ever `unavailable`, and winsorisation **deferred** with its reason.
+  ≤ 12 factors, ≤ 2000 observations, deterministic column order.
+- **Alignment** (`observations.py`): exact timestamp equality in the
+  factor's own observation sequence offset by the declared lag, so
+  pre-window history satisfies a lag or a differencing transform instead of
+  losing the first period; nothing is resampled, forward-filled,
+  interpolated or zero-filled; a missing value removes its period with a
+  stated reason. **Timing states:** `verified_from_validation_split`,
+  `verified_causal_lag`, `verified_trailing_estimation`,
+  `supplied_descriptive`, `contemporaneous_descriptive`,
+  `full_sample_descriptive`, `unknown`, `invalid` — with a future-looking
+  alignment available **only** as an explicitly declared invalid policy that
+  can never become a baseline. **Vintages:** `first_release`,
+  `latest_available_as_of_cutoff` (no revision reaches an earlier fit),
+  `supplied_vintage`, `full_sample_latest_descriptive` (forces a descriptive
+  state); original values preserved; a macro factor without a release
+  timestamp gets its availability assumption stated as a warning.
+- **Estimator** (`regression.py`): OLS by SVD on the approved numpy/scipy
+  stack (statsmodels and scikit-learn are **not installed** and were
+  deliberately not added), rank and singular values, condition number of the
+  **centred** factor block, a `fail` or labelled `minimum_norm_descriptive`
+  rank policy, classical covariance with its assumptions printed and never
+  called robust, Student-t p-values and confidence intervals withheld — not
+  infinite — at zero residual variance / insufficient dof / rank deficiency,
+  R-squared **unavailable** rather than 0 or 1 for a constant target, and an
+  explicit ridge reference with no p-values and no automatic lambda.
+- **Diagnostics + decomposition:** factor correlation (constants
+  unavailable), duplicate/constant column detection, VIF unavailable rather
+  than infinite under exact collinearity, residual moments with the repo's
+  scipy conventions and an explicitly defined additive cumulative-residual
+  drawdown; per-period `measured = intercept + Σ contributions + residual`
+  checked against the estimator's own residual vector; supplied asset
+  exposures aggregated with stored Phase 56 beginning-of-period weights
+  under signed semantics with nothing normalised; cross-sectional
+  decomposition **deferred** with its reason.
+- **Cross-lab (all read-only, all pinned):** benchmark-relative exposure via
+  the same specification fitted to the linked attribution run's declared
+  benchmark; stored Phase 54 regimes (never recomputed, rare regimes
+  withheld); stored Phase 57 stress with **explicitly supplied** factor
+  shocks and an undefined hypothetical residual; stored Phase 58 attribution
+  as a complementary view whose cost block is never folded in; a Model
+  Validation split fitted on training rows only with held-out R² against the
+  **training** mean.
+- **Rest:** trailing rolling windows that a later observation can never
+  rewrite, exposure-stability metrics with no stability verdict, bounded
+  deterministic sensitivity scenarios with the base exactly once, the Phase
+  53 multiple-testing corrections reused on valid p-values, five
+  content-addressed fingerprint kinds, eight SQLite tables + 26 indexes,
+  baselines gated on verified timing + complete + full rank + reconciled, a
+  20-case idempotent demo, 17 API routes, the **Factor Diagnostics** view,
+  81 backend tests and a 30-test Playwright spec. Docs:
+  `FACTOR_DIAGNOSTICS_LAB.md`,
+  `FACTOR_DEFINITION_AND_TRANSFORMATION_POLICY.md`,
+  `FACTOR_MODEL_AND_REGRESSION_POLICY.md`,
+  `FACTOR_EXPOSURE_AND_RETURN_DECOMPOSITION_POLICY.md`,
+  `MACRO_SENSITIVITY_AND_VINTAGE_POLICY.md`,
+  `FACTOR_DIAGNOSTICS_RUNBOOK.md`. **Measured sensitivities under stated
+  assumptions — no causality, no alpha, no manager skill, no return
+  prediction, no factor/macro/portfolio recommendation, no hedging, no
+  allocation, no trade execution, no factor-model certification, not
+  investment advice, and no market or macroeconomic data is ever
+  downloaded.**
+
 ### Phase 58.0 — Portfolio Performance Attribution, Benchmark & Active Risk Diagnostics Lab v1 ✅
 
 - **Research-infrastructure phase:** a local-first attribution lab

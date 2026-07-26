@@ -120,3 +120,14 @@ explains why the drawdown occurred.
 - `STRESS_COVARIANCE_AND_CORRELATION_POLICY.md` — volatility/correlation stress, PSD, repair
 - `DRAWDOWN_AND_EPISODE_ATTRIBUTION_POLICY.md` — drawdown conventions and episode attribution
 - `PORTFOLIO_STRESS_RUNBOOK.md` — operations, demo cases, verification
+
+## Downstream: Factor Diagnostics Lab (Phase 59.0)
+
+The Factor Diagnostics Lab can link a stored stress run to report an
+exposure-implied factor contribution: `measured exposure × SUPPLIED factor
+shock`, in each factor's transformed unit. Factor shocks are **never
+inferred** from this lab's asset, group or global shocks — the caller must
+supply them explicitly — the two shock families stay distinct, this lab's
+records are read-only and fingerprint-pinned, the hypothetical scenario's
+residual component is reported as undefined, and no hedge or reallocation
+follows from the number.

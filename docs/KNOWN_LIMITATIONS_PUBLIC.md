@@ -216,7 +216,29 @@ is not GIPS-compliant reporting, not tax accounting, not live portfolio
 accounting, not a performance guarantee, and not investment, trading or
 performance-reporting advice.
 
-## 23. Future improvements (openly planned)
+## 23. A factor sensitivity is not a cause
+
+The Factor Diagnostics Lab measures how one declared return series moved
+with **supplied** factor and macro observations under a stated
+transformation, unit, lag and availability rule. A coefficient is a
+least-squares sensitivity over that sample and that specification — it is
+**not** evidence that the factor causes the return, not a forecast, not an
+economic exposure, and not a reason to take, avoid or hedge anything. A
+contemporaneous relationship is descriptive association only; a lagged one
+with verified availability is a statement about information order, still not
+causality. The intercept is the mean return the specification did not
+explain — it is not alpha, and the residual is not alpha either. Standard
+errors are classical and assume homoskedastic, serially uncorrelated errors;
+they are never labelled robust, and no HC/HAC estimator exists in this
+project. Statistical significance, adjusted or not, is not economic
+importance. Rank-deficient designs report a labelled minimum-norm solution
+with all inference withheld, near-collinear designs carry a neutral
+condition-number warning that is not a universal rule, and a stable measured
+exposure is a property of the sample, not a permanent property of the
+factor. No market or macroeconomic data is ever downloaded, and the lab
+never builds a factor portfolio, hedges, allocates or certifies a model.
+
+## 24. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

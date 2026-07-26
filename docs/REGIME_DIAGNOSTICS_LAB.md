@@ -255,3 +255,13 @@ categorical labels are declarations; combined regimes are pairwise; maximum
 drawdown omitted.  And permanently: a regime label is a descriptive state
 under one rule — never a prediction, and conditional performance under it
 is never causality or profitability evidence.
+
+## Downstream: Factor Diagnostics Lab (Phase 59.0)
+
+The Factor Diagnostics Lab groups its analysed periods by this lab's
+**stored** assignments to report exposures per regime. Regimes are never
+recomputed there, this run's configuration, result and definition
+fingerprints are pinned and re-checked at execution, a regime with fewer
+than 10 observations has its conditional fit withheld, and differences
+between regimes are presented as measurements — never as structural or
+causal claims.
