@@ -282,8 +282,8 @@ def replace_children(run_id: int, *, benchmark: Optional[Dict[str, Any]],
                         average_weight, arithmetic_contribution,
                         linked_contribution, positive_contribution,
                         negative_contribution, absolute_contribution,
-                        absolute_share, observation_count
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
+                        absolute_share, signed_share, observation_count
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
                     """,
                     (run_id, i, r["asset_id"], r.get("group_id"),
                      r.get("average_weight"), r.get("arithmetic_contribution"),
@@ -291,22 +291,25 @@ def replace_children(run_id: int, *, benchmark: Optional[Dict[str, Any]],
                      r.get("positive_contribution"),
                      r.get("negative_contribution"),
                      r.get("absolute_contribution"), r.get("absolute_share"),
-                     r.get("observation_count", 0)))
+                     r.get("signed_share"), r.get("observation_count", 0)))
             for i, r in enumerate(group_rows):
                 conn.execute(
                     """
                     INSERT INTO attribution_group_results (
                         run_id, group_index, group_id, asset_count,
                         average_weight, arithmetic_contribution,
-                        positive_contribution, negative_contribution,
-                        absolute_contribution, absolute_share
-                    ) VALUES (?,?,?,?,?,?,?,?,?,?)
+                        linked_contribution, positive_contribution,
+                        negative_contribution, absolute_contribution,
+                        absolute_share, signed_share
+                    ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)
                     """,
                     (run_id, i, r["group_id"], r.get("asset_count", 0),
                      r.get("average_weight"), r.get("arithmetic_contribution"),
+                     r.get("linked_contribution"),
                      r.get("positive_contribution"),
                      r.get("negative_contribution"),
-                     r.get("absolute_contribution"), r.get("absolute_share")))
+                     r.get("absolute_contribution"), r.get("absolute_share"),
+                     r.get("signed_share")))
             for i, r in enumerate(brinson_rows):
                 conn.execute(
                     """
@@ -411,6 +414,35 @@ def clear_results(run_id: int) -> None:
             raise
 
 
+def mark_failed(run_id: int, error_message: str, completed_at: str) -> None:
+    """Atomically clear derived rows and persist a sanitized failed state."""
+    with get_connection() as conn:
+        try:
+            conn.execute("BEGIN")
+            for table in CHILD_TABLES:
+                conn.execute(f"DELETE FROM {table} WHERE run_id = ?", (run_id,))
+            conn.execute(
+                """
+                UPDATE portfolio_attribution_runs SET
+                    status = 'failed', error_message = ?, completed_at = ?,
+                    is_baseline = 0, baseline_scope = NULL,
+                    completeness_status = 'unavailable',
+                    reconciliation_status = 'unknown',
+                    portfolio_market_return = NULL, portfolio_net_return = NULL,
+                    benchmark_return = NULL, active_return = NULL,
+                    total_cost_return = NULL, tracking_error = NULL,
+                    information_ratio = NULL, result_fingerprint = NULL,
+                    summary_json = NULL, linking_json = NULL, cost_json = NULL,
+                    active_risk_json = NULL, concentration_json = NULL,
+                    warnings_json = '[]', period_count = 0, group_count = 0,
+                    duration_ms = NULL, updated_at = ?
+                WHERE id = ?
+                """, (error_message, completed_at, _now(), run_id))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
 def get_benchmark(run_id: int) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute(
@@ -464,6 +496,7 @@ def list_assets(run_id: int) -> List[Dict[str, Any]]:
              "negative_contribution": r["negative_contribution"],
              "absolute_contribution": r["absolute_contribution"],
              "absolute_share": r["absolute_share"],
+             "signed_share": r["signed_share"],
              "observation_count": r["observation_count"]} for r in rows]
 
 
@@ -475,10 +508,12 @@ def list_groups(run_id: int) -> List[Dict[str, Any]]:
     return [{"group_id": r["group_id"], "asset_count": r["asset_count"],
              "average_weight": r["average_weight"],
              "arithmetic_contribution": r["arithmetic_contribution"],
+             "linked_contribution": r["linked_contribution"],
              "positive_contribution": r["positive_contribution"],
              "negative_contribution": r["negative_contribution"],
              "absolute_contribution": r["absolute_contribution"],
-             "absolute_share": r["absolute_share"]} for r in rows]
+             "absolute_share": r["absolute_share"],
+             "signed_share": r["signed_share"]} for r in rows]
 
 
 def list_brinson(run_id: int) -> List[Dict[str, Any]]:
@@ -544,6 +579,7 @@ def list_drawdowns(run_id: int) -> List[Dict[str, Any]]:
 
 
 def mark_baseline(run_id: int, scope: str) -> None:
+    """Atomically assign scope, demote its old baseline, and promote this run."""
     now = _now()
     with get_connection() as conn:
         try:
@@ -554,7 +590,8 @@ def mark_baseline(run_id: int, scope: str) -> None:
                 "AND id != ?", (now, scope, run_id))
             conn.execute(
                 "UPDATE portfolio_attribution_runs SET is_baseline = 1, "
-                "updated_at = ? WHERE id = ?", (now, run_id))
+                "baseline_scope = ?, updated_at = ? WHERE id = ?",
+                (scope, now, run_id))
             conn.commit()
         except Exception:
             conn.rollback()
@@ -588,7 +625,7 @@ def lab_summary() -> Dict[str, Any]:
 __all__ = [
     "DEFAULT_PAGE_SIZE", "MAX_PAGE_SIZE", "SORTABLE", "RUN_UPDATE_COLUMNS",
     "CHILD_TABLES", "insert_run", "get_run", "run_demo_key_id", "update_run",
-    "list_runs", "replace_children", "clear_results", "get_benchmark",
+    "list_runs", "replace_children", "clear_results", "mark_failed", "get_benchmark",
     "list_periods", "list_assets", "list_groups", "list_brinson",
     "list_regimes", "list_drawdowns", "mark_baseline", "lab_summary",
 ]

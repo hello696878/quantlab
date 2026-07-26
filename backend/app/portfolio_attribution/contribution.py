@@ -197,9 +197,14 @@ def aggregate_group_results(asset_rows: List[Dict[str, Any]]
             "group_id": g, "arithmetic_contribution": 0.0,
             "positive_contribution": 0.0, "negative_contribution": 0.0,
             "absolute_contribution": 0.0, "asset_count": 0,
-            "average_weight": 0.0,
+            "average_weight": 0.0, "linked_contribution": 0.0,
+            "linked_available": True,
         })
         entry["arithmetic_contribution"] += row["arithmetic_contribution"]
+        if row.get("linked_contribution") is None:
+            entry["linked_available"] = False
+        else:
+            entry["linked_contribution"] += row["linked_contribution"]
         entry["positive_contribution"] += row["positive_contribution"]
         entry["negative_contribution"] += row["negative_contribution"]
         entry["absolute_contribution"] += row["absolute_contribution"]
@@ -207,11 +212,17 @@ def aggregate_group_results(asset_rows: List[Dict[str, Any]]
         if row["average_weight"] is not None:
             entry["average_weight"] += row["average_weight"]
     abs_total = sum(e["absolute_contribution"] for e in acc.values())
+    signed_total = sum(e["arithmetic_contribution"] for e in acc.values())
     out = []
     for g in sorted(acc):
         e = acc[g]
         e["absolute_share"] = (e["absolute_contribution"] / abs_total
                                if abs_total > 0 else None)
+        e["signed_share"] = (
+            e["arithmetic_contribution"] / signed_total
+            if abs(signed_total) > GROUP_WEIGHT_EPS else None)
+        if not e.pop("linked_available"):
+            e["linked_contribution"] = None
         out.append(e)
     return out
 

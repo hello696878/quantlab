@@ -64,15 +64,18 @@ cd frontend && npx tsc --noEmit
 cd frontend && npx playwright test e2e/portfolio-attribution.spec.ts --workers=1
 ```
 
-The Playwright spec targets an already-running dev server (the config never
-starts one). If the dev server becomes unresponsive after repeated full runs,
+The Playwright spec targets already-running services (the config never starts
+them) and must use an isolated temporary/test database, never
+`backend/data/quantlab.db`. If the dev server becomes unresponsive after repeated full runs,
 stop it, delete `frontend/.next`, and start it again — a documented safe
 reset.
 
 ## Isolation
 
 E2E writes are limited to the idempotent demo seeds plus one deliberately
-rejected baseline attempt (409). To reset only this lab in a dev database,
+rejected baseline attempt (409), but those writes are permitted only against
+an isolated test database. The active development database is not an E2E
+target. To reset only this lab in an expendable dev/test database,
 delete rows from `portfolio_attribution_runs` and its six child tables, the
 `demo:pd:attr-*` Phase 56 books, and `experiment_registry` rows named
 `Portfolio attribution: %` — no other registry is touched.

@@ -1,12 +1,11 @@
 /**
  * Portfolio Attribution Lab E2E coverage (Phase 58.0).
  *
- * Isolation policy (docs/PORTFOLIO_ATTRIBUTION_RUNBOOK.md): the only writes
- * are the idempotent demo seeds (unique demo_key; they cascade through the
- * Phase 56/55 idempotent demo loaders and create their own hand-computable
- * demo books) plus one deliberately rejected baseline attempt — real user
- * records are never modified.  No external network.
- */
+ * Isolation policy (docs/PORTFOLIO_ATTRIBUTION_RUNBOOK.md): this spec must run
+ * against services configured with an isolated test database. It writes the
+ * idempotent demo seeds (unique demo_key; cascading through the Phase 56/55
+ * demo loaders) and makes one deliberately rejected baseline attempt. It
+ * never clears a database and performs no external network access. */
 
 import { expect, test, type Page } from "@playwright/test";
 import {

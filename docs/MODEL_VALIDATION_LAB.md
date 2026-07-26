@@ -251,11 +251,13 @@ fingerprints are never modified.
 
 The Portfolio Attribution Lab
 ([`PORTFOLIO_ATTRIBUTION_LAB.md`](PORTFOLIO_ATTRIBUTION_LAB.md), Phase 58.0)
-may link a completed validation run for provenance: its name, leakage state
-and configuration fingerprint are displayed beside the attribution run, and
-attribution always uses the fixed stored weights of the linked portfolio, so
-split memberships, purge/embargo settings and fingerprints here are never
-read for weighting decisions and never modified.
+may link only a completed, leakage-clean validation run with no invalid
+splits for provenance: its name, leakage state, configuration fingerprint
+and result fingerprint are pinned beside the attribution run. This link does
+not create split-filtered or held-out attribution: attribution always uses
+the fixed stored weights and configured observation window of the linked
+portfolio. Split memberships, purge/embargo settings and fingerprints here
+are never read for weighting decisions and never modified.
 
 The Portfolio Stress Lab
 ([`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md), Phase 57.0) does

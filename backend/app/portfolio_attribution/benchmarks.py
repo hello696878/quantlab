@@ -30,6 +30,7 @@ disclosed.
 from __future__ import annotations
 
 import math
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from app.portfolio_attribution.observations import (
@@ -45,6 +46,7 @@ BENCHMARK_SOURCES = ("user_supplied", "demo_fixture", "linked_dataset",
                      "custom_descriptive")
 MAX_ABS_WEIGHT = 10.0
 WEIGHT_SUM_TOLERANCE = 1e-9
+MAX_METADATA_KEYS = 20
 
 
 class BenchmarkError(ValueError):
@@ -60,6 +62,19 @@ def _identifier(value: Any, field: str) -> str:
     return text
 
 
+def _bounded_text(value: Any, field: str, *, maximum: int,
+                  default: str, allow_empty: bool = False) -> str:
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        raise BenchmarkError(f"{field} must be a string")
+    text = value.strip()
+    if not text and not allow_empty:
+        raise BenchmarkError(f"{field} must be a non-empty string")
+    if len(text) > maximum:
+        raise BenchmarkError(f"{field} must be at most {maximum} chars")
+    return text
+
 def _weight(value: Any, field: str) -> float:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         raise BenchmarkError(f"{field} must be a finite number")
@@ -71,9 +86,42 @@ def _weight(value: Any, field: str) -> float:
     return f
 
 
+def _timestamp(value: Any, field: str) -> datetime:
+    if not isinstance(value, str) or not value.strip():
+        raise BenchmarkError(f"{field} must be a non-empty ISO timestamp")
+    try:
+        return datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise BenchmarkError(f"{field} must be a valid ISO timestamp") from exc
+
+
+def _metadata(raw: Any) -> Dict[str, Any]:
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict) or len(raw) > MAX_METADATA_KEYS:
+        raise BenchmarkError(
+            f"benchmark metadata must be an object with at most "
+            f"{MAX_METADATA_KEYS} keys")
+    out: Dict[str, Any] = {}
+    for key, value in raw.items():
+        if not isinstance(key, str) or not key or len(key) > MAX_ID_LENGTH:
+            raise BenchmarkError(
+                "benchmark metadata keys must be non-empty bounded strings")
+        if isinstance(value, bool) or value is None or isinstance(value, str):
+            out[key] = value
+        elif isinstance(value, (int, float)) and math.isfinite(float(value)):
+            out[key] = value
+        else:
+            raise BenchmarkError(
+                f"benchmark metadata[{key!r}] must be a finite scalar")
+    return out
+
+
 def validate_benchmark(raw: Any, *, portfolio_asset_ids: List[str],
                        portfolio_groups: Dict[str, str],
-                       period_count: int) -> Dict[str, Any]:
+                       period_count: int,
+                       period_starts: Optional[List[str]] = None
+                       ) -> Dict[str, Any]:
     """Validate an explicit benchmark definition against the observation set."""
     if raw is None:
         return {"configured": False,
@@ -85,7 +133,8 @@ def validate_benchmark(raw: Any, *, portfolio_asset_ids: List[str],
     known = {"benchmark_id", "name", "description", "source", "kind",
              "asset_ids", "weights", "weights_per_period", "returns",
              "groups", "return_convention", "timing_policy",
-             "dataset_version_id", "metadata"}
+             "dataset_version_id", "metadata", "period_starts",
+             "information_available_at"}
     unknown = set(raw) - known
     if unknown:
         raise BenchmarkError(
@@ -145,6 +194,8 @@ def validate_benchmark(raw: Any, *, portfolio_asset_ids: List[str],
 
     n = len(asset_ids)
     weights_per_period: List[List[float]]
+    supplied_period_starts: List[str] = []
+    information_available_at: List[str] = []
     if kind == "supplied_per_period":
         rows = raw.get("weights_per_period")
         if not isinstance(rows, list) or len(rows) != period_count:
@@ -161,6 +212,35 @@ def validate_benchmark(raw: Any, *, portfolio_asset_ids: List[str],
                 [_weight(v, f"benchmark weight[{t}][{i}]")
                  for i, v in enumerate(row)])
         base_weights = list(weights_per_period[0])
+        supplied_period_starts = raw.get("period_starts")
+        information_available_at = raw.get("information_available_at")
+        if not isinstance(supplied_period_starts, list) \
+                or len(supplied_period_starts) != period_count:
+            raise BenchmarkError(
+                "supplied_per_period requires one period_start per "
+                "attribution period")
+        if not isinstance(information_available_at, list) \
+                or len(information_available_at) != period_count:
+            raise BenchmarkError(
+                "supplied_per_period requires one information_available_at "
+                "timestamp per attribution period")
+        if period_starts is None or supplied_period_starts != period_starts:
+            raise BenchmarkError(
+                "supplied benchmark period_starts must exactly match the "
+                "portfolio attribution periods")
+        for t, (available, start) in enumerate(zip(
+                information_available_at, supplied_period_starts)):
+            available_dt = _timestamp(
+                available, f"information_available_at[{t}]")
+            start_dt = _timestamp(start, f"period_starts[{t}]")
+            if (available_dt.tzinfo is None) != (start_dt.tzinfo is None):
+                raise BenchmarkError(
+                    "benchmark availability and period timestamps must use "
+                    "the same timezone convention")
+            if available_dt > start_dt:
+                raise BenchmarkError(
+                    f"benchmark weights for period {t} were not available at "
+                    "the beginning of the period")
     else:
         base = raw.get("weights")
         if not isinstance(base, list) or len(base) != n:
@@ -200,15 +280,30 @@ def validate_benchmark(raw: Any, *, portfolio_asset_ids: List[str],
             "benchmark-only assets need explicit returns (never fabricated): "
             + ", ".join(sorted(missing)))
 
+    metadata = _metadata(raw.get("metadata"))
     weight_sum = sum(base_weights)
+    dataset_version_id = raw.get("dataset_version_id")
+    if dataset_version_id is not None and (
+            isinstance(dataset_version_id, bool)
+            or not isinstance(dataset_version_id, int)
+            or dataset_version_id <= 0):
+        raise BenchmarkError(
+            "benchmark dataset_version_id must be a positive integer")
     portfolio_only = sorted(set(portfolio_asset_ids) - set(asset_ids))
     benchmark_only = sorted(set(asset_ids) - set(portfolio_asset_ids))
+    if benchmark_only and not metadata.get("currency"):
+        raise BenchmarkError(
+            "benchmark-only assets require explicit metadata.currency; "
+            "currency conversion is never inferred or performed")
     return {
         "configured": True,
         "benchmark_id": _identifier(raw.get("benchmark_id") or "benchmark",
                                     "benchmark_id"),
-        "name": str(raw.get("name") or "Benchmark")[:200],
-        "description": str(raw.get("description") or "")[:2000],
+        "name": _bounded_text(raw.get("name"), "benchmark name",
+                              maximum=200, default="Benchmark"),
+        "description": _bounded_text(
+            raw.get("description"), "benchmark description", maximum=2000,
+            default="", allow_empty=True),
         "source": source,
         "kind": kind,
         "asset_ids": asset_ids,
@@ -218,7 +313,10 @@ def validate_benchmark(raw: Any, *, portfolio_asset_ids: List[str],
         "returns": returns,
         "return_convention": convention,
         "timing_policy": timing,
-        "dataset_version_id": raw.get("dataset_version_id"),
+        "dataset_version_id": dataset_version_id,
+        "metadata": metadata,
+        "period_starts": supplied_period_starts,
+        "information_available_at": information_available_at,
         "weight_sum": weight_sum,
         "weight_sum_is_one": abs(weight_sum - 1.0) <= WEIGHT_SUM_TOLERANCE,
         "portfolio_only_assets": portfolio_only,

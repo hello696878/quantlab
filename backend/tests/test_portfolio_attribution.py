@@ -13,6 +13,7 @@ compare/export, demo idempotence, prior-registry preservation and API paths.
 
 from __future__ import annotations
 
+import copy
 import math
 from datetime import datetime, timedelta
 
@@ -96,6 +97,7 @@ def _benchmark(weights=EQUAL, *, asset_ids=None, **extra):
     ids = asset_ids or ASSETS
     definition = {"benchmark_id": "equal-weight", "name": "Equal weight",
                   "kind": "fixed_weights", "source": "demo_fixture",
+                  "metadata": {"currency": "USD"},
                   "asset_ids": ids,
                   "weights": (weights if isinstance(weights, list)
                               else [weights[a] for a in ids])}
@@ -314,7 +316,16 @@ def test_benchmark_validation_rules():
                                       "return_convention": "log"},
                                      portfolio_asset_ids=ASSETS,
                                      portfolio_groups=groups, period_count=3)
-    # a non-unit weight sum is disclosed, never renormalized
+    with pytest.raises(bench_mod.BenchmarkError, match="name must be a string"):
+        bench_mod.validate_benchmark(
+            {**_benchmark(), "name": {"unexpected": "object"}},
+            portfolio_asset_ids=ASSETS, portfolio_groups=groups,
+            period_count=3)
+    with pytest.raises(bench_mod.BenchmarkError, match="at most 2000"):
+        bench_mod.validate_benchmark(
+            {**_benchmark(), "description": "x" * 2001},
+            portfolio_asset_ids=ASSETS, portfolio_groups=groups,
+            period_count=3)    # a non-unit weight sum is disclosed, never renormalized
     odd = bench_mod.validate_benchmark(
         _benchmark(weights={"eq-a": 0.3, "eq-b": 0.3, "bd-a": 0.3, "bd-b": 0.3}),
         portfolio_asset_ids=ASSETS, portfolio_groups=groups, period_count=3)
@@ -535,7 +546,7 @@ def test_carino_withheld_when_a_return_wipes_out_the_book():
     out = link_mod.link_effects(effects, [-1.0, 0.05], [0.01, 0.01],
                                 "carino", 1e-12)
     assert out["available"] is False
-    assert "logarithm is undefined" in out["reason"]
+    assert "undefined" in out["reason"]
     assert out["linked_effects"] is None
 
 
@@ -548,7 +559,10 @@ def test_time_weighted_return_convention():
     assert withheld["available"] is False
     assert "no result is labelled a time-weighted return" in withheld["reason"]
     wiped = link_mod.time_weighted_return([-1.0], supports_twr=True)
-    assert wiped["available"] is False
+    assert wiped["available"] is True
+    assert wiped["value"] == pytest.approx(-1.0)
+    impossible = link_mod.time_weighted_return([-1.0001], supports_twr=True)
+    assert impossible["available"] is False
 
 
 # ---------------------------------------------------------------------------
@@ -735,6 +749,23 @@ def test_zero_active_return_and_baseline(client):
     assert marked["is_baseline"] is True
 
 
+def test_baseline_replacement_is_atomic_idempotent_and_benchmark_scoped():
+    prun = _book()
+    first = service.execute_run(service.create_run(_payload(prun["id"]))["id"])
+    second = service.execute_run(service.create_run(_payload(prun["id"]))["id"])
+
+    service.mark_baseline(first["id"])
+    service.mark_baseline(second["id"])
+    service.mark_baseline(second["id"])
+    assert pa_store.get_run(first["id"])["is_baseline"] is False
+    assert pa_store.get_run(second["id"])["is_baseline"] is True
+
+    other_benchmark = service.execute_run(service.create_run(_payload(
+        prun["id"], benchmark=_benchmark(BALANCED)))["id"])
+    service.mark_baseline(other_benchmark["id"])
+    assert pa_store.get_run(second["id"])["is_baseline"] is True
+    assert pa_store.get_run(other_benchmark["id"])["is_baseline"] is True
+
 def test_invalid_timing_blocks_baseline(client):
     prun = _book()
     run = service.create_run(_payload(
@@ -822,6 +853,56 @@ def test_regime_and_drawdown_integration_use_stored_records():
         before["result_fingerprint"]
 
 
+def test_drawdown_attribution_uses_exact_stored_episode_and_partial_cost(monkeypatch):
+    episode = {
+        "episode_id": 7,
+        "peak_timestamp": "2024-03-04T00:00:00",
+        "trough_timestamp": "2024-03-05T00:00:00",
+        "recovery_timestamp": None,
+    }
+    original = copy.deepcopy(episode)
+    monkeypatch.setattr(service.stress_store, "list_episodes",
+                        lambda _run_id: [episode])
+    periods = [
+        {"period_start": "2024-03-04T00:00:00"},
+        {"period_start": "2024-03-05T00:00:00"},
+    ]
+    period_results = [
+        {"market_return": -0.02, "benchmark_return": -0.01,
+         "cost_return": 0.001,
+         "brinson": {"allocation_effect": -0.003,
+                     "selection_effect": -0.004,
+                     "interaction_effect": -0.003},
+         "contributions": {"rows": [
+             {"asset_id": "eq-a", "contribution": -0.012},
+             {"asset_id": "bd-a", "contribution": -0.008},
+         ]}},
+        {"market_return": -0.03, "benchmark_return": -0.02,
+         "cost_return": None,
+         "brinson": {"allocation_effect": -0.002,
+                     "selection_effect": -0.005,
+                     "interaction_effect": -0.003},
+         "contributions": {"rows": [
+             {"asset_id": "eq-a", "contribution": -0.018},
+             {"asset_id": "bd-a", "contribution": -0.012},
+         ]}},
+    ]
+
+    rows = service._drawdown_rows(
+        {"stress_run_id": 11}, periods, period_results, 1e-12)
+    assert len(rows) == 1
+    row = rows[0]
+    assert row["episode_id"] == 7
+    assert row["period_count"] == 2
+    assert row["portfolio_market_return"] == pytest.approx(-0.05)
+    assert row["benchmark_return"] == pytest.approx(-0.03)
+    assert row["active_return"] == pytest.approx(-0.02)
+    assert row["cost_return"] is None
+    assert row["reconciliation_state"] == "reconciled"
+    assert sum(item["contribution"] for item in row["contributions"]) \
+        == pytest.approx(-0.05)
+    assert episode == original
+
 def test_compare_and_export(client):
     prun = _book()
     a = service.execute_run(service.create_run(_payload(prun["id"]))["id"])
@@ -889,3 +970,177 @@ def test_demo_idempotent_and_prior_registries_preserved(client):
     assert resp.status_code == 200 and resp.json()["created"] is False
     summary = client.get(f"{BASE}/summary").json()
     assert summary["runs"] == 17 and summary["completed"] == 17
+
+# ---------------------------------------------------------------------------
+# Adversarial Phase 58 review regressions
+# ---------------------------------------------------------------------------
+
+
+def test_observation_timeline_and_return_shape_are_strict():
+    prun = _book()
+    policy = obs_mod.validate_policy({"return_frequency": "daily"})
+    rebalances = service._indexed_rebalances(prun)
+
+    duplicate = copy.deepcopy(prun)
+    duplicate["universe"]["timestamps"][2] = duplicate["universe"]["timestamps"][1]
+    with pytest.raises(obs_mod.ObservationError, match="strictly increasing"):
+        obs_mod.build_observations(duplicate, rebalances, policy)
+
+    mixed = copy.deepcopy(prun)
+    mixed["universe"]["timestamps"][-1] += "+00:00"
+    with pytest.raises(obs_mod.ObservationError, match="timezone convention"):
+        obs_mod.build_observations(mixed, rebalances, policy)
+
+    missing = copy.deepcopy(prun)
+    missing["universe"]["assets"][0]["returns"].pop()
+    with pytest.raises(obs_mod.ObservationError, match="exactly"):
+        obs_mod.build_observations(missing, rebalances, policy)
+
+    non_finite = copy.deepcopy(prun)
+    non_finite["universe"]["assets"][0]["returns"][2] = math.inf
+    with pytest.raises(obs_mod.ObservationError, match="finite"):
+        obs_mod.build_observations(non_finite, rebalances, policy)
+
+
+def test_supplied_benchmark_periods_and_information_timing_align_exactly():
+    groups = {a: demo_mod.GROUPS[a] for a in ASSETS}
+    starts = _stamps(3)[:2]
+    raw = _benchmark(
+        kind="supplied_per_period",
+        weights_per_period=[[0.25] * 4, [0.25] * 4],
+        period_starts=starts,
+        information_available_at=starts,
+        metadata={"currency": "USD"},
+    )
+    valid = bench_mod.validate_benchmark(
+        raw, portfolio_asset_ids=ASSETS, portfolio_groups=groups,
+        period_count=2, period_starts=starts)
+    assert valid["period_starts"] == starts
+    assert valid["metadata"] == {"currency": "USD"}
+
+    shifted = {**raw, "period_starts": [starts[0], _stamps(4)[3]]}
+    with pytest.raises(bench_mod.BenchmarkError, match="exactly match"):
+        bench_mod.validate_benchmark(
+            shifted, portfolio_asset_ids=ASSETS, portfolio_groups=groups,
+            period_count=2, period_starts=starts)
+
+    late = {**raw, "information_available_at": [starts[0], _stamps(4)[3]]}
+    with pytest.raises(bench_mod.BenchmarkError, match="not available"):
+        bench_mod.validate_benchmark(
+            late, portfolio_asset_ids=ASSETS, portfolio_groups=groups,
+            period_count=2, period_starts=starts)
+
+    with pytest.raises(bench_mod.BenchmarkError, match="metadata"):
+        bench_mod.validate_benchmark(
+            {**raw, "metadata": {"nested": {"not": "allowed"}}},
+            portfolio_asset_ids=ASSETS, portfolio_groups=groups,
+            period_count=2, period_starts=starts)
+
+
+def test_carino_adjacent_float_factor_is_stable():
+    x = 0.05
+    y = math.nextafter(x, 0.0)
+    assert link_mod._carino_factor(x, y) == pytest.approx(
+        1.0 / (1.0 + x), rel=1e-14)
+
+
+def test_active_risk_rejects_misaligned_periods():
+    with pytest.raises(ValueError, match="identical lengths"):
+        risk_mod.active_risk([0.10, 0.20], [0.05],
+                             periods_per_year=252, frequency="daily")
+
+
+def test_partial_cost_components_are_not_reported_as_totals():
+    rows = [
+        {"period_id": 0, "state": "available", "total_cost_return": 0.001,
+         "components": {"commission": 0.0002, "spread": 0.0003,
+                        "slippage": 0.0005, "impact": 0.0}},
+        {"period_id": 1, "state": "partial", "total_cost_return": 0.002,
+         "components": {"commission": 0.0004, "spread": None,
+                        "slippage": 0.0016, "impact": None}},
+    ]
+    out = cost_mod.aggregate_costs(rows, {0: 0.01, 1: 0.02})
+    assert out["component_totals"]["commission"] == pytest.approx(0.0006)
+    assert out["component_totals"]["spread"] is None
+    assert out["component_states"]["spread"] == "partial"
+    assert out["component_totals"]["impact"] is None
+
+
+def test_linked_contributions_and_signed_shares_round_trip():
+    prun = _book()
+    done = service.execute_run(service.create_run(
+        _payload(prun["id"], linking_method="carino"))["id"])
+    assets = pa_store.list_assets(done["id"])
+    groups = pa_store.list_groups(done["id"])
+    linked_target = done["summary"]["asset_contribution_linking"]["target"]
+    assert sum(row["linked_contribution"] for row in assets) == pytest.approx(
+        linked_target, abs=1e-12)
+    assert sum(row["linked_contribution"] for row in groups) == pytest.approx(
+        linked_target, abs=1e-12)
+    assert all("signed_share" in row and "absolute_share" in row
+               for row in [*assets, *groups])
+
+
+def test_result_fingerprint_covers_material_detail_blocks():
+    kwargs = {
+        "configuration_fp": "cfg",
+        "period_rows": [{"period_id": 0, "cost_state": "available"}],
+        "asset_rows": [{"asset_id": "a", "signed_share": 1.0}],
+        "group_rows": [{"group_id": "g", "linked_contribution": 0.1}],
+        "brinson_rows": [], "linking": None,
+        "cost_block": {"component_states": {"impact": "unavailable"}},
+        "active_risk_block": {"tracking_error": 0.1},
+        "concentration_blocks": {"asset": {"herfindahl": 1.0}},
+        "regime_rows": [{"regime_label": "calm", "active_return": 0.1}],
+        "drawdown_rows": [{"episode_id": 99, "peak_timestamp": "t0",
+                           "cost_return": None}],
+        "summary": {"time_weighted_return": {"value": 0.1}},
+        "warnings": [], "integrity": "verified",
+        "completeness": "complete", "reconciliation": "reconciled",
+    }
+    original = fp_mod.result_fingerprint(**kwargs)
+    changed = copy.deepcopy(kwargs)
+    changed["regime_rows"][0]["active_return"] = 0.2
+    assert fp_mod.result_fingerprint(**changed) != original
+    local_id_only = copy.deepcopy(kwargs)
+    local_id_only["drawdown_rows"][0]["episode_id"] = 100
+    assert fp_mod.result_fingerprint(**local_id_only) == original
+    non_finite = copy.deepcopy(kwargs)
+    non_finite["summary"]["x"] = math.nan
+    with pytest.raises(fp_mod.FingerprintError, match="non-finite"):
+        fp_mod.result_fingerprint(**non_finite)
+
+
+def test_portfolio_result_change_is_detected_at_execution(monkeypatch):
+    prun = _book()
+    run = service.create_run(_payload(prun["id"]))
+    original = pd_store.get_run
+
+    def tampered(run_id):
+        row = original(run_id)
+        if row and row["id"] == prun["id"]:
+            row = {**row, "result_fingerprint": "changed-result"}
+        return row
+
+    monkeypatch.setattr(service.pd_store, "get_run", tampered)
+    with pytest.raises(service.AttributionError, match="portfolio run changed"):
+        service.execute_run(run["id"])
+    assert pa_store.get_run(run["id"])["status"] == "failed"
+
+
+def test_leakage_failed_validation_link_is_rejected(monkeypatch):
+    prun = _book()
+    monkeypatch.setattr(service.validation_store, "get_run", lambda _: {
+        "id": 123, "name": "leaky", "status": "completed",
+        "configuration_fingerprint": "cfg", "result_fingerprint": "result",
+        "leakage_clean": False, "invalid_split_count": 1,
+    })
+    with pytest.raises(service.AttributionError, match="leakage-clean"):
+        service.create_run(_payload(prun["id"], validation_run_id=123))
+
+
+def test_boolean_optional_ids_are_rejected_by_api(client):
+    prun = _book()
+    response = client.post(f"{BASE}/runs", json={
+        **_payload(prun["id"]), "dataset_version_id": True})
+    assert response.status_code == 422

@@ -100,6 +100,7 @@ def _benchmark(weights: Dict[str, float], *, benchmark_id: str, name: str,
     definition: Dict[str, Any] = {
         "benchmark_id": benchmark_id, "name": name, "kind": kind,
         "source": "demo_fixture", "asset_ids": ids,
+        "metadata": {"currency": "USD"},
         "weights": [weights[a] for a in ids],
     }
     if groups:

@@ -258,11 +258,11 @@ export default function PortfolioAttributionPanel({ onNav }: { onNav?: (view: st
           <div className="flex items-center gap-2">
             <button type="button" disabled={selected.length !== 2}
               onClick={() => { setPair({ a: selected[0], b: selected[1] }); setMode("compare"); }}
-              className="rounded-md border border-blue-300 bg-white px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50">
+              className="rounded-md border border-blue-400 bg-[var(--bg-elev)] px-3 py-1 text-xs font-medium text-blue-200 hover:bg-[var(--glass)] disabled:opacity-50">
               Compare selected
             </button>
             <button type="button" onClick={() => setSelected([])}
-              className="rounded-md border border-slate-200 px-3 py-1 text-xs font-medium text-slate-500 hover:bg-white">Clear</button>
+              className="rounded-md border border-slate-500 px-3 py-1 text-xs font-medium text-slate-300 hover:bg-[var(--glass)]">Clear</button>
           </div>
         </div>
       )}
@@ -292,10 +292,10 @@ export default function PortfolioAttributionPanel({ onNav }: { onNav?: (view: st
                   <th scope="col" className="px-3 py-3 text-left">Benchmark</th>
                   <th scope="col" className="px-3 py-3 text-left">Method</th>
                   <th scope="col" className="px-3 py-3 text-right">Periods</th>
-                  <th scope="col" className="px-3 py-3 text-right">Portfolio</th>
-                  <th scope="col" className="px-3 py-3 text-right">Benchmark ret.</th>
-                  <th scope="col" className="px-3 py-3 text-right">Active</th>
-                  <th scope="col" className="px-3 py-3 text-right">Tracking err.</th>
+                  <th scope="col" className="px-3 py-3 text-right">Portfolio (arith.)</th>
+                  <th scope="col" className="px-3 py-3 text-right">Benchmark (arith.)</th>
+                  <th scope="col" className="px-3 py-3 text-right">Active (arith.)</th>
+                  <th scope="col" className="px-3 py-3 text-right">TE / period</th>
                   <th scope="col" className="px-3 py-3 text-left">Reconciliation</th>
                   <th scope="col" className="px-3 py-3 text-left">Integrity</th>
                   <th scope="col" className="px-3 py-3 text-left">Completeness</th>

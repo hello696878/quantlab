@@ -21,6 +21,7 @@ cross-lab write is an optional NEW Experiment Registry record.
 from __future__ import annotations
 
 import json
+import logging
 import math
 import time
 from datetime import datetime, timezone
@@ -45,6 +46,8 @@ from app.portfolio_attribution import fingerprints as fp_mod
 from app.portfolio_attribution import linking as link_mod
 from app.portfolio_attribution import observations as obs_mod
 from app.portfolio_attribution import store
+
+logger = logging.getLogger(__name__)
 
 ATTRIBUTION_METHODS = ("contribution_only", "brinson")
 COST_POLICIES = ("stored_rebalance_costs", "none")
@@ -88,6 +91,24 @@ def _now() -> str:
 # ---------------------------------------------------------------------------
 
 
+def _optional_positive_id(value: Any, field: str) -> Optional[int]:
+    if value is None:
+        return None
+    if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+        raise AttributionError(f"{field} must be a positive integer")
+    return value
+
+
+def _dataset_identity(version: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "content_fingerprint": version.get("content_fingerprint"),
+        "manifest_fingerprint": version.get("manifest_fingerprint"),
+        "schema_fingerprint": version.get("schema_fingerprint"),
+        "quality_status": version.get("quality_status"),
+        "validation_status": version.get("validation_status"),
+        "invalidated_at": version.get("invalidated_at"),
+    }
+
 def _load_portfolio(portfolio_run_id: Any) -> Dict[str, Any]:
     if isinstance(portfolio_run_id, bool) or not isinstance(portfolio_run_id, int):
         raise AttributionError("portfolio_run_id is required")
@@ -102,10 +123,18 @@ def _load_portfolio(portfolio_run_id: Any) -> Dict[str, Any]:
 
 def _indexed_rebalances(prun: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Stored rebalances with the decision_index the timeline implies."""
-    index = {ts: i for i, ts in enumerate(prun["universe"]["timestamps"])}
+    timestamps = prun["universe"]["timestamps"]
+    index = {ts: i for i, ts in enumerate(timestamps)}
+    rows = pd_store.list_rebalances(prun["id"])
+    decisions = [r.get("decision_timestamp") for r in rows]
+    if len(set(decisions)) != len(decisions):
+        raise AttributionError("linked portfolio has duplicate rebalance decisions")
+    unknown = [ts for ts in decisions if ts not in index]
+    if unknown:
+        raise AttributionError(
+            "linked portfolio has rebalance decisions outside its timeline")
     return [{**r, "decision_index": index[r["decision_timestamp"]]}
-            for r in pd_store.list_rebalances(prun["id"])
-            if r["decision_timestamp"] in index]
+            for r in rows]
 
 
 def create_run(payload: Dict[str, Any], *,
@@ -165,24 +194,46 @@ def create_run(payload: Dict[str, Any], *,
             payload.get("benchmark"),
             portfolio_asset_ids=observations["asset_ids"],
             portfolio_groups=observations["groups"],
-            period_count=observations["period_count"])
+            period_count=observations["period_count"],
+            period_starts=[p["period_start"]
+                           for p in observations["periods"]])
     except bench_mod.BenchmarkError as exc:
         raise AttributionError(str(exc))
+    if benchmark.get("configured"):
+        benchmark["frequency"] = policy["return_frequency"]
+        benchmark["period_start"] = observations["observation_start"]
+        benchmark["period_end"] = observations["observation_end"]
+        portfolio_currencies = {asset.get("currency")
+                                for asset in prun["universe"]["assets"]
+                                if asset.get("currency")}
+        benchmark_currency = (benchmark.get("metadata") or {}).get("currency")
+        if portfolio_currencies and (
+                len(portfolio_currencies) != 1
+                or benchmark_currency not in portfolio_currencies):
+            raise AttributionError(
+                "portfolio and benchmark currencies do not match; currency "
+                "conversion is never inferred or performed")
     if method == "brinson" and not benchmark.get("configured"):
         raise AttributionError(
             "Brinson attribution requires an explicit benchmark definition; "
             "a benchmark is never selected automatically")
 
-    # linked records (all read-only)
+    # Linked records are read-only and their material identities are pinned.
     linked: Dict[str, Any] = {}
-    cost_run_id = payload.get("cost_diagnostic_run_id")
+    cost_run_id = _optional_positive_id(
+        payload.get("cost_diagnostic_run_id"), "cost_diagnostic_run_id")
     if cost_run_id is not None:
         crun = cost_store.get_run(cost_run_id)
-        if crun is None:
+        if crun is None or crun["status"] != "completed":
             raise AttributionError(
-                f"cost-diagnostic run {cost_run_id} not found")
-        linked["cost_model_fingerprint"] = crun["cost_model_fingerprint"]
-    regime_run_id = payload.get("regime_run_id")
+                "cost linkage requires a completed cost-diagnostic run")
+        linked.update({
+            "cost_model_fingerprint": crun["cost_model_fingerprint"],
+            "cost_configuration_fingerprint": crun["configuration_fingerprint"],
+            "cost_result_fingerprint": crun.get("result_fingerprint"),
+        })
+    regime_run_id = _optional_positive_id(
+        payload.get("regime_run_id"), "regime_run_id")
     regime_definition_id = payload.get("regime_definition_id")
     if regime_run_id is not None:
         rrun = regime_store.get_run(regime_run_id)
@@ -198,11 +249,16 @@ def create_run(payload: Dict[str, Any], *,
             raise AttributionError(
                 f"regime definition {regime_definition_id!r} not found in run "
                 f"{rrun['id']}")
-        linked["regime_definition_fingerprint"] = \
-            definition["definition_fingerprint"]
+        linked.update({
+            "regime_configuration_fingerprint": rrun["configuration_fingerprint"],
+            "regime_result_fingerprint": rrun.get("result_fingerprint"),
+            "regime_definition_fingerprint":
+                definition["definition_fingerprint"],
+        })
     elif regime_definition_id:
         raise AttributionError("regime_definition_id requires regime_run_id")
-    stress_run_id = payload.get("stress_run_id")
+    stress_run_id = _optional_positive_id(
+        payload.get("stress_run_id"), "stress_run_id")
     if stress_run_id is not None:
         srun = stress_store.get_run(stress_run_id)
         if srun is None or srun["status"] != "completed":
@@ -212,17 +268,31 @@ def create_run(payload: Dict[str, Any], *,
             raise AttributionError(
                 "the linked stress run analyses a different portfolio run; "
                 "drawdown episodes are never transplanted between books")
-        linked["stress_result_fingerprint"] = srun.get("result_fingerprint")
-    validation_run_id = payload.get("validation_run_id")
+        linked.update({
+            "stress_configuration_fingerprint": srun["configuration_fingerprint"],
+            "stress_result_fingerprint": srun.get("result_fingerprint"),
+        })
+    validation_run_id = _optional_positive_id(
+        payload.get("validation_run_id"), "validation_run_id")
     if validation_run_id is not None:
         vrun = validation_store.get_run(validation_run_id)
         if vrun is None or vrun["status"] != "completed":
             raise AttributionError(
                 "validation linkage requires a completed model-validation run")
-        linked["validation_configuration_fingerprint"] = \
-            vrun.get("configuration_fingerprint")
-
-    dataset_version_id = payload.get("dataset_version_id")
+        if vrun.get("leakage_clean") is not True \
+                or vrun.get("invalid_split_count", 0) != 0:
+            raise AttributionError(
+                "validation linkage requires a leakage-clean run with no "
+                "invalid splits")
+        linked.update({
+            "validation_configuration_fingerprint":
+                vrun.get("configuration_fingerprint"),
+            "validation_result_fingerprint": vrun.get("result_fingerprint"),
+            "validation_leakage_clean": True,
+            "validation_invalid_split_count": 0,
+        })
+    dataset_version_id = _optional_positive_id(
+        payload.get("dataset_version_id"), "dataset_version_id")
     if dataset_version_id is None:
         dataset_version_id = prun.get("dataset_version_id")
     dataset_identity: Dict[str, Any] = {}
@@ -231,10 +301,27 @@ def create_run(payload: Dict[str, Any], *,
         if version is None:
             raise AttributionError(
                 f"dataset version {dataset_version_id} not found")
-        dataset_identity = {
-            "manifest_fingerprint": version["manifest_fingerprint"],
-            "schema_fingerprint": version.get("schema_fingerprint"),
-        }
+        if version.get("invalidated_at"):
+            raise AttributionError(
+                "an invalidated dataset version cannot support verified attribution")
+        dataset_identity = _dataset_identity(version)
+        linked["dataset_identity"] = dataset_identity
+
+    benchmark_dataset_id = benchmark.get("dataset_version_id")
+    if benchmark_dataset_id is not None:
+        benchmark_version = dataset_store.get_version(benchmark_dataset_id)
+        if benchmark_version is None:
+            raise AttributionError(
+                f"benchmark dataset version {benchmark_dataset_id} not found")
+        if benchmark_version.get("invalidated_at"):
+            raise AttributionError(
+                "an invalidated benchmark dataset cannot support attribution")
+        benchmark["dataset_identity"] = _dataset_identity(benchmark_version)
+        linked["benchmark_dataset_identity"] = benchmark["dataset_identity"]
+
+    benchmark["fingerprint"] = (
+        fp_mod.benchmark_definition_fingerprint(benchmark)
+        if benchmark.get("configured") else None)
 
     observation_fp = fp_mod.observation_universe_fingerprint(
         observations, benchmark, dataset_identity,
@@ -252,6 +339,7 @@ def create_run(payload: Dict[str, Any], *,
         "benchmark_id": benchmark.get("benchmark_id"),
         "kind": benchmark.get("kind"),
         "source": benchmark.get("source"),
+        "fingerprint": benchmark.get("fingerprint"),
     }
     filters = {"observation_start": observations["observation_start"],
                "observation_end": observations["observation_end"]}
@@ -400,6 +488,113 @@ def lab_summary() -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _assert_pinned(label: str, current: Dict[str, Any],
+                   expected: Dict[str, Any], mapping: Dict[str, str]) -> None:
+    for expected_key, current_key in mapping.items():
+        if expected_key in expected and expected[expected_key] != current.get(current_key):
+            raise AttributionError(
+                f"the linked {label} changed since this attribution run was "
+                "created; create a new attribution run")
+
+
+def _revalidate_inputs(run: Dict[str, Any]
+                       ) -> Tuple[Dict[str, Any], List[Dict[str, Any]],
+                                  Dict[str, Any]]:
+    """Reload every linked identity and rebuild the observation fingerprint."""
+    config = run["configuration"]
+    expected = config.get("linked") or {}
+    prun = pd_store.get_run(run["portfolio_run_id"])
+    if prun is None or prun["status"] != "completed":
+        raise AttributionError(
+            "the linked portfolio run is no longer available/completed")
+    _assert_pinned("portfolio run", prun, config["portfolio_identity"], {
+        "portfolio_configuration_fingerprint": "configuration_fingerprint",
+        "portfolio_result_fingerprint": "result_fingerprint",
+    })
+    if run.get("cost_diagnostic_run_id"):
+        current = cost_store.get_run(run["cost_diagnostic_run_id"])
+        if current is None or current["status"] != "completed":
+            raise AttributionError("the linked cost-diagnostic run is unavailable")
+        _assert_pinned("cost-diagnostic run", current, expected, {
+            "cost_model_fingerprint": "cost_model_fingerprint",
+            "cost_configuration_fingerprint": "configuration_fingerprint",
+            "cost_result_fingerprint": "result_fingerprint",
+        })
+    if run.get("regime_run_id"):
+        current = regime_store.get_run(run["regime_run_id"])
+        if current is None or current["status"] != "completed":
+            raise AttributionError("the linked regime run is unavailable")
+        _assert_pinned("regime run", current, expected, {
+            "regime_configuration_fingerprint": "configuration_fingerprint",
+            "regime_result_fingerprint": "result_fingerprint",
+        })
+        definition = next((d for d in regime_store.list_definitions(current["id"])
+                           if d["definition_id"] == run["regime_definition_id"]),
+                          None)
+        if definition is None:
+            raise AttributionError("the linked regime definition is unavailable")
+        _assert_pinned("regime definition", definition, expected, {
+            "regime_definition_fingerprint": "definition_fingerprint",
+        })
+    if run.get("stress_run_id"):
+        current = stress_store.get_run(run["stress_run_id"])
+        if current is None or current["status"] != "completed" \
+                or current["portfolio_run_id"] != prun["id"]:
+            raise AttributionError("the linked stress run is unavailable or mismatched")
+        _assert_pinned("stress run", current, expected, {
+            "stress_configuration_fingerprint": "configuration_fingerprint",
+            "stress_result_fingerprint": "result_fingerprint",
+        })
+    if run.get("validation_run_id"):
+        current = validation_store.get_run(run["validation_run_id"])
+        if current is None or current["status"] != "completed" \
+                or current.get("leakage_clean") is not True \
+                or current.get("invalid_split_count", 0) != 0:
+            raise AttributionError(
+                "the linked validation run is unavailable or no longer "
+                "leakage-clean")
+        _assert_pinned("validation run", current, expected, {
+            "validation_configuration_fingerprint": "configuration_fingerprint",
+            "validation_result_fingerprint": "result_fingerprint",
+            "validation_leakage_clean": "leakage_clean",
+            "validation_invalid_split_count": "invalid_split_count",
+        })
+
+    dataset_identity: Dict[str, Any] = {}
+    if run.get("dataset_version_id"):
+        version = dataset_store.get_version(run["dataset_version_id"])
+        if version is None or version.get("invalidated_at"):
+            raise AttributionError(
+                "the linked dataset is missing or has been invalidated")
+        dataset_identity = _dataset_identity(version)
+        if "dataset_identity" in expected \
+                and expected["dataset_identity"] != dataset_identity:
+            raise AttributionError("the linked dataset identity changed")
+    benchmark = config["benchmark"]
+    if benchmark.get("dataset_version_id"):
+        version = dataset_store.get_version(benchmark["dataset_version_id"])
+        if version is None or version.get("invalidated_at"):
+            raise AttributionError(
+                "the benchmark dataset is missing or has been invalidated")
+        identity = _dataset_identity(version)
+        if "benchmark_dataset_identity" in expected \
+                and expected["benchmark_dataset_identity"] != identity:
+            raise AttributionError("the benchmark dataset identity changed")
+
+    rebalances = _indexed_rebalances(prun)
+    policy = config["policy"]
+    window = (run["observation_start"], run["observation_end"])
+    observations = obs_mod.build_observations(
+        prun, rebalances, policy,
+        window=(window[0], window[1]) if window[0] and window[1] else None)
+    observation_fp = fp_mod.observation_universe_fingerprint(
+        observations, benchmark, dataset_identity,
+        policy["weight_timing_policy"])
+    if observation_fp != run["observation_fingerprint"]:
+        raise AttributionError(
+            "the attribution observation universe changed since creation")
+    return prun, rebalances, observations
+
 def execute_run(run_id: int, *, create_experiment: bool = False) -> Dict[str, Any]:
     run = store.get_run(run_id)
     if run is None:
@@ -413,16 +608,12 @@ def execute_run(run_id: int, *, create_experiment: bool = False) -> Dict[str, An
     except (NotFoundError, ConflictError):
         raise
     except AttributionError as exc:
-        store.clear_results(run_id)
-        store.update_run(run_id, {"status": "failed", "error_message": str(exc),
-                                  "is_baseline": 0, "completed_at": _now()})
+        store.mark_failed(run_id, str(exc), _now())
         raise
     except Exception:
-        store.clear_results(run_id)
-        store.update_run(run_id, {
-            "status": "failed",
-            "error_message": "internal error during attribution execution",
-            "is_baseline": 0, "completed_at": _now()})
+        logger.exception("unexpected portfolio-attribution execution failure")
+        store.mark_failed(
+            run_id, "internal error during attribution execution", _now())
         raise InternalExecutionError(
             "internal error during attribution execution; the run is marked "
             "failed with the stored error message")
@@ -437,23 +628,8 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
     variant = config.get("brinson_variant")
     warnings: List[str] = list(config.get("integrity_warnings") or [])
 
-    # step 1: revalidate the linked portfolio
-    prun = pd_store.get_run(run["portfolio_run_id"])
-    if prun is None or prun["status"] != "completed":
-        raise AttributionError(
-            "the linked portfolio run is no longer available/completed")
-    if prun["configuration_fingerprint"] != \
-            config["portfolio_identity"]["portfolio_configuration_fingerprint"]:
-        raise AttributionError(
-            "the linked portfolio run changed since this attribution run was "
-            "created; re-create the run against the current record")
-    rebalances = _indexed_rebalances(prun)
-
-    # step 2: observations
-    window = (run["observation_start"], run["observation_end"])
-    observations = obs_mod.build_observations(
-        prun, rebalances, policy,
-        window=(window[0], window[1]) if window[0] and window[1] else None)
+    # Steps 1-2: revalidate all linked identities and observations.
+    prun, rebalances, observations = _revalidate_inputs(run)
     asset_ids = observations["asset_ids"]
     groups = observations["groups"]
     periods = observations["periods"]
@@ -603,6 +779,14 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
     # aggregates
     asset_rows = contrib_mod.aggregate_asset_results(period_results, asset_ids,
                                                      groups)
+    asset_linking = link_mod.link_contributions(
+        [{row["asset_id"]: row["contribution"]
+          for row in result["contributions"]["rows"]}
+         for result in period_results],
+        market_returns, config["linking_method"])
+    linked_values = asset_linking.get("values") or {}
+    for row in asset_rows:
+        row["linked_contribution"] = linked_values.get(row["asset_id"])
     group_rows = contrib_mod.aggregate_group_results(asset_rows)
     brinson_rows = (brinson_mod.aggregate_brinson(brinson_periods)
                     if brinson_periods else [])
@@ -714,6 +898,7 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
             if benchmark.get("configured") and benchmark_returns else None),
         "active_drawdown": active_dd,
         "group_concentration": group_concentration,
+        "asset_contribution_linking": asset_linking,
         "period_concentration": period_concentration,
         "regime_note": regime_note,
         "execution_order": EXECUTION_ORDER,
@@ -722,8 +907,9 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
     result_fp = fp_mod.result_fingerprint(
         run["configuration_fingerprint"], period_rows, asset_rows, group_rows,
         brinson_rows, linking, cost_block, active_risk_block,
-        concentration_block, drawdown_rows, warnings, integrity, completeness,
-        reconciliation_status)
+        {"asset": concentration_block, "group": group_concentration,
+         "period": period_concentration}, regime_rows, drawdown_rows,
+        summary, warnings, integrity, completeness, reconciliation_status)
 
     benchmark_record = None
     if benchmark.get("configured"):
@@ -736,11 +922,14 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
             "timing_policy": benchmark["timing_policy"],
             "asset_ids": benchmark["asset_ids"],
             "weight_sum": benchmark["weight_sum"],
-            "definition": {k: benchmark[k] for k in
-                           ("asset_ids", "groups", "base_weights", "kind",
-                            "source", "weight_sum", "portfolio_only_assets",
-                            "benchmark_only_assets")},
-            "fingerprint": run["observation_fingerprint"],
+            "definition": {k: benchmark.get(k) for k in
+                           ("asset_ids", "groups", "base_weights", "weights_per_period",
+                            "returns", "kind", "source", "weight_sum",
+                            "portfolio_only_assets", "benchmark_only_assets",
+                            "dataset_version_id", "dataset_identity", "metadata",
+                            "period_starts", "information_available_at",
+                            "frequency", "period_start", "period_end")},
+            "fingerprint": benchmark["fingerprint"],
         }
 
     store.replace_children(
@@ -883,7 +1072,7 @@ def _regime_rows(run: Dict[str, Any], prun: Dict[str, Any],
             "portfolio_market_return": sum(market),
             "benchmark_return": sum(bench) if full_bench else None,
             "active_return": sum(active) if full_bench else None,
-            "cost_return": sum(costs) if costs else None,
+            "cost_return": (sum(costs) if len(costs) == len(idx) else None),
             "net_return": (sum(market) - sum(costs)) if len(costs) == len(idx)
                           else None,
             "allocation_effect": sum(alloc) if alloc else None,
@@ -955,7 +1144,7 @@ def _drawdown_rows(run: Dict[str, Any], periods: List[Dict[str, Any]],
             "portfolio_market_return": sum(market),
             "benchmark_return": sum(bench) if full_bench else None,
             "active_return": active,
-            "cost_return": sum(costs) if costs else None,
+            "cost_return": (sum(costs) if len(costs) == len(window) else None),
             "allocation_effect": sum(alloc) if alloc else None,
             "selection_effect": sum(sel) if sel else None,
             "interaction_effect": sum(inter) if inter else None,
@@ -990,6 +1179,7 @@ def _baseline_scope(run: Dict[str, Any]) -> str:
     return "|".join([
         f"prun:{run['portfolio_run_id']}",
         f"obs:{run['observation_fingerprint'][:16]}",
+        f"bench:{((run.get('configuration') or {}).get('benchmark') or {}).get('fingerprint', 'none')[:16]}",
         f"pol:{run['policy_fingerprint'][:16]}",
         f"win:{run['observation_start']}..{run['observation_end']}",
         f"freq:{run['return_frequency']}",
@@ -1016,8 +1206,11 @@ def mark_baseline(run_id: int) -> Dict[str, Any]:
             f"tolerance — this run is {run['reconciliation_status']}")
     if not run["result_fingerprint"]:
         raise ConflictError("baselines require a result fingerprint")
+    try:
+        _revalidate_inputs(run)
+    except AttributionError as exc:
+        raise ConflictError(str(exc)) from exc
     scope = _baseline_scope(run)
-    store.update_run(run_id, {"baseline_scope": scope})
     store.mark_baseline(run_id, scope)
     return get_run(run_id)
 

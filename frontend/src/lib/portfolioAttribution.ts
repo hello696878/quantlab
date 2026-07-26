@@ -90,6 +90,7 @@ export interface LinkingBlock {
 export interface CostBlock {
   total_cost_return: number | null;
   component_totals: Record<string, number | null>;
+  component_states: Record<string, "complete" | "partial" | "unavailable">;
   gross_market_return_all_periods: number;
   gross_market_return_costed_periods: number;
   net_return_costed_periods: number | null;
@@ -217,6 +218,7 @@ export interface AssetRow {
   negative_contribution: number | null;
   absolute_contribution: number | null;
   absolute_share: number | null;
+  signed_share: number | null;
   observation_count: number;
 }
 
@@ -225,10 +227,12 @@ export interface GroupRow {
   asset_count: number;
   average_weight: number | null;
   arithmetic_contribution: number | null;
+  linked_contribution: number | null;
   positive_contribution: number | null;
   negative_contribution: number | null;
   absolute_contribution: number | null;
   absolute_share: number | null;
+  signed_share: number | null;
 }
 
 export interface BrinsonRow {

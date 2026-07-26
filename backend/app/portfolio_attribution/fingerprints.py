@@ -73,10 +73,28 @@ def observation_universe_fingerprint(observations: Dict[str, Any],
             "weights_per_period": benchmark.get("weights_per_period"),
             "returns": benchmark.get("returns"),
             "timing_policy": benchmark.get("timing_policy"),
+            "frequency": benchmark.get("frequency"),
+            "period_start": benchmark.get("period_start"),
+            "period_end": benchmark.get("period_end"),
+            "dataset_version_id": benchmark.get("dataset_version_id"),
+            "dataset_identity": benchmark.get("dataset_identity"),
+            "metadata": benchmark.get("metadata"),
+            "period_starts": benchmark.get("period_starts"),
+            "information_available_at": benchmark.get(
+                "information_available_at"),
         },
         "dataset": dataset_identity,
     }))
 
+
+def benchmark_definition_fingerprint(benchmark: Dict[str, Any]) -> str:
+    """Content identity for an explicit benchmark, excluding display notes."""
+    material = {key: value for key, value in benchmark.items()
+                if key not in {"note", "fingerprint"}}
+    return sha256_hex(_clean({
+        "kind": "portfolio_attribution_benchmark_v1",
+        "definition": material,
+    }))
 
 def attribution_policy_fingerprint(policy: Dict[str, Any],
                                    attribution_method: str,
@@ -122,52 +140,39 @@ def result_fingerprint(configuration_fp: str,
                        linking: Optional[Dict[str, Any]],
                        cost_block: Optional[Dict[str, Any]],
                        active_risk_block: Optional[Dict[str, Any]],
-                       concentration_block: Optional[Dict[str, Any]],
+                       concentration_blocks: Dict[str, Any],
+                       regime_rows: List[Dict[str, Any]],
                        drawdown_rows: List[Dict[str, Any]],
-                       warnings: List[str],
+                       summary: Dict[str, Any], warnings: List[str],
                        integrity: str, completeness: str,
                        reconciliation: str) -> str:
+    """Fingerprint every material result while excluding local row ids."""
+    material_drawdowns = [
+        {key: value for key, value in row.items()
+         if key not in {"id", "run_id", "episode_id"}}
+        for row in drawdown_rows
+    ]
     return sha256_hex(_clean({
         "kind": "portfolio_attribution_result_v1",
         "configuration_fingerprint": configuration_fp,
-        "periods": [{k: p.get(k) for k in
-                     ("period_id", "portfolio_market_return",
-                      "portfolio_net_return", "benchmark_return",
-                      "active_return", "allocation_effect",
-                      "selection_effect", "interaction_effect", "residual")}
-                    for p in period_rows],
-        "assets": [{k: r.get(k) for k in
-                    ("asset_id", "arithmetic_contribution",
-                     "absolute_contribution")} for r in asset_rows],
-        "groups": [{k: r.get(k) for k in
-                    ("group_id", "arithmetic_contribution")}
-                   for r in group_rows],
-        "brinson": [{k: r.get(k) for k in
-                     ("group_id", "allocation_effect", "selection_effect",
-                      "interaction_effect")} for r in brinson_rows],
-        "linking": ({k: linking.get(k) for k in
-                     ("method", "linked_effects", "linked_target",
-                      "linking_residual")} if linking else None),
-        "cost": ({k: cost_block.get(k) for k in
-                  ("total_cost_return", "net_return_costed_periods",
-                   "completeness")} if cost_block else None),
-        "active_risk": ({k: active_risk_block.get(k) for k in
-                         ("tracking_error", "information_ratio",
-                          "mean_active_return")}
-                        if active_risk_block else None),
-        "concentration": ({k: concentration_block.get(k) for k in
-                           ("herfindahl", "largest_absolute_share")}
-                          if concentration_block else None),
-        "drawdowns": [{k: r.get(k) for k in
-                       ("episode_id", "portfolio_return", "benchmark_return",
-                        "active_return")} for r in drawdown_rows],
+        "periods": period_rows,
+        "assets": asset_rows,
+        "groups": group_rows,
+        "brinson": brinson_rows,
+        "linking": linking,
+        "cost": cost_block,
+        "active_risk": active_risk_block,
+        "concentration": concentration_blocks,
+        "regimes": regime_rows,
+        "drawdowns": material_drawdowns,
+        "summary": summary,
         "warnings": sorted(warnings),
         "integrity": integrity,
         "completeness": completeness,
         "reconciliation": reconciliation,
     }))
 
-
 __all__ = ["FingerprintError", "observation_universe_fingerprint",
+           "benchmark_definition_fingerprint",
            "attribution_policy_fingerprint", "configuration_fingerprint",
            "result_fingerprint"]

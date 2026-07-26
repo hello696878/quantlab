@@ -100,10 +100,17 @@ def aggregate_costs(cost_rows: List[Dict[str, Any]],
 
     total_cost = sum(r["total_cost_return"] for r in costed)
     component_totals: Dict[str, Optional[float]] = {}
+    component_states: Dict[str, str] = {}
     for component in COST_COMPONENTS:
         values = [r["components"].get(component) for r in traded]
         available = [v for v in values if v is not None]
-        component_totals[component] = (sum(available) if available else None)
+        if values and len(available) == len(values):
+            component_totals[component] = sum(available)
+            component_states[component] = "complete"
+        else:
+            component_totals[component] = None
+            component_states[component] = (
+                "partial" if available else "unavailable")
 
     gross_all = sum(market_returns_by_period.values())
     gross_costed = sum(market_returns_by_period[r["period_id"]]
@@ -114,6 +121,7 @@ def aggregate_costs(cost_rows: List[Dict[str, Any]],
     return {
         "total_cost_return": total_cost if costed else None,
         "component_totals": component_totals,
+        "component_states": component_states,
         "gross_market_return_all_periods": gross_all,
         "gross_market_return_costed_periods": gross_costed,
         "net_return_costed_periods": (gross_costed - total_cost

@@ -287,7 +287,8 @@ Attribution runs
 ([`PORTFOLIO_ATTRIBUTION_LAB.md`](PORTFOLIO_ATTRIBUTION_LAB.md)) inherit the
 linked portfolio run's `dataset_version_id` unless one is supplied
 explicitly; the run detail shows the version's fingerprints, provenance and
-quality states and warns visibly when the version was invalidated.  A
+quality states and warns visibly when the version was invalidated.  An invalidated linked portfolio or benchmark dataset blocks attribution
+execution and baseline promotion while preserving historical runs. A
 benchmark definition may declare its own `dataset_version_id` for
 provenance.  Dataset metadata is never mutated by an attribution run, and
 the dataset's manifest and schema fingerprints (not row ids) are what enter

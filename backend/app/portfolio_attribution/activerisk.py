@@ -38,6 +38,9 @@ CONCENTRATION_EPS = 1e-12
 
 def active_series(portfolio_returns: List[float],
                   benchmark_returns: List[float]) -> List[float]:
+    if len(portfolio_returns) != len(benchmark_returns):
+        raise ValueError(
+            "portfolio and benchmark return series must have identical lengths")
     return [p - b for p, b in zip(portfolio_returns, benchmark_returns)]
 
 
@@ -46,8 +49,8 @@ def active_risk(portfolio_returns: List[float],
                 *, periods_per_year: Optional[int],
                 frequency: str) -> Dict[str, Any]:
     """Tracking error, information ratio and hit rates with honest gaps."""
-    n = len(portfolio_returns)
     active = active_series(portfolio_returns, benchmark_returns)
+    n = len(active)
     out: Dict[str, Any] = {
         "observation_count": n,
         "mean_active_return": (sum(active) / n) if n else None,

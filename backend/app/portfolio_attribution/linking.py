@@ -57,7 +57,7 @@ def compound(returns: List[float]) -> Optional[float]:
     level = 1.0
     for r in returns:
         factor = 1.0 + r
-        if factor <= 0 or not math.isfinite(factor):
+        if factor < 0 or not math.isfinite(factor):
             return None
         level *= factor
         if not math.isfinite(level):
@@ -72,7 +72,9 @@ def _carino_factor(x: float, y: float) -> Optional[float]:
     if x == y:
         return 1.0 / (1.0 + x)
     denominator = x - y
-    value = (math.log1p(x) - math.log1p(y)) / denominator
+    # The direct log difference loses precision when x and y are adjacent
+    # floats. This algebraically equivalent form preserves the difference.
+    value = math.log1p(denominator / (1.0 + y)) / denominator
     return value if math.isfinite(value) else None
 
 
@@ -225,6 +227,56 @@ def link_effects(period_effects: List[Dict[str, Any]],
     return result
 
 
+def link_contributions(period_contributions: List[Dict[str, float]],
+                       portfolio_returns: List[float],
+                       method: str) -> Dict[str, Any]:
+    """Link per-asset contributions to the portfolio return convention.
+
+    Arithmetic linking is the ordinary sum. Carino linking uses zero as the
+    comparison return, so linked asset contributions sum to compounded
+    portfolio return when all factors are defined.
+    """
+    if len(period_contributions) != len(portfolio_returns):
+        raise LinkingError("period counts must align for contribution linking")
+    asset_ids = sorted({asset_id for row in period_contributions
+                        for asset_id in row})
+    arithmetic = {asset_id: sum(row.get(asset_id, 0.0)
+                                for row in period_contributions)
+                  for asset_id in asset_ids}
+    if method == "arithmetic":
+        return {"available": True, "method": method,
+                "values": arithmetic, "target": sum(portfolio_returns),
+                "reason": None}
+    if method != "carino":
+        raise LinkingError(
+            f"linking method must be one of {', '.join(LINKING_METHODS)}")
+    total = compound(portfolio_returns)
+    if total is None:
+        return {"available": False, "method": method, "values": None,
+                "target": None,
+                "reason": "a return below -100% makes wealth negative"}
+    k_total = _carino_factor(total, 0.0)
+    if k_total is None or k_total == 0:
+        return {"available": False, "method": method, "values": None,
+                "target": total,
+                "reason": "the total Carino contribution factor is undefined"}
+    factors: List[float] = []
+    for period_return in portfolio_returns:
+        factor = _carino_factor(period_return, 0.0)
+        if factor is None:
+            return {"available": False, "method": method, "values": None,
+                    "target": total,
+                    "reason": ("a period return of -100% makes the Carino "
+                               "contribution factor undefined")}
+        factors.append(factor / k_total)
+    values = {
+        asset_id: sum(factors[t] * period_contributions[t].get(asset_id, 0.0)
+                      for t in range(len(period_contributions)))
+        for asset_id in asset_ids
+    }
+    return {"available": True, "method": method, "values": values,
+            "target": total, "smoothing_factors": factors, "reason": None}
+
 def time_weighted_return(returns: List[float],
                          *, supports_twr: bool) -> Dict[str, Any]:
     """TWR = Π(1+r) − 1 over cash-flow-neutral subperiod returns.
@@ -245,8 +297,8 @@ def time_weighted_return(returns: List[float],
     value = compound(returns)
     if value is None:
         return {"available": False, "value": None,
-                "reason": ("a period return of -100% or worse makes the "
-                           "compounded wealth non-positive"),
+                "reason": ("a period return below -100% makes compounded "
+                           "wealth negative"),
                 "convention": None}
     return {
         "available": True,
@@ -260,4 +312,4 @@ def time_weighted_return(returns: List[float],
 
 
 __all__ = ["LINKING_METHODS", "EFFECT_KEYS", "LinkingError", "compound",
-           "link_effects", "time_weighted_return"]
+           "link_effects", "link_contributions", "time_weighted_return"]

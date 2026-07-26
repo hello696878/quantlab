@@ -51,6 +51,14 @@ close, the linking residual is zero; when they do not, the linking residual is
 Per-period `smoothing_factors` and the `total_scaling_factor` are stored and
 exportable.
 
+## Asset contribution linking
+
+Arithmetic asset contributions are ordinary period sums. Under Carino, the
+same logarithmic construction is applied against a zero comparison return;
+linked asset contributions therefore sum to the compounded portfolio return.
+If any required logarithm is undefined, linked asset contributions remain
+unavailable rather than being partially reported.
+
 ## Group-level linking
 
 When Carinó linking is available, the same per-period factors are applied to
@@ -74,8 +82,10 @@ on cash-flow-neutral subperiod **simple** returns. The stored Phase 56 series
 is a weight-driven return series with no external cash flows, which is
 exactly what TWR requires, so the lab asserts that support explicitly. When
 support cannot be asserted the result is **withheld** — a compounded number is
-never *labelled* a time-weighted return when the inputs do not support it. A
-period return of −100% or worse withholds it too. There is **no
+never *labelled* a time-weighted return when the inputs do not support it.
+A period return of exactly -100% produces a valid -100% TWR; a return below
+-100% is invalid because it implies negative wealth and is withheld. There is
+**no
 money-weighted / IRR / XIRR figure and no placeholder** — no actual cash flows
 exist in the inputs.
 

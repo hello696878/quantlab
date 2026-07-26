@@ -40,6 +40,7 @@ portfolio estimated on the whole sample), ``unknown``, ``invalid``.
 from __future__ import annotations
 
 import math
+from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
 MIN_PERIODS = 1
@@ -77,6 +78,16 @@ def _finite(value: Any, field: str) -> float:
     if not math.isfinite(f):
         raise ObservationError(f"{field} must be a finite number")
     return f
+
+
+def _timestamp(value: Any, field: str) -> Tuple[datetime, bool]:
+    if not isinstance(value, str) or not value.strip():
+        raise ObservationError(f"{field} must be a non-empty ISO timestamp")
+    try:
+        parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ObservationError(f"{field} must be a valid ISO timestamp") from exc
+    return parsed, parsed.tzinfo is not None
 
 
 def validate_policy(raw: Any) -> Dict[str, Any]:
@@ -197,10 +208,21 @@ def build_observations(prun: Dict[str, Any],
     if len(assets) > MAX_ASSETS:
         raise ObservationError(f"at most {MAX_ASSETS} assets are supported")
     asset_ids = [a["asset_id"] for a in assets]
+    if any(not isinstance(a, str) or not a.strip() or len(a) > MAX_ID_LENGTH
+           for a in asset_ids):
+        raise ObservationError(
+            f"asset ids must be non-empty strings up to {MAX_ID_LENGTH} chars")
     if len(set(asset_ids)) != len(asset_ids):
         raise ObservationError("duplicate asset ids in the linked universe")
-    groups = {a["asset_id"]: (a.get("group") or UNCLASSIFIED_GROUP)
-              for a in assets}
+    groups: Dict[str, str] = {}
+    for asset in assets:
+        group = asset.get("group") or UNCLASSIFIED_GROUP
+        if not isinstance(group, str) or not group.strip() \
+                or len(group.strip()) > MAX_ID_LENGTH:
+            raise ObservationError(
+                f"group for asset {asset['asset_id']!r} must be a non-empty "
+                f"string up to {MAX_ID_LENGTH} chars")
+        groups[asset["asset_id"]] = group.strip()
     distinct_groups = sorted(set(groups.values()))
     if len(distinct_groups) > MAX_GROUPS:
         raise ObservationError(f"at most {MAX_GROUPS} groups are supported")
@@ -210,8 +232,27 @@ def build_observations(prun: Dict[str, Any],
     if n < 2:
         raise ObservationError(
             "attribution needs at least two timeline observations")
+    parsed_timestamps = [
+        _timestamp(ts, f"timestamps[{i}]")
+        for i, ts in enumerate(timestamps)]
+    if len({aware for _, aware in parsed_timestamps}) > 1:
+        raise ObservationError(
+            "timestamps must use one timezone convention; naive and "
+            "timezone-aware values cannot be mixed")
+    for i in range(1, len(parsed_timestamps)):
+        if parsed_timestamps[i][0] <= parsed_timestamps[i - 1][0]:
+            raise ObservationError(
+                "timestamps must be unique and strictly increasing")
     # the last timeline observation opens no complete period
     period_count_all = n - 1
+    for k, series in enumerate(returns_matrix):
+        if not isinstance(series, list) or len(series) != n:
+            raise ObservationError(
+                f"returns for asset {asset_ids[k]!r} must contain exactly "
+                f"{n} observations aligned to timestamps")
+        returns_matrix[k] = [
+            _finite(value, f"returns[{asset_ids[k]}][{t}]")
+            for t, value in enumerate(series)]
 
     index = {ts: i for i, ts in enumerate(timestamps)}
     lo, hi = 0, period_count_all - 1

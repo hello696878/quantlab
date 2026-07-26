@@ -21,7 +21,7 @@ mappings, return convention, timing policy and an optional dataset version.
 | Kind | Weight behaviour |
 | --- | --- |
 | `fixed_weights` | the declared vector is restored at the beginning of **every** period (a documented periodic-rebalancing benchmark) |
-| `supplied_per_period` | one explicit weight row per attribution period, in the benchmark's asset order |
+| `supplied_per_period` | one explicit weight row, exact `period_start`, and `information_available_at` timestamp per attribution period, in the benchmark's asset order |
 | `buy_and_hold` | the declared vector **drifts** with benchmark returns by the same recursion the portfolio uses |
 
 ## Returns and universes
@@ -41,9 +41,12 @@ warning and in the benchmark panel.
 Weights must be finite and within ±10. Their sum is computed and
 **disclosed**: a sum other than 1 is reported (`weight_sum_is_one: false`
 plus a warning) and the weights are used **as declared** — never silently
-renormalized. Duplicate benchmark asset ids, unknown keys, a mismatched
+renormalized. Duplicate benchmark asset ids, unknown keys, malformed bounded metadata, a mismatched
 return convention and a non-beginning-of-period timing policy are all
-rejected with explicit messages.
+rejected with explicit messages. Supplied per-period rows must match the
+portfolio period starts exactly, and their information timestamp cannot be
+later than the period start. Benchmark-only assets require an explicit
+currency declaration; no currency conversion is inferred or performed.
 
 ## Active return
 
@@ -55,8 +58,9 @@ computed on identical periods under the identical return convention. The lab
 distinguishes:
 
 - **gross / market-only active return** — the market contribution difference;
-- **cost-adjusted active return** — available only where the cost leg exists,
-  over its stated costed basis (see the attribution policy);
+- **portfolio net return** — reported separately where the portfolio cost leg
+  exists. v1 does not label a net-minus-benchmark figure as cost-adjusted
+  active return because no benchmark transaction-cost leg is supplied;
 
 A period whose benchmark observation is unavailable (for example a
 buy-and-hold benchmark book that was wiped out) leaves benchmark-relative

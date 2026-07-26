@@ -67,28 +67,46 @@ export default function PortfolioAttributionDetail({
 }: Props) {
   const [children, setChildren] = useState<Children | null>(null);
   const [error, setError] = useState<unknown>(null);
+  const [childErrors, setChildErrors] = useState<string[]>([]);
+  const [loadKey, setLoadKey] = useState(0);
   const [marking, setMarking] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
+    setChildren(null);
+    setError(null);
+    setChildErrors([]);
+    Promise.allSettled([
       getBenchmark(run.id), getPeriods(run.id), getAssets(run.id),
       getGroups(run.id), getBrinson(run.id), getRegimes(run.id),
       getDrawdowns(run.id),
-    ])
-      .then(([b, p, a, g, br, rg, dd]) => {
-        if (cancelled) return;
-        setChildren({
-          benchmark: b.benchmark, periods: p.items, assets: a.items,
-          groups: g.items, brinson: br.items, regimes: rg.items,
-          regimeNote: rg.note, drawdowns: dd.items,
-        });
-      })
-      .catch((err) => !cancelled && setError(err));
+    ]).then((results) => {
+      if (cancelled) return;
+      const failures = results.filter((result): result is PromiseRejectedResult =>
+        result.status === "rejected");
+      if (failures.length === results.length) {
+        setError(failures[0].reason);
+        return;
+      }
+      const b = results[0].status === "fulfilled" ? results[0].value : { benchmark: null };
+      const p = results[1].status === "fulfilled" ? results[1].value : { items: [] };
+      const a = results[2].status === "fulfilled" ? results[2].value : { items: [] };
+      const g = results[3].status === "fulfilled" ? results[3].value : { items: [] };
+      const br = results[4].status === "fulfilled" ? results[4].value : { items: [] };
+      const rg = results[5].status === "fulfilled" ? results[5].value : { items: [], note: null };
+      const dd = results[6].status === "fulfilled" ? results[6].value : { items: [] };
+      setChildren({
+        benchmark: b.benchmark, periods: p.items, assets: a.items,
+        groups: g.items, brinson: br.items, regimes: rg.items,
+        regimeNote: rg.note, drawdowns: dd.items,
+      });
+      setChildErrors(failures.map((failure) =>
+        classifyApiError(failure.reason).message));
+    });
     return () => {
       cancelled = true;
     };
-  }, [run.id]);
+  }, [run.id, loadKey]);
 
   async function handleBaseline() {
     setMarking(true);
@@ -111,6 +129,13 @@ export default function PortfolioAttributionDetail({
   }
 
   const summary = run.summary;
+  const canMarkBaseline = run.status === "completed"
+    && !run.is_baseline
+    && ["verified_from_stored_rebalance", "verified_causal_weights"].includes(run.integrity_status)
+    && run.completeness_status === "complete"
+    && run.reconciliation_status === "reconciled"
+    && run.result_fingerprint !== null
+    && run.dataset_invalidated !== true;
 
   return (
     <div className="space-y-4" data-testid="portfolio-attribution-detail">
@@ -156,7 +181,7 @@ export default function PortfolioAttributionDetail({
               Experiment →
             </button>
           )}
-          {run.status === "completed" && !run.is_baseline && (
+          {canMarkBaseline && (
             <button type="button" onClick={handleBaseline} disabled={marking}
               className="rounded-md border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
               {marking ? "Marking…" : "★ Mark baseline"}
@@ -206,6 +231,11 @@ export default function PortfolioAttributionDetail({
             <dd>{run.result_fingerprint ? <CopyValue value={run.result_fingerprint} display={shortFp(run.result_fingerprint)} /> : "—"}</dd>
           </dl>
         </div>
+        {run.dataset_invalidated && (
+          <div className="mt-3 rounded-lg border border-red-300 bg-red-950/30 p-2.5 text-sm text-red-200">
+            The linked dataset has been invalidated. This historical result remains visible but cannot become a baseline.
+          </div>
+        )}
         {run.error_message && (
           <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{run.error_message}</div>
         )}
@@ -228,6 +258,11 @@ export default function PortfolioAttributionDetail({
         <SkeletonTable rows={6} cols={6} caption="Loading attribution results…" />
       ) : (
         <>
+          {childErrors.length > 0 && (
+            <ErrorState title="Some attribution sections are unavailable"
+              message={childErrors.join(" ")}
+              onRetry={() => setLoadKey((value) => value + 1)} />
+          )}
           {children.benchmark && <BenchmarkSection benchmark={children.benchmark} run={run} />}
           <AssetSection rows={children.assets} run={run} />
           <GroupSection rows={children.groups} assets={children.assets} />
@@ -385,16 +420,18 @@ function AssetSection({ rows, run }: { rows: AssetRow[]; run: RunFull }) {
         })}
       </div>
       <div className="mt-3 overflow-x-auto">
-        <table className="w-full min-w-[820px] text-xs">
+        <table className="w-full min-w-[1080px] text-xs">
           <thead>
             <tr className="border-b border-slate-100 text-left font-semibold uppercase tracking-wide text-slate-500">
               <th scope="col" className="px-3 py-2">Asset</th>
               <th scope="col" className="px-3 py-2">Group</th>
               <th scope="col" className="px-3 py-2 text-right">Avg weight</th>
               <th scope="col" className="px-3 py-2 text-right">Arithmetic contrib.</th>
+              <th scope="col" className="px-3 py-2 text-right">Linked contrib.</th>
               <th scope="col" className="px-3 py-2 text-right">Positive</th>
               <th scope="col" className="px-3 py-2 text-right">Negative</th>
-              <th scope="col" className="px-3 py-2 text-right">|share|</th>
+              <th scope="col" className="px-3 py-2 text-right">Signed share</th>
+              <th scope="col" className="px-3 py-2 text-right">Absolute share</th>
               <th scope="col" className="px-3 py-2 text-right">Periods</th>
             </tr>
           </thead>
@@ -405,8 +442,10 @@ function AssetSection({ rows, run }: { rows: AssetRow[]; run: RunFull }) {
                 <td className="px-3 py-1.5">{r.group_id ?? "—"}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(r.average_weight, 2)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(r.arithmetic_contribution, 3)}</td>
+                <td className="px-3 py-1.5 text-right">{fmtPct(r.linked_contribution, 3)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(r.positive_contribution, 3)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(r.negative_contribution, 3)}</td>
+                <td className="px-3 py-1.5 text-right">{fmtPct(r.signed_share, 1)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(r.absolute_share, 1)}</td>
                 <td className="px-3 py-1.5 text-right">{r.observation_count}</td>
               </tr>
@@ -434,15 +473,17 @@ function GroupSection({ rows, assets }: { rows: GroupRow[]; assets: AssetRow[] }
         Explicit stored group labels — never inferred from asset names. Each asset belongs to exactly one group, so group totals sum to the asset totals with no double counting.
       </p>
       <div className="mt-2 overflow-x-auto">
-        <table className="w-full min-w-[680px] text-xs">
+        <table className="w-full min-w-[920px] text-xs">
           <thead>
             <tr className="border-b border-slate-100 text-left font-semibold uppercase tracking-wide text-slate-500">
               <th scope="col" className="px-3 py-2">Group</th>
               <th scope="col" className="px-3 py-2 text-right">Assets</th>
               <th scope="col" className="px-3 py-2 text-right">Arithmetic contrib.</th>
+              <th scope="col" className="px-3 py-2 text-right">Linked contrib.</th>
               <th scope="col" className="px-3 py-2 text-right">Positive</th>
               <th scope="col" className="px-3 py-2 text-right">Negative</th>
-              <th scope="col" className="px-3 py-2 text-right">|share|</th>
+              <th scope="col" className="px-3 py-2 text-right">Signed share</th>
+              <th scope="col" className="px-3 py-2 text-right">Absolute share</th>
               <th scope="col" className="px-3 py-2 text-center">Assets</th>
             </tr>
           </thead>
@@ -452,8 +493,10 @@ function GroupSection({ rows, assets }: { rows: GroupRow[]; assets: AssetRow[] }
                 <td className="px-3 py-1.5">{r.group_id}</td>
                 <td className="px-3 py-1.5 text-right">{r.asset_count}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(r.arithmetic_contribution, 3)}</td>
+                <td className="px-3 py-1.5 text-right">{fmtPct(r.linked_contribution, 3)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(r.positive_contribution, 3)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(r.negative_contribution, 3)}</td>
+                <td className="px-3 py-1.5 text-right">{fmtPct(r.signed_share, 1)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(r.absolute_share, 1)}</td>
                 <td className="px-3 py-1.5 text-center">
                   <button type="button"
@@ -487,11 +530,23 @@ function GroupSection({ rows, assets }: { rows: GroupRow[]; assets: AssetRow[] }
 }
 
 function BrinsonSection({ rows, run }: { rows: BrinsonRow[]; run: RunFull }) {
-  const total = rows.reduce((acc, r) => acc + (r.total_effect ?? 0), 0);
-  const maxAbs = Math.max(1e-12, ...rows.flatMap((r) =>
-    [Math.abs(r.allocation_effect ?? 0), Math.abs(r.selection_effect ?? 0),
-     Math.abs(r.interaction_effect ?? 0)]));
-  const residual = (run.active_return ?? 0) - total;
+  const sumWhenComplete = (
+    key: "allocation_effect" | "selection_effect" | "interaction_effect" | "total_effect",
+  ) => rows.every((row) => row[key] !== null)
+    ? rows.reduce((sum, row) => sum + (row[key] as number), 0)
+    : null;
+  const allocation = sumWhenComplete("allocation_effect");
+  const selection = sumWhenComplete("selection_effect");
+  const interaction = sumWhenComplete("interaction_effect");
+  const total = sumWhenComplete("total_effect");
+  const availableEffects = rows.flatMap((row) =>
+    [row.allocation_effect, row.selection_effect, row.interaction_effect]
+      .filter((value): value is number => value !== null)
+      .map(Math.abs));
+  const maxAbs = Math.max(1e-12, ...availableEffects);
+  const residual = run.active_return !== null && total !== null
+    ? run.active_return - total
+    : null;
   return (
     <div className="card p-4" data-testid="attribution-brinson">
       <h3 className="text-sm font-semibold text-slate-700">
@@ -504,9 +559,9 @@ function BrinsonSection({ rows, run }: { rows: BrinsonRow[]; run: RunFull }) {
         {" "}— an arithmetic decomposition of a measured difference, not evidence of skill.
       </p>
       <div className="mt-2 grid grid-cols-2 gap-3 md:grid-cols-5">
-        <Metric label="Allocation" value={fmtPct(rows.reduce((a, r) => a + (r.allocation_effect ?? 0), 0), 3)} />
-        <Metric label="Selection" value={fmtPct(rows.reduce((a, r) => a + (r.selection_effect ?? 0), 0), 3)} />
-        <Metric label="Interaction" value={fmtPct(rows.reduce((a, r) => a + (r.interaction_effect ?? 0), 0), 3)} />
+        <Metric label="Allocation" value={fmtPct(allocation, 3)} />
+        <Metric label="Selection" value={fmtPct(selection, 3)} />
+        <Metric label="Interaction" value={fmtPct(interaction, 3)} />
         <Metric label="Residual" value={fmtPct(residual, 4)} />
         <Metric label="Total active return" value={fmtPct(run.active_return, 3)} emphasis />
       </div>
@@ -525,7 +580,7 @@ function BrinsonSection({ rows, run }: { rows: BrinsonRow[]; run: RunFull }) {
                   <div key={label} className="flex-1">
                     <div className="h-2 rounded-sm bg-slate-100">
                       <div className={`h-2 rounded-sm ${color}`}
-                        style={{ width: `${(Math.abs(value ?? 0) / maxAbs) * 100}%` }} />
+                        style={{ width: value === null ? "0%" : `${(Math.abs(value) / maxAbs) * 100}%` }} />
                     </div>
                     <div className="mt-0.5 flex justify-between text-[10px] text-slate-500">
                       <span>{label}</span>
@@ -699,32 +754,42 @@ function TimelineSection({ periods }: { periods: PeriodRow[] }) {
   if (!periods.length) return null;
   const w = 720;
   const h = 120;
-  const values = periods.flatMap((p) =>
-    [p.portfolio_market_return ?? 0, p.benchmark_return ?? 0]);
+  type LineKey = "portfolio_market_return" | "benchmark_return" | "active_return";
+  const keys: LineKey[] = ["portfolio_market_return", "benchmark_return", "active_return"];
+  const complete = Object.fromEntries(keys.map((key) => [
+    key, periods.every((period) => Number.isFinite(period[key])),
+  ])) as Record<LineKey, boolean>;
+  const values = periods.flatMap((period) => keys
+    .map((key) => period[key])
+    .filter((value): value is number => value !== null && Number.isFinite(value)));
   const max = Math.max(1e-9, ...values.map(Math.abs));
-  const line = (key: "portfolio_market_return" | "benchmark_return" | "active_return") =>
-    periods.map((p, i) => {
-      const v = p[key] ?? 0;
-      const x = periods.length > 1 ? (i / (periods.length - 1)) * w : 0;
-      const y = h / 2 - (v / max) * (h / 2 - 6);
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(" ");
+  const line = (key: LineKey) => periods.map((period, index) => {
+    const value = period[key] as number;
+    const x = periods.length > 1 ? (index / (periods.length - 1)) * w : 0;
+    const y = h / 2 - (value / max) * (h / 2 - 6);
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(" ");
   return (
     <div className="card p-4" data-testid="attribution-timeline">
       <h3 className="text-sm font-semibold text-slate-700">Active-return timeline</h3>
       <p className="mt-0.5 text-xs text-slate-400">
         Portfolio (slate), benchmark (sky) and active (rose) returns per period, all in return units. The table below carries the same values.
       </p>
+      {keys.some((key) => !complete[key]) && (
+        <p className="mt-2 text-xs text-amber-300">
+          Incomplete series are omitted from the chart rather than plotted as zero. Their unavailable cells remain visible in the table.
+        </p>
+      )}
       <svg viewBox={`0 0 ${w} ${h}`} className="mt-2 w-full" role="img"
         aria-label="Per-period portfolio, benchmark and active returns">
         <line x1="0" y1={h / 2} x2={w} y2={h / 2} stroke="#cbd5e1" strokeWidth="1" />
-        <polyline points={line("portfolio_market_return")} fill="none" stroke="#475569" strokeWidth="1.5" />
-        <polyline points={line("benchmark_return")} fill="none" stroke="#0ea5e9" strokeWidth="1.5" />
-        <polyline points={line("active_return")} fill="none" stroke="#f43f5e" strokeWidth="1.5" />
+        {complete.portfolio_market_return && <polyline points={line("portfolio_market_return")} fill="none" stroke="#475569" strokeWidth="1.5" />}
+        {complete.benchmark_return && <polyline points={line("benchmark_return")} fill="none" stroke="#0ea5e9" strokeWidth="1.5" />}
+        {complete.active_return && <polyline points={line("active_return")} fill="none" stroke="#f43f5e" strokeWidth="1.5" />}
       </svg>
       <div className="mt-3 max-h-72 overflow-auto">
         <table className="w-full min-w-[880px] text-xs">
-          <thead className="sticky top-0 bg-white">
+          <thead className="sticky top-0 bg-[var(--bg-elev)]">
             <tr className="border-b border-slate-100 text-left font-semibold uppercase tracking-wide text-slate-500">
               <th scope="col" className="px-3 py-2">Period start</th>
               <th scope="col" className="px-3 py-2 text-right">Portfolio</th>
@@ -744,7 +809,7 @@ function TimelineSection({ periods }: { periods: PeriodRow[] }) {
               <tr key={p.period_id} className="border-b border-slate-50 font-mono last:border-0">
                 <td className="px-3 py-1.5">{p.period_start.slice(0, 10)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(p.portfolio_market_return, 3)}</td>
-                <td className="px-3 py-1.5 text-right">{p.transaction_cost_return === null ? (p.cost_state ?? "—") : fmtPct(p.transaction_cost_return, 4)}</td>
+                <td className="px-3 py-1.5 text-right">{p.transaction_cost_return === null ? (p.cost_state ?? "unavailable") : fmtPct(p.transaction_cost_return, 4)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(p.portfolio_net_return, 3)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(p.benchmark_return, 3)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(p.active_return, 3)}</td>
@@ -752,7 +817,7 @@ function TimelineSection({ periods }: { periods: PeriodRow[] }) {
                 <td className="px-3 py-1.5 text-right">{fmtPct(p.selection_effect, 3)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(p.interaction_effect, 3)}</td>
                 <td className="px-3 py-1.5 text-right">{fmtPct(p.residual, 5)}</td>
-                <td className="px-3 py-1.5">{p.reconciliation_state ?? "—"}</td>
+                <td className="px-3 py-1.5">{p.reconciliation_state ?? "unavailable"}</td>
               </tr>
             ))}
           </tbody>

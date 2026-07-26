@@ -63,11 +63,19 @@ reconciliation within the configured tolerance.
 | `portfolio_attribution_runs` | run identity, method/variant/linking, policy, window, headline returns, integrity/completeness/reconciliation, fingerprints, links |
 | `attribution_benchmarks` | the validated benchmark definition (one per run) |
 | `attribution_period_results` | per period: market/cost/net/benchmark/active returns, Brinson effects, residual, cash weight, regime label |
-| `attribution_asset_results` | per asset: average weight, arithmetic/positive/negative/absolute contribution, shares |
-| `attribution_group_results` | per group totals (reconcile with the asset totals) |
+| `attribution_asset_results` | per asset: average weight, arithmetic/linked/positive/negative/absolute contribution, signed and absolute shares |
+| `attribution_group_results` | per group arithmetic/linked totals and distinct signed/absolute shares (reconcile with asset totals) |
 | `attribution_brinson_results` | per group: allocation / selection / interaction, arithmetic and linked, window presence |
 | `attribution_regime_results` | per stored regime label |
 | `attribution_drawdown_results` | per stored Phase 57 episode |
+
+## Reproducibility checks
+
+Execution and baseline promotion reload every pinned upstream record and reject
+changed portfolio, cost, regime, stress, validation, or dataset identities.
+Result fingerprints cover complete period, asset, group, Brinson, linking,
+cost, active-risk, concentration, regime, drawdown, summary, warning and state
+blocks while excluding local row ids, persistence timestamps and runtime.
 
 ## API
 

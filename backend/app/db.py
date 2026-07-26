@@ -55,6 +55,14 @@ def get_connection() -> sqlite3.Connection:
     return conn
 
 
+def _ensure_column(conn: sqlite3.Connection, table: str,
+                   column: str, definition: str) -> None:
+    """Apply an additive column migration without rewriting existing rows."""
+    columns = {row[1] for row in conn.execute(f"PRAGMA table_info({table})")}
+    if column not in columns:
+        conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
 # ---------------------------------------------------------------------------
 # Schema initialisation
 # ---------------------------------------------------------------------------
@@ -1702,6 +1710,7 @@ def init_db() -> None:
                 negative_contribution  REAL,
                 absolute_contribution  REAL,
                 absolute_share         REAL,
+                signed_share           REAL,
                 observation_count      INTEGER NOT NULL DEFAULT 0,
                 UNIQUE (run_id, asset_id)
             )
@@ -1718,10 +1727,12 @@ def init_db() -> None:
                 asset_count            INTEGER NOT NULL DEFAULT 0,
                 average_weight         REAL,
                 arithmetic_contribution REAL,
+                linked_contribution    REAL,
                 positive_contribution  REAL,
                 negative_contribution  REAL,
                 absolute_contribution  REAL,
                 absolute_share         REAL,
+                signed_share           REAL,
                 UNIQUE (run_id, group_id)
             )
             """
@@ -1799,6 +1810,12 @@ def init_db() -> None:
             )
             """
         )
+        _ensure_column(conn, "attribution_asset_results",
+                       "signed_share", "REAL")
+        _ensure_column(conn, "attribution_group_results",
+                       "linked_contribution", "REAL")
+        _ensure_column(conn, "attribution_group_results",
+                       "signed_share", "REAL")
         for index_sql in (
             "CREATE INDEX IF NOT EXISTS idx_par_created ON portfolio_attribution_runs(created_at)",
             "CREATE INDEX IF NOT EXISTS idx_par_status ON portfolio_attribution_runs(status)",
