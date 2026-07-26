@@ -17,9 +17,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.67.0-dev";
-const LATEST_VERIFIED_TAG = "v4.66.0-research-experiment-registry-v1";
-const EXPECTED_NEXT_TAG = "v4.67.0-data-provenance-dataset-lineage-v1";
+const VERSION_LABEL = "4.75.0-dev";
+const LATEST_VERIFIED_TAG = "v4.74.0-portfolio-risk-budget-constraint-diagnostics-v1";
+const EXPECTED_NEXT_TAG = "v4.75.0-portfolio-stress-scenario-drawdown-attribution-v1";
 
 const RC_STATUS_CARDS: { title: string; status: string; tone: "ok" | "warn"; text: string }[] = [
   {

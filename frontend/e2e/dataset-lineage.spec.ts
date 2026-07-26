@@ -157,14 +157,21 @@ test.describe("dataset lineage", () => {
     const firstRow = page.locator("tbody tr").first();
     const nameCell = firstRow.locator("td").nth(0);
     const sourceCell = firstRow.locator("td").nth(1);
-    const nameBox = await nameCell.boundingBox();
-    const sourceBox = await sourceCell.boundingBox();
-    const btnBox = await nameCell.getByRole("button").boundingBox();
-    expect(nameBox).not.toBeNull();
-    expect(sourceBox).not.toBeNull();
-    expect(btnBox).not.toBeNull();
-    expect(btnBox!.x + btnBox!.width).toBeLessThanOrEqual(nameBox!.x + nameBox!.width + 2);
-    expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(sourceBox!.x + 2);
+    // The post-seed refetch briefly swaps the table for the loading skeleton,
+    // and boundingBox() does not auto-wait — reading mid-swap yields nulls.
+    // Retry the whole geometry read until the table has settled.
+    await expect(async () => {
+      const nameBox = await nameCell.boundingBox();
+      const sourceBox = await sourceCell.boundingBox();
+      const btnBox = await nameCell.getByRole("button").boundingBox();
+      expect(nameBox).not.toBeNull();
+      expect(sourceBox).not.toBeNull();
+      expect(btnBox).not.toBeNull();
+      // The rendered name stays within its own cell (truncation works).
+      expect(btnBox!.x + btnBox!.width).toBeLessThanOrEqual(nameBox!.x + nameBox!.width + 2);
+      // Cells tile left-to-right without overlapping the Source column.
+      expect(nameBox!.x + nameBox!.width).toBeLessThanOrEqual(sourceBox!.x + 2);
+    }).toPass({ timeout: 20_000 });
     await assertNoHorizontalOverflow(page);
     assertNoFailedLocalRequests(failures);
   });

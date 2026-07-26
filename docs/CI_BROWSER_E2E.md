@@ -20,7 +20,11 @@ artifacts. Companions: [`CI.md`](CI.md) (the main preflight) ·
 
 Run the existing browser regression guard (frozen demo route, Scenario
 Studio severe combo, KO/PEP pairs fixture, responsive geometry, and the
-Phase 48.0 Experiment Registry + Phase 49.0 Dataset Lineage specs) against a
+Phase 48.0 Experiment Registry + Phase 49.0 Dataset Lineage + Phase 50.0
+Model Validation Lab + Phase 51.0 Meta-Labeling Lab + Phase 52.0 Feature
+Diagnostics + Phase 53.0 Overfitting Diagnostics + Phase 54.0 Regime
+Diagnostics + Phase 55.0 Cost Diagnostics + Phase 56.0 Portfolio
+Diagnostics + Phase 57.0 Portfolio Stress specs) against a
 **freshly built, isolated** QuantLab instance — proving the guard doesn't
 secretly depend on anything on the maintainer's machine, and producing
 downloadable evidence (logs, traces, HTML report) per run. The registry specs

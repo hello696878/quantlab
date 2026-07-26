@@ -95,7 +95,109 @@ not an enterprise data catalog, and not a regulatory audit trail. Quality
 checks validate declared structural properties only — passing checks does not
 mean the data is financially or scientifically correct.
 
-## 14. Future improvements (openly planned)
+## 14. Model validation audits intervals, not everything
+
+The Model Validation Lab's purged K-fold, embargo, and CPCV remove and audit
+temporal leakage **through the declared information intervals** of the
+supplied samples. The audit cannot see leakage through features computed from
+wider windows, preprocessing that spans folds, or repeated hyperparameter
+selection on the same data. A "leakage-clean" run is a methodology check —
+not proof of model quality or profitability, and the lab never recommends or
+ranks models.
+
+## 15. Calibration quality is not profitability
+
+The Meta-Labeling Lab's calibration metrics (Brier, ECE, reliability curves)
+measure how well predicted probabilities match observed label frequencies
+under a documented research outcome rule. They say nothing about costs,
+capacity, or future regimes; meta-label 1 is a research condition, not a
+profitable trade; and the lab never selects a best model or recommends a
+threshold — saved threshold policies are the user's own research records.
+
+## 16. Feature importance is sensitivity, not causality
+
+The Feature Diagnostics Lab's permutation importance measures how much one
+metric degrades when one feature column is shuffled on held-out samples —
+under one model, one metric, and the supplied data. It is not causal
+evidence, not a profitability signal, and not feature selection: correlated
+features can split or mask importance, native/coefficient references are
+training-data derived (labelled as such), drift classifications describe
+data changes rather than model failure, and the lab never deletes features,
+retrains user models, or recommends anything.
+
+## 17. PBO and Sharpe deflation are estimates, not verdicts
+
+The Overfitting Diagnostics Lab estimates how often an in-sample-selected
+candidate ranked poorly out of sample (PBO via CSCV) and deflates the
+highest observed Sharpe for the number of trials attempted (PSR/DSR). Both
+are research statistics under explicit assumptions: PBO depends on the
+chosen universe, metric and block count; PSR/DSR inherit distributional
+assumptions and small-sample fragility; the effective trial count is an
+approximation; and declared p-values are recorded, never verified. A low
+PBO is not robustness, a high DSR is not proof against overfitting, and the
+lab never selects, recommends, or allocates to any candidate.
+
+## 18. Regime labels are descriptive states, not predictions
+
+The Regime Diagnostics Lab conditions results on regimes formed by explicit
+causal rules (trailing windows, lagged effective labels, documented
+threshold-fitting subsets). That contract covers the lab's own label
+construction — it cannot audit how the supplied market features were
+produced upstream. Conditioning is stratification, not causal
+identification: a regime can proxy for anything correlated with it, rare
+regimes are honestly withheld rather than estimated, full-sample-fitted
+thresholds are always flagged as descriptive, and no significance testing
+exists in v1. The lab never predicts regimes, never switches strategies,
+and never calls a regime profitable or safe.
+
+## 19. Cost estimates are configured assumptions, not fills
+
+The Cost Diagnostics Lab applies explicitly configured commission, spread,
+slippage and square-root market-impact assumptions to supplied historical
+observations. Every output is an estimate under those assumptions: modelled
+slippage predicts no actual fill, the impact model is a bounded research
+approximation with a caller-chosen coefficient, and capacity scaling assumes
+historical per-unit results scale with size while saying nothing about fill
+availability — it is never executable capacity or a size recommendation.
+Missing inputs stay honestly unavailable (never zero), full-sample liquidity
+averages stay descriptive, break-even levels describe the measured sample
+only, and the lab never executes orders, recommends brokers or sizes,
+proves profitability, or certifies execution quality.
+
+## 20. Portfolio weights are measurements, not allocations
+
+The Portfolio Diagnostics Lab constructs weights under explicit
+covariance, constraint and risk-budget assumptions with a strict
+no-look-ahead estimation contract. Every output is a research
+measurement: sample covariances carry estimation error the lab does not
+model, solvers report convergence but optimize an in-sample estimate
+under one assumption set, risk-budget deviation and diversification
+ratios are descriptive, and constraint satisfaction is verified — never
+optimized around. The lab never applies weights to any system,
+recommends an allocation, identifies an optimal or safest portfolio,
+guarantees diversification, risk reduction or performance, or certifies
+portfolio risk.
+
+## 21. Stress scenarios are assumptions, not predictions
+
+The Portfolio Stress Lab applies explicit deterministic scenarios to
+stored portfolio weights. Every scenario is a stated assumption chosen by
+whoever configured it: **no scenario is a worst case**, a measured loss is
+not a guaranteed or expected loss, and a scenario that produces a small
+loss says nothing about scenarios that were not run. Historical replays
+reproduce what stored observations did in a specific window, not what will
+happen; volatility and correlation stress change *risk estimates* only and
+are never mixed into P&L; a stressed covariance that is not positive
+semidefinite is reported unavailable rather than silently repaired; cost
+and participation figures are reference calculations for a hypothetical
+full-book move, not modelled trades. Drawdown attribution describes what
+was measured over an interval under a labelled static-weight
+approximation — it never proves why a drawdown occurred. The lab never
+hedges, rebalances, trades, or recommends an action, and it is not
+regulatory stress testing, capital-adequacy analysis, proof of safety or
+robustness, or risk-management advice.
+
+## 22. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

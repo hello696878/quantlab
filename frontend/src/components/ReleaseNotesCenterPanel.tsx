@@ -19,9 +19,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.67.0-dev";
-const EXPECTED_NEXT_TAG = "v4.67.0-data-provenance-dataset-lineage-v1";
-const LATEST_VERIFIED_TAG = "v4.66.0-research-experiment-registry-v1";
+const VERSION_LABEL = "4.75.0-dev";
+const EXPECTED_NEXT_TAG = "v4.75.0-portfolio-stress-scenario-drawdown-attribution-v1";
+const LATEST_VERIFIED_TAG = "v4.74.0-portfolio-risk-budget-constraint-diagnostics-v1";
 
 const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
   { title: "Quant research labs", text: "Portfolio/macro, derivatives & volatility, crypto/DeFi/on-chain/alt-data, microstructure, real assets & credit, rates/FX — deterministic educational models with formulas beside the numbers.", route: "risklab" },
@@ -32,7 +32,15 @@ const RELEASE_AREAS: { title: string; text: string; route?: string }[] = [
 ];
 
 const CHANGELOG_CARDS: { tag: string; title: string; text: string }[] = [
-  { tag: "v4.67 (next)", title: "Dataset lineage", text: "Local-first dataset registry: immutable versions with schema/manifest fingerprints, privacy-safe locators, cycle-safe transformation lineage, quality checks, neutral schema drift, and experiment links. Integrity aids only." },
+  { tag: "v4.75 (next)", title: "Portfolio stress lab", text: "Explicit deterministic scenarios on stored portfolio weights: historical replays of stored observations, unit-safe asset/group/global shocks under a documented precedence, volatility/correlation stress with PSD validation and never-silent explicit repair, liquidity/cost stress on copied cost models, reconciled contribution attribution, drifted-book constraint checks, baseline-vs-stressed risk contributions and trailing-peak drawdown attribution. Scenarios are assumptions, not predictions — no worst case, no guaranteed loss, no hedging or trading." },
+  { tag: "v4.74", title: "Portfolio diagnostics lab", text: "Equal-weight, inverse-volatility, ERC and minimum-variance construction on validated covariances with a no-look-ahead estimation contract, independent constraint checks, reconciled risk contributions, concentration/diversification descriptions and cost-aware turnover. Research measurements — never an allocation recommendation or a diversification guarantee." },
+  { tag: "v4.73", title: "Cost & capacity diagnostics lab", text: "Unit-safe commission/spread/slippage/square-root-impact estimates on supplied observations with a no-look-ahead liquidity-input policy, exact gross-to-net reconciliation (missing inputs stay unavailable — never zero), break-even, sensitivity, and capacity scaling with participation warnings. Estimates under configured assumptions — never fill predictions or size advice." },
+  { tag: "v4.72", title: "Regime diagnostics lab", text: "Conditional performance across no-look-ahead market regimes (trailing windows, lagged labels, integrity-stated threshold fitting), rank stability, concentration, and transition differences. Descriptive states — never predictions or switching advice." },
+  { tag: "v4.71", title: "Overfitting diagnostics lab", text: "CSCV/PBO selection-bias estimates with a fixed rank convention, deflated Sharpe (PSR/DSR) under explicit trial-count assumptions, MinTRL, and Bonferroni/Holm/BH corrections. Research statistics — never robustness or a strategy pick." },
+  { tag: "v4.70", title: "Feature diagnostics lab", text: "Held-out permutation importance via validation-split memberships, caveated native/coefficient references, rank stability, correlated-feature groups, and PSI/KS distribution + importance drift. Sensitivity, never causality." },
+  { tag: "v4.69 (untagged)", title: "Meta-labeling lab", text: "Outcome-rule meta-labels, Platt/isotonic calibration with out-of-fold integrity via validation splits, reliability curves (Brier/ECE), and neutral threshold trade-offs with user-saved policies. Never a recommendation." },
+  { tag: "v4.68", title: "Model validation lab", text: "Purged K-fold, embargo, and CPCV over information intervals with a from-scratch leakage audit, temporal split timeline, neutral metrics, and registry links. Methodology only — no profitability claims." },
+  { tag: "v4.67", title: "Dataset lineage", text: "Local-first dataset registry: immutable versions with schema/manifest fingerprints, privacy-safe locators, cycle-safe transformation lineage, quality checks, neutral schema drift, and experiment links. Integrity aids only." },
   { tag: "v4.66", title: "Experiment registry", text: "Local-first SQLite registry of reproducibility metadata: deterministic fingerprints, a conservative reproducibility check, baseline scope, neutral comparison, JSON export, and demo records. Integrity aids only." },
   { tag: "v4.65", title: "Post-publication baseline", text: "Read-only verification of the v4.64 state with observed run IDs, publication record, stable post-release baseline and change policy." },
   { tag: "v4.64", title: "Public release launch", text: "Final manual release draft, facts-only evidence ledger with observed run IDs, public launch checklist, SHA-256 checksum manifest + verifier." },

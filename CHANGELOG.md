@@ -18,27 +18,294 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Data Provenance & Dataset Lineage Dashboard v1** (v4.67 series): a
-  local-first SQLite dataset registry — dataset identity with immutable
-  versions, deterministic SHA-256 schema/manifest fingerprints (content
-  fingerprints only via explicit operations, never per-request file hashing),
-  privacy-safe logical storage locators (absolute paths/credentials rejected
-  and never stored), transformation lineage with cycle rejection and bounded
-  traversal, metadata-driven quality checks with worst-of rollup, neutral
-  schema-drift comparison (none / compatible / potentially_breaking /
-  breaking / unknown), version invalidation that preserves lineage and links,
-  bidirectional Experiment Registry links with fingerprint match flags, JSON
-  export (no paths/secrets), and an idempotent three-chain demo lineage. New
-  FastAPI routes (`/datasets`, `/dataset-versions`, `/dataset-lineage`,
-  `/dataset-links`), a new **Dataset Lineage** frontend view (dark-theme
-  `ql-input` filters, SVG lineage graph with tabular fallback, version
-  comparison), a "Linked datasets" section in the Experiment Registry detail,
-  a 9-test Playwright spec, and three docs (`DATASET_REGISTRY.md`,
-  `DATA_PROVENANCE_POLICY.md`, `DATASET_LINEAGE_RUNBOOK.md`). Provenance
-  records are declared metadata plus fingerprints — integrity aids only, not
-  an audit trail, not tamper-proof, not proof of data correctness.
+- **Portfolio Stress Testing, Scenario Shock & Drawdown Attribution Lab
+  v1** (v4.75 series): a local-first stress lab that applies explicit
+  deterministic scenarios to STORED Phase 56 portfolio weights — nine
+  scenario types (historical window / single period replays of actual
+  stored observations, hypothetical asset shock, hypothetical group shock
+  — each with an optional global-shock level — volatility, correlation,
+  liquidity-and-cost, combined, user-supplied descriptive); unambiguous
+  shock units (return decimal, percent, bps;
+  absolute price shocks unsupported because stored universes carry
+  returns, not reference prices — never fabricated) under a documented
+  precedence (asset → group → global → explicit missing-shock policy) with
+  the resolved source stored per asset; integrity states
+  (`verified_historical_window` — ex-ante only when the window ends
+  strictly before the portfolio decision cutoff, `verified_deterministic_rule`,
+  `supplied_descriptive`, `full_sample_descriptive`, `unknown`, `invalid`;
+  `linked_to_stored_regime` reserved and unused; factor shocks deferred
+  with an explicit reason because no run-linked exposure system exists);
+  a documented, fingerprinted eight-step execution order; contribution
+  attribution reconciled to the scenario total with the cost leg's state,
+  reason, completeness and reference-turnover basis carried inside the
+  triple (a configured-but-uncomputable cost leg is labelled, never
+  silently equal to gross); post-shock drifted weights with a SIGNED cash
+  residual (levered books unchanged at a zero shock) and honest
+  unavailability for a wiped-out book — no automatic rebalancing;
+  independent constraint re-checks on the original and drifted books with
+  breaches attributed per book; volatility/correlation stress
+  (multiplicative / additive with disclosed zero-flooring; uniform
+  multiplier / additive / toward-one / supplied, with asymmetric or
+  non-unit-diagonal supplied matrices rejected rather than silently
+  fixed) rebuilding Σ* = D(σ*)·R*·D(σ*) with PSD validation and
+  never-silent explicit eigenvalue-floor repair, where the disclosed
+  vols/correlations always describe the repaired matrix actually used;
+  baseline-vs-stressed MCR/CCR/PCR with ΔPCR, rank changes and both
+  identity checks; liquidity/cost stress applied to a deep COPY of the
+  linked Phase 55 model with its own new fingerprint (the stored model is
+  never modified) and honestly unavailable components; trailing-peak-only
+  drawdown analysis on the canonical Phase 56 realized series (initial
+  capital counts as a peak; interior gaps and non-positive wealth
+  refused), exhaustive episode detection with recovered/unrecovered
+  states and disclosed deepest-40 persistence, plus per-asset attribution
+  of the deepest episode over the below-peak interval under a labelled
+  static-weight approximation whose arithmetic-vs-geometric gap is
+  disclosed; bounded one-at-a-time sensitivity where the base row shares
+  the run's net basis and probes are labelled self-contained scenarios;
+  six fingerprint kinds (no database ids — a byte-identical configuration
+  reproduces its fingerprint in another database); eight new SQLite
+  tables; baselines gated on verified integrity + complete results + an
+  available stressed covariance; failed executions clear their stale
+  results; a 16-case deterministic demo; the **Portfolio Stress Lab** view
+  (contribution waterfall, baseline-vs-stressed PCR bars, drawdown chart
+  with episode table, cost/participation panel, sensitivity table,
+  verbatim scenario definition); 26 backend tests verified by a 5-agent
+  adversarial pass (188 hand-verified checks; every finding — 7 major,
+  ~20 minor — fixed); a 17-test Playwright spec; six docs. Scenarios are
+  assumptions, not predictions; no scenario is a worst case; measured
+  losses are not guarantees; nothing hedges, rebalances, trades,
+  recommends an action, or proves safety or robustness.
 
-## Grouped release areas — v4.8 through v4.66 (post-showcase series)
+## Grouped release areas — v4.74 (portfolio-construction series)
+
+### Portfolio construction, risk budgeting & constraint diagnostics lab (v4.74)
+
+- **Portfolio Construction, Risk Budgeting, Diversification & Constraint
+  Diagnostics Lab v1** (v4.74 series): a local-first portfolio-research
+  diagnostics lab — strictly aligned 2–20-asset universes with parsed
+  chronological timelines; a no-look-ahead estimation contract (windows
+  end at i−lag with lag ≥ 1; centered windows and negative lags rejected;
+  training-only estimation on a leakage-clean validation split's exact
+  recorded membership; full-sample permanently descriptive and never
+  promotable — adversarially mutation-tested); explicit covariance policy
+  (sample ddof=1 / diagonal reference / fixed shrinkage with a declared
+  alpha and stored target; Ledoit-Wolf honestly deferred without adding
+  scikit-learn) with PSD/eigenvalue/condition validation and a
+  never-silent explicit eigenvalue-floor repair; deterministic
+  transparent methods (user-supplied with provenance-based integrity,
+  equal weight, inverse volatility with a visible fingerprinted floor and
+  recorded clamps, ERC via the log-barrier convex formulation with
+  residual-based convergence and an absolutely capped loose band, SLSQP
+  minimum variance with equality-residual + objective-value reporting;
+  max-diversification and mean-variance deferred with reasons, no
+  placeholders); constraints with eager structural-infeasibility 422s and
+  an independent post-solve re-check (asset-id-structured violations, no
+  silent relaxation); exact MCR/CCR/PCR risk contributions with verified
+  ΣCCR=σ and ΣPCR=1 identities, neutral risk-budget deviation states,
+  concentration/diversification descriptions with clipped correlations;
+  half-L1 turnover with explicit initial-book policies; descriptive
+  rebalance costs from linked Phase 55 models where trade-level config
+  fields (one-sided spreads, monetary fee floors, order counts) are
+  honestly unavailable instead of silently dropped; regime-conditioned
+  summaries from stored Phase 54 assignments (never recomputed); bounded
+  one-at-a-time sensitivity with create-time applicability checks and
+  scenario failures that never void the run; seven fingerprint kinds; six
+  new SQLite tables; baselines gated on integrity + solver success + zero
+  violations + fully completed rebalance histories; an 11-run
+  deterministic demo (15 spec cases); the **Portfolio Diagnostics** view
+  (weight bars with bounds, target-vs-measured risk contributions,
+  printed-value correlation matrix, rebalance/cost table, sensitivity
+  with a neutral base marker, regime table); 22 backend tests verified by
+  a 5-agent adversarial pass (128 hand-verified checks; every finding —
+  3 major, ~12 minor — fixed); an 18-test Playwright spec; six docs.
+  Nothing applies weights anywhere, recommends an allocation, identifies
+  an optimal/safest portfolio, or guarantees diversification, risk
+  reduction, or performance.
+
+## Grouped release areas — v4.73 (execution-cost series)
+
+### Transaction cost, slippage, impact & capacity diagnostics lab (v4.73)
+
+- **Transaction Cost, Slippage, Market Impact & Capacity Diagnostics Lab
+  v1** (v4.73 series): a local-first execution-cost diagnostics lab —
+  explicitly configured commission / spread / slippage / square-root
+  market-impact assumptions applied to supplied trade-level (monetary) or
+  period-level (return-space) observations with unit-safe conversions
+  (1 bp = 0.0001, explicit percent, tick/price/per-contract/per-unit/
+  per-order units, one currency per run, no silent FX conversion);
+  per-side round-trip semantics with floor-then-cap fee bounds, an
+  explicitly configured spread fraction (no silent half-spread), a
+  never-favourable modelled-slippage stress multiplier with supplied
+  realized slippage passed through un-stressed, and a documented
+  `coefficient × volatility × √participation` impact approximation with
+  explicit participation modes and unit-matched ADV; an adversarially
+  verified execution-input no-look-ahead policy (trailing windows with
+  lag ≥ 1 only, chronologically validated series, centered windows and
+  negative lags rejected, no silent fallback from trailing derivation to
+  unclassified supplied inputs, mutation-proven future-data invariance)
+  with seven provenance-based integrity states; exact gross-to-net
+  reconciliation where missing inputs stay unavailable — never zero —
+  with complete/partial/gross-only completeness; aggregates with neutral
+  wording, break-even diagnostics (bps of notional, max cost multiplier,
+  per-component multipliers, impact-coefficient linearity), a bounded
+  deduplicated sensitivity grid with a marked base scenario, capacity
+  scaling where fixed fees stay fixed and impact scales as scale^1.5
+  (optional integer-contract policy with reported exclusions), and
+  participation-threshold warnings; costs conditioned on stored Phase 54
+  regime assignments (never recomputed); gross + cost-adjusted candidate-
+  matrix fingerprints beside read-only Phase 53 links; five new SQLite
+  tables; scope-transactional baselines gated on completeness and
+  integrity; a 6-run deterministic demo (12 spec cases); the **Cost &
+  Capacity** view (gross-to-net waterfall, composition, break-even,
+  sensitivity, capacity curve with printed values, regime cost table);
+  43 backend tests verified by a 5-agent adversarial pass (197
+  hand-computed checks; every finding fixed with a regression); an
+  18-test Playwright spec; five docs. Everything is an estimate under
+  configured assumptions — no fill prediction, capacity guarantee, order
+  execution, size/broker recommendation, profitability proof, or
+  investment/execution advice.
+
+## Grouped release areas — v4.72 (conditional-performance series)
+
+### Market regime robustness & conditional performance lab (v4.72)
+
+- **Market Regime Robustness & Conditional Performance Lab v1** (v4.72
+  series): a local-first regime-diagnostics lab — candidate outcomes
+  conditioned on explicitly defined market regimes (volatility, trend,
+  liquidity from an explicitly named feature, drawdown state from the
+  trailing peak only, user-supplied categorical states with provenance,
+  pairwise combined regimes) under a strict adversarially-tested
+  no-look-ahead contract: trailing windows only, effective labels lagged
+  ≥ 1 period, centered windows and negative/zero lags rejected; four
+  threshold-fitting modes with distinct integrity states (fixed/expanding
+  causal, training-only fitted on a leakage-clean validation split's
+  recorded membership, full-sample always flagged descriptive and never
+  leakage-safe; centered declarations invalid); conditional
+  candidate×regime metrics with observation counts prominent and rare
+  regimes honestly withheld; robustness classifications, warning-free
+  rank stability (rank-reversal demo), concentration diagnostics with
+  mixed-sign honesty, and transition before/after differences with no
+  significance claims and no fabricated p-values; universe/definition/
+  threshold/configuration/result fingerprints; three new SQLite tables;
+  verified-or-declared-only scope-transactional baselines; a 5-run
+  deterministic demo (11 spec cases); the **Regime Diagnostics** view
+  (per-definition regime timeline strips with interval-table fallbacks,
+  coverage/conditional/robustness/rank/concentration/transition tables);
+  25 backend tests verified by a 4-agent adversarial mutation-attack pass
+  (339 checks; 5 findings fixed); a 16-test Playwright spec; five docs.
+  Regimes are descriptive states — never predictions, causality,
+  profitability, or switching advice.
+
+## Grouped release areas — v4.71 (selection-bias series)
+
+### Backtest overfitting, PBO & multiple testing diagnostics lab (v4.71)
+
+- **Backtest Overfitting, PBO & Multiple Testing Diagnostics Lab v1**
+  (v4.71 series): a local-first selection-bias diagnostics lab — CSCV over
+  a strictly-aligned bounded candidate universe with the Probability of
+  Backtest Overfitting under a fixed documented rank/logit convention
+  (rank 1 = worst OOS, ω = rank/(N+1), λ = ln(ω/(1−ω)), PBO = fraction of
+  valid splits with λ < 0, deterministic tie handling, all C(S,S/2)
+  combinations with a hard 924 cap and no sampling); λ-distribution,
+  IS↔OOS degradation and selection-frequency diagnostics in neutral
+  wording; Probabilistic and Deflated Sharpe Ratios with explicit
+  conventions (per-period ddof=1 Sharpe, population skew, NON-excess
+  kurtosis, expected-maximum-Sharpe benchmark, explicit raw/manual/
+  dependence-adjusted trial-count policies, honest one-trial and
+  zero-variance handling) plus Minimum Track Record Length; Bonferroni /
+  Holm / Benjamini–Hochberg corrections with the FWER-vs-FDR distinction,
+  declared-only p-value provenance and stable tie ordering; bounded
+  candidate-dependence diagnostics with warning-free constant detection
+  and an approximate effective trial count; universe/configuration/result
+  fingerprints; four new SQLite tables; scope-transactional baselines;
+  comparison with explicit comparability warnings; JSON export; a 4-run
+  deterministic demo; the **Overfitting Diagnostics** view (λ histogram
+  with labelled zero line, Sharpe assumptions on display, multiple-testing
+  table); 26 backend tests verified by a 5-agent adversarial
+  reference-check pass (303 checks; 3 findings fixed); a 14-test
+  Playwright spec; five docs. Every value is a research statistic under
+  stated assumptions — never profitability, robustness, safety, or a
+  recommendation.
+
+## Grouped release areas — v4.69/v4.70 (research-diagnostics series)
+
+### Feature importance, stability & drift diagnostics lab (v4.70)
+
+- **Feature Importance, Stability & Drift Diagnostics Lab v1** (v4.70
+  series): a local-first feature-diagnostics lab — held-out permutation
+  importance as the primary method (deterministic in-process estimators:
+  L2 logistic, closed-form ridge, bounded CART — no scikit-learn or SHAP
+  added, never pickle/joblib), fitted per linked Model Validation split on
+  train members only and evaluated on held-out test members
+  (leakage-clean runs required; membership mismatches and leakage-failed
+  links fail honestly), with declared splits recorded as declarations and
+  no-split runs disclosed as not held-out; direction-normalized importance
+  (positive = permuting worsened the held-out metric) with bounded
+  deterministic repeats and honest negative values; model-native impurity
+  and standardized-coefficient references with fixed caveats (drop-column
+  omitted, documented); rank stability (Spearman/Kendall, top-k overlap,
+  transparent score + thresholds); deterministic correlated-feature groups
+  (no automatic removal); distribution drift with explicit
+  reference/comparison sets, PSI (explicit bins, ε=1e-6) + KS + documented
+  configurable thresholds; importance drift with neutral wording;
+  target-leakage rejection; config/result/baseline fingerprints; six new
+  SQLite tables; scope-transactional held-out-only baselines; sample-free
+  JSON export; a 4-run deterministic demo; the **Feature Diagnostics**
+  view (importance bars with zero line + negative-in-color, stability
+  matrix, correlation groups, drift tables); 37 backend tests; a 15-test
+  Playwright spec; four docs. Importance is measured sensitivity — never
+  causality, profitability, or a recommendation.
+
+### Meta-labeling, calibration & threshold lab (v4.69 series — untagged; included in the v4.70 tag history)
+
+- **Meta-Labeling, Probability Calibration & Decision Threshold Lab v1**
+  (v4.69 series): a local-first secondary-signal lab — meta-labels whether the
+  primary side (−1/0/1; side 0 abstains, never a failed signal) was correct
+  under a documented strict-inequality outcome rule; dependency-light Platt
+  sigmoid and isotonic (PAV) calibration fitted on training data only, with
+  **verified out-of-fold** calibration per linked Model Validation split
+  memberships (leakage-clean runs only; membership mismatches fail honestly)
+  and declared/not-out-of-fold statuses disclosed rather than trusted;
+  Brier / log loss / ROC AUC / PR AUC / reliability bins / ECE / MCE with
+  undefined metrics null+reason; a bounded neutral threshold grid (coverage
+  prominent, optional abstention band, no "optimal" selection ever); saved
+  research threshold policies with per-run baselines (rejected on failed or
+  not-OOF runs); deterministic configuration/result/policy fingerprints;
+  four new SQLite tables; idempotent Experiment Registry linking and Dataset
+  Lineage links with invalidation warnings; a new **Meta-Labeling Lab** view
+  (reliability + threshold SVG charts with accessible table fallbacks, dark
+  `ql-input` controls); a 7-run demo with policies; a 10-test Playwright
+  spec; 28 backend tests; and three docs (`META_LABELING_LAB.md`,
+  `PROBABILITY_CALIBRATION_POLICY.md`, `META_LABELING_RUNBOOK.md`). Also
+  fixed a fingerprint-row overflow in the Phase 50/51 detail views.
+  Meta-label 1 means the research condition was met — never profitability.
+
+## Grouped release areas — v4.8 through v4.68 (post-showcase series)
+
+### Purged CV, embargo & CPCV model validation lab (v4.68)
+
+- Local-first validation lab: temporal-event samples with closed information
+  intervals, standard K-fold as an explicitly-warned leakage reference,
+  boundary-purged walk-forward, purged K-fold with per-id overlap reasons,
+  CPCV bounded at 100 combinations, duration/fraction embargo per disjoint
+  test block, a from-scratch leakage audit (any remaining overlap or empty
+  training set marks the split invalid), dependency-light neutral metrics,
+  deterministic fingerprints, leakage-clean-only baselines, the Model
+  Validation Lab frontend with a temporal split timeline, an 11-test
+  Playwright spec, and three docs.
+
+
+### Data provenance & dataset lineage dashboard (v4.67)
+
+- Local-first SQLite dataset registry: dataset identity with immutable
+  versions, deterministic schema/manifest fingerprints (content fingerprints
+  only via explicit operations), privacy-safe logical storage locators
+  (absolute paths/credentials rejected), cycle-safe transformation lineage
+  with bounded traversal, metadata-driven quality checks, neutral schema-drift
+  comparison, invalidation that preserves lineage and links, bidirectional
+  Experiment Registry links with fingerprint-match flags, JSON export, an
+  idempotent three-chain demo, the Dataset Lineage frontend view (SVG lineage
+  graph + tabular fallback), and a 9-test Playwright spec.
 
 ### Research experiment registry & reproducibility dashboard (v4.66)
 
@@ -104,7 +371,7 @@ claimed by an entry here.
   fixture isolation + YM roll coverage, and the frozen freeze record with
   five SHA-256'd production screenshots.
 
-The tags between v4.8.0 and v4.66.0 (local milestone tags; full per-phase
+The tags between v4.8.0 and v4.68.0 (local milestone tags; full per-phase
 detail in `docs/ROADMAP.md`) grouped by area:
 
 ### CI preflight, repository hygiene & security sweep (v4.59)

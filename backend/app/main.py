@@ -88,6 +88,14 @@ from app.data_reliability_routes import router as data_reliability_router
 from app.qa_command_center_routes import router as qa_command_center_router
 from app.experiment_registry_routes import router as experiment_registry_router
 from app.dataset_registry_routes import router as dataset_registry_router
+from app.model_validation_routes import router as model_validation_router
+from app.meta_labeling_routes import router as meta_labeling_router
+from app.feature_diagnostics_routes import router as feature_diagnostics_router
+from app.overfitting_diagnostics_routes import router as overfitting_diagnostics_router
+from app.regime_diagnostics_routes import router as regime_diagnostics_router
+from app.cost_diagnostics_routes import router as cost_diagnostics_router
+from app.portfolio_diagnostics_routes import router as portfolio_diagnostics_router
+from app.portfolio_stress_routes import router as portfolio_stress_router
 from app.benchmark import (
     build_benchmark_analytics,
     compute_active_metrics,
@@ -478,6 +486,18 @@ app.include_router(experiment_registry_router)
 
 # Data Provenance & Dataset Lineage Dashboard (Phase 49.0) — local SQLite dataset registry.
 app.include_router(dataset_registry_router)
+
+# Purged CV / Embargo / CPCV Model Validation Lab (Phase 50.0) — local SQLite validation lab.
+app.include_router(model_validation_router)
+
+# Meta-Labeling / Calibration / Threshold Lab (Phase 51.0) — local SQLite research lab.
+app.include_router(meta_labeling_router)
+app.include_router(feature_diagnostics_router)
+app.include_router(overfitting_diagnostics_router)
+app.include_router(regime_diagnostics_router)
+app.include_router(cost_diagnostics_router)
+app.include_router(portfolio_diagnostics_router)
+app.include_router(portfolio_stress_router)
 
 
 # ---------------------------------------------------------------------------

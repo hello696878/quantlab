@@ -257,7 +257,77 @@ reciprocal list is available at
 context — historical experiments that recorded only
 `dataset_name`/`dataset_fingerprint` keep working unchanged.
 
-## 18. Future extensions
+## 18. Model Validation Lab records (Phase 50.0)
+
+Executed validation runs from the Model Validation Lab
+([`MODEL_VALIDATION_LAB.md`](MODEL_VALIDATION_LAB.md)) can create experiment
+records here (module `model_validation`, type = validation method, split/
+leakage metrics) — idempotently: a run creates at most one record, and
+re-execution reuses it.
+
+## 19. Feature Diagnostics records (Phase 52.0)
+
+Executed feature-diagnostics runs
+([`FEATURE_DIAGNOSTICS_LAB.md`](FEATURE_DIAGNOSTICS_LAB.md)) can create
+experiment records here (module `feature_diagnostics`, type =
+`importance_<method>`, held-out integrity + top feature names as descriptive
+parameters, stability/drift summary metrics) — idempotently: a run creates
+at most one record and re-execution reuses it. No recommendation is ever
+recorded.
+
+## 20. Overfitting Diagnostics records (Phase 53.0)
+
+Executed overfitting-diagnostic runs
+([`BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md`](BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md))
+can create experiment records here (module `overfitting_diagnostics`, type =
+`cscv_pbo_<metric>`, PBO/PSR/DSR + trial-count assumptions as metrics, both
+fingerprints as parameters) — idempotently: a run creates at most one record
+and re-execution reuses it.  No recommendation is stored and no candidate is
+ever marked as selected for deployment.
+
+## 21. Regime Diagnostics records (Phase 54.0)
+
+Executed regime-diagnostic runs
+([`REGIME_DIAGNOSTICS_LAB.md`](REGIME_DIAGNOSTICS_LAB.md)) can create
+experiment records here (module `regime_diagnostics`, dimensions +
+integrity status as parameters, coverage/stability counts as metrics, both
+fingerprints) — idempotently: a run creates at most one record and
+re-execution reuses it.  No recommendation is stored.
+
+## 22. Cost Diagnostics records (Phase 55.0)
+
+Executed cost-diagnostic runs
+([`TRANSACTION_COST_DIAGNOSTICS_LAB.md`](TRANSACTION_COST_DIAGNOSTICS_LAB.md))
+can create experiment records here (module `transaction_cost_diagnostics`,
+cost-model choices + integrity/completeness states as parameters,
+gross/net/cost totals and participation-warning counts as metrics, both
+fingerprints) — idempotently: a run creates at most one record and
+re-execution reuses it.  No recommendation is stored.
+
+## 23. Portfolio Diagnostics records (Phase 56.0)
+
+Executed portfolio-diagnostic runs
+([`PORTFOLIO_DIAGNOSTICS_LAB.md`](PORTFOLIO_DIAGNOSTICS_LAB.md)) can
+create experiment records here (module `portfolio_diagnostics`,
+construction/covariance methods + integrity/solver states as parameters,
+portfolio volatility / effective positions / budget deviation / turnover
+/ violation counts as metrics, both fingerprints) — idempotently: a run
+creates at most one record and re-execution reuses it.  No recommendation
+or preferred allocation is stored.
+
+## 24. Portfolio Stress records (Phase 57.0)
+
+Executed portfolio-stress runs
+([`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md)) can create
+experiment records here (module `portfolio_stress_diagnostics`, scenario
+type + linked portfolio run/rebalance + integrity/completeness states and
+both fingerprints as parameters; net scenario return, stressed volatility,
+breach count, episode count and maximum drawdown as metrics) —
+idempotently: a run creates at most one record and re-execution reuses it.
+A stored scenario result is a measurement under stated assumptions, never
+a prediction, a worst case, or a recommended action.
+
+## 25. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

@@ -57,8 +57,15 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   (cross-lab stress + report builder), Research Workspace (presets +
   experiment journal), Experiment Registry (reproducibility metadata +
   fingerprints + comparison), Dataset Lineage (dataset versions, provenance,
-  transformation lineage, quality checks), Data Reliability Center,
-  QA Command Center.
+  transformation lineage, quality checks), Model Validation Lab (purged CV,
+  embargo, CPCV + leakage audit), Meta-Labeling Lab (calibration +
+  thresholds), Feature Diagnostics (importance, stability + drift),
+  Overfitting Diagnostics (PBO, deflated Sharpe + multiple testing),
+  Regime Diagnostics (conditional performance + no-look-ahead regimes),
+  Cost & Capacity (execution-cost, impact + capacity diagnostics),
+  Portfolio Diagnostics (construction, risk budgeting + constraints),
+  Portfolio Stress Lab (scenario shocks, stressed risk + drawdown
+  attribution), Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -270,6 +277,78 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Portfolio Stress Lab (57.0)** — explicit deterministic scenarios
+  applied to stored Phase 56 weights: historical replays of actual stored
+  observations (ex-ante only when the window ends strictly before the
+  decision cutoff), hypothetical asset/group/global shocks in unambiguous
+  units under a documented precedence, volatility/correlation stress with
+  PSD validation and never-silent explicit repair, liquidity/cost stress
+  on copies of linked Phase 55 models, contribution attribution reconciled
+  to the scenario total, post-shock drifted weights and constraint
+  re-checks, baseline-vs-stressed risk contributions, trailing-peak-only
+  drawdown episodes with per-asset attribution (strictly pre-decision for
+  verified historical runs; full stored series explicitly descriptive), and
+  bounded sensitivity probes. Linked identities and material outputs are
+  fingerprinted; drawdown cost attribution is unavailable without a
+  timestamp-aligned realized cost path. Scenarios are assumptions, not
+  predictions — no worst case, no
+  guaranteed loss, no hedging, rebalancing, or trading, and never proof of
+  safety or robustness.
+- **Portfolio Diagnostics (56.0)** — portfolio construction under explicit
+  assumptions: equal weight, inverse volatility (visible floor), equal
+  risk contribution and SLSQP minimum variance on validated covariances
+  (sample / diagonal / fixed shrinkage, PSD checks, never-silent explicit
+  repair) with a no-look-ahead estimation contract, independent
+  post-solve constraint checks, reconciled marginal/component/percentage
+  risk contributions, concentration + diversification descriptions,
+  half-L1 turnover with descriptive Phase 55 cost estimates, and
+  regime-conditioned summaries. Research measurements — never an
+  allocation recommendation, an optimal/safest portfolio, or a
+  diversification guarantee.
+- **Cost & Capacity (55.0)** — execution-cost diagnostics under explicitly
+  configured assumptions: unit-safe commission / spread / slippage /
+  square-root market-impact estimates on supplied trade or period
+  observations, a no-look-ahead policy for liquidity inputs (trailing
+  windows with lag ≥ 1; centered windows rejected), exact gross-to-net
+  reconciliation where missing inputs stay unavailable — never zero —
+  plus break-even, bounded cost-sensitivity and capacity-scaling
+  estimates with participation warnings. Estimates under configured
+  assumptions — never fill predictions, capacity guarantees, size/broker
+  recommendations, or execution advice.
+- **Regime Diagnostics (54.0)** — conditional performance across explicitly
+  defined market regimes (volatility, trend, liquidity, drawdown state,
+  categorical, combined) formed under a strict no-look-ahead contract:
+  trailing windows, lagged effective labels, threshold-fitting subsets with
+  distinct integrity states, honest withholding of rare regimes, rank
+  stability, concentration, and transition differences. Regimes are
+  descriptive states — never predictions, causality, or switching advice.
+- **Overfitting Diagnostics (53.0)** — selection-bias diagnostics: CSCV/PBO
+  (how often the in-sample-selected candidate ranks in the bottom half out
+  of sample, under a fixed documented rank convention), Probabilistic and
+  Deflated Sharpe Ratios with explicit trial-count assumptions, Minimum
+  Track Record Length, Bonferroni/Holm/Benjamini–Hochberg corrections, and
+  candidate-dependence diagnostics. Research statistics under stated
+  assumptions — never profitability, robustness, or a strategy selection.
+- **Feature Diagnostics (52.0)** — held-out permutation importance
+  (deterministic in-process estimators fitted per Model Validation split;
+  positive importance = held-out performance got worse), caveated
+  model-native and coefficient references, rank stability across folds,
+  correlated-feature groups, and feature distribution / importance drift
+  with documented PSI/KS thresholds. Importance is measured sensitivity —
+  never causality, profitability, or feature selection.
+- **Meta-Labeling Lab (51.0)** — a secondary meta-label layer: documented
+  outcome-rule labeling, Platt/isotonic probability calibration fitted on
+  training data only (out-of-fold via Model Validation splits), reliability
+  curves with Brier/ECE/MCE, and neutral decision-threshold trade-offs with
+  user-saved research policies. Never selects a model or recommends a
+  threshold; calibration quality is not profitability.
+- **Model Validation Lab (50.0)** — purged K-fold, embargo, and CPCV for
+  time-dependent samples with information intervals: interval-based purging,
+  a from-scratch leakage audit on every split, a temporal split-timeline
+  visualization, neutral fold metrics, deterministic fingerprints, and links
+  to the Experiment Registry and Dataset Lineage. Standard K-fold is included
+  only as an explicitly-warned leakage reference. Methodology and audit only —
+  no profitability claims, no model recommendations.
 - **Demo Center (34.0)** — eight guided demo paths with deep links, a
   21-module health dashboard, a capability matrix, and an audience-aware demo
   script builder.

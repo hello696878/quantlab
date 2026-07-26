@@ -218,7 +218,70 @@ and `source_reference`/`code_reference` reject absolute paths and credentials;
 `license_url` rejects embedded credentials; exports never carry paths or
 secrets. Strict bounded validation everywhere; parameterised SQL only.
 
-## 18. Limitations
+## 18. Model Validation Lab links (Phase 50.0)
+
+Validation runs ([`MODEL_VALIDATION_LAB.md`](MODEL_VALIDATION_LAB.md)) may
+bind a `dataset_version_id`; the run detail shows the version's fingerprints,
+provenance, and quality states, warns visibly when the version was
+invalidated, and always preserves the recorded identity on historical runs.
+
+## 19. Feature Diagnostics links (Phase 52.0)
+
+Feature-diagnostics runs
+([`FEATURE_DIAGNOSTICS_LAB.md`](FEATURE_DIAGNOSTICS_LAB.md)) may bind a
+`dataset_version_id`; the run detail shows the version's fingerprints,
+provenance and quality states and warns visibly when the version was
+invalidated. Feature `source_column`s are checked against the version's
+schema snapshot — a missing column produces a recorded warning, never a
+fabricated mapping.
+
+## 20. Overfitting Diagnostics links (Phase 53.0)
+
+Overfitting-diagnostic runs
+([`BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md`](BACKTEST_OVERFITTING_DIAGNOSTICS_LAB.md))
+may bind a `dataset_version_id` (run-level and per-candidate); the run detail
+shows the version's fingerprints, provenance and quality states and warns
+visibly when the version was invalidated.  Dataset metadata is never mutated
+by a diagnostic run.
+
+## 21. Regime Diagnostics links (Phase 54.0)
+
+Regime-diagnostic runs
+([`REGIME_DIAGNOSTICS_LAB.md`](REGIME_DIAGNOSTICS_LAB.md)) may bind a
+`dataset_version_id`; the run detail shows the version's fingerprints,
+provenance and quality states and warns visibly when the version was
+invalidated.  Dataset metadata is never mutated by a diagnostic run.
+
+## 22. Cost Diagnostics links (Phase 55.0)
+
+Cost-diagnostic runs
+([`TRANSACTION_COST_DIAGNOSTICS_LAB.md`](TRANSACTION_COST_DIAGNOSTICS_LAB.md))
+may bind a `dataset_version_id`; the run detail shows the version's
+fingerprints, provenance and quality states and warns visibly when the
+version was invalidated.  Execution inputs claiming `dataset_lineage`
+provenance without a linked version degrade honestly to `declared` with a
+warning.  Dataset metadata is never mutated by a diagnostic run.
+
+## 23. Portfolio Diagnostics links (Phase 56.0)
+
+Portfolio-diagnostic runs
+([`PORTFOLIO_DIAGNOSTICS_LAB.md`](PORTFOLIO_DIAGNOSTICS_LAB.md)) may bind
+a `dataset_version_id`; the run detail shows the version's fingerprints,
+provenance and quality states and warns visibly when the version was
+invalidated.  Dataset metadata is never mutated by a diagnostic run.
+
+## 24. Portfolio Stress links (Phase 57.0)
+
+Portfolio-stress runs
+([`PORTFOLIO_STRESS_LAB.md`](PORTFOLIO_STRESS_LAB.md)) inherit the linked
+portfolio run's `dataset_version_id` unless one is supplied explicitly;
+the run detail shows the version's fingerprints, provenance and quality
+states and warns visibly when the version was invalidated.  Dataset
+metadata is never mutated by a stress run, and the dataset's manifest
+fingerprint (not its row id) is what enters the run's configuration
+fingerprint.
+
+## 25. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks

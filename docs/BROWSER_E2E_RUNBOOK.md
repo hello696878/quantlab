@@ -41,6 +41,138 @@ protected and why).
   covered by the backend tests on isolated databases. The review pass added
   guards for the dark-theme `ql-input` filter controls (rgb & oklch
   serializations) and table-column overlap geometry.
+- **Model Validation Lab** (Phase 50.0, `model-validation.spec.ts`): the lab
+  opens with its leakage-prevention disclaimer, the seven-run demo seeds
+  idempotently, method filters work, the purged K-fold detail shows separate
+  purge/embargo counts with zero remaining overlap and the split-timeline SVG,
+  the standard K-fold reference shows its leakage warning, the CPCV run lists
+  its combinations, run comparison stays neutral, the linked dataset/
+  experiment records open, dark-theme controls and column geometry hold, and
+  1024/768 have no page overflow. Only writes: the idempotent demo seeds
+  (which cascade to the other registries' idempotent demo loaders).
+- **Meta-Labeling Lab** (Phase 51.0, `meta-labeling.spec.ts`): the lab opens
+  with its calibration disclaimer, the 7-run demo seeds idempotently, method
+  filters work, the verified-OOF run shows its validation/dataset links and
+  raw-vs-calibrated metrics with the reliability chart + bin-table fallback,
+  manual threshold selection updates coverage with no "optimal" wording
+  anywhere, comparison stays neutral, the one-class failure and
+  invalidated-dataset warning render honestly, dark-theme controls and column
+  geometry hold, and 1024/768 have no page overflow (list AND detail). Only
+  writes: the idempotent demo seeds.
+- **Regime Diagnostics** (Phase 54.0, `regime-diagnostics.spec.ts`): the lab
+  opens with its no-look-ahead disclaimer, the 5-run demo seeds idempotently,
+  integrity filters work, the training-verified run shows its
+  verified-from-validation-split pill with lookback/lag/threshold detail and
+  the validation link, the full-sample run is warned and never called
+  verified while its drawdown definition stays verified-causal, coverage
+  with unassigned counts and the rare-regime "low sample" withholding
+  render, the rank-reversal matrix and its no-winner note render, the
+  concentration/robustness classifications stay neutral (no best/
+  recommended/profitable-regime wording — asserted), the per-definition
+  regime timeline strips render with combined labels and the transitions
+  table with measured (never causal) differences, the invalid
+  centered-labels definition shows its honest state next to a valid causal
+  one, the invalid-definition run's baseline attempt is rejected with a 409
+  (asserted as the only failed request), comparison warns that universes
+  differ, export is path/credential-free, dark-theme controls and column
+  geometry hold, and 1024/768 have no page overflow. Only writes: the
+  idempotent demo seeds.
+- **Cost & Capacity** (Phase 55.0, `cost-diagnostics.spec.ts`): the lab
+  opens with its explicit-assumptions and no-execution disclaimers, the
+  6-run demo seeds idempotently, completeness filters work, the flagship
+  run's waterfall reconciles exactly (component sum = total cost and
+  net = gross − total, asserted numerically through the same API the page
+  uses), the partial-input run keeps missing spread/ADV unavailable —
+  never zero — with the missing components named per observation, the
+  high-turnover run reports its gross-positive→net-nonpositive count with
+  no "failed trades" wording, the sensitivity grid marks the base scenario
+  with no optimal-scenario wording (banned-wording regex asserted), the
+  capacity results show participation rising monotonically with scale and
+  fixed per-order fees constant while per-contract slippage scales 5× at
+  5× (asserted numerically), the participation-threshold warning renders,
+  the regime-linked run's cost table joins stored assignments with
+  never-recomputed wording, the invalid future-looking run's baseline
+  attempt is rejected with a 409 (asserted as the only failed request),
+  an eligible run marks baseline as a comparison reference, comparison
+  stays neutral, export is path/credential/NaN-free, dark-theme controls
+  and explicit units hold, and 1024/768 have no page overflow. Only
+  writes: the idempotent demo seeds plus the deliberate baseline marking
+  on a demo run.
+- **Portfolio Diagnostics** (Phase 56.0, `portfolio-diagnostics.spec.ts`):
+  the lab opens with its no-look-ahead and no-allocation disclaimers, the
+  11-run demo seeds idempotently, method filters work, equal-weight sums
+  to the configured normalization and inverse-volatility ordering is
+  asserted numerically through the same API the page uses, the ERC run's
+  risk contributions reconcile exactly (ΣPCR = 1, ΣCCR = σ) with target
+  and measured budgets both visible and the run marked baseline, the
+  correlation matrix renders with printed values and singularity
+  warnings, the degenerate-covariance run fails honestly while the
+  eigenvalue-floor run shows its recorded repair, weight/group caps are
+  verified satisfied, the turnover-cap violation blocks baseline with the
+  deliberate 409 filtered, linked cost estimates stay partial with
+  impact honestly unavailable, the regime table joins stored assignments
+  with never-recomputed wording, sensitivity shows a neutral base marker
+  with banned-wording asserted absent, full-sample is warned and the
+  future-looking run is invalid, comparison stays neutral, export is
+  path/credential/NaN-free, dark controls and units hold, and desktop/
+  1024/768 have no page overflow. Only writes: the idempotent demo
+  seeds.
+- **Portfolio Stress Lab** (Phase 57.0, `portfolio-stress.spec.ts`): the lab
+  opens with its not-a-prediction / no-worst-case / no-hedging disclaimers
+  and no banned wording, the 16-case demo seeds idempotently, scenario-type
+  and integrity filters work, the flagship's per-asset contributions
+  reconcile to the scenario total through the same API the page uses while
+  P&L and risk effects stay separate, shock units convert exactly
+  (bps/return/percent), the `unavailable` missing-shock policy stays
+  honestly partial with drifted weights withheld, the future-looking
+  ex-ante claim is invalid and its baseline attempt is refused (a
+  deliberate 409), pure volatility stress scales risk with a zero scenario
+  return, the non-PSD supplied correlation is honestly unavailable under
+  repair `none` and visibly repaired under an explicit eigenvalue floor,
+  liquidity/cost stress shows the copied model's new fingerprint with
+  participation above the explicit threshold and impact honestly
+  unavailable, drifted-book constraint breaches appear with no automatic
+  rebalancing, drawdown episodes and deepest-episode attribution render
+  with the labelled approximation, the full-sample window is labelled
+  descriptive, comparison stays neutral, export is downloadable, and the
+  scenario definition shows the execution order plus the deferred factor
+  shocks. Only writes: the idempotent demo seeds plus the deliberately
+  rejected baseline attempt.
+- **Overfitting Diagnostics** (Phase 53.0, `overfitting-diagnostics.spec.ts`):
+  the lab opens with its selection-bias disclaimer, the 4-run demo seeds
+  idempotently, metric/status filters work, the high-PBO noise demo shows
+  the PBO estimate, the λ histogram with its labelled zero boundary and the
+  block/combination counts, selection frequency and IS/OOS degradation
+  render neutrally (no best/winning/recommended/optimal/safe strategy
+  wording — asserted), the Sharpe diagnostics show observed Sharpe /
+  non-excess kurtosis / trial counts / E[maxSR] / DSR with the
+  no-future-profit disclaimer, the multiple-testing table separates
+  Bonferroni/Holm/BH with the FWER-vs-FDR explanation and declared
+  provenance, the dependence section shows the correlated pair and the
+  approximate effective trials, the constant/one-trial demo shows honest
+  unavailability and small-sample warnings, the invalid-config demo fails
+  honestly with no baseline action, comparison warns that universes differ
+  and stays neutral, export is path/credential-free, dark-theme controls
+  and column geometry hold, and 1024/768 have no page overflow.  Only
+  writes: the idempotent demo seeds.
+- **Feature Diagnostics** (Phase 52.0, `feature-diagnostics.spec.ts`): the
+  lab opens with its held-out / non-causality disclaimer, the 4-run demo
+  seeds idempotently, method/integrity filters work, the verified held-out
+  permutation run shows its validation/dataset links, the importance chart
+  with honest negative values and its accessible full table, the
+  rank-stability matrix + pairwise correlations + transparent score formula,
+  the correlated pair group (with no deletion suggestion), distribution
+  drift (high for the drifting feature) and importance drift
+  (importance-drift-without-data-drift rendered honestly), the
+  leakage-failed link fails honestly, the flagship baseline star renders and
+  a not-held-out run's baseline attempt is rejected with a 409 (one of the
+  suite's deliberate non-2xx responses — asserted as the only failed
+  request tracked by this spec),
+  comparison stays neutral, the export JSON is path/credential/sample-free,
+  no "causal"/"best"/"recommended" wording, dark-theme controls and column
+  geometry hold, and 1024/768 have no page overflow (list AND detail). Only
+  writes: the idempotent demo seeds (plus that rejected baseline attempt,
+  which writes nothing).
 - **Dataset Lineage** (Phase 49.0, `dataset-lineage.spec.ts`): the view opens
   with its provenance disclaimer, the demo lineage seeds idempotently (re-seed
   duplicates nothing), filters narrow the table, a dataset detail shows
@@ -54,7 +186,9 @@ protected and why).
   *wording* on the QA/RC pages is a documented exception), no raw stack
   traces, no failed local `/api/*` requests (dev-mode StrictMode
   `ERR_ABORTED` duplicate-mount fetches are a documented, ignored exception —
-  each is followed by a 200).
+  each is followed by a 200; several specs deliberately provoke exactly one
+  409 each (feature diagnostics, portfolio diagnostics, portfolio stress)
+  and assert nothing else failed).
 
 ## 2. What it does NOT check
 

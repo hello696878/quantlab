@@ -1,0 +1,129 @@
+"""Pydantic v2 API models for the Portfolio Stress Lab (permissive
+envelopes: the service layer owns validation and returns explicit 422s)."""
+
+from __future__ import annotations
+
+from typing import Annotated, Any, Dict, List, Optional
+
+from pydantic import BaseModel, ConfigDict, Field
+
+
+PositiveStrictInt = Annotated[int, Field(strict=True, gt=0)]
+
+
+class RunCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=200)
+    description: str = Field(default="", max_length=2000)
+    portfolio_run_id: PositiveStrictInt
+    portfolio_rebalance_id: Optional[PositiveStrictInt] = None
+    scenario: Dict[str, Any]
+    notional: Optional[float] = None
+    sensitivity: Optional[Dict[str, List[float]]] = None
+    dataset_version_id: Optional[PositiveStrictInt] = None
+    regime_run_id: Optional[PositiveStrictInt] = None
+    cost_diagnostic_run_id: Optional[PositiveStrictInt] = None
+    notes: str = Field(default="", max_length=2000)
+
+
+class ExecuteRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    create_experiment: bool = False
+
+
+class InvalidateRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    reason: str = Field(min_length=1, max_length=500)
+
+
+class RunSummary(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    id: int
+    created_at: str
+    updated_at: str
+    name: str
+    description: str
+    status: str
+    scenario_type: str
+    asset_count: int
+    scenario_count: int
+    integrity_status: str
+    completeness_status: str
+    scenario_return: Optional[float] = None
+    scenario_pnl: Optional[float] = None
+    stressed_volatility: Optional[float] = None
+    baseline_volatility: Optional[float] = None
+    breach_count: int = 0
+    episode_count: int = 0
+    max_drawdown: Optional[float] = None
+    configuration_fingerprint: str
+    result_fingerprint: Optional[str] = None
+    scenario_fingerprint: str
+    is_baseline: bool = False
+    portfolio_run_id: int
+    portfolio_rebalance_id: Optional[int] = None
+    error_message: Optional[str] = None
+
+
+class RunFull(RunSummary):
+    configuration: Dict[str, Any]
+    baseline_weight_fingerprint: Optional[str] = None
+    baseline_covariance_fingerprint: Optional[str] = None
+    stressed_covariance_fingerprint: Optional[str] = None
+    reconciliation: Optional[Dict[str, Any]] = None
+    risk_summary: Optional[Dict[str, Any]] = None
+    cost_stress: Optional[Dict[str, Any]] = None
+    drawdown: Optional[Dict[str, Any]] = None
+    covariance_stress: Optional[Dict[str, Any]] = None
+    drifted: Optional[Dict[str, Any]] = None
+    warnings: List[str] = Field(default_factory=list)
+
+
+class RunListResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    items: List[RunSummary]
+    total: int
+    page: int
+    page_size: int
+    total_pages: int
+
+
+class LabSummary(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    runs: int
+    completed: int
+    scenarios: int
+    constraint_breaches: int
+    drawdown_episodes: int
+    baselines: int
+
+
+class RunComparison(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    a_id: int
+    b_id: int
+    comparability_warnings: List[str]
+    groups: Dict[str, Any]
+    contributions: List[Dict[str, Any]]
+    fingerprint_match: Dict[str, bool]
+    baseline: Dict[str, bool]
+
+
+class DemoSeedResponse(BaseModel):
+    model_config = ConfigDict(extra="allow")
+
+    created: bool
+    run_ids: List[int]
+    notes: List[str] = Field(default_factory=list)
+
+
+__all__ = [
+    "RunCreate", "ExecuteRequest", "InvalidateRequest", "RunSummary",
+    "RunFull", "RunListResponse", "LabSummary", "RunComparison",
+    "DemoSeedResponse",
+]
