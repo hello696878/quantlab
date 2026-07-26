@@ -1,7 +1,7 @@
 """
 Deterministic SHA-256 fingerprints for portfolio stress (v1).
 
-Scenario-definition, configuration, result, stressed-covariance,
+Scenario-definition, causal-observation, configuration, result, stressed-covariance,
 stressed-cost-model and per-sensitivity-scenario fingerprints over
 canonical JSON with deterministic arrays; floats quantized to 12 decimal
 places; NaN/Infinity rejected; no database ids, creation timestamps,
@@ -54,6 +54,24 @@ def scenario_fingerprint(scenario: Dict[str, Any], integrity: str) -> str:
     }))
 
 
+def observation_input_fingerprint(kind: str, asset_ids: List[str],
+                                  timestamps: List[str],
+                                  returns_matrix: List[List[float]],
+                                  start_index: int,
+                                  end_index: int) -> str:
+    """Hash only the observations permitted for a causal calculation."""
+    if start_index < 0 or end_index < start_index \
+            or end_index >= len(timestamps):
+        raise FingerprintError("invalid observation fingerprint window")
+    return sha256_hex(_clean({
+        "kind": kind,
+        "asset_ids": asset_ids,
+        "timestamps": timestamps[start_index:end_index + 1],
+        "returns": [row[start_index:end_index + 1]
+                    for row in returns_matrix],
+    }))
+
+
 def configuration_fingerprint(scenario_fp: str,
                               portfolio_identity: Dict[str, Any],
                               notional: Optional[float],
@@ -90,34 +108,11 @@ def stressed_cost_model_fingerprint(base_fp: Optional[str],
 
 
 def result_fingerprint(configuration_fp: str,
-                       contributions: List[Dict[str, Any]],
-                       scenario_result: Dict[str, Any],
-                       stressed_cov_fp: Optional[str],
-                       risk_rows: List[Dict[str, Any]],
-                       constraint_rows: List[Dict[str, Any]],
-                       cost_block: Optional[Dict[str, Any]],
-                       drawdown_block: Optional[Dict[str, Any]],
-                       attribution_block: Optional[Dict[str, Any]],
-                       warnings: List[str], completeness: str,
-                       integrity: str) -> str:
+                       material_result: Dict[str, Any]) -> str:
     return sha256_hex(_clean({
         "kind": "portfolio_stress_result_v1",
         "configuration_fingerprint": configuration_fp,
-        "contributions": [{k: r.get(k) for k in
-                           ("asset_id", "weight", "shock", "contribution")}
-                          for r in contributions],
-        "scenario_result": scenario_result,
-        "stressed_covariance_fingerprint": stressed_cov_fp,
-        "risk": [{k: r.get(k) for k in
-                  ("asset_id", "baseline_pcr", "stressed_pcr")}
-                 for r in risk_rows],
-        "constraints": constraint_rows,
-        "cost": cost_block,
-        "drawdown": drawdown_block,
-        "attribution": attribution_block,
-        "warnings": sorted(warnings),
-        "completeness": completeness,
-        "integrity": integrity,
+        "material_result": material_result,
     }))
 
 
@@ -126,7 +121,6 @@ def sensitivity_fingerprint(configuration_fp: str,
     return sha256_hex(_clean({
         "kind": "portfolio_stress_sensitivity_v1",
         "configuration_fingerprint": configuration_fp,
-        "dimension": scenario.get("dimension"),
-        "value": scenario.get("value"),
-        "is_base": scenario.get("is_base"),
+        "result": {k: v for k, v in scenario.items()
+                   if k != "fingerprint"},
     }))

@@ -3,9 +3,12 @@ envelopes: the service layer owns validation and returns explicit 422s)."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Annotated, Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
+
+
+PositiveStrictInt = Annotated[int, Field(strict=True, gt=0)]
 
 
 class RunCreate(BaseModel):
@@ -13,14 +16,14 @@ class RunCreate(BaseModel):
 
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
-    portfolio_run_id: int
-    portfolio_rebalance_id: Optional[int] = None
+    portfolio_run_id: PositiveStrictInt
+    portfolio_rebalance_id: Optional[PositiveStrictInt] = None
     scenario: Dict[str, Any]
     notional: Optional[float] = None
     sensitivity: Optional[Dict[str, List[float]]] = None
-    dataset_version_id: Optional[int] = None
-    regime_run_id: Optional[int] = None
-    cost_diagnostic_run_id: Optional[int] = None
+    dataset_version_id: Optional[PositiveStrictInt] = None
+    regime_run_id: Optional[PositiveStrictInt] = None
+    cost_diagnostic_run_id: Optional[PositiveStrictInt] = None
     notes: str = Field(default="", max_length=2000)
 
 

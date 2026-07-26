@@ -31,7 +31,7 @@ The 16 documented cases:
 | 8 | Invalid future-looking ex-ante claim | `invalid`; baseline refused |
 | 9 | Volatility ×2.5 | risk estimate only; zero scenario return |
 | 10 | Additive volatility shock | disclosed zero-flooring |
-| 11 | Correlations toward one (α 0.7) | deterministic diversification collapse |
+| 11 | Correlations toward one (α 0.7) | changed dependence and risk under an explicit assumption |
 | 12 | Supplied non-PSD correlation, repair `none` | honest unavailability |
 | 13 | Same matrix, explicit eigenvalue floor | visible repair |
 | 14 | Liquidity and cost stress | copied cost model, participation, honest impact |
@@ -71,14 +71,16 @@ is touched.
 | --- | --- |
 | Net scenario return shows "— (withheld)" | shock coverage is partial while a cost leg exists — the two legs are on different bases, so both are reported separately instead of netted (see the attribution policy) |
 | An episode's Peak column says "initial capital (before …)" | the episode opened on the first observed period, so the peak is the starting capital rather than an observation |
+| Verified historical drawdown stops at the decision cutoff | expected: only observations strictly before the selected decision timestamp enter that causal block; full-series drawdown is descriptive |
+| Drawdown cost attribution unavailable | no timestamp-aligned realized cost path is stored; the separate one-way scenario cost estimate is not imputed into episodes |
 | 422 "unsupported scenario keys" | a mistyped scenario key — nothing is silently ignored |
 | 422 "historical window does not reference actual stored observations" | timestamps are not on the linked portfolio's stored timeline |
 | 422 "shock exceeds ±100%" | shock bound in return space |
 | 422 "factor shocks are deferred in v1" | no factor-exposure system exists; expected |
 | 422 "liquidity/cost stress requires a linked cost-diagnostic run" | pass `cost_diagnostic_run_id` |
-| 409 on mark-baseline | integrity is not verified, the result is not complete, or the stressed covariance is unavailable |
+| 409 on mark-baseline | integrity is not verified, the result is not complete, the stressed covariance is unavailable, or the linked dataset is invalidated |
 | "the stored portfolio weights changed since this stress run was created" | the linked Phase 56 run was re-executed; create a new stress run |
-| Stressed covariance unavailable | non-PSD under repair policy `none` — set an explicit eigenvalue floor if that assumption is intended |
+| Stressed covariance unavailable | matrix is below the PSD tolerance under repair policy `none`; an explicit eigenvalue floor is available only when that modelling assumption is intended |
 
 ## Scope reminder
 

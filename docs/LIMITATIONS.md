@@ -299,7 +299,13 @@ one-way move of the whole book — not modelled trades. Post-shock drifted
 weights are pure arithmetic drift with **no rebalancing**, and drawdown
 attribution uses a labelled static-weight approximation whose linear sum
 reconciles with the interval's summed arithmetic return, not the geometric
-depth. Nothing here hedges, rebalances, trades, or recommends an action;
+depth. Verified historical drawdown is restricted to observations strictly
+before the selected decision timestamp; full-stored-series drawdown is
+explicitly descriptive. There is no timestamp-aligned realized cost path,
+so episode cost attribution is unavailable. Fingerprints are deterministic
+integrity aids over pinned linked identities and material outputs, not a
+tamper-proof audit ledger. Nothing here hedges, rebalances, trades, or
+recommends an action;
 it is not regulatory stress testing, capital-adequacy analysis, or
 risk-management advice.
 

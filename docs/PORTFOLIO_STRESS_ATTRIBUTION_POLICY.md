@@ -54,13 +54,13 @@ risk *estimates* only and is reported separately.
 ## Post-shock drifted weights
 
 ```
-post_value_i = w_i × (1 + r_i)          (r floored at −100%)
+post_value_i = w_i × (1 + r_i)          (r must be ≥ −100%)
 cash         = 1 − Σw                   (SIGNED: negative = borrowed)
 drifted_i    = post_value_i / (Σ post_value + cash)   = w_i(1+r_i) / (1 + Σ w_i r_i)
 ```
 
 Cash is carried unshocked with its sign intact, so a zero shock leaves any
-book — levered or not — unchanged. A non-positive or non-finite denominator
+book — levered or not — unchanged. A return below −100%, or a non-positive or non-finite denominator
 (a wiped-out long-short book) returns unavailable with the reason. **No
 automatic rebalancing occurs**: the drifted book is pure arithmetic drift.
 

@@ -24,6 +24,7 @@ never rebalances, hedges, or trades.
 from __future__ import annotations
 
 import copy
+import logging
 import json
 import math
 import time
@@ -55,6 +56,9 @@ from app.portfolio_stress.scenario import (
     shock_to_return,
     validate_scenario,
 )
+
+logger = logging.getLogger(__name__)
+
 
 
 class PortfolioStressError(ValueError):
@@ -147,7 +151,7 @@ def _validate_sensitivity(raw: Any, *, cost_linked: bool) -> Dict[str, List[floa
 
 
 def _load_portfolio(portfolio_run_id: Any) -> Dict[str, Any]:
-    if not isinstance(portfolio_run_id, int):
+    if isinstance(portfolio_run_id, bool) or not isinstance(portfolio_run_id, int):
         raise PortfolioStressError("portfolio_run_id is required")
     prun = pd_store.get_run(portfolio_run_id)
     if prun is None:
@@ -221,9 +225,15 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
             raise PortfolioStressError(
                 "notional must be a finite number > 0 (never fabricated)")
         notional = float(notional)
+    if scenario["liquidity_cost_stress"] \
+            and scenario["liquidity_cost_stress"].get("notional_scale") \
+            and notional is None:
+        raise PortfolioStressError(
+            "notional_scale requires an explicit portfolio notional")
 
     cost_run_id = payload.get("cost_diagnostic_run_id")
     cost_model = None
+    crun = None
     if cost_run_id is not None:
         crun = cost_store.get_run(cost_run_id)
         if crun is None:
@@ -238,6 +248,7 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
             "liquidity/cost stress requires a linked cost-diagnostic run")
 
     regime_run_id = payload.get("regime_run_id")
+    rrun = None
     if regime_run_id is not None:
         rrun = regime_store.get_run(regime_run_id)
         if rrun is None or rrun["status"] != "completed":
@@ -261,26 +272,62 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
                                         cost_linked=cost_model is not None)
 
     scenario_fp = fp_mod.scenario_fingerprint(scenario, integrity)
+    timeline = universe["timestamps"]
+    returns_matrix = [a["returns"] for a in universe["assets"]]
+    timeline_index = {ts: i for i, ts in enumerate(timeline)}
+    historical_input_fp = None
+    if scenario["historical"] is not None:
+        hist = scenario["historical"]
+        historical_input_fp = fp_mod.observation_input_fingerprint(
+            "portfolio_stress_historical_input_v1", asset_ids, timeline,
+            returns_matrix, timeline_index[hist["start_timestamp"]],
+            timeline_index[hist["end_timestamp"]])
+    drawdown_input_fp = None
+    decision_index = timeline_index[rebalance["decision_timestamp"]]
+    if integrity == "verified_historical_window" and decision_index > 0:
+        drawdown_input_fp = fp_mod.observation_input_fingerprint(
+            "portfolio_stress_predecision_drawdown_input_v1", asset_ids,
+            timeline, returns_matrix, 0, decision_index - 1)
     portfolio_identity = {
         "portfolio_run_id": prun["id"],
         "portfolio_configuration_fingerprint": prun["configuration_fingerprint"],
         "rebalance_id": rebalance["rebalance_id"],
+        "portfolio_universe_fingerprint": prun.get("universe_fingerprint"),
+        "constraint_fingerprint": prun.get("constraint_fingerprint"),
         "weight_fingerprint": rebalance.get("weight_fingerprint"),
         "covariance_fingerprint": rebalance.get("covariance_fingerprint"),
+        "decision_timestamp": rebalance["decision_timestamp"],
+        "effective_timestamp": rebalance.get("effective_timestamp"),
     }
     # fingerprints hash CONTENT-ADDRESSED identity only (no database row
     # ids), so a byte-identical configuration reproduces the same
     # fingerprint in a different database — the ids stay as stored columns
     fp_identity = {
-        "portfolio_configuration_fingerprint": prun["configuration_fingerprint"],
+        "portfolio_configuration_fingerprint": (
+            None if integrity == "verified_historical_window"
+            else prun["configuration_fingerprint"]),
+        "portfolio_universe_fingerprint": (
+            None if integrity == "verified_historical_window"
+            else prun.get("universe_fingerprint")),
+        "constraint_fingerprint": prun.get("constraint_fingerprint"),
         "weight_fingerprint": rebalance.get("weight_fingerprint"),
         "covariance_fingerprint": rebalance.get("covariance_fingerprint"),
         "decision_timestamp": rebalance["decision_timestamp"],
+        "effective_timestamp": rebalance.get("effective_timestamp"),
+        "historical_input_fingerprint": historical_input_fp,
+        "predecision_drawdown_input_fingerprint": drawdown_input_fp,
     }
     fp_linked = {
         "dataset_manifest_fingerprint": dataset_manifest_fp,
         "cost_model_fingerprint": (cost_model or {}).get("fingerprint"),
-        "regime_linked": regime_run_id is not None,
+        "cost_configuration_fingerprint": (
+            crun.get("configuration_fingerprint") if crun else None),
+        "cost_result_fingerprint": (
+            crun.get("result_fingerprint") if crun else None),
+        "regime_configuration_fingerprint": (
+            rrun.get("configuration_fingerprint") if rrun else None),
+        "regime_result_fingerprint": (
+            rrun.get("result_fingerprint") if rrun else None),
     }
     config_fp = fp_mod.configuration_fingerprint(
         scenario_fp, fp_identity, notional, fp_linked,
@@ -295,6 +342,7 @@ def create_run(payload: Dict[str, Any], *, demo_key: Optional[str] = None) -> Di
         "sensitivity": sensitivity,
         "attribution_policy": ATTRIBUTION_POLICY,
         "execution_order": EXECUTION_ORDER,
+        "linked_identities": fp_linked,
         "cost_reference_turnover_note": (
             "cost stress is estimated for a reference one-way move of the "
             "whole book (turnover = 0.5 x sum |w|) under the stressed cost "
@@ -532,19 +580,14 @@ def execute_run(run_id: int, *, create_experiment: bool = False) -> Dict[str, An
     except (NotFoundError, ConflictError):
         raise
     except PortfolioStressError as exc:
-        store.clear_results(run_id)  # a failed run exposes no stale results
-        store.update_run(run_id, {"status": "failed",
-                                  "error_message": str(exc),
-                                  "is_baseline": 0, "completed_at": _now()})
+        store.fail_execution(run_id, str(exc), _now())
         raise
-    except Exception as exc:
-        store.clear_results(run_id)
-        store.update_run(run_id, {"status": "failed",
-                                  "error_message": str(exc),
-                                  "is_baseline": 0, "completed_at": _now()})
+    except Exception:
+        logger.exception("Unexpected portfolio-stress execution failure")
+        store.fail_execution(
+            run_id, "Internal execution error; see server logs.", _now())
         raise InternalExecutionError(
-            "internal error during stress execution; the run is marked "
-            "failed with the stored error message")
+            "internal error during stress execution; the run is marked failed")
 
 
 def _evaluate_scenario_once(scenario: Dict[str, Any], *,
@@ -715,9 +758,51 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
         warnings.append(f"risk recomputation unavailable: "
                         f"{risk_unavailable_reason}")
 
+    linked = config.get("linked_identities") or {}
+    if run.get("dataset_version_id"):
+        version = dataset_store.get_version(run["dataset_version_id"])
+        if version is None:
+            raise PortfolioStressError("the linked dataset version is unavailable")
+        pinned = linked.get("dataset_manifest_fingerprint")
+        if pinned and version.get("manifest_fingerprint") != pinned:
+            raise PortfolioStressError(
+                "the linked dataset manifest changed since this stress run "
+                "was created; re-create the run")
+        if version.get("invalidated_at"):
+            warnings.append(
+                "the linked dataset version is now invalidated; the stored "
+                "stress run remains historical but should not be promoted")
+
+    if run.get("regime_run_id"):
+        rrun = regime_store.get_run(run["regime_run_id"])
+        if rrun is None:
+            raise PortfolioStressError("the linked regime run is unavailable")
+        for key, field in (
+                ("regime_configuration_fingerprint", "configuration_fingerprint"),
+                ("regime_result_fingerprint", "result_fingerprint")):
+            if linked.get(key) and rrun.get(field) != linked[key]:
+                raise PortfolioStressError(
+                    "the linked regime identity changed since this stress "
+                    "run was created; re-create the run")
+
     cost_model = None
     if run.get("cost_diagnostic_run_id"):
+        crun = cost_store.get_run(run["cost_diagnostic_run_id"])
         cost_model = cost_store.get_cost_model(run["cost_diagnostic_run_id"])
+        if crun is None or cost_model is None:
+            raise PortfolioStressError("the linked cost model is unavailable")
+        expected = linked.get("cost_model_fingerprint")
+        if expected and cost_model.get("fingerprint") != expected:
+            raise PortfolioStressError(
+                "the linked cost model changed since this stress run was "
+                "created; re-create the run")
+        for key, field in (
+                ("cost_configuration_fingerprint", "configuration_fingerprint"),
+                ("cost_result_fingerprint", "result_fingerprint")):
+            if linked.get(key) and crun.get(field) != linked[key]:
+                raise PortfolioStressError(
+                    "the linked cost-diagnostic identity changed since this "
+                    "stress run was created; re-create the run")
 
     result = _evaluate_scenario_once(
         scenario, universe=universe, asset_ids=asset_ids,
@@ -760,8 +845,9 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
             + ", ".join(cov_stress["vol_result"]["clamped"]))
     if cov_stress is not None and (cov_stress.get("repair") or {}).get("repaired"):
         warnings.append(
-            "the requested stressed covariance was not positive semidefinite "
-            "and was repaired under the explicit eigenvalue-floor policy "
+            "the requested stressed covariance had an eigenvalue below the "
+            "explicit floor (which can include a singular PSD matrix) and "
+            "was repaired under the explicit eigenvalue-floor policy "
             f"(floor={(cov_stress.get('repair') or {}).get('floor')}); the "
             "disclosed stressed vols/correlations describe the repaired "
             "matrix actually used")
@@ -879,7 +965,22 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
     port_returns = pd_rebalance.portfolio_returns(
         indexed_rebalances, asset_ids, returns_matrix,
         len(universe["timestamps"]))
-    path = dd_mod.drawdown_path(port_returns, universe["timestamps"])
+    analysis_timestamps = universe["timestamps"]
+    analysis_weight_series = weight_series
+    analysis_returns_matrix = returns_matrix
+    analysis_scope = "full stored realized series (descriptive)"
+    cutoff_timestamp = None
+    if integrity == "verified_historical_window":
+        cutoff = timeline_index[rebalance["decision_timestamp"]]
+        cutoff_timestamp = rebalance["decision_timestamp"]
+        analysis_timestamps = analysis_timestamps[:cutoff]
+        analysis_weight_series = analysis_weight_series[:cutoff]
+        analysis_returns_matrix = [row[:cutoff] for row in returns_matrix]
+        port_returns = port_returns[:cutoff]
+        analysis_scope = (
+            "strictly pre-decision realized series for verified ex-ante "
+            "historical analysis")
+    path = dd_mod.drawdown_path(port_returns, analysis_timestamps)
     if not path.get("available") and path.get("reason"):
         warnings.append(f"drawdown analysis unavailable: {path['reason']}")
     if path.get("trailing_unobserved"):
@@ -913,7 +1014,7 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
         attribution = dd_mod.attribute_interval(
             start_offset + deepest["start_index"],
             start_offset + deepest["trough_index"],
-            asset_ids, weight_series, returns_matrix, asset_groups,
+            asset_ids, analysis_weight_series, analysis_returns_matrix, asset_groups,
             static_weights=True)
         if attribution.get("available"):
             attribution_rows = [
@@ -933,10 +1034,13 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
                        "realized series (weights drift between rebalances); "
                        "attribution uses static stored-target weights "
                        "(approximation labelled)")
+        convention += f"; scope: {analysis_scope}"
     drawdown_block = {
         "available": path.get("available", False),
         "reason": path.get("reason"),
         "convention": convention,
+        "analysis_scope": analysis_scope,
+        "decision_cutoff_timestamp": cutoff_timestamp,
         "max_drawdown": path.get("max_drawdown"),
         "episode_count": episode_count_total,
         "episodes_truncated": episode_count_total > len(episodes),
@@ -945,6 +1049,11 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
                     "drawdowns": [round(v, 10) for v in path["drawdowns"]]}
                    if path.get("available") else None),
         "attribution": attribution_block,
+        "cost_attribution": {
+            "available": False,
+            "reason": ("no timestamp-aligned realized transaction-cost "
+                       "series is stored for the selected drawdown interval"),
+        },
     }
 
     # sensitivity (bounded one-at-a-time probes of the same book)
@@ -1011,25 +1120,27 @@ def _execute_body(run_id: int, run: Dict[str, Any], t0: float,
             "clamped": (cov_stress.get("corr_result") or {}).get("clamped"),
         }
 
-    scenario_result = {
-        "direct_shock_return": reconciliation["direct_shock_return"],
-        "stressed_cost_return": reconciliation["stressed_cost_return"],
-        "net_scenario_return": reconciliation["net_scenario_return"],
-        "scenario_pnl": reconciliation["scenario_pnl"],
-    }
     result_fp = fp_mod.result_fingerprint(
-        run["configuration_fingerprint"], contributions["rows"],
-        scenario_result, stressed_cov_fp, risk_rows,
-        [{k: r.get(k) for k in ("book", "constraint", "asset_id")}
-         for r in constraint_rows],
-        ({"stressed_return": reconciliation["stressed_cost_return"]}
-         if cost_block else None),
-        {"max_drawdown": drawdown_block.get("max_drawdown"),
-         "episode_count": drawdown_block.get("episode_count")},
-        ({"portfolio_contribution_sum":
-          attribution_block["portfolio_contribution_sum"]}
-         if attribution_block else None),
-        warnings, completeness, integrity)
+        run["configuration_fingerprint"], {
+            "asset_results": asset_rows,
+            "contribution_summary": {
+                k: v for k, v in contributions.items() if k != "rows"},
+            "reconciliation": reconciliation,
+            "stressed_covariance_fingerprint": stressed_cov_fp,
+            "covariance_stress": covariance_stress_block,
+            "risk_summary": risk_summary,
+            "risk_results": risk_rows,
+            "constraint_results": constraint_rows,
+            "cost_stress": cost_block,
+            "drifted": drifted,
+            "drawdown": drawdown_block,
+            "episodes": episodes,
+            "attribution_results": attribution_rows,
+            "sensitivity_results": sensitivity_rows,
+            "warnings": sorted(warnings),
+            "completeness": completeness,
+            "integrity": integrity,
+        })
 
     store.replace_children(
         run_id,
@@ -1269,10 +1380,15 @@ def _baseline_scope(run: Dict[str, Any]) -> str:
     return "|".join([
         f"prun:{run['portfolio_run_id']}",
         f"reb:{run['portfolio_rebalance_id']}",
-        f"w:{(run['baseline_weight_fingerprint'] or 'none')[:16]}",
-        f"cov:{(run['baseline_covariance_fingerprint'] or 'none')[:16]}",
-        f"scen:{run['scenario_fingerprint'][:16]}",
+        f"w:{run['baseline_weight_fingerprint'] or 'none'}",
+        f"cov:{run['baseline_covariance_fingerprint'] or 'none'}",
+        f"scen:{run['scenario_fingerprint']}",
         f"ntl:{run['configuration'].get('notional') or 'none'}",
+        "obs:{start}:{end}".format(
+            start=((run["configuration"].get("scenario") or {})
+                   .get("historical") or {}).get("start_timestamp", "none"),
+            end=((run["configuration"].get("scenario") or {})
+                 .get("historical") or {}).get("end_timestamp", "none")),
     ])
 
 
@@ -1295,10 +1411,14 @@ def mark_baseline(run_id: int) -> Dict[str, Any]:
         raise ConflictError(
             "baselines require a valid stressed covariance where risk "
             "stress is configured")
+    if run.get("dataset_version_id"):
+        version = dataset_store.get_version(run["dataset_version_id"])
+        if version is None or version.get("invalidated_at"):
+            raise ConflictError(
+                "baselines require a currently valid linked dataset version")
     if not run["result_fingerprint"]:
         raise ConflictError("baselines require a result fingerprint")
     scope = _baseline_scope(run)
-    store.update_run(run_id, {"baseline_scope": scope})
     store.mark_baseline(run_id, scope)
     return get_run(run_id)
 
@@ -1319,6 +1439,19 @@ def _entry(field: str, a: Any, b: Any) -> Dict[str, Any]:
     return {"kind": kind, "field": field, "a": a, "b": b, "note": note}
 
 
+
+def _shock_unit_signature(run: Dict[str, Any]) -> List[str]:
+    scenario = run["configuration"].get("scenario") or {}
+    entries: List[str] = []
+    for prefix in ("asset_shocks", "group_shocks"):
+        for key, spec in sorted((scenario.get(prefix) or {}).items()):
+            entries.append(f"{prefix}:{key}:{spec.get('unit')}")
+    if scenario.get("global_shock"):
+        entries.append(f"global:{scenario['global_shock'].get('unit')}")
+    if scenario.get("historical"):
+        entries.append("historical:stored-simple-returns")
+    return entries
+
 def compare_runs(a_id: int, b_id: int) -> Dict[str, Any]:
     if a_id == b_id:
         raise PortfolioStressError("compare requires two different runs")
@@ -1331,6 +1464,12 @@ def compare_runs(a_id: int, b_id: int) -> Dict[str, Any]:
         comparability.append("different portfolio weights")
     if a["portfolio_rebalance_id"] != b["portfolio_rebalance_id"]:
         comparability.append("different rebalance identities")
+    a_universe = (a["configuration"].get("portfolio_identity") or {}).get(
+        "portfolio_universe_fingerprint")
+    b_universe = (b["configuration"].get("portfolio_identity") or {}).get(
+        "portfolio_universe_fingerprint")
+    if a_universe != b_universe:
+        comparability.append("different portfolio universes")
     if a["baseline_covariance_fingerprint"] != b["baseline_covariance_fingerprint"]:
         comparability.append("different baseline covariance estimates")
     if (a["configuration"].get("notional") or None) != \
@@ -1340,6 +1479,8 @@ def compare_runs(a_id: int, b_id: int) -> Dict[str, Any]:
         comparability.append("different linked cost models")
     if a["integrity_status"] != b["integrity_status"]:
         comparability.append("integrity states differ")
+    if _shock_unit_signature(a) != _shock_unit_signature(b):
+        comparability.append("different shock-unit definitions")
     identity = [_entry(f, a.get(f), b.get(f)) for f in (
         "scenario_type", "asset_count", "scenario_return", "scenario_pnl",
         "baseline_volatility", "stressed_volatility", "breach_count",

@@ -129,8 +129,9 @@ def drifted_weights(weights: Dict[str, float],
     Cash is the SIGNED residual ``1 − Σw`` (negative for a levered book —
     borrowed cash stays borrowed, matching the Phase 56 wealth convention)
     and is carried unshocked, so the denominator equals ``1 + Σ w_i·r_i``.
-    A return ≤ −100% zeroes the position value (documented bankruptcy
-    convention).  A non-positive or non-finite denominator returns
+    A return equal to −100% zeroes the position value; a return below
+    −100% is outside simple-return support and returns unavailable.  A
+    non-positive or non-finite denominator returns
     unavailable — never a fabricated book.  No automatic rebalancing
     occurs.
     """
@@ -139,9 +140,13 @@ def drifted_weights(weights: Dict[str, float],
                 "reason": "drifted weights need a shock for every asset "
                           "(missing-shock policy 'unavailable')"}
     post: Dict[str, float] = {}
+    if any(shocks[a] is not None and shocks[a] < -1.0 for a in asset_ids):
+        return {"weights": None,
+                "reason": "a shock below -100% is outside the simple-return "
+                          "drift convention"}
     for a in asset_ids:
         w = weights.get(a, 0.0)
-        r = max(shocks[a], -1.0)  # ≤ −100% => position value floors at zero
+        r = shocks[a]
         post[a] = w * (1.0 + r)
     net = sum(weights.get(a, 0.0) for a in asset_ids)
     cash = 1.0 - net  # signed residual: negative = borrowed, never clamped

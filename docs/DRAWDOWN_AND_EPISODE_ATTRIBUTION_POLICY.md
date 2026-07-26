@@ -11,6 +11,15 @@ a decision index govern that period onward and **drift** between rebalances
 exactly as recorded. Periods before the first effective rebalance are
 honestly unavailable (`None`), never zero-filled.
 
+For `verified_historical_window` runs, drawdown input is additionally cut off
+**strictly before the selected rebalance decision timestamp**. The stored
+`analysis_scope`, decision cutoff, and an observation-input fingerprint make
+that causal boundary auditable; appending post-decision observations cannot
+change the configuration fingerprint, result fingerprint, or drawdown block.
+Descriptive and hypothetical scenarios may use the complete stored realized
+series, but are explicitly labelled `full_stored_realized_series_descriptive`
+and must not be interpreted as ex-ante evidence.
+
 ## Wealth, peaks, drawdowns
 
 ```
@@ -61,4 +70,7 @@ targets fixed within the interval). Average weights, absolute shares
 and group contributions are reported alongside.
 
 Attribution describes what was measured — it never claims to prove why the
-drawdown happened, and it is not a prediction of future drawdowns.
+drawdown happened, and it is not a prediction of future drawdowns. Phase 57
+does not store a timestamp-aligned realized transaction-cost path, so cost
+attribution inside drawdown episodes is explicitly unavailable rather than
+inferred from the separate one-way scenario cost estimate.

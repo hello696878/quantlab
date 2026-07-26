@@ -46,6 +46,8 @@ export interface RunSummary {
   experiment_id: number | null;
   experiment_name: string | null;
   error_message: string | null;
+  dataset_invalidated?: boolean | null;
+  baseline_scope?: string | null;
 }
 
 export interface ReconciliationBlock {
@@ -109,6 +111,12 @@ export interface DrawdownBlock {
   available: boolean;
   reason: string | null;
   convention: string | null;
+  analysis_scope?: string;
+  decision_cutoff_timestamp?: string | null;
+  cost_attribution?: {
+    available: boolean;
+    reason: string | null;
+  } | null;
   max_drawdown: number | null;
   episode_count: number;
   episodes_truncated?: boolean;
@@ -226,7 +234,7 @@ export interface SensitivityRow {
   scenario_return: number | null;
   stressed_volatility: number | null;
   contribution_hhi: number | null;
-  breach_count: number;
+  breach_count: number | null;
   cost_return: number | null;
   completeness: string | null;
   status: string;

@@ -11,6 +11,7 @@ prior-registry preservation.
 
 from __future__ import annotations
 
+import copy
 import math
 from datetime import datetime, timedelta
 
@@ -896,6 +897,10 @@ def test_api_error_paths(client):
                                   "multiplier": 2.0}}),
         "surprise": True})
     assert extra.status_code == 422
+    bool_id = client.post(f"{BASE}/runs", json=_stress_payload(True, {
+        "scenario_type": "volatility_stress",
+        "volatility_stress": {"mode": "multiplicative", "multiplier": 2.0}}))
+    assert bool_id.status_code == 422
     nan_notional = client.post(f"{BASE}/runs", json=_stress_payload(
         prun["id"], {"scenario_type": "volatility_stress",
                      "volatility_stress": {"mode": "multiplicative",
@@ -949,3 +954,194 @@ def test_demo_idempotent_and_prior_registries_preserved(client):
     seed_resp = client.post(f"{BASE}/demo-seed")
     assert seed_resp.status_code == 200
     assert seed_resp.json()["created"] is False
+
+
+def test_nested_scenario_validation_is_strict_and_type_honest():
+    ids, groups = ["a", "b"], ["g1"]
+    with pytest.raises(scenario_mod.ScenarioError, match="unsupported shock unit"):
+        scenario_mod.shock_to_return(1.0, "ticks")
+    with pytest.raises(scenario_mod.ScenarioError, match="asset_shocks must be an object"):
+        scenario_mod.validate_scenario(
+            {"scenario_type": "hypothetical_asset_shock",
+             "asset_shocks": [["a", {"value": -0.1, "unit": "return"}]]},
+            asset_ids=ids, groups=groups)
+    with pytest.raises(scenario_mod.ScenarioError, match="never silently ignored"):
+        scenario_mod.validate_scenario(
+            {"scenario_type": "hypothetical_asset_shock",
+             "asset_shocks": {"a": {"value": -0.1, "unit": "return",
+                                      "units": "percent"}}},
+            asset_ids=ids, groups=groups)
+    with pytest.raises(scenario_mod.ScenarioError, match="never silently ignored"):
+        scenario_mod.validate_scenario(
+            {"scenario_type": "volatility_stress",
+             "volatility_stress": {"mode": "multiplicative",
+                                   "multiplier": 2.0, "multiplir": 3.0}},
+            asset_ids=ids, groups=groups)
+    with pytest.raises(scenario_mod.ScenarioError, match="combined_scenario"):
+        scenario_mod.validate_scenario(
+            {"scenario_type": "volatility_stress",
+             "volatility_stress": {"mode": "multiplicative",
+                                   "multiplier": 2.0},
+             "asset_shocks": {"a": {"value": -0.1, "unit": "return"}}},
+            asset_ids=ids, groups=groups)
+    with pytest.raises(scenario_mod.ScenarioError, match="at least one"):
+        scenario_mod.validate_scenario(
+            {"scenario_type": "combined_scenario"},
+            asset_ids=ids, groups=groups)
+    with pytest.raises(scenario_mod.ScenarioError, match="NaN or Infinity"):
+        scenario_mod.validate_scenario(
+            {"scenario_type": "hypothetical_asset_shock",
+             "asset_shocks": {"a": {"value": -0.1, "unit": "return"}},
+             "metadata": {"score": float("nan")}},
+            asset_ids=ids, groups=groups)
+
+
+def test_notional_scale_requires_notional_and_bool_id_is_rejected():
+    prun = _portfolio_run()
+    with pytest.raises(service.PortfolioStressError, match="notional_scale"):
+        service.create_run(_stress_payload(prun["id"], {
+            "scenario_type": "liquidity_and_cost_stress",
+            "liquidity_cost_stress": {"notional_scale": 2.0}}))
+    with pytest.raises(service.PortfolioStressError, match="portfolio_run_id"):
+        service._load_portfolio(True)
+
+
+def test_drift_below_minus_one_is_unavailable_not_silently_floored():
+    out = shocks_mod.drifted_weights(
+        {"a": 1.0}, {"a": -1.01}, ["a"])
+    assert out["weights"] is None
+    assert "below -100%" in out["reason"]
+
+
+def test_explicit_floor_repairs_singular_psd_with_accurate_disclosure():
+    singular_psd = np.array([[0.01, 0.01], [0.01, 0.01]])
+    result = stress_mod.build_stressed_covariance(
+        singular_psd, ["a", "b"], None,
+        {"mode": "toward_one", "alpha": 0.0,
+         "repair": "eigenvalue_floor", "eigenvalue_floor": 1e-5})
+    assert result["report"]["psd"] is True
+    assert result["repair"]["repaired"] is True
+    assert min(result["repair"]["original_eigenvalues"]) == pytest.approx(0.0)
+    assert min(result["repair"]["repaired_eigenvalues"]) == pytest.approx(1e-5)
+
+
+def test_material_result_and_sensitivity_fingerprints_cover_outputs():
+    config_fp = "a" * 64
+    base = {
+        "drawdown": {"max_drawdown": -0.10},
+        "constraint_results": [{"constraint": "gross", "amount": 0.1}],
+        "sensitivity_results": [{"dimension": "global_shock",
+                                  "scenario_return": -0.05}],
+    }
+    original = fp_mod.result_fingerprint(config_fp, base)
+    changed = copy.deepcopy(base)
+    changed["drawdown"]["max_drawdown"] = -0.11
+    assert fp_mod.result_fingerprint(config_fp, changed) != original
+    changed = copy.deepcopy(base)
+    changed["constraint_results"][0]["amount"] = 0.2
+    assert fp_mod.result_fingerprint(config_fp, changed) != original
+    row = {"dimension": "global_shock", "value": -0.1, "is_base": False,
+           "scenario_return": -0.1, "status": "completed"}
+    row_changed = {**row, "scenario_return": -0.2}
+    assert fp_mod.sensitivity_fingerprint(config_fp, row) != \
+        fp_mod.sensitivity_fingerprint(config_fp, row_changed)
+
+
+def test_verified_historical_result_ignores_appended_future_observation(
+        monkeypatch):
+    prun = _portfolio_run()
+    timeline = prun["universe"]["timestamps"]
+    payload = _stress_payload(prun["id"], {
+        "scenario_type": "historical_window",
+        "historical": {"usage": "ex_ante",
+                       "start_timestamp": timeline[10],
+                       "end_timestamp": timeline[12]}})
+    first = service.execute_run(service.create_run(payload)["id"])
+    original_get = pd_store.get_run
+
+    def with_extreme_future(run_id):
+        current = original_get(run_id)
+        if current is None or run_id != prun["id"]:
+            return current
+        current = copy.deepcopy(current)
+        future = (datetime.fromisoformat(current["universe"]["timestamps"][-1])
+                  + timedelta(days=1)).isoformat()
+        current["universe"]["timestamps"].append(future)
+        for asset, shock in zip(current["universe"]["assets"],
+                                (0.99, -0.99, 0.75)):
+            asset["returns"].append(shock)
+        return current
+
+    monkeypatch.setattr(service.pd_store, "get_run", with_extreme_future)
+    second = service.execute_run(first["id"])
+    assert second["configuration_fingerprint"] == first["configuration_fingerprint"]
+    assert second["result_fingerprint"] == first["result_fingerprint"]
+    assert second["scenario_return"] == first["scenario_return"]
+    assert second["drawdown"] == first["drawdown"]
+    assert second["drawdown"]["analysis_scope"].startswith("strictly pre-decision")
+
+
+def test_failed_state_and_child_cleanup_roll_back_together():
+    prun = _portfolio_run()
+    run = service.create_run(_stress_payload(prun["id"], {
+        "scenario_type": "hypothetical_asset_shock",
+        "asset_shocks": {"a": {"value": -10, "unit": "percent"}},
+        "missing_shock_policy": "zero"}))
+    completed = service.execute_run(run["id"])
+    before_assets = ps_store.list_asset_results(run["id"])
+    with db_module.get_connection() as conn:
+        conn.execute(
+            "CREATE TRIGGER reject_failed_parent BEFORE UPDATE OF status "
+            "ON portfolio_stress_runs WHEN NEW.status = 'failed' "
+            "BEGIN SELECT RAISE(ABORT, 'forced rollback'); END")
+        conn.commit()
+    with pytest.raises(Exception, match="forced rollback"):
+        ps_store.fail_execution(run["id"], "failure", _ts(1)[0])
+    after = ps_store.get_run(run["id"])
+    assert after["status"] == completed["status"] == "completed"
+    assert after["result_fingerprint"] == completed["result_fingerprint"]
+    assert ps_store.list_asset_results(run["id"]) == before_assets
+
+
+def test_unexpected_execution_error_is_sanitized(client, monkeypatch):
+    prun = _portfolio_run()
+    run = service.create_run(_stress_payload(prun["id"], {
+        "scenario_type": "hypothetical_asset_shock",
+        "asset_shocks": {"a": {"value": -10, "unit": "percent"}},
+        "missing_shock_policy": "zero"}))
+
+    def explode(*args, **kwargs):
+        raise RuntimeError("secret C:/private/path token=abc")
+
+    monkeypatch.setattr(service, "_execute_body", explode)
+    response = client.post(f"{BASE}/runs/{run['id']}/execute", json={})
+    assert response.status_code == 500
+    assert "secret" not in response.text
+    stored = ps_store.get_run(run["id"])
+    assert stored["status"] == "failed"
+    assert stored["error_message"] == "Internal execution error; see server logs."
+
+def test_linked_cost_identity_is_pinned_and_rechecked(monkeypatch):
+    from app.cost_diagnostics.demo import seed_demo_cost_diagnostics
+    from app.cost_diagnostics.store import run_demo_key_id
+
+    seed_demo_cost_diagnostics()
+    cost_run_id = run_demo_key_id("demo:cd:complete-costs")
+    prun = _portfolio_run()
+    run = service.create_run(_stress_payload(prun["id"], {
+        "scenario_type": "liquidity_and_cost_stress",
+        "liquidity_cost_stress": {"spread_multiplier": 2.0}},
+        notional=1_000_000.0, cost_diagnostic_run_id=cost_run_id))
+    original = service.cost_store.get_run
+
+    def changed_identity(run_id):
+        linked = copy.deepcopy(original(run_id))
+        linked["result_fingerprint"] = "changed-after-stress-create"
+        return linked
+
+    monkeypatch.setattr(service.cost_store, "get_run", changed_identity)
+    with pytest.raises(service.PortfolioStressError, match="identity changed"):
+        service.execute_run(run["id"])
+    stored = ps_store.get_run(run["id"])
+    assert stored["status"] == "failed"
+    assert stored["result_fingerprint"] is None

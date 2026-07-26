@@ -41,14 +41,16 @@ be symmetric with a unit diagonal — asymmetry or a non-unit diagonal is
 
 The stressed matrix is validated with the shared Phase 56 utilities
 (`numpy.linalg.eigvalsh`, `PSD_TOLERANCE = −1e-10`, near-singular condition
-warning at `1e12`). If it is not positive semidefinite:
+warning at `1e12`). The repair policy is always explicit:
 
-- repair policy `none` → **matrix unavailable** with the exact reason; risk
-  stress is withheld, the run is `partial`, and it cannot become a baseline.
-  Nothing is silently accepted or repaired.
-- repair policy `eigenvalue_floor` → an explicit spectral repair with the
-  configured floor; original and repaired eigenvalues are both recorded, a
-  run warning fires, and the repair is visible in the UI.
+- repair policy `none` → a matrix below the PSD tolerance is **unavailable**
+  with the exact reason; risk stress is withheld, the run is `partial`, and
+  it cannot become a baseline. Nothing is silently accepted or repaired.
+- repair policy `eigenvalue_floor` → an explicit spectral floor is applied
+  whenever an eigenvalue is below the configured positive floor. This can
+  include a singular but positive-semidefinite matrix. Original and repaired
+  eigenvalues are both recorded, a run warning fires, and the repair is
+  visible in the UI; it is not mislabelled as necessarily non-PSD.
 
 Because a spectral repair rewrites both the diagonal and the off-diagonals,
 the **disclosed** `stressed_vols` / `stressed_correlation` always describe

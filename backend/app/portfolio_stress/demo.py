@@ -249,7 +249,7 @@ def seed_demo_portfolio_stress() -> Dict[str, Any]:
     seed("demo:ps:corr-toward-one", {
         "name": "Correlations moved toward one (alpha 0.7)",
         "description": ("rho + 0.7 x (1 - rho) on the baseline correlation: "
-                        "measured diversification collapse under an explicit "
+                        "measured dependence and risk change under an explicit "
                         "deterministic rule (elementwise blend with the "
                         "all-ones matrix, PSD preserved)."),
         "portfolio_run_id": erc,

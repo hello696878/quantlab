@@ -74,7 +74,11 @@ def shock_to_return(value: float, unit: str) -> float:
         return value
     if unit == "percent":
         return value / 100.0
-    return value / 10_000.0  # bps
+    if unit == "bps":
+        return value / 10_000.0
+    raise ScenarioError(
+        f"unsupported shock unit {unit!r}; expected one of "
+        f"{', '.join(SHOCK_UNITS)}")
 
 
 def _finite(value: Any, field: str) -> float:
@@ -86,10 +90,38 @@ def _finite(value: Any, field: str) -> float:
     return f
 
 
+def _mapping(value: Any, field: str) -> Dict[str, Any]:
+    """Require an actual JSON object, never coerce arbitrary iterables."""
+    if value is None:
+        return {}
+    if not isinstance(value, dict):
+        raise ScenarioError(f"{field} must be an object")
+    return value
+
+
+def _reject_unknown_keys(raw: Dict[str, Any], allowed: set[str],
+                         field: str) -> None:
+    unknown = set(raw) - allowed
+    if unknown:
+        raise ScenarioError(
+            f"unsupported {field} keys (a typo is never silently ignored): "
+            + ", ".join(sorted(str(k) for k in unknown)))
+
+
+def _text(value: Any, field: str, *, default: str,
+          max_length: int) -> str:
+    if value is None:
+        return default
+    if not isinstance(value, str):
+        raise ScenarioError(f"{field} must be a string")
+    return value[:max_length]
+
+
 def _shock_entry(raw: Any, field: str) -> Dict[str, Any]:
     if not isinstance(raw, dict):
         raise ScenarioError(f"{field} must be an object with value and unit")
     unit = raw.get("unit")
+    _reject_unknown_keys(raw, {"value", "unit"}, field)
     if unit not in SHOCK_UNITS:
         raise ScenarioError(
             f"{field}: unit must be one of {', '.join(SHOCK_UNITS)} "
@@ -135,12 +167,16 @@ def validate_scenario(raw: Any, *, asset_ids: List[str],
             "unsupported scenario keys (a typo is never silently ignored): "
             + ", ".join(sorted(unknown_keys)))
     out: Dict[str, Any] = {
-        "scenario_definition_id": str(raw.get("scenario_definition_id")
-                                      or "scenario")[:64],
-        "name": str(raw.get("name") or "Scenario")[:200],
-        "description": str(raw.get("description") or "")[:2000],
+        "scenario_definition_id": _text(
+            raw.get("scenario_definition_id"), "scenario_definition_id",
+            default="scenario", max_length=64),
+        "name": _text(raw.get("name"), "name",
+                      default="Scenario", max_length=200),
+        "description": _text(raw.get("description"), "description",
+                             default="", max_length=2000),
         "scenario_type": scenario_type,
-        "source": str(raw.get("source") or "user")[:200],
+        "source": _text(raw.get("source"), "source",
+                        default="user", max_length=200),
         "units_note": "return = decimal; percent = value/100; "
                       "bps = value/10000",
         "precedence": "asset shock overrides group shock overrides global "
@@ -158,14 +194,16 @@ def validate_scenario(raw: Any, *, asset_ids: List[str],
     known_groups = set(groups)
 
     asset_shocks: Dict[str, Dict[str, Any]] = {}
-    for aid, spec in dict(raw.get("asset_shocks") or {}).items():
+    for aid, spec in _mapping(raw.get("asset_shocks"),
+                              "asset_shocks").items():
         if aid not in known_assets:
             raise ScenarioError(f"asset shock references unknown asset {aid!r}")
         asset_shocks[aid] = _shock_entry(spec, f"asset_shocks[{aid}]")
     out["asset_shocks"] = asset_shocks
 
     group_shocks: Dict[str, Dict[str, Any]] = {}
-    for gid, spec in dict(raw.get("group_shocks") or {}).items():
+    for gid, spec in _mapping(raw.get("group_shocks"),
+                              "group_shocks").items():
         if gid not in known_groups:
             raise ScenarioError(f"group shock references unknown group {gid!r}")
         group_shocks[gid] = _shock_entry(spec, f"group_shocks[{gid}]")
@@ -179,6 +217,9 @@ def validate_scenario(raw: Any, *, asset_ids: List[str],
     if vol is not None:
         if not isinstance(vol, dict):
             raise ScenarioError("volatility_stress must be an object")
+        _reject_unknown_keys(
+            vol, {"mode", "multiplier", "multipliers", "value"},
+            "volatility_stress")
         mode = vol.get("mode", "multiplicative")
         if mode not in VOLATILITY_MODES:
             raise ScenarioError(
@@ -187,7 +228,8 @@ def validate_scenario(raw: Any, *, asset_ids: List[str],
         entry: Dict[str, Any] = {"mode": mode}
         if mode == "multiplicative":
             uniform = vol.get("multiplier")
-            per_asset = dict(vol.get("multipliers") or {})
+            per_asset = _mapping(
+                vol.get("multipliers"), "volatility_stress.multipliers")
             if uniform is None and not per_asset:
                 raise ScenarioError(
                     "multiplicative volatility stress needs a multiplier or "
@@ -221,6 +263,9 @@ def validate_scenario(raw: Any, *, asset_ids: List[str],
         if not isinstance(corr, dict):
             raise ScenarioError("correlation_stress must be an object")
         mode = corr.get("mode")
+        _reject_unknown_keys(
+            corr, {"mode", "value", "alpha", "matrix", "repair",
+                   "eigenvalue_floor"}, "correlation_stress")
         if mode not in CORRELATION_MODES:
             raise ScenarioError(
                 f"correlation_stress.mode must be one of "
@@ -290,6 +335,12 @@ def validate_scenario(raw: Any, *, asset_ids: List[str],
     if liq is not None:
         if not isinstance(liq, dict):
             raise ScenarioError("liquidity_cost_stress must be an object")
+        _reject_unknown_keys(
+            liq, {"spread_multiplier", "slippage_multiplier",
+                  "adv_multiplier", "impact_multiplier", "notional_scale",
+                  "base_adv_notional", "participation_threshold",
+                  "cost_volatility_multiplier"},
+            "liquidity_cost_stress")
         if liq.get("cost_volatility_multiplier") is not None:
             raise ScenarioError(
                 "cost_volatility_multiplier is deferred in v1: the period "
@@ -327,6 +378,9 @@ def validate_scenario(raw: Any, *, asset_ids: List[str],
         if not isinstance(hist, dict):
             raise ScenarioError(
                 "historical scenarios require a historical block")
+        _reject_unknown_keys(
+            hist, {"usage", "start_timestamp", "end_timestamp"},
+            "historical")
         usage = hist.get("usage")
         if usage not in HISTORICAL_USAGES:
             raise ScenarioError(
@@ -366,13 +420,49 @@ def validate_scenario(raw: Any, *, asset_ids: List[str],
     metadata = raw.get("metadata")
     if metadata is not None and not isinstance(metadata, dict):
         raise ScenarioError("scenario metadata must be an object")
-    metadata = dict(metadata or {})
+    configured_components = {
+        "price": bool(asset_shocks or group_shocks
+                      or out["global_shock"] is not None),
+        "volatility": out["volatility_stress"] is not None,
+        "correlation": out["correlation_stress"] is not None,
+        "liquidity_cost": out["liquidity_cost_stress"] is not None,
+        "historical": out["historical"] is not None,
+    }
+    allowed_for_type = {
+        "hypothetical_asset_shock": {"price"},
+        "hypothetical_group_shock": {"price"},
+        "volatility_stress": {"volatility"},
+        "correlation_stress": {"correlation"},
+        "liquidity_and_cost_stress": {"liquidity_cost"},
+        "historical_window": {"historical"},
+        "historical_single_period": {"historical"},
+    }
+    active = {name for name, present in configured_components.items()
+              if present}
+    allowed = allowed_for_type.get(scenario_type)
+    if allowed is not None and not active.issubset(allowed):
+        raise ScenarioError(
+            f"{scenario_type} contains components {sorted(active - allowed)} "
+            "that belong in combined_scenario; scenario type labels must "
+            "describe the calculation actually performed")
+    if scenario_type == "combined_scenario" and not active:
+        raise ScenarioError(
+            "combined_scenario must configure at least one price, "
+            "volatility, correlation, or liquidity/cost component")
+    metadata = metadata or {}
     if len(metadata) > 20:
         raise ScenarioError("scenario metadata supports at most 20 keys")
-    out["metadata"] = {str(k)[:64]: (v if isinstance(v, (int, float, bool))
-                                     or v is None else str(v)[:500])
-                       for k, v in sorted(metadata.items(),
-                                          key=lambda kv: str(kv[0]))}
+    clean_metadata: Dict[str, Any] = {}
+    for key, value in sorted(metadata.items(), key=lambda kv: str(kv[0])):
+        if not isinstance(key, str):
+            raise ScenarioError("scenario metadata keys must be strings")
+        if isinstance(value, float) and not math.isfinite(value):
+            raise ScenarioError(
+                f"scenario metadata[{key}] must not be NaN or Infinity")
+        clean_metadata[key[:64]] = (
+            value if isinstance(value, (int, float, bool)) or value is None
+            else str(value)[:500])
+    out["metadata"] = clean_metadata
     return out
 
 

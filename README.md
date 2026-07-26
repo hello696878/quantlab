@@ -286,8 +286,12 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   on copies of linked Phase 55 models, contribution attribution reconciled
   to the scenario total, post-shock drifted weights and constraint
   re-checks, baseline-vs-stressed risk contributions, trailing-peak-only
-  drawdown episodes with per-asset attribution, and bounded sensitivity
-  probes. Scenarios are assumptions, not predictions — no worst case, no
+  drawdown episodes with per-asset attribution (strictly pre-decision for
+  verified historical runs; full stored series explicitly descriptive), and
+  bounded sensitivity probes. Linked identities and material outputs are
+  fingerprinted; drawdown cost attribution is unavailable without a
+  timestamp-aligned realized cost path. Scenarios are assumptions, not
+  predictions — no worst case, no
   guaranteed loss, no hedging, rebalancing, or trading, and never proof of
   safety or robustness.
 - **Portfolio Diagnostics (56.0)** — portfolio construction under explicit

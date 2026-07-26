@@ -10,6 +10,12 @@ assumption.
 `hypothetical_group_shock`, `volatility_stress`, `correlation_stress`,
 `liquidity_and_cost_stress`, `combined_scenario`, `user_supplied_descriptive`.
 
+Scenario objects are strict at every supported nesting level: unknown keys,
+wrong container types, non-string labels, non-finite metadata numbers, and
+unsupported units are rejected. A pure scenario type cannot smuggle in another
+scenario component; multi-component definitions must use combined_scenario,
+which itself must contain at least one effect.
+
 **Factor shocks are deferred in v1** and rejected with an explicit reason: no
 estimated, run-linked factor-exposure system exists in this repository, and
 exposures are never inferred from asset names.

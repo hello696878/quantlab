@@ -4,7 +4,9 @@ Phase 57.0. A local-first research lab that applies **explicit deterministic
 stress scenarios** to **stored Phase 56 portfolio weights** and attributes the
 measured losses, risk-estimate changes, liquidity/cost effects and historical
 drawdowns. Everything persists in local SQLite with deterministic SHA-256
-fingerprints.
+fingerprints. Configuration identity includes the selected weight/covariance
+decision timestamps, pinned linked identities, and causal observation slices;
+result and sensitivity fingerprints cover their complete material outputs.
 
 ## Honest scope
 
@@ -17,7 +19,11 @@ fingerprints.
   analysis, and not investment, trading, or risk-management advice.
 - Linked records (Phase 56 weights/covariance, Phase 55 cost models, Phase 54
   regime runs, datasets) are consumed **read-only**; no linked fingerprint
-  ever changes. The lab's only cross-lab **write** is an optional new
+  ever changes. Their material identities are pinned into the stress-run
+  configuration and checked again on execution; a changed/missing linked
+  identity is refused, while an invalidated dataset remains visible with an
+  audit warning and is ineligible for baseline promotion. The lab's only
+  cross-lab **write** is an optional new
   Experiment Registry record for an executed run (at most one per run,
   reused on re-execution) — it creates a record, it never modifies one.
   A linked Phase 54 regime run is provenance only in v1: no stored regime
@@ -39,7 +45,11 @@ fingerprints.
 8. final scenario reconciliation (P&L and risk effects kept strictly separate)
 
 Plus trailing-only drawdown analysis of the recomputed portfolio-return series
-and per-asset attribution of the deepest episode.
+and per-asset attribution of the deepest episode. A verified historical run
+uses only observations strictly before its selected decision timestamp;
+descriptive/hypothetical runs use the full stored realized series and say so.
+No timestamp-aligned realized cost path is stored, so drawdown cost attribution
+is explicitly unavailable.
 
 ## Data model (SQLite)
 
@@ -76,8 +86,10 @@ live summary cards, status / integrity / scenario-type filters, the runs
 table with neutral pills, and a detail view with the reconciliation block,
 a signed contribution waterfall, the per-asset table (weight, shock,
 resolved source, contribution, |share|, drifted weight), baseline-vs-stressed
-PCR bars, the constraint table per book, the cost panel with participation,
-the drawdown chart + episode table + deepest-episode attribution, the
+MCR/CCR/PCR values, requested/effective correlation matrices with explicit
+unitless labels, constraint breach or clean-state panels, the cost panel with
+participation, the causally labelled drawdown chart + episode table +
+deepest-episode attribution, the
 sensitivity table, and the scenario definition stored verbatim with its
 execution order. Comparison is neutral with comparability warnings.
 

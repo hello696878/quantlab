@@ -365,6 +365,42 @@ def clear_results(run_id: int) -> None:
             raise
 
 
+def fail_execution(run_id: int, error_message: str,
+                   completed_at: str) -> None:
+    """Atomically clear stale children and mark the parent failed."""
+    with get_connection() as conn:
+        try:
+            conn.execute("BEGIN")
+            for table in ("stress_scenario_definitions", "stress_asset_results",
+                          "stress_risk_results", "stress_constraint_results",
+                          "drawdown_episodes", "drawdown_attribution_results",
+                          "stress_sensitivity_results"):
+                conn.execute(f"DELETE FROM {table} WHERE run_id = ?", (run_id,))
+            conn.execute(
+                """
+                UPDATE portfolio_stress_runs SET
+                    status = 'failed', error_message = ?, is_baseline = 0,
+                    completed_at = ?, duration_ms = NULL,
+                    completeness_status = 'unavailable', scenario_return = NULL,
+                    scenario_pnl = NULL, stressed_volatility = NULL,
+                    baseline_volatility = NULL, breach_count = 0,
+                    episode_count = 0, max_drawdown = NULL,
+                    scenario_count = 0, warnings_json = '[]',
+                    result_fingerprint = NULL,
+                    stressed_covariance_fingerprint = NULL,
+                    reconciliation_json = NULL, risk_summary_json = NULL,
+                    cost_stress_json = NULL, drawdown_json = NULL,
+                    covariance_stress_json = NULL, drifted_json = NULL,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (error_message, completed_at, _now(), run_id))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
+
 def get_scenario(run_id: int) -> Optional[Dict[str, Any]]:
     with get_connection() as conn:
         row = conn.execute(
@@ -464,14 +500,20 @@ def list_sensitivity_results(run_id: int) -> List[Dict[str, Any]]:
 def mark_baseline(run_id: int, scope: str) -> None:
     now = _now()
     with get_connection() as conn:
-        conn.execute(
-            "UPDATE portfolio_stress_runs SET is_baseline = 0, updated_at = ? "
-            "WHERE baseline_scope = ? AND is_baseline = 1 AND id != ?",
-            (now, scope, run_id))
-        conn.execute(
-            "UPDATE portfolio_stress_runs SET is_baseline = 1, updated_at = ? "
-            "WHERE id = ?", (now, run_id))
-        conn.commit()
+        try:
+            conn.execute("BEGIN")
+            conn.execute(
+                "UPDATE portfolio_stress_runs SET is_baseline = 0, updated_at = ? "
+                "WHERE baseline_scope = ? AND is_baseline = 1 AND id != ?",
+                (now, scope, run_id))
+            conn.execute(
+                "UPDATE portfolio_stress_runs SET baseline_scope = ?, "
+                "is_baseline = 1, updated_at = ? WHERE id = ?",
+                (scope, now, run_id))
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
 
 
 def lab_summary() -> Dict[str, Any]:
@@ -503,6 +545,6 @@ __all__ = [
     "insert_run", "get_run", "run_demo_key_id", "update_run", "list_runs",
     "replace_children", "get_scenario", "list_asset_results",
     "list_risk_results", "list_constraint_results", "list_episodes",
-    "list_attribution", "list_sensitivity_results", "mark_baseline",
+    "list_attribution", "list_sensitivity_results", "fail_execution", "mark_baseline",
     "lab_summary",
 ]

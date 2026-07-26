@@ -1708,44 +1708,51 @@ single-asset Backtest + Strategy Comparison:
   carried inside the triple (a configured-but-uncomputable cost leg is
   labelled, never silently equal to gross; a partial cost leg degrades the
   triple to partial); post-shock drifted weights with a SIGNED cash
-  residual (a levered book is unchanged at a zero shock), −100% flooring
-  and honest unavailability for a wiped-out book — **no automatic
+  residual (a levered book is unchanged at a zero shock), exact −100% wipeout
+  handling and honest unavailability below −100% or for a wiped-out book — **no automatic
   rebalancing**; independent constraint re-checks on the original and
   drifted books with breaches attributed per book. **Risk stress:**
   volatility (multiplicative / additive with disclosed zero-flooring) and
   correlation (uniform multiplier / additive / toward-one `ρ+α(1−ρ)` /
   supplied — asymmetric or non-unit-diagonal supplied matrices are
   rejected, never silently fixed) rebuild `Σ* = D(σ*)·R*·D(σ*)` with PSD
-  validation and a never-silent explicit eigenvalue-floor repair, where
-  the disclosed vols/correlations always describe the repaired matrix
+  validation and a never-silent explicit eigenvalue-floor repair (including
+  singular PSD matrices below the configured positive floor), where the
+  disclosed vols/correlations always describe the repaired matrix
   actually used (requested values kept separately); baseline-vs-stressed
   MCR/CCR/PCR with ΔPCR, rank changes and both ΣCCR=σ / ΣPCR=1 identity
   checks; rows are `available` only when a stressed contribution exists.
   **Cost stress:** a deep COPY of the linked Phase 55 model with its own
   new fingerprint (the stored model and fingerprint are never modified),
+  with linked cost/regime/dataset identities pinned and rechecked at execution,
   honestly unavailable components (square-root impact on weight-space
   turnover), and participation only with an explicit base ADV and
   notional. **Drawdown:** the canonical Phase 56 realized series (weights
-  drift between rebalances), trailing-peak-only wealth from 1.0 where the
-  initial capital counts as a peak, interior gaps and non-positive wealth
-  refused, exhaustive episode detection with recovered/unrecovered states
-  and disclosed deepest-40 persistence, plus per-asset attribution of the
-  deepest episode over the below-peak interval under a labelled
-  static-weight approximation whose arithmetic-vs-geometric gap is
-  disclosed. **Bounded sensitivity** (≤40 scenarios, ≤5 values per
+  drift between rebalances), restricted strictly before the selected decision
+  timestamp for verified historical runs and explicitly full-series descriptive
+  otherwise; trailing-peak-only wealth from 1.0 where the initial capital counts
+  as a peak, interior gaps and non-positive wealth refused, exhaustive episode
+  detection with recovered/unrecovered states and disclosed deepest-40
+  persistence, plus per-asset attribution of the deepest episode over the
+  below-peak interval under a labelled static-weight approximation whose
+  arithmetic-vs-geometric gap is disclosed. Timestamp-aligned realized cost
+  attribution is unavailable rather than inferred. **Bounded sensitivity**
+  (≤40 scenarios, ≤5 values per
   dimension) where the base row shares the run's net basis and probes are
   labelled self-contained scenarios; a failing probe never voids the run.
-  Six fingerprint kinds over content-addressed identity only (no database
-  ids); eight new SQLite tables; baselines gated on verified integrity +
-  complete results + an available stressed covariance; failed executions
-  clear stale results. UI: the **Portfolio Stress Lab** view (contribution
-  waterfall, baseline-vs-stressed PCR bars, drawdown chart + episode
-  table, cost/participation panel, sensitivity table, verbatim scenario
-  definition, neutral compare). A 16-case deterministic idempotent demo
-  (flagship-only experiment record). Verification: 26 new backend tests,
-  a 5-agent adversarial review (188 hand-verified checks; 7 major +
-  ~20 minor findings all fixed), `npx tsc --noEmit` clean, a 17-test
-  Playwright spec green. Docs: `PORTFOLIO_STRESS_LAB.md`,
+  Seven fingerprint kinds over content-addressed identity only (no database
+  ids), including causal observation slices and full material result/sensitivity
+  payloads; eight new SQLite tables; scope-transactional baselines gated on
+  verified integrity + complete results + an available stressed covariance +
+  a valid linked dataset; failed executions clear stale child/results atomically.
+  UI: the **Portfolio Stress Lab** view (contribution waterfall, complete
+  baseline-vs-stressed MCR/CCR/PCR table, requested/effective correlation
+  matrices, causally scoped drawdown chart + episode table, cost/participation
+  panel, sensitivity table, verbatim scenario definition, neutral compare).
+  A 16-case deterministic idempotent demo (flagship-only experiment record).
+  Verification: 40 focused backend tests and a 19-test Playwright specification
+  for manual/local execution; `npx tsc --noEmit` clean in review. Docs:
+  `PORTFOLIO_STRESS_LAB.md`,
   `STRESS_SCENARIO_DEFINITION_POLICY.md`,
   `PORTFOLIO_STRESS_ATTRIBUTION_POLICY.md`,
   `DRAWDOWN_AND_EPISODE_ATTRIBUTION_POLICY.md`,

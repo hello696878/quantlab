@@ -48,32 +48,68 @@ interface Children {
   sensitivity: SensitivityRow[];
 }
 
+const emptyChildren = (): Children => ({
+  assets: [],
+  risk: [],
+  constraints: [],
+  episodes: [],
+  attribution: [],
+  sensitivity: [],
+});
+
+const CHILD_LABELS = [
+  "asset results", "risk results", "constraint results",
+  "drawdown episodes", "drawdown attribution", "sensitivity results",
+] as const;
+
 export default function PortfolioStressDetail({
   run, onBack, onRefresh, onOpenPortfolio, onOpenDataset, onOpenExperiment,
   onOpenRegime, onOpenCost,
 }: Props) {
   const [children, setChildren] = useState<Children | null>(null);
-  const [error, setError] = useState<unknown>(null);
+  const [childError, setChildError] = useState<string | null>(null);
+  const [loadingChildren, setLoadingChildren] = useState(true);
+  const [reloadKey, setReloadKey] = useState(0);
   const [marking, setMarking] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
+    setLoadingChildren(true);
+    setChildError(null);
+    Promise.allSettled([
       getAssetResults(run.id), getRiskResults(run.id),
       getConstraintResults(run.id), getEpisodes(run.id),
       getAttribution(run.id), getSensitivity(run.id),
     ])
       .then(([a, r, c, e, at, s]) => {
         if (cancelled) return;
-        setChildren({ assets: a.items, risk: r.items, constraints: c.items,
-                      episodes: e.items, attribution: at.items,
-                      sensitivity: s.items });
+        const next = emptyChildren();
+        const failures: string[] = [];
+        const failed = (index: number, reason: unknown) => {
+          failures.push(`${CHILD_LABELS[index]}: ${classifyApiError(reason).message}`);
+        };
+        if (a.status === "fulfilled") next.assets = a.value.items;
+        else failed(0, a.reason);
+        if (r.status === "fulfilled") next.risk = r.value.items;
+        else failed(1, r.reason);
+        if (c.status === "fulfilled") next.constraints = c.value.items;
+        else failed(2, c.reason);
+        if (e.status === "fulfilled") next.episodes = e.value.items;
+        else failed(3, e.reason);
+        if (at.status === "fulfilled") next.attribution = at.value.items;
+        else failed(4, at.reason);
+        if (s.status === "fulfilled") next.sensitivity = s.value.items;
+        else failed(5, s.reason);
+        setChildren(next);
+        setChildError(failures.length > 0 ? failures.join(" ") : null);
       })
-      .catch((err) => !cancelled && setError(err));
+      .finally(() => {
+        if (!cancelled) setLoadingChildren(false);
+      });
     return () => {
       cancelled = true;
     };
-  }, [run.id]);
+  }, [run.id, reloadKey]);
 
   async function handleBaseline() {
     setMarking(true);
@@ -97,6 +133,13 @@ export default function PortfolioStressDetail({
 
   const rec = run.reconciliation;
   const scenario = (run.configuration?.scenario ?? {}) as Record<string, unknown>;
+  const baselineEligible = run.status === "completed"
+    && !run.is_baseline
+    && ["verified_historical_window", "verified_deterministic_rule"].includes(run.integrity_status)
+    && run.completeness_status === "complete"
+    && Boolean(run.result_fingerprint)
+    && run.covariance_stress?.available !== false
+    && run.dataset_invalidated !== true;
 
   return (
     <div className="space-y-4" data-testid="portfolio-stress-detail">
@@ -136,7 +179,7 @@ export default function PortfolioStressDetail({
               Experiment →
             </button>
           )}
-          {run.status === "completed" && !run.is_baseline && (
+          {baselineEligible && (
             <button type="button" onClick={handleBaseline} disabled={marking}
               className="rounded-md border border-indigo-200 px-3 py-1.5 text-xs font-medium text-indigo-700 hover:bg-indigo-50 disabled:opacity-50">
               {marking ? "Marking…" : "★ Mark baseline"}
@@ -180,6 +223,11 @@ export default function PortfolioStressDetail({
         {run.error_message && (
           <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700">{run.error_message}</div>
         )}
+        {run.dataset_invalidated === true && (
+          <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-2.5 text-sm text-red-700" data-testid="stress-dataset-invalidated">
+            The linked dataset version has been invalidated. This stored result remains visible for audit, but it is not eligible to become a baseline.
+          </div>
+        )}
         {run.warnings.length > 0 && (
           <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-sm text-amber-800" data-testid="stress-warnings">
             {run.warnings.map((w, i) => <p key={i}>⚠ {w}</p>)}
@@ -215,17 +263,17 @@ export default function PortfolioStressDetail({
         </div>
       )}
 
-      {error ? (
-        <ErrorState title="Couldn’t load run details" message={classifyApiError(error).message} onRetry={() => window.location.reload()} />
-      ) : !children ? (
+      {loadingChildren || !children ? (
         <SkeletonTable rows={6} cols={6} caption="Loading stress results…" />
       ) : (
         <>
+          {childError && (
+            <ErrorState title="Some run details are unavailable" message={childError}
+              onRetry={() => setReloadKey((value) => value + 1)} />
+          )}
           <ContributionSection assets={children.assets} drifted={run.drifted} />
           <RiskSection run={run} rows={children.risk} />
-          {children.constraints.length > 0 && (
-            <ConstraintSection rows={children.constraints} />
-          )}
+          <ConstraintSection rows={children.constraints} />
           {run.cost_stress && <CostSection run={run} />}
           <DrawdownSection run={run} episodes={children.episodes} attribution={children.attribution} />
           {children.sensitivity.length > 0 && (
@@ -323,8 +371,11 @@ function ContributionSection({ assets, drifted }: { assets: AssetResultRow[]; dr
       {drifted && !drifted.available && drifted.reason && (
         <p className="mt-2 text-xs text-amber-700">Drifted weights unavailable: {drifted.reason}</p>
       )}
-      {drifted && drifted.available && drifted.cash_weight !== null && drifted.cash_weight > 0 && (
-        <p className="mt-2 text-xs text-slate-500">Cash weight after drift: {fmtPct(drifted.cash_weight, 2)} (carried unshocked; no automatic rebalancing).</p>
+      {drifted && drifted.available && drifted.cash_weight !== null && (
+        <p className="mt-2 text-xs text-slate-500">
+          {drifted.cash_weight < 0 ? "Borrowed-cash residual" : "Cash residual"} after drift: {fmtPct(drifted.cash_weight, 2)}
+          {" "}(signed residual, carried unshocked; no automatic rebalancing).
+        </p>
       )}
     </div>
   );
@@ -367,9 +418,9 @@ function RiskSection({ run, rows }: { run: RunFull; rows: RiskResultRow[] }) {
         <div className="mt-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-xs text-amber-800"
           data-testid="cov-stress-repaired">
           <p>
-            The requested stressed covariance was not positive semidefinite and was repaired
-            under the explicit {cs.repair.policy} policy (original and repaired eigenvalues recorded).
-            The values below describe the <strong>repaired</strong> matrix actually used for risk.
+            The requested stressed covariance had an eigenvalue below the explicit numerical floor and was repaired
+            under the explicit {cs.repair.policy} policy (original and repaired eigenvalues recorded). This can include a
+            singular positive-semidefinite matrix. The values below describe the <strong>repaired</strong> matrix used for risk.
           </p>
           {cs.requested_correlation && cs.stressed_correlation && (
             <p className="mt-1">
@@ -381,14 +432,29 @@ function RiskSection({ run, rows }: { run: RunFull; rows: RiskResultRow[] }) {
           )}
         </div>
       )}
+      {cs?.available && (cs.requested_correlation || cs.stressed_correlation) && (
+        <div className="mt-3 grid gap-3 xl:grid-cols-2" data-testid="stress-correlation-matrices">
+          {cs.requested_correlation && (
+            <CorrelationMatrix title="Requested correlation" matrix={cs.requested_correlation} labels={rows.map((row) => row.asset_id)} />
+          )}
+          {cs.stressed_correlation && (
+            <CorrelationMatrix title={cs.repair?.repaired ? "Effective repaired correlation" : "Effective stressed correlation"}
+              matrix={cs.stressed_correlation} labels={rows.map((row) => row.asset_id)} />
+          )}
+        </div>
+      )}
       {rows.length > 0 && (
         <div className="mt-3 overflow-x-auto">
-          <table className="w-full min-w-[860px] text-xs">
+          <table className="w-full min-w-[1180px] text-xs">
             <thead>
               <tr className="border-b border-slate-100 text-left font-semibold uppercase tracking-wide text-slate-500">
                 <th scope="col" className="px-3 py-2">Asset</th>
                 <th scope="col" className="px-3 py-2">PCR baseline vs stressed</th>
+                <th scope="col" className="px-3 py-2 text-right">Baseline MCR</th>
+                <th scope="col" className="px-3 py-2 text-right">Baseline CCR</th>
                 <th scope="col" className="px-3 py-2 text-right">Baseline PCR</th>
+                <th scope="col" className="px-3 py-2 text-right">Stressed MCR</th>
+                <th scope="col" className="px-3 py-2 text-right">Stressed CCR</th>
                 <th scope="col" className="px-3 py-2 text-right">Stressed PCR</th>
                 <th scope="col" className="px-3 py-2 text-right">Δ PCR</th>
                 <th scope="col" className="px-3 py-2 text-right">Rank Δ</th>
@@ -409,7 +475,11 @@ function RiskSection({ run, rows }: { run: RunFull; rows: RiskResultRow[] }) {
                       </div>
                     </div>
                   </td>
+                  <td className="px-3 py-1.5 text-right font-mono">{r.baseline_mcr === null ? "—" : r.baseline_mcr.toFixed(6)}</td>
+                  <td className="px-3 py-1.5 text-right font-mono">{r.baseline_ccr === null ? "—" : r.baseline_ccr.toFixed(6)}</td>
                   <td className="px-3 py-1.5 text-right font-mono">{r.baseline_pcr === null ? "—" : fmtPct(r.baseline_pcr, 2)}</td>
+                  <td className="px-3 py-1.5 text-right font-mono">{r.stressed_mcr === null ? "—" : r.stressed_mcr.toFixed(6)}</td>
+                  <td className="px-3 py-1.5 text-right font-mono">{r.stressed_ccr === null ? "—" : r.stressed_ccr.toFixed(6)}</td>
                   <td className="px-3 py-1.5 text-right font-mono">{r.stressed_pcr === null ? "—" : fmtPct(r.stressed_pcr, 2)}</td>
                   <td className="px-3 py-1.5 text-right font-mono">{r.pcr_change === null ? "—" : fmtPct(r.pcr_change, 2)}</td>
                   <td className="px-3 py-1.5 text-right font-mono">{r.rank_change === null ? "—" : r.rank_change > 0 ? `+${r.rank_change}` : String(r.rank_change)}</td>
@@ -424,7 +494,45 @@ function RiskSection({ run, rows }: { run: RunFull; rows: RiskResultRow[] }) {
   );
 }
 
+function CorrelationMatrix({ title, matrix, labels }: {
+  title: string; matrix: number[][]; labels: string[];
+}) {
+  return (
+    <div className="min-w-0 rounded-lg border border-slate-100 p-3">
+      <h4 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</h4>
+      <p className="mt-0.5 text-[11px] text-slate-400">Correlation coefficient (unitless)</p>
+      <div className="mt-2 overflow-x-auto">
+        <table className="min-w-max text-[11px]">
+          <thead>
+            <tr><th className="px-2 py-1" />{labels.map((label) => <th key={label} className="px-2 py-1 font-mono">{label}</th>)}</tr>
+          </thead>
+          <tbody>
+            {matrix.map((row, rowIndex) => (
+              <tr key={labels[rowIndex] ?? rowIndex}>
+                <th className="px-2 py-1 text-left font-mono">{labels[rowIndex] ?? rowIndex + 1}</th>
+                {row.map((value, columnIndex) => (
+                  <td key={columnIndex} className="px-2 py-1 text-right font-mono">{value.toFixed(4)}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 function ConstraintSection({ rows }: { rows: ConstraintResultRow[] }) {
+  if (rows.length === 0) {
+    return (
+      <div className="card p-4" data-testid="stress-constraints">
+        <h3 className="text-sm font-semibold text-slate-700">Constraint checks under the scenario</h3>
+        <p className="mt-2 rounded-lg border border-emerald-200 bg-emerald-50 p-2.5 text-sm text-emerald-800">
+          No constraint breaches were detected on the original or post-shock drifted book.
+        </p>
+      </div>
+    );
+  }
   return (
     <div className="card p-4" data-testid="stress-constraints">
       <h3 className="text-sm font-semibold text-slate-700">Constraint checks under the scenario</h3>
@@ -567,6 +675,17 @@ function DrawdownSection({ run, episodes, attribution }: {
               ? ` (the deepest ${episodes.length} are listed below — the count above is the true total)`
               : ""}.
           </p>
+          {dd.analysis_scope && (
+            <p className="mt-1 text-xs text-slate-500" data-testid="drawdown-analysis-scope">
+              Analysis scope: {dd.analysis_scope.replace(/_/g, " ")}
+              {dd.decision_cutoff_timestamp ? `; observations are strictly before the decision cutoff ${dd.decision_cutoff_timestamp}` : ""}.
+            </p>
+          )}
+          {dd.cost_attribution?.available === false && (
+            <p className="mt-1 text-xs text-slate-500">
+              Cost attribution unavailable: {dd.cost_attribution.reason ?? "no timestamp-aligned realized cost series is stored"}.
+            </p>
+          )}
           {svg}
           {episodes.length > 0 && (
             <div className="mt-3 overflow-x-auto">

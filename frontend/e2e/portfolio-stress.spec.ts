@@ -162,6 +162,7 @@ test.describe("portfolio stress lab", () => {
     expect(attempt.status()).toBe(409);
     await openDetail(page, /Invalid future-looking ex-ante claim/);
     await expect(page.getByText("Invalid", { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "★ Mark baseline" })).toHaveCount(0);
     await expect(page.getByTestId("stress-warnings")).toContainText(/never labelled ex-ante/);
     assertNoFailedLocalRequests(failures);
   });
@@ -184,6 +185,7 @@ test.describe("portfolio stress lab", () => {
     await openDetail(page, /Supplied non-PSD correlation — honest unavailability/);
     await expect(page.getByTestId("cov-stress-unavailable")).toContainText(/no silent repair/);
     await expect(page.getByText("partial").first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "★ Mark baseline" })).toHaveCount(0);
     await page.getByRole("button", { name: "← Back to runs" }).click();
     await openDetail(page, /Supplied non-PSD correlation — explicit repair/);
     await expect(page.getByTestId("cov-stress-repaired")).toContainText(
@@ -192,6 +194,10 @@ test.describe("portfolio stress lab", () => {
     // requested values shown beside them
     await expect(page.getByTestId("cov-stress-repaired")).toContainText(
       /requested .* → effective/);
+    await expect(page.getByTestId("stress-correlation-matrices")).toContainText(
+      /Correlation coefficient \(unitless\)/);
+    await expect(page.getByTestId("stress-correlation-matrices")).toContainText(
+      /Effective repaired correlation/);
     assertNoFailedLocalRequests(failures);
   });
 
@@ -240,6 +246,8 @@ test.describe("portfolio stress lab", () => {
     await openDetail(page, /Drawdown episodes on the rebalanced book/);
     await expect(page.getByTestId("drawdown-chart")).toBeVisible();
     await expect(page.getByTestId("stress-drawdown")).toContainText(/trailing-only/);
+    await expect(page.getByTestId("drawdown-analysis-scope")).toContainText(/decision cutoff/);
+    await expect(page.getByTestId("stress-drawdown")).toContainText(/Cost attribution unavailable/);
     await expect(page.getByTestId("stress-attribution")).toBeVisible();
     await expect(page.getByTestId("stress-attribution")).toContainText(/approximation labelled/);
     await expectNoVisibleNaNOrInfinity(page);
@@ -301,6 +309,37 @@ test.describe("portfolio stress lab", () => {
     await expect(page.getByText(/Documented execution order/)).toBeVisible();
     await expect(page.getByText(/Factor shocks are deferred in v1/)).toBeVisible();
     await expect(page.getByText(/Absolute price shocks are unsupported/)).toBeVisible();
+    assertNoFailedLocalRequests(failures);
+  });
+
+  test("filter controls preserve the dark theme", async ({ page }) => {
+    await seedDemo(page);
+    for (const control of [
+      page.getByLabel("Search", { exact: true }),
+      page.getByLabel("Status", { exact: true }),
+      page.getByLabel("Integrity", { exact: true }),
+      page.getByLabel("Scenario type", { exact: true }),
+    ]) {
+      const background = await control.evaluate(
+        (element) => getComputedStyle(element).backgroundColor,
+      );
+      expect(background).not.toBe("rgb(255, 255, 255)");
+    }
+    assertNoFailedLocalRequests(failures);
+  });
+
+  test("stays contained at 1024px and 768px widths", async ({ page }) => {
+    await seedDemo(page);
+    for (const viewport of [
+      { width: 1024, height: 900 },
+      { width: 768, height: 1000 },
+    ]) {
+      await page.setViewportSize(viewport);
+      await assertNoHorizontalOverflow(page);
+    }
+    await openDetail(page, /Supplied non-PSD correlation — explicit repair/);
+    await expect(page.getByTestId("stress-correlation-matrices")).toBeVisible();
+    await assertNoHorizontalOverflow(page);
     assertNoFailedLocalRequests(failures);
   });
 
