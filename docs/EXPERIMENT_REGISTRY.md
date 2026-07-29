@@ -354,7 +354,21 @@ fingerprint as metrics) — idempotently: a run creates at most one record and
 re-execution reuses it.  No claim of causality, alpha, skill, prediction or
 a recommended factor exposure is ever stored.
 
-## 27. Future extensions
+## 27. Signal Decay records (Phase 60.0)
+
+Executed signal-decay runs
+([`SIGNAL_DECAY_DIAGNOSTICS_LAB.md`](SIGNAL_DECAY_DIAGNOSTICS_LAB.md)) can
+create experiment records here (module `signal_decay_diagnostics`, with the
+signal id and type, outcome id, horizon and entry-lag grids, overlap
+policy, bucket count, entity and observation counts and the configuration
+fingerprint as parameters; the first-horizon rank IC, mean one-way
+turnover, integrity status, overlap status, cost completeness and the
+result fingerprint as metrics) — idempotently: a run creates at most one
+record and re-execution reuses it.  No claim of predictability, alpha,
+persistence or a recommended horizon, lag, threshold or trade is ever
+stored.
+
+## 28. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

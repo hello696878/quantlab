@@ -13,26 +13,28 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.77.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
+**`4.78.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
 expected tag on completion of the current phase's review is
-`v4.77.0-factor-exposure-return-decomposition-macro-sensitivity-v1`
-(Phase 59) — "expected" because tags are created by the user after review,
+`v4.78.0-signal-decay-horizon-turnover-implementation-diagnostics-v1`
+(Phase 60) — "expected" because tags are created by the user after review,
 never automatically; no such tag exists yet. Phase 58's expected tag
-`v4.76.0-portfolio-performance-attribution-benchmark-diagnostics-v1` had
-also not been created when this manifest was updated, even though its
-implementation (`e354d76`) and review (`ad8679e`) commits are both on
-`main`. Note: the v4.69 meta-labeling tag was never created; that
-work is included in the `v4.70.0` tag's history (a recorded convention
-deviation, not repaired since tags are never moved).
+`v4.76.0-portfolio-performance-attribution-benchmark-diagnostics-v1` was
+never created even though its implementation (`e354d76`) and review
+(`ad8679e`) commits are both on `main`; Phase 59's
+`v4.77.0-factor-exposure-return-decomposition-macro-sensitivity-v1` was
+created by the user after that phase's review. Note: the v4.69
+meta-labeling tag was never created; that work is included in the
+`v4.70.0` tag's history (a recorded convention deviation, not repaired
+since tags are never moved).
 
 ## 2. Release family
 
 The **v4.x productization / platformization series**: v4.0.0 (local-first
 research terminal) → v4.7.0 (showcase candidate) → v4.8+ (one milestone tag
-per feature phase). 121 local tags existed when this manifest was last
-updated (Phase 59.0); the latest verified tag is
-`v4.75.0-portfolio-stress-scenario-drawdown-attribution-v1` (the frozen
-release-candidate tag is
+per feature phase). 122 local tags existed when this manifest was last
+updated (Phase 60.0); the latest verified tag is
+`v4.77.0-factor-exposure-return-decomposition-macro-sensitivity-v1` (the
+frozen release-candidate tag is
 `v4.60.0-public-release-candidate-demo-freeze-v1`).
 
 ## 3. Major release areas

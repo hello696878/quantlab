@@ -279,3 +279,14 @@ say nothing about fill availability. Period-level runs support only
 notional-proportional cost models. Delay stress is omitted in v1. Break-
 even values describe the measured sample only. Upstream causality of
 supplied observation PnL is the caller's responsibility.
+
+## 15. Downstream: Signal Decay Lab (Phase 60.0)
+
+The Signal Decay Lab (Phase 60) can link one of this lab's stored cost
+models (pinned by id and model fingerprint, read-only) to estimate the
+per-rebalance cost of its neutral top-minus-bottom reference. Only
+notional-proportional components are computable there — commission as bps
+of notional, spread as fixed bps times the configured fraction, slippage
+as fixed bps per side; impact and monetary-per-unit models are reported
+unavailable with reasons rather than approximated. Gross and cost-adjusted
+values stay separate columns, and no cost record is ever modified.

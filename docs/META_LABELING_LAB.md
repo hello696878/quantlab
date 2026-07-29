@@ -174,3 +174,11 @@ primary or secondary model; verified OOF applies to *calibration fitting*
 abstention analysis is descriptive; accepted-outcome statistics are
 descriptive research numbers, not P&L; and all limits are v1-bounded (≤2000
 observations, ≤101 thresholds, ≤30 bins).
+
+## 22. Downstream: Signal Decay Lab (Phase 60.0)
+
+The Signal Decay Lab (Phase 60) can pin a completed meta-labeling run as
+identity context when the analysed signal is a stored probability from
+this lab. In v1 the link is identity pinning only — a probability analysed
+there is treated as a descriptive score, no calibration or threshold
+result flows downstream, and no record here is modified.

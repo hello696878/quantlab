@@ -369,6 +369,38 @@ factor exposure, a macro trade or a portfolio, hedge, allocate, execute, or
 constitute investment, trading or risk-management advice. No market or
 macroeconomic data is ever downloaded.
 
+### A signal-outcome association is conditional on its declared timing
+
+The Signal Decay Lab (Phase 60) measures the descriptive association
+between stored signals and later outcomes. Every number is conditional on
+the caller's declarations: the direction (never inferred from a name), the
+tie policy, the availability policy, the transformation, the horizon and
+lag grids (counted in observations on each entity's own stored grid —
+clock horizons are deferred because they require resampling), the bucket
+configuration and the overlap policy. A signal whose availability is
+merely assumed (`same_timestamp`) is verified only when every entry lag is
+at least 1; at lag 0 it is descriptive. One availability violation makes
+the whole run invalid, visibly and permanently.
+
+Overlapping outcome intervals are not independent, so their real scipy
+p-values carry an attached limitation instead of a correction — no
+Newey–West or similar adjustment exists in this lab, and the effective
+non-overlapping count is a documented descriptive approximation, never an
+inferential sample size. Constants, tiny samples and tie-degenerate
+bucketings leave statistics unavailable with reasons — never 0, never NaN.
+The top-minus-bottom spread is a neutral equal-weight reference (gross
+exposure 2.0, disclosed) whose cost-adjusted variant maps only the linked
+cost model's notional-proportional components onto a declared reference
+notional over a different time base than the holding period — both facts
+are disclosed rather than rescaled, and gross never includes costs.
+Decay summaries locate sign changes, threshold crossings and maxima in the
+sample; the largest-|statistic| horizon is never "the best horizon", the
+guarded exponential half-life exists only when the fitted slope is
+negative, and no horizon, lag, threshold or signal is ever selected,
+recommended or optimised. Nothing here proves predictability or alpha,
+guarantees persistence, sizes positions, monitors anything live, or
+constitutes investment advice. No market data is ever downloaded.
+
 ### Local SQLite — single-user, no auth
 
 Saved backtests, saved reports, and saved custom-strategy templates persist in a **local SQLite** file (`backend/data/quantlab.db`). There is **no authentication, no multi-user support, and no cloud sync** — anyone with access to the running app can read/modify/delete local records. It is intended for single-user, local research, not a shared or hosted deployment.

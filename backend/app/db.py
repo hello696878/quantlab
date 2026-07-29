@@ -2134,6 +2134,268 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_fsens_run ON factor_sensitivity_results(run_id)",
         ):
             conn.execute(index_sql)
+
+        # -------------------------------------------------------------
+        # Phase 60.0 — Signal Decay, Forecast Horizon, Turnover and
+        # Implementation Lag Diagnostics Lab v1 (append-only; no existing
+        # table, column or index is altered or dropped).
+        # -------------------------------------------------------------
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_decay_runs (
+                id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                  TEXT NOT NULL,
+                updated_at                  TEXT NOT NULL,
+                name                        TEXT NOT NULL,
+                description                 TEXT NOT NULL DEFAULT '',
+                status                      TEXT NOT NULL DEFAULT 'pending',
+                signal_id                   TEXT NOT NULL,
+                signal_type                 TEXT NOT NULL,
+                outcome_id                  TEXT NOT NULL,
+                outcome_target_type         TEXT NOT NULL,
+                frequency                   TEXT NOT NULL DEFAULT 'daily',
+                entity_count                INTEGER NOT NULL DEFAULT 0,
+                observation_count           INTEGER NOT NULL DEFAULT 0,
+                horizon_count               INTEGER NOT NULL DEFAULT 0,
+                lag_count                   INTEGER NOT NULL DEFAULT 0,
+                observation_start           TEXT,
+                observation_end             TEXT,
+                integrity_status            TEXT NOT NULL DEFAULT 'unknown',
+                completeness_status         TEXT NOT NULL DEFAULT 'unavailable',
+                overlap_status              TEXT,
+                first_horizon_rank_ic       REAL,
+                mean_one_way_turnover       REAL,
+                configuration               TEXT NOT NULL,
+                results                     TEXT,
+                signal_fingerprint          TEXT NOT NULL,
+                outcome_fingerprint         TEXT NOT NULL,
+                universe_fingerprint        TEXT NOT NULL,
+                horizon_fingerprint         TEXT NOT NULL,
+                analysis_fingerprint        TEXT NOT NULL,
+                configuration_fingerprint   TEXT NOT NULL,
+                result_fingerprint          TEXT,
+                dataset_version_id          INTEGER,
+                feature_run_id              INTEGER,
+                meta_label_run_id           INTEGER,
+                validation_run_id           INTEGER,
+                regime_run_id               INTEGER,
+                cost_diagnostic_run_id      INTEGER,
+                factor_run_id               INTEGER,
+                experiment_id               INTEGER,
+                is_baseline                 INTEGER NOT NULL DEFAULT 0,
+                baseline_scope              TEXT,
+                app_version                 TEXT,
+                git_commit                  TEXT,
+                notes                       TEXT NOT NULL DEFAULT '',
+                error_message               TEXT,
+                demo_key                    TEXT,
+                started_at                  TEXT,
+                completed_at                TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_definitions (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                  INTEGER NOT NULL
+                                        REFERENCES signal_decay_runs(id),
+                signal_id               TEXT NOT NULL,
+                name                    TEXT NOT NULL,
+                description             TEXT NOT NULL DEFAULT '',
+                signal_type             TEXT NOT NULL,
+                source                  TEXT NOT NULL,
+                unit                    TEXT NOT NULL,
+                frequency               TEXT NOT NULL,
+                direction               TEXT NOT NULL,
+                availability_policy     TEXT NOT NULL,
+                transformation          TEXT NOT NULL,
+                missing_policy          TEXT NOT NULL,
+                tie_policy              TEXT NOT NULL,
+                dataset_version_id      INTEGER,
+                feature_run_id          INTEGER,
+                meta_label_run_id       INTEGER,
+                factor_run_id           INTEGER,
+                definition_fingerprint  TEXT NOT NULL,
+                outcome_json            TEXT,
+                metadata_json           TEXT,
+                UNIQUE (run_id, signal_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_observations (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                INTEGER NOT NULL
+                                      REFERENCES signal_decay_runs(id),
+                observation_id        TEXT NOT NULL,
+                entity_id             TEXT NOT NULL,
+                source_timestamp      TEXT NOT NULL,
+                generated_at          TEXT,
+                available_at          TEXT NOT NULL,
+                availability_assumed  INTEGER NOT NULL DEFAULT 0,
+                raw_value             REAL,
+                rank_value            REAL,
+                universe_membership_id TEXT,
+                UNIQUE (run_id, entity_id, source_timestamp)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_horizon_results (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                  INTEGER NOT NULL
+                                        REFERENCES signal_decay_runs(id),
+                horizon                 TEXT NOT NULL,
+                entry_lag               INTEGER NOT NULL DEFAULT 0,
+                selection               TEXT NOT NULL DEFAULT 'overlapping',
+                outcome_scope           TEXT NOT NULL DEFAULT 'raw',
+                observations            INTEGER NOT NULL DEFAULT 0,
+                unavailable_count       INTEGER NOT NULL DEFAULT 0,
+                pearson                 REAL,
+                pearson_p_value         REAL,
+                spearman                REAL,
+                spearman_p_value        REAL,
+                spearman_p_adjusted     REAL,
+                kendall                 REAL,
+                kendall_p_value         REAL,
+                mean_cross_sectional_ic REAL,
+                ic_ratio                REAL,
+                top_minus_bottom        REAL,
+                cost_adjusted_spread    REAL,
+                monotonicity_spearman   REAL,
+                overlap_ratio           REAL,
+                max_simultaneous_overlap INTEGER,
+                effective_non_overlapping INTEGER,
+                overlap_state           TEXT,
+                p_value_note            TEXT,
+                state                   TEXT NOT NULL,
+                reason                  TEXT,
+                detail_json             TEXT,
+                UNIQUE (run_id, horizon, entry_lag, selection, outcome_scope)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_bucket_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES signal_decay_runs(id),
+                horizon             TEXT NOT NULL,
+                entry_lag           INTEGER NOT NULL DEFAULT 0,
+                outcome_scope       TEXT NOT NULL DEFAULT 'raw',
+                bucket              INTEGER NOT NULL,
+                observations        INTEGER NOT NULL DEFAULT 0,
+                score_minimum       REAL,
+                score_maximum       REAL,
+                mean_outcome        REAL,
+                median_outcome      REAL,
+                std_outcome         REAL,
+                positive_rate       REAL,
+                state               TEXT NOT NULL,
+                reason              TEXT,
+                UNIQUE (run_id, horizon, entry_lag, outcome_scope, bucket)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_turnover_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES signal_decay_runs(id),
+                horizon             TEXT NOT NULL,
+                entry_lag           INTEGER NOT NULL DEFAULT 0,
+                timestamp           TEXT NOT NULL,
+                universe_size       INTEGER NOT NULL DEFAULT 0,
+                top_size            INTEGER NOT NULL DEFAULT 0,
+                bottom_size         INTEGER NOT NULL DEFAULT 0,
+                top_entries         INTEGER NOT NULL DEFAULT 0,
+                top_exits           INTEGER NOT NULL DEFAULT 0,
+                bottom_entries      INTEGER NOT NULL DEFAULT 0,
+                bottom_exits        INTEGER NOT NULL DEFAULT 0,
+                jaccard_top         REAL,
+                one_way_turnover    REAL,
+                cost                REAL,
+                cost_return         REAL,
+                cost_state          TEXT,
+                UNIQUE (run_id, horizon, entry_lag, timestamp)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_regime_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES signal_decay_runs(id),
+                regime_label        TEXT NOT NULL,
+                horizon             TEXT NOT NULL,
+                entry_lag           INTEGER NOT NULL DEFAULT 0,
+                observations        INTEGER NOT NULL DEFAULT 0,
+                rare                INTEGER NOT NULL DEFAULT 0,
+                pearson             REAL,
+                spearman            REAL,
+                top_minus_bottom    REAL,
+                overlap_ratio       REAL,
+                state               TEXT NOT NULL,
+                reason              TEXT,
+                UNIQUE (run_id, regime_label, horizon, entry_lag)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_bootstrap_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES signal_decay_runs(id),
+                horizon             TEXT NOT NULL,
+                entry_lag           INTEGER NOT NULL DEFAULT 0,
+                statistic           TEXT NOT NULL,
+                method              TEXT NOT NULL,
+                seed                INTEGER NOT NULL,
+                resamples           INTEGER NOT NULL,
+                valid_resamples     INTEGER NOT NULL DEFAULT 0,
+                observed            REAL,
+                quantiles_json      TEXT,
+                state               TEXT NOT NULL,
+                reason              TEXT,
+                UNIQUE (run_id, horizon, entry_lag, statistic)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_sdr_created ON signal_decay_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_status ON signal_decay_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_integrity ON signal_decay_runs(integrity_status)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_overlap ON signal_decay_runs(overlap_status)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_signal_type ON signal_decay_runs(signal_type)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_target ON signal_decay_runs(outcome_target_type)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_dataset ON signal_decay_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_frun ON signal_decay_runs(feature_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_mrun ON signal_decay_runs(meta_label_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_vrun ON signal_decay_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_rrun ON signal_decay_runs(regime_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_crun ON signal_decay_runs(cost_diagnostic_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_facrun ON signal_decay_runs(factor_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_config_fp ON signal_decay_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_baseline ON signal_decay_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_sdr_scope ON signal_decay_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_sdr_demo_key ON signal_decay_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_sdef_run ON signal_definitions(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sobs_run ON signal_observations(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sobs_entity ON signal_observations(run_id, entity_id)",
+            "CREATE INDEX IF NOT EXISTS idx_shor_run ON signal_horizon_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sbuc_run ON signal_bucket_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_stur_run ON signal_turnover_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sreg_run ON signal_regime_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sboo_run ON signal_bootstrap_results(run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

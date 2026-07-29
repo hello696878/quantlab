@@ -97,6 +97,7 @@ from app.cost_diagnostics_routes import router as cost_diagnostics_router
 from app.portfolio_diagnostics_routes import router as portfolio_diagnostics_router
 from app.portfolio_stress_routes import router as portfolio_stress_router
 from app.factor_diagnostics_routes import router as factor_diagnostics_router
+from app.signal_decay_routes import router as signal_decay_router
 from app.portfolio_attribution_routes import router as portfolio_attribution_router
 from app.benchmark import (
     build_benchmark_analytics,
@@ -502,6 +503,7 @@ app.include_router(portfolio_diagnostics_router)
 app.include_router(portfolio_stress_router)
 app.include_router(portfolio_attribution_router)
 app.include_router(factor_diagnostics_router)
+app.include_router(signal_decay_router)
 
 
 # ---------------------------------------------------------------------------

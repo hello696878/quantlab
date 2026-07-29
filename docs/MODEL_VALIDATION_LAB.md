@@ -286,3 +286,14 @@ is pinned and re-checked, held-out R-squared is benchmarked against the
 TRAINING mean so no held-out information enters the denominator, and a
 linked run that reports leakage withholds the causal-timing claim. Nothing
 is ever refitted on held-out data, and no validation record is modified.
+
+## Downstream: Signal Decay Lab (Phase 60.0)
+
+The Signal Decay Lab (Phase 60) can evaluate a signal on a stored split by
+**prediction time**: training and held-out membership are used verbatim
+(purged and embargoed observations belong to neither set), the split
+fingerprint is pinned and re-checked at execution, bucket thresholds are
+derived from TRAINING observations only and applied frozen to held-out
+observations, and a run evaluated this way earns the
+`verified_from_validation_split` integrity state. Nothing is refitted on
+held-out data, and no validation record is modified.

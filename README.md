@@ -67,8 +67,9 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   Portfolio Stress Lab (scenario shocks, stressed risk + drawdown
   attribution), Portfolio Attribution (contribution, benchmark-relative
   Brinson effects + active risk), Factor Diagnostics (factor exposure,
-  return decomposition + macro sensitivity), Data Reliability Center,
-  QA Command Center.
+  return decomposition + macro sensitivity), Signal Decay Lab (signal-outcome
+  association by horizon + lag, turnover + implementation costs), Data
+  Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -280,6 +281,21 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Signal Decay Lab (60.0)** — descriptive association between stored
+  signals and later outcomes across explicitly declared forecast horizons
+  and implementation lags: exact-timestamp forward returns with per-pair
+  availability enforcement (one violation makes the run invalid), a
+  seven-state integrity axis separate from a three-state overlap axis, real
+  scipy p-values with overlap limitations disclosed rather than corrected,
+  per-timestamp cross-sectional rank IC, equal-count rank buckets with a
+  neutral top-minus-bottom reference spread, sign-change/threshold/half-life
+  decay summaries, one-way turnover + membership churn + holding-cohort
+  overlap, notional-proportional cost adjustment from a pinned cost model
+  (gross always separate), stored-regime, frozen-threshold held-out and
+  factor-residual views, seeded bootstrap quantiles and multiple-testing
+  adjustment beside raw values. Descriptions of stored samples — never
+  proof of predictability or alpha, never a signal, horizon, lag or
+  threshold recommendation, never a persistence guarantee.
 - **Factor Diagnostics (59.0)** — measured sensitivity of one explicitly
   declared return series to supplied factor and macro observations: explicit
   units, transformation formulas, lags and availability rules; exact

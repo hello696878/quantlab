@@ -18,6 +18,80 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Signal Decay, Forecast Horizon, Turnover & Implementation Lag
+  Diagnostics Lab v1** (v4.78 series): a local-first lab that measures the
+  DESCRIPTIVE association between stored signal observations (scores,
+  probabilities, ranks) and later outcomes across explicitly declared
+  forecast horizons and implementation lags. Signal definitions are explicit
+  contracts — type, unit, a declared direction that is NEVER inferred from
+  the name, tie policy, availability policy (`explicit_available_at` or
+  `same_timestamp`, the latter marked "(assumed)" everywhere), and a
+  transformation (`none`, `rank_cross_sectional`, or `rank_full_sample`
+  which demotes the whole run to `full_sample_descriptive`). Timing is a
+  single enforced contract: signal at grid index i, entry lag l, horizon k
+  (units = observations on the entity's OWN stored grid; clock units
+  deferred with the resampling reason stated) → entry `grid[i+l]`, exit
+  `grid[i+l+k]`, forward return by EXACT-timestamp price lookup only, the
+  return earned over `(entry, exit]`; one `available_at > entry` violation
+  makes the whole run `invalid`, forensically visible and permanently
+  baseline-ineligible. Integrity (7 states, from
+  `verified_from_validation_split` down to `invalid`) and overlap
+  (`non_overlapping` / `partially_overlapping` / `overlapping` on half-open
+  `[entry_idx, exit_idx)` intervals, so back-to-back holdings do not
+  overlap) are separate run-level axes; overlapping cells keep their REAL
+  scipy p-values with an attached limitation note (never suppressed, never
+  "corrected" silently), an effective non-overlapping count that is
+  documented as descriptive — never an inferential sample size — and an
+  optional deterministic earliest-first non-overlapping selection stored
+  BESIDE the full rows, never replacing them. Statistics are scipy-only
+  (pearsonr/spearmanr/kendalltau); constants, small samples and degenerate
+  ties are unavailable WITH reasons — never 0, never NaN. Cross-sectional
+  rank IC is computed per timestamp over that stamp's own ≥3-entity
+  universe and aggregated (mean/median/std, descriptive ic_ratio, sign
+  shares). Equal-count rank buckets (2–10, global or per-timestamp,
+  deterministic tie ordering) yield bucket outcome means, a monotonicity
+  description with NO p-value, and a top-minus-bottom spread that is a
+  neutral equal-weight measurement reference (gross exposure 2.0
+  disclosed) — conservatively unavailable when unique scores < bucket
+  count; under a linked Phase 52 validation split, bucket thresholds are
+  frozen from TRAINING observations and applied unrefitted to held-out
+  data. Decay summaries report the first sign-change horizon, first
+  below-threshold horizon, the largest-|statistic| horizon (a location,
+  NEVER "the best horizon") and a guarded exponential fit whose half-life
+  exists only when the fitted slope is negative. Turnover of the reference
+  ranking: one-way turnover 0.5·Σ|Δw| with explicit initial-rebalance
+  policies (`no_prior_unavailable` default — the first rebalance is null,
+  excluded from means — or `zero_prior_full_build`), top-bucket Jaccard,
+  entry/exit counts, holding duration, and holding-cohort overlap with
+  gross exposure disclosed under a declared normalisation. Implementation
+  lags shift BOTH entry and exit; the lag surface reports degradation and
+  no lag is ever recommended. A linked Phase 55 cost model (pinned by
+  fingerprint, read-only) contributes only its notional-proportional
+  components (commission bps, spread bps × fraction, per-side slippage
+  bps) — impact and monetary models are unavailable with reasons — and the
+  cost-adjusted spread (gross spread minus MEAN per-rebalance reference
+  cost return, different time bases disclosed) always sits in a separate
+  column from gross. Stored Phase 54 regime assignments are never
+  recomputed (rare regimes < 10 observations withhold statistics), Phase
+  59 factor residuals are summed read-only over `[entry, exit)` with an
+  exact-coverage requirement, Bonferroni/Holm/BH adjustment (shared Phase
+  53 utility) shows adjusted p-values NEXT TO raw ones, and an optional
+  seeded bootstrap (iid/moving-block/timestamp, `default_rng`, 50–2000
+  resamples) reports quantiles only — no bootstrap p-value. Six canonical
+  fingerprints, an integrity-gated baseline (never performance-gated), a
+  neutral field-state run comparison that declares no winner, a
+  schema-versioned export (`signal_decay_export_v1`, ≤25 runs, no ids/
+  paths/credentials), completeness that counts DATA gaps only (structural
+  grid-end unavailability disclosed separately), 8 tables + 26 indexes, a
+  24-case hand-computable demo (correlations exactly ±1, sign change at
+  horizon 2, gross-positive/cost-adjusted-non-positive, a deliberately
+  invalid future-looking run, one eligible baseline), 60 backend tests, a
+  full Signal Decay Lab UI (decay curve, buckets, turnover, cost, regime,
+  held-out, factor-residual, bootstrap, multiple-testing, observations and
+  policy panels) and a Playwright spec. Nothing here proves
+  predictability, validates alpha, recommends a signal, horizon, lag or
+  threshold, or is investment advice.
+
 - **Factor Exposure, Return Decomposition & Macro Sensitivity Diagnostics
   Lab v1** (v4.77 series): a local-first factor research lab that measures
   the sensitivity of ONE explicitly declared return series — a stored Phase

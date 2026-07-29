@@ -205,3 +205,14 @@ HC/HAC estimator exists in this repository and none is simulated);
 cross-sectional decomposition, winsorisation and lag/standardisation
 sensitivity dimensions deferred with reasons; measured sensitivities describe
 the supplied sample under the declared specification and nothing else.
+
+## 16. Downstream: Signal Decay Lab (Phase 60.0)
+
+The Signal Decay Lab (Phase 60) can link a completed run of this lab
+(pinned by configuration, result and model-policy fingerprints, read-only)
+to compare raw outcomes with factor-residualised outcomes: the residual
+outcome of a holding is the arithmetic sum of this lab's stored per-period
+residuals whose period start falls inside `[entry, exit)`, required to
+cover exactly the holding's horizon. Raw and residual diagnostics are
+separate rows there, a residual association is not alpha, and nothing is
+neutralised automatically or written back to this lab.

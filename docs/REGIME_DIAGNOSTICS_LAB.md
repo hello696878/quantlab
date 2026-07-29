@@ -265,3 +265,13 @@ fingerprints are pinned and re-checked at execution, a regime with fewer
 than 10 observations has its conditional fit withheld, and differences
 between regimes are presented as measurements — never as structural or
 causal claims.
+
+## Downstream: Signal Decay Lab (Phase 60.0)
+
+The Signal Decay Lab (Phase 60) groups its signal-outcome pairs by this
+lab's **stored** assignments (a pair belongs to the regime of its entry
+timestamp) to report per-regime associations. Regimes are never recomputed
+there, this run's configuration, result and definition fingerprints are
+pinned and re-checked at execution, a regime with fewer than 10 pairs has
+its statistics withheld as rare, and differences between regimes are
+presented as measurements — never as structural or causal claims.

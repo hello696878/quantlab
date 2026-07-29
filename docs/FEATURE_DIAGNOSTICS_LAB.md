@@ -310,3 +310,10 @@ rather than calendar time; declared held-out splits are recorded
 declarations, not verified; the quality of any conclusions is bounded by the
 caller-supplied samples.  And permanently: measured importance is not
 causality, not profitability, and never a recommendation.
+
+## Downstream: Signal Decay Lab (Phase 60.0)
+
+The Signal Decay Lab (Phase 60) can pin a completed feature-diagnostics
+run as identity context for a signal built from those features. In v1 the
+link is identity pinning only — no importance, stability or drift numbers
+flow downstream, and no record here is modified.

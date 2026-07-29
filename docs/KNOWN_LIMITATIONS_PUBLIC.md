@@ -238,7 +238,35 @@ exposure is a property of the sample, not a permanent property of the
 factor. No market or macroeconomic data is ever downloaded, and the lab
 never builds a factor portfolio, hedges, allocates or certifies a model.
 
-## 24. Future improvements (openly planned)
+## 24. A measured association is not a predictive signal
+
+The Signal Decay Lab measures how stored signal observations were
+associated with later outcomes across explicitly declared horizons and
+implementation lags — over one stored sample, under one stated timing
+rule. A correlation, rank IC, bucket spread or monotone bucket staircase
+in that sample is **not** evidence the signal predicts anything, not
+validated alpha, not a reason to trade, and not a persistence guarantee;
+the demo deliberately contains a constructed perfect association to make
+the point that in-sample perfection proves nothing. The horizon or lag
+with the largest measured statistic is a location in the sample, never
+"the best" horizon or a recommended lag. Overlapping outcome intervals
+share price moves, so their classical p-values are optimistic to an
+unknown degree — the lab attaches that limitation to every affected
+number instead of correcting for it, and the effective non-overlapping
+count is a descriptive approximation, never an inferential sample size.
+Horizons are counted on each entity's own stored observation grid; clock
+horizons are deferred because they would require resampling. The
+top-minus-bottom spread is an equal-weight measurement reference, not a
+strategy, and its cost-adjusted variant covers only notional-proportional
+cost components from a linked stored model over a stated reference
+notional — impact, monetary and volume-dependent costs stay honestly
+unavailable. Signals whose availability is assumed (`same_timestamp`) are
+verified only when every entry is delayed at least one observation;
+full-sample rank transformations demote the whole run to descriptive.
+Nothing is selected, sized, optimised, monitored or executed, and no
+market data is ever downloaded.
+
+## 25. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

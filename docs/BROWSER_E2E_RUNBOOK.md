@@ -163,6 +163,33 @@ protected and why).
   controls are dark with explicit units, and 1024/768 have no page overflow.
   Only writes: the idempotent demo seeds plus the deliberately rejected
   baseline attempt.
+- **Signal Decay Lab** (Phase 60.0, `signal-decay.spec.ts`): the lab opens
+  with its no-predictability / no-advice disclaimers (the same
+  negation-aware overclaim scan), the 24-case demo seeds idempotently
+  (cascading the regime, validation, cost and factor demo loaders on a cold
+  database), overlap / integrity / signal-type filters work, the perfect
+  positive and negative cases read exactly ±1 through the same API the page
+  uses, constants stay unavailable with reasons, the tie-heavy case shows
+  its tie policy with the spread conservatively unavailable, the mean
+  cross-sectional rank IC reads exactly 1 on each stamp's own universe, the
+  decay curve shows per-horizon sample counts and overlap states with no
+  optimal-horizon wording, the sign-changing case locates its first sign
+  change at horizon 2, the overlapping run keeps its real p-values with the
+  not-independent limitation visible, the deterministic non-overlapping
+  selection (9 of 36 pairs) sits beside the full rows, monotone and
+  U-shaped buckets render with score boundaries, high-churn versus
+  stable-membership turnover read 0.861/0.093 versus 0/1 with the initial
+  rebalance honestly "unavailable (no prior)", the lag surface degrades
+  with no recommended-lag wording, the cost-adjusted case is gross-positive
+  and net-non-positive with gross kept separate, stored regimes mark rare
+  buckets and are never recomputed, held-out results state the frozen
+  training-threshold rule, the future-looking run is invalid with its
+  timing violation listed and refused as a baseline (a deliberate 409), raw
+  and factor-residual scopes stay separate rows, comparison declares no
+  winner, the eligible baseline is integrity-gated and marked, export is
+  schema-versioned and path-free, filter controls are dark with visible
+  units, and 1440/1024/768 have no page overflow. Only writes: the
+  idempotent demo seeds plus the deliberately rejected baseline attempt.
 - **Factor Diagnostics** (Phase 59.0, `factor-diagnostics.spec.ts`): the lab
   opens with its no-causality / no-advice / nothing-downloaded disclaimers (a
   negation-aware overclaim scan lets the lab's own negated disclaimers pass

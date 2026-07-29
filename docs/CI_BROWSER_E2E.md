@@ -25,7 +25,8 @@ Model Validation Lab + Phase 51.0 Meta-Labeling Lab + Phase 52.0 Feature
 Diagnostics + Phase 53.0 Overfitting Diagnostics + Phase 54.0 Regime
 Diagnostics + Phase 55.0 Cost Diagnostics + Phase 56.0 Portfolio
 Diagnostics + Phase 57.0 Portfolio Stress + Phase 58.0 Portfolio
-Attribution + Phase 59.0 Factor Diagnostics specs) against a
+Attribution + Phase 59.0 Factor Diagnostics + Phase 60.0 Signal Decay
+specs) against a
 **freshly built, isolated** QuantLab instance — proving the guard doesn't
 secretly depend on anything on the maintainer's machine, and producing
 downloadable evidence (logs, traces, HTML report) per run. The registry specs

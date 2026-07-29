@@ -307,7 +307,20 @@ identity marked disputed).  Dataset metadata is never mutated by a
 factor-diagnostic run, and the dataset identity that enters a factor's
 definition fingerprint is the manifest/schema fingerprint, never a row id.
 
-## 27. Limitations
+## 27. Signal Decay links (Phase 60.0)
+
+Signal-decay runs
+([`SIGNAL_DECAY_DIAGNOSTICS_LAB.md`](SIGNAL_DECAY_DIAGNOSTICS_LAB.md)) may
+declare a `dataset_version_id` pinning the dataset identity of the signal
+observations.  The run detail shows the version's name, label, schema /
+manifest fingerprints and quality states, and warns visibly when the
+version was invalidated (results are still reported, with their input
+identity marked disputed).  Dataset metadata is never mutated by a
+signal-decay run, and the dataset identity that enters the run's
+observation-universe fingerprint is the manifest/schema fingerprint, never
+a row id.
+
+## 28. Limitations
 
 Single-user local-first; content fingerprints for user files rely on
 explicitly supplied hashes (no background file scanning in v1); quality checks
