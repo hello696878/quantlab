@@ -213,7 +213,12 @@ def ols_fit(y_values: Sequence[float],
         raise RegressionError("the fitted values are not finite")
 
     rss = float(np.sum(residuals ** 2))
-    tss = float(np.sum((y - y.mean()) ** 2))
+    if intercept:
+        tss = float(np.sum((y - y.mean()) ** 2))
+        r_squared_convention = "centred TSS: SUM((y - mean(y))^2)"
+    else:
+        tss = float(np.sum(y ** 2))
+        r_squared_convention = "uncentred TSS for a no-intercept model: SUM(y^2)"
     dof = int(n - parameters)
     sigma_squared = rss / dof if dof >= MIN_DEGREES_OF_FREEDOM else None
 
@@ -229,7 +234,9 @@ def ols_fit(y_values: Sequence[float],
         r_squared = float(1.0 - rss / tss)
         denominator = n - parameters
         if denominator >= 1:
-            adjusted = float(1.0 - (1.0 - r_squared) * (n - 1) / denominator)
+            numerator_dof = n - 1 if intercept else n
+            adjusted = float(
+                1.0 - (1.0 - r_squared) * numerator_dof / denominator)
 
     residual_mean = float(np.mean(residuals))
     residual_std = float(np.std(residuals, ddof=1)) if n >= 2 else None
@@ -350,6 +357,7 @@ def ols_fit(y_values: Sequence[float],
         "residual_sum_of_squares": rss,
         "total_sum_of_squares": tss,
         "r_squared": r_squared,
+        "r_squared_convention": r_squared_convention,
         "adjusted_r_squared": adjusted,
         "r_squared_note": r_squared_note,
         "root_mean_squared_error": rmse,
@@ -382,9 +390,21 @@ def ridge_fit(y_values: Sequence[float],
     lam = validate_ridge_lambda(ridge_lambda)
     y = _finite_array(y_values, "target series")
     factor_matrix = _finite_array(factor_values, "factor matrix")
+    if factor_matrix.ndim != 2:
+        raise RegressionError("the factor matrix must be two-dimensional")
     n, k = factor_matrix.shape
     if len(names) != k:
         raise RegressionError("factor names must match the factor columns")
+    if y.shape[0] != n:
+        raise RegressionError(
+            f"target has {y.shape[0]} observations but the factor matrix has {n}")
+    if n == 0:
+        raise RegressionError("at least one observation is required")
+    if scaling == "zscore_fit_sample" and not intercept:
+        raise RegressionError(
+            "zscore_fit_sample centres factors and therefore implies a "
+            "non-zero offset in original units; it is unsupported when the "
+            "intercept is excluded")
 
     scale_centre = np.zeros(k)
     scale_spread = np.ones(k)
@@ -397,6 +417,11 @@ def ridge_fit(y_values: Sequence[float],
 
     design = _design(scaled, intercept)
     parameters = design.shape[1]
+    design_singular = np.linalg.svd(design, compute_uv=False)
+    design_tolerance = (max(design.shape) * RANK_TOLERANCE_SCALE
+                        * max(float(design_singular[0]), 1e-300))
+    design_rank = int(sum(1 for value in design_singular
+                          if value > design_tolerance))
     penalty = np.eye(parameters) * lam
     if intercept:
         penalty[0, 0] = 0.0  # the intercept is never penalised
@@ -412,7 +437,12 @@ def ridge_fit(y_values: Sequence[float],
     fitted = design @ beta
     residuals = y - fitted
     rss = float(np.sum(residuals ** 2))
-    tss = float(np.sum((y - y.mean()) ** 2))
+    if intercept:
+        tss = float(np.sum((y - y.mean()) ** 2))
+        r_squared_convention = "centred TSS: SUM((y - mean(y))^2)"
+    else:
+        tss = float(np.sum(y ** 2))
+        r_squared_convention = "uncentred TSS for a no-intercept model: SUM(y^2)"
     r_squared = (float(1.0 - rss / tss)
                  if tss > ZERO_VARIANCE_TOLERANCE else None)
     offset = 1 if intercept else 0
@@ -463,6 +493,7 @@ def ridge_fit(y_values: Sequence[float],
         "residual_sum_of_squares": rss,
         "total_sum_of_squares": tss,
         "r_squared": r_squared,
+        "r_squared_convention": r_squared_convention,
         "adjusted_r_squared": None,
         "r_squared_note": (
             "R-squared of a penalised fit is descriptive only: it is not "
@@ -471,10 +502,10 @@ def ridge_fit(y_values: Sequence[float],
         "residual_mean": float(np.mean(residuals)),
         "residual_std": float(np.std(residuals, ddof=1)) if n >= 2 else None,
         "sigma_squared": None,
-        "rank": None,
+        "rank": design_rank,
         "expected_rank": int(parameters),
-        "rank_status": "full_rank" if cond["factor_rank"] == k
-                       else "rank_deficient_descriptive",
+        "rank_status": ("full_rank" if design_rank == parameters
+                        else "rank_deficient_descriptive"),
         "rank_policy": "minimum_norm_descriptive",
         "standard_error_method": None,
         "standard_error_assumptions": None,

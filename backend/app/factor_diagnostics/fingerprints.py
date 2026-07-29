@@ -59,6 +59,7 @@ def factor_definition_fingerprint(definition: Dict[str, Any],
         "standardisation_window": definition["standardisation_window"],
         "winsorisation_policy": definition["winsorisation_policy"],
         "source": definition["source"],
+        "dataset_version_id": definition.get("dataset_version_id"),
         "dataset_identity": dataset_identity or {},
     }))
 
@@ -105,7 +106,18 @@ def observation_universe_fingerprint(alignment: Dict[str, Any],
             "information_available_at": r["information_available_at"],
             "target_return": r["target_return"],
             "factor_values": list(r["factor_values"]),
-            "knowable_at": [s["knowable_at"] for s in r["factor_sources"]],
+            "factor_sources": [{
+                "factor_id": s["factor_id"],
+                "observation_id": s["observation_id"],
+                "source_timestamp": s["source_timestamp"],
+                "available_at": s["available_at"],
+                "effective_timestamp": s["effective_timestamp"],
+                "knowable_at": s["knowable_at"],
+                "release_timestamp": s["release_timestamp"],
+                "raw_value": s.get("raw_value"),
+                "vintage_state": s["vintage_state"],
+                "quality_state": s["quality_state"],
+            } for s in r["factor_sources"]],
         } for r in alignment["rows"]],
     }))
 
@@ -116,6 +128,12 @@ def model_policy_fingerprint(policy: Dict[str, Any]) -> str:
         "kind": "factor_model_policy_v1",
         "analysis_mode": policy["analysis_mode"],
         "regression_method": policy["regression_method"],
+        "solver_identity": (
+            "not_applicable_supplied_exposures"
+            if policy["analysis_mode"] == "supplied_exposure_aggregation"
+            else ("numpy.linalg.lstsq_svd"
+                  if policy["regression_method"] == "ols"
+                  else "numpy.linalg.solve_penalised_normal_equations")),
         "intercept_policy": policy["intercept_policy"],
         "ridge_lambda": policy.get("ridge_lambda"),
         "ridge_scaling": policy.get("ridge_scaling"),
@@ -151,6 +169,8 @@ def configuration_fingerprint(observation_fp: str, policy_fp: str,
             "regime_identity": linked.get("regime_identity"),
             "stress_identity": linked.get("stress_identity"),
             "dataset_identity": linked.get("dataset_identity"),
+            "factor_dataset_identities":
+                linked.get("factor_dataset_identities") or {},
         },
         "sensitivity": [{
             "label": s["label"], "is_base": s["is_base"],
@@ -160,6 +180,23 @@ def configuration_fingerprint(observation_fp: str, policy_fp: str,
             "factor_subset": s["factor_subset"],
             "factor_scale": s["factor_scale"],
         } for s in sensitivity],
+    }))
+
+
+def sensitivity_result_fingerprint(scenario: Dict[str, Any],
+                                   design_rows: Sequence[Dict[str, Any]],
+                                   fit: Dict[str, Any],
+                                   summary: Dict[str, Any]) -> str:
+    """Identity of one effective sensitivity sample, policy and result."""
+    return sha256_hex(_clean({
+        "kind": "factor_sensitivity_result_v1",
+        "scenario": scenario,
+        "period_indices": [row["period_index"] for row in design_rows],
+        "period_starts": [row["period_start"] for row in design_rows],
+        "factor_values": [row["factor_values"] for row in design_rows],
+        "target_returns": [row["target_return"] for row in design_rows],
+        "fit": fit,
+        "summary": summary,
     }))
 
 
@@ -237,5 +274,6 @@ def result_fingerprint(*, coefficients: Sequence[Dict[str, Any]],
 __all__ = [
     "FingerprintError", "factor_definition_fingerprint", "target_fingerprint",
     "observation_universe_fingerprint", "model_policy_fingerprint",
-    "configuration_fingerprint", "result_fingerprint",
+    "configuration_fingerprint", "sensitivity_result_fingerprint",
+    "result_fingerprint",
 ]

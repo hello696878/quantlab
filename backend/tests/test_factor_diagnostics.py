@@ -688,8 +688,13 @@ def test_supplied_exposure_mode_aggregates_stored_weights_end_to_end():
                 row["exposures"][factor_id] * row["factor_values"][factor_id])
         assert row["measured_return"] == pytest.approx(
             row["modelled_return"] + row["residual"], abs=1e-12)
+    assert executed["fit"]["method"] == "supplied_exposure_aggregation"
+    assert executed["fit"]["rank_status"] == "not_applicable"
+    assert executed["r_squared"] is not None
+    assert executed["intercept"] is None
     for coefficient in store.list_coefficients(executed["id"]):
         assert coefficient["exposure_state"] == "supplied"
+        assert coefficient["coefficient"] is None
 
 
 def test_supplied_exposure_mode_leaves_a_missing_asset_exposure_unavailable():
@@ -1068,6 +1073,7 @@ def test_demo_held_out_metrics_never_refit_on_the_held_out_rows():
     run_id = store.run_demo_key_id("demo:fd:held-out-validation")
     run = service.get_run(run_id)
     held_out = run["held_out"]
+    assert held_out is not None, run["error_message"]
     assert held_out["training_observations"] > 0
     assert held_out["held_out_observations"] > 0
     assert held_out["purged_observations"] >= 0
@@ -1236,3 +1242,164 @@ def test_api_compare_reports_neutral_differences(client):
     body = response.json()
     assert body["comparability_warnings"]
     assert "no run is better" in body["note"]
+
+
+def test_log_change_rejects_non_positive_endpoints_even_when_ratio_is_positive():
+    definition = defs_mod.validate_definition({
+        "factor_id": "log", "name": "log", "category": "style",
+        "source": "test", "unit": "index_level", "frequency": "daily",
+        "transformation": "log_change"})
+    assert defs_mod.transform_series([-2.0, -1.0], definition) == [None, None]
+
+
+def test_supplied_transformed_unit_is_whitelisted():
+    with pytest.raises(defs_mod.DefinitionError):
+        defs_mod.validate_definition({
+            "factor_id": "bad", "name": "bad", "category": "style",
+            "source": "test", "unit": "ratio", "frequency": "daily",
+            "transformation": "supplied_transformed",
+            "transformed_unit": "return_fractoin"})
+
+
+def test_timestamps_are_calendar_valid_and_canonicalised():
+    assert obs_mod.normalise_timestamp(
+        "2024-01-01T01:00:00+01:00", field="stamp") == (
+            "2024-01-01T00:00:00.000000Z")
+    with pytest.raises(obs_mod.ObservationError):
+        obs_mod.normalise_timestamp("2024-02-30", field="stamp")
+
+
+def test_target_sequence_fields_reject_non_lists():
+    target = copy.deepcopy(_payload()["target"])
+    target["period_ends"] = {"not": "a list"}
+    with pytest.raises(target_mod.TargetError):
+        target_mod.validate_target(target)
+
+
+def test_factor_frequency_must_match_target_frequency():
+    payload = _payload()
+    payload["factors"][0]["frequency"] = "monthly"
+    with pytest.raises(service.FactorError) as excinfo:
+        service.create_run(payload)
+    assert "mixed-frequency" in str(excinfo.value)
+
+
+def test_observation_ids_are_unique_across_factors():
+    payload = _payload()
+    payload["factors"][1]["observations"][0]["observation_id"] = (
+        payload["factors"][0]["observations"][0]["observation_id"])
+    with pytest.raises(service.FactorError) as excinfo:
+        service.create_run(payload)
+    assert "unique across the run" in str(excinfo.value)
+
+
+def test_no_intercept_ols_uses_uncentred_r_squared():
+    fit = reg_mod.ols_fit([1.0, 2.0, 3.0], [[1.0], [1.0], [1.0]], ["x"],
+                          intercept=False,
+                          rank_policy="minimum_norm_descriptive")
+    assert fit["r_squared"] == pytest.approx(1.0 - 2.0 / 14.0)
+    assert "uncentred" in fit["r_squared_convention"]
+
+
+def test_no_intercept_ridge_uses_uncentred_r_squared_and_reports_rank():
+    fit = reg_mod.ridge_fit(
+        [1.0, 2.0, 3.0], [[1.0], [1.0], [1.0]], ["constant"],
+        ridge_lambda=1.0, intercept=False, scaling="none")
+    assert fit["r_squared"] == pytest.approx(1.0 - 2.75 / 14.0)
+    assert fit["r_squared_convention"].startswith("uncentred TSS")
+    assert fit["rank"] == 1
+    assert fit["expected_rank"] == 1
+    assert fit["rank_status"] == "full_rank"
+
+
+def test_ridge_rejects_centred_scaling_without_an_intercept():
+    with pytest.raises(reg_mod.RegressionError):
+        reg_mod.ridge_fit([1.0, 2.0, 3.0], [[1.0], [2.0], [4.0]], ["x"],
+                          ridge_lambda=1.0, intercept=False,
+                          scaling="zscore_fit_sample")
+
+
+def test_vif_is_unavailable_when_the_other_factors_are_rank_deficient():
+    rows = diag_mod.variance_inflation(
+        [[1.0, 2.0, 2.0], [2.0, 3.0, 3.0], [4.0, 5.0, 5.0],
+         [8.0, 9.0, 9.0], [16.0, 17.0, 17.0]], ["target", "a", "b"])
+    assert rows[0]["state"] == "unavailable"
+    assert "rank deficient" in rows[0]["reason"]
+
+
+def test_residual_drawdown_includes_an_initial_loss_from_zero():
+    block = diag_mod.residual_diagnostics([-1.0, 0.5], ["a", "b"])
+    assert block["cumulative_drawdown"] == pytest.approx(-1.0)
+
+
+def test_observation_fingerprint_tracks_selected_source_identity():
+    executed = _run()
+    configuration = copy.deepcopy(executed["configuration"])
+    configuration["factors"][0]["observations"][HISTORY]["observation_id"] = (
+        "replacement-source-id")
+    store.update_run(executed["id"], {"configuration": configuration})
+    rebuilt = service._rebuild(store.get_run(executed["id"]))
+    fingerprints = {
+        factor["factor_id"]: factor["definition_fingerprint"]
+        for factor in configuration["factors"]}
+    changed = fp_mod.observation_universe_fingerprint(
+        rebuilt["alignment"], rebuilt["target"], fingerprints)
+    assert changed != executed["observation_fingerprint"]
+
+
+def test_sensitivity_fingerprint_tracks_effective_sample_and_scale():
+    executed = _run(sensitivity=[
+        {"label": "short", "lookback": 12},
+        {"label": "scaled", "factor_scale": 2.0}])
+    rows = {row["label"]: row
+            for row in store.list_sensitivity(executed["id"])}
+    assert rows["base"]["fingerprint"] != rows["short"]["fingerprint"]
+    assert rows["base"]["fingerprint"] != rows["scaled"]["fingerprint"]
+
+
+def test_observation_metadata_key_count_is_bounded():
+    stamps = _stamps(2)
+    factor = _factor("bounded", [0.1, 0.2], stamps)
+    definition = defs_mod.validate_definition(factor)
+    factor["observations"][0]["metadata"] = {
+        f"key-{index}": index for index in range(21)}
+    with pytest.raises(obs_mod.ObservationError) as excinfo:
+        obs_mod.validate_observations(definition, factor["observations"])
+    assert "20 keys" in str(excinfo.value)
+
+
+def test_persisted_observations_preserve_selected_raw_values():
+    executed = _run()
+    rows = store.list_observations(executed["id"])
+    expected = executed["configuration"]["factors"][0]["observations"][HISTORY]["raw_value"]
+    factor_a = next(row for row in rows if row["factor_id"] == "factor_a")
+    assert factor_a["raw_value"] == pytest.approx(expected)
+
+
+def test_api_rejects_non_list_target_sequences(client):
+    payload = _payload()
+    payload["target"]["information_available_at"] = {"bad": "shape"}
+    response = client.post(f"{BASE}/runs", json=payload)
+    assert response.status_code == 422
+    assert "must be a list" in response.text
+
+
+def test_sensitivity_with_validation_uses_training_rows_only():
+    demo_mod.seed_demo_factor_diagnostics()
+    run_id = store.run_demo_key_id("demo:fd:held-out-validation")
+    run = store.get_run(run_id)
+    configuration = copy.deepcopy(run["configuration"])
+    factor_ids = [factor["factor_id"] for factor in configuration["factors"]]
+    configuration["sensitivity"] = sens_mod.validate_scenarios(
+        [{"label": "scaled", "factor_scale": 1.1}],
+        factor_ids=factor_ids,
+        observation_count=run["observation_count"])
+    membership = {row["period_index"]: row["membership"]
+                  for row in store.list_periods(run_id)}
+    training_count = sum(value == "train" for value in membership.values())
+    rows = service._sensitivity_rows(
+        configuration, service._rebuild(run), configuration["policy"],
+        1e-9, membership)
+    assert rows
+    assert all(row["observations"] == training_count for row in rows), (
+        training_count, rows)

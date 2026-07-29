@@ -126,9 +126,14 @@ def validate_target(raw: Any) -> Dict[str, Any]:
             f"timestamps ({len(timestamps)}) and returns ({len(returns)}) must "
             f"have the same length")
     period_ends = raw.get("period_ends")
+    if period_ends is not None and not isinstance(period_ends, list):
+        raise TargetError("period_ends must be a list when supplied")
     if period_ends is not None and len(period_ends) != len(timestamps):
         raise TargetError("period_ends must have the same length as timestamps")
     cutoffs = raw.get("information_available_at")
+    if cutoffs is not None and not isinstance(cutoffs, list):
+        raise TargetError(
+            "information_available_at must be a list when supplied")
     if cutoffs is not None and len(cutoffs) != len(timestamps):
         raise TargetError(
             "information_available_at must have the same length as timestamps")
@@ -231,6 +236,7 @@ def build_attribution_target(spec: Dict[str, Any], run: Dict[str, Any],
 
     periods: List[Dict[str, Any]] = []
     missing = 0
+    previous_start: Optional[str] = None
     for index, row in enumerate(period_rows):
         value = row.get(column)
         if value is None or not _finite(value):
@@ -243,6 +249,18 @@ def build_attribution_target(spec: Dict[str, Any], run: Dict[str, Any],
         cutoff = normalise_timestamp(
             row.get("information_available_at") or row["period_start"],
             field="information_available_at")
+        if previous_start is not None and start <= previous_start:
+            raise TargetError(
+                "stored attribution periods must be unique and strictly "
+                "increasing")
+        if end < start:
+            raise TargetError(
+                f"stored attribution period end {end} precedes start {start}")
+        if cutoff > start:
+            raise TargetError(
+                f"stored attribution information cutoff {cutoff} is after "
+                f"period start {start}")
+        previous_start = start
         periods.append({
             "period_index": len(periods),
             "period_start": start,

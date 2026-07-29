@@ -62,33 +62,43 @@ export default function FactorDiagnosticsDetail(props: Props) {
   const [observations, setObservations] = useState<ObservationRow[] | null>(null);
   const [rareThreshold, setRareThreshold] = useState<number>(10);
   const [marking, setMarking] = useState(false);
+  const [detailLoadError, setDetailLoadError] = useState<string | null>(null);
+  const [detailRetry, setDetailRetry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
+    setCoefficients(null);
+    setPeriods(null);
+    setRolling(null);
+    setRegimes(null);
+    setSensitivity(null);
+    setObservations(null);
+    setDetailLoadError(null);
+
+    void Promise.allSettled([
       getCoefficients(run.id), getPeriods(run.id), getRolling(run.id),
       getRegimes(run.id), getSensitivity(run.id), getObservations(run.id),
-    ])
-      .then(([c, p, r, g, s, o]) => {
-        if (cancelled) return;
-        setCoefficients(c.items);
-        setPeriods(p.items);
-        setRolling(r.items);
-        setRegimes(g.items);
-        setRareThreshold(g.rare_threshold);
-        setSensitivity(s.items);
-        setObservations(o.items);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        const cls = classifyApiError(err);
-        if (cls.backendUnavailable) notifyBackendOffline();
-        else toast.error("Couldn’t load run details", cls.message);
-      });
+    ] as const).then(([c, p, r, g, s, o]) => {
+      if (cancelled) return;
+      setCoefficients(c.status === "fulfilled" ? c.value.items : []);
+      setPeriods(p.status === "fulfilled" ? p.value.items : []);
+      setRolling(r.status === "fulfilled" ? r.value.items : []);
+      setRegimes(g.status === "fulfilled" ? g.value.items : []);
+      if (g.status === "fulfilled") setRareThreshold(g.value.rare_threshold);
+      setSensitivity(s.status === "fulfilled" ? s.value.items : []);
+      setObservations(o.status === "fulfilled" ? o.value.items : []);
+
+      const failed = [c, p, r, g, s, o].find((result) => result.status === "rejected");
+      if (!failed || failed.status !== "rejected") return;
+      const cls = classifyApiError(failed.reason);
+      setDetailLoadError(cls.message);
+      if (cls.backendUnavailable) notifyBackendOffline();
+      else toast.error("Could not load every run detail", cls.message);
+    });
     return () => {
       cancelled = true;
     };
-  }, [run.id]);
+  }, [run.id, detailRetry]);
 
   async function handleBaseline() {
     setMarking(true);
@@ -150,6 +160,16 @@ export default function FactorDiagnosticsDetail(props: Props) {
         )}
       </div>
 
+      {detailLoadError && (
+        <div className="card flex flex-wrap items-center justify-between gap-3 border border-red-400/40 p-4 text-sm text-red-200" role="alert">
+          <p>Some run-detail sections are unavailable: {detailLoadError}</p>
+          <button type="button" onClick={() => setDetailRetry((value) => value + 1)}
+            className="rounded-md border border-red-300/50 px-3 py-1.5 font-medium hover:bg-red-400/10">
+            Retry details
+          </button>
+        </div>
+      )}
+
       <div className="card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -172,7 +192,9 @@ export default function FactorDiagnosticsDetail(props: Props) {
           <Field label="Target" value={`${run.target_id} · ${run.target_type.replace(/_/g, " ")}`} />
           <Field label="Target source" value={run.target_source.replace(/_/g, " ")} />
           <Field label="Analysis mode" value={MODE_LABELS[run.analysis_mode] ?? run.analysis_mode} />
-          <Field label="Estimator" value={`${run.regression_method.toUpperCase()} · intercept ${run.intercept_policy}d`} />
+          <Field label="Estimator" value={run.analysis_mode === "supplied_exposure_aggregation"
+            ? "Not applicable (supplied exposures)"
+            : `${run.regression_method.toUpperCase()} - intercept ${run.intercept_policy}d`} />
           <Field label="Timing" value={TIMING_LABELS[run.timing_policy] ?? run.timing_policy} />
           <Field label="Vintage policy" value={run.vintage_policy.replace(/_/g, " ")} />
           <Field label="Return convention" value={`${run.return_convention} · ${run.return_frequency} · ${run.currency}`} />
@@ -239,8 +261,10 @@ export default function FactorDiagnosticsDetail(props: Props) {
       {/* ---------------- coefficients ---------------- */}
       <div className="card overflow-hidden" data-testid="factor-coefficients">
         <SectionHeader title="Factor exposures"
-          note={run.fit?.standard_error_assumptions ??
-                "Standard errors are unavailable for this estimator."} />
+          note={run.analysis_mode === "supplied_exposure_aggregation"
+            ? "Supplied exposures vary by period and are shown in the decomposition table; no coefficient is estimated."
+            : run.fit?.standard_error_assumptions ??
+              "Standard errors are unavailable for this estimator."} />
         {!coefficients ? (
           <SkeletonTable rows={3} cols={6} caption="Loading coefficients…" />
         ) : (
@@ -938,30 +962,34 @@ function SectionHeader({ title, note }: { title: string; note: string }) {
 }
 
 function CoefficientChart({ rows }: { rows: CoefficientRow[] }) {
-  const values = rows.map((r) => r.coefficient ?? 0);
+  const available = rows.filter((row) => typeof row.coefficient === "number");
+  if (available.length === 0) {
+    return <p className="px-4 py-3 text-xs text-slate-500">No static coefficients are available for this analysis mode.</p>;
+  }
+  const values = available.map((row) => row.coefficient as number);
   const max = Math.max(1e-12, ...values.map((v) => Math.abs(v)));
   const width = 640;
   const rowHeight = 26;
-  const height = Math.max(rowHeight, rows.length * rowHeight);
+  const height = Math.max(rowHeight, available.length * rowHeight);
   const mid = width / 2;
   return (
     <div className="overflow-x-auto px-4 pt-3">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img"
         aria-label="Factor coefficients (bars left of centre are negative)"
         data-testid="coefficient-chart">
-        <line x1={mid} y1="0" x2={mid} y2={height} stroke="#cbd5e1" strokeWidth="1" />
-        {rows.map((row, i) => {
-          const value = row.coefficient ?? 0;
+        <line x1={mid} y1="0" x2={mid} y2={height} stroke="var(--chart-axis-line)" strokeWidth="1" />
+        {available.map((row, i) => {
+          const value = row.coefficient as number;
           const w = (Math.abs(value) / max) * (mid - 60);
           return (
             <g key={row.factor_id}>
               <rect x={value >= 0 ? mid : mid - w} y={i * rowHeight + 6}
                 width={Math.max(w, 1)} height={rowHeight - 12}
-                fill={value >= 0 ? "#2563eb" : "#dc2626"} opacity="0.75" />
-              <text x={4} y={i * rowHeight + rowHeight / 2 + 4} fontSize="11" fill="#475569">
+                fill={value >= 0 ? "var(--chart-primary)" : "var(--neg)"} opacity="0.75" />
+              <text x={4} y={i * rowHeight + rowHeight / 2 + 4} fontSize="11" fill="var(--text-mut)">
                 {row.factor_id}
               </text>
-              <text x={width - 4} y={i * rowHeight + rowHeight / 2 + 4} fontSize="11" fill="#475569"
+              <text x={width - 4} y={i * rowHeight + rowHeight / 2 + 4} fontSize="11" fill="var(--text-mut)"
                 textAnchor="end">
                 {fmtNum(row.coefficient, 4)}
               </text>
@@ -978,7 +1006,7 @@ function RollingChart({ rows, factorIds }: { rows: RollingRow[]; factorIds: stri
   if (usable.length < 2) return null;
   const width = 720;
   const height = 160;
-  const palette = ["#2563eb", "#059669", "#d97706", "#7c3aed", "#dc2626"];
+  const palette = ["var(--chart-primary)", "var(--pos)", "var(--warn)", "var(--violet)", "var(--neg)"];
   const all = factorIds.flatMap((id) =>
     usable.map((r) => r.coefficients?.[id]).filter((v): v is number => typeof v === "number"));
   const min = Math.min(...all);
@@ -991,7 +1019,7 @@ function RollingChart({ rows, factorIds }: { rows: RollingRow[]; factorIds: stri
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img"
         aria-label="Rolling coefficient by window (table below carries the same values)"
         data-testid="rolling-chart">
-        <line x1="30" y1={height - 20} x2={width - 10} y2={height - 20} stroke="#cbd5e1" strokeWidth="1" />
+        <line x1="30" y1={height - 20} x2={width - 10} y2={height - 20} stroke="var(--chart-axis-line)" strokeWidth="1" />
         {factorIds.map((id, k) => {
           const points = usable
             .map((r, i) => {
@@ -1005,35 +1033,37 @@ function RollingChart({ rows, factorIds }: { rows: RollingRow[]; factorIds: stri
               stroke={palette[k % palette.length]} strokeWidth="1.5" />
           ) : null;
         })}
-        <text x="4" y="12" fontSize="10" fill="#64748b">{max.toFixed(3)}</text>
-        <text x="4" y={height - 24} fontSize="10" fill="#64748b">{min.toFixed(3)}</text>
+        <text x="4" y="12" fontSize="10" fill="var(--text-mut)">{max.toFixed(3)}</text>
+        <text x="4" y={height - 24} fontSize="10" fill="var(--text-mut)">{min.toFixed(3)}</text>
       </svg>
     </div>
   );
 }
 
 function ResidualChart({ periods }: { periods: PeriodRow[] }) {
-  const values = periods
-    .map((p) => p.residual)
-    .filter((v): v is number => typeof v === "number");
-  if (values.length < 2) return null;
+  const available = periods
+    .map((period) => period.residual)
+    .filter((value): value is number => typeof value === "number");
+  if (available.length < 2) return null;
   const width = 720;
   const height = 120;
-  const max = Math.max(1e-12, ...values.map((v) => Math.abs(v)));
+  const max = Math.max(1e-12, ...available.map((value) => Math.abs(value)));
   const mid = height / 2;
-  const barWidth = Math.max(1, (width - 20) / values.length - 1);
+  const barWidth = Math.max(1, (width - 20) / periods.length - 1);
   return (
     <div className="mt-3 overflow-x-auto">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img"
         aria-label="Residual by period (bars below the centre line are negative)"
         data-testid="residual-chart">
-        <line x1="10" y1={mid} x2={width - 10} y2={mid} stroke="#cbd5e1" strokeWidth="1" />
-        {values.map((v, i) => {
-          const h = (Math.abs(v) / max) * (mid - 8);
+        <line x1="10" y1={mid} x2={width - 10} y2={mid} stroke="var(--chart-axis-line)" strokeWidth="1" />
+        {periods.map((period, i) => {
+          const value = period.residual;
+          if (typeof value !== "number") return null;
+          const h = (Math.abs(value) / max) * (mid - 8);
           return (
-            <rect key={i} x={10 + i * (barWidth + 1)} y={v >= 0 ? mid - h : mid}
+            <rect key={i} x={10 + i * (barWidth + 1)} y={value >= 0 ? mid - h : mid}
               width={barWidth} height={Math.max(h, 0.5)}
-              fill={v >= 0 ? "#2563eb" : "#dc2626"} opacity="0.7" />
+              fill={value >= 0 ? "var(--chart-primary)" : "var(--neg)"} opacity="0.7" />
           );
         })}
       </svg>

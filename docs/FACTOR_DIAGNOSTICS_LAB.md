@@ -154,10 +154,10 @@ guarantees a later revision never reaches an earlier fit.
 
 ## 11. Fingerprints
 
-Five kinds — factor definition, target series, observation universe, model
+Six kinds — factor definition, target series, observation universe, model
 policy, configuration and result — over canonical JSON with 12-dp float
 quantization. NaN and Infinity are rejected. No database id, timestamp,
-duration or path enters a fingerprint, so the same inputs under the same
+duration or path enters a fingerprint. Factor fingerprints include each factor's dataset identity; the observation fingerprint includes selected source observation ids, timestamps, vintages, raw values and quality state; sensitivity result fingerprints include the effective sample, scenario and fitted result. Thus the same inputs under the same
 policy reproduce the same fingerprint on another machine. Execution re-checks
 every linked record's fingerprint and refuses rather than silently measuring
 different inputs.
@@ -175,7 +175,7 @@ recommends nothing.
 
 The **Factor Diagnostics** view lists runs with neutral status pills and
 filters (status, integrity, mode, timing, rank, free-text search), and its
-detail page renders the factor definitions, the coefficient table and bar
+detail page renders the factor definitions, the coefficient table and, only when static coefficients are available, its bar
 chart, the reconciliation block, the per-period decomposition, design
 conditioning with the correlation matrix (heatmap **and** table — colour is
 never the only signal), residual diagnostics with a residual chart, rolling

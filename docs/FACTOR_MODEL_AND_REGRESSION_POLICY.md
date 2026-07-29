@@ -76,9 +76,7 @@ parameter(s)"*.
 
 ## 6. Constant target
 
-If the total sum of squares is zero, **R² is undefined** and is reported as
-`null` with a reason — never as 0 or 1. Adjusted R² and RMSE follow the same
-availability logic.
+With an intercept, R-squared uses centred total sum of squares. Without an intercept, it uses the uncentred sum of squares `sum(y^2)` and is labelled with that convention. If the applicable denominator is zero, R-squared is undefined and is reported as `null` with a reason, never as 0 or 1. Adjusted R-squared follows the same availability rule and uses the residual degrees of freedom. RMSE remains defined whenever a finite residual vector exists, including for a constant target.
 
 ## 7. Ridge — an explicit research reference
 
@@ -108,9 +106,7 @@ with an OLS R².
 * variance inflation `VIF_k = 1 / (1 − R²_k)` from regressing factor *k* on
   the others with an intercept.
 
-A VIF is `unavailable` with a reason — never a sentinel and never infinite —
-when there are fewer than two factors, too few observations, a constant
-factor, or an exact linear dependence (`R²_k = 1`). Nothing is removed,
+A VIF is `unavailable` with a reason, never a sentinel and never infinite, when there are fewer than two factors, too few observations, a constant factor, exact linear dependence (`R-squared = 1`), or a rank-deficient auxiliary regression on the other factors. Nothing is removed,
 reordered or selected automatically.
 
 ## 9. Residual diagnostics
@@ -122,7 +118,7 @@ autocorrelation, the five largest absolute residuals with their periods,
 residual concentration (HHI of squared residuals) with the effective number
 of periods, and a cumulative residual drawdown defined explicitly as the
 maximum drawdown of the **additive** cumulative residual sum against its
-trailing peak (residuals are not compounded and are not a tradable series).
+trailing peak, with the initial peak anchored at zero so a first-period loss is retained (residuals are not compounded and are not a tradable series).
 
 Small samples and constant residual series leave the shape moments
 unavailable with a note. The lab states that residuals are what the
@@ -157,7 +153,7 @@ from their neighbours. Bounds: window 4–500, step 1–50, at most 400 windows.
 
 Bounded (≤ 16), deterministic, de-duplicated, base exactly once, over
 lookback, uniform lag delta, intercept policy, ridge lambda, explicit factor
-subset and factor scaling. Standardisation-policy and winsorisation
+subset and factor scaling. When Model Validation is linked, every sensitivity fit uses training rows only; held-out, purged and embargoed rows never enter scenario estimation. Standardisation-policy and winsorisation
 dimensions are **deferred** with stated reasons: they change the factor
 definition and therefore the observation-universe identity, which is a
 different run rather than a cell of this run's grid. No scenario is labelled

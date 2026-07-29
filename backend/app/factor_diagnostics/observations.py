@@ -39,6 +39,7 @@ from __future__ import annotations
 
 import math
 import re
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.factor_diagnostics import definitions as defs
@@ -75,11 +76,24 @@ class ObservationError(ValueError):
 
 
 def normalise_timestamp(value: Any, *, field: str) -> str:
-    """ISO-8601 timestamps only; comparison is lexicographic on this form."""
+    """Validate ISO-8601 and return a canonical, sortable representation."""
     if not isinstance(value, str) or not _TS_PATTERN.match(value):
         raise ObservationError(
             f"{field} must be an ISO-8601 timestamp (YYYY-MM-DD[THH:MM[:SS]])")
-    return value.replace(" ", "T")
+    text = value.replace(" ", "T")
+    if len(text) == 10:
+        try:
+            return datetime.fromisoformat(text).date().isoformat()
+        except ValueError as exc:
+            raise ObservationError(f"{field} is not a valid calendar date") from exc
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ObservationError(f"{field} is not a valid ISO-8601 timestamp") from exc
+    if parsed.tzinfo is not None:
+        return parsed.astimezone(timezone.utc).isoformat(
+            timespec="microseconds").replace("+00:00", "Z")
+    return parsed.isoformat(timespec="microseconds")
 
 
 def validate_timing_policy(value: Any) -> str:
@@ -209,6 +223,10 @@ def validate_observations(definition: Dict[str, Any],
         metadata = item.get("metadata") or {}
         if not isinstance(metadata, dict):
             raise ObservationError("observation metadata must be an object")
+        if len(metadata) > defs.MAX_METADATA_KEYS:
+            raise ObservationError(
+                f"observation metadata is limited to "
+                f"{defs.MAX_METADATA_KEYS} keys")
         if len(str(metadata)) > defs.MAX_METADATA_CHARS:
             raise ObservationError(
                 f"observation metadata is limited to "
@@ -411,6 +429,7 @@ def align(target: Dict[str, Any], definitions: Sequence[Dict[str, Any]],
                 "release_timestamp": release,
                 "vintage_state": bundle["vintage_states"][obs_index],
                 "quality_state": row["quality_state"],
+                "raw_value": bundle["raw_series"][obs_index],
             })
         if reason is not None:
             excluded.append({"period_index": period_index,

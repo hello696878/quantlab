@@ -29,6 +29,7 @@ residual_t              = measured_t − modelled_return_t
 
 Rules for the supplied path:
 
+* no regression estimator is run and no static coefficient is reported; the supplied period-level exposures remain the exposure source of record;
 * asset ordering is exact and weights are used as the book holds them —
   **nothing is normalised**;
 * long and short weights aggregate under the same signed formula, which the
@@ -99,10 +100,7 @@ active_contribution_k = portfolio_contribution_k − benchmark_contribution_k
 ```
 
 The benchmark is **never selected automatically**: it is whatever the linked
-attribution run declared. If the benchmark series covers fewer periods, the
-overlap is used and the shortfall is stated. If too few overlapping
-observations remain to identify the same specification, the comparison is
-withheld. Every row carries the sentence *an active exposure is a measured
+attribution run declared. The benchmark must cover every portfolio estimation period. Under linked Model Validation, both fits use the same training rows. A missing benchmark value withholds the comparison rather than fitting a different sample; observations outside the estimation window are irrelevant. If the exact shared sample cannot identify the same specification, the comparison is withheld. Every row carries the sentence *an active exposure is a measured
 difference; it is neither desirable nor undesirable here*.
 
 ## 5. What a contribution is not

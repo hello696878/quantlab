@@ -121,6 +121,13 @@ def variance_inflation(factor_values: Sequence[Sequence[float]],
             entry["reason"] = f"the VIF regression could not be fitted: {exc}"
             out.append(entry)
             continue
+        if fit["rank_status"] != "full_rank":
+            entry["reason"] = (
+                "the auxiliary regression on the other factors is rank "
+                "deficient, so this variance inflation factor is not "
+                "identified")
+            out.append(entry)
+            continue
         r_squared = fit["r_squared"]
         if r_squared is None:
             entry["reason"] = fit["r_squared_note"]
@@ -211,7 +218,9 @@ def residual_diagnostics(residuals: Sequence[float],
         out["effective_periods"] = float(1.0 / hhi) if hhi > 0 else None
 
     cumulative = np.cumsum(values)
-    peak = -math.inf
+    # The additive residual path starts from zero.  Without that initial
+    # baseline, a loss in the first period can never register as a drawdown.
+    peak = 0.0
     drawdown = 0.0
     for value in cumulative:
         peak = max(peak, float(value))

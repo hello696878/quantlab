@@ -63,6 +63,15 @@ SOURCE_UNITS = (
     "rate_fraction", "rate_percent", "zscore", "ratio", "count",
 )
 
+#: Units an already-transformed supplied series may declare.  Keeping this
+#: bounded prevents a typo from becoming a new, apparently valid unit.
+TRANSFORMED_UNITS = SOURCE_UNITS + (
+    "log_change_fraction",
+    "return_fraction_change", "return_percent_change",
+    "basis_points_change", "index_level_change", "rate_fraction_change",
+    "rate_percent_change", "zscore_change", "ratio_change", "count_change",
+)
+
 #: Units that express a period return and can therefore be multiplied by a
 #: dimensionless exposure to obtain a return contribution (§ decomposition).
 RETURN_LIKE_UNITS: Dict[str, float] = {
@@ -129,6 +138,9 @@ def result_unit(transformation: str, source_unit: str,
         if supplied_unit is None:
             raise DefinitionError(
                 "supplied_transformed requires an explicit transformed_unit")
+        if supplied_unit not in TRANSFORMED_UNITS:
+            raise DefinitionError(
+                f"transformed_unit must be one of {list(TRANSFORMED_UNITS)}")
         return supplied_unit
     raise DefinitionError(f"unknown transformation '{transformation}'")
 
@@ -337,7 +349,7 @@ def transform_series(values: Sequence[Optional[float]],
                 continue
             ratio = cur / prev
             if transformation == "log_change":
-                if ratio <= 0.0:
+                if prev <= 0.0 or cur <= 0.0:
                     continue
                 out[t] = math.log(ratio)
             elif transformation == "simple_return":
@@ -410,7 +422,8 @@ def contribution_scale(transformed_unit: str) -> Optional[float]:
 __all__ = [
     "MAX_FACTORS", "MIN_LAG", "MAX_LAG", "MIN_STANDARDISATION_WINDOW",
     "MAX_STANDARDISATION_WINDOW", "FACTOR_CATEGORIES", "TRANSFORMATIONS",
-    "SOURCE_UNITS", "RETURN_LIKE_UNITS", "AVAILABILITY_POLICIES",
+    "SOURCE_UNITS", "TRANSFORMED_UNITS", "RETURN_LIKE_UNITS",
+    "AVAILABILITY_POLICIES",
     "MISSING_POLICIES", "STANDARDISATION_POLICIES", "WINSORISATION_POLICIES",
     "BASIS_POINT_SCALE", "DefinitionError", "result_unit",
     "validate_definition", "validate_definitions", "transform_series",

@@ -20,7 +20,7 @@ any kind — the transformation is chosen from a closed list.
 | `unit` | source unit of the RAW series: `return_fraction`, `return_percent`, `basis_points`, `index_level`, `rate_fraction`, `rate_percent`, `zscore`, `ratio`, `count` |
 | `frequency` | `daily` … `annual`, or `unspecified` |
 | `transformation` | one of the eight below |
-| `transformed_unit` | derived, not overridable (except for `supplied_transformed`, where it must be declared) |
+| `transformed_unit` | derived, not overridable (except for `supplied_transformed`, where it must be declared from the bounded unit vocabulary) |
 | `lag` | integer in `[0, 60]`; **negative lags are rejected** |
 | `availability_policy` | `same_timestamp`, `explicit_available_at`, `lagged_by_periods` |
 | `missing_policy` | `unavailable` only — v1 never forward-fills, interpolates or zero-fills |
@@ -50,7 +50,7 @@ never zero-filled or back-filled.
 
 `s = 10 000` for a `rate_fraction` source and `100` for a `rate_percent`
 source; `basis_point_change` is **rejected** for any other source unit, so
-the conversion is never ambiguous. `simple_return`, `percent_change` and
+the conversion is never ambiguous. `log_change` requires both adjacent levels to be strictly positive. A `supplied_transformed` unit is validated against the same bounded source/change unit vocabulary, so a typo cannot create an apparently valid unit. `simple_return`, `percent_change` and
 `log_change` require an `index_level`, `ratio` or `count` source — a ratio
 of two rates is not a return.
 
@@ -79,15 +79,15 @@ v1 analysis mode. Nothing is clipped silently.
 
 | field | contract |
 | --- | --- |
-| `observation_id` | unique within the factor (auto-generated when omitted) |
+| `observation_id` | unique across the run (auto-generated when omitted) |
 | `source_timestamp` | ISO-8601; **strictly increasing** per factor |
 | `available_at` | when the value could have been known; required when the policy is `explicit_available_at`; must not precede `source_timestamp` |
 | `value` | finite, or `null` for an explicit gap |
 | `vintages` | optional ordered releases, see [`MACRO_SENSITIVITY_AND_VINTAGE_POLICY.md`](MACRO_SENSITIVITY_AND_VINTAGE_POLICY.md) |
 | `quality_state` | `observed`, `revised`, `estimated_by_source`, `unknown` |
-| `metadata` | bounded object |
+| `metadata` | bounded object (at most 20 keys and 2000 rendered characters) |
 
-Duplicate observation ids, duplicate or out-of-order timestamps, non-finite
+ISO timestamps are calendar-validated and canonicalised before ordering and fingerprinting. Duplicate observation ids anywhere in the run, duplicate or out-of-order timestamps, non-finite
 values and an `available_at` earlier than the observation it describes are
 all validation errors.
 
@@ -109,6 +109,8 @@ If the factor has no observation at a target timestamp, the run is
 **refused**: v1 aligns by exact timestamp and never resamples. If the
 offset observation does not exist or its transformed value is unavailable,
 that period leaves the estimation sample with its reason recorded.
+
+Every factor frequency must equal the target return frequency; v1 refuses mixed-frequency regression rather than resampling.
 
 ## 7. Units and contributions
 

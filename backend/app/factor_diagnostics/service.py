@@ -230,6 +230,18 @@ def _validate_policy(raw: Any, *, analysis_mode: str) -> Dict[str, Any]:
         raise FactorError(
             "supplied_exposure_aggregation uses supplied exposures; no "
             "estimator is fitted, so a ridge method cannot apply")
+    if analysis_mode == "supplied_exposure_aggregation":
+        if mt_block is not None:
+            raise FactorError(
+                "multiple-testing correction is unavailable for supplied "
+                "exposures because no coefficient estimator is fitted")
+        if rolling is not None:
+            raise FactorError(
+                "rolling coefficient estimation is unavailable for supplied "
+                "exposures because exposures already vary by period")
+        if estimation_scope != "full_sample_window":
+            raise FactorError(
+                "estimation_scope does not apply to supplied exposures")
 
     return {
         "analysis_mode": analysis_mode,
@@ -449,11 +461,43 @@ def create_run(payload: Dict[str, Any], *,
         raise FactorError("each factor must be an object")
     definitions = defs_mod.validate_definitions(definition_inputs)
     observations: Dict[str, List[Dict[str, Any]]] = {}
+    observation_ids: set[str] = set()
     for definition, raw in zip(definitions, raw_factors):
-        observations[definition["factor_id"]] = obs_mod.validate_observations(
+        if definition["frequency"] != target["frequency"]:
+            raise FactorError(
+                f"factor '{definition['factor_id']}' frequency "
+                f"{definition['frequency']!r} does not match target frequency "
+                f"{target['frequency']!r}; mixed-frequency alignment is not "
+                f"implemented in v1")
+        validated = obs_mod.validate_observations(
             definition, raw.get("observations"))
+        duplicates = sorted(
+            {row["observation_id"] for row in validated} & observation_ids)
+        if duplicates:
+            raise FactorError(
+                f"observation_id values must be unique across the run; "
+                f"duplicates: {duplicates[:5]}")
+        observation_ids.update(row["observation_id"] for row in validated)
+        observations[definition["factor_id"]] = validated
 
     links = _resolve_links(payload, analysis_mode=analysis_mode)
+    links["factor_dataset_identities"] = {
+        d["factor_id"]: _dataset_identity(d.get("dataset_version_id"))
+        for d in definitions if d.get("dataset_version_id") is not None}
+    if analysis_mode == "supplied_exposure_aggregation":
+        if links["ids"]["validation_run_id"] is not None:
+            raise FactorError(
+                "validation linkage is unavailable for supplied exposures "
+                "because no estimator is fitted")
+        if links["ids"]["stress_run_id"] is not None:
+            raise FactorError(
+                "factor stress linkage is unavailable for supplied exposures "
+                "because it requires estimated coefficients")
+        if payload.get("sensitivity"):
+            raise FactorError(
+                "coefficient sensitivity scenarios are unavailable for "
+                "supplied exposures because no estimator is fitted")
+
 
     asset_exposures = None
     if analysis_mode == "supplied_exposure_aggregation":
@@ -465,6 +509,10 @@ def create_run(payload: Dict[str, Any], *,
             "asset_exposures are only used by supplied_exposure_aggregation")
 
     benchmark_comparison = bool(payload.get("benchmark_comparison", False))
+    if benchmark_comparison and analysis_mode == "supplied_exposure_aggregation":
+        raise FactorError(
+            "benchmark coefficient comparison is unavailable for supplied "
+            "exposures because no estimator is fitted")
     if benchmark_comparison and target["source"] != "attribution_run":
         raise FactorError(
             "benchmark comparison reads the benchmark series of the linked "
@@ -483,7 +531,8 @@ def create_run(payload: Dict[str, Any], *,
 
     definition_fingerprints = {
         d["factor_id"]: fp_mod.factor_definition_fingerprint(
-            d, links.get("dataset_identity"))
+            d, (links["factor_dataset_identities"].get(d["factor_id"])
+                or links.get("dataset_identity")))
         for d in definitions}
     target_fp = fp_mod.target_fingerprint(target)
     observation_fp = fp_mod.observation_universe_fingerprint(
@@ -706,6 +755,64 @@ def _fit_design(y: Sequence[float], x: Sequence[Sequence[float]],
                            confidence=policy["confidence_level"])
 
 
+def _supplied_fit(period_rows: Sequence[Dict[str, Any]],
+                  factor_ids: Sequence[str]) -> Dict[str, Any]:
+    """Descriptive fit-shaped block for supplied exposures; no estimator."""
+    available = [row for row in period_rows
+                 if row.get("modelled_return") is not None]
+    measured = [float(row["measured_return"]) for row in available]
+    fitted = [float(row["modelled_return"]) for row in available]
+    residuals = [float(row["residual"]) for row in available]
+    n = len(available)
+    rss = float(sum(value * value for value in residuals))
+    mean = float(sum(measured) / n) if n else 0.0
+    tss = float(sum((value - mean) ** 2 for value in measured))
+    r_squared = (None if tss <= reg_mod.ZERO_VARIANCE_TOLERANCE
+                 else float(1.0 - rss / tss))
+    residual_mean = float(sum(residuals) / n) if n else None
+    residual_std = None
+    if n >= 2 and residual_mean is not None:
+        residual_std = float(math.sqrt(
+            sum((value - residual_mean) ** 2 for value in residuals) / (n - 1)))
+    unavailable = (
+        "period-varying exposures are supplied and stored on each period; "
+        "no constant coefficient is estimated")
+    coefficients = [{
+        "factor_id": factor_id, "coefficient": None,
+        "standard_error": None, "t_statistic": None, "p_value": None,
+        "confidence_lower": None, "confidence_upper": None,
+        "unavailable_reason": unavailable,
+    } for factor_id in factor_ids]
+    return {
+        "method": "supplied_exposure_aggregation",
+        "intercept_policy": "not_applicable",
+        "observations": n, "factors": len(factor_ids), "parameters": 0,
+        "degrees_of_freedom": None, "intercept": None,
+        "coefficients": coefficients, "fitted": fitted,
+        "residuals": residuals, "residual_sum_of_squares": rss,
+        "total_sum_of_squares": tss, "r_squared": r_squared,
+        "adjusted_r_squared": None,
+        "r_squared_note": (
+            "descriptive goodness-of-fit of supplied period exposures; no "
+            "coefficient estimator was fitted"),
+        "root_mean_squared_error": (
+            float(math.sqrt(rss / n)) if n else None),
+        "residual_mean": residual_mean, "residual_std": residual_std,
+        "sigma_squared": None, "rank": None, "expected_rank": None,
+        "rank_status": "not_applicable",
+        "rank_policy": "not_applicable", "standard_error_method": None,
+        "standard_error_assumptions": None,
+        "standard_error_state": "unavailable",
+        "standard_error_note": unavailable, "confidence_level": None,
+        "factor_rank": None, "factor_count": len(factor_ids),
+        "singular_values": [], "condition_number": None,
+        "condition_state": "unavailable",
+        "condition_note": (
+            "conditioning is not an estimator diagnostic in supplied mode"),
+        "constant_columns": [], "duplicate_columns": [],
+    }
+
+
 def _execute_body(run_id: int, run: Dict[str, Any], started: float,
                   create_experiment: bool) -> Dict[str, Any]:
     rebuilt = _rebuild(run)
@@ -797,7 +904,12 @@ def _execute_body(run_id: int, run: Dict[str, Any], started: float,
 
     held_out: Optional[Dict[str, Any]] = None
     membership: Dict[int, str] = {}
-    if validation_block is not None:
+    if policy["analysis_mode"] == "supplied_exposure_aggregation":
+        period_rows, mode_warnings = _supplied_exposure_rows(
+            run, configuration, design_rows, definitions, tolerance)
+        warnings.extend(mode_warnings)
+        fit = _supplied_fit(period_rows, factor_ids)
+    elif validation_block is not None:
         fit, held_out, membership, split_warnings = _fit_with_validation(
             run, design_rows, factor_ids, policy, tolerance)
         warnings.extend(split_warnings)
@@ -823,7 +935,7 @@ def _execute_body(run_id: int, run: Dict[str, Any], started: float,
             f"duplicate factor column(s) detected ({pairs}); the design is "
             f"rank deficient and the coefficients are not separately "
             f"identified")
-    if fit["rank_status"] != "full_rank":
+    if fit["method"] in ("ols", "ridge") and fit["rank_status"] != "full_rank":
         warnings.append(
             f"RANK DEFICIENT design (rank {fit['rank']} of "
             f"{fit['expected_rank']}): the reported coefficients are a "
@@ -831,11 +943,7 @@ def _execute_body(run_id: int, run: Dict[str, Any], started: float,
             f"standard error, t-statistic or p-value is published for them")
 
     # --- step 4: decomposition + reconciliation -------------------------
-    if policy["analysis_mode"] == "supplied_exposure_aggregation":
-        period_rows, mode_warnings = _supplied_exposure_rows(
-            run, configuration, design_rows, definitions, tolerance)
-        warnings.extend(mode_warnings)
-    else:
+    if policy["analysis_mode"] != "supplied_exposure_aggregation":
         period_rows = decomp_mod.regression_period_rows(
             design_rows, fit, factor_ids, tolerance,
             fit_residuals=fit["residuals"])
@@ -849,9 +957,15 @@ def _execute_body(run_id: int, run: Dict[str, Any], started: float,
 
     # --- step 5: design + residual diagnostics --------------------------
     correlation = diag_mod.correlation_matrix(x, factor_ids)
-    vif_rows = diag_mod.variance_inflation(x, factor_ids)
+    vif_rows = ([] if fit["method"] == "supplied_exposure_aggregation"
+                else diag_mod.variance_inflation(x, factor_ids))
+    residual_stamps = (
+        [row["period_start"] for row in period_rows
+         if row.get("residual") is not None]
+        if fit["method"] == "supplied_exposure_aggregation"
+        else [row["period_start"] for row in design_rows])
     residuals_block = diag_mod.residual_diagnostics(
-        fit["residuals"], [r["period_start"] for r in design_rows])
+        fit["residuals"], residual_stamps)
     multicollinearity = {
         "correlation": correlation,
         "vif": vif_rows,
@@ -900,7 +1014,8 @@ def _execute_body(run_id: int, run: Dict[str, Any], started: float,
 
     # --- step 7: benchmark, regime, stress, held-out ---------------------
     exposure_comparison, benchmark_warnings = _benchmark_comparison(
-        run, configuration, design_rows, factor_ids, policy, fit, period_rows)
+        run, configuration, design_rows, factor_ids, policy, fit, period_rows,
+        membership)
     warnings.extend(benchmark_warnings)
 
     regime_rows = _regime_rows(run, configuration, design_rows, period_rows,
@@ -913,7 +1028,7 @@ def _execute_body(run_id: int, run: Dict[str, Any], started: float,
 
     # --- step 8: sensitivity, fingerprints, persistence -------------------
     sensitivity_rows = _sensitivity_rows(configuration, rebuilt, policy,
-                                         tolerance)
+                                         tolerance, membership)
 
     coefficient_rows = _coefficient_rows(fit, definitions, period_rows,
                                          vif_rows, multiple_testing_rows,
@@ -1069,10 +1184,24 @@ def _fit_with_validation(run: Dict[str, Any],
 
     time_by_sample = {s["sample_id"]: s.get("prediction_time")
                       for s in vrun["samples"]}
-    train_times = {time_by_sample.get(sid) for sid in split["train_ids"]}
-    test_times = {time_by_sample.get(sid) for sid in split["test_ids"]}
-    purged_times = {time_by_sample.get(sid) for sid in split["purged_ids"]}
-    embargoed_times = {time_by_sample.get(sid) for sid in split["embargoed_ids"]}
+
+    def sample_times(sample_ids: Sequence[str]) -> set[str]:
+        stamps: set[str] = set()
+        for sample_id in sample_ids:
+            stamp = time_by_sample.get(sample_id)
+            if stamp is None:
+                continue
+            try:
+                stamps.add(obs_mod.normalise_timestamp(
+                    stamp, field="validation prediction_time"))
+            except obs_mod.ObservationError as exc:
+                raise FactorError(str(exc)) from exc
+        return stamps
+
+    train_times = sample_times(split["train_ids"])
+    test_times = sample_times(split["test_ids"])
+    purged_times = sample_times(split["purged_ids"])
+    embargoed_times = sample_times(split["embargoed_ids"])
 
     membership: Dict[int, str] = {}
     train_index: List[int] = []
@@ -1196,7 +1325,12 @@ def _supplied_exposure_rows(run: Dict[str, Any], configuration: Dict[str, Any],
     book = pa_observations.build_observations(prun, rebalances, pa_policy)
     weights_by_stamp: Dict[str, Optional[Dict[str, float]]] = {}
     for period in book["periods"]:
-        stamp = period["period_start"]
+        try:
+            stamp = obs_mod.normalise_timestamp(
+                period["period_start"], field="portfolio period_start")
+        except obs_mod.ObservationError as exc:
+            raise ConflictError(
+                f"the linked portfolio has an invalid timestamp: {exc}") from exc
         rows = period.get("rows") or []
         if not rows or any(r.get("portfolio_beginning_weight") is None
                            for r in rows):
@@ -1303,7 +1437,9 @@ def _coefficient_rows(fit: Dict[str, Any], definitions: List[Dict[str, Any]],
             "factor_id": factor_id,
             "coefficient": _finite_or_none(coefficient["coefficient"]),
             "coefficient_unit": (
-                f"target return per 1 {units.get(factor_id, 'unit')}"),
+                None if exposure_state == "supplied"
+                else f"target return per 1 "
+                     f"{units.get(factor_id, 'unit')}"),
             "exposure_state": exposure_state,
             "standard_error": _finite_or_none(coefficient["standard_error"]),
             "t_statistic": _finite_or_none(coefficient["t_statistic"]),
@@ -1344,7 +1480,7 @@ def _observation_rows(alignment: Dict[str, Any],
                 "effective_timestamp": source["effective_timestamp"],
                 "knowable_at": source["knowable_at"],
                 "release_timestamp": source["release_timestamp"],
-                "raw_value": None,
+                "raw_value": _finite_or_none(source.get("raw_value")),
                 "transformed_value": float(design["factor_values"][index]),
                 "unit": units.get(source["factor_id"], "unknown"),
                 "quality_state": source["quality_state"],
@@ -1357,7 +1493,8 @@ def _benchmark_comparison(run: Dict[str, Any], configuration: Dict[str, Any],
                           design_rows: List[Dict[str, Any]],
                           factor_ids: List[str], policy: Dict[str, Any],
                           fit: Dict[str, Any],
-                          period_rows: List[Dict[str, Any]]
+                          period_rows: List[Dict[str, Any]],
+                          membership: Dict[int, str]
                           ) -> Tuple[List[Dict[str, Any]], List[str]]:
     """Fit the SAME specification to the linked benchmark return series."""
     if not configuration.get("benchmark_comparison"):
@@ -1370,22 +1507,37 @@ def _benchmark_comparison(run: Dict[str, Any], configuration: Dict[str, Any],
             "comparison is available")
         return [], warnings
     periods = attribution_store.list_periods(run["attribution_run_id"])
-    returns_by_stamp = {p["period_start"]: p.get("benchmark_return")
-                        for p in periods}
+    returns_by_stamp: Dict[str, Optional[float]] = {}
+    try:
+        for period in periods:
+            stamp = obs_mod.normalise_timestamp(
+                period["period_start"], field="benchmark period_start")
+            returns_by_stamp[stamp] = period.get("benchmark_return")
+    except obs_mod.ObservationError as exc:
+        warnings.append(
+            f"the linked benchmark has an invalid timestamp; comparison is "
+            f"unavailable: {exc}")
+        return [], warnings
+    fit_rows = [row for row in design_rows
+                if not membership
+                or membership.get(row["period_index"]) == "train"]
+    missing = [row["period_start"] for row in fit_rows
+               if returns_by_stamp.get(row["period_start"]) is None]
+    if missing:
+        warnings.append(
+            f"the benchmark is missing {len(missing)} of the exact "
+            f"{len(fit_rows)} portfolio estimation periods; comparison is "
+            f"withheld rather than fitting a different sample")
+        return [], warnings
     y: List[float] = []
     x: List[List[float]] = []
-    for row in design_rows:
+    for row in fit_rows:
         value = returns_by_stamp.get(row["period_start"])
-        if value is None:
-            continue
         y.append(float(value))
         x.append([float(v) for v in row["factor_values"]])
-    if len(y) != len(design_rows):
-        warnings.append(
-            f"the benchmark series covers {len(y)} of "
-            f"{len(design_rows)} aligned periods; the exposure comparison uses "
-            f"the overlapping periods only")
-    if len(y) <= len(factor_ids) + 1:
+    parameters = len(factor_ids) + (
+        1 if policy["intercept_policy"] == "include" else 0)
+    if len(y) <= parameters:
         warnings.append(
             "too few overlapping benchmark observations to fit the same "
             "specification; the exposure comparison is unavailable")
@@ -1403,7 +1555,7 @@ def _benchmark_comparison(run: Dict[str, Any], configuration: Dict[str, Any],
     portfolio_contributions: Dict[str, Optional[float]] = {}
     benchmark_contributions: Dict[str, Optional[float]] = {}
     for index, factor_id in enumerate(factor_ids):
-        values = [float(row["factor_values"][index]) for row in design_rows]
+        values = [float(row["factor_values"][index]) for row in fit_rows]
         portfolio_contributions[factor_id] = float(
             portfolio_exposures[factor_id] * sum(values))
         benchmark_contributions[factor_id] = float(
@@ -1438,7 +1590,15 @@ def _regime_rows(run: Dict[str, Any], configuration: Dict[str, Any],
     if definition is None:
         warnings.append("the linked regime definition is unavailable")
         return []
-    label_by_stamp = dict(zip(rrun["timestamps"], definition["assignments"]))
+    try:
+        label_by_stamp = {
+            obs_mod.normalise_timestamp(stamp, field="regime timestamp"): label
+            for stamp, label in zip(
+                rrun["timestamps"], definition["assignments"])}
+    except obs_mod.ObservationError as exc:
+        warnings.append(
+            f"the linked regime timestamps are invalid; regime results are unavailable: {exc}")
+        return []
     buckets: Dict[str, List[int]] = {}
     for position, row in enumerate(design_rows):
         label = label_by_stamp.get(row["period_start"])
@@ -1477,6 +1637,13 @@ def _regime_rows(run: Dict[str, Any], configuration: Dict[str, Any],
                                         if all(v is not None for v in values)
                                         else None)
         entry["contributions"] = contributions
+        if policy["analysis_mode"] == "supplied_exposure_aggregation":
+            entry["status"] = "descriptive"
+            entry["reason"] = (
+                "regime sums use the stored period-varying supplied exposures; "
+                "no conditional coefficient estimator is fitted")
+            rows.append(entry)
+            continue
         if rare:
             entry["status"] = "rare"
             entry["reason"] = (
@@ -1610,7 +1777,8 @@ def _attribution_linkage(run: Dict[str, Any], target: Dict[str, Any],
 
 def _sensitivity_rows(configuration: Dict[str, Any], rebuilt: Dict[str, Any],
                       policy: Dict[str, Any],
-                      tolerance: float) -> List[Dict[str, Any]]:
+                      tolerance: float,
+                      membership: Dict[int, str]) -> List[Dict[str, Any]]:
     scenarios = configuration.get("sensitivity") or []
     target = rebuilt["target"]
     definitions = rebuilt["definitions"]
@@ -1631,6 +1799,10 @@ def _sensitivity_rows(configuration: Dict[str, Any], rebuilt: Dict[str, Any],
             scenario_definitions = [
                 {**d, "lag": d["lag"] + int(scenario.get("lag_delta") or 0)}
                 for d in definitions if d["factor_id"] in set(subset)]
+            if any(d["lag"] > defs_mod.MAX_LAG for d in scenario_definitions):
+                raise defs_mod.DefinitionError(
+                    f"sensitivity lag exceeds the supported maximum "
+                    f"of {defs_mod.MAX_LAG}")
             alignment = obs_mod.align(
                 target, scenario_definitions,
                 {k: v for k, v in observations.items() if k in set(subset)},
@@ -1638,6 +1810,10 @@ def _sensitivity_rows(configuration: Dict[str, Any], rebuilt: Dict[str, Any],
                 vintage_policy=policy["vintage_policy"],
                 lead_periods=policy["lead_periods"])
             design_rows = alignment["rows"]
+            if membership:
+                design_rows = [
+                    row for row in design_rows
+                    if membership.get(row["period_index"]) == "train"]
             if scenario.get("lookback"):
                 design_rows = design_rows[-int(scenario["lookback"]):]
             scale = float(scenario.get("factor_scale") or 1.0)
@@ -1671,13 +1847,8 @@ def _sensitivity_rows(configuration: Dict[str, Any], rebuilt: Dict[str, Any],
                 "coefficients": {c["factor_id"]: float(c["coefficient"])
                                  for c in fit["coefficients"]},
             })
-            entry["fingerprint"] = fp_mod.model_policy_fingerprint({
-                **policy,
-                "intercept_policy": (scenario.get("intercept_policy")
-                                     or policy["intercept_policy"]),
-                "ridge_lambda": scenario.get("ridge_lambda"),
-                "rolling": None,
-            })
+            entry["fingerprint"] = fp_mod.sensitivity_result_fingerprint(
+                scenario, design_rows, fit, summary)
         except (reg_mod.RegressionError, obs_mod.ObservationError,
                 decomp_mod.DecompositionError, defs_mod.DefinitionError) as exc:
             entry["status"] = "unavailable"
@@ -1693,6 +1864,8 @@ def _completeness(alignment: Dict[str, Any],
         return "unavailable"
     if alignment["excluded_periods"] or summary["periods_unavailable"]:
         return "partial"
+    if fit["method"] == "supplied_exposure_aggregation":
+        return "complete"
     if fit["rank_status"] != "full_rank":
         return "partial"
     if fit["standard_error_state"] != "available" and fit["method"] == "ols":
