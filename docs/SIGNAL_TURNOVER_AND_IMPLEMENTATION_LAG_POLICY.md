@@ -10,11 +10,16 @@ the spread — a measurement device, not a strategy.
 
 ## 2. One-way turnover
 
-With equal weights `w_t` over bucket members at rebalance `t`:
+Let `w_t` be the combined signed reference weights: +1 allocated equally
+across the top bucket and -1 allocated equally across the bottom bucket
+(gross exposure 2.0). Then:
 
 ```
 one_way_turnover_t = 0.5 · Σ_i |w_t(i) - w_{t-1}(i)|
 ```
+
+Both legs are measured directly. An asymmetric bottom-leg change is not
+approximated by doubling top-leg turnover.
 
 Initial-rebalance policies are explicit:
 
@@ -59,15 +64,17 @@ Only notional-proportional components are computable in this lab:
 Impact models and monetary-per-unit models are **unavailable with
 reasons** — mapping them onto a unitless reference book would require
 inventing volumes. With computable per-side bps `c` and one-way turnover
-`τ` on reference notional `N` (validated to [1e3, 1e9], both legs
-trade):
+`τ` on the combined signed gross-2 book and reference notional `N`
+(validated to [1e3, 1e9]):
 
 ```
-per_rebalance_cost = (c / 1e4) · 2 · (2 · τ · N)
+total_traded_notional = 2 · τ · N
+per_rebalance_cost = (c / 1e4) · total_traded_notional
 ```
 
-The cost-adjusted spread is the gross top-minus-bottom spread minus the
-**mean** per-rebalance reference cost return. Holding periods and
+The cost-adjusted spread is reported only for the first configured horizon
+and lag used to construct the turnover timeline: gross top-minus-bottom
+spread minus the **mean** per-rebalance reference cost return. Holding periods and
 rebalance intervals are different time bases; the mismatch is disclosed
 rather than rescaled. Gross and cost-adjusted values are always separate
 columns, and missing cost inputs stay unavailable — never zero.

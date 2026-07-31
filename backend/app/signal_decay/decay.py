@@ -114,6 +114,7 @@ def _exponential_fit(series: List[Dict[str, Any]]) -> Dict[str, Any]:
     out: Dict[str, Any] = {
         "state": "unavailable", "reason": None,
         "log_slope": None, "log_intercept": None, "half_life": None,
+        "r_squared": None, "fitted": [], "residuals": [],
         "half_life_unit": "horizon units",
         "convention": ("OLS on ln|stat_h| against h; half_life = -ln(2)/b "
                        "only when the fitted slope b is negative and finite; "
@@ -142,8 +143,23 @@ def _exponential_fit(series: List[Dict[str, Any]]) -> Dict[str, Any]:
     if not (math.isfinite(intercept) and math.isfinite(slope)):
         out["reason"] = "the fitted coefficients are not finite"
         return out
-    out.update({"state": "available", "log_intercept": intercept,
-                "log_slope": slope})
+    fitted_log = design @ coef
+    residuals = y - fitted_log
+    ss_residual = float(np.sum(residuals ** 2))
+    ss_total = float(np.sum((y - np.mean(y)) ** 2))
+    r_squared = (None if ss_total == 0.0 else
+                 float(1.0 - ss_residual / ss_total))
+    out.update({
+        "state": "available", "log_intercept": intercept,
+        "log_slope": slope, "r_squared": r_squared,
+        "fitted": [
+            {"horizon": row["horizon"],
+             "fitted_absolute_statistic": float(math.exp(predicted))}
+            for row, predicted in zip(series, fitted_log)],
+        "residuals": [
+            {"horizon": row["horizon"], "log_residual": float(residual)}
+            for row, residual in zip(series, residuals)],
+    })
     if slope < 0:
         out["half_life"] = float(-math.log(2.0) / slope)
     else:

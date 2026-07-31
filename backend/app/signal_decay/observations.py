@@ -37,14 +37,15 @@ intervals overlapping at least one other, overlap ratio, the maximum number
 of simultaneously open intervals, and a documented descriptive
 approximation ``ceil(n / k)`` of the non-overlapping sample count.  The
 deterministic non-overlap policy is: walk each entity's usable pairs in
-time order, keep the earliest, then keep the next pair whose entry index is
-at or after the previously kept pair's exit index.
+time order, keep the earliest, then keep the next pair whose entry timestamp is
+at or after the previously kept pair's exit timestamp.
 """
 
 from __future__ import annotations
 
 import math
 import re
+from datetime import date, datetime, timezone
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from app.signal_decay.definitions import DefinitionError
@@ -95,7 +96,18 @@ def normalise_timestamp(value: Any, *, field: str) -> str:
     if not isinstance(value, str) or not _TS_PATTERN.match(value):
         raise ObservationError(
             f"{field} must be an ISO-8601 timestamp (YYYY-MM-DD[THH:MM[:SS]])")
-    return value.replace(" ", "T")
+    normalised = value.replace(" ", "T")
+    try:
+        if "T" not in normalised:
+            return date.fromisoformat(normalised).isoformat()
+        parsed = datetime.fromisoformat(normalised.replace("Z", "+00:00"))
+    except ValueError as exc:
+        raise ObservationError(f"{field} is not a valid calendar timestamp") from exc
+    if parsed.tzinfo is not None:
+        parsed = parsed.astimezone(timezone.utc)
+    rendered = parsed.isoformat(timespec="microseconds")
+    rendered = rendered.replace("+00:00", "Z")
+    return rendered.replace(".000000", "")
 
 
 # ---------------------------------------------------------------------------
@@ -273,6 +285,10 @@ def validate_supplied_outcomes(raw: Any) -> List[Dict[str, Any]]:
         available_at = item.get("available_at")
         available_at = (normalise_timestamp(available_at, field="available_at")
                         if available_at is not None else end)
+        if available_at < end:
+            raise ObservationError(
+                f"outcome available_at cannot precede period_end "
+                f"({entity_id} @ {signal_stamp})")
         value = item.get("value")
         if value is not None and not _finite(value):
             raise ObservationError("outcome value must be finite or null")
@@ -540,18 +556,19 @@ def _overlap_from_intervals(pairs: List[Dict[str, Any]],
     for intervals in by_entity.values():
         intervals.sort()
         total += len(intervals)
+        # Adjacent-only comparisons miss later intervals nested inside a long
+        # interval.  Track the furthest prior exit and the next sorted start
+        # so every participant in a half-open overlap is counted once.
+        latest_prior_end = None
         for position, (start, end) in enumerate(intervals):
-            hit = False
-            if position > 0:
-                prev_start, prev_end = intervals[position - 1]
-                if prev_start < end and start < prev_end:
-                    hit = True
-            if position + 1 < len(intervals):
-                next_start, next_end = intervals[position + 1]
-                if start < next_end and next_start < end:
-                    hit = True
-            if hit:
+            overlaps_prior = (latest_prior_end is not None
+                              and start < latest_prior_end)
+            overlaps_later = (position + 1 < len(intervals)
+                              and intervals[position + 1][0] < end)
+            if overlaps_prior or overlaps_later:
                 overlapping += 1
+            if latest_prior_end is None or end > latest_prior_end:
+                latest_prior_end = end
         events: List[Tuple[Any, int]] = []
         for start, end in intervals:
             events.append((start, 1))
@@ -581,20 +598,25 @@ def select_non_overlapping(pairs: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     """Deterministic non-overlap selection (documented policy).
 
     Per entity, in time order: keep the earliest usable pair, then keep the
-    next pair whose entry index is at or after the previously kept pair's
-    exit index.  No randomisation, no score-based choice.
+    next pair whose entry timestamp is at or after the previously kept pair's
+    exit timestamp.  Timestamp intervals are required here because supplied
+    outcomes need not lie on the signal observation grid.  Ties break on the
+    source observation id.  No randomisation, no score-based choice.
     """
     by_entity: Dict[str, List[Dict[str, Any]]] = {}
     for pair in pairs:
         by_entity.setdefault(pair["entity_id"], []).append(pair)
     selected: List[Dict[str, Any]] = []
     for entity_id in sorted(by_entity):
-        rows = sorted(by_entity[entity_id], key=lambda p: p["entry_index"])
-        last_exit: Optional[int] = None
+        rows = sorted(by_entity[entity_id],
+                      key=lambda p: (p["entry_timestamp"],
+                                     p["exit_timestamp"],
+                                     p["observation_id"]))
+        last_exit: Optional[str] = None
         for row in rows:
-            if last_exit is None or row["entry_index"] >= last_exit:
+            if last_exit is None or row["entry_timestamp"] >= last_exit:
                 selected.append(row)
-                last_exit = row["exit_index"]
+                last_exit = row["exit_timestamp"]
     return selected
 
 

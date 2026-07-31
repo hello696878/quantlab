@@ -10,7 +10,8 @@ assumed silently.
 Each signal definition declares exactly one availability policy:
 
 * **`explicit_available_at`** — every observation carries its own
-  `available_at` timestamp, stating when the value was knowable. This is
+  `available_at` timestamp, stating when the value was knowable. ISO-8601
+  offsets are normalised to UTC before ordering. This is
   the strongest declaration and the only one eligible for
   `verified_point_in_time`.
 * **`same_timestamp`** — availability is *assumed* to equal each
@@ -86,3 +87,10 @@ Supplied outcomes are accepted verbatim as descriptive data: horizons are
 the single literal `"supplied"`, only lag 0 is allowed, and integrity is
 capped at `supplied_descriptive` because the lab cannot verify how they
 were computed.
+
+## 6. Supplied-outcome availability
+
+A supplied outcome cannot be available before its own `period_end`; missing
+`available_at` defaults explicitly to `period_end`. This prevents a completed
+outcome from being treated as knowable while its measurement interval is still
+open.

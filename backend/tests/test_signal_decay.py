@@ -167,6 +167,23 @@ def test_explicit_availability_is_required_and_never_fabricated():
     assert "never fabricated" in str(excinfo.value)
 
 
+def test_timestamps_are_calendar_valid_and_timezone_normalised():
+    normalised = obs_mod.normalise_timestamp(
+        "2024-01-02T08:00:00+08:00", field="timestamp")
+    assert normalised == "2024-01-02T00:00:00Z"
+    with pytest.raises(obs_mod.ObservationError):
+        obs_mod.normalise_timestamp("2024-02-30", field="timestamp")
+
+
+def test_supplied_outcome_cannot_be_available_before_period_end():
+    with pytest.raises(obs_mod.ObservationError, match="cannot precede"):
+        obs_mod.validate_supplied_outcomes([{
+            "entity_id": "a", "signal_timestamp": "2024-01-01",
+            "period_start": "2024-01-02", "period_end": "2024-01-05",
+            "available_at": "2024-01-04", "value": 0.1,
+        }])
+
+
 def test_horizons_reject_clock_units_negative_lags_and_duplicates():
     with pytest.raises(obs_mod.ObservationError) as excinfo:
         obs_mod.validate_horizons({"horizons": [1], "unit": "days"},
@@ -251,6 +268,21 @@ def test_outcome_before_availability_marks_the_run_invalid():
         service.mark_baseline(executed["id"])
 
 
+def test_run_window_uses_global_timestamp_bounds_across_entities():
+    older = [f"2020-01-0{i}" for i in range(1, 5)]
+    newer = [f"2025-01-0{i}" for i in range(1, 5)]
+    payload = _payload(n=4)
+    payload["observations"] = (
+        demo_mod._signal_rows(newer, [1.0, 2.0, 3.0, 4.0], entity_id="a")
+        + demo_mod._signal_rows(older, [1.0, 2.0, 3.0, 4.0], entity_id="b"))
+    payload["prices"] = (
+        demo_mod._prices_from_returns(newer, [0.01] * 3, entity_id="a")
+        + demo_mod._prices_from_returns(older, [0.01] * 3, entity_id="b"))
+    created = service.create_run(payload)
+    assert created["observation_start"] == older[0]
+    assert created["observation_end"] == newer[-1]
+
+
 def test_future_outlier_cannot_change_earlier_pairs():
     clean = _run(name="clean", n=20)
     payload = _payload(name="shocked", n=20)
@@ -322,6 +354,25 @@ def test_cross_sectional_ranks_use_only_the_contemporaneous_universe():
         assert sorted(ranks) == [1.0, 2.0, 3.0, 4.0]
 
 
+def test_rank_transformation_keeps_missing_signal_unavailable():
+    definition = defs_mod.validate_signal_definition({
+        "signal_id": "ranked", "signal_type": "continuous_score",
+        "unit": "score", "direction": "higher_is_higher_score",
+        "availability_policy": "same_timestamp",
+        "transformation": "rank_full_sample",
+    })
+    rows = obs_mod.validate_signal_observations(definition, [
+        {"entity_id": "a", "source_timestamp": "2024-01-01", "value": 1.0},
+        {"entity_id": "a", "source_timestamp": "2024-01-02", "value": None},
+        {"entity_id": "a", "source_timestamp": "2024-01-03", "value": 3.0},
+        {"entity_id": "a", "source_timestamp": "2024-01-04", "value": 4.0},
+    ])
+    service._apply_transformation(definition, rows)
+    scores = service._scores_for(rows, definition)
+    assert rows[1]["rank_value"] is None
+    assert ("a", "2024-01-02") not in scores
+
+
 def test_full_sample_ranking_forces_a_descriptive_state():
     payload = _payload()
     payload["signal"]["transformation"] = "rank_full_sample"
@@ -351,6 +402,23 @@ def test_overlap_detection_and_deterministic_selection():
         overlapping["observations"] / 4)
 
 
+def test_nested_intervals_and_supplied_timestamps_are_handled_exactly():
+    pairs = [
+        {"observation_id": "long", "entity_id": "a",
+         "entry_timestamp": "2024-01-01", "exit_timestamp": "2024-01-10"},
+        {"observation_id": "inner-1", "entity_id": "a",
+         "entry_timestamp": "2024-01-02", "exit_timestamp": "2024-01-03"},
+        {"observation_id": "inner-2", "entity_id": "a",
+         "entry_timestamp": "2024-01-04", "exit_timestamp": "2024-01-05"},
+        {"observation_id": "later", "entity_id": "a",
+         "entry_timestamp": "2024-01-10", "exit_timestamp": "2024-01-12"},
+    ]
+    overlap = obs_mod._overlap_from_intervals(pairs, by_stamp=True)
+    assert overlap["overlapping_interval_count"] == 3
+    assert [row["observation_id"] for row in
+            obs_mod.select_non_overlapping(pairs)] == ["long", "later"]
+
+
 def test_back_to_back_intervals_do_not_overlap():
     pairs = [{"entity_id": "a", "entry_index": 0, "exit_index": 2,
               "entry_timestamp": "t0", "exit_timestamp": "t2"},
@@ -378,8 +446,19 @@ def test_correlations_are_real_scipy_values():
     kendall = stats_mod.correlation(x, y, method="kendall",
                                     minimum_observations=4,
                                     overlapping=False)
+    expected_kendall = scipy_stats.kendalltau(x, y, variant="b")
     assert kendall["statistic"] == pytest.approx(
-        float(scipy_stats.kendalltau(x, y).statistic))
+        float(expected_kendall.statistic))
+    assert kendall["p_value"] == pytest.approx(float(expected_kendall.pvalue))
+
+    tie_x = [1.0, 1.0, 2.0, 3.0, 3.0, 4.0]
+    tie_y = [1.0, 2.0, 2.0, 3.0, 4.0, 4.0]
+    tied = stats_mod.correlation(tie_x, tie_y, method="kendall",
+                                 minimum_observations=4,
+                                 overlapping=False)
+    expected_tied = scipy_stats.kendalltau(tie_x, tie_y, variant="b")
+    assert tied["statistic"] == pytest.approx(float(expected_tied.statistic))
+    assert tied["p_value"] == pytest.approx(float(expected_tied.pvalue))
 
 
 def test_constant_series_and_small_samples_are_unavailable():
@@ -416,6 +495,14 @@ def test_signal_autocorrelation_is_distinct_from_prediction():
                                              1.0, 2.0], max_lag=2)
     assert rows[0]["autocorrelation"] == pytest.approx(-1.0)
     assert rows[1]["autocorrelation"] == pytest.approx(1.0)
+
+
+def test_signal_autocorrelation_preserves_gaps_and_entity_boundaries():
+    rows = stats_mod.signal_autocorrelation(
+        [1.0, None, 3.0, 10.0, 20.0, 10.0, 20.0], max_lag=1,
+        entity_ids=["a", "a", "a", "b", "b", "b", "b"])
+    assert rows[0]["observations"] == 3
+    assert rows[0]["autocorrelation"] == pytest.approx(-1.0)
 
 
 # ---------------------------------------------------------------------------
@@ -498,6 +585,10 @@ def test_half_life_requires_a_coherent_exponential_fit():
     fit = summary["exponential_fit"]
     assert fit["state"] == "available"
     assert fit["half_life"] == pytest.approx(math.log(2) / 0.3, rel=1e-6)
+    assert fit["r_squared"] == pytest.approx(1.0)
+    assert len(fit["fitted"]) == len(clean)
+    assert all(abs(row["log_residual"]) < 1e-12
+               for row in fit["residuals"])
 
     mixed = [{"horizon": 1, "spearman": 0.5},
              {"horizon": 2, "spearman": -0.3},
@@ -569,7 +660,9 @@ def test_membership_timeline_jaccard_and_holding_duration():
     rows = timeline["rows"]
     assert rows[0]["one_way_turnover"] is None
     assert rows[1]["one_way_turnover"] == pytest.approx(0.0)
-    assert rows[2]["one_way_turnover"] == pytest.approx(1.0)
+    # Combined gross-2 signed book: a moves +1 -> -0.5 and b -0.5 -> +1.
+    assert rows[2]["one_way_turnover"] == pytest.approx(1.5)
+    assert "gross exposure 2.0" in timeline["summary"]["turnover_convention"]
     assert rows[1]["jaccard_top"] == pytest.approx(1.0)
     assert rows[2]["jaccard_top"] == pytest.approx(0.0)
     assert timeline["summary"]["average_holding_duration"] == pytest.approx(2.0)
@@ -623,6 +716,20 @@ def test_moving_block_bootstrap_needs_an_explicit_block_length():
     assert result["block_length"] == 5
 
 
+def test_moving_block_bootstrap_refuses_cross_entity_blocks():
+    pairs = [
+        {"entity_id": entity, "signal_timestamp": demo_mod._stamps(8)[i],
+         "signal_value": float(i), "outcome_value": float(i) + 0.1}
+        for entity in ("a", "b") for i in range(8)]
+    config = boot_mod.validate_bootstrap_config({
+        "method": "moving_block", "seed": 3, "resamples": 50,
+        "block_length": 3, "statistic": "pearson",
+    })
+    result = boot_mod.run_bootstrap(pairs, config, bucket_count=3)
+    assert result["state"] == "unavailable"
+    assert "entity boundaries" in result["reason"]
+
+
 # ---------------------------------------------------------------------------
 # Cost mapping
 # ---------------------------------------------------------------------------
@@ -641,8 +748,8 @@ def test_cost_mapping_computes_bps_components_and_refuses_the_rest():
     assert "impact" in estimate["unavailable_components"]
     assert estimate["completeness"] == "partial"
     costed = estimate["rows"][1]
-    per_side = 2.0 * 0.5 * 100000.0
-    assert costed["cost"] == pytest.approx(4.0 / 1e4 * 2.0 * per_side)
+    assert costed["traded_notional_total"] == pytest.approx(100000.0)
+    assert costed["cost"] == pytest.approx(4.0 / 1e4 * 100000.0)
     assert estimate["rows"][0]["state"] == "unavailable"
 
 
@@ -677,6 +784,24 @@ def test_fingerprints_are_stable_and_move_on_material_change():
     created = service.create_run(policy_changed)
     fourth = service.execute_run(created["id"])
     assert fourth["horizon_fingerprint"] != first["horizon_fingerprint"]
+
+
+def test_result_fingerprint_includes_turnover_and_cost_timelines():
+    def fingerprint(turnover_rows, cost_rows):
+        return fp_mod.result_fingerprint(
+            horizon_rows=[], bucket_rows=[],
+            turnover={"summary": {"mean": 0.5}, "rows": turnover_rows},
+            overlap=[], cost={"total_cost": 1.0, "rows": cost_rows},
+            regimes=[], held_out=None, bootstrap_rows=[], decay=[], warnings=[],
+            integrity_status="verified_point_in_time",
+            completeness_status="complete", overlap_status="non_overlapping")
+
+    first = fingerprint([{"timestamp": "t", "turnover": 0.5}],
+                        [{"timestamp": "t", "cost": 1.0}])
+    assert first != fingerprint([{"timestamp": "t", "turnover": 0.6}],
+                                [{"timestamp": "t", "cost": 1.0}])
+    assert first != fingerprint([{"timestamp": "t", "turnover": 0.5}],
+                                [{"timestamp": "t", "cost": 2.0}])
 
 
 def test_fingerprints_reject_non_finite_values():
@@ -717,6 +842,19 @@ def test_failed_execution_clears_stale_results():
         service.execute_run(executed["id"])
     assert store.get_run(executed["id"])["status"] == "failed"
     assert store.list_horizons(executed["id"]) == []
+
+
+def test_unexpected_execution_error_is_sanitised_for_callers(monkeypatch):
+    created = service.create_run(_payload(name="internal failure"))
+
+    def fail(*_args, **_kwargs):
+        raise RuntimeError("sensitive internal detail")
+
+    monkeypatch.setattr(service, "_execute_body", fail)
+    with pytest.raises(service.InternalExecutionError) as excinfo:
+        service.execute_run(created["id"])
+    assert "sensitive internal detail" not in str(excinfo.value)
+    assert store.get_run(created["id"])["status"] == "failed"
 
 
 def test_baseline_requires_verified_integrity_and_is_transactional():
@@ -776,6 +914,95 @@ def test_export_is_free_of_paths_and_credentials():
         assert banned not in text
     assert payload["schema_version"] == "signal_decay_export_v1"
     assert "proves" in payload["disclaimer"]
+
+    def keys(value):
+        if isinstance(value, dict):
+            nested = [keys(v) for v in value.values()]
+            return set(value) | set().union(*nested, set())
+        if isinstance(value, list):
+            return set().union(*(keys(v) for v in value), set())
+        return set()
+
+    database_ids = {
+        "id", "run_id", "dataset_version_id", "feature_run_id",
+        "meta_label_run_id", "validation_run_id", "regime_run_id",
+        "cost_diagnostic_run_id", "factor_run_id", "experiment_id",
+    }
+    assert not (keys(payload["runs"]) & database_ids)
+
+
+def test_validation_membership_requires_unambiguous_sample_identity(monkeypatch):
+    validation_run = {"samples": [
+        {"sample_id": "train-a", "prediction_time": "2024-01-01"},
+        {"sample_id": "test-a", "prediction_time": "2024-01-01"},
+    ]}
+    split = {"split_label": "fold", "split_fingerprint": "f" * 64,
+             "train_ids": ["train-a"], "test_ids": ["test-a"],
+             "purged_ids": [], "embargoed_ids": []}
+    monkeypatch.setattr(service.validation_store, "get_run",
+                        lambda _run_id: validation_run)
+    monkeypatch.setattr(service.validation_store, "list_splits",
+                        lambda _run_id: [split])
+    identity = {"split_label": "fold", "split_fingerprint": "f" * 64}
+    observations = [{"entity_id": "a", "source_timestamp": "2024-01-01",
+                     "universe_membership_id": None}]
+    with pytest.raises(service.ConflictError, match="ambiguous"):
+        service._validation_membership(
+            {"validation_run_id": 1}, identity, observations)
+
+    observations = [
+        {"entity_id": "a", "source_timestamp": "2024-01-01",
+         "universe_membership_id": "train-a"},
+        {"entity_id": "b", "source_timestamp": "2024-01-01",
+         "universe_membership_id": "test-a"},
+    ]
+    membership = service._validation_membership(
+        {"validation_run_id": 1}, identity, observations)
+    assert membership["train"] == {("a", "2024-01-01")}
+    assert membership["test"] == {("b", "2024-01-01")}
+
+
+def test_held_out_global_buckets_are_not_refit_when_training_is_too_small():
+    pairs = []
+    scores = {}
+    for index in range(6):
+        stamp = f"2024-01-0{index + 1}"
+        entity = f"e{index}"
+        scores[(entity, stamp)] = float(index)
+        pairs.append({
+            "observation_id": f"o{index}", "entity_id": entity,
+            "signal_timestamp": stamp, "entry_timestamp": stamp,
+            "exit_timestamp": f"2024-01-0{index + 2}",
+            "outcome_value": float(index) / 100.0,
+        })
+    membership = {
+        "train": {(p["entity_id"], p["signal_timestamp"])
+                  for p in pairs[:2]},
+        "test": {(p["entity_id"], p["signal_timestamp"])
+                 for p in pairs[2:]},
+        "purged": set(), "embargoed": set(),
+    }
+    warnings = []
+    held_out = service._held_out_block(
+        {}, {"validation_identity": {"split_label": "s",
+                                     "leakage_clean": True}},
+        membership, {(1, 0): {"built": {"pairs": pairs}}}, scores,
+        service._validate_analysis_policy(None),
+        bucket_mod.validate_bucket_config({"bucket_count": 3}),
+        {"horizons": [1], "entry_lags": [0], "minimum_observations": 4},
+        warnings)
+    assert held_out["frozen_bucket_thresholds"] is None
+    assert held_out["held_out_buckets_available"] is False
+    assert held_out["held_out"]["top_minus_bottom"] is None
+    assert any("not re-fit" in warning for warning in warnings)
+
+
+def test_conflicting_embedded_link_identity_is_rejected_before_lookup():
+    payload = _payload()
+    payload["feature_run_id"] = 1
+    payload["signal"]["feature_run_id"] = 2
+    with pytest.raises(service.SignalDecayError, match="conflicting"):
+        service.create_run(payload)
 
 
 # ---------------------------------------------------------------------------

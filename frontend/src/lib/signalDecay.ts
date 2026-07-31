@@ -58,6 +58,9 @@ export interface DecayBlock {
     log_slope: number | null;
     log_intercept: number | null;
     half_life: number | null;
+    r_squared: number | null;
+    fitted: { horizon: number; fitted_absolute_statistic: number }[];
+    residuals: { horizon: number; log_residual: number }[];
     half_life_unit: string;
     convention: string;
   };
@@ -81,6 +84,7 @@ export interface TurnoverSummary {
   average_holding_duration: number | null;
   holding_duration_unit: string;
   initial_policy: string;
+  turnover_convention: string;
   initial_policy_note: string;
 }
 
@@ -129,6 +133,7 @@ export interface HeldOutBlock {
   held_out: Record<string, unknown>;
   full_sample: Record<string, unknown>;
   frozen_bucket_thresholds: number[] | null;
+  held_out_buckets_available: boolean;
   note: string;
 }
 

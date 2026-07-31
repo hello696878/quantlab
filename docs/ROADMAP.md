@@ -1768,12 +1768,16 @@ single-asset Backtest + Strategy Comparison:
   Decay Lab** view (decay curve + SVG chart, buckets, turnover/holding
   overlap, cost, regimes, held-out, factor-residual, bootstrap,
   multiple-testing, observations with "(assumed)" markers, six-fingerprint
-  policy panel), 60 backend tests and a 26-test Playwright spec. Docs:
+  policy panel), 72 backend tests and a 26-test Playwright spec. Docs:
   `SIGNAL_DECAY_DIAGNOSTICS_LAB.md`, `SIGNAL_AND_OUTCOME_TIMING_POLICY.md`,
   `FORECAST_HORIZON_AND_OVERLAP_POLICY.md`,
   `SIGNAL_BUCKET_AND_IC_POLICY.md`,
   `SIGNAL_TURNOVER_AND_IMPLEMENTATION_LAG_POLICY.md`,
-  `SIGNAL_DECAY_RUNBOOK.md`. **Descriptive associations under stated
+  `SIGNAL_DECAY_RUNBOOK.md`. Review hardening covers canonical timestamps,
+  nested/supplied interval overlap, exact split membership, frozen held-out
+  thresholds, combined gross-2 turnover/cost mapping, fit residual evidence,
+  entity-safe bootstrap, complete result fingerprints and export privacy.
+  **Descriptive associations under stated
   timing, horizon and overlap policies — no predictability proof, no
   validated alpha, no signal/horizon/lag/threshold recommendation, no
   position sizing, no live monitoring, no execution, no persistence

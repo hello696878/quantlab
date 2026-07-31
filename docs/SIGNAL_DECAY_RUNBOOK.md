@@ -101,3 +101,10 @@ not pick the largest-|statistic| horizon and call it best, do not treat
 the equal-weight reference as a strategy, do not compare gross numbers
 with costed numbers as if they were the same series, and do not use the
 effective non-overlapping count as a sample size for inference.
+
+## 10. Bootstrap boundary choice
+
+`moving_block` bootstrap is available only for a single entity, where one
+chronological order is well defined. Multi-entity panels must use timestamp
+bootstrap to resample whole cross-sections; the lab refuses to create blocks
+across entity boundaries.

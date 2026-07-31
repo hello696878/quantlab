@@ -111,10 +111,9 @@ def cost_estimate(model: Dict[str, Any], *,
                   reference_notional: float) -> Dict[str, Any]:
     """Per-rebalance and total descriptive cost estimate.
 
-    One-way turnover τ means the reference sells τ·N and buys τ·N — each
-    side trades notional τ·N, so a per-side rate applies to 2·τ·N in total.
-    The long AND short legs of the spread reference each rebalance, so the
-    traded notional doubles again (gross 2.0): traded_per_side = 2·τ·N.
+    Turnover τ is already measured from the signed gross-2 reference weights
+    (long top, short bottom): τ = 0.5 * sum(abs(delta weight)).  Total traded
+    notional is therefore 2·τ·N.  The two legs are not multiplied again.
     """
     components = [_component_bps(model, c) for c in COST_COMPONENTS]
     computable = [c for c in components if c["state"] == "available"]
@@ -131,6 +130,7 @@ def cost_estimate(model: Dict[str, Any], *,
             "timestamp": row["timestamp"],
             "one_way_turnover": turnover,
             "traded_notional_per_side": None,
+            "traded_notional_total": None,
             "cost": None, "cost_return": None, "state": "unavailable",
             "reason": None,
         }
@@ -139,10 +139,12 @@ def cost_estimate(model: Dict[str, Any], *,
                                "(no prior book), so its cost is unavailable")
             skipped += 1
         else:
-            per_side = 2.0 * float(turnover) * reference_notional
-            cost = per_side_bps / 1e4 * 2.0 * per_side
+            traded_total = 2.0 * float(turnover) * reference_notional
+            per_side = traded_total / 2.0
+            cost = per_side_bps / 1e4 * traded_total
             entry.update({
                 "traded_notional_per_side": per_side,
+                "traded_notional_total": traded_total,
                 "cost": cost,
                 "cost_return": cost / reference_notional,
                 "state": ("available" if not unavailable
@@ -168,9 +170,10 @@ def cost_estimate(model: Dict[str, Any], *,
         "skipped_rebalances": skipped,
         "completeness": completeness,
         "convention": (
-            "one-way turnover τ trades τ·N per side per leg; the long and "
-            "short legs each trade, so per-side traded notional is 2·τ·N and "
-            "a per-side rate applies twice (entry and exit sides). Computed "
+            "one-way turnover τ is computed from signed gross-2 reference "
+            "weights; total traded notional is 2·τ·N and per-side traded "
+            "notional is τ·N. The long and short legs are already included "
+            "in τ and are not doubled again. Computed "
             "components are the notional-proportional ones only; everything "
             "else is unavailable with its reason. Gross results never "
             "include costs; cost-adjusted results are shown separately."),

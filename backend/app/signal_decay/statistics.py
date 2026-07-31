@@ -98,7 +98,7 @@ def correlation(signal: Sequence[Optional[float]],
     elif method == "spearman":
         result = sp_stats.spearmanr(x, y)
     else:
-        result = sp_stats.kendalltau(x, y)
+        result = sp_stats.kendalltau(x, y, variant="b")
     statistic = float(result.statistic)
     p_value = float(result.pvalue)
     if not math.isfinite(statistic):
@@ -223,26 +223,47 @@ def _aggregate_ic(spearman_values: List[float], pearson_values: List[float],
 # ---------------------------------------------------------------------------
 
 def signal_autocorrelation(values: Sequence[Optional[float]],
-                           *, max_lag: int = 5) -> List[Dict[str, Any]]:
+                           *, max_lag: int = 5,
+                           entity_ids: Optional[Sequence[str]] = None
+                           ) -> List[Dict[str, Any]]:
     """Trailing-lag autocorrelation of the SIGNAL itself.
 
-    Signal persistence (a signal correlated with its own past) is a
-    different thing from predictive association with outcomes, and the two
-    are reported in separate blocks so they cannot be conflated.
+    Missing values preserve their grid position, and optional entity ids keep
+    lag pairs within an entity.  This prevents a null observation from
+    collapsing time or the end of one entity from pairing with the start of
+    another.  Signal persistence remains distinct from outcome association.
     """
-    series = [v for v in values if v is not None]
-    array = np.asarray(series, dtype=np.float64)
+    if entity_ids is not None and len(entity_ids) != len(values):
+        raise StatisticsError(
+            "entity_ids must have the same length as signal values")
+    groups: Dict[str, List[Optional[float]]] = {}
+    if entity_ids is None:
+        groups["aggregate"] = list(values)
+    else:
+        for entity_id, value in zip(entity_ids, values):
+            groups.setdefault(str(entity_id), []).append(value)
+
     rows: List[Dict[str, Any]] = []
     for lag in range(1, max_lag + 1):
+        current: List[float] = []
+        previous: List[float] = []
+        for series in groups.values():
+            for index in range(lag, len(series)):
+                now = series[index]
+                before = series[index - lag]
+                if now is None or before is None:
+                    continue
+                current.append(float(now))
+                previous.append(float(before))
+        a = np.asarray(current, dtype=np.float64)
+        b = np.asarray(previous, dtype=np.float64)
         entry: Dict[str, Any] = {"lag": lag, "autocorrelation": None,
-                                 "observations": max(0, array.size - lag),
+                                 "observations": int(a.size),
                                  "reason": None}
-        if array.size - lag < 3:
-            entry["reason"] = "fewer than 3 overlapping observations"
+        if a.size < 3:
+            entry["reason"] = "fewer than 3 valid within-entity lag pairs"
             rows.append(entry)
             continue
-        a = array[lag:]
-        b = array[:-lag]
         if np.unique(a).size < 2 or np.unique(b).size < 2:
             entry["reason"] = "constant series"
             rows.append(entry)
@@ -251,7 +272,6 @@ def signal_autocorrelation(values: Sequence[Optional[float]],
         entry["autocorrelation"] = value if math.isfinite(value) else None
         rows.append(entry)
     return rows
-
 
 def sign_agreement(signal: Sequence[Optional[float]],
                    outcome: Sequence[Optional[float]]) -> Dict[str, Any]:

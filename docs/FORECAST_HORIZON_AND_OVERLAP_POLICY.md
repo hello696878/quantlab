@@ -47,9 +47,11 @@ to an unknown degree. The lab's response is disclosure, not adjustment:
 
 When a run requests `overlap_policy: "non_overlapping"`, the lab
 additionally evaluates a deterministically selected subset: keep the
-earliest pair, then repeatedly keep the next pair whose entry index is at
-or after the previous kept pair's exit index (per entity, ties broken by
-entity id then timestamp). Both the full overlapping rows and the
+earliest pair, then repeatedly keep the next pair whose entry timestamp is
+at or after the previous kept pair's exit timestamp (per entity, ties broken
+by entry, exit and source observation id). This timestamp rule also covers
+supplied intervals that are not on a synthetic signal grid. Both the full
+overlapping rows and the
 selected rows are stored side by side — selection is a documented rule,
 never a sampling choice, and never replaces the full sample.
 
@@ -62,6 +64,7 @@ the configured absolute threshold (threshold optional, must be in
 (0, 1)), the horizon with the largest |statistic|, and simple ratios
 between horizons. An exponential description `|stat_k| ≈ exp(a + b·k)`
 is fitted only when at least 3 same-sign non-zero horizons exist; the
+fit quality (`R²`), fitted magnitudes and log-residuals are retained;
 half-life `-ln 2 / b` is reported only when `b < 0`, otherwise null with
 the reason. All of it describes this sample; the maximum-|statistic|
 horizon is a location, **never "the best horizon"**, and no horizon,

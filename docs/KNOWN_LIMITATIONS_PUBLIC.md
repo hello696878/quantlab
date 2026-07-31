@@ -260,7 +260,12 @@ top-minus-bottom spread is an equal-weight measurement reference, not a
 strategy, and its cost-adjusted variant covers only notional-proportional
 cost components from a linked stored model over a stated reference
 notional — impact, monetary and volume-dependent costs stay honestly
-unavailable. Signals whose availability is assumed (`same_timestamp`) are
+unavailable. Turnover is a combined signed gross-2 reference-book measure;
+the cost-adjusted spread is reported only for the first horizon/lag used to
+build that timeline, and its rebalance cost return is not rescaled to a
+holding-period rate. Moving-block bootstrap is single-entity only; timestamp
+bootstrap is required for multi-entity cross-sections. Signals whose
+availability is assumed (`same_timestamp`) are
 verified only when every entry is delayed at least one observation;
 full-sample rank transformations demote the whole run to descriptive.
 Nothing is selected, sized, optimised, monitored or executed, and no

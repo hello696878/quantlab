@@ -98,7 +98,7 @@ def validate_bootstrap_config(raw: Any) -> Optional[Dict[str, Any]]:
 
 
 def _statistic(x: np.ndarray, y: np.ndarray, statistic: str,
-               *, top_count: int) -> Optional[float]:
+               *, bucket_count: int) -> Optional[float]:
     if x.size < 3 or np.unique(x).size < 2 or np.unique(y).size < 2:
         return None
     if statistic == "pearson":
@@ -107,7 +107,7 @@ def _statistic(x: np.ndarray, y: np.ndarray, statistic: str,
         value = float(sp_stats.spearmanr(x, y).statistic)
     else:
         order = np.argsort(x, kind="stable")
-        k = max(1, min(top_count, x.size // 2))
+        k = max(1, min(x.size // bucket_count, x.size // 2))
         bottom = y[order[:k]]
         top = y[order[-k:]]
         value = float(np.mean(top) - np.mean(bottom))
@@ -121,7 +121,6 @@ def run_bootstrap(pairs: List[Dict[str, Any]], config: Dict[str, Any],
     x = np.asarray([p["signal_value"] for p in ordered], dtype=np.float64)
     y = np.asarray([p["outcome_value"] for p in ordered], dtype=np.float64)
     n = x.size
-    top_count = max(1, n // bucket_count)
     out: Dict[str, Any] = {
         "method": config["method"], "seed": config["seed"],
         "resamples": config["resamples"],
@@ -137,7 +136,15 @@ def run_bootstrap(pairs: List[Dict[str, Any]], config: Dict[str, Any],
     if n < 8:
         out["reason"] = "fewer than 8 pairs"
         return out
-    observed = _statistic(x, y, config["statistic"], top_count=top_count)
+    if config["method"] == "moving_block" and len({
+            pair["entity_id"] for pair in ordered}) > 1:
+        out["reason"] = (
+            "moving_block is unavailable for multiple entities because a "
+            "single flattened order would create blocks across entity "
+            "boundaries; use timestamp bootstrap for cross-sections")
+        return out
+    observed = _statistic(
+        x, y, config["statistic"], bucket_count=bucket_count)
     if observed is None:
         out["reason"] = ("the observed statistic is unavailable (constant or "
                          "too-small sample)")
@@ -155,7 +162,7 @@ def run_bootstrap(pairs: List[Dict[str, Any]], config: Dict[str, Any],
             chosen = rng.integers(0, len(stamps), size=len(stamps))
             index = [i for c in chosen for i in by_stamp[stamps[int(c)]]]
             value = _statistic(x[index], y[index], config["statistic"],
-                               top_count=top_count)
+                               bucket_count=bucket_count)
             if value is not None:
                 values.append(value)
     elif config["method"] == "moving_block":
@@ -171,14 +178,14 @@ def run_bootstrap(pairs: List[Dict[str, Any]], config: Dict[str, Any],
             index = [s + offset for s in starts for offset in range(block)]
             index = index[:n]
             value = _statistic(x[index], y[index], config["statistic"],
-                               top_count=top_count)
+                               bucket_count=bucket_count)
             if value is not None:
                 values.append(value)
     else:
         for _ in range(config["resamples"]):
             index = rng.integers(0, n, size=n)
             value = _statistic(x[index], y[index], config["statistic"],
-                               top_count=top_count)
+                               bucket_count=bucket_count)
             if value is not None:
                 values.append(value)
 

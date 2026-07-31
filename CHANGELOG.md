@@ -85,10 +85,16 @@ claimed by an entry here.
   grid-end unavailability disclosed separately), 8 tables + 26 indexes, a
   24-case hand-computable demo (correlations exactly ±1, sign change at
   horizon 2, gross-positive/cost-adjusted-non-positive, a deliberately
-  invalid future-looking run, one eligible baseline), 60 backend tests, a
+  invalid future-looking run, one eligible baseline), 72 backend tests, a
   full Signal Decay Lab UI (decay curve, buckets, turnover, cost, regime,
   held-out, factor-residual, bootstrap, multiple-testing, observations and
-  policy panels) and a Playwright spec. Nothing here proves
+  policy panels) and a Playwright spec. Review hardening adds calendar-valid
+  canonical timestamps (offset-aware values normalised to UTC), exact
+  supplied-interval overlap selection, missing-rank safety,
+  exact validation-sample membership, no held-out threshold refit, combined
+  gross-2 turnover/cost arithmetic, fit residual evidence, entity-safe
+  bootstrap, complete result fingerprints and database-id-free export.
+  Nothing here proves
   predictability, validates alpha, recommends a signal, horizon, lag or
   threshold, or is investment advice.
 

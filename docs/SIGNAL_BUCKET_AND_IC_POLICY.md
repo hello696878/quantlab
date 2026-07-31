@@ -5,7 +5,8 @@
 Per horizon × lag cell, over aligned (score, outcome) pairs:
 
 * **Pearson**, **Spearman** and (on request) **Kendall** via
-  `scipy.stats` — every p-value is the real scipy value;
+  `scipy.stats` — Kendall is explicitly the tie-adjusted tau-b variant,
+  and every p-value is the real scipy value;
 * **sign agreement**: share of pairs where sign(score) equals
   sign(outcome), reported with its base count;
 * constants, samples below the configured minimum, and degenerate ties
@@ -33,16 +34,21 @@ across entities are different measurements and are labelled as such.
   `per_timestamp` scope (rank each timestamp's universe);
 * deterministic tie ordering: (score value, entity id, timestamp) — the
   same input always yields the same buckets;
-* every bucket row stores its count, score min/max and outcome mean;
+* every bucket row stores its count, score min/max, outcome mean, median,
+  sample standard deviation and positive rate; bucket outcomes are pooled
+  observation-weighted, so under `per_timestamp` scope a timestamp with more
+  eligible entities has more weight;
   a `minimum_per_bucket` guard makes underpopulated bucketing
   unavailable with a reason;
 * when the number of **unique** scores is smaller than the bucket count
   (binary or constant signals), bucket assignment would be arbitrary
   tie-splitting, so the spread is conservatively unavailable with
   exactly that reason;
-* under a linked validation split, bucket thresholds are derived from
-  TRAINING observations only and applied **frozen** to held-out
-  observations — nothing is refitted.
+* under a linked validation split, global bucket thresholds are derived from
+  TRAINING observations only and applied **frozen** to held-out observations;
+  if training cannot fit them, the held-out bucket spread is unavailable,
+  never refitted. Per-timestamp bucketing has no persistent fitted threshold
+  and uses only each timestamp's contemporaneous signal cross-section.
 
 ## 4. Top-minus-bottom spread
 

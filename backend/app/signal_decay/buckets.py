@@ -56,6 +56,11 @@ def validate_bucket_config(raw: Any) -> Dict[str, Any]:
     return {"bucket_count": count, "scope": scope,
             "minimum_per_bucket": minimum,
             "scheme": "equal_count_rank",
+            "outcome_aggregation": "observation_weighted",
+            "outcome_aggregation_note": (
+                "bucket outcome summaries pool eligible observations; under "
+                "per_timestamp scope, timestamps with more eligible entities "
+                "therefore receive more weight"),
             "ordering": ("bucket 1 = lowest configured score; ties ordered by "
                          "the declared tie policy with (entity_id, timestamp) "
                          "as the deterministic secondary key")}

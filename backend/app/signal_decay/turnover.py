@@ -12,7 +12,7 @@ with ``w_i,t = 1/n_t`` for members and 0 otherwise.  The first rebalance
 has NO prior book: under the default ``no_prior_unavailable`` policy its
 turnover is null with that reason (never silently treated as a full
 build), and under the explicit ``zero_prior_full_build`` policy it counts
-the full build (turnover 1.0 for a non-empty bucket) — the choice is a
+the signed long/short build from zero — the choice is a
 declared configuration, not a hidden default.
 
 Holding-period overlap: with horizon ``k`` steps and a rebalance every
@@ -73,6 +73,37 @@ def one_way_turnover(previous: Optional[Set[str]],
                      for e in sorted(entities))
 
 
+def reference_one_way_turnover(previous_top: Optional[Set[str]],
+                               previous_bottom: Optional[Set[str]],
+                               current_top: Set[str],
+                               current_bottom: Set[str], *,
+                               initial_policy: str) -> Optional[float]:
+    """Turnover of the gross-2 long-top / short-bottom reference.
+
+    Signed reference weights are +1 across the top leg and -1 across the
+    bottom leg.  The result is 0.5 * sum(abs(delta weight)) across both legs,
+    so asymmetric changes are measured rather than assuming both legs turn
+    over at the top leg's rate.
+    """
+    if previous_top is None or previous_bottom is None:
+        if initial_policy != "zero_prior_full_build":
+            return None
+        previous_top = set()
+        previous_bottom = set()
+
+    def signed(top: Set[str], bottom: Set[str]) -> Dict[str, float]:
+        weights = _weights(top)
+        for entity, weight in _weights(bottom).items():
+            weights[entity] = weights.get(entity, 0.0) - weight
+        return weights
+
+    before = signed(previous_top, previous_bottom)
+    after = signed(current_top, current_bottom)
+    entities = set(before) | set(after)
+    return 0.5 * sum(abs(after.get(entity, 0.0)
+                         - before.get(entity, 0.0))
+                     for entity in sorted(entities))
+
 def membership_timeline(pairs: List[Dict[str, Any]],
                         assignments: Sequence[int], *,
                         bucket_count: int,
@@ -121,8 +152,9 @@ def membership_timeline(pairs: List[Dict[str, Any]],
             "bottom_entries": len(bottom_entries),
             "bottom_exits": len(bottom_exits),
             "jaccard_top": jaccard,
-            "one_way_turnover": one_way_turnover(
-                previous_top, top, initial_policy=initial_policy),
+            "one_way_turnover": reference_one_way_turnover(
+                previous_top, previous_bottom, top, bottom,
+                initial_policy=initial_policy),
             "top_members": sorted(top),
         })
         previous_top = top
@@ -141,10 +173,14 @@ def membership_timeline(pairs: List[Dict[str, Any]],
                                      if completed_runs else None),
         "holding_duration_unit": "rebalances",
         "initial_policy": initial_policy,
+        "turnover_convention": (
+            "0.5 × sum(abs(delta signed weight)) across the long top and "
+            "short bottom legs (gross exposure 2.0)"),
         "initial_policy_note": (
-            "the first rebalance has no prior book; its turnover is null "
-            "under no_prior_unavailable, or a declared full build under "
-            "zero_prior_full_build — never a hidden zero prior"),
+            "the first rebalance has no prior book; combined reference "
+            "turnover is null under no_prior_unavailable, or a declared "
+            "gross-2 full build under zero_prior_full_build — never a "
+            "hidden zero prior"),
     }
     jaccards = [r["jaccard_top"] for r in rows if r["jaccard_top"] is not None]
     if jaccards:
@@ -171,9 +207,6 @@ def holding_overlap(rebalance_count: int, horizon: Any, *,
             "supplied outcomes carry their own intervals, so the cohort "
             "count is not defined by a horizon step")
         return out
-    concurrent = [min(i + 1, horizon,
-                      rebalance_count - i if rebalance_count - i > 0 else 1)
-                  for i in range(rebalance_count)]
     concurrent = [min(i + 1, horizon) for i in range(rebalance_count)]
     maximum = max(concurrent)
     average = sum(concurrent) / len(concurrent)
@@ -207,5 +240,6 @@ def holding_overlap(rebalance_count: int, horizon: Any, *,
 __all__ = [
     "INITIAL_TURNOVER_POLICIES", "COHORT_NORMALISATION_POLICIES",
     "TurnoverError", "validate_turnover_config", "one_way_turnover",
-    "membership_timeline", "holding_overlap",
+    "reference_one_way_turnover", "membership_timeline",
+    "holding_overlap",
 ]

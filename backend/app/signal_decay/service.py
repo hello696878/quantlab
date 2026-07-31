@@ -384,9 +384,11 @@ def _apply_transformation(definition: Dict[str, Any],
                           observations: List[Dict[str, Any]]) -> None:
     """Fill ``rank_value`` in place under the declared transformation."""
     transformation = definition["transformation"]
+    # Every observation receives an explicit rank slot. Missing raw values stay
+    # unavailable under rank transformations instead of raising during scoring.
+    for row in observations:
+        row["rank_value"] = None
     if transformation == "none":
-        for row in observations:
-            row["rank_value"] = None
         return
     if transformation == "rank_cross_sectional":
         by_stamp: Dict[str, List[Dict[str, Any]]] = {}
@@ -447,6 +449,30 @@ def create_run(payload: Dict[str, Any], *,
 
     definition = defs_mod.validate_signal_definition(payload.get("signal"))
     outcome = defs_mod.validate_outcome_definition(payload.get("outcome"))
+
+    # Linked identities may be declared beside the run or in the definition.
+    # Coalesce them before fingerprinting and reject conflicting identities.
+    link_payload = dict(payload)
+    embedded_links = {
+        "dataset_version_id": (definition.get("dataset_version_id"),
+                               outcome.get("dataset_version_id")),
+        "feature_run_id": (definition.get("feature_run_id"),),
+        "meta_label_run_id": (definition.get("meta_label_run_id"),),
+        "factor_run_id": (definition.get("factor_run_id"),),
+    }
+    for field, embedded_values in embedded_links.items():
+        declared = [value for value in (payload.get(field), *embedded_values)
+                    if value is not None]
+        if len(set(declared)) > 1:
+            raise SignalDecayError(
+                f"conflicting {field} values were supplied")
+        resolved = declared[0] if declared else None
+        link_payload[field] = resolved
+        if field in definition:
+            definition[field] = resolved
+        if field == "dataset_version_id":
+            outcome[field] = resolved
+
     observations = obs_mod.validate_signal_observations(
         definition, payload.get("observations"))
 
@@ -474,7 +500,7 @@ def create_run(payload: Dict[str, Any], *,
     turnover_config = turnover_mod.validate_turnover_config(
         payload.get("turnover"))
     analysis = _validate_analysis_policy(payload.get("policy"))
-    links = _resolve_links(payload)
+    links = _resolve_links(link_payload)
 
     if links["ids"]["cost_diagnostic_run_id"] is not None \
             and analysis["reference_notional"] is None:
@@ -521,8 +547,8 @@ def create_run(payload: Dict[str, Any], *,
         "observation_count": len(observations),
         "horizon_count": len(horizons["horizons"]),
         "lag_count": len(horizons["entry_lags"]),
-        "observation_start": observations[0]["source_timestamp"],
-        "observation_end": observations[-1]["source_timestamp"],
+        "observation_start": min(o["source_timestamp"] for o in observations),
+        "observation_end": max(o["source_timestamp"] for o in observations),
         "configuration": configuration,
         "signal_fingerprint": signal_fp,
         "outcome_fingerprint": outcome_fp,
@@ -624,7 +650,8 @@ def execute_run(run_id: int, *,
     except Exception as exc:  # pragma: no cover - defensive
         store.mark_failed(run_id, f"unexpected execution failure: {exc}",
                           store._now())
-        raise InternalExecutionError(str(exc)) from exc
+        raise InternalExecutionError(
+            "signal-decay execution failed unexpectedly") from exc
 
 
 def _cell(pairs: List[Dict[str, Any]], scores: Dict[Tuple[str, str], float],
@@ -632,7 +659,8 @@ def _cell(pairs: List[Dict[str, Any]], scores: Dict[Tuple[str, str], float],
           outcome_scope: str, overlap: Dict[str, Any],
           unavailable_count: int, analysis: Dict[str, Any],
           bucket_config: Dict[str, Any], minimum_observations: int,
-          frozen_thresholds: Optional[List[float]] = None
+          frozen_thresholds: Optional[List[float]] = None,
+          compute_buckets: bool = True
           ) -> Tuple[Dict[str, Any], List[Dict[str, Any]]]:
     """One (horizon, lag, selection, scope) result row + its bucket rows."""
     signal_values = [scores.get((p["entity_id"], p["signal_timestamp"]))
@@ -697,7 +725,7 @@ def _cell(pairs: List[Dict[str, Any]], scores: Dict[Tuple[str, str], float],
                        f"{analysis['minimum_cross_section_entities']}")}
 
     bucket_rows: List[Dict[str, Any]] = []
-    if scored_pairs:
+    if scored_pairs and compute_buckets:
         assignments, thresholds, boundaries = bucket_mod.assign_buckets(
             scored_pairs, signal_values,
             bucket_count=bucket_config["bucket_count"],
@@ -911,19 +939,23 @@ def _execute_body(run_id: int, run: Dict[str, Any],
             mean_cost_return = (cost_block["total_cost_return"]
                                 / cost_block["costed_rebalances"])
         for row in horizon_rows:
-            if row["outcome_scope"] != "raw" \
-                    or row["selection"] != "overlapping":
+            if (row["outcome_scope"] != "raw"
+                    or row["selection"] != "overlapping"
+                    or row["horizon"] != first_horizon
+                    or row["entry_lag"] != horizons["entry_lags"][0]):
                 continue
-            if row.get("top_minus_bottom") is not None \
-                    and mean_cost_return is not None:
+            if (row.get("top_minus_bottom") is not None
+                    and mean_cost_return is not None):
                 row["cost_adjusted_spread"] = float(
                     row["top_minus_bottom"] - mean_cost_return)
         if cost_block:
             cost_block["spread_adjustment_convention"] = (
-                "cost-adjusted spread = gross top-minus-bottom spread minus "
-                "the MEAN per-rebalance reference cost return; holding "
-                "periods and rebalance intervals are different time bases, "
-                "which is disclosed rather than rescaled")
+                "cost-adjusted spread is reported only for the first configured "
+                "horizon and entry lag used to build this turnover timeline: "
+                "gross top-minus-bottom spread minus the MEAN per-rebalance "
+                "reference cost return; holding periods and rebalance intervals "
+                "are different time bases, which is disclosed rather than "
+                "rescaled")
 
     # --- step 5: decay, regimes, validation, factor residuals ------------
     raw_rows = [r for r in horizon_rows
@@ -986,7 +1018,8 @@ def _execute_body(run_id: int, run: Dict[str, Any],
     result_fp = fp_mod.result_fingerprint(
         horizon_rows=[{k: v for k, v in r.items() if k != "detail"}
                       for r in horizon_rows],
-        bucket_rows=bucket_rows, turnover=turnover_summary,
+        bucket_rows=bucket_rows,
+        turnover={"summary": turnover_summary, "rows": turnover_rows},
         overlap=overlap_summaries, cost=cost_block, regimes=regime_rows,
         held_out=held_out, bootstrap_rows=bootstrap_rows, decay=decay_rows,
         warnings=warnings, integrity_status=integrity,
@@ -1128,14 +1161,47 @@ def _validation_membership(run: Dict[str, Any],
         raise ConflictError("the linked validation split is unavailable")
     _assert_pinned("validation split", split, validation_identity,
                    {"split_fingerprint": "split_fingerprint"})
-    time_by_sample = {s["sample_id"]: s.get("prediction_time")
-                      for s in vrun["samples"]}
-    return {
-        "train": {time_by_sample.get(i) for i in split["train_ids"]},
-        "test": {time_by_sample.get(i) for i in split["test_ids"]},
-        "purged": {time_by_sample.get(i) for i in split["purged_ids"]},
-        "embargoed": {time_by_sample.get(i) for i in split["embargoed_ids"]},
+
+    samples_by_id = {sample["sample_id"]: sample
+                     for sample in vrun["samples"]}
+    ids_by_time: Dict[str, List[str]] = {}
+    for sample_id, sample in samples_by_id.items():
+        ids_by_time.setdefault(sample.get("prediction_time"), []).append(sample_id)
+    memberships = {
+        "train": set(split["train_ids"]),
+        "test": set(split["test_ids"]),
+        "purged": set(split["purged_ids"]),
+        "embargoed": set(split["embargoed_ids"]),
     }
+    resolved: Dict[str, set] = {key: set() for key in memberships}
+    for observation in observations:
+        source = observation["source_timestamp"]
+        sample_id = observation.get("universe_membership_id")
+        if sample_id is not None:
+            sample = samples_by_id.get(sample_id)
+            if sample is None:
+                raise ConflictError(
+                    f"signal observation references unknown validation sample "
+                    f"{sample_id!r}")
+            if sample.get("prediction_time") != source:
+                raise ConflictError(
+                    f"validation sample {sample_id!r} has prediction_time "
+                    f"{sample.get('prediction_time')!r}, not signal timestamp "
+                    f"{source!r}")
+        else:
+            candidates = ids_by_time.get(source, [])
+            if len(candidates) > 1:
+                raise ConflictError(
+                    f"validation membership is ambiguous at {source}; supply "
+                    f"universe_membership_id on each signal observation")
+            sample_id = candidates[0] if candidates else None
+        if sample_id is None:
+            continue
+        key = (observation["entity_id"], source)
+        for label, member_ids in memberships.items():
+            if sample_id in member_ids:
+                resolved[label].add(key)
+    return resolved
 
 
 def _held_out_block(run, links, membership, base_cells, scores, analysis,
@@ -1148,47 +1214,66 @@ def _held_out_block(run, links, membership, base_cells, scores, analysis,
     if base is None:
         return None
     pairs = base["built"]["pairs"]
-    train_pairs = [p for p in pairs
-                   if p["signal_timestamp"] in membership["train"]]
-    test_pairs = [p for p in pairs
-                  if p["signal_timestamp"] in membership["test"]]
-    purged = sum(1 for p in pairs
-                 if p["signal_timestamp"] in membership["purged"])
-    embargoed = sum(1 for p in pairs
-                    if p["signal_timestamp"] in membership["embargoed"])
 
-    def _stats(subset, label, frozen=None):
-        overlap = {"state": base["built"]["overlap"]["state"],
-                   "overlap_ratio": base["built"]["overlap"]["overlap_ratio"],
-                   "max_simultaneous_overlap":
-                       base["built"]["overlap"]["max_simultaneous_overlap"]}
+    def _key(pair):
+        return pair["entity_id"], pair["signal_timestamp"]
+
+    train_pairs = [pair for pair in pairs if _key(pair) in membership["train"]]
+    test_pairs = [pair for pair in pairs if _key(pair) in membership["test"]]
+    purged = sum(1 for pair in pairs if _key(pair) in membership["purged"])
+    embargoed = sum(
+        1 for pair in pairs if _key(pair) in membership["embargoed"])
+
+    def _stats(subset, label, frozen=None, compute_buckets=True):
+        overlap = obs_mod._overlap_from_intervals(subset, by_stamp=True)
         row, _buckets = _cell(
             subset, scores, horizon=first, entry_lag=lag,
             selection="overlapping", outcome_scope=label, overlap=overlap,
             unavailable_count=0, analysis=analysis,
             bucket_config=bucket_config,
-            minimum_observations=max(3, min(
-                horizons["minimum_observations"], len(subset))),
-            frozen_thresholds=frozen)
+            minimum_observations=horizons["minimum_observations"],
+            frozen_thresholds=frozen, compute_buckets=compute_buckets)
         return {k: row.get(k) for k in
                 ("observations", "pearson", "spearman", "spearman_p_value",
                  "top_minus_bottom", "monotonicity_spearman", "state",
                  "reason")}
 
-    # Train-derived bucket thresholds, applied FROZEN to held-out pairs.
+    # Global bucket cut points are fitted on training signals only. A held-out
+    # bucket spread is unavailable when training cannot fit those cut points;
+    # it is never silently re-fit on held-out signals. Per-timestamp buckets
+    # need no fitted threshold and use only each timestamp's signal cross-section.
     frozen_thresholds = None
-    train_scored = [dict(p, signal_value=scores.get(
-        (p["entity_id"], p["signal_timestamp"]))) for p in train_pairs]
-    train_scored = [p for p in train_scored if p["signal_value"] is not None]
-    if len(train_scored) >= bucket_config["bucket_count"]:
-        _a, frozen_thresholds, _b = bucket_mod.assign_buckets(
-            train_scored, [p["signal_value"] for p in train_scored],
-            bucket_count=bucket_config["bucket_count"], scope="global")
+    heldout_buckets_available = True
+    if bucket_config["scope"] == "global":
+        train_scored = [dict(pair, signal_value=scores.get(
+            (pair["entity_id"], pair["signal_timestamp"])))
+            for pair in train_pairs]
+        train_scored = [pair for pair in train_scored
+                        if pair["signal_value"] is not None]
+        if len(train_scored) >= bucket_config["bucket_count"]:
+            (_assignments, frozen_thresholds, _boundaries) = (
+                bucket_mod.assign_buckets(
+                    train_scored,
+                    [pair["signal_value"] for pair in train_scored],
+                    bucket_count=bucket_config["bucket_count"], scope="global"))
+        else:
+            heldout_buckets_available = False
+            warnings.append(
+                "training observations cannot fit the configured global bucket "
+                "thresholds; held-out bucket spreads are unavailable and are "
+                "not re-fit on held-out signals")
+
     leakage_clean = links["validation_identity"].get("leakage_clean")
     if leakage_clean is False:
         warnings.append(
             "the linked validation run reports leakage; held-out figures are "
             "descriptive and the verified claim is withheld")
+    threshold_note = (
+        "global bucket thresholds are derived from TRAINING observations only "
+        "and applied frozen to held-out observations"
+        if bucket_config["scope"] == "global" else
+        "per-timestamp buckets use each timestamp's contemporaneous signal "
+        "cross-section and fit no persistent threshold")
     return {
         "split_label": links["validation_identity"]["split_label"],
         "leakage_clean": leakage_clean,
@@ -1197,14 +1282,14 @@ def _held_out_block(run, links, membership, base_cells, scores, analysis,
         "purged_observations": purged,
         "embargoed_observations": embargoed,
         "training": _stats(train_pairs, "train"),
-        "held_out": _stats(test_pairs, "held_out",
-                           frozen=frozen_thresholds),
+        "held_out": _stats(
+            test_pairs, "held_out", frozen=frozen_thresholds,
+            compute_buckets=heldout_buckets_available),
         "full_sample": _stats(pairs, "full"),
         "frozen_bucket_thresholds": frozen_thresholds,
-        "note": ("bucket thresholds are derived from TRAINING observations "
-                 "only and applied frozen to held-out observations; nothing "
-                 "is refitted on held-out data, and purge/embargo membership "
-                 "is used exactly as stored"),
+        "held_out_buckets_available": heldout_buckets_available,
+        "note": (f"{threshold_note}; nothing is refitted on held-out data, "
+                 f"and purge/embargo membership is used exactly as stored"),
     }
 
 
@@ -1301,6 +1386,7 @@ def _factor_residuals(run, links, base_cells, scores, analysis,
             continue
         expected = horizon if isinstance(horizon, int) else None
         residual_pairs: List[Dict[str, Any]] = []
+        horizon_unmatched = 0
         for pair in base["built"]["pairs"]:
             # residual outcome = sum of the linked factor run's stored
             # per-period residuals whose period_start lies in [entry, exit)
@@ -1311,6 +1397,7 @@ def _factor_residuals(run, links, base_cells, scores, analysis,
             if not stamps or any(v is None for v in values) \
                     or (expected is not None and len(stamps) != expected):
                 unmatched += 1
+                horizon_unmatched += 1
                 continue
             matched_any = True
             residual_pairs.append(
@@ -1321,7 +1408,7 @@ def _factor_residuals(run, links, base_cells, scores, analysis,
             residual_pairs, scores, horizon=horizon, entry_lag=lag,
             selection="overlapping", outcome_scope="factor_residual",
             overlap=base["built"]["overlap"],
-            unavailable_count=unmatched, analysis=analysis,
+            unavailable_count=horizon_unmatched, analysis=analysis,
             bucket_config=bucket_config,
             minimum_observations=horizons["minimum_observations"])
         horizon_rows.append(row)
@@ -1360,7 +1447,9 @@ def _multiple_testing(horizon_rows, analysis):
     family_rows = sorted(
         [r for r in horizon_rows
          if r["outcome_scope"] == "raw" and r["selection"] == "overlapping"],
-        key=lambda r: (r["entry_lag"], str(r["horizon"])))
+        key=lambda r: (r["entry_lag"],
+                       (0, r["horizon"]) if isinstance(r["horizon"], (int, float))
+                       else (1, str(r["horizon"]))))
     entries = [{"candidate_id": f"lag{r['entry_lag']}-h{r['horizon']}",
                 "raw_p": r.get("spearman_p_value"),
                 "provenance": {"test": "Spearman rank correlation",
@@ -1395,7 +1484,8 @@ def _signal_diagnostics(observations, scores):
     values = [scores.get((o["entity_id"], o["source_timestamp"]))
               for o in observations]
     return {
-        "autocorrelation": stats_mod.signal_autocorrelation(values),
+        "autocorrelation": stats_mod.signal_autocorrelation(
+            values, entity_ids=[o["entity_id"] for o in observations]),
         "note": ("signal persistence (association with its own past) is a "
                  "different measurement from any signal-outcome association "
                  "and must not be read as predictive power"),
@@ -1558,6 +1648,23 @@ def compare_runs(a_id: int, b_id: int) -> Dict[str, Any]:
     }
 
 
+_EXPORT_DATABASE_ID_KEYS = frozenset({
+    "id", "run_id", "dataset_version_id", "feature_run_id",
+    "meta_label_run_id", "validation_run_id", "regime_run_id",
+    "cost_diagnostic_run_id", "factor_run_id", "experiment_id",
+})
+
+
+def _privacy_safe_export(value: Any) -> Any:
+    """Remove local SQLite identities recursively while preserving research IDs."""
+    if isinstance(value, dict):
+        return {key: _privacy_safe_export(item) for key, item in value.items()
+                if key not in _EXPORT_DATABASE_ID_KEYS}
+    if isinstance(value, list):
+        return [_privacy_safe_export(item) for item in value]
+    return value
+
+
 def export(filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     page = store.list_runs(filters=filters or {}, page=1,
                            page_size=MAX_EXPORT_RUNS)
@@ -1565,7 +1672,7 @@ def export(filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
     for row in page["items"]:
         run = _hydrate(row)
         run_id = run["id"]
-        runs.append({
+        runs.append(_privacy_safe_export({
             "run": {k: v for k, v in run.items() if k != "configuration"},
             "configuration": {k: v for k, v in
                               (row.get("configuration") or {}).items()
@@ -1578,7 +1685,7 @@ def export(filters: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
             "turnover": store.list_turnover(run_id),
             "regimes": store.list_regimes(run_id),
             "bootstrap": store.list_bootstrap(run_id),
-        })
+        }))
     return {
         "schema_version": EXPORT_SCHEMA_VERSION,
         "exported_at": store._now(),

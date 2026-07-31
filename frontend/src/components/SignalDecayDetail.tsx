@@ -26,6 +26,7 @@ import {
 } from "@/lib/signalDecay";
 import { notifyBackendOffline, toast } from "@/lib/toast";
 import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
+import ErrorState from "@/components/ui/ErrorState";
 import {
   CompletenessPill,
   IntegrityPill,
@@ -57,33 +58,49 @@ export default function SignalDecayDetail(props: Props) {
   const [observations, setObservations] = useState<ObservationRow[] | null>(null);
   const [rareThreshold, setRareThreshold] = useState<number>(10);
   const [marking, setMarking] = useState(false);
+  const [detailError, setDetailError] = useState<string | null>(null);
+  const [detailRetry, setDetailRetry] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
-    Promise.all([
-      getHorizons(run.id), getBuckets(run.id), getTurnover(run.id),
-      getRegimes(run.id), getBootstrap(run.id), getObservations(run.id),
-    ])
-      .then(([h, b, t, g, bo, o]) => {
-        if (cancelled) return;
-        setHorizons(h.items);
-        setBuckets(b.items);
-        setTurnover(t.items);
-        setRegimes(g.items);
-        setRareThreshold(g.rare_threshold);
-        setBootstrap(bo.items);
-        setObservations(o.items);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        const cls = classifyApiError(err);
+    setDetailError(null);
+    setHorizons(null);
+    setBuckets(null);
+    setTurnover(null);
+    setRegimes(null);
+    setBootstrap(null);
+    setObservations(null);
+
+    async function loadDetails() {
+      const [h, b, t, g, bo, o] = await Promise.allSettled([
+        getHorizons(run.id), getBuckets(run.id), getTurnover(run.id),
+        getRegimes(run.id), getBootstrap(run.id), getObservations(run.id),
+      ]);
+      if (cancelled) return;
+
+      setHorizons(h.status === "fulfilled" ? h.value.items : []);
+      setBuckets(b.status === "fulfilled" ? b.value.items : []);
+      setTurnover(t.status === "fulfilled" ? t.value.items : []);
+      setRegimes(g.status === "fulfilled" ? g.value.items : []);
+      if (g.status === "fulfilled") setRareThreshold(g.value.rare_threshold);
+      setBootstrap(bo.status === "fulfilled" ? bo.value.items : []);
+      setObservations(o.status === "fulfilled" ? o.value.items : []);
+
+      const failure = [h, b, t, g, bo, o].find(
+        (result) => result.status === "rejected");
+      if (failure?.status === "rejected") {
+        const cls = classifyApiError(failure.reason);
+        setDetailError(cls.message);
         if (cls.backendUnavailable) notifyBackendOffline();
-        else toast.error("Couldn’t load run details", cls.message);
-      });
+        else toast.error("Couldn’t load all run details", cls.message);
+      }
+    }
+
+    void loadDetails();
     return () => {
       cancelled = true;
     };
-  }, [run.id]);
+  }, [run.id, detailRetry]);
 
   async function handleBaseline() {
     setMarking(true);
@@ -160,6 +177,14 @@ export default function SignalDecayDetail(props: Props) {
         )}
       </div>
 
+      {detailError && (
+        <ErrorState
+          title="Some run details could not be loaded"
+          message={detailError}
+          onRetry={() => setDetailRetry((value) => value + 1)}
+        />
+      )}
+
       <div className="card p-4">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
@@ -212,7 +237,7 @@ export default function SignalDecayDetail(props: Props) {
           <SkeletonTable rows={4} cols={8} caption="Loading horizons…" />
         ) : (
           <>
-            <DecayChart rows={decayRows} />
+            <DecayChart rows={decayRows} horizonUnit={horizonUnit} />
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1100px] text-xs">
                 <thead>
@@ -280,6 +305,7 @@ export default function SignalDecayDetail(props: Props) {
                   value={d.exponential_fit?.half_life !== null && d.exponential_fit?.half_life !== undefined
                     ? `${fmtNum(d.exponential_fit.half_life, 2)} ${d.exponential_fit.half_life_unit}`
                     : `unavailable — ${d.exponential_fit?.reason ?? "no fit"}`} />
+                <Field label="Fit R²" value={fmtNum(d.exponential_fit?.r_squared, 3)} />
               </dl>
               <p className="mt-1 text-slate-500">{d.note}</p>
               {d.exponential_fit && (
@@ -330,7 +356,7 @@ export default function SignalDecayDetail(props: Props) {
       {buckets && buckets.length > 0 && (
         <div className="card overflow-hidden" data-testid="signal-buckets">
           <SectionHeader title="Bucket outcomes"
-            note="Equal-count rank buckets over the configured score orientation; bucket 1 is the lowest configured score. Boundaries and counts are visible, empty buckets stay visible, and monotone means do not prove predictability." />
+            note={`Equal-count rank buckets over the configured score orientation; bucket 1 is the lowest configured score. Boundaries and counts are visible, empty buckets stay visible, and monotone means do not prove predictability. ${String((run.bucket_policy as Record<string, unknown>)?.outcome_aggregation_note ?? "")}`} />
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px] text-xs">
               <thead>
@@ -344,6 +370,7 @@ export default function SignalDecayDetail(props: Props) {
                   <th scope="col" className="px-3 py-2 text-right">Score max ({signalUnit})</th>
                   <th scope="col" className="px-3 py-2 text-right">Mean outcome</th>
                   <th scope="col" className="px-3 py-2 text-right">Median</th>
+                  <th scope="col" className="px-3 py-2 text-right">Std. dev.</th>
                   <th scope="col" className="px-3 py-2 text-right">Positive rate</th>
                   <th scope="col" className="px-3 py-2">State</th>
                 </tr>
@@ -360,6 +387,7 @@ export default function SignalDecayDetail(props: Props) {
                     <td className="px-3 py-1.5 text-right font-mono">{fmtNum(b.score_maximum)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtPct(b.mean_outcome)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtPct(b.median_outcome)}</td>
+                    <td className="px-3 py-1.5 text-right font-mono">{fmtPct(b.std_outcome)}</td>
                     <td className="px-3 py-1.5 text-right font-mono">{fmtPct(b.positive_rate, 1)}</td>
                     <td className="px-3 py-1.5" title={b.reason ?? undefined}>{b.state}</td>
                   </tr>
@@ -374,12 +402,12 @@ export default function SignalDecayDetail(props: Props) {
       {turnover && turnover.length > 0 && (
         <div className="card overflow-hidden" data-testid="signal-turnover">
           <SectionHeader title="Reference turnover timeline"
-            note={run.turnover_summary?.initial_policy_note ?? "Equal-weight top-bucket reference; one-way turnover = 0.5 × Σ|w_t − w_t−1|."} />
+            note={`${run.turnover_summary?.turnover_convention ?? "Combined long/short reference turnover."} ${run.turnover_summary?.initial_policy_note ?? ""}`} />
           {run.turnover_summary && (
             <dl className="grid grid-cols-2 gap-x-6 gap-y-1 px-4 py-3 text-xs md:grid-cols-5">
               <Field label="Rebalances" value={run.turnover_summary.rebalance_count} />
-              <Field label="Mean one-way turnover" value={fmtPct(run.turnover_summary.mean_one_way_turnover, 1)} />
-              <Field label="Max one-way turnover" value={fmtPct(run.turnover_summary.max_one_way_turnover, 1)} />
+              <Field label="Mean combined turnover" value={fmtPct(run.turnover_summary.mean_one_way_turnover, 1)} />
+              <Field label="Max combined turnover" value={fmtPct(run.turnover_summary.max_one_way_turnover, 1)} />
               <Field label="Mean Jaccard (top)" value={fmtNum(run.turnover_summary.mean_jaccard_top, 3)} />
               <Field label="Avg holding duration"
                 value={run.turnover_summary.average_holding_duration === null ? "—"
@@ -397,7 +425,7 @@ export default function SignalDecayDetail(props: Props) {
                   <th scope="col" className="px-3 py-2 text-right">Bottom entries</th>
                   <th scope="col" className="px-3 py-2 text-right">Bottom exits</th>
                   <th scope="col" className="px-3 py-2 text-right">Jaccard (top)</th>
-                  <th scope="col" className="px-3 py-2 text-right">One-way turnover</th>
+                  <th scope="col" className="px-3 py-2 text-right">Combined one-way turnover</th>
                   <th scope="col" className="px-3 py-2 text-right">Cost (reference ccy)</th>
                   <th scope="col" className="px-3 py-2">Cost state</th>
                 </tr>
@@ -715,36 +743,50 @@ function SectionHeader({ title, note }: { title: string; note: string }) {
   );
 }
 
-function DecayChart({ rows }: { rows: HorizonRow[] }) {
-  const usable = rows.filter((r) => typeof r.horizon === "number"
-    && r.spearman !== null);
+function DecayChart({ rows, horizonUnit }: { rows: HorizonRow[]; horizonUnit: string }) {
+  const usable = rows
+    .filter((row) => typeof row.horizon === "number" && row.spearman !== null)
+    .sort((a, b) => Number(a.horizon) - Number(b.horizon));
   if (usable.length < 2) return null;
   const width = 720;
   const height = 150;
-  const values = usable.map((r) => r.spearman as number);
+  const values = usable.map((row) => row.spearman as number);
   const min = Math.min(...values, 0);
   const max = Math.max(...values, 0);
   const span = max - min || 1;
-  const x = (i: number) => (i / Math.max(1, usable.length - 1)) * (width - 60) + 40;
-  const y = (v: number) => height - 24 - ((v - min) / span) * (height - 44);
-  const points = usable.map((r, i) => `${x(i)},${y(r.spearman as number)}`).join(" ");
+  const firstHorizon = Number(usable[0].horizon);
+  const lastHorizon = Number(usable[usable.length - 1].horizon);
+  const horizonSpan = lastHorizon - firstHorizon || 1;
+  const x = (horizon: number) =>
+    ((horizon - firstHorizon) / horizonSpan) * (width - 60) + 40;
+  const y = (value: number) =>
+    height - 24 - ((value - min) / span) * (height - 44);
+  const points = usable
+    .map((row) => `${x(Number(row.horizon))},${y(row.spearman as number)}`)
+    .join(" ");
   return (
     <div className="overflow-x-auto px-4 pt-3">
       <svg viewBox={`0 0 ${width} ${height}`} className="w-full" role="img"
-        aria-label="Rank IC by horizon (the table below carries the same values)"
+        aria-label={`Rank IC by forecast horizon in ${horizonUnit}; the table below carries the same values`}
         data-testid="decay-chart">
-        <line x1="40" y1={y(0)} x2={width - 20} y2={y(0)} stroke="#cbd5e1" strokeWidth="1" />
-        <polyline points={points} fill="none" stroke="#2563eb" strokeWidth="1.5" />
-        {usable.map((r, i) => (
-          <g key={i}>
-            <circle cx={x(i)} cy={y(r.spearman as number)} r="3" fill="#2563eb" />
-            <text x={x(i)} y={height - 6} fontSize="10" fill="#64748b" textAnchor="middle">
-              h{r.horizon}
+        <line x1="40" y1={y(0)} x2={width - 20} y2={y(0)}
+          stroke="var(--chart-grid, var(--line))" strokeWidth="1" />
+        <polyline points={points} fill="none" stroke="var(--chart-primary, var(--accent))"
+          strokeWidth="6" opacity="0.16" />
+        <polyline points={points} fill="none" stroke="var(--chart-primary, var(--accent))"
+          strokeWidth="1.75" />
+        {usable.map((row) => (
+          <g key={`${row.horizon}-${row.entry_lag}`}>
+            <circle cx={x(Number(row.horizon))} cy={y(row.spearman as number)} r="3"
+              fill="var(--chart-primary, var(--accent))" />
+            <text x={x(Number(row.horizon))} y={height - 6} fontSize="10"
+              fill="var(--text-mut)" textAnchor="middle">
+              h{row.horizon}
             </text>
           </g>
         ))}
-        <text x="4" y="14" fontSize="10" fill="#64748b">{max.toFixed(2)}</text>
-        <text x="4" y={height - 26} fontSize="10" fill="#64748b">{min.toFixed(2)}</text>
+        <text x="4" y="14" fontSize="10" fill="var(--text-mut)">{max.toFixed(2)}</text>
+        <text x="4" y={height - 26} fontSize="10" fill="var(--text-mut)">{min.toFixed(2)}</text>
       </svg>
     </div>
   );

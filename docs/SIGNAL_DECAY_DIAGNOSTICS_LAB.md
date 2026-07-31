@@ -121,17 +121,20 @@ to — never instead of — the raw values.
 See [`SIGNAL_BUCKET_AND_IC_POLICY.md`](SIGNAL_BUCKET_AND_IC_POLICY.md) and
 [`SIGNAL_TURNOVER_AND_IMPLEMENTATION_LAG_POLICY.md`](SIGNAL_TURNOVER_AND_IMPLEMENTATION_LAG_POLICY.md).
 The top-minus-bottom spread is a neutral equal-weight measurement
-reference (gross exposure 2.0), not a strategy. Cost adjustment uses a
+reference (gross exposure 2.0), not a strategy. Turnover is measured on
+the combined signed long-top/short-bottom book. Cost adjustment uses a
 linked, fingerprint-pinned Phase 55 model read-only; only its
 notional-proportional components are computable here, everything else is
 unavailable with a reason, and gross and cost-adjusted values are always
-separate columns.
+separate columns. The cost-adjusted spread is limited to the first horizon
+and lag whose turnover timeline actually supplies the estimate.
 
 ## 8. Linked records
 
 Every link is pinned by id **and** fingerprint at execution time; a
 fingerprint mismatch is a conflict, not a silent re-read. Regime
-assignments, validation split membership (by prediction time, purge and
+assignments, validation split membership (by explicit sample id when
+available, with only an unambiguous prediction-time fallback; purge and
 embargo included), cost model components and factor residuals are used
 exactly as stored. Feature and meta-labeling links are identity pinning
 only in v1. Residual outcomes are the arithmetic sum of the linked factor
