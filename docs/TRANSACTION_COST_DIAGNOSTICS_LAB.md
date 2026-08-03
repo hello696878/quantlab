@@ -290,3 +290,12 @@ of notional, spread as fixed bps times the configured fraction, slippage
 as fixed bps per side; impact and monetary-per-unit models are reported
 unavailable with reasons rather than approximated. Gross and cost-adjusted
 values stay separate columns, and no cost record is ever modified.
+
+## 16. Downstream: Signal Ensemble Lab (Phase 61.0)
+
+The Signal Ensemble Lab (Phase 61) prices its combination reference's
+turnover with one of this lab's stored cost models under the same
+contract as the Signal Decay Lab: pinned by model fingerprint,
+read-only, notional-proportional components only, missing inputs
+unavailable rather than zero, and gross always separate from
+cost-adjusted. No cost record is ever modified.

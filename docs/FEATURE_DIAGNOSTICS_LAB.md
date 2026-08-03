@@ -317,3 +317,7 @@ The Signal Decay Lab (Phase 60) can pin a completed feature-diagnostics
 run as identity context for a signal built from those features. In v1 the
 link is identity pinning only — no importance, stability or drift numbers
 flow downstream, and no record here is modified.
+
+The Signal Ensemble Lab (Phase 61) may pin a completed run of this lab
+the same way — identity context only; nothing flows downstream and
+nothing here is modified.

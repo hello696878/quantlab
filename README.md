@@ -68,8 +68,9 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
   attribution), Portfolio Attribution (contribution, benchmark-relative
   Brinson effects + active risk), Factor Diagnostics (factor exposure,
   return decomposition + macro sensitivity), Signal Decay Lab (signal-outcome
-  association by horizon + lag, turnover + implementation costs), Data
-  Reliability Center, QA Command Center.
+  association by horizon + lag, turnover + implementation costs), Signal
+  Ensemble Lab (multi-signal redundancy + explicit combination references),
+  Data Reliability Center, QA Command Center.
 - **Portfolio & Macro** — Portfolio Risk Lab, Macro Regime & Cross-Asset
   Allocation Lab, portfolio backtest/optimization/frontier/stress/factor
   tools.
@@ -281,6 +282,23 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
   metadata-driven quality checks, neutral schema-drift comparison, and links
   to Experiment Registry records. Declared metadata + fingerprints —
   integrity aids only, not a tamper-proof ledger or data catalog.
+- **Signal Ensemble Lab (61.0)** — descriptive similarity, redundancy and
+  explicit user-configured combination references over multiple stored
+  signals: exact (entity, timestamp) alignment with missingness disclosed
+  and never repaired, strict-intersection versus pairwise-complete
+  policies with per-pair sample counts, real scipy pairwise statistics
+  with constants and ties honestly unavailable, bucket/tail agreement,
+  a correlation-distance matrix with eigenvalue concentration and an
+  effective signal count always labelled matrix concentration, optional
+  scipy hierarchical clustering at an explicit threshold, four explicit
+  combination modes whose per-observation contributions reconcile
+  exactly, require-all or opt-in renormalise missing policies, side-by-
+  side component/combination evaluation through the Signal Decay
+  policies with turnover and pinned cost models, neutral leave-one-out
+  deltas, regime/held-out/factor-residual views and seeded bootstrap
+  quantiles. Descriptions of stored samples — never proof of
+  independence, diversification, predictability or alpha, never a
+  signal, weight or ensemble recommendation.
 - **Signal Decay Lab (60.0)** — descriptive association between stored
   signals and later outcomes across explicitly declared forecast horizons
   and implementation lags: exact-timestamp forward returns with per-pair

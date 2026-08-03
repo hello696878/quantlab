@@ -182,3 +182,8 @@ identity context when the analysed signal is a stored probability from
 this lab. In v1 the link is identity pinning only — a probability analysed
 there is treated as a descriptive score, no calibration or threshold
 result flows downstream, and no record here is modified.
+
+The Signal Ensemble Lab (Phase 61) may pin a completed run of this lab
+the same way — identity context only; a stored probability used as an
+ensemble component is a descriptive score, and nothing here is
+modified.

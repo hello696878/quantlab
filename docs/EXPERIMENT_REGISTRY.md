@@ -368,7 +368,21 @@ record and re-execution reuses it.  No claim of predictability, alpha,
 persistence or a recommended horizon, lag, threshold or trade is ever
 stored.
 
-## 28. Future extensions
+## 28. Signal Ensemble records (Phase 61.0)
+
+Executed signal-ensemble runs
+([`SIGNAL_ENSEMBLE_DIAGNOSTICS_LAB.md`](SIGNAL_ENSEMBLE_DIAGNOSTICS_LAB.md))
+can create experiment records here (module `signal_ensemble_diagnostics`,
+with the canonical signal ids, combination mode, alignment policy,
+signal and observation counts and the configuration fingerprint as
+parameters; the mean absolute pairwise correlation, effective signal
+count, combination coverage, mean one-way turnover, integrity status,
+cost completeness and the result fingerprint as metrics) — idempotently:
+a run creates at most one record and re-execution reuses it.  No claim
+of a recommended ensemble, preferred signal, optimal weights or a
+validated signal combination is ever stored.
+
+## 29. Future extensions
 
 Per-record change history, richer charts (timeline / module distribution),
 optional CSV export, cross-scope baseline dashboards, and opt-in recording from

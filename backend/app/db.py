@@ -2396,6 +2396,288 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_sboo_run ON signal_bootstrap_results(run_id)",
         ):
             conn.execute(index_sql)
+
+        # --- Phase 61: Signal Ensemble, Redundancy & Combination Lab -----
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_runs (
+                id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+                created_at                  TEXT NOT NULL,
+                updated_at                  TEXT NOT NULL,
+                name                        TEXT NOT NULL,
+                description                 TEXT NOT NULL DEFAULT '',
+                status                      TEXT NOT NULL DEFAULT 'pending',
+                combination_mode            TEXT NOT NULL,
+                alignment_policy            TEXT NOT NULL,
+                frequency                   TEXT NOT NULL DEFAULT 'daily',
+                signal_count                INTEGER NOT NULL DEFAULT 0,
+                entity_count                INTEGER NOT NULL DEFAULT 0,
+                observation_count           INTEGER NOT NULL DEFAULT 0,
+                strict_intersection_count   INTEGER NOT NULL DEFAULT 0,
+                combined_available_count    INTEGER,
+                observation_start           TEXT,
+                observation_end             TEXT,
+                integrity_status            TEXT NOT NULL DEFAULT 'unknown',
+                completeness_status         TEXT NOT NULL DEFAULT 'unavailable',
+                mean_absolute_correlation   REAL,
+                effective_signal_count      REAL,
+                configuration               TEXT NOT NULL DEFAULT '{}',
+                results                     TEXT NOT NULL DEFAULT '{}',
+                universe_fingerprint        TEXT,
+                combination_fingerprint     TEXT,
+                similarity_fingerprint      TEXT,
+                analysis_fingerprint        TEXT,
+                configuration_fingerprint   TEXT,
+                result_fingerprint          TEXT,
+                dataset_version_id          INTEGER
+                                            REFERENCES dataset_versions(id),
+                signal_decay_run_id         INTEGER
+                                            REFERENCES signal_decay_runs(id),
+                feature_run_id              INTEGER
+                                            REFERENCES feature_runs(id),
+                meta_label_run_id           INTEGER
+                                            REFERENCES meta_label_runs(id),
+                validation_run_id           INTEGER
+                                            REFERENCES validation_runs(id),
+                regime_run_id               INTEGER
+                                            REFERENCES regime_diagnostic_runs(id),
+                cost_diagnostic_run_id      INTEGER
+                                            REFERENCES cost_diagnostic_runs(id),
+                factor_run_id               INTEGER
+                                            REFERENCES factor_diagnostic_runs(id),
+                experiment_id               INTEGER
+                                            REFERENCES experiment_registry(id),
+                is_baseline                 INTEGER NOT NULL DEFAULT 0,
+                baseline_scope              TEXT,
+                app_version                 TEXT,
+                git_commit                  TEXT,
+                notes                       TEXT,
+                error_message               TEXT,
+                demo_key                    TEXT,
+                started_at                  TEXT,
+                completed_at                TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_definitions (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                  INTEGER NOT NULL
+                                        REFERENCES signal_ensemble_runs(id),
+                signal_id               TEXT NOT NULL,
+                name                    TEXT NOT NULL,
+                definition              TEXT NOT NULL,
+                definition_fingerprint  TEXT NOT NULL,
+                orientation             TEXT NOT NULL,
+                normalisation           TEXT NOT NULL,
+                stored_observations     INTEGER NOT NULL DEFAULT 0,
+                coverage                REAL,
+                UNIQUE (run_id, signal_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_pairwise_results (
+                id                       INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                   INTEGER NOT NULL
+                                         REFERENCES signal_ensemble_runs(id),
+                signal_a                 TEXT NOT NULL,
+                signal_b                 TEXT NOT NULL,
+                alignment_mode           TEXT NOT NULL,
+                overlap_count            INTEGER NOT NULL DEFAULT 0,
+                coverage_a               REAL,
+                coverage_b               REAL,
+                pearson                  REAL,
+                pearson_p                REAL,
+                spearman                 REAL,
+                spearman_p               REAL,
+                spearman_p_adjusted      REAL,
+                kendall                  REAL,
+                kendall_p                REAL,
+                mean_absolute_difference REAL,
+                sign_agreement_rate      REAL,
+                zero_sign_count          INTEGER,
+                agreement                TEXT,
+                tails                    TEXT,
+                correlations             TEXT,
+                state                    TEXT NOT NULL,
+                reason                   TEXT,
+                UNIQUE (run_id, signal_a, signal_b, alignment_mode)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_observations (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES signal_ensemble_runs(id),
+                entity_id           TEXT NOT NULL,
+                timestamp           TEXT NOT NULL,
+                available_at        TEXT,
+                combined_score      REAL,
+                component_count     INTEGER NOT NULL DEFAULT 0,
+                missing_signal_ids  TEXT,
+                state               TEXT NOT NULL,
+                reason              TEXT,
+                UNIQUE (run_id, entity_id, timestamp)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_component_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES signal_ensemble_runs(id),
+                entity_id           TEXT NOT NULL,
+                timestamp           TEXT NOT NULL,
+                signal_id           TEXT NOT NULL,
+                raw_value           REAL,
+                oriented_value      REAL,
+                normalised_value    REAL,
+                configured_weight   REAL,
+                effective_weight    REAL,
+                contribution        REAL,
+                sign_vote           INTEGER,
+                missing             INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_horizon_results (
+                id                      INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                  INTEGER NOT NULL
+                                        REFERENCES signal_ensemble_runs(id),
+                scope                   TEXT NOT NULL,
+                subject_id              TEXT,
+                horizon                 TEXT NOT NULL,
+                entry_lag               INTEGER NOT NULL DEFAULT 0,
+                outcome_scope           TEXT NOT NULL DEFAULT 'raw',
+                observations            INTEGER NOT NULL DEFAULT 0,
+                pearson                 REAL,
+                spearman                REAL,
+                spearman_p              REAL,
+                spearman_p_adjusted     REAL,
+                mean_cross_sectional_ic REAL,
+                top_minus_bottom        REAL,
+                cost_adjusted_spread    REAL,
+                overlap_ratio           REAL,
+                mean_one_way_turnover   REAL,
+                state                   TEXT NOT NULL,
+                reason                  TEXT,
+                detail                  TEXT
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_leave_one_out_results (
+                id                  INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id              INTEGER NOT NULL
+                                    REFERENCES signal_ensemble_runs(id),
+                omitted_signal_id   TEXT NOT NULL,
+                metrics             TEXT NOT NULL,
+                state               TEXT NOT NULL,
+                reason              TEXT,
+                UNIQUE (run_id, omitted_signal_id)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_regime_results (
+                id                          INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                      INTEGER NOT NULL
+                                            REFERENCES signal_ensemble_runs(id),
+                regime_label                TEXT NOT NULL,
+                observations                INTEGER NOT NULL DEFAULT 0,
+                rare                        INTEGER NOT NULL DEFAULT 0,
+                mean_absolute_correlation   REAL,
+                effective_signal_count      REAL,
+                combined_spearman           REAL,
+                top_minus_bottom            REAL,
+                coverage                    REAL,
+                state                       TEXT NOT NULL,
+                reason                      TEXT,
+                detail                      TEXT,
+                UNIQUE (run_id, regime_label)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_bootstrap_results (
+                id                    INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id                INTEGER NOT NULL
+                                      REFERENCES signal_ensemble_runs(id),
+                statistic             TEXT NOT NULL,
+                method                TEXT NOT NULL,
+                seed                  INTEGER NOT NULL,
+                resamples             INTEGER NOT NULL,
+                block_length          INTEGER,
+                quantiles             TEXT,
+                unavailable_resamples INTEGER,
+                state                 TEXT NOT NULL,
+                reason                TEXT,
+                UNIQUE (run_id, statistic)
+            )
+            """
+        )
+        conn.execute(
+            """
+            CREATE TABLE IF NOT EXISTS signal_ensemble_sensitivity_results (
+                id                   INTEGER PRIMARY KEY AUTOINCREMENT,
+                run_id               INTEGER NOT NULL
+                                     REFERENCES signal_ensemble_runs(id),
+                scenario_index       INTEGER NOT NULL,
+                is_base              INTEGER NOT NULL DEFAULT 0,
+                label                TEXT NOT NULL,
+                scenario             TEXT NOT NULL,
+                scenario_fingerprint TEXT NOT NULL,
+                metrics              TEXT NOT NULL,
+                warnings             TEXT,
+                state                TEXT NOT NULL,
+                reason               TEXT,
+                UNIQUE (run_id, scenario_index)
+            )
+            """
+        )
+        for index_sql in (
+            "CREATE INDEX IF NOT EXISTS idx_ser_created ON signal_ensemble_runs(created_at)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_status ON signal_ensemble_runs(status)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_integrity ON signal_ensemble_runs(integrity_status)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_mode ON signal_ensemble_runs(combination_mode)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_alignment ON signal_ensemble_runs(alignment_policy)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_dataset ON signal_ensemble_runs(dataset_version_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_sdrun ON signal_ensemble_runs(signal_decay_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_frun ON signal_ensemble_runs(feature_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_mrun ON signal_ensemble_runs(meta_label_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_vrun ON signal_ensemble_runs(validation_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_rrun ON signal_ensemble_runs(regime_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_crun ON signal_ensemble_runs(cost_diagnostic_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_facrun ON signal_ensemble_runs(factor_run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_config_fp ON signal_ensemble_runs(configuration_fingerprint)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_baseline ON signal_ensemble_runs(is_baseline)",
+            "CREATE INDEX IF NOT EXISTS idx_ser_scope ON signal_ensemble_runs(baseline_scope)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_ser_demo_key ON signal_ensemble_runs(demo_key)",
+            "CREATE INDEX IF NOT EXISTS idx_sedef_run ON signal_ensemble_definitions(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sepair_run ON signal_ensemble_pairwise_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_seobs_run ON signal_ensemble_observations(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_seobs_entity ON signal_ensemble_observations(run_id, entity_id)",
+            "CREATE INDEX IF NOT EXISTS idx_secomp_run ON signal_ensemble_component_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_secomp_key ON signal_ensemble_component_results(run_id, timestamp, entity_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sehor_run ON signal_ensemble_horizon_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sehor_scope ON signal_ensemble_horizon_results(run_id, scope)",
+            "CREATE INDEX IF NOT EXISTS idx_seloo_run ON signal_ensemble_leave_one_out_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sereg_run ON signal_ensemble_regime_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_seboo_run ON signal_ensemble_bootstrap_results(run_id)",
+            "CREATE INDEX IF NOT EXISTS idx_sesen_run ON signal_ensemble_sensitivity_results(run_id)",
+        ):
+            conn.execute(index_sql)
         conn.commit()
     finally:
         conn.close()

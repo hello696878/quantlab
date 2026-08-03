@@ -1677,6 +1677,121 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 61.0 — Signal Ensemble, Redundancy & Combination Diagnostics Lab v1 ✅
+
+- **Research-infrastructure phase:** a local-first multi-signal lab
+  (`backend/app/signal_ensemble/`) for COMPARING stored signals and
+  evaluating **explicit, user-configured** combination references — never
+  an optimiser, selector or recommender. **Universe model**
+  (`universe.py`, reusing the Phase 60 definition contract): 2–12 signals
+  in deterministic canonical (sorted) order, unique ids, one shared
+  stored frequency (mixed frequencies refused — nothing is resampled),
+  ≤ 50 entities / ≤ 40 000 observations / ≤ 10 000 aligned keys, an
+  explicit `strict_intersection` or `pairwise_complete` alignment policy,
+  a missing policy that is only ever `unavailable`, and per-signal
+  user-declared orientation (`as_supplied` /
+  `multiply_by_negative_one` — never derived from performance, raw
+  values unchanged, never called a correction).
+- **Alignment** (`alignment.py`): explicit (entity, timestamp) keys —
+  row-number alignment impossible by construction; the strict
+  intersection is the ONLY universe combinations, matrices and
+  regime/validation conditioning may use; pairwise-complete rows exist
+  for pairwise diagnostics only, each with its own sample count, and a
+  pairwise-complete matrix is never assembled. Missingness (present /
+  stored-null / absent / coverage per signal + strict coverage) is part
+  of the result; nothing is forward-filled, interpolated or
+  zero/mean-imputed.
+- **Normalisation** (`normalisation.py`): none, cross-sectional rank
+  percentile `(rank − 0.5)/n` with the documented tie method,
+  cross-sectional z-score with explicit ddof ∈ {0, 1}, or a STRICTLY
+  trailing z-score (declared window 2–250, `include_current` explicit,
+  centred windows prohibited); zero variance / thin universes / short
+  histories unavailable with counted reasons; adversarial tests prove a
+  future entity cannot change earlier cross-sectional ranks and a future
+  outlier cannot change earlier trailing z-scores.
+- **Pairwise similarity** (`pairwise.py`, reusing the reviewed
+  `signal_decay.statistics.correlation`): Pearson/Spearman (Kendall
+  tau-b on request) with REAL scipy p-values; constants, heavy ties and
+  sub-minimum overlap unavailable with reasons; comparable-scale mean
+  absolute difference (never rescaled silently); sign agreement with
+  zero-sign counts; per-timestamp bucket agreement over the SAME shared
+  keys (exact/adjacent rates, top/bottom Jaccard, directional
+  disagreements); rank-based tail co-occurrence at an explicit quantile
+  (counts only, no synthetic p-values, no downside-protection claim).
+  No correlation threshold ever marks signals duplicates.
+- **Redundancy & clustering** (`redundancy.py`): strict-intersection
+  correlation matrix → distance `sqrt(0.5·(1−ρ))` (unavailable
+  propagates; only sub-1e-12 numerical negatives are clipped);
+  eigenvalues with a 1e-10 PSD tolerance — a non-PSD matrix is refused,
+  never silently repaired; matrix rank + neutral ill-conditioning
+  warnings; condition number unavailable (not infinite) at singularity;
+  effective signal count `(Σλ)²/Σλ²` always labelled a
+  matrix-concentration diagnostic, never the true number of independent
+  signals; scipy hierarchical clustering (single/complete/average,
+  EXPLICIT flat threshold, deterministic merges and leaf order, refuses
+  incomplete matrices, no auto cluster count, no representative
+  selection, no signal removal; ward not offered).
+- **Combinations** (`combination.py`): equal weight; user-supplied
+  STATIC weights with declared negative-weight policy and normalisation
+  (`require_sum_to_one` / `normalise_by_sum` / `normalise_by_gross` /
+  `none`) — gross, net, max |w|, zero-weight ids and residual stored;
+  rank average (equal-weight mean of rank percentiles, an explicit
+  property of the mode); majority sign (non-linear, sign votes,
+  reconciliation `not_applicable`). Missing components: `require_all`
+  (default) or explicitly opted-in `renormalise_available` (missing ids,
+  effective count and effective weights visible, minimum ≥ 2); no zero
+  imputation, no carry-forward, no automatic long-only conversion.
+  Per-observation contributions reconcile with the combined score to
+  1e-9 over ALL observations (a deterministic stored sample is
+  disclosed); a combined observation's availability is the LATEST used
+  component availability, and one violation marks the run `invalid`.
+- **Evaluation & cross-lab (read-only, fingerprint-pinned):** the
+  combined score and every component run through the reviewed Phase 60
+  machinery (build_pairs, correlations, cross-sectional IC, buckets,
+  signed-book turnover, Phase 55 notional-proportional costs on an
+  explicit reference notional, gross always separate); demo cases show
+  combining both CANCELLING and CREATING turnover — neither called
+  better; neutral leave-one-signal-out deltas under the configured
+  policy (no exclusion recommendation, no "harmful signal" label);
+  stored Phase 54 regime conditioning (rare < 10 withheld); Phase 52
+  train/held-out separation (per-timestamp and trailing transforms fit
+  no persistent parameter and weights stay fixed — nothing refittable;
+  clean-split evaluation earns `verified_from_validation_split`); Phase
+  59 factor-residual OUTCOME comparison with signal-value
+  residualisation DEFERRED (no stored residual signal series exists;
+  automatic residualisation prohibited); Phase 53 Bonferroni/Holm/BH
+  beside raw p-values; seeded whole-cross-section bootstrap
+  (timestamp / moving-block, 50–2000 resamples, quantiles only);
+  bounded deterministic sensitivity scenarios (base exactly once,
+  duplicates collapse by fingerprint, ≤ 24, none preferred).
+- **Rest:** eight integrity states (`verified_from_validation_split`
+  … `invalid`), completeness complete/partial/unavailable, six
+  canonical-JSON fingerprints (Phase 60 `_clean` reused; NaN/Inf
+  rejected; no ids/paths), integrity-gated baselines with transactional
+  same-scope replacement (never performance-gated), a neutral
+  field-state comparison that declares no winner, a schema-versioned
+  export (`signal_ensemble_export_v1`, ≤ 25 runs), 10 SQLite tables +
+  29 indexes, a 24-case hand-computable idempotent demo
+  (`demo:sen:*` — correlations exactly ±1, strict 18 vs pairwise 30
+  overlap, effective count exactly 1 with one cluster, rank-deficient
+  matrix warning, reconciliation to 1e-9, churn-cancel vs churn-create,
+  one eligible baseline), 16 API routes, the **Signal Ensemble Lab**
+  view (similarity matrix with accessible table, redundancy panel,
+  cluster table, contribution view, full-vs-LOO, horizon/turnover/
+  cost/regime/held-out/factor/bootstrap/sensitivity sections,
+  six-fingerprint policy panel), 71 backend tests and a 26-test
+  Playwright spec. Docs: `SIGNAL_ENSEMBLE_DIAGNOSTICS_LAB.md`,
+  `SIGNAL_UNIVERSE_AND_ALIGNMENT_POLICY.md`,
+  `SIGNAL_SIMILARITY_AND_REDUNDANCY_POLICY.md`,
+  `SIGNAL_COMBINATION_AND_CONTRIBUTION_POLICY.md`,
+  `SIGNAL_ENSEMBLE_VALIDATION_AND_COST_POLICY.md`,
+  `SIGNAL_ENSEMBLE_RUNBOOK.md`. **Descriptive measurements under stated
+  alignment, timing and missing-data policies — no independence or
+  diversification proof, no predictability or alpha claim, no signal or
+  weight recommendation, no ensemble optimisation or certification, no
+  execution, not investment advice, and no market data is ever
+  downloaded.**
+
 ### Phase 60.0 — Signal Decay, Forecast Horizon, Turnover & Implementation Lag Diagnostics Lab v1 ✅
 
 - **Research-infrastructure phase:** a local-first signal-diagnostics lab

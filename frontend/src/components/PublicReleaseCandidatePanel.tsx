@@ -17,9 +17,9 @@
 
 import { useState } from "react";
 
-const VERSION_LABEL = "4.78.0-dev";
-const LATEST_VERIFIED_TAG = "v4.77.0-factor-exposure-return-decomposition-macro-sensitivity-v1";
-const EXPECTED_NEXT_TAG = "v4.78.0-signal-decay-horizon-turnover-implementation-diagnostics-v1";
+const VERSION_LABEL = "4.79.0-dev";
+const LATEST_VERIFIED_TAG = "v4.78.0-signal-decay-horizon-turnover-implementation-diagnostics-v1";
+const EXPECTED_NEXT_TAG = "v4.79.0-signal-ensemble-redundancy-combination-diagnostics-v1";
 
 const RC_STATUS_CARDS: { title: string; status: string; tone: "ok" | "warn"; text: string }[] = [
   {

@@ -163,6 +163,36 @@ protected and why).
   controls are dark with explicit units, and 1024/768 have no page overflow.
   Only writes: the idempotent demo seeds plus the deliberately rejected
   baseline attempt.
+- **Signal Ensemble Lab** (Phase 61.0, `signal-ensemble.spec.ts`): the lab
+  opens with its alignment / no-selection disclaimers (the negation-aware
+  overclaim scan), the 24-case demo seeds idempotently (cascading the
+  regime, validation, cost and factor demo loaders on a cold database),
+  mode / alignment / integrity filters work, the identical pair reads
+  exactly 1 with its 30-observation overlap through the same API the page
+  uses and the inverse pair reads exactly −1 with no inversion
+  recommended, the constant signal and the thin-overlap pair stay
+  unavailable with reasons and visible counts, strict intersection (18
+  keys) sits beside pairwise-complete (30 keys) on the same pair, the
+  redundant trio shows effective signal count exactly 1 labelled as
+  matrix concentration with one cluster at the explicit threshold, the
+  rank-deficient matrix warns with the condition number unavailable
+  rather than infinite, equal-weight contributions are re-summed
+  client-side and reconcile to 1e-9, user weights show configured 0.7/0.3
+  beside effective values, require-all leaves exactly four gaps with
+  missing ids while renormalise-available reaches full coverage with
+  effective weights visible, leave-one-out stays neutral with no removal
+  recommendation, the horizon-shift case differs between h1 and h4 with
+  no best-horizon wording, churn-cancel and churn-create turnover pairs
+  read 0 versus >0.5 with the neither-is-better note, the cost-linked
+  case keeps gross separate from cost-adjusted, training/held-out are
+  separated with nothing refitted, regime similarity flips on stored
+  assignments never recomputed, signal-value factor residualisation is
+  visibly deferred, comparison declares no winner, the eligible baseline
+  is integrity-gated and the assumed-availability run is refused (a
+  deliberate 409), export is schema-versioned and path-free, filter
+  controls are dark with visible units, and 1440/1024/768 have no page
+  overflow. Only writes: the idempotent demo seeds plus the deliberately
+  rejected baseline attempt.
 - **Signal Decay Lab** (Phase 60.0, `signal-decay.spec.ts`): the lab opens
   with its no-predictability / no-advice disclaimers (the same
   negation-aware overclaim scan), the 24-case demo seeds idempotently

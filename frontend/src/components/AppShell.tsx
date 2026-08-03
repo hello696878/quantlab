@@ -45,6 +45,7 @@ export type View =
   | "portfolioattribution"
   | "factordiagnostics"
   | "signaldecay"
+  | "signalensemble"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

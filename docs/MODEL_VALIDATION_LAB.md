@@ -297,3 +297,14 @@ derived from TRAINING observations only and applied frozen to held-out
 observations, and a run evaluated this way earns the
 `verified_from_validation_split` integrity state. Nothing is refitted on
 held-out data, and no validation record is modified.
+
+## Downstream: Signal Ensemble Lab (Phase 61.0)
+
+The Signal Ensemble Lab (Phase 61) evaluates a combined score on a
+stored split by prediction time, exactly as the Signal Decay Lab does:
+memberships, purge and embargo used verbatim, the split fingerprint
+pinned, supplied weights fixed, and per-timestamp/trailing
+transformations fitting no persistent parameter — so nothing is or can
+be refitted on held-out data. Clean-split evaluation earns
+`verified_from_validation_split`; a leakage-failed run keeps its
+figures descriptive.

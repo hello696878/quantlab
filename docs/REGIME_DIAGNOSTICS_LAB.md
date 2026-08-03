@@ -275,3 +275,12 @@ there, this run's configuration, result and definition fingerprints are
 pinned and re-checked at execution, a regime with fewer than 10 pairs has
 its statistics withheld as rare, and differences between regimes are
 presented as measurements — never as structural or causal claims.
+
+## Downstream: Signal Ensemble Lab (Phase 61.0)
+
+The Signal Ensemble Lab (Phase 61) groups its strict-intersection keys
+and combination pairs by this lab's stored assignments to report
+per-regime similarity, effective signal count and combined-score IC.
+Regimes are never recomputed there, fingerprints are pinned and
+re-checked, regimes under 10 observations withhold statistics as rare,
+and no regime-dependent weight switching exists.

@@ -216,3 +216,12 @@ residuals whose period start falls inside `[entry, exit)`, required to
 cover exactly the holding's horizon. Raw and residual diagnostics are
 separate rows there, a residual association is not alpha, and nothing is
 neutralised automatically or written back to this lab.
+
+## 17. Downstream: Signal Ensemble Lab (Phase 61.0)
+
+The Signal Ensemble Lab (Phase 61) can compare its combined score's
+OUTCOMES against this lab's stored per-period residuals (pinned,
+read-only, exact horizon coverage; raw and residual scopes separate;
+never called alpha). Residualising SIGNAL VALUES is deferred there with
+its reason: no stored factor-residualised signal series exists, and
+automatic residualisation is prohibited.

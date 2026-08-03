@@ -401,6 +401,37 @@ recommended or optimised. Nothing here proves predictability or alpha,
 guarantees persistence, sizes positions, monitors anything live, or
 constitutes investment advice. No market data is ever downloaded.
 
+### An ensemble diagnostic is conditional on its declared configuration
+
+The Signal Ensemble Lab (Phase 61) compares stored signals and evaluates
+explicit combination references. Every number is conditional on the
+caller's declarations: the universe (2–12 signals on one shared stored
+frequency — nothing is resampled), the alignment policy (strict
+intersection is the only universe matrices and combinations may use;
+pairwise-complete rows carry their own sample counts and never form a
+matrix), the per-signal normalisation (explicit ddof, strictly trailing
+windows, zero variance unavailable), the declared orientation (never
+derived from performance) and the combination policy (static weights,
+explicit negative-weight and normalisation rules, require-all or opt-in
+renormalise missing handling, minimum component counts).
+
+Similarity is sample description: real scipy p-values with constants,
+ties and thin overlap unavailable, and no independence or duplication
+conclusion at any correlation level. Matrix diagnostics run only on
+complete strict-intersection matrices; negative eigenvalues beyond a
+1e-10 tolerance refuse the matrix rather than repairing it, the
+condition number is unavailable rather than infinite at singularity, and
+the effective signal count is matrix concentration only. Contribution
+reconciliation is verified over all observations to 1e-9 with a
+deterministic stored sample disclosed; majority-sign combinations are
+sign votes with linear reconciliation explicitly not applicable.
+Signal-value factor residualisation is deferred with its reason (no
+stored residual signal series exists; automatic residualisation is
+prohibited); bootstrap emits quantiles, never p-values; sensitivity
+scenarios are bounded, deduplicated and never ranked. Nothing selects,
+weights, optimises, certifies or recommends an ensemble, and nothing
+here proves independence, diversification, predictability or alpha.
+
 ### Local SQLite — single-user, no auth
 
 Saved backtests, saved reports, and saved custom-strategy templates persist in a **local SQLite** file (`backend/data/quantlab.db`). There is **no authentication, no multi-user support, and no cloud sync** — anyone with access to the running app can read/modify/delete local records. It is intended for single-user, local research, not a shared or hosted deployment.

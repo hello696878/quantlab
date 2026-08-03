@@ -271,7 +271,30 @@ full-sample rank transformations demote the whole run to descriptive.
 Nothing is selected, sized, optimised, monitored or executed, and no
 market data is ever downloaded.
 
-## 25. Future improvements (openly planned)
+## 25. Signal similarity is not information accounting
+
+The Signal Ensemble Lab measures how stored signals moved together over
+one aligned sample and what explicit, user-configured combinations of
+them did — nothing more. A low correlation never proves two signals
+carry independent information, a high one never proves duplication, and
+no threshold anywhere marks signals duplicates. The effective signal
+count is a concentration property of one correlation matrix (eigenvalue
+arithmetic over the strict intersection), never the true number of
+independent signals; a rank-deficient or non-PSD matrix is disclosed
+and refused rather than repaired. Combinations are measurement
+references: weights are always user-supplied or trivially equal — never
+derived from performance — component contributions must reconcile
+exactly, missing components follow an explicit declared policy, and a
+combined score is never more point-in-time than its least-available
+component. Leave-one-out differences are neutral deltas, not exclusion
+advice; combining is shown both removing and creating turnover, and
+neither direction is better. Clustering runs only at an explicit
+threshold with no automatic cluster count, no representative signal and
+no removal. Nothing here selects signals, optimises or certifies an
+ensemble, proves diversification or predictability, or is investment
+advice — and no market data is ever downloaded.
+
+## 26. Future improvements (openly planned)
 
 - A frontend test framework (shared chart/formula primitives first).
 - Registry-vs-route drift tests so stale metadata fails CI.

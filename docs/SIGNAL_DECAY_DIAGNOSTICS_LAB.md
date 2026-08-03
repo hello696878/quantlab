@@ -161,3 +161,13 @@ reported but neither implies tradability; costs cover
 notional-proportional components only; no slippage-from-impact modelling;
 no automatic selection of anything. All of this is restated in
 [`KNOWN_LIMITATIONS_PUBLIC.md`](KNOWN_LIMITATIONS_PUBLIC.md).
+
+## 11. Downstream: Signal Ensemble Lab (Phase 61.0)
+
+The Signal Ensemble Lab (Phase 61) reuses this lab's reviewed machinery
+read-only — the definition contract for every universe member, the
+correlation/bucket/turnover/cost engines for evaluating combined scores,
+and optionally a completed run of this lab pinned by configuration and
+result fingerprints as identity context. Stored decay results are never
+recomputed or mutated there, and a combination evaluated through these
+policies is a measurement reference, never a strategy.

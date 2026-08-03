@@ -18,6 +18,91 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Signal Ensemble, Redundancy & Combination Diagnostics Lab v1**
+  (v4.79 series): a local-first lab for COMPARING multiple stored signals
+  and evaluating EXPLICIT, user-configured combination references — never
+  an optimiser, selector or ensemble recommender. Universes are explicit:
+  2–12 Phase 60-style signal definitions in deterministic canonical
+  order, one shared stored frequency (mixed frequencies refused — nothing
+  is resampled), bounded entities/observations/aligned keys, and per-signal
+  user-declared orientation (never derived from performance; raw values
+  unchanged; never called a correction). Alignment is by exact
+  (entity, timestamp) keys — row-number alignment is impossible by
+  construction — under a declared policy: strict_intersection (the ONLY
+  universe combinations, matrices and conditioning may use) or
+  pairwise_complete (pairwise rows only, each carrying its own sample
+  count; a pairwise-complete matrix is never assembled). Missingness is
+  disclosed per signal (present / stored-null / absent / coverage) and
+  never repaired: no forward fill, interpolation, zero or mean imputation.
+  Normalisation is explicit per signal (none, cross-sectional rank
+  percentile `(rank−0.5)/n`, cross-sectional z-score with declared ddof,
+  or a STRICTLY trailing z-score with declared window and
+  current-observation policy); zero variance and thin universes stay
+  unavailable with counted reasons, and adversarial tests prove a future
+  entity or future outlier cannot change an earlier value. Pairwise
+  diagnostics reuse the reviewed Phase 60 correlation machinery (real
+  scipy p-values, Kendall tau-b on request, constants/ties/thin overlap
+  honestly unavailable) plus comparable-scale mean absolute difference,
+  sign agreement with zero-sign counts, per-timestamp bucket agreement
+  (exact/adjacent/top/bottom Jaccard over the SAME shared universe) and
+  rank-based tail co-occurrence at an explicit quantile — counts only, no
+  synthetic p-values, and NO correlation threshold ever marks signals
+  duplicates. Matrix-level redundancy runs on the strict intersection
+  only: distance `sqrt(0.5·(1−ρ))` (unavailable propagates, never a
+  silent zero), eigenvalues with a 1e-10 PSD tolerance (a non-PSD matrix
+  is refused, never repaired), rank and condition number (unavailable
+  rather than infinite at singularity), eigenvalue concentration and the
+  effective signal count `(Σλ)²/Σλ²` — always labelled a
+  matrix-concentration diagnostic, never the true number of independent
+  signals. Hierarchical clustering uses the already-approved scipy stack
+  (single/complete/average linkage, EXPLICIT flat threshold,
+  deterministic merges/leaf order, refuses incomplete matrices; no
+  auto cluster count, no representative selection, no signal removal).
+  Combinations are explicit: equal weight, user-supplied STATIC weights
+  (declared negative-weight policy; require_sum_to_one /
+  normalise_by_sum / normalise_by_gross / none with gross, net,
+  max |w|, zero-weight ids and the residual stored), rank average
+  (equal-weight mean of rank percentiles) and a majority-sign vote
+  (non-linear, contributions reported as sign votes, reconciliation
+  not_applicable). Missing components follow require_all (default) or
+  the explicitly opted-in renormalise_available (missing ids, effective
+  count and effective weights visible; minimum component count
+  enforced); per-observation contributions
+  `effective_weight × oriented_normalised` reconcile with the combined
+  score to 1e-9 over ALL observations (a stored deterministic sample is
+  disclosed), and a combined observation's availability is the LATEST
+  component availability — one violation marks the run invalid. The
+  combined score and every component are evaluated side by side through
+  the Phase 60 horizon/lag/bucket policies with signed-book turnover
+  (demo cases show combining both cancelling and CREATING churn —
+  neither called better) and pinned Phase 55 notional-proportional costs
+  (gross always separate; missing inputs never zero). Neutral
+  leave-one-signal-out deltas (no exclusion recommendation, no "harmful
+  signal" label), stored Phase 54 regime conditioning (rare regimes
+  withheld), Phase 52 train/held-out separation (per-timestamp and
+  trailing transforms fit no persistent parameter, weights stay fixed —
+  nothing refittable), Phase 59 factor-residual OUTCOME comparison
+  (signal-value residualisation deferred with its reason: no stored
+  residual signal series exists and automatic residualisation is
+  prohibited), Phase 53 Bonferroni/Holm/BH adjustment beside raw
+  p-values, seeded whole-cross-section bootstrap quantiles (timestamp or
+  moving-block; no bootstrap p-value) and bounded deterministic
+  sensitivity scenarios (base exactly once, duplicates collapse by
+  fingerprint, ≤24, no preferred configuration). Six canonical
+  fingerprints, integrity-gated baselines (never performance-gated),
+  neutral field-state comparison that declares no winner, a
+  schema-versioned export (`signal_ensemble_export_v1`, ≤25 runs, no
+  ids/paths/credentials, NaN/Infinity rejected), 10 SQLite tables + 29
+  indexes, a 24-case hand-computable idempotent demo (`demo:sen:*`), 16
+  API routes, the **Signal Ensemble Lab** view (similarity matrix with an
+  accessible table, redundancy/effective-count panel, cluster table,
+  contribution view, full-vs-LOO, horizon/turnover/cost/regime/held-out/
+  factor/bootstrap/sensitivity sections, six-fingerprint policy panel),
+  71 backend tests and a 26-test Playwright spec. Nothing here proves
+  signal independence, diversification, predictability or alpha,
+  recommends signals, weights or an ensemble, optimises a combination,
+  executes trades, or is investment advice.
+
 - **Signal Decay, Forecast Horizon, Turnover & Implementation Lag
   Diagnostics Lab v1** (v4.78 series): a local-first lab that measures the
   DESCRIPTIVE association between stored signal observations (scores,
