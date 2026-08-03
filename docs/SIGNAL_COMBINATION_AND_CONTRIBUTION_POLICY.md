@@ -75,8 +75,10 @@ total counts disclosed on the run.
 A combined observation's availability is the LATEST `available_at` of
 its used components: a combination is never more point-in-time than its
 inputs. A component available only after the observation timestamp
-makes the run `invalid`. Aggregate contribution summaries are labelled
-descriptive.
+makes the run `invalid`. When linked validation is used, all used
+components must also reference one consistent stored validation sample;
+cross-sectional samples are therefore not guessed from a non-unique
+timestamp. Aggregate contribution summaries are labelled descriptive.
 
 ## 6. Leave-one-signal-out
 
@@ -86,4 +88,6 @@ and the differences — coverage, mean |correlation|, effective count,
 first-horizon rank IC, spread, turnover — are reported as neutral
 deltas. This is not a feature-selection algorithm: there is no
 exclusion recommendation, no "harmful signal" label, and insufficient
-data stays unavailable.
+data stays unavailable. Similarity and effective-count diagnostics are
+recomputed on the remaining signals' own common post-normalisation
+sample rather than slicing the full-universe matrix.

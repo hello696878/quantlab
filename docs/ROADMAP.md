@@ -1779,7 +1779,7 @@ single-asset Backtest + Strategy Comparison:
   view (similarity matrix with accessible table, redundancy panel,
   cluster table, contribution view, full-vs-LOO, horizon/turnover/
   cost/regime/held-out/factor/bootstrap/sensitivity sections,
-  six-fingerprint policy panel), 71 backend tests and a 26-test
+  six-fingerprint policy panel), 80 backend tests and a 26-test
   Playwright spec. Docs: `SIGNAL_ENSEMBLE_DIAGNOSTICS_LAB.md`,
   `SIGNAL_UNIVERSE_AND_ALIGNMENT_POLICY.md`,
   `SIGNAL_SIMILARITY_AND_REDUNDANCY_POLICY.md`,

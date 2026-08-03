@@ -43,6 +43,8 @@ def universe_fingerprint(universe: Dict[str, Any],
                 "source_timestamp": row["source_timestamp"],
                 "available_at": row["available_at"],
                 "value": row["raw_value"],
+                "universe_membership_id":
+                    row.get("universe_membership_id"),
             } for row in rows]
             for signal_id, rows in observations.items()},
     }))
@@ -86,6 +88,7 @@ def analysis_policy_fingerprint(policy: Dict[str, Any]) -> str:
         "kind": "signal_ensemble_analysis_policy_v1",
         "horizons": [str(h) for h in policy.get("horizons") or []],
         "entry_lags": list(policy.get("entry_lags") or []),
+        "outcome": policy.get("outcome"),
         "bucket": policy.get("bucket"),
         "turnover": policy.get("turnover"),
         "reference_notional": policy.get("reference_notional"),

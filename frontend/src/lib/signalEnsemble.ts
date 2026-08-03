@@ -277,6 +277,7 @@ export interface RunFull extends RunSummary {
     union_keys: number;
     strict_intersection_keys: number;
     strict_intersection_coverage: number | null;
+    post_normalisation_intersection_keys?: number;
     per_signal: {
       signal_id: string;
       union_keys: number;

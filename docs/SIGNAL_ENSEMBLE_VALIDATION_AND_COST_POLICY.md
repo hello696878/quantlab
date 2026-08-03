@@ -12,7 +12,11 @@ Components are evaluated the same way at the first configured lag, so
 component and combination diagnostics sit side by side.  Horizons are
 1–250 grid observations (≤ 6 per run), lags 0–60 (≤ 3), and no horizon,
 lag or ensemble is ever called better.  One timing violation anywhere
-marks the run `invalid`.
+marks the run `invalid`. Unavailable combined scores remain as null
+rows on the synthetic evaluation grid: an h-step return always spans h
+stored observations, never h available scores. Leave-one-out and
+sensitivity combinations use the same latest-component availability
+provenance.
 
 ## 2. Turnover — components versus combination
 
@@ -40,14 +44,18 @@ never called better.
 
 ## 4. Model Validation integration (Phase 52, read-only)
 
-Training and held-out memberships come from the stored split by
-prediction time (purge and embargo used exactly as stored, split
-fingerprint pinned).  Per-timestamp and trailing transformations fit no
-persistent parameter, and supplied weights stay fixed, so nothing is or
-can be refitted on held-out data.  Training, held-out and full-sample
-combination diagnostics are reported separately; a leakage-failed run
-keeps its figures descriptive and the verified claim withheld;
-evaluating on a clean split earns `verified_from_validation_split`.
+Training and held-out memberships come from the stored split by explicit
+`universe_membership_id`; prediction-time fallback is allowed only when
+that timestamp identifies exactly one stored sample. Purge and embargo
+are used exactly as stored and the split fingerprint is pinned.
+Per-timestamp and trailing transformations fit no persistent parameter,
+and supplied weights stay fixed, so nothing is or can be refitted on
+held-out data. Training redundancy is recomputed only on training
+memberships; training, held-out and full-sample combination diagnostics
+are reported separately. A leakage-failed or unevaluated run keeps its
+figures descriptive and the verified claim withheld; only a split that
+explicitly reports `leakage_clean = true` earns
+`verified_from_validation_split`.
 
 ## 5. Regime integration (Phase 54, read-only)
 
@@ -72,11 +80,12 @@ automatic residualisation is prohibited.
 ## 7. Bootstrap and sensitivity
 
 Bootstrap resamples WHOLE timestamp cross-sections (`timestamp` iid or
-`moving_block` over chronologically ordered stamps — blocks never cross
-entity boundaries), with a deterministic seed, 50–2000 resamples,
-explicit block length, 2.5/50/97.5 quantiles and unavailable resamples
-counted.  No bootstrap p-value exists and nothing is called
-scientifically validated.  Sensitivity scenarios are user-declared
+`moving_block` over chronologically ordered timestamps). Each sampled
+timestamp keeps its complete cross-section intact. It uses a
+deterministic seed, 50–2000 resamples, explicit block length,
+2.5/50/97.5 quantiles and unavailable resamples counted. No bootstrap
+p-value exists and nothing is called scientifically validated.
+Sensitivity scenarios are user-declared
 overrides (normalisation, orientation, weights, missing policy,
 minimum components, matrix method, bucket count, horizon, lag) — the
 base scenario appears exactly once, duplicates collapse by scenario

@@ -1217,3 +1217,386 @@ def test_comparison_neutral_states(client):
     assert "no winner" in body["note"]
     assert any("combination policies differ" in w
                for w in body["warnings"])
+
+# ---------------------------------------------------------------------------
+# Adversarial timing, common-sample, validation and fingerprint regressions
+# ---------------------------------------------------------------------------
+
+def test_combination_evaluation_preserves_null_grid_steps():
+    stamps = _stamps(4)
+    validated = _validated({
+        "a": _rows(stamps, [1.0, 2.0, 3.0, 4.0]),
+        "b": _rows(stamps, [1.0, None, 3.0, 4.0]),
+    })
+    grid = align_mod.build_grid(validated)
+    policy = combo_mod.validate_combination_policy(
+        {"mode": "equal_weight"}, ["a", "b"])
+    combined = combo_mod.combine(
+        keys=grid["keys"], component_values=grid["values"],
+        policy=policy, signal_ids=["a", "b"])
+    synthetic = service._synthetic_combination_rows(
+        combined["observations"], signal_ids=["a", "b"], grid=grid,
+        prefix="timing")
+
+    assert len(synthetic) == 4
+    assert synthetic[1]["raw_value"] is None
+    prices = {
+        ("aggregate", stamp): price
+        for stamp, price in zip(stamps, [100.0, 110.0, 121.0, 133.1])
+    }
+    built = service.sd_obs.build_pairs(
+        synthetic, target_type="forward_return", prices=prices,
+        supplied=None, horizon=1, entry_lag=0,
+        extreme_loss_policy="report_verbatim")
+    first = next(pair for pair in built["pairs"]
+                 if pair["signal_timestamp"] == stamps[0])
+    assert first["exit_timestamp"] == stamps[1]
+    assert first["outcome_value"] == pytest.approx(0.10)
+
+
+def test_matrix_and_loo_use_common_post_normalisation_samples():
+    stamps = _stamps(10)
+    signals = {
+        "a": _rows(stamps, [float(i * i + 1) for i in range(10)]),
+        "b": _rows(stamps[2:], [float(i * 3 + 2) for i in range(8)]),
+        "c": _rows(stamps[1:], [float((i + 1) ** 3) for i in range(9)]),
+    }
+    normalisation = {
+        signal_id: {
+            "mode": "trailing_zscore", "window": 3,
+            "minimum_observations": 2, "ddof": 1,
+            "include_current": False,
+        }
+        for signal_id in signals
+    }
+    created = service.create_run(_payload(
+        name="common transformed sample", signals=signals,
+        normalisation=normalisation))
+    run = service.execute_run(created["id"])
+
+    assert run["missingness"]["strict_intersection_keys"] == 8
+    assert run["missingness"][
+        "post_normalisation_intersection_keys"] == 6
+    strict_rows = [
+        row for row in store.list_pairwise(run["id"])
+        if row["alignment_mode"] == "strict_intersection"
+    ]
+    assert {row["overlap_count"] for row in strict_rows} == {6}
+    omit_b = next(
+        row for row in store.list_leave_one_out(run["id"])
+        if row["omitted_signal_id"] == "b")
+    assert omit_b["metrics"]["similarity_observations"] == 7
+
+
+def test_combined_provenance_uses_latest_availability_and_exact_membership():
+    key = ("asset", "2024-01-02T00:00:00Z")
+    observation = {
+        "entity_id": key[0], "timestamp": key[1],
+        "missing_signal_ids": [],
+    }
+    grid = {
+        "available_at": {
+            "a": {key: "2024-01-02T00:00:00Z"},
+            "b": {key: "2024-01-02T01:00:00Z"},
+        },
+        "assumed": {"a": {key: False}, "b": {key: False}},
+        "membership_id": {
+            "a": {key: "sample-1"}, "b": {key: "sample-1"},
+        },
+    }
+    provenance = service._combined_provenance(
+        observation, ["a", "b"], grid)
+    assert provenance["available_at"] == "2024-01-02T01:00:00Z"
+    assert provenance["universe_membership_id"] == "sample-1"
+
+    grid["membership_id"]["b"][key] = "sample-2"
+    with pytest.raises(service.SignalEnsembleError, match="different"):
+        service._combined_provenance(observation, ["a", "b"], grid)
+
+
+def test_validation_membership_prefers_explicit_sample_ids(monkeypatch):
+    stamp = "2024-01-02T00:00:00Z"
+    validation_run = {
+        "samples": [
+            {"sample_id": "asset-a", "prediction_time": stamp},
+            {"sample_id": "asset-b", "prediction_time": stamp},
+        ]
+    }
+    split = {
+        "split_label": "heldout", "split_fingerprint": "split-fp",
+        "train_ids": ["asset-a"], "test_ids": ["asset-b"],
+        "purged_ids": [], "embargoed_ids": [],
+    }
+    monkeypatch.setattr(
+        service.validation_store, "get_run", lambda _run_id: validation_run)
+    monkeypatch.setattr(
+        service.validation_store, "list_splits", lambda _run_id: [split])
+    observations = [
+        {
+            "entity_id": "A", "source_timestamp": stamp,
+            "raw_value": 1.0, "universe_membership_id": "asset-a",
+        },
+        {
+            "entity_id": "B", "source_timestamp": stamp,
+            "raw_value": 2.0, "universe_membership_id": "asset-b",
+        },
+    ]
+    memberships = service._validation_membership(
+        {"validation_run_id": 7},
+        {"split_label": "heldout", "split_fingerprint": "split-fp"},
+        observations)
+    assert memberships["train"] == {("A", stamp)}
+    assert memberships["test"] == {("B", stamp)}
+
+
+def test_heldout_redundancy_is_recomputed_on_training_membership(monkeypatch):
+    stamps = _stamps(8)
+    samples = [
+        {"sample_id": f"s-{index}", "prediction_time": stamp}
+        for index, stamp in enumerate(stamps)
+    ]
+    split = {
+        "split_label": "heldout", "split_fingerprint": "split-fp",
+        "train_ids": [f"s-{i}" for i in range(4)],
+        "test_ids": [f"s-{i}" for i in range(4, 8)],
+        "purged_ids": [], "embargoed_ids": [],
+    }
+    monkeypatch.setattr(
+        service.validation_store, "get_run",
+        lambda _run_id: {"samples": samples})
+    monkeypatch.setattr(
+        service.validation_store, "list_splits", lambda _run_id: [split])
+    keys = [("asset", stamp) for stamp in stamps]
+    observations = [
+        {
+            "entity_id": "asset", "source_timestamp": stamp,
+            "raw_value": float(index),
+            "universe_membership_id": f"s-{index}",
+        }
+        for index, stamp in enumerate(stamps)
+    ]
+    normalised = {
+        "a": {key: float(i + 1) for i, key in enumerate(keys)},
+        "b": {
+            key: value for key, value in zip(
+                keys, [1.0, 2.0, 3.0, 4.0, 8.0, 2.0, 7.0, 1.0])
+        },
+    }
+    pairs = [
+        {
+            "entity_id": "asset", "signal_timestamp": stamp,
+            "signal_value": float(index), "outcome_value": float(index),
+        }
+        for index, stamp in enumerate(stamps)
+    ]
+    block = service._held_out_block(
+        {"validation_run_id": 7},
+        {"validation_identity": {
+            "split_label": "heldout", "split_fingerprint": "split-fp",
+            "leakage_clean": True,
+        }},
+        combination_pairs=pairs, combination_observations=observations,
+        strict_keys=keys, normalised=normalised,
+        similarity={"matrix_method": "pearson",
+                    "minimum_pair_overlap": 3},
+        analysis={}, warnings=[])
+    full = service.stats_mod.correlation(
+        list(normalised["a"].values()), list(normalised["b"].values()),
+        method="pearson", minimum_observations=3, overlapping=False)
+    assert block["training_mean_absolute_correlation"] == pytest.approx(1.0)
+    assert abs(full["statistic"]) < 1.0
+
+
+def test_empty_bootstrap_returns_explicit_unavailable_rows():
+    config = {
+        "method": "moving_block",
+        "statistics": ["mean_absolute_correlation",
+                       "effective_signal_count"],
+        "seed": 9, "resamples": 50, "block_length": 2,
+    }
+    rows = service._run_bootstrap(
+        config, strict_keys=[], normalised={"a": {}, "b": {}},
+        signal_ids=["a", "b"],
+        similarity={"matrix_method": "spearman",
+                    "minimum_pair_overlap": 4},
+        combination_pairs=[])
+    assert len(rows) == 2
+    assert all(row["state"] == "unavailable" for row in rows)
+    assert all(row["unavailable_resamples"] == 50 for row in rows)
+
+
+def test_new_policy_validation_is_strict_and_early():
+    with pytest.raises(combo_mod.CombinationError):
+        combo_mod.validate_combination_policy(
+            {"mode": "equal_weight", "allow_negative_weights": "false"},
+            ["a", "b"])
+    with pytest.raises(pair_mod.PairwiseError):
+        pair_mod.validate_similarity_policy(
+            {"correlation_methods": "pearson"})
+    with pytest.raises(pair_mod.PairwiseError):
+        pair_mod.validate_similarity_policy(
+            {"correlation_methods": ["pearson", "pearson"]})
+    with pytest.raises(norm_mod.NormalisationError):
+        norm_mod.validate_normalisation({
+            "a": {
+                "mode": "trailing_zscore", "window": 3,
+                "minimum_observations": 4, "ddof": 1,
+                "include_current": False,
+            }
+        }, ["a"])
+    with pytest.raises(service.SignalEnsembleError, match="horizon"):
+        service.create_run(_payload(
+            name="bad sensitivity horizon",
+            analysis={"sensitivity": {"scenarios": [
+                {"label": "bad", "horizon": 1}
+            ]}}))
+    with pytest.raises(service.SignalEnsembleError, match="entry_lag"):
+        service.create_run(_payload(
+            name="bad sensitivity lag",
+            analysis={"sensitivity": {"scenarios": [
+                {"label": "bad", "entry_lag": -1}
+            ]}}))
+
+
+def test_semantic_fingerprints_cover_material_dimensions():
+    stamps = _stamps(5)
+    universe = universe_mod.validate_universe(
+        demo_mod._universe({
+            "a": _rows(stamps, _base_values(5)),
+            "b": _rows(stamps, _alt_values(5)),
+        }))
+    definitions = {"a": "definition-a", "b": "definition-b"}
+
+    def universe_fp(value):
+        return fp_mod.universe_fingerprint(value, definitions, None)
+
+    base_universe_fp = universe_fp(universe)
+    for mutate in (
+        lambda u: u["observations"]["a"][0].update(raw_value=999.0),
+        lambda u: u["observations"]["a"][0].update(
+            available_at=stamps[1]),
+        lambda u: u["observations"]["a"][0].update(
+            universe_membership_id="sample-x"),
+        lambda u: u.update(alignment_policy="pairwise_complete"),
+    ):
+        changed = copy.deepcopy(universe)
+        mutate(changed)
+        assert universe_fp(changed) != base_universe_fp
+
+    base_policy = combo_mod.validate_combination_policy(
+        {"mode": "equal_weight"}, ["a", "b"])
+    base_norm = norm_mod.validate_normalisation(None, ["a", "b"])
+    base_combo_fp = fp_mod.combination_policy_fingerprint(
+        base_policy, {"a": "as_supplied", "b": "as_supplied"}, base_norm)
+    combo_cases = [
+        (
+            combo_mod.validate_combination_policy(
+                {"mode": "user_weights", "weights": {"a": 0.7, "b": 0.3}},
+                ["a", "b"]),
+            {"a": "as_supplied", "b": "as_supplied"}, base_norm,
+        ),
+        (
+            base_policy,
+            {"a": "multiply_by_negative_one", "b": "as_supplied"},
+            base_norm,
+        ),
+        (
+            base_policy,
+            {"a": "as_supplied", "b": "as_supplied"},
+            norm_mod.validate_normalisation({
+                "a": {"mode": "cross_sectional_rank_percentile"},
+                "b": {"mode": "cross_sectional_rank_percentile"},
+            }, ["a", "b"]),
+        ),
+        (
+            combo_mod.validate_combination_policy({
+                "mode": "equal_weight",
+                "missing_component_policy": "renormalise_available",
+                "minimum_component_count": 2,
+            }, ["a", "b"]),
+            {"a": "as_supplied", "b": "as_supplied"}, base_norm,
+        ),
+    ]
+    for policy, orientations, normalisation in combo_cases:
+        assert fp_mod.combination_policy_fingerprint(
+            policy, orientations, normalisation) != base_combo_fp
+
+    base_similarity = pair_mod.validate_similarity_policy(None)
+    base_similarity_fp = fp_mod.similarity_policy_fingerprint(
+        base_similarity, "strict_intersection")
+    changed_similarity = copy.deepcopy(base_similarity)
+    changed_similarity["correlation_methods"] = ["pearson", "spearman",
+                                                  "kendall"]
+    assert fp_mod.similarity_policy_fingerprint(
+        changed_similarity, "strict_intersection") != base_similarity_fp
+    clustered = copy.deepcopy(base_similarity)
+    clustered["clustering"] = {
+        "linkage": "average", "distance_threshold": 0.25,
+    }
+    assert fp_mod.similarity_policy_fingerprint(
+        clustered, "strict_intersection") != base_similarity_fp
+
+    base_analysis = service._validate_analysis_policy(
+        {"horizons": [1], "entry_lags": [0],
+         "bootstrap": {
+             "method": "timestamp",
+             "statistics": ["mean_absolute_correlation"],
+             "seed": 3, "resamples": 50,
+         }},
+        has_prices=True, cost_linked=False)
+    base_analysis_fp = fp_mod.analysis_policy_fingerprint(base_analysis)
+    for field, value in (("horizons", [2]), ("entry_lags", [1])):
+        changed = copy.deepcopy(base_analysis)
+        changed[field] = value
+        assert fp_mod.analysis_policy_fingerprint(
+            changed) != base_analysis_fp
+    changed = copy.deepcopy(base_analysis)
+    changed["bootstrap"]["seed"] = 4
+    assert fp_mod.analysis_policy_fingerprint(changed) != base_analysis_fp
+    changed = copy.deepcopy(base_analysis)
+    changed["outcome"]["extreme_loss_policy"] = "mark_unavailable"
+    assert fp_mod.analysis_policy_fingerprint(changed) != base_analysis_fp
+
+
+    linked = {
+        "cost_identity": {"cost_model": "simple", "fingerprint": "cost-a"},
+        "validation_identity": {
+            "split_label": "heldout", "split_fingerprint": "split-a",
+        },
+    }
+    base_configuration_fp = fp_mod.configuration_fingerprint(
+        "u", "c", "s", "a", linked)
+    for identity, value in (
+        ("cost_identity",
+         {"cost_model": "commission_slippage", "fingerprint": "cost-b"}),
+        ("validation_identity",
+         {"split_label": "heldout", "split_fingerprint": "split-b"}),
+    ):
+        changed = copy.deepcopy(linked)
+        changed[identity] = value
+        assert fp_mod.configuration_fingerprint(
+            "u", "c", "s", "a", changed) != base_configuration_fp
+
+
+def test_tail_diagnostics_are_populated_and_material_to_result_fingerprint():
+    stamps = _stamps()
+    returns = [0.02 if i % 3 else -0.015 for i in range(len(stamps) - 1)]
+    prices = sd_demo._prices_from_returns(stamps, returns)
+
+    def execute(quantile):
+        created = service.create_run(_payload(
+            name=f"tail {quantile}", prices=prices,
+            similarity={"tail_quantile": quantile},
+            analysis={"horizons": [1], "entry_lags": [0]}))
+        run = service.execute_run(created["id"])
+        row = next(
+            item for item in store.list_pairwise(run["id"])
+            if item["alignment_mode"] == "strict_intersection")
+        return run, row
+
+    first, first_row = execute(0.10)
+    second, second_row = execute(0.20)
+    assert first_row["tails"]["negative_outcome_coexceedance"] is not None
+    assert first_row["tails"]["positive_outcome_coexceedance"] is not None
+    assert first_row["tails"]["tail_size"] != second_row["tails"]["tail_size"]
+    assert first["result_fingerprint"] != second["result_fingerprint"]

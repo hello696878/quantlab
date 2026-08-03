@@ -90,6 +90,10 @@ def validate_normalisation(raw: Any, signal_ids: List[str]
                 raise NormalisationError(
                     f"trailing_zscore for {signal_id} requires an integer "
                     f"window in [{MIN_WINDOW}, {MAX_WINDOW}]")
+            if minimum > window:
+                raise NormalisationError(
+                    f"minimum_observations for {signal_id} cannot exceed "
+                    f"its trailing_zscore window ({window})")
         elif window is not None:
             raise NormalisationError(
                 f"window is only valid for trailing_zscore ({signal_id})")

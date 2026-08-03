@@ -43,8 +43,12 @@ def validate_similarity_policy(raw: Any) -> Dict[str, Any]:
         "clustering"})
     if unknown:
         raise PairwiseError(f"unknown similarity policy keys: {unknown}")
-    methods = tuple(policy.get("correlation_methods")
-                    or ("pearson", "spearman"))
+    methods_raw = policy.get("correlation_methods")
+    if methods_raw is not None and not isinstance(methods_raw, list):
+        raise PairwiseError("correlation_methods must be a list")
+    methods = tuple(methods_raw or ("pearson", "spearman"))
+    if len(set(methods)) != len(methods):
+        raise PairwiseError("correlation_methods must not contain duplicates")
     for method in methods:
         if method not in sd_statistics.CORRELATION_METHODS:
             raise PairwiseError(

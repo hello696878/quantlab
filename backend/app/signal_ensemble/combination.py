@@ -84,13 +84,16 @@ def validate_combination_policy(raw: Any, signal_ids: List[str]
     if tie_policy not in ("average", "first"):
         raise CombinationError("tie_policy must be 'average' or 'first'")
 
+    allow_negative = raw.get("allow_negative_weights", False)
+    if not isinstance(allow_negative, bool):
+        raise CombinationError("allow_negative_weights must be a boolean")
+
     policy: Dict[str, Any] = {
         "mode": mode,
         "missing_component_policy": missing_policy,
         "minimum_component_count": minimum_components,
         "tie_policy": tie_policy,
-        "allow_negative_weights": bool(raw.get("allow_negative_weights",
-                                               False)),
+        "allow_negative_weights": allow_negative,
         "weight_normalisation": None,
         "configured_weights": None,
         "final_weights": None,
@@ -135,7 +138,7 @@ def _validate_weights(raw: Dict[str, Any], signal_ids: List[str]
     if extra:
         raise CombinationError(f"weights reference unknown signal(s): "
                                f"{extra}")
-    allow_negative = bool(raw.get("allow_negative_weights", False))
+    allow_negative = raw.get("allow_negative_weights", False)
     configured: Dict[str, float] = {}
     for signal_id in sorted(signal_ids):
         value = weights_raw[signal_id]

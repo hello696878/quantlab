@@ -39,15 +39,20 @@ unrelated rows.
 ## 3. The two alignment policies
 
 * **`strict_intersection`** (default) — only keys where EVERY signal in
-  the universe has a stored, non-null value. This is the only universe
-  that combination calculations, matrix-level diagnostics (eigenvalues,
-  effective count, clustering) and regime/validation conditioning may
-  use, so every matrix cell shares one observation universe.
+  the universe has a stored, non-null value. Transformations can make
+  some of those values unavailable (for example, a trailing-z-score
+  warm-up), so matrix-level diagnostics then use one further common
+  post-normalisation subset. Its count is disclosed and every matrix
+  cell uses exactly that same subset.
 * **`pairwise_complete`** — for pairwise diagnostics only: each pair
   uses its own overlap and every row carries its own sample count.
   Pairwise-complete rows are stored NEXT TO the strict rows, and a
   pairwise-complete matrix is never assembled — a matrix whose cells
   used different universes would silently mix samples.
+
+Combination rows are evaluated on the stored union grid under the
+separate, explicit `require_all` or `renormalise_available` missing
+policy. They never borrow a pair-specific overlap.
 
 ## 4. Missingness is disclosed, never repaired
 
@@ -55,8 +60,9 @@ A missing observation is missing: no forward fill, no interpolation, no
 fabricated observation, no zero imputation, no mean imputation. The
 missingness summary (per signal: union keys, present, stored-null,
 absent, coverage; plus the strict-intersection coverage) is part of the
-result and visible in the UI. The alignment policy and missing policy
-both enter the similarity-policy and universe fingerprints.
+result and visible in the UI. The common post-normalisation matrix count
+is disclosed separately. The alignment policy and missing policy both
+enter the similarity-policy and universe fingerprints.
 
 ## 5. Bounded overlap honesty
 

@@ -415,6 +415,9 @@ derived from performance) and the combination policy (static weights,
 explicit negative-weight and normalisation rules, require-all or opt-in
 renormalise missing handling, minimum component counts).
 
+The stored strict intersection and the common post-normalisation matrix
+sample can differ because warm-ups and zero variance remain unavailable;
+the latter count is disclosed and every matrix cell uses that one sample.
 Similarity is sample description: real scipy p-values with constants,
 ties and thin overlap unavailable, and no independence or duplication
 conclusion at any correlation level. Matrix diagnostics run only on

@@ -54,7 +54,11 @@ claims to measure true informational independence.
 
 ## 5. Matrix concentration
 
-Strict-intersection matrices only. From a complete, symmetric matrix:
+Strict-intersection matrices only. The stored non-null intersection is
+filtered once more after normalisation, and every matrix cell uses that
+same common post-normalisation sample. The sample count is shown in the
+missingness disclosure; pair-specific complete-case rows never enter
+the matrix. From a complete, symmetric matrix:
 eigenvalues (`eigvalsh`), matrix rank at tolerance 1e-10, condition
 number (unavailable — not infinite — when the smallest eigenvalue is
 zero within tolerance), top-eigenvalue share, and

@@ -37,32 +37,38 @@ def build_grid(observations: Dict[str, List[Dict[str, Any]]]
       ``keys``          sorted union of (entity, timestamp) keys,
       ``values``        {signal_id: {key: raw_value or None}},
       ``available_at``  {signal_id: {key: availability timestamp}},
+      ``membership_id`` {signal_id: {key: validation sample id or None}},
       ``assumed``       {signal_id: {key: bool}} (availability assumed),
       ``timestamps``    sorted unique timestamps,
       ``entities``      sorted unique entities.
     """
     values: Dict[str, Dict[Key, Optional[float]]] = {}
     available_at: Dict[str, Dict[Key, str]] = {}
+    membership_id: Dict[str, Dict[Key, Optional[str]]] = {}
     assumed: Dict[str, Dict[Key, bool]] = {}
     keys: set = set()
     for signal_id, rows in observations.items():
         v: Dict[Key, Optional[float]] = {}
         a: Dict[Key, str] = {}
+        m: Dict[Key, Optional[str]] = {}
         s: Dict[Key, bool] = {}
         for row in rows:
             key = (row["entity_id"], row["source_timestamp"])
             v[key] = row["raw_value"]
             a[key] = row["available_at"]
+            m[key] = row.get("universe_membership_id")
             s[key] = bool(row.get("availability_assumed"))
             keys.add(key)
         values[signal_id] = v
         available_at[signal_id] = a
+        membership_id[signal_id] = m
         assumed[signal_id] = s
     sorted_keys = sorted(keys)
     return {
         "keys": sorted_keys,
         "values": values,
         "available_at": available_at,
+        "membership_id": membership_id,
         "assumed": assumed,
         "timestamps": sorted({k[1] for k in sorted_keys}),
         "entities": sorted({k[0] for k in sorted_keys}),

@@ -137,7 +137,98 @@ def _finite_or_none(value: Any) -> Optional[float]:
     return number if math.isfinite(number) else None
 
 
-# ---------------------------------------------------------------------------
+def _common_value_keys(keys: Sequence[Key],
+                       values: Dict[str, Dict[Key, Optional[float]]],
+                       signal_ids: Sequence[str]) -> List[Key]:
+    """Keys where every selected post-transformation value is available."""
+    return [key for key in keys
+            if all(values[signal_id].get(key) is not None
+                   for signal_id in signal_ids)]
+
+
+def _combined_provenance(observation: Dict[str, Any],
+                         signal_ids: Sequence[str],
+                         grid: Dict[str, Any]) -> Dict[str, Any]:
+    """Latest input availability and unambiguous validation sample id."""
+    key = (observation["entity_id"], observation["timestamp"])
+    present = [signal_id for signal_id in signal_ids
+               if signal_id not in observation["missing_signal_ids"]]
+    if not present:
+        return {
+            "available_at": observation["timestamp"],
+            "availability_assumed": True,
+            "universe_membership_id": None,
+        }
+    membership_ids = {
+        grid["membership_id"][signal_id].get(key)
+        for signal_id in present
+        if grid["membership_id"][signal_id].get(key) is not None
+    }
+    if len(membership_ids) > 1:
+        raise SignalEnsembleError(
+            f"components reference different validation samples at "
+            f"{key[0]} / {key[1]}")
+    return {
+        "available_at": max(
+            grid["available_at"][signal_id][key] for signal_id in present),
+        "availability_assumed": any(
+            grid["assumed"][signal_id].get(key, True)
+            for signal_id in present),
+        "universe_membership_id": (
+            next(iter(membership_ids)) if membership_ids else None),
+    }
+
+
+def _synthetic_combination_rows(
+        observations: Sequence[Dict[str, Any]], *,
+        signal_ids: Sequence[str], grid: Dict[str, Any],
+        prefix: str) -> List[Dict[str, Any]]:
+    """Phase 60 rows without compressing unavailable timestamps.
+
+    Null rows remain on the per-entity grid so an h-step outcome is always
+    measured over h stored grid observations, not h available scores.
+    """
+    out: List[Dict[str, Any]] = []
+    for index, observation in enumerate(observations):
+        available = observation["state"] == "available"
+        provenance = (_combined_provenance(observation, signal_ids, grid)
+                      if available else {
+                          "available_at": observation["timestamp"],
+                          "availability_assumed": True,
+                          "universe_membership_id": None,
+                      })
+        out.append({
+            "observation_id": f"{prefix}-{index:05d}",
+            "entity_id": observation["entity_id"],
+            "source_timestamp": observation["timestamp"],
+            "generated_at": None,
+            "available_at": provenance["available_at"],
+            "availability_assumed": provenance["availability_assumed"],
+            "raw_value": (
+                observation["combined_score"] if available else None),
+            "universe_membership_id":
+                provenance["universe_membership_id"],
+            "metadata": {},
+        })
+    out.sort(key=lambda row: (row["entity_id"], row["source_timestamp"]))
+    return out
+
+
+def _matrix_rows(signal_ids: Sequence[str], keys: Sequence[Key],
+                 values: Dict[str, Dict[Key, Optional[float]]], *,
+                 method: str, minimum: int) -> List[Dict[str, Any]]:
+    rows: List[Dict[str, Any]] = []
+    for signal_a, signal_b in pair_mod.pair_order(signal_ids):
+        correlation = stats_mod.correlation(
+            [values[signal_a][key] for key in keys],
+            [values[signal_b][key] for key in keys],
+            method=method, minimum_observations=minimum,
+            overlapping=False)
+        rows.append({
+            "signal_a": signal_a, "signal_b": signal_b,
+            "correlations": {method: correlation}})
+    return rows
+
 # Analysis policy
 # ---------------------------------------------------------------------------
 
@@ -252,8 +343,7 @@ def _validate_analysis_policy(raw: Any, *, has_prices: bool,
         if method not in BOOTSTRAP_METHODS:
             raise SignalEnsembleError(
                 f"bootstrap.method must be one of {list(BOOTSTRAP_METHODS)} "
-                f"— whole cross-sections are resampled by timestamp; blocks "
-                f"never cross entity boundaries")
+                f"— timestamp resampling keeps whole cross-sections intact")
         statistics = bootstrap.get("statistics") or []
         if not statistics or not set(statistics) <= set(BOOTSTRAP_STATISTICS):
             raise SignalEnsembleError(
@@ -302,7 +392,7 @@ def _validate_analysis_policy(raw: Any, *, has_prices: bool,
         allowed = {"label", "normalisation", "orientations", "weights",
                    "weight_normalisation", "missing_component_policy",
                    "minimum_component_count", "matrix_method",
-                   "bucket_count", "horizon", "entry_lag", "tail_quantile"}
+                   "bucket_count", "horizon", "entry_lag"}
         for scenario in scenarios:
             if not isinstance(scenario, dict):
                 raise SignalEnsembleError(
@@ -315,6 +405,37 @@ def _validate_analysis_policy(raw: Any, *, has_prices: bool,
                     or not isinstance(scenario["label"], str):
                 raise SignalEnsembleError(
                     "each sensitivity scenario needs a string label")
+            if len(scenario["label"].strip()) > 100:
+                raise SignalEnsembleError(
+                    "sensitivity scenario labels must be at most 100 chars")
+            matrix_method = scenario.get("matrix_method")
+            if (matrix_method is not None
+                    and matrix_method not in ("pearson", "spearman")):
+                raise SignalEnsembleError(
+                    "scenario matrix_method must be pearson or spearman")
+            bucket_count = scenario.get("bucket_count")
+            if bucket_count is not None and (
+                    isinstance(bucket_count, bool)
+                    or not isinstance(bucket_count, int)
+                    or not (2 <= bucket_count <= 10)):
+                raise SignalEnsembleError(
+                    "scenario bucket_count must be an integer in [2, 10]")
+            horizon = scenario.get("horizon")
+            if horizon is not None and (
+                    isinstance(horizon, bool) or not isinstance(horizon, int)
+                    or not (1 <= horizon <= 250)):
+                raise SignalEnsembleError(
+                    "scenario horizon must be an integer in [1, 250]")
+            if horizon is not None and not has_prices:
+                raise SignalEnsembleError(
+                    "scenario horizon evaluation requires supplied prices")
+            entry_lag = scenario.get("entry_lag")
+            if entry_lag is not None and (
+                    isinstance(entry_lag, bool)
+                    or not isinstance(entry_lag, int)
+                    or not (0 <= entry_lag <= 60)):
+                raise SignalEnsembleError(
+                    "scenario entry_lag must be an integer in [0, 60]")
         sensitivity = {"scenarios": scenarios}
 
     leave_one_out = cfg.get("leave_one_out", True)
@@ -804,6 +925,15 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
     else:
         combination_inputs = normalised
 
+    matrix_keys = _common_value_keys(strict_keys, normalised, signal_ids)
+    missingness["post_normalisation_intersection_keys"] = len(matrix_keys)
+    if len(matrix_keys) < len(strict_keys):
+        warnings.append(
+            f"{len(strict_keys) - len(matrix_keys)} stored strict-"
+            f"intersection key(s) are unavailable after the configured "
+            f"normalisation; every matrix cell uses the remaining common "
+            f"post-normalisation intersection of {len(matrix_keys)} keys")
+
     # --- pairwise similarity -------------------------------------------
     pairs = pair_mod.pair_order(signal_ids)
     pairwise_rows: List[Dict[str, Any]] = []
@@ -819,6 +949,32 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
         return True
 
     outcome_by_key: Optional[Dict[Key, float]] = None
+    if prices is not None and analysis["horizons"] and matrix_keys:
+        tail_source = [{
+            "observation_id": f"tail-{index:05d}",
+            "entity_id": key[0],
+            "source_timestamp": key[1],
+            "generated_at": None,
+            "available_at": max(
+                grid["available_at"][signal_id][key]
+                for signal_id in signal_ids),
+            "availability_assumed": any(
+                grid["assumed"][signal_id].get(key, True)
+                for signal_id in signal_ids),
+            "raw_value": 0.0,
+            "universe_membership_id": None,
+            "metadata": {},
+        } for index, key in enumerate(matrix_keys)]
+        tail_built = sd_obs.build_pairs(
+            tail_source, target_type="forward_return", prices=prices,
+            supplied=None, horizon=analysis["horizons"][0],
+            entry_lag=analysis["entry_lags"][0],
+            extreme_loss_policy=analysis["outcome"]
+            ["extreme_loss_policy"])
+        outcome_by_key = {
+            (pair["entity_id"], pair["signal_timestamp"]):
+                pair["outcome_value"]
+            for pair in tail_built["pairs"]}
 
     def _flatten(row: Dict[str, Any]) -> Dict[str, Any]:
         correlations = row["correlations"]
@@ -837,7 +993,7 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
         row = _flatten(pair_mod.pair_row(
             signal_a, signal_b,
             values_a=normalised[signal_a], values_b=normalised[signal_b],
-            keys=strict_keys,
+            keys=matrix_keys,
             stored_a=len(stored_keys[signal_a]),
             stored_b=len(stored_keys[signal_b]),
             policy=similarity, alignment_mode="strict_intersection",
@@ -845,12 +1001,12 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
         row["agreement"] = pair_mod.bucket_agreement(
             signal_a, signal_b,
             values_a=normalised[signal_a], values_b=normalised[signal_b],
-            keys=strict_keys,
+            keys=matrix_keys,
             bucket_count=similarity["agreement_bucket_count"])
         row["tails"] = pair_mod.tail_cooccurrence(
             signal_a, signal_b,
             values_a=normalised[signal_a], values_b=normalised[signal_b],
-            keys=strict_keys, quantile=similarity["tail_quantile"],
+            keys=matrix_keys, quantile=similarity["tail_quantile"],
             outcomes=outcome_by_key)
         pairwise_rows.append(row)
         if uni["alignment_policy"] == "pairwise_complete":
@@ -930,15 +1086,16 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
     for observation in combined["observations"]:
         key = (observation["entity_id"], observation["timestamp"])
         if observation["state"] == "available":
-            present = [s for s in signal_ids
-                       if s not in observation["missing_signal_ids"]]
-            avail = max(grid["available_at"][s].get(key, key[1])
-                        for s in present)
-            if avail > key[1]:
+            provenance = _combined_provenance(
+                observation, signal_ids, grid)
+            if provenance["available_at"] > key[1]:
                 availability_violations += 1
-            observation = dict(observation, available_at=avail)
+            observation = dict(observation, **provenance)
         else:
-            observation = dict(observation, available_at=None)
+            observation = dict(
+                observation, available_at=None,
+                availability_assumed=True,
+                universe_membership_id=None)
         combined_rows.append(observation)
     if availability_violations:
         warnings.append(
@@ -947,33 +1104,13 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
             f"timestamp; the run is INVALID")
 
     # --- synthetic combined signal for Phase 60-style evaluation --------
-    def _synthetic_rows(rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        out = []
-        for i, observation in enumerate(rows):
-            if observation["state"] != "available":
-                continue
-            out.append({
-                "observation_id": f"cmb-{i:05d}",
-                "entity_id": observation["entity_id"],
-                "source_timestamp": observation["timestamp"],
-                "generated_at": None,
-                "available_at": observation["available_at"],
-                "availability_assumed": False,
-                "raw_value": observation["combined_score"],
-                "universe_membership_id": None,
-                "metadata": {},
-            })
-        out.sort(key=lambda r: (r["entity_id"], r["source_timestamp"]))
-        return out
-
-    combination_observations = _synthetic_rows(combined_rows)
+    combination_observations = _synthetic_combination_rows(
+        combined_rows, signal_ids=signal_ids, grid=grid, prefix="cmb")
 
     def _component_rows_for(signal_id: str) -> List[Dict[str, Any]]:
         out = []
         for i, key in enumerate(stored_keys[signal_id]):
             value = combination_inputs[signal_id].get(key)
-            if value is None:
-                continue
             out.append({
                 "observation_id": f"{signal_id}-{i:05d}",
                 "entity_id": key[0], "source_timestamp": key[1],
@@ -982,7 +1119,8 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
                 "availability_assumed":
                     grid["assumed"][signal_id].get(key, False),
                 "raw_value": value,
-                "universe_membership_id": None, "metadata": {},
+                "universe_membership_id":
+                    grid["membership_id"][signal_id].get(key), "metadata": {},
             })
         return out
 
@@ -1191,7 +1329,8 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
         loo_rows = _leave_one_out(
             signal_ids=signal_ids, grid=grid,
             combination_inputs=combination_inputs,
-            configuration=configuration, strict_rows=strict_rows,
+            similarity_values=normalised,
+            configuration=configuration,
             similarity=similarity, analysis=analysis, prices=prices,
             full_metrics={
                 "coverage": combined["coverage"],
@@ -1211,14 +1350,15 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
 
     # --- regimes ---------------------------------------------------------
     regime_rows = _regime_rows(
-        run, links, strict_keys=strict_keys, normalised=normalised,
+        run, links, strict_keys=matrix_keys, normalised=normalised,
         signal_ids=signal_ids, similarity=similarity,
         combination_pairs=combination_pairs_first, warnings=warnings)
 
     # --- validation split ------------------------------------------------
     held_out = _held_out_block(
         run, links, combination_pairs=combination_pairs_first,
-        strict_keys=strict_keys, strict_rows=strict_rows,
+        combination_observations=combination_observations,
+        strict_keys=matrix_keys, normalised=normalised,
         similarity=similarity, analysis=analysis, warnings=warnings)
 
     # --- factor residual outcomes ---------------------------------------
@@ -1231,7 +1371,7 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
     bootstrap_rows: List[Dict[str, Any]] = []
     if analysis["bootstrap"]:
         bootstrap_rows = _run_bootstrap(
-            analysis["bootstrap"], strict_keys=strict_keys,
+            analysis["bootstrap"], strict_keys=matrix_keys,
             normalised=normalised, signal_ids=signal_ids,
             similarity=similarity,
             combination_pairs=combination_pairs_first)
@@ -1264,7 +1404,8 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
     integrity = _classify_integrity(
         uni=uni, normalisation=normalisation, analysis=analysis,
         violations=availability_violations + pair_violations,
-        validation_evaluated=held_out is not None)
+        validation_evaluated=(
+            held_out is not None and held_out.get("leakage_clean") is True))
     completeness = _classify_completeness(
         combined=combined, matrix=matrix, cost_block=cost_block)
 
@@ -1309,10 +1450,8 @@ def _execute_body(run_id: int, create_experiment: bool) -> Dict[str, Any]:
         "warnings": warnings,
     }
     result_fp = fp_mod.result_fingerprint(
-        aligned_keys=[list(k) for k in strict_keys],
-        pairwise_rows=[{k: v for k, v in r.items()
-                        if k not in ("agreement", "tails", "correlations")}
-                       for r in pairwise_rows],
+        aligned_keys=[list(k) for k in matrix_keys],
+        pairwise_rows=pairwise_rows,
         distance=distance, clustering=clustering,
         matrix_diagnostics=diagnostics, redundancy=redundancy,
         combined_observations=[{k: v for k, v in o.items()}
@@ -1455,20 +1594,10 @@ def _classify_completeness(*, combined: Dict[str, Any],
     return "complete" if complete else "partial"
 
 
-def _submatrix_effective_count(strict_rows: List[Dict[str, Any]],
-                               remaining: List[str],
-                               method: str) -> Optional[float]:
-    subset = [r for r in strict_rows
-              if r["signal_a"] in remaining and r["signal_b"] in remaining]
-    matrix = red_mod.correlation_matrix(subset, remaining, method=method)
-    diagnostics = red_mod.matrix_diagnostics(matrix)
-    return diagnostics.get("effective_signal_count")
-
-
 def _leave_one_out(*, signal_ids: List[str], grid: Dict[str, Any],
                    combination_inputs: Dict[str, Dict[Key, Optional[float]]],
+                   similarity_values: Dict[str, Dict[Key, Optional[float]]],
                    configuration: Dict[str, Any],
-                   strict_rows: List[Dict[str, Any]],
                    similarity: Dict[str, Any], analysis: Dict[str, Any],
                    prices: Optional[Dict[Tuple[str, str], float]],
                    full_metrics: Dict[str, Any]) -> List[Dict[str, Any]]:
@@ -1499,35 +1628,28 @@ def _leave_one_out(*, signal_ids: List[str], grid: Dict[str, Any],
         combined = combo_mod.combine(
             keys=grid["keys"], component_values=combination_inputs,
             policy=policy, signal_ids=remaining)
-        subset = [r for r in strict_rows
-                  if r["signal_a"] in remaining
-                  and r["signal_b"] in remaining]
-        absolutes = [abs(r["spearman"] if similarity["matrix_method"]
-                         == "spearman" else r["pearson"])
-                     for r in subset
-                     if (r["spearman"] if similarity["matrix_method"]
-                         == "spearman" else r["pearson"]) is not None]
+        remaining_raw_keys = align_mod.strict_intersection(grid, remaining)
+        remaining_keys = _common_value_keys(
+            remaining_raw_keys, similarity_values, remaining)
+        subset = _matrix_rows(
+            remaining, remaining_keys, similarity_values,
+            method=similarity["matrix_method"],
+            minimum=similarity["minimum_pair_overlap"])
+        absolutes = [
+            abs(row["correlations"][similarity["matrix_method"]]["statistic"])
+            for row in subset
+            if row["correlations"][similarity["matrix_method"]]["state"]
+            == "available"]
         mean_abs = (float(np.mean(absolutes)) if absolutes else None)
-        effective = _submatrix_effective_count(
-            strict_rows, remaining, similarity["matrix_method"])
+        reduced_matrix = red_mod.correlation_matrix(
+            subset, remaining, method=similarity["matrix_method"])
+        effective = red_mod.matrix_diagnostics(
+            reduced_matrix).get("effective_signal_count")
         spearman = spread = turnover_mean = None
         if analysis["horizons"] and prices is not None:
-            synthetic = []
-            for i, observation in enumerate(combined["observations"]):
-                if observation["state"] != "available":
-                    continue
-                synthetic.append({
-                    "observation_id": f"loo-{omitted}-{i:05d}",
-                    "entity_id": observation["entity_id"],
-                    "source_timestamp": observation["timestamp"],
-                    "generated_at": None,
-                    "available_at": observation["timestamp"],
-                    "availability_assumed": True,
-                    "raw_value": observation["combined_score"],
-                    "universe_membership_id": None, "metadata": {},
-                })
-            synthetic.sort(key=lambda r: (r["entity_id"],
-                                          r["source_timestamp"]))
+            synthetic = _synthetic_combination_rows(
+                combined["observations"], signal_ids=remaining, grid=grid,
+                prefix=f"loo-{omitted}")
             if synthetic:
                 built = sd_obs.build_pairs(
                     synthetic, target_type="forward_return",
@@ -1575,6 +1697,7 @@ def _leave_one_out(*, signal_ids: List[str], grid: Dict[str, Any],
 
         entry["metrics"] = {
             "coverage": combined["coverage"],
+            "similarity_observations": len(remaining_keys),
             "coverage_delta": _delta(combined["coverage"],
                                      full_metrics["coverage"]),
             "mean_absolute_correlation": mean_abs,
@@ -1706,47 +1829,77 @@ def _regime_rows(run, links, *, strict_keys: List[Key],
     return rows
 
 
-def _held_out_block(run, links, *, combination_pairs: List[Dict[str, Any]],
-                    strict_keys: List[Key],
-                    strict_rows: List[Dict[str, Any]],
-                    similarity: Dict[str, Any], analysis: Dict[str, Any],
-                    warnings: List[str]) -> Optional[Dict[str, Any]]:
-    identity = links.get("validation_identity")
-    if not identity:
-        return None
+def _validation_membership(
+        run: Dict[str, Any], identity: Dict[str, Any],
+        observations: Sequence[Dict[str, Any]]) -> Dict[str, Set[Key]]:
+    """Resolve stored split membership by explicit id or unique timestamp."""
     vrun = validation_store.get_run(run["validation_run_id"])
     splits = validation_store.list_splits(run["validation_run_id"])
-    split = next((s for s in splits
-                  if s["split_label"] == identity["split_label"]), None)
+    split = next((item for item in splits
+                  if item["split_label"] == identity["split_label"]), None)
     if vrun is None or split is None:
         raise ConflictError("the linked validation split is unavailable")
     _assert_pinned("validation split", split, identity,
                    {"split_fingerprint": "split_fingerprint"})
+
     samples_by_id = {sample["sample_id"]: sample
                      for sample in vrun["samples"]}
     ids_by_time: Dict[str, List[str]] = {}
     for sample_id, sample in samples_by_id.items():
-        ids_by_time.setdefault(sample.get("prediction_time"),
-                               []).append(sample_id)
-    memberships = {
+        ids_by_time.setdefault(
+            sample.get("prediction_time"), []).append(sample_id)
+    member_ids = {
         "train": set(split["train_ids"]),
         "test": set(split["test_ids"]),
         "purged": set(split["purged_ids"]),
         "embargoed": set(split["embargoed_ids"]),
     }
+    resolved: Dict[str, Set[Key]] = {
+        label: set() for label in member_ids}
+    for observation in observations:
+        if observation.get("raw_value") is None:
+            continue
+        source = observation["source_timestamp"]
+        sample_id = observation.get("universe_membership_id")
+        if sample_id is not None:
+            sample = samples_by_id.get(sample_id)
+            if sample is None:
+                raise ConflictError(
+                    f"combined observation references unknown validation "
+                    f"sample {sample_id!r}")
+            if sample.get("prediction_time") != source:
+                raise ConflictError(
+                    f"validation sample {sample_id!r} has prediction_time "
+                    f"{sample.get('prediction_time')!r}, not signal "
+                    f"timestamp {source!r}")
+        else:
+            candidates = ids_by_time.get(source, [])
+            if len(candidates) > 1:
+                raise ConflictError(
+                    f"validation membership is ambiguous at {source}; "
+                    f"supply one consistent universe_membership_id on "
+                    f"each component observation")
+            sample_id = candidates[0] if candidates else None
+        if sample_id is None:
+            continue
+        key = (observation["entity_id"], source)
+        for label, ids in member_ids.items():
+            if sample_id in ids:
+                resolved[label].add(key)
+    return resolved
 
-    def _bucket_of(stamp: str) -> Optional[str]:
-        candidates = ids_by_time.get(stamp, [])
-        if len(candidates) > 1:
-            raise ConflictError(
-                f"validation membership is ambiguous at {stamp}")
-        if not candidates:
-            return None
-        sample_id = candidates[0]
-        for label, member_ids in memberships.items():
-            if sample_id in member_ids:
-                return label
+
+def _held_out_block(run, links, *, combination_pairs: List[Dict[str, Any]],
+                    combination_observations: List[Dict[str, Any]],
+                    strict_keys: List[Key],
+                    normalised: Dict[str, Dict[Key, Optional[float]]],
+                    similarity: Dict[str, Any], analysis: Dict[str, Any],
+                    warnings: List[str]) -> Optional[Dict[str, Any]]:
+    identity = links.get("validation_identity")
+    if not identity:
         return None
+    memberships = _validation_membership(
+        run, identity, combination_observations)
 
     def _stats(pairs: List[Dict[str, Any]]) -> Dict[str, Any]:
         block = stats_mod.correlation_block(
@@ -1758,26 +1911,32 @@ def _held_out_block(run, links, *, combination_pairs: List[Dict[str, Any]],
                 "spearman": block["spearman"].get("statistic"),
                 "reason": block["spearman"].get("reason")}
 
+    def _pair_key(pair: Dict[str, Any]) -> Key:
+        return pair["entity_id"], pair["signal_timestamp"]
+
     train_pairs = [p for p in combination_pairs
-                   if _bucket_of(p["signal_timestamp"]) == "train"]
+                   if _pair_key(p) in memberships["train"]]
     test_pairs = [p for p in combination_pairs
-                  if _bucket_of(p["signal_timestamp"]) == "test"]
+                  if _pair_key(p) in memberships["test"]]
     purged = sum(1 for p in combination_pairs
-                 if _bucket_of(p["signal_timestamp"]) == "purged")
+                 if _pair_key(p) in memberships["purged"])
     embargoed = sum(1 for p in combination_pairs
-                    if _bucket_of(p["signal_timestamp"]) == "embargoed")
+                    if _pair_key(p) in memberships["embargoed"])
 
     def _redundancy_over(bucket: str) -> Optional[float]:
-        keys = [k for k in strict_keys if _bucket_of(k[1]) == bucket]
+        keys = [key for key in strict_keys
+                if key in memberships[bucket]]
         if len(keys) < similarity["minimum_pair_overlap"]:
             return None
-        absolutes: List[float] = []
-        for row in strict_rows:
-            correlation = row["correlations"].get(
-                similarity["matrix_method"])
-            if not correlation or correlation["state"] != "available":
-                continue
-            absolutes.append(abs(correlation["statistic"]))
+        rows = _matrix_rows(
+            sorted(normalised), keys, normalised,
+            method=similarity["matrix_method"],
+            minimum=similarity["minimum_pair_overlap"])
+        absolutes = [
+            abs(row["correlations"][similarity["matrix_method"]]["statistic"])
+            for row in rows
+            if row["correlations"][similarity["matrix_method"]]["state"]
+            == "available"]
         return float(np.mean(absolutes)) if absolutes else None
 
     leakage_clean = identity.get("leakage_clean")
@@ -1886,6 +2045,16 @@ def _run_bootstrap(config: Dict[str, Any], *, strict_keys: List[Key],
                    combination_pairs: List[Dict[str, Any]]
                    ) -> List[Dict[str, Any]]:
     stamps = sorted({k[1] for k in strict_keys})
+    if not stamps:
+        return [{
+            "statistic": statistic, "method": config["method"],
+            "seed": config["seed"], "resamples": config["resamples"],
+            "block_length": config.get("block_length"),
+            "quantiles": None,
+            "unavailable_resamples": config["resamples"],
+            "state": "unavailable",
+            "reason": "no common post-normalisation timestamps to resample",
+        } for statistic in config["statistics"]]
     keys_by_stamp: Dict[str, List[Key]] = {}
     for key in strict_keys:
         keys_by_stamp.setdefault(key[1], []).append(key)
@@ -2073,6 +2242,19 @@ def _scenario_metrics(overrides, configuration, uni, analysis, similarity,
         "horizon",
         analysis["horizons"][0] if analysis["horizons"] else None)
     entry_lag = overrides.get("entry_lag", analysis["entry_lags"][0])
+    if horizon is not None and (
+            isinstance(horizon, bool) or not isinstance(horizon, int)
+            or not (1 <= horizon <= 250)):
+        raise SignalEnsembleError(
+            "scenario horizon must be an integer in [1, 250]")
+    if horizon is not None and prices is None:
+        raise SignalEnsembleError(
+            "scenario horizon evaluation requires supplied prices")
+    if isinstance(entry_lag, bool) or not isinstance(entry_lag, int) \
+            or not (0 <= entry_lag <= 60):
+        raise SignalEnsembleError(
+            "scenario entry_lag must be an integer in [0, 60]")
+
 
     grid = align_mod.build_grid(uni["observations"])
     stored_keys = {signal_id: [(r["entity_id"], r["source_timestamp"])
@@ -2087,18 +2269,12 @@ def _scenario_metrics(overrides, configuration, uni, analysis, similarity,
             config=normalisation[signal_id],
             tie_policy=uni["definitions"][signal_id]["tie_policy"])
         normalised[signal_id] = result["values"]
-    strict_keys = align_mod.strict_intersection(grid, signal_ids)
-    resampled_rows: List[Dict[str, Any]] = []
-    for signal_a, signal_b in pair_mod.pair_order(signal_ids):
-        xs = [normalised[signal_a].get(k) for k in strict_keys]
-        ys = [normalised[signal_b].get(k) for k in strict_keys]
-        correlation = stats_mod.correlation(
-            xs, ys, method=matrix_method,
-            minimum_observations=similarity["minimum_pair_overlap"],
-            overlapping=False)
-        resampled_rows.append({
-            "signal_a": signal_a, "signal_b": signal_b,
-            "correlations": {matrix_method: correlation}})
+    strict_raw_keys = align_mod.strict_intersection(grid, signal_ids)
+    matrix_keys = _common_value_keys(
+        strict_raw_keys, normalised, signal_ids)
+    resampled_rows = _matrix_rows(
+        signal_ids, matrix_keys, normalised, method=matrix_method,
+        minimum=similarity["minimum_pair_overlap"])
     absolutes = [abs(r["correlations"][matrix_method]["statistic"])
                  for r in resampled_rows
                  if r["correlations"][matrix_method]["state"]
@@ -2106,27 +2282,30 @@ def _scenario_metrics(overrides, configuration, uni, analysis, similarity,
     matrix = red_mod.correlation_matrix(resampled_rows, signal_ids,
                                         method=matrix_method)
     diagnostics = red_mod.matrix_diagnostics(matrix)
+    if combination_policy["mode"] == "rank_average":
+        combination_values: Dict[str, Dict[Key, Optional[float]]] = {}
+        for signal_id in signal_ids:
+            result = norm_mod.normalise_signal(
+                oriented=oriented[signal_id],
+                stored_keys=stored_keys[signal_id],
+                config={"mode": "cross_sectional_rank_percentile",
+                        "ddof": 1, "minimum_observations":
+                            normalisation[signal_id]
+                            ["minimum_observations"],
+                        "window": None, "include_current": False},
+                tie_policy=uni["definitions"][signal_id]["tie_policy"])
+            combination_values[signal_id] = result["values"]
+    else:
+        combination_values = normalised
+
     combined = combo_mod.combine(
-        keys=grid["keys"], component_values=normalised,
+        keys=grid["keys"], component_values=combination_values,
         policy=combination_policy, signal_ids=signal_ids)
     spearman = spread = turnover_mean = None
     if horizon is not None and prices is not None:
-        synthetic = []
-        for i, observation in enumerate(combined["observations"]):
-            if observation["state"] != "available":
-                continue
-            synthetic.append({
-                "observation_id": f"sc-{i:05d}",
-                "entity_id": observation["entity_id"],
-                "source_timestamp": observation["timestamp"],
-                "generated_at": None,
-                "available_at": observation["timestamp"],
-                "availability_assumed": True,
-                "raw_value": observation["combined_score"],
-                "universe_membership_id": None, "metadata": {},
-            })
-        synthetic.sort(key=lambda r: (r["entity_id"],
-                                      r["source_timestamp"]))
+        synthetic = _synthetic_combination_rows(
+            combined["observations"], signal_ids=signal_ids, grid=grid,
+            prefix="sc")
         if synthetic:
             built = sd_obs.build_pairs(
                 synthetic, target_type="forward_return", prices=prices,

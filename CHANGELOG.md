@@ -98,7 +98,7 @@ claimed by an entry here.
   accessible table, redundancy/effective-count panel, cluster table,
   contribution view, full-vs-LOO, horizon/turnover/cost/regime/held-out/
   factor/bootstrap/sensitivity sections, six-fingerprint policy panel),
-  71 backend tests and a 26-test Playwright spec. Nothing here proves
+  80 backend tests and a 26-test Playwright spec. Nothing here proves
   signal independence, diversification, predictability or alpha,
   recommends signals, weights or an ensemble, optimises a combination,
   executes trades, or is investment advice.

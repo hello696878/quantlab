@@ -320,7 +320,7 @@ export default function SignalEnsemblePanel({ onNav }: { onNav?: (view: string) 
                   <th scope="col" className="px-3 py-3 text-right">Signals</th>
                   <th scope="col" className="px-3 py-3 text-right">Obs.</th>
                   <th scope="col" className="px-3 py-3 text-right">Strict keys</th>
-                  <th scope="col" className="px-3 py-3 text-right">Coverage</th>
+                  <th scope="col" className="px-3 py-3 text-right">Combined available</th>
                   <th scope="col" className="px-3 py-3 text-right">Mean |ρ|</th>
                   <th scope="col" className="px-3 py-3 text-right">Effective count</th>
                   <th scope="col" className="px-3 py-3 text-left">Integrity</th>
@@ -357,10 +357,7 @@ export default function SignalEnsemblePanel({ onNav }: { onNav?: (view: string) 
                     <td className="px-3 py-2 text-right font-mono">{run.observation_count}</td>
                     <td className="px-3 py-2 text-right font-mono">{run.strict_intersection_count}</td>
                     <td className="px-3 py-2 text-right font-mono">
-                      {run.combined_available_count !== null && run.strict_intersection_count
-                        ? fmtPct(run.combined_available_count
-                            / Math.max(1, run.observation_count / run.signal_count), 0)
-                        : "—"}
+                      {run.combined_available_count ?? "—"}
                     </td>
                     <td className="px-3 py-2 text-right font-mono">{fmtNum(run.mean_absolute_correlation, 3)}</td>
                     <td className="px-3 py-2 text-right font-mono">{fmtNum(run.effective_signal_count, 2)}</td>

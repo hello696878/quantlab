@@ -28,6 +28,7 @@ import {
 } from "@/lib/signalEnsemble";
 import { toast } from "@/lib/toast";
 import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
+import ErrorState from "@/components/ui/ErrorState";
 import {
   CompletenessPill,
   IntegrityPill,
@@ -48,12 +49,15 @@ export default function SignalEnsembleDetail({ run: initial, onBack, onNav }: Pr
   const [components, setComponents] = useState<ComponentRow[] | null>(null);
   const [horizons, setHorizons] = useState<HorizonRow[] | null>(null);
   const [regimes, setRegimes] = useState<RegimeRow[] | null>(null);
+  const [detailError, setDetailError] = useState<unknown>(null);
+  const [retryTick, setRetryTick] = useState(0);
   const [bootstrap, setBootstrap] = useState<BootstrapRow[] | null>(null);
   const [sensitivity, setSensitivity] = useState<SensitivityRow[] | null>(null);
   const [marking, setMarking] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
+    setDetailError(null);
     Promise.all([
       getPairwise(run.id), getComponents(run.id), getHorizons(run.id),
       getRegimes(run.id), getBootstrap(run.id), getSensitivity(run.id),
@@ -68,12 +72,21 @@ export default function SignalEnsembleDetail({ run: initial, onBack, onNav }: Pr
         setBootstrap(boot.items);
         setSensitivity(sen.items);
       })
-      .catch((err) => toast.error("Couldn’t load run details",
-        classifyApiError(err).message));
+      .catch((err) => {
+        if (cancelled) return;
+        setDetailError(err);
+        setPairwise([]);
+        setObservations([]);
+        setComponents([]);
+        setHorizons([]);
+        setRegimes([]);
+        setBootstrap([]);
+        setSensitivity([]);
+      });
     return () => {
       cancelled = true;
     };
-  }, [run.id]);
+  }, [run.id, retryTick]);
 
   async function handleBaseline() {
     setMarking(true);
@@ -189,6 +202,13 @@ export default function SignalEnsembleDetail({ run: initial, onBack, onNav }: Pr
         </div>
       )}
 
+      {detailError !== null && (
+        <ErrorState
+          title="Could not load all run details"
+          message={classifyApiError(detailError).message}
+          onRetry={() => setRetryTick((value) => value + 1)}
+        />
+      )}
       {/* ---------------- signals + missingness ---------------- */}
       <div className="card overflow-hidden" data-testid="ensemble-missingness">
         <SectionHeader title="Signals, orientation and missingness"
@@ -238,7 +258,10 @@ export default function SignalEnsembleDetail({ run: initial, onBack, onNav }: Pr
           <p className="px-4 py-2 text-xs text-slate-500">
             Union keys {run.missingness.union_keys} · strict intersection{" "}
             {run.missingness.strict_intersection_keys} (
-            {fmtPct(run.missingness.strict_intersection_coverage, 1)} of the union).
+            {fmtPct(run.missingness.strict_intersection_coverage, 1)} of the union)
+            {" "}· common post-normalisation matrix sample{" "}
+            {run.missingness.post_normalisation_intersection_keys
+              ?? run.missingness.strict_intersection_keys}.
           </p>
         )}
       </div>
