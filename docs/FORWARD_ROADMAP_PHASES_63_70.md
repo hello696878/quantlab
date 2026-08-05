@@ -19,17 +19,49 @@ each entry:
 - every statistic honest: unavailable states with reasons, no fabricated
   p-values, gross and costed figures separate.
 
-Sequencing rationale: 63 closes the biggest capability gap with existing
-infrastructure → 64 unifies the ML islands that 63 will want to consume →
-65 gives every run a replayable identity (needed before an explainer can
-cite runs) → 66 protects the frontend that all of it surfaces through →
+Sequencing rationale: 63 adds the missing frontend invariant and component-test
+layer before another large panel lands → 64 closes the biggest capability gap
+with existing infrastructure → 65 unifies the ML islands that 64 can consume →
+66 gives every run a replayable identity (needed before an explainer can cite
+runs) →
 67 defines the real-data contract → 68 uses 67's discipline plus 59's
-factor tooling on the scanner → 69 explains what 65 made citable → 70
+factor tooling on the scanner → 69 explains what 66 made citable → 70
 plans exposure of the result.
 
 ---
 
-## Phase 63 — Strategy Return Stream, Strategy Similarity and Portfolio Ensemble Diagnostics Lab v1 · **SELECTED NEXT**
+## Phase 63 — Frontend Component Test Foundation and Registry Drift Guards v1 · **SELECTED NEXT**
+
+**Goal.** Give the frontend its first unit/component test layer and stop
+registry-versus-route drift silently.
+
+**Dependencies.** None technical; benefits everything.
+
+**Scope.** A component test framework decision (Vitest + Testing Library
+is the natural fit for Next 14 + TS) with a small, high-value suite:
+registry invariants (slug uniqueness, every `live` model resolving to a
+real strategy id, every registry route existing in the view union),
+formatting helpers (`fmtNum`/`fmtPct`/`fmtP` null and non-finite paths),
+and pill/state components. Plus a drift guard test that fails when a
+sidebar item, view union member or registry entry loses its counterpart.
+
+**Explicit non-scope.** No visual/pixel regression; no snapshot sprawl;
+no rewrite of existing Playwright specs; no CI gating change without the
+user's decision.
+
+**Commits/tag.** `Add frontend component test foundation registry drift
+guards v1` → `Review …` → `v4.81.0-frontend-component-tests-registry-drift-guards-v1`.
+
+**Acceptance criteria.** The new suite runs offline in seconds; a
+deliberately broken registry entry fails a test; `npx tsc --noEmit` and
+the Playwright suite stay green.
+
+**Risks.** A new dev dependency — must be dev-only, offline, and
+explicitly approved in that phase.
+
+---
+
+## Phase 64 — Strategy Return Stream, Strategy Similarity and Portfolio Ensemble Diagnostics Lab v1
 
 **Goal.** Measure how multiple stored **strategy return streams** relate
 to one another and what explicit, user-configured combinations of them
@@ -78,7 +110,7 @@ strategy generation.
 
 **Commits/tag.** `Add strategy return stream similarity portfolio
 ensemble diagnostics lab v1` → `Review …` → expected
-`v4.81.0-strategy-return-stream-similarity-portfolio-ensemble-v1`.
+`v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-v1`.
 
 **Acceptance criteria.** Hand-computable demo cases (identical streams →
 correlation 1 and zero diversification effect; anti-correlated pair;
@@ -98,7 +130,7 @@ recommended; the overclaim scan must cover "optimal allocation",
 
 ---
 
-## Phase 64 — Unified ML Research Lifecycle and Model Artifact Registry v1
+## Phase 65 — Unified ML Research Lifecycle and Model Artifact Registry v1
 
 **Goal.** Join the two ML islands (the CLI futures loop and the
 API/SQLite diagnostics chain) into one traceable lifecycle: dataset →
@@ -106,7 +138,7 @@ features → labels → training → purged validation → calibration →
 held-out predictions → cost-aware evaluation → artifact registry →
 comparison.
 
-**Why here.** Phase 63 will want strategy streams that came from
+**Why here.** Phase 64 will want strategy streams that came from
 somewhere traceable, and every later phase benefits from one model
 identity instead of two.
 
@@ -125,7 +157,7 @@ no AutoML or hyperparameter search; no automatic retraining; no unsafe
 deserialisation; no remote registry.
 
 **Commits/tag.** `Add unified ml research lifecycle model artifact
-registry v1` → `Review …` → `v4.82.0-unified-ml-lifecycle-model-artifact-registry-v1`.
+registry v1` → `Review …` → `v4.83.0-unified-ml-lifecycle-model-artifact-registry-v1`.
 
 **Acceptance criteria.** One demo run traverses every stage with a
 single identity; refusal paths tested (missing dataset version,
@@ -137,14 +169,14 @@ adapters only.
 
 ---
 
-## Phase 65 — Reproducible Run Replay by Hash and Environment Manifest v1
+## Phase 66 — Reproducible Run Replay by Hash and Environment Manifest v1
 
 **Goal.** Make a stored run recreatable from its hash: resolve a config
 hash to its canonical configuration, attach an environment manifest, and
 give the UI a replay path.
 
 **Dependencies.** Phase 12.7 config hash; Phase 49 dataset versions;
-Phase 64 artifact identity.
+Phase 65 artifact identity.
 
 **Scope.** Persist `config_hash` with saved runs; a resolve endpoint
 (hash → canonical config, never auto-executing); an environment manifest
@@ -156,7 +188,7 @@ prefills the form and states explicitly what could not be reproduced.
 automatic re-execution; no cloud storage; no user accounts.
 
 **Commits/tag.** `Add reproducible run replay by hash environment
-manifest v1` → `Review …` → `v4.83.0-reproducible-run-replay-environment-manifest-v1`.
+manifest v1` → `Review …` → `v4.84.0-reproducible-run-replay-environment-manifest-v1`.
 
 **Acceptance criteria.** Round-trip test (config → hash → resolve →
 identical canonical config); environment mismatch surfaces as a warning,
@@ -167,40 +199,10 @@ the manifest must state what it does and does not guarantee.
 
 ---
 
-## Phase 66 — Frontend Component Test Foundation and Registry Drift Guards v1
+## Phase 67 — Futures Point-in-Time Data Contract, Calendar Foundation and Adapter Specification v1
 
-**Goal.** Give the frontend its first unit/component test layer and stop
-registry-versus-route drift silently.
-
-**Dependencies.** None technical; benefits everything.
-
-**Scope.** A component test framework decision (Vitest + Testing Library
-is the natural fit for Next 14 + TS) with a small, high-value suite:
-registry invariants (slug uniqueness, every `live` model resolving to a
-real strategy id, every registry route existing in the view union),
-formatting helpers (`fmtNum`/`fmtPct`/`fmtP` null and non-finite paths),
-and pill/state components. Plus a drift guard test that fails when a
-sidebar item, view union member or registry entry loses its counterpart.
-
-**Explicit non-scope.** No visual/pixel regression; no snapshot sprawl;
-no rewrite of existing Playwright specs; no CI gating change without the
-user's decision.
-
-**Commits/tag.** `Add frontend component test foundation registry drift
-guards v1` → `Review …` → `v4.84.0-frontend-component-tests-registry-drift-guards-v1`.
-
-**Acceptance criteria.** The new suite runs offline in seconds; a
-deliberately broken registry entry fails a test; `npx tsc --noEmit` and
-the Playwright suite stay green.
-
-**Risks.** A new dev dependency — must be dev-only, offline, and
-explicitly approved in that phase.
-
----
-
-## Phase 67 — Futures Point-in-Time Data Contract, Calendar and Real-Data Adapter Specification v1
-
-**Goal.** Specify (not integrate) what real futures data would require:
+**Goal.** Specify what real futures data would require and implement the
+local calendar/validation foundation without integrating a provider:
 a point-in-time contract, a session/holiday calendar model, correction
 and vintage policy, provenance and licensing rules, and an adapter
 interface behind the existing fail-closed seam.
@@ -217,11 +219,12 @@ adapter interface definition with fail-closed defaults; licensing and
 attribution requirements written down.
 
 **Explicit non-scope.** No vendor integration, no API keys, no paid
-subscription, no downloads, no scraping — specification plus local
-validation only.
+subscription, no downloads, no scraping — contract and adapter specification
+plus local calendar/validation implementation only.
 
 **Commits/tag.** `Add futures point in time data contract calendar
-adapter specification v1` → `Review …` → `v4.85.0-futures-point-in-time-contract-calendar-adapter-spec-v1`.
+foundation adapter specification v1` → `Review …` →
+`v4.85.0-futures-point-in-time-contract-calendar-foundation-adapter-spec-v1`.
 
 **Acceptance criteria.** A local CSV corpus validates against the
 contract; a deliberately restated bar is detected rather than silently
@@ -266,39 +269,39 @@ disclaimers must stay at Phase 59/61 standards.
 
 ---
 
-## Phase 69 — AI Research Explainer with Evidence-Grounded Output v1
+## Phase 69 — Evidence-Grounded Research Explainer v1 (Deterministic)
 
 **Goal.** Explain stored results in plain language, citing only values
 that exist in a stored run — never recommending anything.
 
-**Dependencies.** Phase 65 (a run must be citable and replayable),
-Phase 64 (model identity), the existing per-lab policy documents that
+**Dependencies.** Phase 66 (a run must be citable and replayable),
+Phase 65 (model identity), the existing per-lab policy documents that
 supply the honest vocabulary.
 
 **Scope.** An explanation service that reads a stored run, produces a
 structured narrative where **every numeric claim carries a provenance
 reference** to the field it came from, refuses when the underlying value
 is unavailable, and is constrained by an explicit banned-claim list
-(no predictions, no advice, no "good/bad" verdicts). A deterministic,
-offline template mode must exist as the default; any model-backed mode
-is opt-in, local-only, and produces the same provenance structure.
+(no predictions, no advice, no "good/bad" verdicts). The v1 renderer is
+deterministic and offline: validated templates map stored fields to prose
+without any generative model or provider.
 
 **Explicit non-scope.** No trading or investment advice; no
-recommendations of signals, strategies, weights or horizons; no cloud
-LLM calls without an explicit user decision in that phase; no
-free-form generation without provenance; no persuasion or confidence
-language.
+recommendations of signals, strategies, weights or horizons; no local or
+cloud LLM/model calls; no provider credentials or new model dependency;
+no free-form generation; no persuasion or confidence language.
 
-**Commits/tag.** `Add ai research explainer evidence grounded output v1`
-→ `Review …` → `v4.87.0-ai-research-explainer-evidence-grounded-v1`.
+**Commits/tag.** `Add deterministic evidence grounded research explainer
+v1`
+→ `Review …` → `v4.87.0-deterministic-evidence-grounded-research-explainer-v1`.
 
 **Acceptance criteria.** Every sentence in an explanation maps to a
 stored field or is a stated limitation; a run with unavailable
 statistics produces an explanation that says so; the banned-claim scan
-passes on generated output as well as on source code.
+passes on rendered output as well as on source code.
 
 **Risks.** The highest wording risk in the roadmap; mitigated by
-template-first design, provenance requirements and generated-output
+template-only design, provenance requirements and rendered-output
 scanning.
 
 ---
@@ -308,7 +311,7 @@ scanning.
 **Goal.** Produce the plan and the hardening work for a **read-only**
 public demo, without adding authentication or multi-user features.
 
-**Dependencies.** Phase 66 (frontend guards), the frozen demo baseline,
+**Dependencies.** Phase 63 (frontend guards), the frozen demo baseline,
 `docs/DEPLOYMENT_READINESS.md`.
 
 **Scope.** A read-only mode specification (which endpoints are disabled,
@@ -342,14 +345,14 @@ plan plus local hardening, with the unbuilt parts named.
 
 | Phase | Title | Status of dependencies | New dependency? | Data boundary |
 |---|---|---|---|---|
-| 63 | Strategy return stream / ensemble diagnostics | all present | none | supplied series + stored local runs |
-| 64 | Unified ML lifecycle + artifact registry | 63 helps, not required | none | local artifacts only |
-| 65 | Replay by hash + environment manifest | 64 recommended | none | local only |
-| 66 | Frontend component tests + drift guards | none | dev-only test runner (decision required) | none |
-| 67 | Futures point-in-time contract + calendars | local pipeline present | none (spec only) | local CSV only |
+| 63 | Frontend component tests + drift guards | none | dev-only test runner (decision required) | none |
+| 64 | Strategy return stream / ensemble diagnostics | frontend guards from 63 | none | supplied series + stored local runs |
+| 65 | Unified ML lifecycle + artifact registry | 64 helps, not required | none | local artifacts only |
+| 66 | Replay by hash + environment manifest | 65 recommended | none | local only |
+| 67 | Futures point-in-time contract + calendar foundation | local pipeline present | none | local CSV only |
 | 68 | Cross-sectional neutralisation + scanner validation | 59, 52, 53 present; 67 helps | none | synthetic universe |
-| 69 | AI research explainer | 65 required, 64 recommended | opt-in local model only (decision required) | stored runs only |
-| 70 | Read-only hosted demo + hardening plan | 66 recommended | none | local demo data |
+| 69 | Deterministic evidence-grounded explainer | 66 required, 65 recommended | none | stored runs only |
+| 70 | Read-only hosted demo + hardening plan | 63 recommended | none | local demo data |
 
 Phases 63–70 deliberately schedule **no** live execution, **no** paid
 providers and **no** automatic investment recommendations.

@@ -27,7 +27,8 @@ Companion documents:
 | `deferred` | Intentionally postponed with no selected implementation phase. |
 | `deliberate_non_goal` | Prohibited by the platform positioning (e.g. real-money order execution). |
 
-A **workspace is not a model**: ~40 interactive workspaces exist, but a
+A **workspace is not a model**: the authoritative frontend `View` union has
+57 routed top-level view identifiers, but a
 single workspace (for example the Options Lab) contains several models,
 while other workspaces contain none (Demo Center, QA Command Center).
 Neither number is a percentage of the aspirational ~100-model catalog,
@@ -39,12 +40,12 @@ anywhere in the repository.
 
 | Status | Phase-order areas (20) | Model categories (12) |
 |---|---|---|
-| `built` | 7 | 2 |
-| `built_partial` | 9 | 8 |
-| `planned` | 1 | 0 |
-| `research` | 1 | 1 |
-| `deferred` | 2 | 0 |
-| `deliberate_non_goal` | 0 | 1 (within category 10) |
+| `built` | 3 | 2 |
+| `built_partial` | 15 | 10 |
+| `planned` | 0 | 0 |
+| `research` | 2 | 0 |
+| `deferred` | 0 | 0 |
+| `deliberate_non_goal` | 0 | 0 (category 10 contains such components but has primary status `built_partial`) |
 
 Every item below carries exactly one current status.
 
@@ -79,7 +80,7 @@ Every item below carries exactly one current status.
 | Docs evidence | `docs/EXPERIMENT_REPRODUCIBILITY_POLICY.md` |
 | Latest relevant phase | 12.7 |
 | Dependencies | Dataset Lineage (49.0) for dataset versions; experiment store hashes |
-| Next action | **Phase 65** — replay by hash + environment manifest |
+| Next action | **Phase 66** — replay by hash + environment manifest |
 | Public-facing | Yes · **Release-blocking:** No |
 
 ### 3. Robustness / Stability — `built_partial`
@@ -87,7 +88,7 @@ Every item below carries exactly one current status.
 | Field | Value |
 |---|---|
 | Implemented scope | Seeded block-bootstrap Monte Carlo over realized daily returns with distributions of final return, max drawdown and Sharpe (never mutates the core backtest); SMA fast×slow parameter-sensitivity grid re-run through the identical pipeline with a metric-tabbed heatmap. Separately, Phase 53's Overfitting lab implements PBO/CSCV, deflated Sharpe and multiple-testing corrections. |
-| Missing scope | Inside *this* lab: deflated Sharpe is null in v1, PBO is not implemented, the sweep supports only SMA, and the A–F grade is heuristic. No stationary/circular bootstrap选择, no cross-lab bridge that feeds Robustness output into the Overfitting lab. |
+| Missing scope | Inside *this* lab: deflated Sharpe is null in v1, PBO is not implemented, the sweep supports only SMA, and the A-F grade is heuristic. No stationary/circular bootstrap option and no cross-lab bridge that feeds Robustness output into the Overfitting lab. |
 | Backend evidence | `backend/app/robustness.py`, `backend/app/sensitivity.py`; separately `backend/app/overfitting_diagnostics/` |
 | Frontend evidence | `frontend/src/components/RobustnessLabCard.tsx`, `frontend/src/components/StabilityLabCard.tsx`, `frontend/src/components/OverfittingDiagnosticsPanel.tsx` |
 | Test evidence | `backend/tests/test_robustness.py` (18), `backend/tests/test_sensitivity.py` (20), `backend/tests/test_overfitting_diagnostics.py` |
@@ -101,23 +102,23 @@ Every item below carries exactly one current status.
 
 | Field | Value |
 |---|---|
-| Implemented scope | Typed registry of 14 model entries (7 `live` with a `strategyId` linking into Backtest Studio) with hypothesis, signal logic, parameters, strengths, failure modes and cost notes; index + detail panel with deep links and cross-links into papers/disasters. |
-| Missing scope | 7 of 14 entries are documentation stubs; blueprint scale implies many more implemented models. **No automated test at all** for the registry or panel (no slug-uniqueness or registry-vs-route drift guard). |
+| Implemented scope | Typed registry of 13 entries: 6 `live` entries with a `strategyId` and full strategy detail linking into Backtest Studio, plus 2 `built` scanner summaries and 5 planned/research/future catalog summaries; index + detail panel with deep links and cross-links into papers/disasters. |
+| Missing scope | The 5 planned/research/future entries are documentation-only, and the 2 scanner entries are summaries rather than Backtest Studio strategies. Blueprint scale implies many more implemented models. **No automated test at all** for the registry or panel (no slug-uniqueness or registry-vs-route drift guard). |
 | Backend evidence | `backend/app/strategies.py`, `backend/app/backtest.py`, `backend/app/strategy_gallery.py` |
-| Frontend evidence | `frontend/src/lib/modelRegistry.ts` (568 lines, 14 entries), `frontend/src/components/StrategyLibraryPanel.tsx` |
+| Frontend evidence | `frontend/src/lib/modelRegistry.ts` (13 entries), `frontend/src/components/StrategyLibraryPanel.tsx` |
 | Test evidence | Indirect only: `backend/tests/test_backtest.py` (21), `backend/tests/test_bb_strategy.py` (27). No registry test. |
 | Docs evidence | `docs/ROADMAP.md` (Phase 13.0), `docs/PROJECT_OVERVIEW.md` |
 | Latest relevant phase | 13.0 |
 | Dependencies | Core engine |
-| Next action | **Phase 66** — registry drift guards + component tests |
+| Next action | **Phase 63** — registry drift guards + component tests |
 | Public-facing | Yes · **Release-blocking:** No |
 
 ### 5. Paper Replication Series — `built_partial`
 
 | Field | Value |
 |---|---|
-| Implemented scope | 9 classic-paper entries with research question, original method, "what QuantLab can do today", data requirements, limitations and an explicit `replicationLevel`; 4 live, 3 carrying a run-preset that preselects a strategy/ticker (never auto-running). |
-| Missing scope | No entry reaches `simplified_replication` or `full_replication` — nothing reproduces a paper's universe, rebalancing or reported results (needs cross-sectional data + formation/holding portfolio construction + factor benchmarks). 5 of 9 entries are planned text. No tests. |
+| Implemented scope | 8 classic-paper entries with research question, original method, "what QuantLab can do today", data requirements, limitations and an explicit `replicationLevel`; 3 are `live` inspired demos and each carries a run-preset that preselects a strategy/ticker (never auto-running). |
+| Missing scope | No entry reaches `simplified_replication` or `full_replication` — nothing reproduces a paper's universe, rebalancing or reported results (needs cross-sectional data + formation/holding portfolio construction + factor benchmarks). 5 of 8 entries are planned/future text. No tests. |
 | Backend evidence | Routes into `backend/app/backtest.py` / `strategies.py` presets |
 | Frontend evidence | `frontend/src/lib/paperRegistry.ts` (367 lines), `frontend/src/components/PaperReplicationsPanel.tsx` |
 | Test evidence | None dedicated (no e2e spec, no unit test); indirect backend strategy tests only |
@@ -244,7 +245,7 @@ Every item below carries exactly one current status.
 | Docs evidence | `docs/LIMITATIONS.md` |
 | Latest relevant phase | 19.0–19.3 |
 | Dependencies | Phase 50 Model Validation (CPCV), Phase 51 Meta-Labeling |
-| Next action | **Phase 64** unifies the ML lifecycle across these islands |
+| Next action | **Phase 65** unifies the ML lifecycle across these islands |
 | Public-facing | Yes · **Release-blocking:** No |
 
 ### 14. Global Markets Globe — `built`
@@ -259,7 +260,7 @@ Every item below carries exactly one current status.
 | Docs evidence | `docs/GLOBE_DATA.md` |
 | Latest relevant phase | 20.0 + data-layer phases |
 | Dependencies | Optional providers only |
-| Next action | Optional: add a globe e2e spec in Phase 66 |
+| Next action | Optional: add a dedicated globe e2e spec separately |
 | Public-facing | Yes · **Release-blocking:** No |
 
 ### 15. Portfolio Studio and Strategy Ensemble Builder — `built_partial`
@@ -274,7 +275,7 @@ Every item below carries exactly one current status.
 | Docs evidence | `docs/PORTFOLIO_CONSTRUCTION_POLICY.md`, `docs/SIGNAL_ENSEMBLE_DIAGNOSTICS_LAB.md` |
 | Latest relevant phase | 56.0–58.0 (portfolio), 61.0 (signal ensemble) |
 | Dependencies | Phases 55–61 infrastructure |
-| Next action | **Phase 63** — strategy return-stream ensemble diagnostics (selected next phase) |
+| Next action | **Phase 64** — strategy return-stream ensemble diagnostics |
 | Public-facing | Yes · **Release-blocking:** No |
 
 ### 16. ML and AI Lab — `built_partial`
@@ -289,10 +290,10 @@ Every item below carries exactly one current status.
 | Docs evidence | `docs/AI_QUANT_ARCHITECTURE.md`, `docs/EXPERIMENT_REPRODUCIBILITY_POLICY.md`, `docs/MODEL_VALIDATION_LAB.md` |
 | Latest relevant phase | 50.0–61.0 + the local futures track |
 | Dependencies | Experiment Registry, Dataset Lineage |
-| Next action | **Phase 64** — unified ML lifecycle + model artifact registry |
+| Next action | **Phase 65** — unified ML lifecycle + model artifact registry |
 | Public-facing | Partly (labs yes; ML loop no) · **Release-blocking:** No |
 
-### 17. AI Explainer Copilot — `planned`
+### 17. AI Explainer Copilot — `research`
 
 | Field | Value |
 |---|---|
@@ -303,8 +304,8 @@ Every item below carries exactly one current status.
 | Test evidence | None |
 | Docs evidence | `docs/MASTER_BLUEPRINT_V3.md` (listed as future) |
 | Latest relevant phase | — |
-| Dependencies | Phase 65 replay identity (so explanations cite reproducible runs) |
-| Next action | **Phase 69** — evidence-grounded explainer (no trade advice, ever) |
+| Dependencies | Phase 66 replay identity; a separately approved local model/runtime would be required for an actual copilot |
+| Next action | Phase 69 builds a deterministic evidence-grounded renderer only; model-backed AI remains unscheduled research |
 | Public-facing | Would be · **Release-blocking:** No |
 
 ### 18. 3D Visualization Engine — `research`
@@ -326,7 +327,7 @@ Every item below carries exactly one current status.
 
 | Field | Value |
 |---|---|
-| Implemented scope | Quant Disasters: 7 case studies with severity/category, failure modes, simplified mechanism, "what a naive backtest would miss", a trust checklist with available true/false flags, "cannot model yet" lists and lessons, cross-linked to models and papers. Dashboard: hero workflows, trust-layer grid, content cards, featured items, health/offline tiles. |
+| Implemented scope | Quant Disasters: 6 case studies with severity/category, failure modes, simplified mechanism, "what a naive backtest would miss", a trust checklist with available true/false flags, "cannot model yet" lists and lessons, cross-linked to models and papers. Dashboard: hero workflows, trust-layer grid, content cards, featured items, health/offline tiles. |
 | Missing scope | No disaster case is runnable as a scenario (the registry has no run-preset); a blueprint version would need replayable stress scenarios with historical windows wired into the stress/scenario engines. Content is static frontend data with no backend. Broader content engine (authoring, versioning) absent. |
 | Backend evidence | None for disasters (frontend-static); health endpoint consumed by the dashboard |
 | Frontend evidence | `frontend/src/lib/disasterRegistry.ts` (399), `frontend/src/components/QuantDisastersPanel.tsx` (302), `HomeDashboard.tsx` |
@@ -341,11 +342,11 @@ Every item below carries exactly one current status.
 
 | Field | Value |
 |---|---|
-| Implemented scope | QA Command Center, Demo Center and Data Reliability packages with deterministic registries and analyze endpoints; Release Notes Center, Public Release Candidate, Portfolio Showcase and Developer Onboarding panels; release docs (checklist, notes template, manifest, milestone history); checksum verifier and print-summary scripts; CI (backend tests + frontend build) and a manual `workflow_dispatch` Browser E2E Preflight; a frozen demo baseline with五 screenshots and regression fixtures. |
-| Missing scope | Hosted deployment: no authentication, no multi-user isolation (single-user SQLite by design), no backups/migration ops, no monitoring, no secret management beyond env-var docs, no hosting target/HTTPS/reverse proxy, no provider governance for a public instance. |
+| Implemented scope | QA Command Center, Demo Center and Data Reliability packages with deterministic registries and analyze endpoints; Release Notes Center, Public Release Candidate, Portfolio Showcase and Developer Onboarding panels; release docs (checklist, notes template, manifest, milestone history); checksum verifier and print-summary scripts; backend/frontend Dockerfiles and Docker Compose for local use; CI (backend tests + frontend build) and a manual `workflow_dispatch` Browser E2E Preflight; a frozen demo baseline with five screenshots and regression fixtures. |
+| Missing scope | Hosted deployment: no authentication, no multi-user isolation (single-user SQLite by design), no backup/restore operations, no versioned migration/rollback tooling, no monitoring, no production secret management, no selected hosting target/HTTPS/reverse proxy, and no provider governance for a public instance. Local containers are development/demo tooling, not deployment readiness. |
 | Backend evidence | `backend/app/qa_command_center/`, `demo_center/`, `data_reliability/` + their routers |
 | Frontend evidence | `ReleaseNotesCenterPanel.tsx`, `PublicReleaseCandidatePanel.tsx`, `PortfolioShowcasePanel.tsx`, `DeveloperOnboardingPanel.tsx`, `QaCommandCenterPanel.tsx` |
-| Test evidence | `backend/tests/test_qa_command_center.py` (24), `test_demo_center.py` (23), `test_data_reliability.py`; `frontend/e2e/` (19 spec files) |
+| Test evidence | `backend/tests/test_qa_command_center.py` (24), `test_demo_center.py` (23), `test_data_reliability.py`; `frontend/e2e/` (18 spec files + `helpers.ts`) |
 | Docs evidence | `docs/DEPLOYMENT_READINESS.md`, `docs/RELEASE_CHECKLIST.md`, `docs/POST_RELEASE_BASELINE_v4.64.md`, `docs/CI_BROWSER_E2E.md` |
 | Latest relevant phase | 52.0–58.0 + release phases |
 | Dependencies | A hosting decision; auth remains deferred |
@@ -361,8 +362,8 @@ Data-mode key: **DS** deterministic sample · **US** user-supplied ·
 default).
 
 ### 1. Equities — `built_partial`
-- **Implemented:** six single-asset strategies (SMA crossover, RSI mean reversion, Bollinger, time-series momentum, volatility breakout, pairs) on a lookahead-safe, cost-aware vectorised engine with long/short modes; Strategy Comparison; sweep/train-test/walk-forward; cross-sectional momentum/reversal scanner.
-- **Partial:** the Strategy Library lists 7 further catalog entries as documentation only.
+- **Implemented:** five single-asset strategies (SMA crossover, RSI mean reversion, Bollinger, time-series momentum, volatility breakout) plus a two-asset pairs strategy on lookahead-safe, cost-aware engines with supported position modes; Strategy Comparison; sweep/train-test/walk-forward; cross-sectional momentum/reversal scanner.
+- **Partial:** the Strategy Library also lists 2 built scanner summaries and 5 planned/research/future documentation-only entries.
 - **Planned:** low-vol, quality, seasonality models (no phase selected → `deferred` in practice).
 - **Research:** none blocking. **Excluded:** live order routing (`deliberate_non_goal`).
 - **Data mode:** US + CSV + DS. **Validation maturity:** high for the engine (`test_backtest.py` 21, `test_strategies.py` 10, `test_pairs_strategy.py` 30, plus Phases 50–61 diagnostics); no registry test.
@@ -426,13 +427,13 @@ default).
 - **Implemented:** multi-asset backtest/optimization/frontier/risk dashboard/stress/factor analysis, risk parity and Black–Litterman helpers, capped-simplex projection, rebalancing; plus Phases 56–58 diagnostics labs (construction & risk budgeting, scenario stress & drawdown attribution, performance attribution & active risk).
 - **Partial within the category:** the *strategy* ensemble builder (area 15) is absent; factor betas/scenarios in the Risk Lab are hand-specified constants rather than estimated.
 - **Data mode:** DS + US. **Validation maturity:** high (`test_portfolio_risk.py` 61, `test_portfolio.py` 16, plus three lab suites and three e2e specs).
-- **Remaining dependency:** none for v1; **Phase 63** extends it to strategy streams.
+- **Remaining dependency:** none for v1; **Phase 64** extends it to strategy streams.
 
 ### 12. Machine Learning & AI — `built_partial`
 - See phase-order area 16. Two working halves (local futures ML loop; validation/diagnostics chain) that are not one lifecycle.
-- **Research-only:** tree ensembles/boosting/neural models (deliberately absent — no heavy ML dependency has been added); AI Explainer (`planned`, Phase 69).
+- **Research-only:** tree ensembles/boosting/neural models (deliberately absent — no heavy ML dependency has been added); model-backed AI Explainer (Phase 69 is deterministic only).
 - **Data mode:** CSV + DS. **Validation maturity:** high in parts (`test_ml_signal.py` 80; every Phase 50–61 suite) but no end-to-end lifecycle test.
-- **Remaining dependency:** artifact registry + lifecycle wiring → **Phase 64**.
+- **Remaining dependency:** artifact registry + lifecycle wiring → **Phase 65**.
 
 ---
 
@@ -478,6 +479,12 @@ default).
 | Microstructure / TCA | `built_partial` | DS + US | analytics over a static tape |
 
 **No layer in this repository is production-ready, and no deterministic
-sample work is described as such.** The only network-capable paths are
-the default yfinance price provider and two opt-in, fail-closed globe
-adapters that are disabled by default.
+sample work is described as such.** The only **external market/provider**
+runtime paths found are the default yfinance historical-price path and two
+opt-in, fail-closed globe enrichment paths (FRED macro and delayed yfinance
+index/FX quotes). The standard backtest yfinance path is enabled by default
+and fails the request when its provider is unavailable; only the two globe
+enrichments are disabled by default and fall back to static dossiers.
+Frontend `fetch` calls target the local FastAPI proxy, and
+`scripts/wait_for_http.py` only polls a caller-supplied HTTP health URL;
+neither is an external market-data provider.

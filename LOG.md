@@ -21,8 +21,9 @@ chain through Signal Ensemble (v4.79 tagged).
   deployment) and a neutral tag audit — the missing v4.76 Phase 58 tag
   and the recorded v4.69 deviation stay unrepaired by policy
   (docs/BLUEPRINT_RECONCILIATION_REPORT.md).
-- Forward roadmap for Phases 63-70; Phase 63 selected: Strategy Return
-  Stream, Strategy Similarity and Portfolio Ensemble Diagnostics Lab v1
+- Forward roadmap for Phases 63-70; the review moved frontend component
+  tests and registry drift guards to Phase 63, before the Phase 64 Strategy
+  Return Stream / Portfolio Ensemble Diagnostics Lab
   (docs/FORWARD_ROADMAP_PHASES_63_70.md).
 - TASKS.md / STOP_POINT.md / MASTER_BLUEPRINT_V3.md / ROADMAP.md /
   PROJECT_SNAPSHOT.md / VERSION_MANIFEST.md / CHANGELOG.md reconciled;
@@ -39,9 +40,12 @@ production certification.
 
 ### Next
 
-- User: commit `Add master blueprint reconciliation project status audit
-  roadmap v1`, run the Codex review, then create the v4.80 tag manually.
-- Then Phase 63 (do not start it inside Phase 62).
+- Implementation committed as `e50cca2`; Codex review corrections and
+  focused verification are complete in the worktree. User next creates the
+  `Review master blueprint reconciliation project status audit roadmap v1`
+  commit after inspecting this review.
+- Final local/CI verification and hygiene precede the user-created v4.80 tag.
+- Then Phase 63 frontend test foundations (do not start inside Phase 62).
 
 ## 2026-07-05 (local futures data path v0.1 — stable)
 

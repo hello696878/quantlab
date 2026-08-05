@@ -1,4 +1,4 @@
-# QuantLab — Version Manifest (Phase 40.0)
+# QuantLab — Version Manifest (Phase 62.0)
 
 The project's versioning conventions, verified against the local git history
 when written. Companion docs: [`../CHANGELOG.md`](../CHANGELOG.md) (grouped
@@ -16,9 +16,9 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 **`4.80.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
 expected tag on completion of the current phase's review is
 `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1`
-(Phase 62, a documentation/status phase) — "expected" because tags are
-created by the user after review, never automatically; no such tag exists
-yet. Phase 61's
+(Phase 62, a documentation/status phase) — implementation commit `e50cca2` is
+on `main`, while the review commit is pending. "Expected" means the user creates
+the tag only after review and final verification; no such tag exists yet. Phase 61's
 `v4.79.0-signal-ensemble-redundancy-combination-diagnostics-v1`,
 Phase 60's
 `v4.78.0-signal-decay-horizon-turnover-implementation-diagnostics-v1` and

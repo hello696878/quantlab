@@ -19,18 +19,19 @@ capability was added, and no product behaviour changed.
 | Document | What it claimed | Repository reality | Action taken |
 |---|---|---|---|
 | `TASKS.md` | "Now: local futures data path v0.1 stable — no task in flight"; "Do Not Do Yet: ML, options, futures_continuous, real data" (dated 2026-07-05) | Options shipped long before that date (Phases 14.x); `futures_continuous` exists (`backend/app/datastore/futures_continuous.py`, `continuous_build.py`); a full local-futures ML loop exists (`features/`, `labels/`, `ml_signal/`, `local_pipeline/`); Phases 48–61 added fourteen diagnostics labs | Rewritten to the truthful Phase 62 state; historical "Done" records preserved verbatim; superseded prohibitions relabelled as history |
-| `STOP_POINT.md` | "Current Phase: local futures data path v0.1 — stable … committed through `3d320f6`" | `main` is at `40ec1fd` (Phase 61 review), VERSION was `4.79.0-dev`, 124 tags exist | Replaced with a Phase 62 handoff (version/phase/branch/tag state, frozen baseline, next safe step, restart commands, non-goals) |
+| `STOP_POINT.md` | "Current Phase: local futures data path v0.1 — stable … committed through `3d320f6`" | Phase 62 implementation is now committed on `main` at `e50cca2`; VERSION is `4.80.0-dev`; 124 tags exist and v4.80 does not | Replaced with a Phase 62 handoff and refreshed after the implementation commit (version/phase/branch/tag state, frozen baseline, next safe step, restart commands, non-goals) |
 | `LOG.md` | Newest entry 2026-07-05 (futures v0.1) | 13 feature phases landed afterwards | New dated entry prepended in the existing format; older entries untouched |
 | `docs/MASTER_BLUEPRINT_V3.md` | "Futures & Commodities — research"; "Real Estate — research"; "Microstructure & HFT — future"; "ML & AI — future"; "Strategy Ensemble Builder — research"; status vocabulary `built/planned/research/future` | Futures: educational lab **and** a local research pipeline with instruments, ingest, continuous contracts, backtest adapter and ML loop. Real estate: income-property + MBS analytics with 50 tests. Microstructure: order-book/TCA/toxicity lab with 43 tests. ML: validation chain (Phases 50–61) plus the futures ML loop. Signal Ensemble ≠ Strategy Ensemble Builder | Status labels corrected in place; vocabulary aligned to the six-class matrix; the document stays an internal direction, not a feature claim |
-| `docs/PROJECT_SNAPSHOT.md` | Phase 61 header, "~40 interactive workspaces" | Accurate but version-stale | Header/version refreshed; pointer to the status matrix added |
+| `docs/PROJECT_SNAPSHOT.md` | Phase 61 header, "~40 interactive workspaces" | Version-stale and count-stale: the `View` union now contains 57 routed identifiers | Header/version/count refreshed; pointer to the status matrix added |
 | `docs/VERSION_MANIFEST.md` | 123 tags, latest verified v4.78 | 124 tags, latest verified v4.79 | Counts and expected-tag line updated |
 | `AGENTS.md` | "The current priority is: build a correct backend MVP" | The MVP shipped at v4.0.0; the platform is at v4.79 | **Left unchanged** — it is a historical instruction file for the Codex review flow, not a status claim; noted here instead |
 | `CLAUDE.md` | "Current focus: Phase 1 futures-first … Do not implement yet: ML, options, futures_continuous …" | Same contradiction as `TASKS.md` | **Left unchanged** — it is the user's own operating-instruction file; flagged here for the user to update if desired (this phase does not rewrite user instructions) |
 
-Nothing else in `docs/` contradicted the code materially: the per-lab
-documents written in Phases 48–61 matched their implementations, and
-`docs/LIMITATIONS.md` / `docs/KNOWN_LIMITATIONS_PUBLIC.md` were already
-honest about deterministic data and missing capabilities.
+The per-lab documents written in Phases 48–61 matched their implementations,
+and `docs/LIMITATIONS.md` / `docs/KNOWN_LIMITATIONS_PUBLIC.md` were already
+honest about deterministic data and missing capabilities. This review did,
+however, correct additional count, provider-default, saved-hash, canvas and
+containerization claims in the Phase 62 deliverables.
 
 ## 2. Headline finding
 
@@ -42,7 +43,7 @@ category headlines imply**. Both directions matter:
   ingest → continuous contracts → backtest → features/labels → model →
   experiment store → evidence packs) was invisible in `TASKS.md` and
   `STOP_POINT.md`, and is still invisible in the product UI.
-- Over-claimable: "~40 workspaces" is **not** ~40 models, and the
+- Over-claimable: 57 routed view identifiers are **not** 57 models, and the
   ~100-model catalog has no defined denominator. This document
   publishes no completion percentage for that catalog; see §3.
 
@@ -55,13 +56,13 @@ two, and no rule for whether a diagnostic lab counts at all. Publishing
 a percentage would therefore be fabricating a denominator. What can be
 stated honestly:
 
-- ~40 interactive workspaces are routed in the frontend view switch.
-- 14 strategy entries exist in `frontend/src/lib/modelRegistry.ts`, of
-  which **7** are `live` (executable through Backtest Studio).
+- 57 top-level identifiers exist in the frontend `View` union.
+- 13 entries exist in `frontend/src/lib/modelRegistry.ts`, of which **6**
+  are `live` and executable through Backtest Studio.
 - The pricing/analytics catalogue (options, vol, rates, FX, credit, real
   estate/MBS, microstructure, crypto family) contains dozens of distinct
   closed-form or simulation models, each with its own tests.
-- 16 product-workflow diagnostics workspaces exist (Phases 48–61).
+- 14 diagnostics workspaces were added specifically in Phases 48–61.
 
 ## 4. Gap analysis
 
@@ -69,21 +70,22 @@ stated honestly:
 
 Phase 61 combines **signal values** at aligned (entity, timestamp) keys.
 A Strategy Ensemble Builder combines **strategy return streams**. The
-following strategy-level functions are absent today:
+following functions are not implemented end to end at the strategy-stream
+level, although every row has reusable infrastructure:
 
-| Function | Present? | Nearest existing infrastructure |
+| Function | Strategy-stream state | Nearest existing infrastructure |
 |---|---|---|
-| Strategy return-stream alignment (different calendars, start dates, missing days) | **No** | `signal_ensemble/alignment.py` aligns signal values, not return series |
-| Capital / risk allocation across strategies | **No** | `portfolio_diagnostics/` allocates across *assets* (ERC, min-var, inverse-vol) |
-| Strategy-level turnover and rebalancing between strategies | **No** | `signal_decay/turnover.py` measures a bucket reference book |
-| Drawdown / tail overlap between strategies | **No** | `portfolio_stress/` has drawdown attribution for one book |
-| Walk-forward ensemble policies | **No** | `research/*` walk-forward is single-strategy SMA |
-| Frozen held-out combination evaluation | Partly | Phase 52 splits + Phase 61 frozen-threshold pattern exist and are reusable |
-| Portfolio constraints applied to an ensemble | **No** | `portfolio_diagnostics/constraints.py` exists for asset weights |
-| Strategy contribution attribution | **No** | `portfolio_attribution/` attributes across assets/groups |
+| Strategy return-stream alignment (different calendars, start dates, missing days) | Absent; reusable | `signal_ensemble/alignment.py` aligns signal values; `portfolio.py` aligns asset returns |
+| Capital / risk allocation across strategies | Absent; reusable | `portfolio_diagnostics/` allocates across *assets* (ERC, min-var, inverse-vol) |
+| Strategy-level turnover and rebalancing between strategies | Absent; reusable | portfolio rebalancing and `signal_decay/turnover.py` provide policies, not strategy-stream accounting |
+| Drawdown / tail overlap between strategies | Absent; reusable | `portfolio_stress/` attributes one book; Phase 61 measures signal tail co-occurrence |
+| Walk-forward ensemble policies | Absent; reusable | SMA and portfolio walk-forward tools evaluate other objects |
+| Frozen held-out combination evaluation | Partial/reusable | Phase 52 splits + Phase 61 frozen-threshold pattern exist, but no strategy combination is frozen |
+| Portfolio constraints applied to an ensemble | Absent; reusable | `portfolio_diagnostics/constraints.py` exists for asset weights |
+| Strategy contribution attribution | Absent; reusable | `portfolio_attribution/` attributes across assets/groups |
 
-This is the single largest blueprint gap that current infrastructure can
-close cleanly → **Phase 63** (selected, §6).
+This remains meaningful new scope, but frontend regression foundations are
+the lower-risk prerequisite → strategy-stream work moves to **Phase 64**.
 
 ### 4.2 Unified ML research lifecycle
 
@@ -102,7 +104,7 @@ close cleanly → **Phase 63** (selected, §6).
 
 **Diagnosis:** the pieces exist but form two parallel islands — a
 CLI/filesystem futures ML loop and an API/SQLite diagnostics chain —
-with no shared identity. → **Phase 64**.
+with no shared identity. → **Phase 65**.
 
 ### 4.3 Replay by hash
 
@@ -110,12 +112,12 @@ with no shared identity. → **Phase 64**.
 |---|---|
 | config hash | **Built** — canonical JSON, documented normalization, CSV content folded in |
 | dataset version | Partly — `dataset_registry` versions exist but do not enter the backtest config hash |
-| exact run recreation | **Missing** — no endpoint or route resolves a hash back to a config or result; `saved_backtests` does not store `config_hash` |
+| exact run recreation | **Missing** — no endpoint or route resolves a hash back to a config or result. New frontend-saved backtests preserve the hash indirectly inside `params.reproducibility`, but it is optional, not a dedicated/indexed identity, and older/API-created rows may omit it |
 | environment identity | **Missing** — no manifest of Python/Node/library versions attached to a run |
 | artifact identity | Partly — `ExperimentStore` writes content-hashed artifacts; diagnostics labs use result fingerprints; nothing unifies them |
 | replay routing | **Missing** — the UI states the hash "is not a public URL", which is accurate |
 
-→ **Phase 65**.
+→ **Phase 66**.
 
 ### 4.4 Real research data (futures)
 
@@ -141,8 +143,9 @@ with no shared identity. → **Phase 64**.
 | visual regression | Deliberately avoided — five frozen screenshots exist as release evidence, not as assertions (pixel tests are excluded by policy) |
 | screenshot currency | **Stale** — `docs/screenshots/release_*.png` date from the v4.60 freeze; workspaces added since are not depicted (`docs/SCREENSHOT_CHECKLIST.md`) |
 
-19 Playwright spec files / 254 chromium tests exist and are the only
-frontend regression net. → **Phase 66**.
+The directory contains 19 files: 18 `*.spec.ts` files plus `helpers.ts`.
+Playwright discovers 254 chromium tests across the 18 specs; discovery is
+not an E2E pass. These are the only frontend regression net. → **Phase 63**.
 
 ### 4.6 Deployment
 
@@ -156,6 +159,7 @@ frontend regression net. → **Phase 66**.
 | monitoring | **Missing** |
 | secret management | Partly — env-var documentation and a no-secrets-in-repo rule; no vault/rotation story |
 | provider governance | Partly — opt-in, fail-closed, disabled-by-default adapters; no per-instance quota/abuse policy |
+| containerization | Built for local use — backend/frontend Dockerfiles and Docker Compose exist; this is not a selected hosting target or production hardening |
 
 Authentication and multi-user hosting **remain deferred and are not
 silently added by this phase**. → **Phase 70** (plan only).
@@ -180,7 +184,7 @@ silently added by this phase**. → **Phase 70** (plan only).
 | 59.0 Factor Diagnostics | `6273189` | `b281d15` | `v4.77.0-…` | **Exists** → `b281d15` | None | No |
 | 60.0 Signal Decay | `1e15ab0` | `d726527` | `v4.78.0-…` | **Exists** → `d726527` | None | No |
 | 61.0 Signal Ensemble | `c0f256d` | `40ec1fd` | `v4.79.0-…` | **Exists** → `40ec1fd` | None | No |
-| 62.0 (this phase) | not yet committed | pending | `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1` | Not created | User creates after review | n/a |
+| 62.0 (this phase) | `e50cca2` | pending | `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1` | Not created | Review commit, CI/user verification and hygiene first; user tags later | n/a |
 
 ### 5.1 Phase 58 missing-tag finding
 
@@ -199,36 +203,56 @@ tags**.
 
 ## 6. Selected next phase: Phase 63
 
-**Strategy Return Stream, Strategy Similarity and Portfolio Ensemble
-Diagnostics Lab v1.**
+**Frontend Component Test Foundation and Registry Drift Guards v1.**
 
-Why it follows Phase 61 naturally:
-
-1. Phase 61 combines signal VALUES; Phase 63 combines complete strategy
-   RETURN STREAMS — the same discipline one level up.
-2. It closes the largest genuine blueprint gap (area 15, §4.1): the
-   Strategy Ensemble Builder has been listed as `research` since v3 of
-   the blueprint and has no implementation.
-3. It reuses existing infrastructure rather than inventing engines:
-   Portfolio Diagnostics (allocation and constraints), Attribution
-   (contribution reconciliation), Stress (drawdown attribution), Cost
-   (turnover pricing), Regime (conditioning), Model Validation
-   (train/held-out), Overfitting (multiple testing), Signal Decay and
-   Signal Ensemble (alignment, redundancy, fingerprints, baselines,
-   neutral comparison).
-4. It needs no new dependency, no new data source and no new provider.
+The original order put another large frontend lab ahead of the first
+component-test layer even though this audit found count drift in two
+hand-maintained registries and the `View` union. Phase 63 now establishes the
+small offline invariant suite first. Strategy Return Stream, Strategy
+Similarity and Portfolio Ensemble Diagnostics remains the largest product
+gap and moves to Phase 64; Unified ML moves to 65 and replay identity to 66.
+This preserves the ML-before-replay dependency while reducing frontend drift
+risk before the ensemble panel lands. No phase was implemented here.
 
 Full scope, non-scope, acceptance criteria and risks:
 [`FORWARD_ROADMAP_PHASES_63_70.md`](FORWARD_ROADMAP_PHASES_63_70.md).
 **Phase 63 was deliberately not started in this phase.**
 
-## 7. Remaining uncertainties
+## 7. Review verification and failure classification
+
+The review reproduced the four reported failures in the current workspace:
+
+- `test_collect_creates_no_repo_artifacts_or_db`
+- `test_all_renderers_return_str_and_touch_no_repo_artifacts`
+- `test_cli_creates_no_database_or_repo_artifacts`
+- `test_e2e_experiment_evidence_pack_over_real_and_tampered_runs`
+
+All are in `backend/tests/test_experiment_review.py` and fail the same
+assertion because the active pre-existing `backend/data/quantlab.db` exists.
+The database predates the documentation commit and is used by already-running
+local services; it was not moved, deleted or modified. The same four tests
+pass from a clean `git archive` snapshot of `e50cca2`, proving the failures
+are environment-only rather than introduced by Phase 62. The review did not
+weaken or change the tests.
+
+The implementation run reported **4,268 passed, 4 failed, 3 skipped**. A
+review-time full rerun in the active workspace exceeded the command's
+65-minute timeout and produced no final summary, so it is not described as
+green. Focused verification identified the three skips exactly: the two
+symlink tests in `test_experiment_audit.py` and the symlink-output test in
+`test_experiment_review.py`, all skipped because this Windows environment
+does not permit symlink creation. Frontend typecheck exits zero. Playwright
+discovery reports 254 Chromium tests in 18 spec files; full E2E was not run
+because the available services use the active user database and the task
+forbids starting isolated services. No frontend production build was run.
+
+## 8. Remaining uncertainties
 
 - The ~100-model catalog remains undefined; any future percentage claim
   needs an enumerated list and a counting rule first (§3).
 - Frontend registries have no tests, so the matrix's frontend evidence
-  is file-verified but not regression-protected until Phase 66.
-- The five frozen screenshots predate ~14 workspaces; they remain valid
+  is file-verified but not regression-protected until Phase 63.
+- The five frozen screenshots predate many later workspaces; they remain valid
   as release evidence for v4.60 but no longer depict the product.
 - `CLAUDE.md` and `AGENTS.md` still carry early-phase operating
   instructions; this phase flags rather than rewrites them because they

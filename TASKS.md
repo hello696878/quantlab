@@ -9,9 +9,8 @@ preserved at the bottom because they document real completed work.
 - **Phase 62.0 — Master Blueprint Reconciliation, Project Status Audit
   and Forward Roadmap v1** (documentation/status phase; no product code
   changes).
-- Branch: `phase62-blueprint-reconciliation-roadmap-audit` on top of
-  `40ec1fd` (Phase 61 review, `main`).
-- Expected implementation commit:
+- Current branch: `main`.
+- Implementation commit: `e50cca2` —
   `Add master blueprint reconciliation project status audit roadmap v1`.
 - Expected review commit:
   `Review master blueprint reconciliation project status audit roadmap v1`.
@@ -50,29 +49,34 @@ preserved at the bottom because they document real completed work.
       `docs/MASTER_BLUEPRINT_V3.md`, `docs/ROADMAP.md`,
       `docs/PROJECT_SNAPSHOT.md`, `docs/VERSION_MANIFEST.md`,
       `CHANGELOG.md`, `VERSION`.
-- [x] Verification: full backend suite, `npx tsc --noEmit`, Playwright
-      discovery (`--list`) only; no builds, no servers.
-- [ ] User: review, commit, and (after the Codex review) create the
-      v4.80 tag manually.
+- [x] Implementation verification recorded: 4,268 passed, 4 environment-
+      sensitive failures, 3 skipped; typecheck clean; Playwright discovery only.
+- [x] Codex review corrections and verification: unsupported counts and
+      status claims corrected; focused environment-failure classification,
+      TypeScript check and Playwright discovery recorded. The attempted
+      current-workspace full backend rerun exceeded the 65-minute command
+      timeout and is not claimed green.
+- [ ] User: create the review commit, complete final local/CI verification,
+      and only then create the v4.80 tag manually.
 
 ## Next (selected Phase 63–70 roadmap)
 
 See `docs/FORWARD_ROADMAP_PHASES_63_70.md` for full scope, dependencies,
 acceptance criteria and non-scope. Sequence:
 
-1. **Phase 63** — Strategy Return Stream, Strategy Similarity and
-   Portfolio Ensemble Diagnostics Lab v1 (selected next phase).
-2. **Phase 64** — Unified ML Research Lifecycle and Model Artifact
+1. **Phase 63** — Frontend Component Test Foundation and Registry Drift
+   Guards v1 (selected next phase).
+2. **Phase 64** — Strategy Return Stream, Strategy Similarity and
+   Portfolio Ensemble Diagnostics Lab v1.
+3. **Phase 65** — Unified ML Research Lifecycle and Model Artifact
    Registry v1.
-3. **Phase 65** — Reproducible Run Replay by Hash and Environment
+4. **Phase 66** — Reproducible Run Replay by Hash and Environment
    Manifest v1.
-4. **Phase 66** — Frontend Component Test Foundation and Registry Drift
-   Guards v1.
-5. **Phase 67** — Futures Point-in-Time Data Contract, Calendar and
-   Real-Data Adapter Specification v1.
+5. **Phase 67** — Futures Point-in-Time Data Contract, Calendar
+   Foundation and Adapter Specification v1.
 6. **Phase 68** — Advanced Cross-Sectional Neutralisation and Scanner
    Validation v1.
-7. **Phase 69** — AI Research Explainer with Evidence-Grounded Output v1.
+7. **Phase 69** — Deterministic Evidence-Grounded Research Explainer v1.
 8. **Phase 70** — Read-Only Hosted Demo and Deployment Hardening Plan v1.
 
 ## Deliberate non-goals (standing)

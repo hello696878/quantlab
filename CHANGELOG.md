@@ -34,8 +34,8 @@ claimed by an entry here.
   Phase 58 tag and the recorded v4.69 deviation — no history rewritten,
   no tags created or moved), and a dependency-aware
   `docs/FORWARD_ROADMAP_PHASES_63_70.md` (Phase 63 recommendation:
-  Strategy Return Stream, Strategy Similarity & Portfolio Ensemble
-  Diagnostics Lab v1). Reconciles the long-stale `TASKS.md`,
+  Frontend Component Test Foundation and Registry Drift Guards v1; the
+  strategy return-stream ensemble follows in Phase 64). Reconciles the long-stale `TASKS.md`,
   `STOP_POINT.md` and `LOG.md` (which still described the July 2026
   local-futures v0.1 checkpoint) with the actual Phase 61 state, updates
   `docs/MASTER_BLUEPRINT_V3.md` status labels to repository reality

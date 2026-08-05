@@ -8,7 +8,7 @@ public use. Status ground truth by area:
 ## Summary
 
 QuantLab is a local-first, deterministic, **educational** quant research
-platform: ~40 interactive workspaces behind one shell (grouped sidebar,
+platform: 57 routed top-level view identifiers behind one shell (grouped sidebar,
 dashboard, command palette), a FastAPI + Pydantic v2 backend with a
 consistent `sample`/`analyze` API pattern, and a Next.js 14 + TypeScript
 frontend with shared charts, local KaTeX formulas, and copy-friendly report
@@ -60,24 +60,27 @@ Full map: `PROJECT_OVERVIEW.md`.
 ## Data modes
 
 Deterministic static samples in most labs; user-configured inputs in the
-backtest engines; local calculation in Options/Credit/Export Report; the
-only external providers (yfinance historical, opt-in FRED macro, opt-in
-delayed globe quotes) are disabled by default, fail closed, and are never
-relied on in tests (KO/PEP pairs demo has a network-free fixture). Registry:
+backtest engines; local calculation in Options/Credit/Export Report; the external provider paths are yfinance historical prices (default for
+market backtests) plus opt-in FRED macro and delayed globe quotes (disabled by
+default and fail-closed to static dossiers); none is relied on in tests (KO/PEP pairs demo has a network-free fixture). Registry:
 the in-app Data Reliability Center.
 
 ## Testing
 
-~2,900+ deterministic backend tests (2,968 green at the v4.60 freeze — see
-the ROADMAP entry per phase for each milestone's count); strict finiteness
-guarantees at the API boundary; wording contracts as tests;
-`npx tsc --noEmit` for the frontend; a Playwright browser E2E guard covering
+The Phase 62 implementation run reported 4,268 passed, four active-database
+environment assertion failures and three Windows symlink-permission skips;
+the review reproduced and classified those four failures without changing
+tests or the active database. Its attempted full rerun exceeded the 65-minute
+command timeout, so no green full-suite claim is made. Strict finiteness
+guarantees exist at the API boundary; wording contracts are tests;
+`npx tsc --noEmit` is clean for the frontend; a Playwright browser E2E guard covering
 the frozen demo path, the Experiment Registry, Dataset Lineage, Model
 Validation Lab, Meta-Labeling Lab, Feature Diagnostics, Overfitting
 Diagnostics, Regime Diagnostics, Cost & Capacity, Portfolio Diagnostics, Portfolio Stress Lab, Portfolio Attribution, Factor Diagnostics, Signal Decay Lab, and Signal Ensemble Lab views (local-first, plus a manually triggered CI workflow —
-`CI_BROWSER_E2E.md`); **no frontend unit-test framework yet**.
-Verification is run locally by the user (helper wrappers in
-`scripts\*.ps1`).
+`CI_BROWSER_E2E.md`); **no frontend unit/component-test framework yet**.
+Playwright discovery reports 254 Chromium tests in 18 spec files; discovery
+is not an E2E pass. Verification is run locally by the user (helper wrappers
+in `scripts\*.ps1`).
 
 ## Documentation inventory
 
@@ -116,8 +119,8 @@ frontend tests; single-user local-first (no auth/hosting); full ledger in
 
 ## Next recommended improvements
 
-1. Frontend test framework (shared primitives first).
-2. Registry-vs-route drift tests so stale metadata fails CI.
-3. Pre-configured deep links between product layers.
-4. Screenshot captures for the newer labs (real runs).
-5. Read-only hosted demo once the deployment gaps are addressed.
+1. Phase 63: frontend component-test foundation and registry drift guards.
+2. Phase 64: strategy return-stream ensemble diagnostics.
+3. Phase 65/66: unified ML identity, then replay by hash.
+4. Screenshot captures for newer workspaces (real runs).
+5. Read-only hosted-demo planning only after the documented gaps are addressed.

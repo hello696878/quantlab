@@ -1702,12 +1702,11 @@ single-asset Backtest + Strategy Comparison:
 - **Forward roadmap** (`docs/FORWARD_ROADMAP_PHASES_63_70.md`):
   dependency-aware Phases 63–70 with per-phase goal, scope, non-scope,
   expected commits/tags, acceptance criteria and risks. Selected next
-  phase: **63 — Strategy Return Stream, Strategy Similarity & Portfolio
-  Ensemble Diagnostics Lab v1** (Phase 61 combines signal VALUES; Phase
-  63 combines complete strategy RETURN STREAMS, closing a real blueprint
-  gap while reusing the Portfolio/Attribution/Cost/Regime/Validation/
-  Overfitting/Signal infrastructure). Implementation deliberately not
-  started in this phase.
+  phase after review: **63 — Frontend Component Test Foundation and Registry
+  Drift Guards v1**, because count drift was found in hand-maintained
+  registries and another large frontend lab should not precede that guard.
+  Strategy Return Stream / Portfolio Ensemble Diagnostics moves to Phase 64.
+  No future phase was implemented here.
 - **Reconciled:** TASKS.md and STOP_POINT.md rewritten to the truthful
   Phase 62 state (historical records preserved); LOG.md entry added;
   `MASTER_BLUEPRINT_V3.md` status labels updated to repository reality
@@ -1717,8 +1716,9 @@ single-asset Backtest + Strategy Comparison:
   deployment and accounts stay deferred); PROJECT_SNAPSHOT and
   VERSION_MANIFEST refreshed; VERSION → `4.80.0-dev`; CHANGELOG entry
   describes a documentation/status phase. **Verification:** full backend
-  suite, `npx tsc --noEmit`, Playwright discovery only (no builds, no
-  servers). Positioning unchanged: local-first, deterministic,
+  suite (implementation run: 4,268 passed, 4 active-database environment
+  assertion failures, 3 skipped), `npx tsc --noEmit`, and Playwright
+  discovery only (18 specs / 254 chromium tests; no builds, no servers). Positioning unchanged: local-first, deterministic,
   educational, not investment advice, no live trading, no
   production-risk certification.
 
@@ -4025,7 +4025,12 @@ single-asset Backtest + Strategy Comparison:
 
 ---
 
-## Future Phases — aligned with Master Blueprint v3
+## Legacy Future-Phases Snapshot (superseded in Phase 62)
+
+> Historical planning snapshot retained for audit context. Its counts,
+> four-label vocabulary, provider status and future/research labels are not
+> current. Use [`BLUEPRINT_STATUS_MATRIX.md`](BLUEPRINT_STATUS_MATRIX.md) and
+> [`FORWARD_ROADMAP_PHASES_63_70.md`](FORWARD_ROADMAP_PHASES_63_70.md).
 
 Development now follows **[Master Blueprint v3](MASTER_BLUEPRINT_V3.md)**: a
 long-term catalog of ~100 educational quant models across 12 categories plus

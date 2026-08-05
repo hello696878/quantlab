@@ -12,7 +12,7 @@ product-workflow diagnostics chain).
 ## Current repository goal
 
 QuantLab is a **local-first, deterministic, educational** quant research
-platform: ~40 interactive workspaces over a FastAPI + SQLite backend and a
+platform: 57 routed top-level view identifiers over a FastAPI + SQLite backend and a
 Next.js 14 frontend, plus a local futures research pipeline (local CSV
 only). Not investment advice; no live trading; no production
 trading/risk/compliance certification.
@@ -23,11 +23,12 @@ trading/risk/compliance certification.
 |---|---|
 | VERSION | `4.80.0-dev` |
 | Latest completed feature phase | 61.0 — Signal Ensemble, Redundancy & Combination Diagnostics Lab v1 |
-| Phase 61 commits | `c0f256d` (Add) / `40ec1fd` (Review, = `main` HEAD) |
+| Phase 61 commits | `c0f256d` (Add) / `40ec1fd` (Review) |
 | Latest tag | `v4.79.0-signal-ensemble-redundancy-combination-diagnostics-v1` |
 | Current phase | 62.0 (documentation/status audit — this phase) |
-| Current branch | `phase62-blueprint-reconciliation-roadmap-audit` |
-| Phase 62 review/tag state | implementation not yet committed; review pending; expected tag `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1` (user-created after review, never automatic) |
+| Current branch | `main` |
+| Phase 62 implementation | `e50cca2` (`Add master blueprint reconciliation project status audit roadmap v1`) |
+| Phase 62 review/tag state | Codex corrections complete in the worktree; review commit pending; v4.80 tag absent and remains gated on the review commit, CI/user verification and hygiene |
 
 ## Protected frozen release baseline
 
@@ -51,13 +52,14 @@ change silently.
 
 ## Next safe step
 
-1. User reviews and commits this phase
-   (`Add master blueprint reconciliation project status audit roadmap v1`),
-   then runs the Codex review pass, then creates the v4.80 tag manually.
-2. The selected next implementation phase is **Phase 63 — Strategy
-   Return Stream, Strategy Similarity and Portfolio Ensemble Diagnostics
-   Lab v1** (`docs/FORWARD_ROADMAP_PHASES_63_70.md`). Do not begin it
-   inside Phase 62.
+1. Inspect the completed Codex review, then the user creates the review
+   commit (`Review master blueprint reconciliation project status audit
+   roadmap v1`).
+2. Run final local/CI verification and hygiene checks; only then may the user
+   create the v4.80 tag manually.
+3. The selected next implementation phase is **Phase 63 — Frontend
+   Component Test Foundation and Registry Drift Guards v1**
+   (`docs/FORWARD_ROADMAP_PHASES_63_70.md`). Do not begin it in Phase 62.
 
 ## Exact restart commands
 
@@ -92,5 +94,5 @@ npx tsc --noEmit
 - No paid providers / API-key management beyond the existing opt-in,
   fail-closed, disabled-by-default adapters.
 - No authentication, multi-user hosting or cloud sync in the current
-  phase sequence (Phase 70 plans a read-only hosted demo SPEC only).
+  phase sequence (Phase 70 plans and locally hardens a read-only demo mode; it does not deploy anything).
 - No production trading/risk/compliance certification claims anywhere.

@@ -7,7 +7,9 @@ reliability, and QA readiness — behind one shell (sidebar, dashboard, command
 palette, shared charts, local LaTeX formula panels).
 
 > **Ground rules:** deterministic static sample / synthetic / user-entered
-> data (optional external providers are disabled by default and fail closed);
+> data in most labs; standard market backtests use yfinance by default, while
+> optional FRED and delayed-quote globe enrichments are disabled by default
+> and fail closed to static dossiers;
 > no live trading, no telemetry, no login, no cloud. Educational only — not
 > investment, trading, allocation, legal, tax, compliance, or risk-management
 > advice, and not production trading, risk, or compliance infrastructure.
@@ -31,11 +33,11 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
 - **Full-stack engineering** — FastAPI + Pydantic v2 backend, Next.js 14 +
   TypeScript + Tailwind frontend, typed end to end.
 - **Quantitative finance modeling** — documented educational implementations
-  across ~40 workspaces (options, volatility, rates, credit, FX, futures,
+  across 57 routed top-level views (options, volatility, rates, credit, FX, futures,
   real estate/MBS, microstructure, crypto derivatives/DeFi/tokenomics/
   on-chain, alternative data, macro regimes).
-- **Deterministic sample-data design** — every lab runs offline on
-  hand-written static samples; tests never depend on live providers.
+- **Deterministic sample-data design** — most analytical labs run offline on
+  labelled static samples; tests never depend on live providers.
 - **API design** — consistent `GET /sample` + `POST /analyze` pattern with
   strict validation (`extra="forbid"`, finite-float guards, friendly 422s).
 - **Frontend data visualization** — shared theme-aware recharts components,
