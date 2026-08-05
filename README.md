@@ -165,24 +165,34 @@ See `docs/DEMO_SCRIPT.md`, `docs/DEMO_VIDEO_SCRIPT.md`, and
 
 ---
 
-## Current research focus (Phase 1: futures-first)
+## Local futures research track
 
-QuantLab is also being upgraded in-place as a long-term multi-market platform,
-futures-first, while preserving the existing code.
+Alongside the interactive workspaces, QuantLab carries a **local-only
+futures research pipeline**. It reads local CSV files and deterministic
+synthetic fixtures — there is no network path, no vendor feed and no
+broker anywhere in it — and it is CLI-only (no frontend surface):
 
-**QuantLab local futures data path v0.1 is stable.** The local, synthetic-only
-futures data foundation is complete end to end:
+```
+local CSV -> validate -> ingest (RawFuturesStore) -> continuous contract
+          -> features -> labels -> split/train/evaluate -> experiment store
+```
 
-- Instruments supported: **ES, NQ, YM, RTY** (validated, immutable YAML specs).
-- Per-record futures daily bar schema with registry-aware validation.
-- A read-only local CSV workflow, synthetic data only, no network:
+- Instruments: **ES, NQ, YM, RTY** (validated, immutable YAML specs) with
+  CME month codes and expiry math.
+- Raw daily-bar validation at frame and record level with a deterministic
+  content hash.
+- Ratio-adjusted continuous-contract building with documented roll rules
+  (`backend/app/datastore/futures_continuous.py`).
+- A futures backtest adapter with t+1 execution, roll-seam-safe returns
+  and tick/commission costs.
+- 16 trailing features, five label families, and deterministic
+  linear/logistic/dummy models with train/evaluate splits.
+- Experiment runs persisted as hashed local directories, with catalog,
+  audit, review and evidence-pack CLIs.
 
-  ```
-  local CSV -> validate -> normalize -> processed CSV -> metadata lookup -> tiny futures report
-  ```
-
-- Read-only smoke checks and reports all exit 0; full backend suite green
-  (2,900 passed as of Phase 38.0).
+Known limits: no session/holiday calendar, no point-in-time/vintage
+layer, no intraday bars, no multi-root portfolio backtest, and no UI.
+Status detail: [`docs/BLUEPRINT_STATUS_MATRIX.md`](docs/BLUEPRINT_STATUS_MATRIX.md).
 
 Key files for the local futures data path:
 
@@ -198,15 +208,21 @@ Key files for the local futures data path:
 - `docs/INSTRUMENTS_LAYER.md` — instruments layer architecture note
 - `docs/FUTURES_DATA_INGESTION_PLAN.md` — how real futures data will enter later (design only)
 
-### Not allowed yet (deliberate scope limits)
+### Deliberate scope limits (standing)
 
-- ML beyond the methodology labs
-- CFDs
-- options work in the futures pipeline (the educational Options Lab predates this scope)
-- futures_continuous beyond the local pipeline
-- real data download for the futures path (no IBKR)
-- production trading
-- major backtest engine rewrite
+- No live trading, broker/exchange/wallet integration or order execution.
+- No automatic investment recommendations, signal/strategy selection or
+  position sizing.
+- No real-data download for the futures path (no vendor, no IBKR); local
+  CSV and synthetic fixtures only.
+- No CFDs.
+- No authentication, multi-user hosting or cloud sync.
+- No production trading, risk or compliance certification claims.
+
+(Earlier revisions of this section also excluded ML, options and
+`futures_continuous`; those limits were superseded by the phases that
+implemented them — see
+[`docs/BLUEPRINT_RECONCILIATION_REPORT.md`](docs/BLUEPRINT_RECONCILIATION_REPORT.md).)
 
 ### Verification (futures path)
 
@@ -430,6 +446,7 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
 ## Project docs
 
 - [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — architecture map
+- [docs/BLUEPRINT_STATUS_MATRIX.md](docs/BLUEPRINT_STATUS_MATRIX.md) · [docs/BLUEPRINT_RECONCILIATION_REPORT.md](docs/BLUEPRINT_RECONCILIATION_REPORT.md) · [docs/FORWARD_ROADMAP_PHASES_63_70.md](docs/FORWARD_ROADMAP_PHASES_63_70.md) — evidence-audited status per area, the gap analysis and tag audit, and the next eight planned phases
 - [docs/ROADMAP.md](docs/ROADMAP.md) — per-phase build log and future plans
 - [CHANGELOG.md](CHANGELOG.md) · [VERSION](VERSION) — grouped changelog and the current milestone label
 - [docs/VERSION_MANIFEST.md](docs/VERSION_MANIFEST.md) · [docs/RELEASE_CHECKLIST.md](docs/RELEASE_CHECKLIST.md) — versioning conventions and the release flow

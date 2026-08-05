@@ -1,8 +1,9 @@
-# QuantLab — Project Snapshot (Phase 61.0)
+# QuantLab — Project Snapshot (Phase 62.0)
 
 A one-page handoff doc. Facts verified against the repo when written
-(version label `4.79.0-dev`); counts drift as phases land — re-verify before
-public use.
+(version label `4.80.0-dev`); counts drift as phases land — re-verify before
+public use. Status ground truth by area:
+[`BLUEPRINT_STATUS_MATRIX.md`](BLUEPRINT_STATUS_MATRIX.md).
 
 ## Summary
 

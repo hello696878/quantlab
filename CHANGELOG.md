@@ -18,6 +18,35 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Master Blueprint Reconciliation, Project Status Audit & Forward
+  Roadmap v1** (v4.80 series): a documentation/status phase — no new
+  financial model, analytics engine, database table, API endpoint,
+  frontend workspace, dependency, provider integration or trading
+  capability. Adds an evidence-backed
+  `docs/BLUEPRINT_STATUS_MATRIX.md` (every Master Blueprint phase-order
+  area and all 12 model categories classified as built / built_partial /
+  planned / research / deferred / deliberate_non_goal, each with backend,
+  frontend, test and documentation evidence paths), a
+  `docs/BLUEPRINT_RECONCILIATION_REPORT.md` (stale-document findings; the
+  signal-vs-strategy ensemble gap; the unified-ML-lifecycle,
+  replay-by-hash, futures real-data, frontend-quality and deployment
+  gaps; and a neutral tag/version audit covering the missing v4.76
+  Phase 58 tag and the recorded v4.69 deviation — no history rewritten,
+  no tags created or moved), and a dependency-aware
+  `docs/FORWARD_ROADMAP_PHASES_63_70.md` (Phase 63 recommendation:
+  Strategy Return Stream, Strategy Similarity & Portfolio Ensemble
+  Diagnostics Lab v1). Reconciles the long-stale `TASKS.md`,
+  `STOP_POINT.md` and `LOG.md` (which still described the July 2026
+  local-futures v0.1 checkpoint) with the actual Phase 61 state, updates
+  `docs/MASTER_BLUEPRINT_V3.md` status labels to repository reality
+  (futures, real estate and microstructure are no longer "research"/
+  "future"; Signal Ensemble is not the Strategy Ensemble Builder; ML
+  validation exists while a unified ML lifecycle stays partial; launch
+  tooling exists while hosted deployment and accounts stay deferred),
+  and refreshes ROADMAP / PROJECT_SNAPSHOT / VERSION_MANIFEST. Local
+  positioning unchanged: local-first, deterministic, educational, not
+  investment advice, no live trading, no production-risk certification.
+
 - **Signal Ensemble, Redundancy & Combination Diagnostics Lab v1**
   (v4.79 series): a local-first lab for COMPARING multiple stored signals
   and evaluating EXPLICIT, user-configured combination references — never

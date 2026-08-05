@@ -1,97 +1,96 @@
 # STOP POINT - QuantLab
 
-Date: 2026-07-05 (local futures data path v0.1 stable)
+Date: 2026-08-05 (Phase 62.0 — Master Blueprint Reconciliation, Project
+Status Audit and Forward Roadmap v1)
 
-## Project Goal
+This replaces the stale 2026-07-05 "local futures data path v0.1" stop
+point, which no longer described the repository (the futures track later
+gained ingestion, continuous contracts, a local backtest pipeline, an ML
+signal loop and an experiment catalog; Phases 48–61 added the fourteen-lab
+product-workflow diagnostics chain).
 
-QuantLab is a long-term multi-market AI quant research platform.
+## Current repository goal
 
-The current direction is:
+QuantLab is a **local-first, deterministic, educational** quant research
+platform: ~40 interactive workspaces over a FastAPI + SQLite backend and a
+Next.js 14 frontend, plus a local futures research pipeline (local CSV
+only). Not investment advice; no live trading; no production
+trading/risk/compliance certification.
 
-- futures-first
-- preserve existing crypto QuantLab code
-- upgrade in-place
-- do not start a parallel repo
+## Current version and phase state
 
-## Current Phase
+| Field | Value |
+|---|---|
+| VERSION | `4.80.0-dev` |
+| Latest completed feature phase | 61.0 — Signal Ensemble, Redundancy & Combination Diagnostics Lab v1 |
+| Phase 61 commits | `c0f256d` (Add) / `40ec1fd` (Review, = `main` HEAD) |
+| Latest tag | `v4.79.0-signal-ensemble-redundancy-combination-diagnostics-v1` |
+| Current phase | 62.0 (documentation/status audit — this phase) |
+| Current branch | `phase62-blueprint-reconciliation-roadmap-audit` |
+| Phase 62 review/tag state | implementation not yet committed; review pending; expected tag `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1` (user-created after review, never automatic) |
 
-QuantLab **local futures data path v0.1 — stable**. The local, synthetic-only
-futures data foundation is complete end to end (committed through `3d320f6`).
+## Protected frozen release baseline
 
-## Supported Local Workflow (synthetic data only, no network)
+`v4.60.0-public-release-candidate-demo-freeze-v1` (demo freeze) and the
+post-release baseline `v4.64.0-public-github-release-launch-v1`
+(`docs/POST_RELEASE_BASELINE_v4.64.md`): the frozen demo route, the five
+`docs/screenshots/release_*.png`, the Scenario Studio severe-stress
+outputs (severity 100.0/100, 8/8 modules), the KO/PEP pairs fixture
+(119 trade events, −23.0% vs +112.7%), the checksum manifests and the
+Browser E2E guard. Frozen tags are never moved; fixture outputs never
+change silently.
 
-```
-local CSV
--> validate
--> normalize
--> processed CSV
--> metadata lookup
--> tiny futures report
-```
+## Known documentation/tag gaps (recorded, not repaired)
 
-## Current Known Completed Work
+- Phase 58's expected tag `v4.76.0-portfolio-performance-attribution-benchmark-diagnostics-v1`
+  was never created (commits `e354d76`/`ad8679e` are on `main`).
+- The v4.69 meta-labeling tag was never created (work is inside the
+  `v4.70.0` tag's history). Both are recorded convention deviations;
+  history is not rewritten and tags are not created retroactively.
+- Full audit: `docs/BLUEPRINT_RECONCILIATION_REPORT.md` §tag-audit.
 
-- Instruments supported: **ES, NQ, YM, RTY** (config-only additions after ES;
-  procedure documented in docs/INSTRUMENTS_LAYER.md section 6).
-- Instrument registry validation; specs are frozen/strict with a tick-value
-  invariant.
-- Per-record futures daily bar schema (backend/app/datastore/daily_bar.py)
-  with registry-aware validation.
-- Local CSV loader (backend/app/datastore/csv_fixtures.py); synthetic ES/NQ
-  fixtures under backend/tests/fixtures/futures_csv/.
-- Read-only local CSV workflow scripts:
-  - scripts/check_instruments.py — registry smoke check
-  - scripts/check_futures_metadata.py — metadata smoke report
-  - scripts/run_synthetic_futures_report.py — synthetic mini trade report
-  - scripts/check_local_futures_csv.py — validate local CSVs (read-only)
-  - scripts/normalize_local_futures_csv.py — validate + one normalized CSV per root
-  - scripts/report_local_futures_csv.py — per-root summary of normalized output
-- All scripts read local files only; the smoke check and report write nothing,
-  the normalizer writes once to its output dir and never mutates inputs; no
-  network, no new dependencies.
+## Next safe step
 
-## Verification Commands
+1. User reviews and commits this phase
+   (`Add master blueprint reconciliation project status audit roadmap v1`),
+   then runs the Codex review pass, then creates the v4.80 tag manually.
+2. The selected next implementation phase is **Phase 63 — Strategy
+   Return Stream, Strategy Similarity and Portfolio Ensemble Diagnostics
+   Lab v1** (`docs/FORWARD_ROADMAP_PHASES_63_70.md`). Do not begin it
+   inside Phase 62.
+
+## Exact restart commands
 
 ```powershell
-C:\quantlab\backend\venv\Scripts\python.exe scripts\check_instruments.py
-C:\quantlab\backend\venv\Scripts\python.exe scripts\check_futures_metadata.py
-C:\quantlab\backend\venv\Scripts\python.exe scripts\run_synthetic_futures_report.py
-C:\quantlab\backend\venv\Scripts\python.exe scripts\check_local_futures_csv.py --path backend\tests\fixtures
-C:\quantlab\backend\venv\Scripts\python.exe scripts\normalize_local_futures_csv.py --input backend\tests\fixtures --output-dir backend\tests\_tmp_normalized_futures
-C:\quantlab\backend\venv\Scripts\python.exe scripts\report_local_futures_csv.py --input backend\tests\_tmp_normalized_futures
-C:\quantlab\backend\venv\Scripts\python.exe -m pytest backend/tests -q
+cd C:\quantlab
+git status -sb
+git log -10 --oneline --decorate
+
+# Backend dev server
+cd C:\quantlab\backend
+venv\Scripts\uvicorn app.main:app --reload --port 8000
+
+# Frontend dev server (user-run)
+cd C:\quantlab\frontend
+npm run dev
+
+# Full backend suite (backend venv carries pytest)
+cd C:\quantlab
+backend\venv\Scripts\python.exe -m pytest backend\tests -q
+
+# Frontend typecheck
+cd C:\quantlab\frontend
+npx tsc --noEmit
 ```
 
-Latest results (2026-07-05): every smoke check / report exits 0; full suite
-2469 passed. Remove the throwaway `backend\tests\_tmp_normalized_futures`
-folder afterward (it is not committed).
+## Explicit non-goals (standing)
 
-## Important Rule
-
-Do not implement these yet:
-
-- ML
-- CFDs
-- options
-- futures_continuous
-- real data download (no yfinance, no IBKR)
-- production trading
-- major backtest engine rewrite
-
-Proceed one tiny commit at a time.
-
-## Next Safe Step
-
-Pick ONE tiny step:
-
-- Design a tiny strategy/report interface that consumes local normalized CSV
-  only (no new data source) — specification / documentation first.
-- Or: decide the real data source plan (provenance, licensing, adapter shape)
-  before any ingestion implementation.
-
-## Risks
-
-- Jumping into ML before the data layer is proven beyond synthetic data.
-- Downloading real data before the ingestion plan and provenance rules are settled.
-- Rewriting existing crypto code instead of preserving and integrating it.
-- Making the platform too broad too early.
+- No live trading, broker/exchange/wallet integration, or real-money
+  execution — deliberate non-goal by positioning.
+- No automatic investment recommendations, strategy/signal selection or
+  position sizing.
+- No paid providers / API-key management beyond the existing opt-in,
+  fail-closed, disabled-by-default adapters.
+- No authentication, multi-user hosting or cloud sync in the current
+  phase sequence (Phase 70 plans a read-only hosted demo SPEC only).
+- No production trading/risk/compliance certification claims anywhere.

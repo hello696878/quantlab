@@ -10,14 +10,29 @@ must stay credible: no "guaranteed alpha", no "institutional-grade data", no
 for education and research — transparent about data quality and backtest
 limitations, **not live trading, not investment advice**.
 
-Status labels used below: **built** · **planned** · **research** · **future**.
+Status labels used below follow the Phase 62 audit vocabulary:
+**built** · **built_partial** · **planned** · **research** ·
+**deferred** · **deliberate_non_goal**. The evidence behind every label
+(actual backend, frontend, test and documentation files) lives in
+[`BLUEPRINT_STATUS_MATRIX.md`](BLUEPRINT_STATUS_MATRIX.md); the gap
+analysis and tag audit live in
+[`BLUEPRINT_RECONCILIATION_REPORT.md`](BLUEPRINT_RECONCILIATION_REPORT.md);
+the selected next phases live in
+[`FORWARD_ROADMAP_PHASES_63_70.md`](FORWARD_ROADMAP_PHASES_63_70.md).
+Labels below were last reconciled against the repository in **Phase 62.0
+(2026-08-05)**.
 
 ---
 
 ## 1. Vision
 
 An interactive platform where a user can explore ~**100 educational quant
-models across 12 categories**, run honest backtests on real historical data,
+models across 12 categories** — an aspiration, not an inventory: the 100
+has never been enumerated, no counting rule for "one model" exists, and
+**no completion percentage against it may be published** until both are
+defined (see `BLUEPRINT_STATUS_MATRIX.md` §3). Today ~40 workspaces are
+routed, of which 7 strategy models are executable in Backtest Studio.
+The vision is to run honest backtests on real historical data,
 stress the results (robustness, costs, risk rules, benchmarks), and learn the
 math behind each model — with trust features that make every number
 reproducible and every limitation explicit.
@@ -70,9 +85,9 @@ reproducible and every limitation explicit.
 | Robustness Lab (bootstrap Monte Carlo, deflated Sharpe, sensitivity heatmaps, PBO if feasible) | **built** (v1: block bootstrap + heuristic grade; 12.9 added the SMA parameter-sensitivity heatmap / Stability Lab. Deflated Sharpe / PBO / multi-strategy sweeps remain v2 — not implemented) |
 | Quant Disasters Series (what blew up and why — LTCM, Aug 2007, vol short 2018, …) | **built** (v1: 6 case studies — LTCM, 1987, Flash Crash, Volmageddon, Archegos, FTX — educational summaries with honest "cannot model yet" lists; scenario stress simulations remain future) |
 | Paper Replication Series (classic papers, honest deviations) | **built** (v1: 8 paper pages + 3 inspired demos clearly labelled as simplified; full replications future — need universe data) |
-| AI Explainer Copilot (explains results; never recommends trades) | future |
-| 3D Visualization Engine (vol surfaces, sweep landscapes) | future |
-| Strategy Ensemble Builder | research |
+| AI Explainer Copilot (explains results; never recommends trades) | **planned** (Phase 69 — evidence-grounded, provenance-per-claim, no advice; nothing exists yet) |
+| 3D Visualization Engine (vol surfaces, sweep landscapes) | **research** (no GPU/3D path exists; the globe is a hand-written canvas-2D projection, and surfaces elsewhere are 2-D grids — adding a 3D library is an open dependency decision) |
+| Strategy Ensemble Builder | **research → selected for Phase 63.** Phase 61 built a *Signal* Ensemble Lab (combining signal VALUES). Strategy-level work — return-stream alignment, capital/risk allocation across strategies, strategy turnover, drawdown/tail overlap, walk-forward ensemble policies, frozen held-out combination, ensemble constraints, strategy contribution attribution — does **not** exist yet |
 
 ## 4. Model catalog — 12 categories (~100 models long-term)
 
@@ -90,7 +105,18 @@ reproducible and every limitation explicit.
 3. **Event-Driven & Arbitrage** — **built (v1)**: event study (abnormal returns,
    CAR/CAAR) + simplified merger-arb calculator (15.0). Planned: full merger-arb,
    convertible-arb, index add/remove engines
-4. **Futures & Commodities** — research (carry, term-structure, trend)
+4. **Futures & Commodities** — **built_partial** (no longer "research").
+   Two tracks exist: the educational Futures & Commodities Lab
+   (cost-of-carry, convenience yield, basis, curve shape, roll yield,
+   calendar spread, margin/leverage, stress scenarios) **and** a local
+   futures research pipeline — YAML instrument registry (ES/NQ/RTY/YM),
+   validated raw bars with content hashes, local-CSV ingest into a
+   `RawFuturesStore`, ratio-adjusted continuous-contract building with
+   documented roll rules, a t+1 futures backtest adapter, and a
+   features → labels → model → experiment pipeline. Missing: session/
+   holiday calendars, any vendor/network source, intraday bars,
+   multi-root portfolio backtests, and any frontend surface for the
+   research pipeline (Phase 67 specifies the real-data contract)
 5. **FX** — **built (v1)**: FX Lab — interest rate parity forward, FX carry, PPP
    deviation, currency exposure + stress, Garman-Kohlhagen FX options (16.2).
    Planned: FX vol surface, momentum/carry strategy backtests, live rates
@@ -104,14 +130,36 @@ reproducible and every limitation explicit.
    transitions, credit spread strategies
 8. **Crypto** — built (partial: tickers + 365-day convention); funding-rate /
    basis models research; exchange-native data future
-9. **Real Estate** — research (REIT factor / rate sensitivity)
-10. **Market Microstructure & HFT** — future; **14 educational HFT models as
-    simulations on synthetic data only** (order-book imbalance, queue position,
-    market-making toys). No real HFT execution, no live tick feeds.
-11. **Portfolio & Risk** — built (core); ensemble builder + risk parity v2
-    planned
-12. **Machine Learning & AI** — future (feature pipelines, walk-forward ML
-    guards, overfitting alarms first)
+9. **Real Estate** — **built_partial** (no longer "research"): income-property
+   analytics (EGI/NOI, cap-rate valuation, amortization, LTV/DSCR, levered
+   cash flow with a bisection IRR, equity multiple, six stress scenarios,
+   REIT NAV discount/premium) plus MBS prepayment analytics (CPR/SMM/PSA,
+   projected cash flows, WAL, duration/convexity approximations). Missing:
+   OAS, a term-structure model, prepayment behaviour under shocks, CMO
+   waterfalls
+10. **Market Microstructure & educational HFT** — **built_partial** (no longer
+    "future"): order-book summary and depth imbalance, microprice, trade-tape
+    VWAP/TWAP/signed imbalance, implementation shortfall and slippage,
+    execution-schedule comparison, liquidity stress scenarios, TCA attribution
+    and order-flow toxicity — analytic formulas over a static tape. Missing:
+    matching engine, queue-position and latency models, agent-based
+    simulation. **deliberate_non_goal:** real HFT execution, live tick feeds
+    for trading, order submission
+11. **Portfolio & Risk** — **built** (multi-asset backtest/optimization/
+    frontier/risk dashboard/stress/factor analysis, risk parity and
+    Black-Litterman helpers, plus the Phase 56-58 construction, stress and
+    attribution labs). The **strategy** ensemble builder remains absent —
+    see the trust-features table and Phase 63
+12. **Machine Learning & AI** — **built_partial** (no longer "future"): a
+    validation/diagnostics chain exists (purged CV + embargo + CPCV,
+    meta-labeling calibration and thresholds, feature importance/stability/
+    drift, PBO/deflated Sharpe/multiple testing, regime, cost, signal decay
+    and ensemble diagnostics) **and** a local futures ML loop exists (16
+    trailing features, five label families, linear/logistic/dummy models,
+    split/train/evaluate, experiment persistence). They are **not one
+    lifecycle**: the ML loop is CLI-only with no API or UI and stores runs
+    on the filesystem while the labs use the SQLite registry. No tree
+    ensembles, boosting or neural models exist. Phase 64 unifies this
 
 ## 5. Phase order (near-term first)
 
@@ -125,14 +173,23 @@ reproducible and every limitation explicit.
 6. ~~Options Pricing Engine v1~~ — **built** (14.0 Black–Scholes; 14.1 CRR
    binomial tree + American exercise; 14.2 Monte Carlo GBM + Asian/barrier;
    14.3 IV surface + SVI research fit; 14.4 Heston stochastic volatility)
-7. Volatility Lab v1
+7. ~~Volatility Lab v1~~ — **built_partial** (21.x: IV inversion over a
+   supplied chain, smile, put-spread skew, ATM term structure, surface
+   summary grid, realized-vs-implied, simplified variance-swap fair strike,
+   vega exposure, scenarios; no fitted/arbitrage-free surface, no SABR
+   calibration, no chain source, and no dedicated lab doc yet)
 8. ~~Event-Driven & Arbitrage Module~~ — **built (v1)** (15.0: event study + merger-arb calculator)
 9. Rates / FX / Credit Module — **started** (16.0: Yield Curve Lab v1;
    16.1: Short Rate Models v1 — Vasicek / CIR; 16.2: FX Lab v1 — IRP / carry /
    PPP / exposure / Garman-Kohlhagen; 17.0: Credit Risk Lab v1 — Merton / hazard /
    CDS / risky bond)
-10. Real Estate Module
-11. Microstructure & HFT Lab (educational simulations)
+10. ~~Real Estate Module~~ — **built_partial** (22.0/23.0: income-property
+    analytics + MBS prepayment; no OAS or term-structure model)
+11. ~~Microstructure & HFT Lab (educational simulations)~~ —
+    **built_partial** (24.x: order book, execution schedules, TCA
+    attribution, order-flow toxicity, liquidity stress; no matching engine,
+    queue/latency model or agent simulation; live execution is a permanent
+    non-goal)
 12. ~~Cross-Sectional Scanner Engine~~ — **built (v1)** (18.0: second engine —
     synthetic universe, dollar-neutral long/short, lookahead-safe portfolio
     backtest; reversal + momentum)
@@ -145,15 +202,42 @@ reproducible and every limitation explicit.
     rates, market structure, sample headlines, QuantLab cross-links; live FRED
     macro, delayed index / FX quotes, news / sentiment, and GeoJSON borders
     planned; static illustrative data, not real-time)
-15. Portfolio Studio + Ensemble Builder
-16. ML & AI Lab
-17. AI Explainer Copilot
-18. 3D Visualization Engine
+15. Portfolio Studio + Ensemble Builder — **built_partial**: the Portfolio
+    Studio side is built (multi-asset optimization/frontier/risk/stress/
+    factor tools plus the Phase 56-58 diagnostics labs); the **Strategy
+    Ensemble Builder is not** — Phase 61's Signal Ensemble combines signal
+    values, not strategy return streams. Selected for **Phase 63**
+16. ML & AI Lab — **built_partial** (see category 12: two working halves,
+    not one lifecycle; Phase 64 unifies them)
+17. AI Explainer Copilot — **planned** (Phase 69; nothing exists yet)
+18. 3D Visualization Engine — **research** (no 3D rendering path exists;
+    open dependency decision)
 19. Dashboard & Content Engine — Quant Disasters **built** (13.2); dashboard
     content hub **built** (13.3: hero workflows, Trust Layer grid, Content
     Engine cards, featured items, direction panel); broader content engine
-    future
-20. Platform & Launch
+    future. Note: no disaster case is replayable as a scenario yet (the
+    registry carries no run preset)
+20. Platform & Launch — **built_partial**: QA Command Center, Demo Center,
+    Data Reliability, Release Notes Center, Public Release Candidate,
+    Portfolio Showcase and Developer Onboarding all exist, with release
+    docs, checksum verification, CI and a manual Browser E2E workflow.
+    **Hosted deployment, authentication and multi-user isolation remain
+    deferred** — no auth, no per-user data isolation, no backups or
+    monitoring story (Phase 70 plans a read-only demo without adding
+    accounts)
+
+## 5b. Areas whose labels changed in the Phase 62 audit
+
+For traceability, the labels corrected on 2026-08-05 were: Futures &
+Commodities (research → built_partial), Real Estate (research →
+built_partial), Microstructure & HFT (future → built_partial), ML & AI
+(future → built_partial), Volatility Lab (unlabelled → built_partial),
+Strategy Ensemble Builder (research → research, now explicitly
+distinguished from the built Signal Ensemble Lab and selected for Phase
+63), AI Explainer (future → planned), 3D Visualization (future →
+research), Platform & Launch (unlabelled → built_partial with deferred
+hosting/auth). Evidence for each:
+[`BLUEPRINT_STATUS_MATRIX.md`](BLUEPRINT_STATUS_MATRIX.md).
 
 ## 6. Hard constraints (apply to every phase)
 

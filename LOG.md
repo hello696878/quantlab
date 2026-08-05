@@ -1,5 +1,48 @@
 # LOG - QuantLab
 
+## 2026-08-05 (Phase 62.0 — blueprint reconciliation / status audit)
+
+### Status
+
+Documentation/status phase only — no product code changes. The July
+futures-checkpoint planning docs (TASKS.md, STOP_POINT.md, this log) had
+gone stale: since then the futures track gained ingestion, continuous
+contracts (backend/app/datastore/futures_continuous.py), a local backtest
+pipeline, an ML signal loop and an experiment catalog/evidence-pack CLI,
+and Phases 48-61 added the fourteen-lab product-workflow diagnostics
+chain through Signal Ensemble (v4.79 tagged).
+
+### Completed
+
+- Evidence-audited status matrix for every Master Blueprint phase-order
+  area and all 12 model categories (docs/BLUEPRINT_STATUS_MATRIX.md).
+- Reconciliation report with gap analyses (strategy-vs-signal ensemble,
+  ML lifecycle, replay-by-hash, futures real data, frontend quality,
+  deployment) and a neutral tag audit — the missing v4.76 Phase 58 tag
+  and the recorded v4.69 deviation stay unrepaired by policy
+  (docs/BLUEPRINT_RECONCILIATION_REPORT.md).
+- Forward roadmap for Phases 63-70; Phase 63 selected: Strategy Return
+  Stream, Strategy Similarity and Portfolio Ensemble Diagnostics Lab v1
+  (docs/FORWARD_ROADMAP_PHASES_63_70.md).
+- TASKS.md / STOP_POINT.md / MASTER_BLUEPRINT_V3.md / ROADMAP.md /
+  PROJECT_SNAPSHOT.md / VERSION_MANIFEST.md / CHANGELOG.md reconciled;
+  VERSION -> 4.80.0-dev.
+
+### Superseded rules (recorded, not silently dropped)
+
+The old "Do not implement ML / futures_continuous / options" checkpoint
+rules were superseded by later phases that implemented those areas; the
+standing non-goals are now: no live trading or execution, no automatic
+investment recommendations, no paid providers beyond the opt-in
+fail-closed adapters, no auth/multi-user hosting (deferred), no
+production certification.
+
+### Next
+
+- User: commit `Add master blueprint reconciliation project status audit
+  roadmap v1`, run the Codex review, then create the v4.80 tag manually.
+- Then Phase 63 (do not start it inside Phase 62).
+
 ## 2026-07-05 (local futures data path v0.1 — stable)
 
 ### Status
