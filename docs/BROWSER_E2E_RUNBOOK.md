@@ -1,4 +1,9 @@
-# QuantLab — Browser E2E Runbook (Phase 43.0)
+# QuantLab — Browser E2E Runbook
+
+> **Layer note (Phase 63.0):** component tests (`npm run test:unit`) cover
+> shared components and navigation identity in jsdom, offline. This runbook
+> covers the browser layer. Neither replaces the other, and neither replaces
+> the user-run production smoke pass. (Phase 43.0)
 
 How to run the Playwright regression harness that guards the frozen public
 demo path. Companions: [`PLAYWRIGHT_SETUP.md`](PLAYWRIGHT_SETUP.md) (setup) ·

@@ -44,6 +44,13 @@ they never mutate real data.
   available to it; no deployment; no release/tag creation; no GitHub API
   mutations. Concurrency-guarded per ref; 30-minute job timeout.
 
+> **Layer note (Phase 63.0):** the fast frontend component tests
+> (`npm run test:unit`, Vitest + jsdom) run in the main `ci.yml` workflow on
+> every push. They cover shared components and navigation/registry identity
+> and are **not** a replacement for this browser suite, which is the only
+> layer that exercises real workflows in a real browser. See
+> [`FRONTEND_COMPONENT_TESTING.md`](FRONTEND_COMPONENT_TESTING.md).
+
 ## 3. Why manual and non-blocking in v1
 
 The harness is new (v4.61). Keeping it out of the push/PR gate avoids

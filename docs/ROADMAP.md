@@ -1677,6 +1677,86 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 63.0 — Frontend Component Test Foundation & Registry Drift Guards v1 ✅
+
+- **Testing/reliability phase** — no financial model, analytics lab, UI or
+  navigation redesign, route migration, backend API, database table or
+  product-behaviour change.
+- **Test stack** (devDependencies only, one runner + one DOM environment):
+  Vitest 2.1 (+ `@vitest/coverage-v8`) + `@vitejs/plugin-react` + React
+  Testing Library (`react`/`dom`/`jest-dom`/`user-event`) + jsdom 25. No Jest beside
+  Vitest, no second browser-automation framework, no CDN asset, no Babel
+  migration, no live backend. Config: `frontend/vitest.config.ts`
+  (jsdom, `@/*` alias mirroring tsconfig, `src/**/*.{test,spec}` only,
+  `e2e/**` excluded, watch off, mocks restored between tests).
+- **Setup** (`src/test/setup.ts`): a hard **network guard** — an unmocked
+  `fetch` throws a named error, so a missing API mock can never pass
+  silently — plus the shims jsdom lacks (`matchMedia`, `ResizeObserver`,
+  `scrollIntoView`), per-test `localStorage` isolation and a
+  NaN/Infinity honesty matcher. It never silences React warnings or
+  errors; the async tests wrap state settling in `act(…)` instead.
+- **Scripts:** `test:unit` (one-shot, CI form), `test:unit:watch` (local),
+  `test:unit:coverage` (v8, console `text-summary`; any on-disk reporter
+  would go to the gitignored `artifacts/frontend-coverage/`, and coverage
+  is measured but never enforced), `test:frontend` (tests + typecheck).
+- **Canonical workspace registry** (`frontend/src/lib/workspaceRegistry.ts`):
+  `WORKSPACE_VISIBILITY` as an exhaustive `Record<View, …>` (a new view id
+  cannot compile without an explicit visibility decision),
+  `INTERNAL_VIEW_REASONS` (a hidden view must state why),
+  `WORKSPACES`/`WORKSPACE_BY_ID`/`WORKSPACE_GROUPS` **derived from
+  `NAV_GROUPS`** so labels, order and grouping stay owned by the sidebar,
+  and `WORKSPACE_COMMANDS` — the 58 palette navigation commands moved
+  verbatim out of the page component. That move plus its import was the
+  entire refactor: no label, ordering, grouping, visibility or behaviour
+  changed, and `npx tsc --noEmit` stayed clean across it. Transient
+  sub-views (portfolio tabs, library/paper/disaster slugs, options tabs)
+  are deliberately excluded — they are state, not routes.
+- **26 drift guards** (`src/lib/workspaceRegistry.test.ts`): view identity
+  (no duplicate/empty ids, documented id format, every union member
+  classified, valid visibility values, every internal view justified, no
+  stale justification); component mapping (every routed workspace has a
+  `view === "…"` branch AND header metadata; no branch for an
+  unregistered view); sidebar (targets only registered views, every public
+  workspace exactly once, no internal leakage, deterministic order, valid
+  non-duplicate groups, no empty group, every entry resolvable); command
+  palette (only registered targets, every public workspace reachable,
+  unique titles since they become React keys, non-empty lowercase keyword
+  aliases, repeated views allowed only with distinct titles); cross-module
+  links (every literal `handleNav("…")` and every `onNav("…")` across all
+  component files targets a registered, non-internal view — catching the
+  `route as View` string casts the compiler cannot check).
+- **56 component tests**: Sidebar (groups, entries, `aria-current`, exact
+  navigation ids, keyboard activation, decorative headings); Command
+  Palette (canonical-label search, keyword-alias search where the alias is
+  never displayed, ArrowDown+Enter, Escape running nothing, honest empty
+  state, labelled modal dialog with focused input); Dashboard (quick-action
+  targets, accessible names, no NaN); FormulaReference/SafeMath (grouped
+  rendering, malformed LaTeX degrading instead of crashing, a throwing
+  renderer falling back to raw LaTeX source, LaTeX-**source** copy plus
+  both clipboard-rejected and clipboard-absent failure states, collapse
+  visibility); shared loading/empty/error/offline primitives (roles,
+  retry callbacks); settings/browser-storage safety (defaults, malformed
+  JSON, wrong-shape JSON, storage throwing on every accessor, non-finite
+  sanitisation).
+- **Source-scan boundary:** only two surfaces are not runtime values — the
+  erased `View` type and the 57-branch switcher inside a 2.5k-line client
+  component. `src/test/sourceScan.ts` reads those two with narrow,
+  comment-stripped patterns that **throw with the file to fix** rather
+  than passing silently; every other surface is asserted against real
+  imported values. The limitation is documented in both new docs.
+- **CI:** `npm ci` → `npm run test:unit` → `npx tsc --noEmit` →
+  `npm run build`, one-shot, no browser download, no backend, no secrets,
+  no permission change. Playwright keeps its own manually triggered
+  workflow and all 254 specs untouched; component tests are explicitly
+  **not** a replacement for E2E or the user-run production smoke.
+- **Docs:** `FRONTEND_COMPONENT_TESTING.md` (stack rationale, commands,
+  conventions, API/browser mocking policy, layer boundaries, omissions,
+  how Phase 64 should use it) and `FRONTEND_REGISTRY_DRIFT_GUARDS.md`
+  (registry design, every guard, how to add a workspace/sidebar entry/
+  dashboard card/palette command safely, failure-message table, the
+  source-scan limitation). **No accessibility certification, no
+  visual-regression system, no claim of complete frontend coverage.**
+
 ### Phase 62.0 — Master Blueprint Reconciliation, Project Status Audit & Forward Roadmap v1 ✅
 
 - **Documentation/status phase** — no new financial model, analytics

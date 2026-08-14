@@ -45,7 +45,9 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
 - **Risk-aware product language** — every module states its data mode,
   simplifications, and limitations in the UI and docs.
 - **Testing & QA workflow** — a large deterministic backend test suite
-  (3,000+ tests), CI preflight (backend tests + frontend typecheck/build), a
+  (3,000+ tests), a frontend component-test layer (Vitest + React Testing
+  Library + jsdom) with navigation/registry drift guards, CI preflight
+  (backend tests + frontend component tests + typecheck + build), a
   Playwright browser guard covering the frozen demo path and the Experiment
   Registry with a manually triggered CI workflow, a QA Command Center, and a
   Data Reliability Center.
@@ -123,7 +125,8 @@ npm run build
 ```
 
 Docker Compose (`docker compose up --build`) brings up both services; CI
-(`.github/workflows/ci.yml`) runs backend tests and a frontend build on push.
+(`.github/workflows/ci.yml`) runs backend tests, the frontend component tests,
+the typecheck and the frontend build on push.
 
 ## Testing
 
@@ -132,6 +135,8 @@ cd C:\quantlab
 backend\venv\Scripts\python.exe -m pytest backend\tests -q
 
 cd C:\quantlab\frontend
+npm run test:unit   # frontend component tests (Vitest + jsdom, offline,
+                    # one-shot; no backend, no browser download)
 npx tsc --noEmit
 npm run e2e   # browser regression guard for the frozen demo path
               # (local/manual; servers must already be running —
@@ -448,6 +453,7 @@ deterministic static sample data (see `docs/PROJECT_OVERVIEW.md` and
 ## Project docs
 
 - [docs/PROJECT_OVERVIEW.md](docs/PROJECT_OVERVIEW.md) — architecture map
+- [docs/FRONTEND_COMPONENT_TESTING.md](docs/FRONTEND_COMPONENT_TESTING.md) · [docs/FRONTEND_REGISTRY_DRIFT_GUARDS.md](docs/FRONTEND_REGISTRY_DRIFT_GUARDS.md) — the frontend component-test layer and the navigation/registry drift guards
 - [docs/BLUEPRINT_STATUS_MATRIX.md](docs/BLUEPRINT_STATUS_MATRIX.md) · [docs/BLUEPRINT_RECONCILIATION_REPORT.md](docs/BLUEPRINT_RECONCILIATION_REPORT.md) · [docs/FORWARD_ROADMAP_PHASES_63_70.md](docs/FORWARD_ROADMAP_PHASES_63_70.md) — evidence-audited status per area, the gap analysis and tag audit, and the next eight planned phases
 - [docs/ROADMAP.md](docs/ROADMAP.md) — per-phase build log and future plans
 - [CHANGELOG.md](CHANGELOG.md) · [VERSION](VERSION) — grouped changelog and the current milestone label

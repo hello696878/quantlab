@@ -1,7 +1,7 @@
-# QuantLab — Project Snapshot (Phase 62.0)
+# QuantLab — Project Snapshot (Phase 63.0)
 
 A one-page handoff doc. Facts verified against the repo when written
-(version label `4.80.0-dev`); counts drift as phases land — re-verify before
+(version label `4.81.0-dev`); counts drift as phases land — re-verify before
 public use. Status ground truth by area:
 [`BLUEPRINT_STATUS_MATRIX.md`](BLUEPRINT_STATUS_MATRIX.md).
 
@@ -54,7 +54,8 @@ deterministic `sample.py` + pure `service.py`, exposed as
 `GET /<lab>/sample` + `POST /<lab>/analyze`; SQLite for saved work) and
 `frontend/` (Next.js 14 single-page shell; typed per-lab clients; shared
 chart/formula/state primitives; app-router error/loading/not-found safety
-pages). Docker Compose; GitHub Actions CI (backend tests + frontend build).
+pages). Docker Compose; GitHub Actions CI (backend tests + frontend
+component tests + typecheck + build).
 Full map: `PROJECT_OVERVIEW.md`.
 
 ## Data modes
@@ -77,7 +78,12 @@ guarantees exist at the API boundary; wording contracts are tests;
 the frozen demo path, the Experiment Registry, Dataset Lineage, Model
 Validation Lab, Meta-Labeling Lab, Feature Diagnostics, Overfitting
 Diagnostics, Regime Diagnostics, Cost & Capacity, Portfolio Diagnostics, Portfolio Stress Lab, Portfolio Attribution, Factor Diagnostics, Signal Decay Lab, and Signal Ensemble Lab views (local-first, plus a manually triggered CI workflow —
-`CI_BROWSER_E2E.md`); **no frontend unit/component-test framework yet**.
+`CI_BROWSER_E2E.md`). Phase 63.0 added the first frontend component-test
+layer: Vitest + React Testing Library + jsdom, **82 tests in 7 files**
+(26 navigation/registry drift guards plus component tests for the sidebar,
+command palette, dashboard, formula reference, shared state primitives and
+browser-storage safety), run one-shot in CI before the typecheck and build
+(`FRONTEND_COMPONENT_TESTING.md`).
 Playwright discovery reports 254 Chromium tests in 18 spec files; discovery
 is not an E2E pass. Verification is run locally by the user (helper wrappers
 in `scripts\*.ps1`).
@@ -113,14 +119,16 @@ need).
 ## Known limitations (headlines)
 
 Educational simplifications on hand-written samples (nothing calibrated; no
-alpha claims); hand-maintained registries can drift until re-reviewed; no
-frontend tests; single-user local-first (no auth/hosting); full ledger in
-`LIMITATIONS.md`.
+alpha claims); hand-maintained registries are now guarded for identity drift
+but their content is still hand-maintained; frontend testing covers shared
+components and navigation identity only — no visual regression, no
+accessibility certification, no analytics-panel component tests; single-user
+local-first (no auth/hosting); full ledger in `LIMITATIONS.md`.
 
 ## Next recommended improvements
 
-1. Phase 63: frontend component-test foundation and registry drift guards.
-2. Phase 64: strategy return-stream ensemble diagnostics.
+1. Phase 64: strategy return-stream ensemble diagnostics.
+2. Extend component tests to further shared primitives as they stabilise.
 3. Phase 65/66: unified ML identity, then replay by hash.
 4. Screenshot captures for newer workspaces (real runs).
 5. Read-only hosted-demo planning only after the documented gaps are addressed.

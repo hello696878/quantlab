@@ -20,8 +20,10 @@ no live provider is ever contacted (yfinance is monkeypatched in the backtest
 API tests; every lab runs on static samples).
 
 **Job 2 — Frontend Build** (`ubuntu-latest`, Node 20):
-`npm ci` (lockfile-exact), then `npx tsc --noEmit` (fast-fail typecheck,
-added in 41.0), then `npm run build`. The build job predates Phase 41 and is
+`npm ci` (lockfile-exact), then `npm run test:unit` (frontend component
+tests, added in 63.0 — one-shot Vitest/jsdom, offline, no browser download),
+then `npx tsc --noEmit` (fast-fail typecheck, added in 41.0), then
+`npm run build`. The build job predates Phase 41 and is
 kept because the project has always expected CI to verify the production
 build compiles — **on the runner**; your local `npm run build` remains a
 separate, user-run step.
@@ -45,6 +47,10 @@ if (Test-Path .\artifacts) {
     Remove-Item -Recurse -Force .\artifacts
 }
 backend\venv\Scripts\python.exe -m pytest backend\tests -q
+
+# Frontend component tests (Phase 63.0)
+cd C:\quantlabrontend
+npm run test:unit
 
 # Frontend typecheck
 cd C:\quantlab\frontend

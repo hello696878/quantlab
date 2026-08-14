@@ -41,9 +41,9 @@ jobs:
         working-directory: backend
         run: python -m pytest -q
 
-  # ── Job 2: verify the Next.js production build succeeds ───────────────────
+  # ── Job 2: frontend component tests, typecheck, then the production build ─
   frontend-build:
-    name: Frontend Build
+    name: Frontend Tests & Build
     runs-on: ubuntu-latest
 
     steps:
@@ -60,6 +60,13 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: npm ci
+
+      # Component/unit tests (Phase 63.0): one-shot, jsdom, offline — no
+      # browser download, no backend, no live data. Playwright E2E stays in
+      # its own manually triggered workflow (browser-e2e.yml).
+      - name: Frontend component tests
+        working-directory: frontend
+        run: npm run test:unit
 
       # Fast-fail typecheck before the full build (Phase 41.0).
       - name: TypeScript check

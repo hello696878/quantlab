@@ -23,6 +23,14 @@ npm run dev
 cd C:\quantlab
 backend\venv\Scripts\python.exe -m pytest backend\tests -q
 
+# Frontend component tests (Vitest + jsdom, offline, one-shot)
+cd C:\quantlab\frontend
+npm run test:unit
+
+# Frontend component tests + typecheck together
+cd C:\quantlab\frontend
+npm run test:frontend
+
 # Frontend typecheck
 cd C:\quantlab\frontend
 npx tsc --noEmit

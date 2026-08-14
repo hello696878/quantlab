@@ -80,12 +80,25 @@ primitives: `components/charts/LabCharts.tsx`, `components/math/`
   pattern for anything new: opt-in, fail-closed, fixture-backed.
 - After the suite, the repo-root `artifacts\` folder must not exist.
 
-## 7. Typecheck
+## 7. Frontend tests and typecheck
 
-`cd frontend; npx tsc --noEmit` (or `.\scripts\run_frontend_typecheck.ps1`).
-Strict TypeScript; avoid `any`. `tsconfig.tsbuildinfo` is generated and
-gitignored (untracked since Phase 42.3) — never commit it. There is currently
-no frontend test framework.
+**Component tests** (Phase 63.0): `cd frontend; npm run test:unit` — Vitest +
+React Testing Library + jsdom, one-shot, offline (an unmocked `fetch` fails the
+test by design), no backend and no browser download. `npm run test:unit:watch`
+is the local watch mode; `npm run test:frontend` runs the tests and the
+typecheck together. They cover shared components and the navigation/registry
+drift guards — see [`FRONTEND_COMPONENT_TESTING.md`](FRONTEND_COMPONENT_TESTING.md)
+and [`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md).
+They do not replace Playwright E2E or the user-run production smoke.
+
+**Typecheck**: `cd frontend; npx tsc --noEmit` (or
+`.\scripts\run_frontend_typecheck.ps1`). Strict TypeScript; avoid `any`.
+`tsconfig.tsbuildinfo` is generated and gitignored (untracked since Phase
+42.3) — never commit it.
+
+**Adding a workspace?** The drift guards name exactly which of the five
+navigation surfaces you missed; the procedure is in
+[`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md) §4.
 
 ## 8. Conventions worth copying (inferred from the repo)
 

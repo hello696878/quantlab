@@ -10,7 +10,11 @@
     "e2e": "playwright test",
     "e2e:frozen": "playwright test e2e/frozen-demo.spec.ts e2e/scenario-studio.spec.ts e2e/pairs-ko-pep.spec.ts",
     "e2e:responsive": "playwright test e2e/responsive.spec.ts",
-    "e2e:report": "playwright show-report ../artifacts/e2e/playwright-report"
+    "e2e:report": "playwright show-report ../artifacts/e2e/playwright-report",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest",
+    "test:unit:coverage": "vitest run --coverage",
+    "test:frontend": "vitest run && tsc --noEmit"
   },
   "dependencies": {
     "@types/katex": "^0.16.8",
@@ -22,12 +26,20 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.61.1",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.4",
     "@types/node": "^20",
     "@types/react": "^18",
     "@types/react-dom": "^18",
+    "@vitejs/plugin-react": "^4.7.0",
+    "@vitest/coverage-v8": "^2.1.9",
     "autoprefixer": "^10.4.21",
+    "jsdom": "^25.0.1",
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^2.1.9"
   }
 }

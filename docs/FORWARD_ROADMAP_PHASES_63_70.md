@@ -1,5 +1,18 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
+> **Status update (Phase 63.0 — DELIVERED).** Phase 63 below is implemented.
+> Delivered beyond its written scope: a canonical workspace registry with an
+> exhaustive `Record<View, …>` visibility classification, 26 drift guards
+> (view identity, component mapping, sidebar, palette, and cross-module
+> `onNav`/`handleNav` link targets), 56 component tests, and the CI gate
+> (`npm run test:unit` before typecheck and build). Its "no CI gating change
+> without the user's decision" risk was resolved by the Phase 63 prompt
+> explicitly requesting the CI integration. Docs:
+> [`FRONTEND_COMPONENT_TESTING.md`](FRONTEND_COMPONENT_TESTING.md),
+> [`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md).
+> The next phase is **Phase 64 — Strategy Return Stream, Strategy Similarity
+> and Portfolio Ensemble Diagnostics Lab v1**, unchanged in scope.
+
 An ordered, dependency-aware plan derived from the evidence audit in
 [`BLUEPRINT_STATUS_MATRIX.md`](BLUEPRINT_STATUS_MATRIX.md) and the gap
 analysis in
@@ -30,7 +43,7 @@ plans exposure of the result.
 
 ---
 
-## Phase 63 — Frontend Component Test Foundation and Registry Drift Guards v1 · **SELECTED NEXT**
+## Phase 63 — Frontend Component Test Foundation and Registry Drift Guards v1 · **DELIVERED**
 
 **Goal.** Give the frontend its first unit/component test layer and stop
 registry-versus-route drift silently.

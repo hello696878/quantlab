@@ -117,3 +117,31 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check_environment.ps1
 
 All helper scripts are short and readable — inspect them before running;
 none install anything, start the frontend, download code, or touch secrets.
+
+## Frontend component tests (Phase 63.0)
+
+**`npm run test:unit` reports an unmocked network request.** That is the
+network guard in `frontend/src/test/setup.ts` doing its job: a component under
+test called `fetch`. Mock the specific local client module
+(`vi.mock("@/lib/api", ...)`) and return deterministic data — never mock fetch
+globally as successful.
+
+**A registry drift guard fails after adding a workspace.** The failure names
+the missing surface (visibility classification, sidebar entry, switcher
+branch, header metadata, or palette command). The full procedure is in
+[`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md) §4.
+
+**`Could not find "export type View =" ...` or `No \`view === "…"\` branches
+found`.** A source-scan tripwire fired: `src/components/AppShell.tsx` or
+`src/app/page.tsx` was restructured so the scanner can no longer read it.
+Update `frontend/src/test/sourceScan.ts` and the drift-guard document
+together — do not delete the guard.
+
+**A clipboard assertion fails unexpectedly.** `userEvent.setup()` installs its
+own clipboard stub, so `stubClipboard(...)` must be called **after**
+`renderWithUser(...)`.
+
+**React `act(...)` warnings.** Do not suppress them. Settle the component's
+async work inside `act` (see the `open()` helper in
+`src/components/CommandPalette.test.tsx`) so genuine unhandled updates stay
+visible.

@@ -18,6 +18,72 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Frontend Component Test Foundation & Registry Drift Guards v1**
+  (v4.81 series): QuantLab's first frontend unit/component testing layer,
+  plus deterministic guards against navigation and workspace drift. Test
+  stack (devDependencies only, one runner and one DOM environment):
+  **Vitest** (+ **@vitest/coverage-v8**) + **@vitejs/plugin-react** +
+  **React Testing Library** (`@testing-library/react`, `/dom`,
+  `/jest-dom`, `/user-event`) +
+  **jsdom** — no Jest beside Vitest, no second browser-automation
+  framework, no CDN asset, no Babel migration and no live backend. Global
+  setup installs a **hard network guard** (an unmocked `fetch` throws a
+  named error, so a missing API mock can never pass silently), the
+  browser shims jsdom lacks (`matchMedia`, `ResizeObserver`,
+  `scrollIntoView`), per-test `localStorage` isolation and a
+  NaN/Infinity honesty matcher — and deliberately never silences React
+  warnings or errors. New scripts: `test:unit` (one-shot, the CI form),
+  `test:unit:watch` (local only), `test:unit:coverage` (v8, console
+  `text-summary` only; nothing written to the repository, and any on-disk
+  reporter would land in the gitignored artifacts tree) and
+  `test:frontend` (tests + typecheck). Coverage is measured, not
+  enforced: no threshold is claimed.
+  A canonical workspace registry (`frontend/src/lib/workspaceRegistry.ts`)
+  now holds the minimum navigation metadata needed for verification:
+  `WORKSPACE_VISIBILITY` as an exhaustive `Record<View, …>` so a new view
+  id cannot compile without an explicit visibility decision,
+  `INTERNAL_VIEW_REASONS` so any hidden view must state why,
+  `WORKSPACES`/`WORKSPACE_BY_ID`/`WORKSPACE_GROUPS` **derived from the
+  sidebar** so labels, ordering and grouping stay owned by the product,
+  and `WORKSPACE_COMMANDS` (the 58 palette navigation commands, moved
+  verbatim out of the page component). The only refactor was that move
+  plus the import — no label, order, group, visibility or behaviour
+  changed, and the typecheck stayed clean across it. 26 drift guards
+  assert: no duplicate/empty/malformed view ids; every union member
+  classified; every routed workspace has a switcher branch AND header
+  metadata (and no branch exists for an unregistered view); the sidebar
+  lists every public workspace exactly once, in registry order, with
+  valid groups and no internal leakage; palette commands target only
+  registered views, reach every public workspace, and carry unique titles
+  and lowercase keyword aliases; and every literal `handleNav("…")` /
+  `onNav("…")` cross-link in the page and all component files targets a
+  registered, non-internal view — catching the string casts the compiler
+  cannot check. 56 component tests cover the Sidebar (groups, entries,
+  `aria-current`, exact navigation ids, keyboard activation, decorative
+  headings), the Command Palette (canonical-label search, keyword-alias
+  search that never displays the alias, arrow+Enter flow, Escape without
+  running anything, honest empty state), the Dashboard (quick-action
+  targets, accessible names, no NaN), FormulaReference/SafeMath (grouped
+  rendering, malformed LaTeX degrading instead of crashing, the renderer
+  throwing and falling back to raw source, LaTeX-source copy plus BOTH
+  clipboard-rejected and clipboard-absent failure states, collapse
+  visibility), the shared loading/empty/error/offline primitives
+  (roles, retry callbacks), and settings/browser-storage safety
+  (defaults, malformed JSON, wrong-shape JSON, storage that throws on
+  every accessor, sanitisation of non-finite values). Two source scans
+  (the erased `View` type and the 57-branch switcher) are narrow,
+  comment-stripped tripwires that throw with the file to fix rather than
+  passing silently — documented as a limitation, with every other surface
+  asserted against real imported values. CI now runs `npm run test:unit`
+  after `npm ci` and before the typecheck and production build, one-shot,
+  with no browser download, no backend, no secrets and no new
+  permissions; Playwright keeps its own manually triggered workflow and
+  all 254 specs untouched. Docs: `FRONTEND_COMPONENT_TESTING.md`,
+  `FRONTEND_REGISTRY_DRIFT_GUARDS.md`. No financial model, analytics
+  engine, database table, API endpoint, workspace or product behaviour
+  changed; this is a testing and reliability phase, and it certifies
+  nothing about frontend correctness or accessibility.
+
 - **Master Blueprint Reconciliation, Project Status Audit & Forward
   Roadmap v1** (v4.80 series): a documentation/status phase — no new
   financial model, analytics engine, database table, API endpoint,

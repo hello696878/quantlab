@@ -57,6 +57,27 @@ Copy-Item .env.example .env.local
 
 ---
 
+## Tests (Phase 63.0)
+
+```powershell
+cd C:\quantlab\frontend
+npm run test:unit          # component/unit tests — Vitest + jsdom, one-shot
+npm run test:unit:watch    # local watch mode
+npm run test:frontend      # tests + tsc --noEmit
+```
+
+Component tests are **offline by design**: an unmocked `fetch` fails the test,
+no backend is required, and no browser is downloaded. They cover shared
+components (sidebar, command palette, dashboard, formula reference, loading/
+empty/error/offline states, settings storage) and the navigation/registry
+drift guards. They do **not** replace the Playwright E2E suite (`npm run e2e`,
+real browser + running services) or the user-run production smoke pass.
+
+Details: [`../docs/FRONTEND_COMPONENT_TESTING.md`](../docs/FRONTEND_COMPONENT_TESTING.md) ·
+[`../docs/FRONTEND_REGISTRY_DRIFT_GUARDS.md`](../docs/FRONTEND_REGISTRY_DRIFT_GUARDS.md)
+
+---
+
 ## Run (development)
 
 ```powershell
