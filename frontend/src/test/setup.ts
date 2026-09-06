@@ -10,13 +10,16 @@
  *   a missing API mock can never pass silently;
  * * it never stubs application modules.  Tests inject their own doubles.
  *
- * Individual tests may override any shim locally (and `restoreMocks` in
- * vitest.config.ts puts it back afterwards).
+ * Individual tests may override shims locally. Cleanup restores spies,
+ * stubbed globals, direct browser-property descriptors and timers.
  */
 
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, expect, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
+import http from "node:http";
+import https from "node:https";
+import { createNetworkGuard } from "./networkGuard";
 
 // ---------------------------------------------------------------------------
 // Network guard — unmocked requests fail loudly
@@ -27,19 +30,28 @@ import { cleanup } from "@testing-library/react";
  * path that reaches `fetch` without a test-supplied double is a defect in the
  * test (a missing mock), so it throws instead of hanging or silently passing.
  */
-function networkGuard(input: unknown): never {
-  const target =
-    typeof input === "string"
-      ? input
-      : input && typeof input === "object" && "url" in input
-        ? String((input as { url: unknown }).url)
-        : String(input);
-  throw new Error(
-    `Unmocked network request to "${target}" in a component test. ` +
-      "Component tests are offline by design: mock the specific local API " +
-      "client module (e.g. vi.mock(\"@/lib/api\")) and return deterministic " +
-      "repository-owned data. See docs/FRONTEND_COMPONENT_TESTING.md.",
-  );
+const network = createNetworkGuard();
+const browser = window;
+const storage = browser.localStorage;
+const originalUrl = browser.location.href;
+const originals = [
+  [browser, "localStorage"],
+  [browser.navigator, "clipboard"],
+  [Element.prototype, "scrollIntoView"],
+] as const;
+const descriptors = originals.map(([object, key]) => Object.getOwnPropertyDescriptor(object, key));
+
+function installNetworkGuards(): void {
+  vi.stubGlobal("fetch", vi.fn(() => network.block("fetch")));
+  vi.spyOn(XMLHttpRequest.prototype, "send").mockImplementation(() => network.block("XMLHttpRequest"));
+  for (const name of ["WebSocket", "EventSource"] as const) {
+    vi.stubGlobal(name, class { constructor() { network.block(name); } });
+  }
+  if (typeof browser.navigator.sendBeacon === "function") vi.spyOn(browser.navigator, "sendBeacon").mockImplementation(() => network.block("sendBeacon"));
+  for (const transport of [http, https]) {
+    vi.spyOn(transport, "request").mockImplementation(() => network.block("node HTTP request"));
+    vi.spyOn(transport, "get").mockImplementation(() => network.block("node HTTP get"));
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -53,7 +65,7 @@ class ResizeObserverStub {
 }
 
 function installBrowserShims(): void {
-  vi.stubGlobal("fetch", vi.fn(networkGuard));
+  installNetworkGuards();
 
   if (!window.matchMedia) {
     vi.stubGlobal(
@@ -81,24 +93,32 @@ function installBrowserShims(): void {
     Element.prototype.scrollIntoView = vi.fn();
   }
 
-  // requestAnimationFrame exists in modern jsdom, but keep the fallback so the
-  // suite does not depend on the jsdom version.
-  if (!window.requestAnimationFrame) {
-    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
-      setTimeout(() => cb(performance.now()), 0) as unknown as number,
-    );
-    vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id));
-  }
 }
+
+// Block import-time browser/HTTP calls as well as requests made during a test.
+installNetworkGuards();
 
 beforeEach(() => {
   installBrowserShims();
-  window.localStorage.clear();
+  storage.clear();
 });
 
 afterEach(() => {
-  cleanup();
-  window.localStorage.clear();
+  try {
+    cleanup();
+  } finally {
+    vi.useRealTimers();
+    vi.restoreAllMocks();
+    vi.unstubAllGlobals();
+    originals.forEach(([object, key], i) => {
+      const descriptor = descriptors[i];
+      if (descriptor) Object.defineProperty(object, key, descriptor);
+      else Reflect.deleteProperty(object, key);
+    });
+    storage.clear();
+    browser.history.replaceState(null, "", originalUrl);
+  }
+  network.assertClean();
 });
 
 // ---------------------------------------------------------------------------

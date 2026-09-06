@@ -393,8 +393,9 @@ delete at any time. The harness **never writes to
 - The KO/PEP guard pins the frozen date range explicitly because the app's
   default dates are relative to "today" — this is a feature of the guard,
   not a bug in the app.
-- The suite mutates nothing persistent: each test runs in a fresh browser
-  context; localStorage-based prefs never leave the test profile.
+- Browser preferences stay in fresh test contexts. The API specs do persist
+  demo seeds and some baseline transitions: use an isolated test database,
+  never the active user database. Idempotence does not mean read-only.
 
 ## Ground rules (unchanged by this doc)
 

@@ -1683,18 +1683,18 @@ single-asset Backtest + Strategy Comparison:
   navigation redesign, route migration, backend API, database table or
   product-behaviour change.
 - **Test stack** (devDependencies only, one runner + one DOM environment):
-  Vitest 2.1 (+ `@vitest/coverage-v8`) + `@vitejs/plugin-react` + React
+  Vitest 3.2.6 (+ matching `@vitest/coverage-v8`) + `@vitejs/plugin-react` + React
   Testing Library (`react`/`dom`/`jest-dom`/`user-event`) + jsdom 25. No Jest beside
   Vitest, no second browser-automation framework, no CDN asset, no Babel
   migration, no live backend. Config: `frontend/vitest.config.ts`
   (jsdom, `@/*` alias mirroring tsconfig, `src/**/*.{test,spec}` only,
-  `e2e/**` excluded, watch off, mocks restored between tests).
-- **Setup** (`src/test/setup.ts`): a hard **network guard** — an unmocked
-  `fetch` throws a named error, so a missing API mock can never pass
-  silently — plus the shims jsdom lacks (`matchMedia`, `ResizeObserver`,
-  `scrollIntoView`), per-test `localStorage` isolation and a
-  NaN/Infinity honesty matcher. It never silences React warnings or
-  errors; the async tests wrap state settling in `act(…)` instead.
+  `e2e/**` excluded, one-shot `vitest run` and explicit local watch script).
+- **Setup** (`src/test/setup.ts`): guarded browser fetch/XHR, WebSocket,
+  EventSource, available sendBeacon and Node HTTP/HTTPS requests. Attempts
+  throw and are recorded so caught errors still fail the test; this is not a
+  raw-socket sandbox. Missing layout APIs have narrow shims. Per-test cleanup
+  restores spies, globals, timers, storage, clipboard, scroll and URL state.
+  React warnings are not suppressed. See `PHASE_63_REVIEW.md` for verification.
 - **Scripts:** `test:unit` (one-shot, CI form), `test:unit:watch` (local),
   `test:unit:coverage` (v8, console `text-summary`; any on-disk reporter
   would go to the gitignored `artifacts/frontend-coverage/`, and coverage
@@ -1711,7 +1711,7 @@ single-asset Backtest + Strategy Comparison:
   changed, and `npx tsc --noEmit` stayed clean across it. Transient
   sub-views (portfolio tabs, library/paper/disaster slugs, options tabs)
   are deliberately excluded — they are state, not routes.
-- **26 drift guards** (`src/lib/workspaceRegistry.test.ts`): view identity
+- **Drift guards** (`src/lib/workspaceRegistry.test.ts`): view identity
   (no duplicate/empty ids, documented id format, every union member
   classified, valid visibility values, every internal view justified, no
   stale justification); component mapping (every routed workspace has a
@@ -1721,11 +1721,11 @@ single-asset Backtest + Strategy Comparison:
   non-duplicate groups, no empty group, every entry resolvable); command
   palette (only registered targets, every public workspace reachable,
   unique titles since they become React keys, non-empty lowercase keyword
-  aliases, repeated views allowed only with distinct titles); cross-module
+  search keywords (not route aliases), repeated views allowed only with distinct titles); cross-module
   links (every literal `handleNav("…")` and every `onNav("…")` across all
   component files targets a registered, non-internal view — catching the
   `route as View` string casts the compiler cannot check).
-- **56 component tests**: Sidebar (groups, entries, `aria-current`, exact
+- **Component tests**: Sidebar (groups, entries, `aria-current`, exact
   navigation ids, keyboard activation, decorative headings); Command
   Palette (canonical-label search, keyword-alias search where the alias is
   never displayed, ArrowDown+Enter, Escape running nothing, honest empty
@@ -1738,16 +1738,18 @@ single-asset Backtest + Strategy Comparison:
   retry callbacks); settings/browser-storage safety (defaults, malformed
   JSON, wrong-shape JSON, storage throwing on every accessor, non-finite
   sanitisation).
-- **Source-scan boundary:** only two surfaces are not runtime values — the
-  erased `View` type and the 57-branch switcher inside a 2.5k-line client
-  component. `src/test/sourceScan.ts` reads those two with narrow,
-  comment-stripped patterns that **throw with the file to fix** rather
-  than passing silently; every other surface is asserted against real
-  imported values. The limitation is documented in both new docs.
+- **Source-scan boundary:** the existing TypeScript compiler API reads the
+  erased View union, JSX rendering branches, header object, literal navigation
+  calls and explicitly listed navigation-data fields. Syntax/comment/CRLF and
+  mutation fixtures test the scanner. Reads are contained under frontend/src;
+  tests, generated files and symlink entries are excluded. Dynamic dataflow
+  and renamed navigation conventions are not inferred. The original 82 tests
+  in 7 files were strengthened during review; current results and dependency
+  security blockers are recorded in `PHASE_63_REVIEW.md`.
 - **CI:** `npm ci` → `npm run test:unit` → `npx tsc --noEmit` →
   `npm run build`, one-shot, no browser download, no backend, no secrets,
   no permission change. Playwright keeps its own manually triggered
-  workflow and all 254 specs untouched; component tests are explicitly
+  workflow and all 254 Chromium tests in 18 spec files untouched; component tests are explicitly
   **not** a replacement for E2E or the user-run production smoke.
 - **Docs:** `FRONTEND_COMPONENT_TESTING.md` (stack rationale, commands,
   conventions, API/browser mocking policy, layer boundaries, omissions,

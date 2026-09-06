@@ -1,7 +1,7 @@
 # STOP POINT - QuantLab
 
-Date: 2026-08-05 (Phase 62.0 — Master Blueprint Reconciliation, Project
-Status Audit and Forward Roadmap v1)
+Date: 2026-09-07 (Phase 63 review: Frontend Component Test Foundation and
+Registry Drift Guards v1)
 
 This replaces the stale 2026-07-05 "local futures data path v0.1" stop
 point, which no longer described the repository (the futures track later
@@ -21,14 +21,16 @@ trading/risk/compliance certification.
 
 | Field | Value |
 |---|---|
-| VERSION | `4.80.0-dev` |
+| VERSION | `4.81.0-dev` |
 | Latest completed feature phase | 61.0 — Signal Ensemble, Redundancy & Combination Diagnostics Lab v1 |
 | Phase 61 commits | `c0f256d` (Add) / `40ec1fd` (Review) |
-| Latest tag | `v4.79.0-signal-ensemble-redundancy-combination-diagnostics-v1` |
-| Current phase | 62.0 (documentation/status audit — this phase) |
+| Latest tag | `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1` |
+| Current phase | 63.0 (frontend test infrastructure and navigation guards) |
 | Current branch | `main` |
 | Phase 62 implementation | `e50cca2` (`Add master blueprint reconciliation project status audit roadmap v1`) |
-| Phase 62 review/tag state | Codex corrections complete in the worktree; review commit pending; v4.80 tag absent and remains gated on the review commit, CI/user verification and hygiene |
+| Phase 62 review/tag state | Review `ceb5c41` and v4.80 tag exist |
+| Phase 63 implementation | `0d1c903` |
+| Phase 63 review/tag state | Uncommitted review fixes; see `docs/PHASE_63_REVIEW.md`. Dependency-security blockers remain. Review commit, CI, manual build/smoke and clean hygiene required before v4.81; no tag created |
 
 ## Protected frozen release baseline
 
@@ -52,14 +54,12 @@ change silently.
 
 ## Next safe step
 
-1. Inspect the completed Codex review, then the user creates the review
-   commit (`Review master blueprint reconciliation project status audit
-   roadmap v1`).
-2. Run final local/CI verification and hygiene checks; only then may the user
-   create the v4.80 tag manually.
-3. The selected next implementation phase is **Phase 63 — Frontend
-   Component Test Foundation and Registry Drift Guards v1**
-   (`docs/FORWARD_ROADMAP_PHASES_63_70.md`). Do not begin it in Phase 62.
+1. Inspect `docs/PHASE_63_REVIEW.md` and resolve the recorded security blockers.
+2. User creates the Phase 63 review commit, runs relevant CI and the local
+   production build/browser smoke, then checks hygiene before any v4.81 tag.
+3. The next implementation phase remains **Phase 64: Strategy Return Stream,
+   Strategy Similarity and Portfolio Ensemble Diagnostics Lab v1**. It has
+   not been started.
 
 ## Exact restart commands
 

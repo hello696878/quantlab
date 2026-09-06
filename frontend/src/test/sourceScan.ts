@@ -1,181 +1,154 @@
-/**
- * Narrow source scanners for the registry drift guards (Phase 63.0).
- *
- * Two pieces of navigation identity are NOT reachable as runtime values:
- *
- * 1. the `View` union in `src/components/AppShell.tsx` is a TypeScript type,
- *    so it is erased before any test can import it;
- * 2. the root workspace switcher in `src/app/page.tsx` is a flat chain of
- *    `{view === "x" && <Panel/>}` JSX expressions inside one 2.5k-line client
- *    component — importing it into jsdom would pull in every analytics panel,
- *    and converting all 57 branches into a component map would be exactly the
- *    broad navigation rewrite this phase is not allowed to do.
- *
- * For those two, and only those two, the guards read the source text.
- *
- * DOCUMENTED LIMITATIONS of this approach:
- *
- * * it matches literal patterns only — a view id built at runtime (template
- *   string, variable) is invisible to it;
- * * comments and prose are stripped before matching, so a mention of a view
- *   id in a sentence is never treated as a route;
- * * it is a drift tripwire, not a parser: if these files are ever restructured
- *   so the patterns no longer appear, the guards fail loudly (empty match set)
- *   rather than passing silently.
- *
- * Everything else (sidebar entries, palette commands, dashboard targets,
- * workspace registry) is asserted against real imported values, never text.
- */
-
-import { readdirSync, readFileSync } from "node:fs";
+/** Test-only syntax checks, not a router or a data-flow analyzer. */
+import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { dirname, join, resolve } from "node:path";
+import { dirname, join, relative, resolve, isAbsolute } from "node:path";
+import ts from "typescript";
 
-const HERE = dirname(fileURLToPath(import.meta.url));
-/** `frontend/src` — this file lives in `frontend/src/test`. */
-const SRC_ROOT = resolve(HERE, "..");
-
-export const APP_SHELL_PATH = resolve(SRC_ROOT, "components/AppShell.tsx");
-export const PAGE_PATH = resolve(SRC_ROOT, "app/page.tsx");
+const SRC_ROOT = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 
 function readSource(path: string): string {
-  return readFileSync(path, "utf8");
+  const resolved = realpathSync(resolve(SRC_ROOT, path));
+  const child = relative(SRC_ROOT, resolved);
+  if (child.startsWith("..") || isAbsolute(child)) throw new Error("Source scan must stay inside frontend/src");
+  return readFileSync(resolved, "utf8");
 }
 
-/**
- * Remove `//` and block comments so prose can never be mistaken for a route.
- * Deliberately simple: it is applied to first-party source we control, and an
- * over-eager strip can only cause a guard to fail loudly, never to pass.
- */
-function stripComments(source: string): string {
-  return source
-    .replace(/\/\*[\s\S]*?\*\//g, " ")
-    .replace(/(^|[^:])\/\/[^\n]*/g, "$1 ");
+function parse(source: string): ts.SourceFile {
+  // TypeScript is already a devDependency; no regex stripping or code execution.
+  const result = ts.transpileModule(source, {
+    fileName: "navigation.tsx", reportDiagnostics: true,
+    compilerOptions: { jsx: ts.JsxEmit.Preserve, target: ts.ScriptTarget.ESNext },
+  });
+  const errors = result.diagnostics?.filter((d) => d.category === ts.DiagnosticCategory.Error) ?? [];
+  if (errors.length) throw new Error(`Invalid navigation source: ${errors.map((d) => ts.flattenDiagnosticMessageText(d.messageText, " ")).join("; ")}`);
+  return ts.createSourceFile("navigation.tsx", source, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
 }
 
-/**
- * The `View` union members, read from the type declaration in AppShell.
- *
- * Fails loudly (throws) when the declaration cannot be located, so a
- * restructure surfaces as a red test rather than an empty comparison.
- */
-export function readViewUnionIds(): string[] {
-  const source = readSource(APP_SHELL_PATH);
-  const marker = "export type View =";
-  const start = source.indexOf(marker);
-  if (start < 0) {
-    throw new Error(
-      `Could not find "${marker}" in src/components/AppShell.tsx. The View ` +
-        "union moved or changed shape — update src/test/sourceScan.ts and " +
-        "docs/FRONTEND_REGISTRY_DRIFT_GUARDS.md together.",
-    );
-  }
-  const end = source.indexOf(";", start);
-  const body = stripComments(source.slice(start + marker.length, end));
-  const ids = Array.from(body.matchAll(/"([a-z0-9-]+)"/g)).map((m) => m[1]);
-  if (ids.length === 0) {
-    throw new Error(
-      "The View union declaration produced no members — the drift guard can " +
-        "no longer read it. See src/test/sourceScan.ts.",
-    );
-  }
+function visit(node: ts.Node, action: (node: ts.Node) => void): void {
+  action(node);
+  ts.forEachChild(node, (child) => visit(child, action));
+}
+
+function unwrap(node: ts.Expression): ts.Expression {
+  while (ts.isParenthesizedExpression(node) || ts.isAsExpression(node) || ts.isSatisfiesExpression(node)) node = node.expression;
+  return node;
+}
+
+function literal(node: ts.Expression): string | undefined {
+  const value = unwrap(node);
+  return ts.isStringLiteral(value) ? value.text : undefined;
+}
+
+function nonempty(values: string[], description: string): string[] {
+  if (!values.length) throw new Error(`No ${description} found. Update sourceScan.ts and its fixtures when changing navigation syntax.`);
+  return values;
+}
+
+export function parseViewUnionIds(source: string): string[] {
+  const declarations = parse(source).statements.filter((s): s is ts.TypeAliasDeclaration =>
+    ts.isTypeAliasDeclaration(s) && s.name.text === "View" && !!s.modifiers?.some((m) => m.kind === ts.SyntaxKind.ExportKeyword));
+  if (declarations.length !== 1) throw new Error("Expected exactly one exported View type in AppShell.tsx");
+  const type = declarations[0].type;
+  const members = ts.isUnionTypeNode(type) ? type.types : [type];
+  return nonempty(members.map((m) => {
+    if (!ts.isLiteralTypeNode(m) || !ts.isStringLiteral(m.literal)) throw new Error("View must contain only string literal members");
+    return m.literal.text;
+  }), "View members");
+}
+
+export function parseSwitcherViewIds(source: string): string[] {
+  const ids: string[] = [];
+  visit(parse(source), (node) => {
+    if (!ts.isJsxExpression(node) || !node.expression) return;
+    const expr = unwrap(node.expression);
+    if (!ts.isBinaryExpression(expr) || expr.operatorToken.kind !== ts.SyntaxKind.AmpersandAmpersandToken) return;
+    const condition = unwrap(expr.left);
+    const render = unwrap(expr.right);
+    if (!ts.isBinaryExpression(condition) || condition.operatorToken.kind !== ts.SyntaxKind.EqualsEqualsEqualsToken ||
+        !ts.isIdentifier(condition.left) || condition.left.text !== "view") return;
+    if (!ts.isJsxElement(render) && !ts.isJsxSelfClosingElement(render) && !ts.isJsxFragment(render)) return;
+    const id = literal(condition.right);
+    if (id === undefined) throw new Error("Workspace render branch needs a literal View ID");
+    ids.push(id);
+  });
+  return nonempty(ids, "JSX workspace render branches in page.tsx");
+}
+
+export function parseViewMetaKeys(source: string): string[] {
+  const maps: ts.VariableDeclaration[] = [];
+  visit(parse(source), (node) => {
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === "VIEW_META") maps.push(node);
+  });
+  if (maps.length !== 1 || !maps[0].initializer) throw new Error("Expected one VIEW_META initializer in page.tsx");
+  const object = unwrap(maps[0].initializer);
+  if (!ts.isObjectLiteralExpression(object)) throw new Error("VIEW_META must be a literal object");
+  return nonempty(object.properties.map((p) => {
+    if (!ts.isPropertyAssignment(p) || (!ts.isIdentifier(p.name) && !ts.isStringLiteral(p.name))) throw new Error("VIEW_META keys must be explicit, not computed/spread");
+    return p.name.text;
+  }), "VIEW_META keys");
+}
+
+export function parseNavLiterals(source: string, name: "handleNav" | "onNav"): string[] {
+  const ids: string[] = [];
+  visit(parse(source), (node) => {
+    if (!ts.isCallExpression(node) || !ts.isIdentifier(node.expression) || node.expression.text !== name) return;
+    const id = node.arguments[0] && literal(node.arguments[0]);
+    if (id !== undefined) ids.push(id);
+  });
   return ids;
 }
 
-/**
- * The view ids the root switcher actually renders a branch for, read from the
- * `view === "x"` comparisons in `src/app/page.tsx`.
- */
-export function readSwitcherViewIds(): string[] {
-  const source = stripComments(readSource(PAGE_PATH));
-  const ids = Array.from(source.matchAll(/view === "([a-z0-9-]+)"/g)).map((m) => m[1]);
-  if (ids.length === 0) {
-    throw new Error(
-      'No `view === "…"` branches found in src/app/page.tsx. The workspace ' +
-        "switcher was restructured — update src/test/sourceScan.ts and " +
-        "docs/FRONTEND_REGISTRY_DRIFT_GUARDS.md together.",
-    );
-  }
-  return Array.from(new Set(ids));
+/** Only these reviewed, frontend-owned data tables use view/route as workspace IDs. */
+const NAV_DATA_FIELDS: Readonly<Record<string, string>> = {
+  "HomeDashboard.tsx": "view",
+  "PortfolioShowcasePanel.tsx": "route",
+  "DeveloperOnboardingPanel.tsx": "route",
+  "ReleaseNotesCenterPanel.tsx": "route",
+  "PublicReleaseCandidatePanel.tsx": "route",
+};
+
+export function parseNavDataTargets(source: string, field: string): string[] {
+  const ids: string[] = [];
+  visit(parse(source), (node) => {
+    if (!ts.isPropertyAssignment(node) || (!ts.isIdentifier(node.name) && !ts.isStringLiteral(node.name)) || node.name.text !== field) return;
+    const id = literal(node.initializer);
+    if (id === undefined) throw new Error(`Navigation data field ${field} must be a literal; document any new dynamic mapping`);
+    ids.push(id);
+  });
+  return nonempty(ids, `${field} navigation data fields`);
 }
 
-/**
- * The keys of the header `VIEW_META` map in `src/app/page.tsx`.
- *
- * `VIEW_META` is typed `Record<View, …>`, so TypeScript already guarantees
- * exhaustiveness; this scan is a belt-and-braces check that the runtime object
- * matches the union the guards compare everything else against.
- */
-export function readViewMetaKeys(): string[] {
-  const source = readSource(PAGE_PATH);
-  const marker = "const VIEW_META";
-  const start = source.indexOf(marker);
-  if (start < 0) {
-    throw new Error(
-      "Could not find `const VIEW_META` in src/app/page.tsx — update " +
-        "src/test/sourceScan.ts and the drift-guard documentation together.",
-    );
-  }
-  const open = source.indexOf("{", start);
-  const end = source.indexOf("\n};", open);
-  const body = stripComments(source.slice(open, end));
-  // Top-level keys are indented exactly two spaces inside the object literal.
-  const keys = Array.from(body.matchAll(/^ {2}"?([a-z0-9-]+)"?:\s*\{/gm)).map((m) => m[1]);
-  if (keys.length === 0) {
-    throw new Error(
-      "VIEW_META produced no keys — the header metadata map changed shape. " +
-        "See src/test/sourceScan.ts.",
-    );
-  }
-  return keys;
+export function isProductionSource(path: string): boolean {
+  const parts = path.replace(/\\/g, "/").split("/");
+  return !parts.some((p) => p.startsWith(".") || ["node_modules", "__tests__", "__fixtures__", "fixtures", "generated", "test", "e2e"].includes(p)) &&
+    /\.tsx?$/.test(path) && !/\.(test|spec)\.[cm]?[jt]sx?$/.test(path);
 }
 
-/**
- * Literal `handleNav("x")` targets in `src/app/page.tsx`.
- *
- * Panels receive `onNav` callbacks that cast plain strings to `View`
- * (`handleNav(route as View)`), so those cross-panel navigation targets are
- * not type-checked at the call site. Scanning the literals catches a stale id
- * that the compiler cannot.
- */
-export function readHandleNavLiterals(): string[] {
-  const source = stripComments(readSource(PAGE_PATH));
-  const ids = Array.from(source.matchAll(/handleNav\("([a-z0-9-]+)"\)/g)).map((m) => m[1]);
-  return Array.from(new Set(ids));
-}
+export const readViewUnionIds = (): string[] => parseViewUnionIds(readSource("components/AppShell.tsx"));
+export const readSwitcherViewIds = (): string[] => parseSwitcherViewIds(readSource("app/page.tsx"));
+export const readViewMetaKeys = (): string[] => parseViewMetaKeys(readSource("app/page.tsx"));
+export const readHandleNavLiterals = (): string[] => parseNavLiterals(readSource("app/page.tsx"), "handleNav");
 
-/**
- * Every literal `onNav("x")` navigation target across the component tree,
- * with the file that declares it.
- *
- * These are the cross-module links the dashboard and the diagnostics panels
- * use to send the user to another workspace. They are structured calls (never
- * prose), but the `onNav` prop is typed `(view: string) => void` in several
- * panels, so a stale id survives compilation — which is exactly what this
- * guard catches.
- *
- * Module identifiers that belong to other domains (Demo Center module ids,
- * Scenario Studio `ScenarioModuleId`s) are deliberately NOT scanned: they are
- * backend-owned identity, not workspace routes.
- */
 export function readComponentNavTargets(): { file: string; view: string }[] {
-  const dir = resolve(SRC_ROOT, "components");
   const found: { file: string; view: string }[] = [];
-  const walk = (path: string): void => {
-    for (const entry of readdirSync(path, { withFileTypes: true })) {
-      const child = join(path, entry.name);
-      if (entry.isDirectory()) {
-        walk(child);
-      } else if (entry.name.endsWith(".tsx") && !entry.name.includes(".test.")) {
-        const source = stripComments(readFileSync(child, "utf8"));
-        for (const match of Array.from(
-          source.matchAll(/onNav\("([a-z0-9-]+)"\)/g),
-        )) {
-          found.push({ file: entry.name, view: match[1] });
+  const dataFiles = new Set(Object.keys(NAV_DATA_FIELDS));
+  const walk = (dir: string): void => {
+    for (const entry of readdirSync(resolve(SRC_ROOT, dir), { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name, "en"))) {
+      const child = join(dir, entry.name);
+      if (entry.isDirectory() && isProductionSource(join(child, "probe.tsx"))) walk(child);
+      else if (entry.isFile() && isProductionSource(child)) {
+        const source = readSource(child);
+        const ids = parseNavLiterals(source, "onNav");
+        const field = NAV_DATA_FIELDS[entry.name];
+        if (field) {
+          dataFiles.delete(entry.name);
+          ids.push(...parseNavDataTargets(source, field));
         }
+        found.push(...ids.map((view) => ({ file: child.replace(/\\/g, "/"), view })));
       }
     }
   };
-  walk(dir);
+  walk("components");
+  if (dataFiles.size) throw new Error(`Reviewed navigation data components moved: ${Array.from(dataFiles).join(", ")}`);
   return found;
 }

@@ -20,12 +20,11 @@ A workspace's identity is spread across five hand-maintained places:
 | 4 | the workspace switcher (`{view === "x" && <Panel/>}`) | `frontend/src/app/page.tsx` |
 | 5 | command-palette navigation commands | `frontend/src/lib/workspaceRegistry.ts` |
 
-TypeScript only links two of them: `VIEW_META` is `Record<View, …>`, so it is
-exhaustive by construction. **Nothing** made the sidebar, the switcher or the
-palette agree — a new view could ship with a header and no page, or a renamed
-view could leave a dead palette command, and both compiled cleanly. Panels also
-call `onNav` through string casts (`handleNav(route as View)`), which bypasses
-the compiler entirely.
+TypeScript checks typed navigation targets, and `VIEW_META: Record<View, …>`
+is exhaustive. It does not require exhaustive sidebar, JSX-switcher or palette
+coverage: a new view can have a header but no page or navigation entry. Some
+panels also cast strings (`handleNav(route as View)`), bypassing target checking.
+The guards add completeness and cross-surface checks, not a new router.
 
 ## 2. The canonical registry
 
@@ -36,7 +35,7 @@ verify the five surfaces — and no more:
 |---|---|
 | `WORKSPACE_VISIBILITY` | `Record<View, "sidebar" \| "internal">` — an exhaustive classification. Adding a `View` member without classifying it is a **compile error**. |
 | `INTERNAL_VIEW_REASONS` | `Partial<Record<View, string>>` — every `internal` view must state why it is hidden. Empty today. |
-| `WORKSPACES` | one entry per routed view (`id`, `label`, `group`, `visibility`, `publicWorkspace`), **derived from `NAV_GROUPS`** so labels/order/grouping stay owned by the sidebar. |
+| `WORKSPACES` | one entry per sidebar item (`id`, `label`, `group`, `visibility`, `publicWorkspace`), **derived from `NAV_GROUPS`**, not an independent list of expected public IDs. |
 | `WORKSPACE_BY_ID`, `WORKSPACE_GROUPS`, `ALL_VIEW_IDS` | lookups used by the guards and tests. |
 | `WORKSPACE_COMMANDS` | the palette's navigation command data (`view`, `title`, `keywords`), moved verbatim out of the page component. |
 
@@ -44,6 +43,14 @@ verify the five surfaces — and no more:
 library/paper/disaster slugs, options tabs. They are state inside a workspace,
 not routes, and including them would make the registry describe something the
 router does not own.
+
+`View` in AppShell remains the canonical identity type. The registry joins
+metadata for verification; it does not implement routing or access control.
+The public-ID expectation comes independently from `WORKSPACE_VISIBILITY`,
+so deleting a sidebar item cannot also delete the test's expected value.
+There are currently 57 identities, all public, and 58 navigation commands.
+Counts are observations, not frozen assertions. Search keywords may overlap:
+they are not URL aliases. Unique command titles protect the `nav-title` keys.
 
 ### What the Phase 63 refactor changed
 
@@ -59,7 +66,8 @@ No label, ordering, grouping, visibility or behaviour changed, and
 
 ## 3. What the guards check
 
-`frontend/src/lib/workspaceRegistry.test.ts` — 26 assertions:
+`frontend/src/lib/workspaceRegistry.test.ts` checks the real source and
+mutation fixtures for missing, stale, duplicated and internal targets:
 
 **View identities** — no duplicate ids · no empty ids · ids match
 `^[a-z][a-z0-9]*(-[a-z0-9]+)*$` · every union member classified in the
@@ -100,8 +108,9 @@ subtitle; add the `{view === "id" && <Panel/>}` branch; add at least one
 `npm run test:unit` — the guards name whichever step is missing.
 
 **A hidden/internal workspace** — set `WORKSPACE_VISIBILITY` to `"internal"`,
-add an `INTERNAL_VIEW_REASONS` entry, and keep it out of the sidebar and out of
-every `onNav(...)` cross-link.
+add a nonblank `INTERNAL_VIEW_REASONS` entry, and keep it out of the sidebar,
+palette navigation commands and every public cross-link. This is a test
+policy, not a runtime security boundary; no internal view exists today.
 
 **A sidebar entry** — it must point at a registered, public view; the registry
 derives from the sidebar, so re-ordering or relabelling is safe and the guards
@@ -116,10 +125,13 @@ React keys.
 
 **Deep links** — the app keeps view state in React (`useState<View>`), and the
 only URL-parameter surface is the Globe permalink helper
-(`frontend/src/lib/globe/permalink.ts`), which resolves market ids rather than
-view ids. There is no view-level deep-link parser to guard today; if one is
-added it must accept only registered ids and fall back to `home`, and this
-document and the guards must be updated together.
+(`frontend/src/lib/globe/permalink.ts`). It recognizes exactly `view=globe`
+plus market/tour/presentation fields. Other values, including other valid
+workspace IDs, do not select a workspace: initial load remains Home, and
+the existing popstate handler returns Home for non-Globe URLs. The `/globe`
+route redirects to the canonical query form. Helper tests cover this narrow
+contract; browser back/forward and full page hydration still need browser
+verification. No general or hidden-view URL resolver was introduced.
 
 ## 5. The source-scan limitation (read this before changing page.tsx)
 
@@ -131,18 +143,27 @@ Two of the five surfaces are not runtime values:
   analytics panel, and converting it to a component map would be the broad
   navigation rewrite this phase was not allowed to do.
 
-For those two only, `frontend/src/test/sourceScan.ts` reads the source text.
-Its documented limits:
+The test-only scanner uses the existing TypeScript compiler API for the View
+type, JSX switcher branches, VIEW_META keys, literal handleNav/onNav calls
+(including optional calls), and reviewed frontend-owned route/view tables in
+HomeDashboard, PortfolioShowcase, DeveloperOnboarding, ReleaseNotesCenter and
+PublicReleaseCandidate. It never evaluates source. Comments and prose are AST
+nodes, not matches; LF/CRLF, single/double quotes and indentation are covered.
+Only comparisons that conditionally render JSX count as switcher branches,
+so the Globe navigation side effect cannot hide a missing Globe panel.
 
-* it matches literal patterns only — an id built at runtime is invisible to it;
-* comments and block comments are stripped first, so prose is never treated as
-  a route;
-* it is a tripwire, not a parser: if these files are restructured so the
-  patterns disappear, the scanners **throw with a message naming the file to
-  fix** rather than silently passing.
+Reads are anchored to frontend/src, realpaths must remain beneath that root,
+symlink entries are not traversed, and test/spec/fixture/generated/hidden
+directories are excluded. Missing reviewed files, malformed source and
+unsupported required declaration shapes fail with actionable errors.
 
-Everything else — sidebar, palette, registry, cross-links — is asserted against
-real imported values.
+Limits: this is not data-flow analysis. Arbitrary runtime callbacks, renamed
+navigation APIs, new data-table conventions, computed routes, backend-supplied
+Demo Center links and transient Scenario/Research module IDs are not inferred.
+Review new dynamic navigation explicitly and extend the narrow scanner/tests
+when appropriate. Imported Sidebar/registry values remain the source of
+labels/order, not a duplicate frozen list. Typecheck and browser checks still
+matter; a JSX branch's presence does not prove its component renders correctly.
 
 ## 6. Common failure messages
 
@@ -154,7 +175,7 @@ real imported values.
 | `these components navigate to view ids that no longer exist` | a stale `onNav("…")` cross-link | update the target |
 | `public workspaces unreachable from the command palette` | missing palette command | add a `WORKSPACE_COMMANDS` entry |
 | `command titles become palette ids … duplicates would collide` | two commands share a title | make the title unique |
-| `Could not find "export type View =" …` | the union moved or changed shape | update `sourceScan.ts` **and** this document together |
+| `Expected exactly one exported View type` | the union moved or changed shape | update `sourceScan.ts` **and** this document together |
 
 ## 7. What these guards do not do
 

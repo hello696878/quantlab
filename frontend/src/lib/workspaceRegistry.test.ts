@@ -6,7 +6,7 @@
  * data, the root switcher, the header metadata and the dashboard's navigation
  * targets. They assert against imported runtime values wherever possible and
  * fall back to the narrow, documented source scans in `src/test/sourceScan.ts`
- * only for the two pieces that are not runtime values.
+ * for erased types, inline JSX/metadata and literal navigation links.
  *
  * They are contracts about identity, not about product design: adding a
  * workspace is expected to touch several of them at once, and the failure
@@ -15,6 +15,7 @@
 
 import { describe, expect, it } from "vitest";
 import { NAV, NAV_GROUPS } from "@/components/Sidebar";
+import { assertCommandIdentities, assertMappings, assertPublicTargets, assertUniqueIds, publicIds } from "@/test/registryAssertions";
 import {
   ALL_VIEW_IDS,
   INTERNAL_VIEW_REASONS,
@@ -37,6 +38,7 @@ const VIEW_ID_PATTERN = /^[a-z][a-z0-9]*(-[a-z0-9]+)*$/;
 const viewUnionIds = readViewUnionIds();
 const switcherIds = readSwitcherViewIds();
 const registryIds = ALL_VIEW_IDS.map(String);
+const componentTargets = readComponentNavTargets();
 
 function sorted(values: readonly string[]): string[] {
   return values.slice().sort();
@@ -48,6 +50,7 @@ function sorted(values: readonly string[]): string[] {
 
 describe("view identities", () => {
   it("declares no duplicate view ids", () => {
+    assertUniqueIds(viewUnionIds, "View union");
     expect(sorted(viewUnionIds)).toEqual(sorted(Array.from(new Set(viewUnionIds))));
   });
 
@@ -83,7 +86,7 @@ describe("view identities", () => {
       .filter(([, visibility]) => visibility === "internal")
       .map(([id]) => id);
     const undocumented = internal.filter(
-      (id) => !(INTERNAL_VIEW_REASONS as Record<string, string | undefined>)[id],
+      (id) => !INTERNAL_VIEW_REASONS[id as keyof typeof INTERNAL_VIEW_REASONS]?.trim(),
     );
     expect(
       undocumented,
@@ -105,6 +108,7 @@ describe("view identities", () => {
 
 describe("component mapping", () => {
   it("renders a branch for every routed workspace", () => {
+    assertMappings(registryIds, switcherIds, "page.tsx render branches");
     const missing = registryIds.filter((id) => !switcherIds.includes(id));
     expect(
       missing,
@@ -143,10 +147,9 @@ describe("sidebar", () => {
 
   it("lists every public workspace exactly once", () => {
     const sidebarIds = NAV.map((n) => String(n.id));
-    const publicIds = WORKSPACES.filter((w) => w.publicWorkspace).map((w) =>
-      String(w.id),
-    );
-    expect(sorted(sidebarIds)).toEqual(sorted(publicIds));
+    const expected = publicIds(WORKSPACE_VISIBILITY);
+    assertMappings(expected, sidebarIds, "Sidebar");
+    expect(sorted(sidebarIds)).toEqual(sorted(expected));
     expect(
       sidebarIds.length,
       "a duplicated sidebar entry renders the same workspace twice",
@@ -166,6 +169,7 @@ describe("sidebar", () => {
   });
 
   it("uses non-empty labels and known group headings", () => {
+    expect(new Set(WORKSPACES.map((w) => w.label.trim().toLowerCase())).size).toBe(WORKSPACES.length);
     for (const entry of WORKSPACES) {
       expect(entry.label.trim(), `empty label for ${entry.id}`).not.toBe("");
       expect(
@@ -211,8 +215,7 @@ describe("command palette registry", () => {
 
   it("reaches every public workspace", () => {
     const covered = new Set(WORKSPACE_COMMANDS.map((c) => String(c.view)));
-    const missing = WORKSPACES.filter((w) => w.publicWorkspace)
-      .map((w) => String(w.id))
+    const missing = publicIds(WORKSPACE_VISIBILITY)
       .filter((id) => !covered.has(id));
     expect(
       missing,
@@ -221,6 +224,8 @@ describe("command palette registry", () => {
   });
 
   it("declares unique command titles", () => {
+    assertCommandIdentities(WORKSPACE_COMMANDS);
+    assertPublicTargets(WORKSPACE_COMMANDS.map((c) => c.view), WORKSPACE_VISIBILITY, "Palette");
     const titles = WORKSPACE_COMMANDS.map((c) => c.title);
     const duplicates = titles.filter((t, i) => titles.indexOf(t) !== i);
     expect(
@@ -230,7 +235,7 @@ describe("command palette registry", () => {
     ).toEqual([]);
   });
 
-  it("declares deterministic, non-empty keyword aliases", () => {
+  it("declares deterministic, non-empty search keywords (not routing aliases)", () => {
     for (const command of WORKSPACE_COMMANDS) {
       expect(command.keywords.trim(), `empty keywords for ${command.title}`).not.toBe(
         "",
@@ -276,7 +281,8 @@ describe("cross-module navigation targets", () => {
   });
 
   it("only links to registered views from dashboard and panel cross-links", () => {
-    const targets = readComponentNavTargets();
+    const targets = componentTargets;
+    assertPublicTargets(targets.map((t) => t.view), WORKSPACE_VISIBILITY, "Component cross-links");
     expect(
       targets.length,
       "no component onNav targets found — the scan pattern may be stale",
@@ -292,10 +298,40 @@ describe("cross-module navigation targets", () => {
     const internal = Object.entries(WORKSPACE_VISIBILITY)
       .filter(([, v]) => v === "internal")
       .map(([id]) => id);
-    const leaked = readComponentNavTargets().filter((t) => internal.includes(t.view));
+    const leaked = componentTargets.filter((t) => internal.includes(t.view));
     expect(
       leaked.map((t) => `${t.file} → ${t.view}`),
       "internal views must not be reachable from a public card or button",
     ).toEqual([]);
+  });
+});
+
+describe("adversarial registry fixtures", () => {
+  const visibility = { home: "sidebar", risk: "sidebar", internal: "internal" };
+
+  it("detects a public sidebar row removed even if the sidebar-derived list loses it too", () => {
+    expect(() => assertMappings(publicIds(visibility), ["home"], "Sidebar")).toThrow(/Sidebar: missing \[risk\]/);
+  });
+
+  it.each(["Sidebar", "Dashboard", "Palette", "Cross-link"])("rejects stale and internal %s targets", (surface) => {
+    expect(() => assertPublicTargets(["removed"], visibility, surface)).toThrow(/unknown or internal/);
+    expect(() => assertPublicTargets(["internal"], visibility, surface)).toThrow(/internal/);
+  });
+
+  it("rejects missing, stale and duplicate component mappings", () => {
+    expect(() => assertMappings(["home", "risk"], ["home"], "Switcher")).toThrow(/missing \[risk\]/);
+    expect(() => assertMappings(["home"], ["home", "risk"], "Switcher")).toThrow(/stale \[risk\]/);
+    expect(() => assertMappings(["home"], ["home", "home"], "Switcher")).toThrow(/duplicate/);
+  });
+
+  it("rejects invalid IDs and visibility", () => {
+    for (const ids of [["home", "home"], [""], ["Home"], ["bad/path"]]) expect(() => assertUniqueIds(ids, "View")).toThrow(/invalid or duplicate/);
+    expect(() => publicIds({ home: "typo" })).toThrow(/visibility/);
+  });
+
+  it("rejects alternate-command identity collisions, but allows shared search words", () => {
+    expect(() => assertCommandIdentities([{ title: "Open Risk" }, { title: "Open Risk" }])).toThrow(/unique/);
+    expect(() => assertCommandIdentities([{ title: " " }])).toThrow(/nonempty/);
+    expect(() => assertCommandIdentities(WORKSPACE_COMMANDS)).not.toThrow();
   });
 });

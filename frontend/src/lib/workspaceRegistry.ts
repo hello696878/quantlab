@@ -7,7 +7,7 @@
  * that ties them together for verification, and it holds the MINIMUM metadata
  * needed for that:
  *
- * * `WORKSPACES` — one entry per routed `View`, derived from the sidebar so
+ * * `WORKSPACES` — one entry per sidebar item (not internal views), derived so
  *   product ordering, labels and grouping stay exactly where the product
  *   defines them (this module never re-declares a label);
  * * `WORKSPACE_VISIBILITY` — a `Record<View, …>`, so the compiler forces an
@@ -162,7 +162,7 @@ export const ALL_VIEW_IDS: readonly View[] = Object.keys(
  * and its drift guards read one list. A view may legitimately carry more than
  * one command (`sweep` is reachable as both "Research Tools" and "Parameter
  * Sweep"); the guards allow that and only reject unknown views or duplicated
- * command identities. `keywords` are search aliases and are never displayed.
+ * command identities. `keywords` are search words, not unique routing aliases.
  */
 export const WORKSPACE_COMMANDS: { view: View; title: string; keywords: string }[] = [
   { view: "home", title: "Go to Home", keywords: "command center dashboard" },

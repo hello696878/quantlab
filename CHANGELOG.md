@@ -48,7 +48,7 @@ claimed by an entry here.
   and `WORKSPACE_COMMANDS` (the 58 palette navigation commands, moved
   verbatim out of the page component). The only refactor was that move
   plus the import — no label, order, group, visibility or behaviour
-  changed, and the typecheck stayed clean across it. 26 drift guards
+  changed. The initial 26 drift guards (strengthened during review)
   assert: no duplicate/empty/malformed view ids; every union member
   classified; every routed workspace has a switcher branch AND header
   metadata (and no branch exists for an unregistered view); the sidebar
@@ -58,7 +58,7 @@ claimed by an entry here.
   and lowercase keyword aliases; and every literal `handleNav("…")` /
   `onNav("…")` cross-link in the page and all component files targets a
   registered, non-internal view — catching the string casts the compiler
-  cannot check. 56 component tests cover the Sidebar (groups, entries,
+  cannot check. The initial 56 component tests cover the Sidebar (groups, entries,
   `aria-current`, exact navigation ids, keyboard activation, decorative
   headings), the Command Palette (canonical-label search, keyword-alias
   search that never displays the alias, arrow+Enter flow, Escape without
@@ -70,15 +70,18 @@ claimed by an entry here.
   visibility), the shared loading/empty/error/offline primitives
   (roles, retry callbacks), and settings/browser-storage safety
   (defaults, malformed JSON, wrong-shape JSON, storage that throws on
-  every accessor, sanitisation of non-finite values). Two source scans
-  (the erased `View` type and the 57-branch switcher) are narrow,
-  comment-stripped tripwires that throw with the file to fix rather than
-  passing silently — documented as a limitation, with every other surface
-  asserted against real imported values. CI now runs `npm run test:unit`
+  every accessor, sanitisation of non-finite values). Review replaced the
+  regex source scans with TypeScript syntax-tree checks for the View type,
+  JSX switcher, header metadata, literal calls and reviewed navigation data
+  tables. Independent visibility expectations and mutation fixtures catch
+  missing public entries; browser-state cleanup and recorded blocked requests
+  prevent silent mock leaks. Patched Vitest/coverage 3.2.6 and Vite 7.3.6;
+  pre-existing dependency advisories remain release blockers (see
+  `docs/PHASE_63_REVIEW.md`). CI now runs `npm run test:unit`
   after `npm ci` and before the typecheck and production build, one-shot,
   with no browser download, no backend, no secrets and no new
   permissions; Playwright keeps its own manually triggered workflow and
-  all 254 specs untouched. Docs: `FRONTEND_COMPONENT_TESTING.md`,
+  all 254 tests in 18 specs untouched. Docs: `FRONTEND_COMPONENT_TESTING.md`,
   `FRONTEND_REGISTRY_DRIFT_GUARDS.md`. No financial model, analytics
   engine, database table, API endpoint, workspace or product behaviour
   changed; this is a testing and reliability phase, and it certifies

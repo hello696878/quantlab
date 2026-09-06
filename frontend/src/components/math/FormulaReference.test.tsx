@@ -44,9 +44,8 @@ describe("SafeMath", () => {
   });
 
   it("does not crash on malformed LaTeX", () => {
-    expect(() =>
-      renderWithUser(<SafeMath latex="\\frac{unbalanced" />),
-    ).not.toThrow();
+    const { container } = renderWithUser(<SafeMath latex={"\\frac{unbalanced"} />);
+    expect(container.querySelector(".katex-error")).toHaveTextContent("\\frac{unbalanced");
   });
 
   it("falls back to readable raw LaTeX when the renderer throws", async () => {
@@ -58,13 +57,16 @@ describe("SafeMath", () => {
         },
       },
     }));
-    const { default: Isolated } = await import("@/components/math/SafeMath");
-    const { container } = renderWithUser(<Isolated latex="\\gamma_{fail}" />);
-    const code = container.querySelector("code");
-    expect(code, "the fallback must show the raw LaTeX source").not.toBeNull();
-    expect(code).toHaveTextContent("\\gamma_{fail}");
-    vi.doUnmock("katex");
-    vi.resetModules();
+    try {
+      const { default: Isolated } = await import("@/components/math/SafeMath");
+      const { container } = renderWithUser(<Isolated latex={"\\gamma_{fail}"} />);
+      const code = container.querySelector("code");
+      expect(code, "the fallback must show the raw LaTeX source").not.toBeNull();
+      expect(code).toHaveTextContent("\\gamma_{fail}");
+    } finally {
+      vi.doUnmock("katex");
+      vi.resetModules();
+    }
   });
 });
 
@@ -106,7 +108,7 @@ describe("FormulaReference", () => {
     const { writeText } = stubClipboard("ok");
     await user.click(screen.getByRole("button", { name: /Copy the LaTeX formula reference/i }));
     expect(writeText).toHaveBeenCalledTimes(1);
-    const copied = writeText.mock.calls[0][0] as string;
+    const copied = writeText.mock.calls[0][0];
     expect(copied).toContain("r_t = \\frac{P_t}{P_{t-1}} - 1");
     expect(copied).not.toContain("<span");
     await waitFor(() => expect(screen.getByText(/Copied LaTeX formulas/i)).toBeInTheDocument());

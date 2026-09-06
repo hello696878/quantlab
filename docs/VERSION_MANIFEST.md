@@ -16,8 +16,8 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 **`4.81.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
 expected tag on completion of the current phase's review is
 `v4.81.0-frontend-component-test-foundation-registry-drift-guards-v1`
-(Phase 63, a testing/reliability phase) — its implementation commit is not
-yet made and its review is pending. "Expected" means the user creates
+(Phase 63, a testing/reliability phase) — implementation commit `0d1c903`
+exists; the review commit, CI and manual verification remain pending. "Expected" means the user creates
 the tag only after review and final verification; no such tag exists yet. Phase 62's
 `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1`
 (implementation `e50cca2`, review `ceb5c41`), Phase 61's
@@ -61,9 +61,9 @@ updated (Phase 63.0); the latest verified tag is
 1. Each feature phase lands as an **`Add <feature> v1`** commit.
 2. A review pass lands as a **`Review <feature> v1`** commit.
 3. The user tags **after review** and pushes the tag manually.
-4. The frontend production build is **run locally by the user** — it is not
-   part of any automated step in this repo (CI additionally builds the
-   frontend on push, which is separate from the local release flow).
+4. The local frontend production build and browser smoke are **user-run**.
+   CI also builds on push/PR, separately; that does not replace manual smoke
+   evidence and no local build was run during this review.
 
 ## 5. Tag naming convention (verified)
 

@@ -72,14 +72,20 @@ describe("HomeDashboard", () => {
     expect(onNav).toHaveBeenCalledWith("reports");
   });
 
-  it("only ever navigates to registered view ids", async () => {
+  it("all primary quick actions navigate to their exact registered targets", async () => {
     const { user, onNav } = renderDashboard();
     await settle();
     // Exercise a representative set of dashboard controls and assert that no
     // click produces a view id the router does not know.
-    for (const name of [/Open Portfolio Lab/i, /Build Custom Strategy/i, /Open Settings/i]) {
-      const button = screen.queryByRole("button", { name });
-      if (button) await user.click(button);
+    for (const [name, target] of [
+      ["Run Single-Asset Backtest", "backtest"], ["Compare Strategies", "comparison"],
+      ["Upload CSV Data", "csv"], ["Build Custom Strategy", "builder"],
+      ["Open Portfolio Lab", "portfolio"], ["View Saved Backtests", "saved"],
+      ["View Saved Reports", "reports"], ["Open Settings", "settings"],
+      ["Export Research Report", "backtest"],
+    ]) {
+      await user.click(screen.getByRole("button", { name: new RegExp(name, "i") }));
+      expect(onNav).toHaveBeenLastCalledWith(target);
     }
     const targets = onNav.mock.calls.map((call) => String(call[0]));
     expect(targets.length).toBeGreaterThan(0);
@@ -92,11 +98,7 @@ describe("HomeDashboard", () => {
   it("gives every rendered control an accessible name", async () => {
     renderDashboard();
     await settle();
-    const unnamed = screen
-      .getAllByRole("button")
-      .filter((button) => (button.textContent ?? "").trim() === "" &&
-        !button.getAttribute("aria-label"));
-    expect(unnamed, "buttons without an accessible name").toHaveLength(0);
+    for (const button of screen.getAllByRole("button")) expect(button).toHaveAccessibleName();
   });
 
   it("renders no NaN or Infinity in its summary tiles", async () => {

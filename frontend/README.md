@@ -35,7 +35,7 @@ frontend/
 │   │   └── StrategyComparisonPanel.tsx  Multi-strategy comparison UI
 │   └── lib/
 │       ├── types.ts                  TypeScript interfaces (mirrors backend schemas)
-│       ├── api.ts                    Fetch wrappers for all backend endpoints
+│       ├── api.ts                    Shared fetch wrappers (labs also have local clients)
 │       └── format.ts                 Number/date formatters used across components
 ├── .env.local                        BACKEND_URL env var (default: http://localhost:8000)
 ├── .env.example                      Example backend URL configuration
@@ -49,9 +49,12 @@ frontend/
 
 ## Install
 
+The component-test toolchain requires Node `^20.19.0 || >=22.12.0`.
+CI uses the latest Node 20; this review used Node 24.15.0.
+
 ```powershell
 cd C:\quantlab\frontend
-npm install
+npm ci
 Copy-Item .env.example .env.local
 ```
 

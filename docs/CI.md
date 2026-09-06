@@ -19,7 +19,7 @@ installs `backend/requirements.txt`, runs `python -m pytest -q` from
 no live provider is ever contacted (yfinance is monkeypatched in the backtest
 API tests; every lab runs on static samples).
 
-**Job 2 — Frontend Build** (`ubuntu-latest`, Node 20):
+**Job 2 — Frontend Tests & Build** (`ubuntu-latest`, latest Node 20, at least 20.19):
 `npm ci` (lockfile-exact), then `npm run test:unit` (frontend component
 tests, added in 63.0 — one-shot Vitest/jsdom, offline, no browser download),
 then `npx tsc --noEmit` (fast-fail typecheck, added in 41.0), then
@@ -49,7 +49,8 @@ if (Test-Path .\artifacts) {
 backend\venv\Scripts\python.exe -m pytest backend\tests -q
 
 # Frontend component tests (Phase 63.0)
-cd C:\quantlabrontend
+cd C:\quantlab\frontend
+npm ci
 npm run test:unit
 
 # Frontend typecheck
@@ -68,7 +69,8 @@ Wrappers: `scripts\run_backend_tests.ps1`, `scripts\run_frontend_typecheck.ps1`.
 
 ## Known limitations
 
-- No frontend *unit* tests exist yet. The browser E2E harness (Phase 43.0 —
+- Frontend unit/component tests cover shared components and navigation identity,
+  not every analytics panel. The browser E2E harness (Phase 43.0 —
   [`BROWSER_E2E_RUNBOOK.md`](BROWSER_E2E_RUNBOOK.md)) is **deliberately not
   part of this push/PR gate**: it needs a built, running app, and keeping it
   out of the default pipeline avoids slowness/flake while the harness
@@ -77,7 +79,7 @@ Wrappers: `scripts\run_backend_tests.ps1`, `scripts\run_frontend_typecheck.ps1`.
   (`.github/workflows/browser-e2e.yml` —
   [`CI_BROWSER_E2E.md`](CI_BROWSER_E2E.md)), which is non-blocking and
   `workflow_dispatch`-only in v1. This workflow (`ci.yml`) keeps covering
-  backend tests + typecheck + build unchanged.
+  backend tests + frontend unit/component tests + typecheck + build.
 - CI proves the suite passes on a clean Linux runner — local-environment
   issues (venv drift, node_modules staleness) are covered by
   `scripts\check_environment.ps1` instead.

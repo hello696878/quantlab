@@ -7,7 +7,7 @@
  * failure modes that historically break hydration.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_SETTINGS,
   SETTINGS_STORAGE_KEY,
@@ -16,17 +16,7 @@ import {
   sanitizeSettings,
   saveSettings,
 } from "@/lib/settings";
-import { restoreLocalStorage, stubUnavailableLocalStorage } from "@/test/testUtils";
-
-let realStorage: Storage;
-
-beforeEach(() => {
-  realStorage = window.localStorage;
-});
-
-afterEach(() => {
-  restoreLocalStorage(realStorage);
-});
+import { stubUnavailableLocalStorage } from "@/test/testUtils";
 
 describe("sanitizeSettings", () => {
   it("returns the documented defaults for a completely invalid value", () => {
@@ -79,8 +69,25 @@ describe("loadSettings", () => {
   });
 
   it("round-trips a saved value", () => {
-    const saved = saveSettings({ ...DEFAULT_SETTINGS });
+    const saved = saveSettings({ ...DEFAULT_SETTINGS, accent_color: "emerald", default_initial_capital: 12500, default_transaction_cost_bps: 0 });
     expect(loadSettings()).toEqual(saved);
+    expect(loadSettings().accent_color).toBe("emerald");
+    expect(loadSettings().default_transaction_cost_bps).toBe(0);
+  });
+
+  it("returns defaults when access to the storage property itself is denied", () => {
+    Object.defineProperty(window, "localStorage", { configurable: true, get() { throw new Error("storage denied"); } });
+    expect(loadSettings()).toEqual(DEFAULT_SETTINGS);
+    expect(() => saveSettings(DEFAULT_SETTINGS)).not.toThrow();
+    expect(() => resetSettings()).not.toThrow();
+  });
+
+  it("imports and reads defaults without a browser", async () => {
+    vi.stubGlobal("window", undefined);
+    vi.resetModules();
+    const server = await import("@/lib/settings");
+    expect(server.loadSettings()).toEqual(DEFAULT_SETTINGS);
+    expect(server.resetSettings()).toEqual(DEFAULT_SETTINGS);
   });
 });
 

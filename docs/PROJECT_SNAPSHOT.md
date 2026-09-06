@@ -79,10 +79,12 @@ the frozen demo path, the Experiment Registry, Dataset Lineage, Model
 Validation Lab, Meta-Labeling Lab, Feature Diagnostics, Overfitting
 Diagnostics, Regime Diagnostics, Cost & Capacity, Portfolio Diagnostics, Portfolio Stress Lab, Portfolio Attribution, Factor Diagnostics, Signal Decay Lab, and Signal Ensemble Lab views (local-first, plus a manually triggered CI workflow —
 `CI_BROWSER_E2E.md`). Phase 63.0 added the first frontend component-test
-layer: Vitest + React Testing Library + jsdom, **82 tests in 7 files**
-(26 navigation/registry drift guards plus component tests for the sidebar,
+layer: Vitest + React Testing Library + jsdom; the original implementation
+had **82 tests in 7 files**. Review strengthened the guards and isolation;
+current counts and verification are in `PHASE_63_REVIEW.md`.
+Navigation/registry drift guards plus component tests for the sidebar,
 command palette, dashboard, formula reference, shared state primitives and
-browser-storage safety), run one-shot in CI before the typecheck and build
+browser-storage safety run one-shot in CI before the typecheck and build
 (`FRONTEND_COMPONENT_TESTING.md`).
 Playwright discovery reports 254 Chromium tests in 18 spec files; discovery
 is not an E2E pass. Verification is run locally by the user (helper wrappers

@@ -34,9 +34,9 @@ export function renderWithUser(
  * the test would silently assert against user-event's stub instead of yours.
  */
 export function stubClipboard(mode: "ok" | "reject" | "absent"): {
-  writeText: ReturnType<typeof vi.fn>;
+  writeText: ReturnType<typeof vi.fn<(text: string) => Promise<void>>>;
 } {
-  const writeText = vi.fn(() =>
+  const writeText = vi.fn((_text: string) =>
     mode === "reject"
       ? Promise.reject(new Error("clipboard write denied"))
       : Promise.resolve(),
@@ -70,28 +70,9 @@ export function stubUnavailableLocalStorage(): void {
       throw new Error("localStorage is unavailable");
     },
     length: 0,
-  } as unknown as Storage;
+  } satisfies Storage;
   Object.defineProperty(window, "localStorage", {
     configurable: true,
     value: throwing,
   });
-}
-
-/** Restore the jsdom localStorage implementation after a stub. */
-export function restoreLocalStorage(original: Storage): void {
-  Object.defineProperty(window, "localStorage", {
-    configurable: true,
-    value: original,
-  });
-}
-
-/**
- * Assert that a rendered region contains no NaN / Infinity text — the same
- * honesty rule the Playwright specs apply to whole pages.
- */
-export function expectNoNonFiniteText(element: HTMLElement): void {
-  const text = element.textContent ?? "";
-  if (/\bNaN\b|\bInfinity\b|\b-Infinity\b/.test(text)) {
-    throw new Error(`rendered region contains NaN/Infinity: ${text.slice(0, 200)}`);
-  }
 }

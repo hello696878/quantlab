@@ -74,15 +74,7 @@ async function open(): Promise<HTMLElement> {
     openCommandPalette();
   });
   const dialog = await screen.findByRole("dialog", { name: "Command palette" });
-  // Flush the `Promise.allSettled` resource fetch inside `act` so its state
-  // update is accounted for. Without this the suite would either be racy or
-  // have to silence React's act(...) warning — and silencing it would hide
-  // genuine unhandled updates in future tests.
-  await act(async () => {
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-  });
+  // Wait for the observable loading state instead of counting microtasks.
   await waitFor(() =>
     expect(screen.queryByText(/Loading saved resources/)).toBeNull(),
   );
@@ -121,7 +113,7 @@ describe("CommandPalette", () => {
     const { user } = renderPalette();
     await open();
     // "dendrogram" appears only in the Signal Ensemble command's keywords.
-    await user.type(screen.getByPlaceholderText(/Search commands/), "dendrogram");
+    await user.type(screen.getByPlaceholderText(/Search commands/), "DENDROGRAM");
     const match = screen.getByRole("button", { name: /Open Signal Ensemble Lab/ });
     expect(match).toBeInTheDocument();
     expect(match).not.toHaveTextContent("dendrogram");
@@ -142,10 +134,14 @@ describe("CommandPalette", () => {
     await open();
     const input = screen.getByPlaceholderText(/Search commands/);
     await user.type(input, "Open Signal");
-    const before = screen.getAllByRole("button").map((b) => b.textContent);
-    expect(before.length).toBeGreaterThan(1);
+    expect(screen.getByRole("button", { name: /Open Signal Decay Lab/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open Signal Ensemble Lab/ })).toBeInTheDocument();
+    const secondTitle = screen.getAllByRole("button")[1].textContent;
+    const second = WORKSPACE_COMMANDS.find((c) => c.title === secondTitle);
+    expect(second).toBeDefined();
     await user.keyboard("{ArrowDown}{Enter}");
     expect(onRun).toHaveBeenCalledTimes(1);
+    expect(onRun).toHaveBeenCalledWith(second!.view);
   });
 
   it("closes on Escape without running anything", async () => {
@@ -154,6 +150,39 @@ describe("CommandPalette", () => {
     await user.keyboard("{Escape}");
     await waitFor(() => expect(screen.queryByRole("dialog")).toBeNull());
     expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it.each(["Control", "Meta"])("opens and toggles with %s+K", async (modifier) => {
+    const { user, onRun } = renderPalette();
+    await user.keyboard(`{${modifier}>}k{/${modifier}}`);
+    expect(await screen.findByRole("dialog", { name: "Command palette" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByText(/Loading saved resources/)).toBeNull());
+    await user.keyboard(`{${modifier}>}k{/${modifier}}`);
+    expect(screen.queryByRole("dialog")).toBeNull();
+    expect(onRun).not.toHaveBeenCalled();
+  });
+
+  it("moves ArrowUp and clamps at the first match (existing behavior)", async () => {
+    const { user, onRun } = renderPalette();
+    await open();
+    await user.type(screen.getByPlaceholderText(/Search commands/), "Open Signal");
+    const matches = screen.getAllByRole("button");
+    const first = WORKSPACE_COMMANDS.find((c) => c.title === matches[0].textContent);
+    expect(first).toBeDefined();
+    await user.keyboard("{ArrowDown}{ArrowUp}{ArrowUp}{Enter}");
+    expect(onRun).toHaveBeenCalledWith(first!.view);
+  });
+
+  it("resets selection after changing the query", async () => {
+    const { user, onRun } = renderPalette();
+    await open();
+    const input = screen.getByPlaceholderText(/Search commands/);
+    await user.type(input, "Open Signal");
+    await user.keyboard("{ArrowDown}");
+    await user.clear(input);
+    await user.type(input, "Factor Diagnostics");
+    await user.keyboard("{Enter}");
+    expect(onRun).toHaveBeenCalledWith("factordiagnostics");
   });
 
   it("shows an honest empty state for an unknown search", async () => {
@@ -172,7 +201,7 @@ describe("CommandPalette", () => {
     await open();
     await user.type(screen.getByPlaceholderText(/Search commands/), "Open");
     for (const button of screen.getAllByRole("button")) {
-      expect(button.textContent?.trim()).not.toBe("");
+      expect(button).toHaveAccessibleName();
     }
   });
 });

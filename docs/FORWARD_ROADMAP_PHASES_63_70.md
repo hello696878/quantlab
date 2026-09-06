@@ -1,7 +1,7 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Status update (Phase 63.0 — DELIVERED).** Phase 63 below is implemented.
-> Delivered beyond its written scope: a canonical workspace registry with an
+> **Status update (Phase 63.0 — IMPLEMENTED, REVIEW GATES PENDING).** Phase 63 below is implemented.
+> Added beyond its original outline: a workspace metadata registry with an
 > exhaustive `Record<View, …>` visibility classification, 26 drift guards
 > (view identity, component mapping, sidebar, palette, and cross-module
 > `onNav`/`handleNav` link targets), 56 component tests, and the CI gate
@@ -12,6 +12,11 @@
 > [`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md).
 > The next phase is **Phase 64 — Strategy Return Stream, Strategy Similarity
 > and Portfolio Ensemble Diagnostics Lab v1**, unchanged in scope.
+> Original counts below describe commit `0d1c903`; current review results,
+> dependency-security blockers and release gates: `PHASE_63_REVIEW.md`.
+> Model/paper catalog slug and live-strategy referential checks, plus the
+> proposed standalone formatter tests, were not delivered by this narrower
+> workspace foundation; they remain gaps rather than completed acceptance.
 
 An ordered, dependency-aware plan derived from the evidence audit in
 [`BLUEPRINT_STATUS_MATRIX.md`](BLUEPRINT_STATUS_MATRIX.md) and the gap
@@ -43,7 +48,7 @@ plans exposure of the result.
 
 ---
 
-## Phase 63 — Frontend Component Test Foundation and Registry Drift Guards v1 · **DELIVERED**
+## Phase 63 — Frontend Component Test Foundation and Registry Drift Guards v1 · **IMPLEMENTED, REVIEW GATES PENDING**
 
 **Goal.** Give the frontend its first unit/component test layer and stop
 registry-versus-route drift silently.
@@ -63,7 +68,8 @@ no rewrite of existing Playwright specs; no CI gating change without the
 user's decision.
 
 **Commits/tag.** `Add frontend component test foundation registry drift
-guards v1` → `Review …` → `v4.81.0-frontend-component-tests-registry-drift-guards-v1`.
+guards v1` → `Review …` → future
+`v4.81.0-frontend-component-test-foundation-registry-drift-guards-v1`.
 
 **Acceptance criteria.** The new suite runs offline in seconds; a
 deliberately broken registry entry fails a test; `npx tsc --noEmit` and

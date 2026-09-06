@@ -48,8 +48,8 @@ npm install
 
 ## 6. `npx tsc` not found
 
-Install Node 18+ (which includes npx), then `npm install` in `frontend\` so
-TypeScript is present in `node_modules`.
+Install Node matching `^20.19.0 || >=22.12.0` for the reviewed test toolchain,
+then run `npm ci` in `frontend\` so TypeScript and the locked tools are present.
 
 ## 7. Next.js behaving strangely after big changes
 
@@ -100,10 +100,10 @@ that `katex/dist/katex.min.css` is imported in `app/layout.tsx` and that
 
 ## 13. Command palette route missing
 
-Every view needs four wiring points: the `View` union (`AppShell.tsx`), a
-sidebar group entry (`Sidebar.tsx`), TITLES + palette entries + the view
-render (`page.tsx`). If a palette entry does nothing, the view render in
-`page.tsx` is the usual missing piece.
+Check the `View` union (`AppShell.tsx`), visibility and palette commands
+(`workspaceRegistry.ts`), sidebar groups (`Sidebar.tsx`), and `VIEW_META` plus
+the JSX switcher (`page.tsx`). Run `npm run test:unit`; the registry guards
+identify missing or stale navigation surfaces.
 
 ## 14. PowerShell won't run the helper scripts
 
@@ -122,7 +122,8 @@ none install anything, start the frontend, download code, or touch secrets.
 
 **`npm run test:unit` reports an unmocked network request.** That is the
 network guard in `frontend/src/test/setup.ts` doing its job: a component under
-test called `fetch`. Mock the specific local client module
+test attempted a guarded browser or Node HTTP request, even if the application
+caught its error. Mock the specific local client module
 (`vi.mock("@/lib/api", ...)`) and return deterministic data — never mock fetch
 globally as successful.
 
@@ -131,8 +132,8 @@ the missing surface (visibility classification, sidebar entry, switcher
 branch, header metadata, or palette command). The full procedure is in
 [`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md) §4.
 
-**`Could not find "export type View =" ...` or `No \`view === "…"\` branches
-found`.** A source-scan tripwire fired: `src/components/AppShell.tsx` or
+**`Expected exactly one exported View type` or `No JSX workspace render branches`.**
+A source-scan tripwire fired: `src/components/AppShell.tsx` or
 `src/app/page.tsx` was restructured so the scanner can no longer read it.
 Update `frontend/src/test/sourceScan.ts` and the drift-guard document
 together — do not delete the guard.

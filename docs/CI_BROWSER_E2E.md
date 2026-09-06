@@ -46,7 +46,7 @@ they never mutate real data.
 
 > **Layer note (Phase 63.0):** the fast frontend component tests
 > (`npm run test:unit`, Vitest + jsdom) run in the main `ci.yml` workflow on
-> every push. They cover shared components and navigation/registry identity
+> pushes and pull requests targeting main. They cover shared components and navigation/registry identity
 > and are **not** a replacement for this browser suite, which is the only
 > layer that exercises real workflows in a real browser. See
 > [`FRONTEND_COMPONENT_TESTING.md`](FRONTEND_COMPONENT_TESTING.md).
@@ -56,8 +56,8 @@ they never mutate real data.
 The harness is new (v4.61). Keeping it out of the push/PR gate avoids
 slowing or flaking the main pipeline while a stability record accumulates;
 the frozen-demo guard is most valuable run deliberately before
-releases/reviews. Main CI (`ci.yml`) is unchanged: backend tests + frontend
-typecheck/build on every push/PR.
+releases/reviews. Main CI (`ci.yml`) now includes backend tests + frontend
+unit/component tests, typecheck and build on pushes/PRs targeting main.
 
 ## 4. Environment
 
@@ -149,9 +149,10 @@ step's conclusion; download the evidence artifact from the run page.
 
 ## 11. Difference from the main CI workflow
 
-`ci.yml` (push/PR): backend tests + frontend typecheck/build — no servers,
-no browser. `browser-e2e.yml` (manual): everything above **plus** a running
-app and the browser suite, in one job, with evidence artifacts. Neither
+`ci.yml` (main push/PR): backend tests + frontend unit tests/typecheck/build,
+with no servers or browser. `browser-e2e.yml` (manual) runs backend tests,
+typecheck/build, a running app and the browser suite in one job with evidence
+artifacts; it does not repeat the component-test step. Neither
 deploys, publishes, or touches tags/releases.
 
 ## 12. Promotion criteria (future, deliberate decision required)

@@ -23,8 +23,8 @@ pieces still behave; it says nothing about a workflow end to end.
 
 | Choice | Version | Why |
 |---|---|---|
-| **Vitest** | `^2.1.9` | Native ESM + TypeScript, reuses the Vite pipeline Next 14 already resembles, one config file, no Babel migration. |
-| **@vitest/coverage-v8** | `^2.1.9` | Coverage provider for `test:unit:coverage`; pinned to the same major as the runner. |
+| **Vitest** | `3.2.6` | TypeScript/JSX test transforms via Vite (separate from Next's build pipeline); patched test server dependencies. |
+| **@vitest/coverage-v8** | `3.2.6` | Coverage provider, pinned to exactly the runner version. |
 | **@vitejs/plugin-react** | `^4.7.0` | JSX/Fast-Refresh transform for the test build only. |
 | **@testing-library/react** | `^16.3.2` | Behaviour-first queries; discourages implementation-detail assertions. |
 | **@testing-library/dom** | `^10.4.1` | Explicit peer of RTL 16. |
@@ -34,6 +34,12 @@ pieces still behave; it says nothing about a workflow end to end.
 
 Version ranges are the ones recorded in `frontend/package.json`; the exact
 resolved versions are in `frontend/package-lock.json`.
+
+The reviewed lockfile uses Vite 7.3.6 and requires Node `^20.19.0 || >=22.12.0`
+(local verification: Node 24.15.0; CI selects the latest Node 20).
+The Phase 63-added Vitest/Vite advisories were patched. `npm audit` still
+reports pre-existing application/build dependencies; see the Phase 63 review
+report before making any security or release-readiness claim.
 
 All eight are **devDependencies**. There is exactly one runner and one DOM
 environment — no Jest, no happy-dom, no second browser automation framework
@@ -73,7 +79,7 @@ cd C:\quantlab\frontend && npm run test:frontend
   Coverage output is never committed.
 
   The measured figure today is low by construction — the include globs cover
-  all of `src/lib/**` and `src/components/**` while only seven files have
+  all of `src/lib/**` and `src/components/**` while only a small subset has
   tests, so most of the denominator is untested analytics panels. Treat it as
   a baseline to move, not a quality score.
 * `test:frontend` — `test:unit` followed by `tsc --noEmit`.
@@ -100,22 +106,28 @@ specs are never executed by the wrong runner.
 
 `src/test/setup.ts` installs, per test:
 
-* **a network guard** — `fetch` throws a named error describing the missing
-  mock. There is no "all requests succeed" default, so a component that
-  quietly gained an API call fails loudly instead of passing;
-* `matchMedia`, `ResizeObserver`, `scrollIntoView` and (if needed)
-  `requestAnimationFrame` shims that jsdom lacks;
-* a cleared `localStorage` before and after every test;
+* **network guards** for fetch, XHR send, WebSocket, EventSource, sendBeacon
+  when present, and Node HTTP/HTTPS request/get. Attempts throw and are
+  recorded; teardown fails even if application code caught the first error.
+  Guards are installed before test modules load and reinstalled per test.
+  These prevent accidental standard HTTP calls, not hostile code executing
+  arbitrary raw sockets or child processes; this is not a security sandbox;
+* missing `matchMedia`, `ResizeObserver` and `scrollIntoView` shims;
+  jsdom's actual requestAnimationFrame is retained;
+* cleared storage, restored clipboard/storage/prototype descriptors, real
+  timers, restored globals/spies, DOM cleanup and reset URL per test;
 * `toBeFiniteNumericText()` — the repository's NaN/Infinity honesty rule as a
   matcher.
 
-It deliberately does **not** silence React warnings or errors. The Command
-Palette and Dashboard tests wrap their asynchronous state settling in `act(…)`
-rather than muting the warning, so a genuine unhandled update stays visible.
+It deliberately does **not** silence React warnings or errors. A test-owned
+console.error sentinel is intentionally printed by the isolation regression;
+other stderr must be investigated. Logging alone is not automatically a test
+failure, whereas thrown errors, unhandled rejections and blocked network
+attempts fail. Async assertions use Testing Library/act without global muting.
 
 `src/test/testUtils.tsx` provides `renderWithUser`, `stubClipboard`
-(`ok` / `reject` / `absent`), `stubUnavailableLocalStorage` +
-`restoreLocalStorage`, and `expectNoNonFiniteText`.
+(`ok` / `reject` / `absent`) and `stubUnavailableLocalStorage`.
+Storage restoration is automatic in setup; numeric checks use the shared matcher.
 
 **Clipboard ordering matters**: call `stubClipboard(...)` *after*
 `renderWithUser(...)`, because `userEvent.setup()` installs its own clipboard
@@ -149,13 +161,16 @@ without an API, the test should show that, not paper over it.
 
 | Area | File | Focus |
 |---|---|---|
-| Registry drift guards | `src/lib/workspaceRegistry.test.ts` | 26 identity/mapping/sidebar/palette/cross-link contracts |
+| Registry drift guards | `src/lib/workspaceRegistry.test.ts` | identity/mapping/sidebar/palette/cross-link contracts and adversarial mutation fixtures |
 | Sidebar | `src/components/Sidebar.test.tsx` | groups, entries, `aria-current`, navigation ids, keyboard |
 | Command palette | `src/components/CommandPalette.test.tsx` | label + alias search, keyboard flow, empty state, Escape |
 | Dashboard | `src/components/HomeDashboard.test.tsx` | quick-action navigation targets, accessible names, no NaN |
 | Formula reference / SafeMath | `src/components/math/FormulaReference.test.tsx` | rendering, invalid math, LaTeX copy + failure states, collapse |
 | Shared state primitives | `src/components/ui/states.test.tsx` | empty/error/offline/loading roles and retry callbacks |
 | Settings + storage safety | `src/lib/settings.test.ts` | defaults, malformed JSON, unavailable storage, sanitisation |
+| Source scanner | `src/test/sourceScan.test.ts` | syntax, comments/prose, quotes, CRLF, invalid IDs, non-production paths |
+| Setup isolation | `src/test/setupIsolation.test.tsx` | DOM, storage, clipboard, timers, console visibility and caught network attempts |
+| Globe permalinks | `src/lib/globe/permalink.test.ts` | existing query/fallback/history helpers and SSR safety, not a general router |
 
 Deliberately **not** covered in v1: the large analytics panels (their maths is
 tested on the backend and their workflows in Playwright), chart rendering
@@ -206,19 +221,15 @@ permissions. Playwright continues to run only in the manually triggered
   not assertions).
 * No accessibility scanner, no performance/bundle budget.
 * No component tests for the analytics panels or chart internals.
-* The two source-scan guards are tripwires, not parsers — see
+* The source scans use the TypeScript syntax tree, not runtime data-flow analysis — see
   [`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md) §5.
 * Coverage is available but not enforced; no threshold is claimed.
 * **No frontend/backend route-manifest guard (deliberately deferred).** A guard
   that compares the paths in `frontend/src/lib/api.ts` against a manifest of
-  FastAPI routes was considered and not built. Every frontend call already goes
-  through the typed `api.ts` client, so a removed backend route breaks the
-  backend route tests and the Playwright E2E run — a manifest would restate
-  that in a third place while adding a file that must be regenerated on every
-  backend change. The failure mode it would catch (a path typo in a call the
-  E2E suite never exercises) is real but narrow, and a stale manifest is worse
-  than no manifest: it fails on correct changes and trains people to ignore it.
-  If the E2E suite ever stops covering a route family, revisit this.
+  FastAPI routes was considered and not built. Clients also live in per-lab
+  files, not only `api.ts`; TypeScript does not verify server path existence,
+  and the browser suite does not exercise every route. This remains a real
+  coverage gap, not evidence of complete API compatibility.
 
 ## 13. How Phase 64 should use this foundation
 

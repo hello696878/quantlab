@@ -35,7 +35,8 @@ credit) define endpoints directly in `main.py`. Saved work uses local SQLite.
 ## 3. Frontend architecture in one paragraph
 
 A single-page shell: `AppShell.tsx` holds the `View` union, `Sidebar.tsx` the
-grouped nav, `page.tsx` the title registry + command palette + view renders.
+grouped nav, `workspaceRegistry.ts` visibility + palette navigation metadata,
+and `page.tsx` header metadata, command actions and view renders.
 Each lab pairs a typed client in `src/lib/<lab>.ts` (fetch wrappers +
 formatting helpers) with a `src/components/<Lab>Panel.tsx` (sample load on
 mount → request `useMemo` → debounced analyze with AbortController). Shared
@@ -49,7 +50,8 @@ primitives: `components/charts/LabCharts.tsx`, `components/math/`
 - New lab tests → `backend/tests/test_<lab>.py`
 - New panel → `frontend/src/components/<Lab>Panel.tsx` + `frontend/src/lib/<lab>.ts`
 - Navigation → `AppShell.tsx` (View union), `Sidebar.tsx` (group + icon),
-  `page.tsx` (TITLES, palette entries, view render), `HomeDashboard.tsx` (card)
+  `workspaceRegistry.ts` (visibility + palette metadata), `page.tsx`
+  (`VIEW_META`, command actions, view render), `HomeDashboard.tsx` (card)
 - Docs → `docs/ROADMAP.md` (phase entry) + `docs/LIMITATIONS.md` (honest paragraph)
 
 ## 5. Adding a new deterministic lab (the checklist)
@@ -64,8 +66,8 @@ primitives: `components/charts/LabCharts.tsx`, `components/math/`
 6. Tests: endpoints, formula spot-checks vs hand-computed values, validation
    rejections, an `_assert_all_finite` walk of every response, and wording
    contracts if you generate text (no recommendation language).
-7. Frontend lib + panel (copy a recent panel's skeleton), then wire the four
-   navigation points.
+7. Frontend lib + panel, then follow the workspace wiring procedure in
+   `FRONTEND_REGISTRY_DRIFT_GUARDS.md` and run the component tests.
 8. Docs: ROADMAP phase entry, LIMITATIONS paragraph, READMEs.
 9. Verify: `.\scripts\run_backend_tests.ps1` and
    `.\scripts\run_frontend_typecheck.ps1`. The production build is user-run.

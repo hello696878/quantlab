@@ -111,13 +111,15 @@ venv\Scripts\uvicorn app.main:app --reload --port 8000
 
 Frontend:
 
+Use Node `^20.19.0 || >=22.12.0` for the component-test toolchain.
+
 ```powershell
 cd C:\quantlab\frontend
-npm install
+npm ci
 npm run dev
 ```
 
-Production build (run locally by you — not by any tooling in this repo):
+Production build (run locally by you; CI also builds on its isolated runner):
 
 ```powershell
 cd C:\quantlab\frontend
@@ -126,7 +128,7 @@ npm run build
 
 Docker Compose (`docker compose up --build`) brings up both services; CI
 (`.github/workflows/ci.yml`) runs backend tests, the frontend component tests,
-the typecheck and the frontend build on push.
+the typecheck and the frontend build on pushes/PRs targeting main.
 
 ## Testing
 
@@ -162,10 +164,11 @@ See `docs/DEMO_SCRIPT.md`, `docs/DEMO_VIDEO_SCRIPT.md`, and
 - Deterministic static sample data in most labs; the backtest engines use
   user-configured inputs, and the built-in KO/PEP pairs demo has a
   network-free deterministic fixture.
-- Optional external providers (yfinance historical downloads, opt-in FRED
-  macro, opt-in delayed quotes for the globe) are **disabled by default,
-  fail closed to static data, and are never relied on in tests**; their
-  availability is never guaranteed.
+- Market backtests use yfinance by default, except fixture-backed paths;
+  provider failures are reported rather than replaced with fake performance.
+  Optional FRED/delayed-quote globe enrichments are disabled by default and
+  fail closed to labelled static dossiers. Tests do not rely on live providers;
+  external availability is never guaranteed.
 - **Not investment advice. Not a trading system. Not production risk,
   compliance, or data-governance infrastructure.** Educational and portfolio
   purposes only. See `docs/LIMITATIONS.md` for the full honest ledger.

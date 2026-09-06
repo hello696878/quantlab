@@ -1,10 +1,22 @@
 # TASKS - QuantLab
 
-Reconciled at Phase 62.0 (2026-08-05). The sections below reflect the
-repository's ACTUAL state; the historical futures-checkpoint records are
-preserved at the bottom because they document real completed work.
+Current handoff updated for Phase 63 review (2026-09-07). The Phase 62
+audit and futures-checkpoint records below are retained as history.
 
 ## Current phase
+
+- Phase 63: Frontend Component Test Foundation and Registry Drift Guards v1.
+- Branch `main`; implementation `0d1c903`; VERSION `4.81.0-dev`.
+- Phase 62 review `ceb5c41` and v4.80 tag exist.
+- Phase 63 review changes are uncommitted. No push, CI trigger, local build,
+  browser smoke, tag or Phase 64 implementation is claimed.
+- Verification and outstanding dependency-security blockers are recorded in
+  `docs/PHASE_63_REVIEW.md`. Resolve those blockers before the review-commit
+  readiness gate; user creates commits/tags only after reviewing the evidence.
+- Next implementation remains Phase 64: Strategy Return Stream, Strategy
+  Similarity and Portfolio Ensemble Diagnostics Lab v1.
+
+## Historical Phase 62 handoff
 
 - **Phase 62.0 — Master Blueprint Reconciliation, Project Status Audit
   and Forward Roadmap v1** (documentation/status phase; no product code
@@ -36,7 +48,7 @@ preserved at the bottom because they document real completed work.
   old "Do not implement ML / futures_continuous" rules were superseded
   by those phases and are recorded as history, not current policy.
 
-## Now (Phase 62 tasks)
+## Historical Phase 62 tasks
 
 - [x] Read governing docs and inspect repository reality (git log/tags/
       branches, backend modules, frontend workspaces, e2e specs).
@@ -65,7 +77,7 @@ See `docs/FORWARD_ROADMAP_PHASES_63_70.md` for full scope, dependencies,
 acceptance criteria and non-scope. Sequence:
 
 1. **Phase 63** — Frontend Component Test Foundation and Registry Drift
-   Guards v1 (selected next phase).
+   Guards v1 (implemented; review in progress).
 2. **Phase 64** — Strategy Return Stream, Strategy Similarity and
    Portfolio Ensemble Diagnostics Lab v1.
 3. **Phase 65** — Unified ML Research Lifecycle and Model Artifact

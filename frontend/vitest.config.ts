@@ -36,8 +36,6 @@ export default defineConfig({
     unstubEnvs: true,
     unstubGlobals: true,
     clearMocks: true,
-    // No watch by default: CI and `npm run test:unit` must be one-shot.
-    watch: false,
     coverage: {
       provider: "v8",
       // Written to the gitignored artifacts tree, never committed.
