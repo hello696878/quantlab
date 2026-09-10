@@ -4,3 +4,7 @@ pythonpath = ["."]
 testpaths   = ["tests"]
 # Show short tracebacks and extra summary for failures and errors.
 addopts     = "-v --tb=short -q"
+markers = [
+    "db_free: explicitly audited database-free lab test; SQLite access fails closed",
+    "fresh_schema: exercise real schema creation/migrations, never a copied schema",
+]

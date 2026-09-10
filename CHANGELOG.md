@@ -18,6 +18,26 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 64.0: Strategy Return Stream, Strategy Similarity and Portfolio
+  Ensemble Diagnostics Lab v1** (`4.82.0-dev`): bounded supplied simple-return
+  definitions/observations; strict period intersection and explicit pairwise
+  overlap; SciPy correlations, empirical lower-tail and trailing-drawdown
+  diagnostics; common-sample PSD/rank/eigenvalue concentration; equal or user
+  static weights, reconciled arithmetic contributions and no double deduction
+  of underlying costs. Additive local SQLite run lifecycle, explicit baseline,
+  pinned read-only dataset/regime/validation links, optional experiment record,
+  deterministic scenarios/demo/export and SHA-256 identities. Adds a registry-
+  integrated workspace, accessible tables, wealth chart, component tests and
+  guarded browser spec. No strategy-engine changes, optimizer, provider,
+  execution, automatic allocation or Phase 65. Verification and intentional
+  unavailable integrations: `docs/PHASE_64_IMPLEMENTATION.md`. The user's
+  repaired combined backend run passed 4,359 tests with 3 platform skips;
+  prior failures are retained as superseded history. Snapshot/DB protection
+  checks passed; outer runner final exit was not recorded. Maintenance covers
+  test isolation and UTF-8 subprocess handling, not a demonstrated overall
+  speedup. Production build/browser pass, CI and independent review are not
+  claimed. Implementation remains uncommitted by instruction.
+
 - **Frontend Component Test Foundation & Registry Drift Guards v1**
   (v4.81 series): QuantLab's first frontend unit/component testing layer,
   plus deterministic guards against navigation and workspace drift. Test

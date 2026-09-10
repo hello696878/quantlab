@@ -1,5 +1,11 @@
 # Signal Ensemble, Redundancy and Combination Diagnostics Lab (v1)
 
+Phase 64 [Strategy Ensemble Lab](STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md) is distinct:
+Phase 61 combines signal values, while Phase 64 combines explicit strategy
+returns after exact-period alignment. It does not reinterpret stored signals
+as realized returns, select components, or rerun source strategies. Existing
+Phase 61 data, logic and contracts are unchanged.
+
 Phase 61.0 · module `signal_ensemble` · API `/signal-ensembles` ·
 UI **Signal Ensemble Lab**
 

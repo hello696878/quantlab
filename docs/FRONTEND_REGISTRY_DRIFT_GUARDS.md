@@ -1,5 +1,11 @@
 # Frontend Registry Drift Guards (Phase 63.0, v1)
 
+Phase 64 adds `strategyensemble` through the existing View/visibility/sidebar/
+command/header/component mapping contract. No parallel router or registry.
+Focused link tests cover initial deep links, browser-history destinations and
+leaving via direct demo navigation; panel tests mock only the local API client.
+See [implementation evidence](PHASE_64_IMPLEMENTATION.md).
+
 Deterministic tests that fail when QuantLab's navigation surfaces stop
 agreeing with each other. Companion document:
 [`FRONTEND_COMPONENT_TESTING.md`](FRONTEND_COMPONENT_TESTING.md).
@@ -48,7 +54,7 @@ router does not own.
 metadata for verification; it does not implement routing or access control.
 The public-ID expectation comes independently from `WORKSPACE_VISIBILITY`,
 so deleting a sidebar item cannot also delete the test's expected value.
-There are currently 57 identities, all public, and 58 navigation commands.
+There are currently 58 identities, all public, and 59 navigation commands.
 Counts are observations, not frozen assertions. Search keywords may overlap:
 they are not URL aliases. Unique command titles protect the `nav-title` keys.
 
@@ -138,7 +144,7 @@ verification. No general or hidden-view URL resolver was introduced.
 Two of the five surfaces are not runtime values:
 
 * the `View` union is a **type**, erased before any test can import it;
-* the switcher is 57 `{view === "x" && …}` JSX expressions inside one
+* the switcher is 58 `{view === "x" && …}` JSX expressions inside one
   2.5k-line client component — importing it into jsdom would pull in every
   analytics panel, and converting it to a component map would be the broad
   navigation rewrite this phase was not allowed to do.

@@ -1,5 +1,12 @@
 # Purged CV, Embargo & CPCV Model Validation Lab (Phase 50.0)
 
+Phase 64 [Strategy Ensemble Lab](STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md) can reuse one
+completed leakage-clean run and explicit valid split. Train/test/purged/embargoed
+IDs stay unchanged; each retained sample must match an exact common return
+interval, including publication availability. Training and held-out wealth use
+the same frozen caller weights, no refit/optimization. Multi-window stitching
+is deferred. Caller declarations are not proof of an unobserved research process.
+
 A **local-first** validation lab for time-dependent financial research:
 temporal-event samples, four split methods, interval-based purging, a
 configurable embargo, a from-scratch leakage audit, neutral fold metrics,

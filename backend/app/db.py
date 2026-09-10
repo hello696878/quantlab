@@ -2678,6 +2678,8 @@ def init_db() -> None:
             "CREATE INDEX IF NOT EXISTS idx_sesen_run ON signal_ensemble_sensitivity_results(run_id)",
         ):
             conn.execute(index_sql)
+        from app.strategy_ensemble.store import initialize as initialize_strategy_ensembles
+        initialize_strategy_ensembles(conn)
         conn.commit()
     finally:
         conn.close()

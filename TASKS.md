@@ -1,20 +1,30 @@
 # TASKS - QuantLab
 
-Current handoff updated for Phase 63 review (2026-09-07). The Phase 62
+Current handoff updated for Phase 64 implementation (2026-09-08). The Phase 62
 audit and futures-checkpoint records below are retained as history.
+Evidence finalized 2026-09-10 without rerunning tests or changing executable code.
 
 ## Current phase
 
-- Phase 63: Frontend Component Test Foundation and Registry Drift Guards v1.
-- Branch `main`; implementation `0d1c903`; VERSION `4.81.0-dev`.
-- Phase 62 review `ceb5c41` and v4.80 tag exist.
-- Phase 63 review changes are uncommitted. No push, CI trigger, local build,
-  browser smoke, tag or Phase 64 implementation is claimed.
-- Verification and outstanding dependency-security blockers are recorded in
-  `docs/PHASE_63_REVIEW.md`. Resolve those blockers before the review-commit
-  readiness gate; user creates commits/tags only after reviewing the evidence.
-- Next implementation remains Phase 64: Strategy Return Stream, Strategy
-  Similarity and Portfolio Ensemble Diagnostics Lab v1.
+- Phase 64: Strategy Return Stream, Strategy Similarity and Portfolio Ensemble
+  Diagnostics Lab v1. Branch `phase64-strategy-return-stream-ensemble`;
+  VERSION `4.82.0-dev`; implementation changes remain uncommitted.
+- Phase 63 implementation `0d1c903`, review `0eceda6` and v4.81 tag exist.
+- [x] Implement supplied return-stream contract, diagnostics, fixed weights,
+  persistence, pinned links, API, frontend and deterministic demo/tests.
+- [x] Recover completed full-suite output; preserve active DB and artifacts.
+- [x] Add policies/runbook and record checks in `docs/PHASE_64_IMPLEMENTATION.md`.
+- [x] Verify existing repaired combined backend run: 4,359 passed + 3 platform
+  skips = 4,362 tests, pytest process exit 0; all recorded protection checks pass.
+  Outer runner final exit was not recorded. Historical failures remain history.
+- [x] Reconcile exact snapshot hashes and collection IDs; prepare user-only
+  combined commit commands without staging. See `docs/BACKEND_TEST_MAINTENANCE.md`.
+- [ ] User: manual isolated browser verification and production build.
+- [ ] Independent Codex review; resolve issues before release decisions.
+- [ ] Verify CI on the final reviewed commit and remaining security/release gates.
+- No commit, push, tag, CI trigger, server, deployment or Phase 65 work.
+- Historical dependency advisories in `docs/PHASE_63_REVIEW.md` were not
+  re-audited or resolved by this implementation; no dependency changes made.
 
 ## Historical Phase 62 handoff
 
@@ -77,9 +87,9 @@ See `docs/FORWARD_ROADMAP_PHASES_63_70.md` for full scope, dependencies,
 acceptance criteria and non-scope. Sequence:
 
 1. **Phase 63** — Frontend Component Test Foundation and Registry Drift
-   Guards v1 (implemented; review in progress).
+   Guards v1 (implementation/review commits and tag exist).
 2. **Phase 64** — Strategy Return Stream, Strategy Similarity and
-   Portfolio Ensemble Diagnostics Lab v1.
+   Portfolio Ensemble Diagnostics Lab v1 (implemented locally; review pending).
 3. **Phase 65** — Unified ML Research Lifecycle and Model Artifact
    Registry v1.
 4. **Phase 66** — Reproducible Run Replay by Hash and Environment

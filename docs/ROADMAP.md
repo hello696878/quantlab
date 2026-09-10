@@ -1677,6 +1677,26 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
+### Phase 64.0 - Strategy Return Stream and Portfolio Ensemble Diagnostics v1 (implementation)
+
+- New `strategyensemble` workspace uses the Phase 63 canonical registry, exact
+  period-aligned supplied returns, equal/user static weights, similarity/tail/
+  trailing-drawdown diagnostics and arithmetic contribution reconciliation.
+- Bounded additive SQLite persistence, neutral baseline, JSON export and
+  deterministic fingerprints. Dataset/regime/validation links are read-only
+  and content-pinned; optional Experiment Registry recording. No duplicated
+  strategy PnL engine and no universal source-linking claim.
+- Costs already in source returns are not charged again. Execution costs,
+  drift, negative weights, multi-window walk-forward, factor/stress identities
+  and bootstrap are honestly deferred, not invented.
+- Manual verification and independent review remain pending. Exact test
+  evidence, remaining gates and limitations: [implementation report](PHASE_64_IMPLEMENTATION.md).
+  Frontend build and servers were not run. Phase 65 has not started.
+- Policies and API: [lab](STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md) and
+  [runbook](STRATEGY_ENSEMBLE_RUNBOOK.md). `VERSION` is `4.82.0-dev`;
+  expected v4.82 tag is not created. Phase 63 implementation `0d1c903`, review
+  `0eceda6` and v4.81 tag were verified in local Git history.
+
 ### Phase 63.0 — Frontend Component Test Foundation & Registry Drift Guards v1 ✅
 
 - **Testing/reliability phase** — no financial model, analytics lab, UI or

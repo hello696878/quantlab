@@ -1,5 +1,12 @@
 # Data Provenance & Dataset Lineage Registry (Phase 49.0)
 
+Phase 64: [Strategy Ensemble Lab](STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md) accepts an
+explicit dataset version per supplied strategy, reads/pins its public identity
+and manifest/content/schema fingerprints, and rejects invalidated or changed
+links before rerun/baseline. No version is mutated. A supplied dataset label
+without a version ID remains unlinked; it is not independently verified lineage.
+Storage locators are not copied into the ensemble export.
+
 A **local-first, single-user** registry of dataset identity, immutable
 versions, transformation lineage, metadata-driven quality checks, and links to
 the Experiment Registry — so a research run's data can be identified, compared,

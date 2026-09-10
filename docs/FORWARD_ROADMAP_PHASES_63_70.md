@@ -1,6 +1,15 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Status update (Phase 63.0 — IMPLEMENTED, REVIEW GATES PENDING).** Phase 63 below is implemented.
+> **Current status (Phase 64.0 implementation, 2026-09-08).** Phase 63's
+> implementation `0d1c903`, review `0eceda6` and v4.81 tag exist locally.
+> Phase 64 is implemented but uncommitted; manual verification and independent
+> review remain pending. Evidence finalized 2026-09-10: combined backend snapshot
+> passed 4,359 tests with 3 platform skips; runner-exit limitations and superseded
+> failure history: [PHASE_64_IMPLEMENTATION.md](PHASE_64_IMPLEMENTATION.md).
+> Phase 65 has not started. The original plan below is retained, not a claim
+> that every optional integration was delivered.
+>
+> **Historical Phase 63 implementation note.** Phase 63 below is implemented.
 > Added beyond its original outline: a workspace metadata registry with an
 > exhaustive `Record<View, …>` visibility classification, 26 drift guards
 > (view identity, component mapping, sidebar, palette, and cross-module
@@ -10,8 +19,8 @@
 > explicitly requesting the CI integration. Docs:
 > [`FRONTEND_COMPONENT_TESTING.md`](FRONTEND_COMPONENT_TESTING.md),
 > [`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md).
-> The next phase is **Phase 64 — Strategy Return Stream, Strategy Similarity
-> and Portfolio Ensemble Diagnostics Lab v1**, unchanged in scope.
+> The selected next feature was **Phase 64 — Strategy Return Stream, Strategy
+> Similarity and Portfolio Ensemble Diagnostics Lab v1**; current status above.
 > Original counts below describe commit `0d1c903`; current review results,
 > dependency-security blockers and release gates: `PHASE_63_REVIEW.md`.
 > Model/paper catalog slug and live-strategy referential checks, plus the
@@ -48,7 +57,7 @@ plans exposure of the result.
 
 ---
 
-## Phase 63 — Frontend Component Test Foundation and Registry Drift Guards v1 · **IMPLEMENTED, REVIEW GATES PENDING**
+## Phase 63 — Frontend Component Test Foundation and Registry Drift Guards v1 (implementation/review commits exist)
 
 **Goal.** Give the frontend its first unit/component test layer and stop
 registry-versus-route drift silently.

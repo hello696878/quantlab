@@ -1,5 +1,12 @@
 # Research Experiment Registry & Reproducibility Dashboard (Phase 48.0)
 
+Phase 64 integration: [Strategy Ensemble Lab](STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md)
+can explicitly record module `strategy_ensemble_diagnostics` with counts,
+alignment, fixed-weight mode, integrity/completeness and fingerprints. No
+performance-based selection. Recording is best-effort and once-requested per
+run; null `experiment_id` is not a successful link. Existing records are not
+rewritten. See the Phase 64 runbook for disposable-DB verification.
+
 A **local-first, single-user** registry that records reproducibility metadata for
 QuantLab research runs and presents them in an interactive frontend dashboard.
 

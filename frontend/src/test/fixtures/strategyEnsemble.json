@@ -1,0 +1,680 @@
+{
+  "id": 1,
+  "name": "Deterministic test run",
+  "status": "completed",
+  "is_baseline": false,
+  "error_message": null,
+  "created_at": "2024-01-01",
+  "updated_at": "2024-01-01",
+  "request": {
+    "name": "Identical streams",
+    "description": "Deterministic educational fixture, not market performance.",
+    "definitions": [
+      {
+        "strategy_id": "a",
+        "strategy_name": "Strategy A",
+        "source_type": "supplied",
+        "source_run_id": null,
+        "source_fingerprint": "3c2bce1dc664612a51427d0baaa9238f90669e868a84945a845b2a93e2171bc3",
+        "configuration_fingerprint": "d2c063bab3e5ac30281315a225a258289965011deee6c9c6723667bebbcb8b4a",
+        "dataset_identity": "phase64_deterministic_returns_v1",
+        "dataset_version_id": null,
+        "return_convention": "simple_arithmetic",
+        "gross_or_net": "gross",
+        "frequency": "daily",
+        "currency": "USD",
+        "leverage_convention": "already_in_returns",
+        "exposure_convention": "strategy_return_weight",
+        "availability_policy": "outcome_at_or_after_period_end",
+        "configuration_available_at": "2024-01-01T00:00:00.000000Z",
+        "observation_start": "2024-01-01T00:00:00.000000Z",
+        "observation_end": "2024-01-05T00:00:00.000000Z",
+        "metadata": {}
+      },
+      {
+        "strategy_id": "b",
+        "strategy_name": "Strategy B",
+        "source_type": "supplied",
+        "source_run_id": null,
+        "source_fingerprint": "010f87592f1dc87b7dd9d378967643898ea6ec11e721f3e9d1bd37601bd4697f",
+        "configuration_fingerprint": "0d016612f6f94997622151bc6d1009a9c17c57c906bdc4b92fbd7c7cdec3ba16",
+        "dataset_identity": "phase64_deterministic_returns_v1",
+        "dataset_version_id": null,
+        "return_convention": "simple_arithmetic",
+        "gross_or_net": "gross",
+        "frequency": "daily",
+        "currency": "USD",
+        "leverage_convention": "already_in_returns",
+        "exposure_convention": "strategy_return_weight",
+        "availability_policy": "outcome_at_or_after_period_end",
+        "configuration_available_at": "2024-01-01T00:00:00.000000Z",
+        "observation_start": "2024-01-01T00:00:00.000000Z",
+        "observation_end": "2024-01-05T00:00:00.000000Z",
+        "metadata": {}
+      }
+    ],
+    "observations": [
+      {
+        "strategy_id": "a",
+        "period_start": "2024-01-01T00:00:00.000000Z",
+        "period_end": "2024-01-02T00:00:00.000000Z",
+        "return_value": 0.1,
+        "gross_or_net": "gross",
+        "information_available_at": "2024-01-02T00:00:00.000000Z",
+        "turnover": null,
+        "cost_return": null,
+        "gross_exposure": null,
+        "net_exposure": null,
+        "source_observation_id": "p000"
+      },
+      {
+        "strategy_id": "a",
+        "period_start": "2024-01-02T00:00:00.000000Z",
+        "period_end": "2024-01-03T00:00:00.000000Z",
+        "return_value": -0.1,
+        "gross_or_net": "gross",
+        "information_available_at": "2024-01-03T00:00:00.000000Z",
+        "turnover": null,
+        "cost_return": null,
+        "gross_exposure": null,
+        "net_exposure": null,
+        "source_observation_id": "p001"
+      },
+      {
+        "strategy_id": "a",
+        "period_start": "2024-01-03T00:00:00.000000Z",
+        "period_end": "2024-01-04T00:00:00.000000Z",
+        "return_value": 0.02,
+        "gross_or_net": "gross",
+        "information_available_at": "2024-01-04T00:00:00.000000Z",
+        "turnover": null,
+        "cost_return": null,
+        "gross_exposure": null,
+        "net_exposure": null,
+        "source_observation_id": "p002"
+      },
+      {
+        "strategy_id": "a",
+        "period_start": "2024-01-04T00:00:00.000000Z",
+        "period_end": "2024-01-05T00:00:00.000000Z",
+        "return_value": -0.02,
+        "gross_or_net": "gross",
+        "information_available_at": "2024-01-05T00:00:00.000000Z",
+        "turnover": null,
+        "cost_return": null,
+        "gross_exposure": null,
+        "net_exposure": null,
+        "source_observation_id": "p003"
+      },
+      {
+        "strategy_id": "b",
+        "period_start": "2024-01-01T00:00:00.000000Z",
+        "period_end": "2024-01-02T00:00:00.000000Z",
+        "return_value": 0.05,
+        "gross_or_net": "gross",
+        "information_available_at": "2024-01-02T00:00:00.000000Z",
+        "turnover": null,
+        "cost_return": null,
+        "gross_exposure": null,
+        "net_exposure": null,
+        "source_observation_id": "p000"
+      },
+      {
+        "strategy_id": "b",
+        "period_start": "2024-01-02T00:00:00.000000Z",
+        "period_end": "2024-01-03T00:00:00.000000Z",
+        "return_value": -0.02,
+        "gross_or_net": "gross",
+        "information_available_at": "2024-01-03T00:00:00.000000Z",
+        "turnover": null,
+        "cost_return": null,
+        "gross_exposure": null,
+        "net_exposure": null,
+        "source_observation_id": "p001"
+      },
+      {
+        "strategy_id": "b",
+        "period_start": "2024-01-03T00:00:00.000000Z",
+        "period_end": "2024-01-04T00:00:00.000000Z",
+        "return_value": -0.01,
+        "gross_or_net": "gross",
+        "information_available_at": "2024-01-04T00:00:00.000000Z",
+        "turnover": null,
+        "cost_return": null,
+        "gross_exposure": null,
+        "net_exposure": null,
+        "source_observation_id": "p002"
+      },
+      {
+        "strategy_id": "b",
+        "period_start": "2024-01-04T00:00:00.000000Z",
+        "period_end": "2024-01-05T00:00:00.000000Z",
+        "return_value": 0.04,
+        "gross_or_net": "gross",
+        "information_available_at": "2024-01-05T00:00:00.000000Z",
+        "turnover": null,
+        "cost_return": null,
+        "gross_exposure": null,
+        "net_exposure": null,
+        "source_observation_id": "p003"
+      }
+    ],
+    "policy": {
+      "mode": "equal_weight",
+      "weights": {},
+      "normalization": "require_sum_to_one",
+      "negative_weight_policy": "reject",
+      "alignment": "strict_intersection",
+      "rebalance_policy": "static_return_reference",
+      "initial_build": "unavailable",
+      "allocation_cost_policy": "not_modeled"
+    },
+    "analysis": {
+      "pairwise_alignment": "strict_intersection",
+      "matrix_method": "pearson",
+      "minimum_samples": 4,
+      "tail_quantile": 0.1,
+      "tail_minimum_samples": 20,
+      "tail_ties": "inclusive_linear_quantile",
+      "severe_drawdown": -0.1,
+      "rare_regime_minimum": 10,
+      "correction": "holm",
+      "alpha": 0.05,
+      "tolerance": 1e-10,
+      "bootstrap": "deferred"
+    },
+    "weights_available_at": "2024-01-01T00:00:00.000000Z",
+    "regime": null,
+    "validation": null,
+    "scenarios": []
+  },
+  "links": {},
+  "results": {
+    "coverage": {
+      "strict_intersection_periods": 4,
+      "union_periods": 4,
+      "strategies": [
+        {
+          "strategy_id": "a",
+          "stored_periods": 4,
+          "missing_periods": 0,
+          "excluded_periods": 0,
+          "coverage_ratio": 1
+        },
+        {
+          "strategy_id": "b",
+          "stored_periods": 4,
+          "missing_periods": 0,
+          "excluded_periods": 0,
+          "coverage_ratio": 1
+        }
+      ],
+      "exclusion_reason": "exact period start/end absent from another stream",
+      "gaps": 0
+    },
+    "pairwise": [
+      {
+        "strategy_a": "a",
+        "strategy_b": "b",
+        "n": 4,
+        "alignment": "strict_intersection",
+        "correlations": {
+          "pearson": {
+            "value": 0.6839411288813297,
+            "p_value": 0.31605887111867026,
+            "reason": null
+          },
+          "spearman": {
+            "value": 0.7999999999999999,
+            "p_value": 0.2000000000000001,
+            "reason": null
+          }
+        },
+        "covariance": 0.002,
+        "covariance_units": "decimal_return_squared_per_declared_period",
+        "sign_agreement": 0.5,
+        "simultaneous_loss_count": 1,
+        "simultaneous_gain_count": 1,
+        "positive_agreement": 0.25,
+        "negative_agreement": 0.25,
+        "opposite_sign_count": 2,
+        "joint_loss_rate": 0.25,
+        "mean_absolute_difference": 0.055,
+        "empirical_lower_tail_overlap": {
+          "state": "unavailable",
+          "reason": "insufficient samples or constant stream"
+        },
+        "drawdown_overlap": {
+          "simultaneous_periods": 2,
+          "state_agreement": 0.75,
+          "severe_periods": 0,
+          "deepest_episode_overlap": 3,
+          "loss_period_overlap": 1
+        }
+      }
+    ],
+    "matrix": {
+      "strategy_ids": [
+        "a",
+        "b"
+      ],
+      "n": 4,
+      "method": "pearson",
+      "sample": "strict_intersection",
+      "values": [
+        [
+          1,
+          0.6839411288813297
+        ],
+        [
+          0.6839411288813297,
+          1
+        ]
+      ],
+      "eigenvalues": [
+        0.31605887111867026,
+        1.6839411288813297
+      ],
+      "rank": 2,
+      "condition": 5.327935023374371,
+      "effective_strategy_count": 1.3626062322946175,
+      "mean_absolute_correlation": 0.6839411288813297,
+      "maximum_absolute_correlation": 0.6839411288813297,
+      "psd_tolerance": 1e-10,
+      "state": "available",
+      "reason": null
+    },
+    "strategy_drawdowns": {
+      "a": {
+        "periods": [
+          {
+            "period_start": "2024-01-01T00:00:00.000000Z",
+            "period_end": "2024-01-02T00:00:00.000000Z",
+            "return_value": 0.1,
+            "wealth": 1.1,
+            "running_peak": 1.1,
+            "drawdown": 0
+          },
+          {
+            "period_start": "2024-01-02T00:00:00.000000Z",
+            "period_end": "2024-01-03T00:00:00.000000Z",
+            "return_value": -0.1,
+            "wealth": 0.9900000000000001,
+            "running_peak": 1.1,
+            "drawdown": -0.09999999999999998
+          },
+          {
+            "period_start": "2024-01-03T00:00:00.000000Z",
+            "period_end": "2024-01-04T00:00:00.000000Z",
+            "return_value": 0.02,
+            "wealth": 1.0098,
+            "running_peak": 1.1,
+            "drawdown": -0.08200000000000007
+          },
+          {
+            "period_start": "2024-01-04T00:00:00.000000Z",
+            "period_end": "2024-01-05T00:00:00.000000Z",
+            "return_value": -0.02,
+            "wealth": 0.989604,
+            "running_peak": 1.1,
+            "drawdown": -0.10036
+          }
+        ],
+        "episodes": [
+          {
+            "start": "2024-01-02T00:00:00.000000Z",
+            "trough": "2024-01-05T00:00:00.000000Z",
+            "recovery": null,
+            "start_index": 1,
+            "end_index": 3,
+            "max_drawdown": -0.10036,
+            "duration_periods": 3
+          }
+        ],
+        "max_drawdown": -0.10036,
+        "compounded_return": -0.01039599999999996
+      },
+      "b": {
+        "periods": [
+          {
+            "period_start": "2024-01-01T00:00:00.000000Z",
+            "period_end": "2024-01-02T00:00:00.000000Z",
+            "return_value": 0.05,
+            "wealth": 1.05,
+            "running_peak": 1.05,
+            "drawdown": 0
+          },
+          {
+            "period_start": "2024-01-02T00:00:00.000000Z",
+            "period_end": "2024-01-03T00:00:00.000000Z",
+            "return_value": -0.02,
+            "wealth": 1.029,
+            "running_peak": 1.05,
+            "drawdown": -0.02000000000000013
+          },
+          {
+            "period_start": "2024-01-03T00:00:00.000000Z",
+            "period_end": "2024-01-04T00:00:00.000000Z",
+            "return_value": -0.01,
+            "wealth": 1.01871,
+            "running_peak": 1.05,
+            "drawdown": -0.02980000000000005
+          },
+          {
+            "period_start": "2024-01-04T00:00:00.000000Z",
+            "period_end": "2024-01-05T00:00:00.000000Z",
+            "return_value": 0.04,
+            "wealth": 1.0594584,
+            "running_peak": 1.0594584,
+            "drawdown": 0
+          }
+        ],
+        "episodes": [
+          {
+            "start": "2024-01-02T00:00:00.000000Z",
+            "trough": "2024-01-04T00:00:00.000000Z",
+            "recovery": "2024-01-05T00:00:00.000000Z",
+            "start_index": 1,
+            "end_index": 3,
+            "max_drawdown": -0.02980000000000005,
+            "duration_periods": 3
+          }
+        ],
+        "max_drawdown": -0.02980000000000005,
+        "compounded_return": 0.05945840000000002
+      }
+    },
+    "ensemble": {
+      "weights": {
+        "original": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "effective": {
+          "a": 0.5,
+          "b": 0.5
+        },
+        "sum": 1,
+        "gross": 1,
+        "net": 1,
+        "max_absolute_weight": 0.5,
+        "zero_weight_strategies": [],
+        "normalization_residual": 0
+      },
+      "n": 4,
+      "periods": [
+        {
+          "period_start": "2024-01-01T00:00:00.000000Z",
+          "period_end": "2024-01-02T00:00:00.000000Z",
+          "contributions": {
+            "a": 0.05,
+            "b": 0.025
+          },
+          "ensemble_return": 0.07500000000000001,
+          "residual": 0
+        },
+        {
+          "period_start": "2024-01-02T00:00:00.000000Z",
+          "period_end": "2024-01-03T00:00:00.000000Z",
+          "contributions": {
+            "a": -0.05,
+            "b": -0.01
+          },
+          "ensemble_return": -0.060000000000000005,
+          "residual": 0
+        },
+        {
+          "period_start": "2024-01-03T00:00:00.000000Z",
+          "period_end": "2024-01-04T00:00:00.000000Z",
+          "contributions": {
+            "a": 0.01,
+            "b": -0.005
+          },
+          "ensemble_return": 0.005,
+          "residual": 0
+        },
+        {
+          "period_start": "2024-01-04T00:00:00.000000Z",
+          "period_end": "2024-01-05T00:00:00.000000Z",
+          "contributions": {
+            "a": -0.01,
+            "b": 0.02
+          },
+          "ensemble_return": 0.01,
+          "residual": 0
+        }
+      ],
+      "contribution_summary": [
+        {
+          "strategy_id": "a",
+          "arithmetic_contribution": 0,
+          "share": 0,
+          "positive_periods": 2,
+          "negative_periods": 2,
+          "absolute_share": 0.6666666666666666
+        },
+        {
+          "strategy_id": "b",
+          "arithmetic_contribution": 0.030000000000000002,
+          "share": 0.9999999999999999,
+          "positive_periods": 2,
+          "negative_periods": 2,
+          "absolute_share": 0.3333333333333333
+        }
+      ],
+      "absolute_contribution_concentration": 0.5555555555555556,
+      "reconciliation_max_residual": 0,
+      "arithmetic_sum": 0.030000000000000006,
+      "arithmetic_geometric_gap": -0.004291975000000094,
+      "mean_return": 0.0075000000000000015,
+      "volatility_per_period": 0.05515130702591432,
+      "drawdown": {
+        "periods": [
+          {
+            "period_start": "2024-01-01T00:00:00.000000Z",
+            "period_end": "2024-01-02T00:00:00.000000Z",
+            "return_value": 0.07500000000000001,
+            "wealth": 1.075,
+            "running_peak": 1.075,
+            "drawdown": 0
+          },
+          {
+            "period_start": "2024-01-02T00:00:00.000000Z",
+            "period_end": "2024-01-03T00:00:00.000000Z",
+            "return_value": -0.060000000000000005,
+            "wealth": 1.0105,
+            "running_peak": 1.075,
+            "drawdown": -0.06000000000000005
+          },
+          {
+            "period_start": "2024-01-03T00:00:00.000000Z",
+            "period_end": "2024-01-04T00:00:00.000000Z",
+            "return_value": 0.005,
+            "wealth": 1.0155524999999999,
+            "running_peak": 1.075,
+            "drawdown": -0.05530000000000013
+          },
+          {
+            "period_start": "2024-01-04T00:00:00.000000Z",
+            "period_end": "2024-01-05T00:00:00.000000Z",
+            "return_value": 0.01,
+            "wealth": 1.025708025,
+            "running_peak": 1.075,
+            "drawdown": -0.04585300000000003
+          }
+        ],
+        "episodes": [
+          {
+            "start": "2024-01-02T00:00:00.000000Z",
+            "trough": "2024-01-03T00:00:00.000000Z",
+            "recovery": null,
+            "start_index": 1,
+            "end_index": 3,
+            "max_drawdown": -0.06000000000000005,
+            "duration_periods": 3,
+            "arithmetic_contributions": {
+              "a": -0.05,
+              "b": 0.005
+            }
+          }
+        ],
+        "max_drawdown": -0.06000000000000005,
+        "compounded_return": 0.025708024999999912
+      },
+      "turnover": {
+        "initial_allocation": null,
+        "subsequent_target_weight_change": 0,
+        "executed_rebalance_turnover": null,
+        "underlying": [
+          {
+            "strategy_id": "a",
+            "cost_observations": 0,
+            "turnover_observations": 0,
+            "cost_return_sum": null,
+            "turnover_sum": null
+          },
+          {
+            "strategy_id": "b",
+            "cost_observations": 0,
+            "turnover_observations": 0,
+            "cost_return_sum": null,
+            "turnover_sum": null
+          }
+        ]
+      },
+      "costs": {
+        "basis": "gross",
+        "completeness": "allocation_costs_not_modeled",
+        "allocation_cost": null,
+        "underlying_cost_deducted_again": false,
+        "gross_ensemble_reference": 0.025708024999999912,
+        "net_of_strategy_costs_reference": null,
+        "fully_net_ensemble": null,
+        "reason": "Input returns used verbatim. Underlying costs are read-only; allocation costs unavailable."
+      }
+    },
+    "sensitivity": [
+      {
+        "label": "Base",
+        "is_base": true,
+        "fingerprint": "e13c313ca3ff7414db97bba2d1b1f2a8ffce03bef92009508ef4f3893cd73346",
+        "policy": {
+          "mode": "equal_weight",
+          "weights": {},
+          "normalization": "require_sum_to_one",
+          "negative_weight_policy": "reject",
+          "alignment": "strict_intersection",
+          "rebalance_policy": "static_return_reference",
+          "initial_build": "unavailable",
+          "allocation_cost_policy": "not_modeled"
+        },
+        "weights": {
+          "original": {
+            "a": 0.5,
+            "b": 0.5
+          },
+          "effective": {
+            "a": 0.5,
+            "b": 0.5
+          },
+          "sum": 1,
+          "gross": 1,
+          "net": 1,
+          "max_absolute_weight": 0.5,
+          "zero_weight_strategies": [],
+          "normalization_residual": 0
+        },
+        "n": 4,
+        "mean_return": 0.0075000000000000015,
+        "volatility_per_period": 0.05515130702591432,
+        "compounded_return": 0.025708024999999912,
+        "max_drawdown": -0.06000000000000005,
+        "concentration": 0.5555555555555556,
+        "mean_absolute_correlation": 0.6839411288813297,
+        "turnover": {
+          "initial_allocation": null,
+          "subsequent_target_weight_change": 0,
+          "executed_rebalance_turnover": null,
+          "underlying": [
+            {
+              "strategy_id": "a",
+              "cost_observations": 0,
+              "turnover_observations": 0,
+              "cost_return_sum": null,
+              "turnover_sum": null
+            },
+            {
+              "strategy_id": "b",
+              "cost_observations": 0,
+              "turnover_observations": 0,
+              "cost_return_sum": null,
+              "turnover_sum": null
+            }
+          ]
+        },
+        "costs": {
+          "basis": "gross",
+          "completeness": "allocation_costs_not_modeled",
+          "allocation_cost": null,
+          "underlying_cost_deducted_again": false,
+          "gross_ensemble_reference": 0.025708024999999912,
+          "net_of_strategy_costs_reference": null,
+          "fully_net_ensemble": null,
+          "reason": "Input returns used verbatim. Underlying costs are read-only; allocation costs unavailable."
+        }
+      }
+    ],
+    "multiple_testing": {
+      "family": "all available Pearson and Spearman pairwise tests in this run",
+      "correction": "holm",
+      "results": [
+        {
+          "candidate_id": "a:b:pearson",
+          "raw_p_value": 0.31605887111867026,
+          "bonferroni": 0.6321177422373405,
+          "holm": 0.4000000000000002,
+          "bh": 0.31605887111867026,
+          "provenance_status": "declared",
+          "provenance": {
+            "method": "scipy_pearson",
+            "sample": "strict_intersection"
+          },
+          "state_raw": "above_threshold",
+          "state_bonferroni": "above_threshold",
+          "state_holm": "above_threshold",
+          "state_bh": "above_threshold"
+        },
+        {
+          "candidate_id": "a:b:spearman",
+          "raw_p_value": 0.2000000000000001,
+          "bonferroni": 0.4000000000000002,
+          "holm": 0.4000000000000002,
+          "bh": 0.31605887111867026,
+          "provenance_status": "declared",
+          "provenance": {
+            "method": "scipy_spearman",
+            "sample": "strict_intersection"
+          },
+          "state_raw": "above_threshold",
+          "state_bonferroni": "above_threshold",
+          "state_holm": "above_threshold",
+          "state_bh": "above_threshold"
+        }
+      ],
+      "limitation": "Classical p-values assume independent observations; serial dependence is not corrected. No alpha or diversification proof."
+    },
+    "regimes": [],
+    "validation": {
+      "state": "unavailable",
+      "reason": "no stored validation split linked"
+    },
+    "warnings": [],
+    "deferred": {},
+    "integrity": "declared_timing_passed",
+    "baseline_eligible": true,
+    "definition_fingerprints": {}
+  },
+  "fingerprints": {},
+  "experiment_id": null,
+  "experiment_requested": 0
+}

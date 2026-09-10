@@ -72,6 +72,8 @@ import PortfolioAttributionPanel from "@/components/PortfolioAttributionPanel";
 import FactorDiagnosticsPanel from "@/components/FactorDiagnosticsPanel";
 import SignalDecayPanel from "@/components/SignalDecayPanel";
 import SignalEnsemblePanel from "@/components/SignalEnsemblePanel";
+import StrategyEnsemblePanel from "@/components/StrategyEnsemblePanel";
+import { isStrategyEnsembleLink, useStrategyEnsembleLinkCleanup, writeStrategyEnsembleLink } from "@/lib/strategyEnsembleLink";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
 import QACommandCenterPanel from "@/components/QACommandCenterPanel";
@@ -588,6 +590,10 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     subtitle:
       "A local-first signal-ensemble lab: descriptive similarity, redundancy and EXPLICIT user-configured combination references over multiple stored signals aligned on exact (entity, timestamp) keys — never by row number, and never with forward fill, interpolation or zero/mean imputation. Every pairwise row carries its own overlap count under a declared strict-intersection or pairwise-complete policy; correlations are real scipy statistics whose constants, heavy ties and thin overlaps stay conservatively unavailable with reasons; matrix-level diagnostics (rank, condition number, eigenvalue concentration and the effective signal count) are computed only on the strict intersection and always described as matrix concentration, never as the true number of independent signals. Combinations are explicit — equal weight, user-supplied static weights with declared negative-weight and normalisation policies, rank average, or a majority-sign reference — with per-observation component contributions that reconcile exactly, missing components handled by an explicit require-all or opt-in renormalise policy, and evaluation through the Phase 60 horizon, lag, bucket, turnover and linked Phase 55 cost policies side by side with each component, plus neutral leave-one-signal-out differences. Stored regime, validation, cost, signal-decay, feature, meta-labeling and factor records are read-only and fingerprint-pinned. Nothing here selects a signal, derives or optimises weights, picks a threshold, horizon or lag, proves independence, diversification, predictability or alpha, guarantees anything, executes trades, or constitutes investment, trading or risk-management advice. No market or alternative data is ever downloaded.",
   },
+  strategyensemble: {
+    title: "Strategy Ensemble Lab",
+    subtitle: "Local strategy-return diagnostics. Explicit fixed weights, declared cost basis and exact period alignment. No selection, advice or execution.",
+  },
   scanner: {
     title: "Cross-Sectional Scanner",
     subtitle:
@@ -685,6 +691,7 @@ const GLOBE_MARKET_ALIASES: Record<string, string> = {
 
 export default function HomePage() {
   const [view, setView] = useState<View>("home");
+  useStrategyEnsembleLinkCleanup(view);
 
   // Guided-demo banner ("Demo parameters loaded. Click Run to execute.") and
   // the portfolio sub-tab a demo should open on.  `portfolioKey` is bumped to
@@ -833,6 +840,7 @@ export default function HomePage() {
   //    leaving the globe) always matches the address bar — no stale selection.
   useEffect(() => {
     const entry = readGlobeParams();
+    if (isStrategyEnsembleLink()) setView("strategyensemble");
     if (entry.isGlobe) {
       openGlobe(entry.market, {
         tour: entry.tour,
@@ -842,6 +850,11 @@ export default function HomePage() {
     }
 
     function onPopState() {
+      if (isStrategyEnsembleLink()) {
+        setView("strategyensemble");
+        setDemoNotice(null);
+        return;
+      }
       const here = readGlobeParams();
       if (here.isGlobe) {
         setSavedDetailId(null);
@@ -898,6 +911,8 @@ export default function HomePage() {
   }
 
   function handleNav(next: View) {
+    if (next === "strategyensemble") writeStrategyEnsembleLink(true);
+    else if (next !== "globe") writeStrategyEnsembleLink(false);
     const leavingGlobe = view === "globe" && next !== "globe";
     setView(next);
     setDemoNotice(null);
@@ -922,7 +937,7 @@ export default function HomePage() {
       setGlobePresentation(false);
       setGlobeKey((k) => k + 1);
       writeGlobeUrl({ market: null }, "push");
-    } else if (leavingGlobe) {
+    } else if (leavingGlobe && next !== "strategyensemble") {
       clearGlobeUrl("push");
     }
   }
@@ -2317,6 +2332,7 @@ export default function HomePage() {
         {view === "factordiagnostics" && <FactorDiagnosticsPanel onNav={(route) => handleNav(route as View)} />}
         {view === "signaldecay" && <SignalDecayPanel onNav={(route) => handleNav(route as View)} />}
         {view === "signalensemble" && <SignalEnsemblePanel onNav={(route) => handleNav(route as View)} />}
+        {view === "strategyensemble" && <StrategyEnsemblePanel />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

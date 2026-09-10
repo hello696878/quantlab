@@ -1,5 +1,11 @@
 # QuantLab — Market Regime Robustness & Conditional Performance Lab (Phase 54.0)
 
+Phase 64 [Strategy Ensemble Lab](STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md) may link one
+completed run/definition read-only. Exact period-start assignments and integrity
+are pinned; original contents are rechecked before reuse. Rare/unassigned groups
+retain null statistics. Group drawdown summaries observe the full trailing path,
+not a synthetic concatenated regime path. No regime-dependent weight changes.
+
 The local-first lab that conditions candidate outcomes on explicitly defined
 market regimes.  Companions:
 [`MARKET_REGIME_DEFINITION_POLICY.md`](MARKET_REGIME_DEFINITION_POLICY.md)

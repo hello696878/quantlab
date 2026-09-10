@@ -1,5 +1,11 @@
 # Transaction Cost, Slippage, Market Impact & Capacity Diagnostics Lab (v1)
 
+Phase 64 [strategy-return cost policy](STRATEGY_ENSEMBLE_WEIGHT_CONTRIBUTION_COST_POLICY.md)
+reads explicit source basis and optional costs/turnover without executing this
+lab's cost model again. Already-net returns are never charged twice. Allocation
+costs and fully-net executable performance remain unavailable because v1 does
+not model drift or executed rebalance notionals. No Phase 55 records are changed.
+
 Phase 55.0 adds a local-first research diagnostics lab that applies
 explicitly configured execution-cost assumptions to supplied historical
 strategy, candidate, validation, or experiment observations. It answers,

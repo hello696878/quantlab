@@ -10,6 +10,23 @@ delayed quotes as real-time market data.
 
 ---
 
+## Strategy Ensemble Lab (Phase 64)
+
+Registered view `strategyensemble`, sidebar and command palette entry,
+`/?view=strategyensemble` permalink. `StrategyEnsemblePanel` reads the real
+local `/api/strategy-ensembles` API through the existing backend proxy.
+Create supplied JSON inputs, execute explicitly, inspect table-backed wealth,
+similarity, contribution, cost and held-out results; compare, baseline,
+invalidate and export saved runs. No auto-run on navigation or fake metrics.
+
+Deterministic demo runs are explicitly seeded in SQLite by the backend, not
+injected into production frontend state. Never seed an active DB during tests.
+The new unit tests mock only the local client and use a test-only fixture.
+The browser spec requires explicitly isolated, already-running services.
+See [runbook](../docs/STRATEGY_ENSEMBLE_RUNBOOK.md) and
+[verification](../docs/PHASE_64_IMPLEMENTATION.md). Production build and full
+browser verification remain user-run; no server was started for this task.
+
 ## Folder structure
 
 ```

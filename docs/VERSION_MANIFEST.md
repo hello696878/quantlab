@@ -1,4 +1,4 @@
-# QuantLab — Version Manifest (Phase 63.0)
+# QuantLab — Version Manifest (Phase 64.0)
 
 The project's versioning conventions, verified against the local git history
 when written. Companion docs: [`../CHANGELOG.md`](../CHANGELOG.md) (grouped
@@ -13,12 +13,18 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.81.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The next
-expected tag on completion of the current phase's review is
-`v4.81.0-frontend-component-test-foundation-registry-drift-guards-v1`
-(Phase 63, a testing/reliability phase) — implementation commit `0d1c903`
-exists; the review commit, CI and manual verification remain pending. "Expected" means the user creates
-the tag only after review and final verification; no such tag exists yet. Phase 62's
+**`4.82.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The expected
+future tag is
+`v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-diagnostics-v1`.
+Phase 64 implementation is uncommitted; independent review and manual
+verification remain pending. No v4.82 tag exists and none was created here.
+See [implementation evidence](PHASE_64_IMPLEMENTATION.md); a development version
+is not a claim of release readiness.
+
+Phase 63 implementation `0d1c903`, review `0eceda6` and tag
+`v4.81.0-frontend-component-test-foundation-registry-drift-guards-v1` exist
+in local Git history. Their existence does not establish the outcome of
+uninspected CI/build/security gates. Phase 62's
 `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1`
 (implementation `e50cca2`, review `ceb5c41`), Phase 61's
 `v4.79.0-signal-ensemble-redundancy-combination-diagnostics-v1`,
@@ -39,9 +45,9 @@ never moved (full audit:
 
 The **v4.x productization / platformization series**: v4.0.0 (local-first
 research terminal) → v4.7.0 (showcase candidate) → v4.8+ (one milestone tag
-per feature phase). 125 local tags existed when this manifest was last
-updated (Phase 63.0); the latest verified tag is
-`v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1`
+per feature phase). 126 local tags existed when this manifest was last
+updated (Phase 64.0); the latest verified tag is
+`v4.81.0-frontend-component-test-foundation-registry-drift-guards-v1`
 (the frozen release-candidate tag is
 `v4.60.0-public-release-candidate-demo-freeze-v1`).
 

@@ -1,7 +1,8 @@
 # STOP POINT - QuantLab
 
-Date: 2026-09-07 (Phase 63 review: Frontend Component Test Foundation and
-Registry Drift Guards v1)
+Date: 2026-09-08 (Phase 64 implementation: Strategy Return Stream,
+Similarity and Portfolio Ensemble Diagnostics Lab v1)
+Evidence finalized: 2026-09-10, using the user's existing full-run records.
 
 This replaces the stale 2026-07-05 "local futures data path v0.1" stop
 point, which no longer described the repository (the futures track later
@@ -12,7 +13,7 @@ product-workflow diagnostics chain).
 ## Current repository goal
 
 QuantLab is a **local-first, deterministic, educational** quant research
-platform: 57 routed top-level view identifiers over a FastAPI + SQLite backend and a
+platform: 58 routed top-level view identifiers over a FastAPI + SQLite backend and a
 Next.js 14 frontend, plus a local futures research pipeline (local CSV
 only). Not investment advice; no live trading; no production
 trading/risk/compliance certification.
@@ -21,16 +22,17 @@ trading/risk/compliance certification.
 
 | Field | Value |
 |---|---|
-| VERSION | `4.81.0-dev` |
+| VERSION | `4.82.0-dev` |
 | Latest completed feature phase | 61.0 — Signal Ensemble, Redundancy & Combination Diagnostics Lab v1 |
 | Phase 61 commits | `c0f256d` (Add) / `40ec1fd` (Review) |
-| Latest tag | `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1` |
-| Current phase | 63.0 (frontend test infrastructure and navigation guards) |
-| Current branch | `main` |
+| Latest tag | `v4.81.0-frontend-component-test-foundation-registry-drift-guards-v1` |
+| Current phase | 64.0 (strategy return streams and fixed-weight diagnostics; locally implemented, uncommitted) |
+| Current branch | `phase64-strategy-return-stream-ensemble` |
 | Phase 62 implementation | `e50cca2` (`Add master blueprint reconciliation project status audit roadmap v1`) |
 | Phase 62 review/tag state | Review `ceb5c41` and v4.80 tag exist |
 | Phase 63 implementation | `0d1c903` |
-| Phase 63 review/tag state | Uncommitted review fixes; see `docs/PHASE_63_REVIEW.md`. Dependency-security blockers remain. Review commit, CI, manual build/smoke and clean hygiene required before v4.81; no tag created |
+| Phase 63 review/tag state | Review `0eceda6` and v4.81 tag verified in local history; historic security notes in `docs/PHASE_63_REVIEW.md` not re-audited here |
+| Phase 64 verification | `docs/PHASE_64_IMPLEMENTATION.md`; combined backend snapshot: 4,359 passed, 3 platform skips, pytest process exit 0; outer runner exit not recorded; build/browser/CI/independent review pending |
 
 ## Protected frozen release baseline
 
@@ -54,12 +56,15 @@ change silently.
 
 ## Next safe step
 
-1. Inspect `docs/PHASE_63_REVIEW.md` and resolve the recorded security blockers.
-2. User creates the Phase 63 review commit, runs relevant CI and the local
-   production build/browser smoke, then checks hygiene before any v4.81 tag.
-3. The next implementation phase remains **Phase 64: Strategy Return Stream,
-   Strategy Similarity and Portfolio Ensemble Diagnostics Lab v1**. It has
-   not been started.
+1. Read `docs/PHASE_64_IMPLEMENTATION.md` and the Phase 64 runbook; inspect Git
+   diff without overwriting the uncommitted implementation.
+2. Read `docs/BACKEND_TEST_MAINTENANCE.md`: the four former safety failures and
+   nine encoding failures now pass in the user's full run. No test rerun is
+   needed for this evidence-only handoff. User performs isolated browser/build
+   verification and requests independent review; final CI/security gates remain.
+   Do not delete active data or unrelated evidence.
+3. User alone creates commits/push/tag after reviewing gates. No Phase 65 work
+   is authorized. Existing historical dependency-security notes remain relevant.
 
 ## Exact restart commands
 

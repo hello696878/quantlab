@@ -25,7 +25,6 @@ import math
 import pytest
 
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
-main_module = pytest.importorskip("app.main")
 db_module = pytest.importorskip("app.db")
 universe_mod = pytest.importorskip("app.signal_ensemble.universe")
 align_mod = pytest.importorskip("app.signal_ensemble.alignment")
@@ -43,15 +42,13 @@ BASE = "/signal-ensembles"
 
 
 @pytest.fixture(autouse=True)
-def fresh_db(tmp_path, monkeypatch):
-    db_file = tmp_path / "test_quantlab.db"
-    monkeypatch.setattr(db_module, "_db_path_override", db_file)
-    db_module.init_db()
-    yield
+def fresh_db(isolated_lab_db):
+    return isolated_lab_db
 
 
 @pytest.fixture
 def client():
+    main_module = pytest.importorskip("app.main")
     return TestClient(main_module.app)
 
 
@@ -112,6 +109,7 @@ def _run(**kwargs):
 # Universe validation and canonical ordering
 # ---------------------------------------------------------------------------
 
+@pytest.mark.db_free
 def test_universe_requires_at_least_two_signals():
     stamps = _stamps()
     with pytest.raises(universe_mod.UniverseError) as excinfo:
@@ -121,6 +119,7 @@ def test_universe_requires_at_least_two_signals():
     assert "between 2 and" in str(excinfo.value)
 
 
+@pytest.mark.db_free
 def test_universe_rejects_duplicate_signal_ids():
     with pytest.raises(universe_mod.UniverseError) as excinfo:
         universe_mod.validate_universe({
@@ -129,6 +128,7 @@ def test_universe_rejects_duplicate_signal_ids():
     assert "duplicate signal_id" in str(excinfo.value)
 
 
+@pytest.mark.db_free
 def test_universe_rejects_incompatible_frequencies():
     stamps = _stamps()
     weekly = _definition("sig-b")
@@ -141,6 +141,7 @@ def test_universe_rejects_incompatible_frequencies():
     assert "nothing is resampled" in str(excinfo.value)
 
 
+@pytest.mark.db_free
 def test_universe_canonical_ordering_is_sorted():
     stamps = _stamps()
     uni = universe_mod.validate_universe({
@@ -150,6 +151,7 @@ def test_universe_canonical_ordering_is_sorted():
     assert uni["signal_ids"] == ["alpha", "zeta"]
 
 
+@pytest.mark.db_free
 def test_universe_rejects_missing_and_unknown_observations():
     stamps = _stamps()
     with pytest.raises(universe_mod.UniverseError):
@@ -164,6 +166,7 @@ def test_universe_rejects_missing_and_unknown_observations():
                              "ghost": _rows(stamps, _alt_values())}})
 
 
+@pytest.mark.db_free
 def test_universe_bounds_signal_count():
     stamps = _stamps(5)
     signals = [_definition(f"s-{i:02d}") for i in range(13)]
@@ -174,6 +177,7 @@ def test_universe_bounds_signal_count():
                                         "observations": observations})
 
 
+@pytest.mark.db_free
 def test_non_finite_signal_value_rejected():
     stamps = _stamps(5)
     rows = _rows(stamps, [1.0, 2.0, 3.0, 4.0, 5.0])
@@ -189,6 +193,7 @@ def test_non_finite_signal_value_rejected():
 # Alignment
 # ---------------------------------------------------------------------------
 
+@pytest.mark.db_free
 def test_strict_intersection_uses_shared_nonnull_keys():
     stamps = _stamps(6)
     grid = align_mod.build_grid(_validated({
@@ -199,6 +204,7 @@ def test_strict_intersection_uses_shared_nonnull_keys():
     assert len(strict) == 4  # index 2 is null in a, index 5 absent in b
 
 
+@pytest.mark.db_free
 def test_pairwise_overlap_is_pair_specific():
     stamps = _stamps(6)
     grid = align_mod.build_grid(_validated({
@@ -211,6 +217,7 @@ def test_pairwise_overlap_is_pair_specific():
     assert len(align_mod.strict_intersection(grid, ["a", "b", "c"])) == 2
 
 
+@pytest.mark.db_free
 def test_missingness_summary_discloses_nulls_and_absences():
     stamps = _stamps(6)
     grid = align_mod.build_grid(_validated({
@@ -226,6 +233,7 @@ def test_missingness_summary_discloses_nulls_and_absences():
     assert "no forward fill" in summary["note"]
 
 
+@pytest.mark.db_free
 def test_row_number_alignment_is_impossible_by_construction():
     """Keys are explicit (entity, timestamp) pairs; shifting one signal's
     timestamps changes the intersection instead of silently pairing rows."""
@@ -261,6 +269,7 @@ def _norm(values, mode, *, entities=None, n=None, **cfg):
                                      config=config, tie_policy="average")
 
 
+@pytest.mark.db_free
 def test_cross_sectional_rank_percentile_exact():
     result = _norm([10.0, 20.0, 30.0, 40.0],
                    "cross_sectional_rank_percentile",
@@ -269,6 +278,7 @@ def test_cross_sectional_rank_percentile_exact():
     assert values == [0.125, 0.375, 0.625, 0.875]
 
 
+@pytest.mark.db_free
 def test_cross_sectional_zscore_exact():
     result = _norm([1.0, 2.0, 3.0], "cross_sectional_zscore",
                    entities=["e1", "e2", "e3"], ddof=1)
@@ -276,6 +286,7 @@ def test_cross_sectional_zscore_exact():
     assert abs(z + 1.0) < 1e-12  # (1-2)/1
 
 
+@pytest.mark.db_free
 def test_zero_variance_normalisation_unavailable():
     result = _norm([5.0, 5.0, 5.0], "cross_sectional_zscore",
                    entities=["e1", "e2", "e3"])
@@ -284,6 +295,7 @@ def test_zero_variance_normalisation_unavailable():
                for r in result["reasons"])
 
 
+@pytest.mark.db_free
 def test_trailing_zscore_is_strictly_trailing():
     values = [1.0, 2.0, 3.0, 4.0, 100.0]
     result = _norm(values, "trailing_zscore", window=4,
@@ -297,6 +309,7 @@ def test_trailing_zscore_is_strictly_trailing():
     assert result["values"][("e", stamps[0])] is None  # no history yet
 
 
+@pytest.mark.db_free
 def test_future_outlier_cannot_change_earlier_trailing_zscore():
     base = [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]
     tampered = base[:-1] + [1e6]
@@ -308,6 +321,7 @@ def test_future_outlier_cannot_change_earlier_trailing_zscore():
         assert r1["values"][("e", stamp)] == r2["values"][("e", stamp)]
 
 
+@pytest.mark.db_free
 def test_future_entity_cannot_change_earlier_cross_sectional_ranks():
     stamps = _stamps(2)
     oriented = {("e1", stamps[0]): 1.0, ("e2", stamps[0]): 2.0,
@@ -325,6 +339,7 @@ def test_future_entity_cannot_change_earlier_cross_sectional_ranks():
     assert result["values"][("e2", stamps[0])] == 0.5
 
 
+@pytest.mark.db_free
 def test_normalisation_validation_rejects_bad_config():
     with pytest.raises(norm_mod.NormalisationError):
         norm_mod.validate_normalisation({"x": {"mode": "zscore"}}, ["x"])
@@ -379,6 +394,7 @@ def _pair(values_a, values_b, **kwargs):
                                                          True))
 
 
+@pytest.mark.db_free
 def test_pairwise_identical_is_exactly_one_with_real_p():
     values = _base_values(20)
     row = _pair(values, list(values))
@@ -389,6 +405,7 @@ def test_pairwise_identical_is_exactly_one_with_real_p():
     assert row["sign_agreement_rate"] == 1.0
 
 
+@pytest.mark.db_free
 def test_pairwise_constant_unavailable_never_zero():
     row = _pair([1.0] * 10, _base_values(10))
     assert row["correlations"]["pearson"]["state"] == "unavailable"
@@ -396,6 +413,7 @@ def test_pairwise_constant_unavailable_never_zero():
     assert "constant" in row["correlations"]["pearson"]["reason"]
 
 
+@pytest.mark.db_free
 def test_pairwise_thin_overlap_unavailable_with_count():
     row = _pair([1.0, 2.0], [2.0, 1.0])
     assert row["state"] == "unavailable"
@@ -593,6 +611,7 @@ def test_clustering_validation_requires_explicit_threshold():
 # Combination modes and weights
 # ---------------------------------------------------------------------------
 
+@pytest.mark.db_free
 def test_equal_weight_combination_is_exact_mean():
     policy = combo_mod.validate_combination_policy(
         {"mode": "equal_weight"}, ["a", "b"])
@@ -941,6 +960,7 @@ def test_fingerprints_material_change():
     assert d["universe_fingerprint"] == a["universe_fingerprint"]
 
 
+@pytest.mark.db_free
 def test_fingerprints_reject_non_finite():
     with pytest.raises(fp_mod.FingerprintError):
         fp_mod.analysis_policy_fingerprint({
@@ -963,6 +983,7 @@ def test_execution_is_reproducible():
 # Persistence, migration, failure handling
 # ---------------------------------------------------------------------------
 
+@pytest.mark.fresh_schema
 def test_migration_preserves_prior_registries():
     with db_module.get_connection() as conn:
         tables = {r["name"] for r in conn.execute(

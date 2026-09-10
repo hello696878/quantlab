@@ -85,6 +85,7 @@ export const WORKSPACE_VISIBILITY: Record<View, WorkspaceVisibility> = {
   factordiagnostics: "sidebar",
   signaldecay: "sidebar",
   signalensemble: "sidebar",
+  strategyensemble: "sidebar",
   democenter: "sidebar",
   datareliability: "sidebar",
   qacommandcenter: "sidebar",
@@ -223,4 +224,5 @@ export const WORKSPACE_COMMANDS: { view: View; title: string; keywords: string }
   { view: "saved", title: "Go to Saved Backtests", keywords: "history persisted sqlite" },
   { view: "reports", title: "Go to Saved Reports", keywords: "report gallery markdown" },
   { view: "settings", title: "Go to Settings", keywords: "preferences theme defaults" },
+  { view: "strategyensemble", title: "Open Strategy Ensemble Lab", keywords: "strategy return stream portfolio static weights correlation similarity tail overlap drawdown contribution cost basis held out regime sensitivity" },
 ];

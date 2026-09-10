@@ -23,7 +23,6 @@ import math
 import pytest
 
 TestClient = pytest.importorskip("fastapi.testclient").TestClient
-main_module = pytest.importorskip("app.main")
 db_module = pytest.importorskip("app.db")
 defs_mod = pytest.importorskip("app.factor_diagnostics.definitions")
 obs_mod = pytest.importorskip("app.factor_diagnostics.observations")
@@ -42,15 +41,13 @@ BASE = "/factor-diagnostics"
 
 
 @pytest.fixture(autouse=True)
-def fresh_db(tmp_path, monkeypatch):
-    db_file = tmp_path / "test_quantlab.db"
-    monkeypatch.setattr(db_module, "_db_path_override", db_file)
-    db_module.init_db()
-    yield
+def fresh_db(isolated_lab_db):
+    return isolated_lab_db
 
 
 @pytest.fixture
 def client():
+    main_module = pytest.importorskip("app.main")
     return TestClient(main_module.app)
 
 
@@ -122,6 +119,7 @@ def _run(**kwargs):
 # Factor definitions, transformations, units
 # ---------------------------------------------------------------------------
 
+@pytest.mark.db_free
 def test_definition_rejects_unknown_keys_and_categories():
     with pytest.raises(defs_mod.DefinitionError):
         defs_mod.validate_definition({"factor_id": "a", "unit": "ratio",
@@ -133,6 +131,7 @@ def test_definition_rejects_unknown_keys_and_categories():
                                       "category": "momentum"})
 
 
+@pytest.mark.db_free
 def test_definition_rejects_negative_lag_and_centered_window():
     with pytest.raises(defs_mod.DefinitionError):
         defs_mod.validate_definition({"factor_id": "a", "unit": "ratio",
@@ -144,6 +143,7 @@ def test_definition_rejects_negative_lag_and_centered_window():
     assert "trailing" in str(excinfo.value)
 
 
+@pytest.mark.db_free
 def test_definition_rejects_duplicate_factor_ids():
     base = {"factor_id": "a", "unit": "ratio", "transformation": "level"}
     with pytest.raises(defs_mod.DefinitionError) as excinfo:
@@ -151,6 +151,7 @@ def test_definition_rejects_duplicate_factor_ids():
     assert "duplicate" in str(excinfo.value)
 
 
+@pytest.mark.db_free
 def test_definition_rejects_winsorisation_and_zero_fill():
     with pytest.raises(defs_mod.DefinitionError):
         defs_mod.validate_definition({
@@ -162,6 +163,7 @@ def test_definition_rejects_winsorisation_and_zero_fill():
             "missing_policy": "forward_fill"})
 
 
+@pytest.mark.db_free
 def test_transformation_formulas_are_exact():
     level = {"transformation": "level", "unit": "index_level",
              "factor_id": "x", "standardisation_policy": "none",
@@ -190,6 +192,7 @@ def test_transformation_formulas_are_exact():
         pytest.approx(2.0)
 
 
+@pytest.mark.db_free
 def test_basis_point_conversion_is_explicit_about_the_source_unit():
     fraction = {"transformation": "basis_point_change", "unit": "rate_fraction",
                 "factor_id": "r", "standardisation_policy": "none",
@@ -204,6 +207,7 @@ def test_basis_point_conversion_is_explicit_about_the_source_unit():
                                       "transformation": "basis_point_change"})
 
 
+@pytest.mark.db_free
 def test_trailing_zscore_never_reads_its_own_or_a_future_observation():
     definition = {"transformation": "trailing_zscore", "unit": "ratio",
                   "factor_id": "z", "standardisation_policy": "none",
@@ -220,6 +224,7 @@ def test_trailing_zscore_never_reads_its_own_or_a_future_observation():
         pytest.approx(8.0)
 
 
+@pytest.mark.db_free
 def test_contribution_scale_only_exists_for_return_like_units():
     assert defs_mod.contribution_scale("return_fraction") == 1.0
     assert defs_mod.contribution_scale("return_percent") == 0.01
@@ -231,6 +236,7 @@ def test_contribution_scale_only_exists_for_return_like_units():
 # Observations, alignment and timing
 # ---------------------------------------------------------------------------
 
+@pytest.mark.db_free
 def test_observations_require_strictly_increasing_unique_timestamps():
     definition = defs_mod.validate_definition({
         "factor_id": "a", "unit": "return_fraction",
@@ -248,6 +254,7 @@ def test_observations_require_strictly_increasing_unique_timestamps():
              "value": 0.2}])
 
 
+@pytest.mark.db_free
 def test_observations_reject_non_finite_values():
     definition = defs_mod.validate_definition({
         "factor_id": "a", "unit": "return_fraction",
@@ -340,6 +347,7 @@ def test_future_observation_cannot_change_an_earlier_verified_fit():
     assert base["observation_count"] == N
 
 
+@pytest.mark.db_free
 def test_vintage_policies_select_different_values():
     row = {"raw_value": 1.0, "vintages": [
         {"release_timestamp": "2024-01-05T00:00:00", "value": 10.0,
@@ -903,6 +911,7 @@ def test_a_material_change_moves_the_fingerprints():
         policy_changed["model_policy_fingerprint"]
 
 
+@pytest.mark.db_free
 def test_fingerprints_reject_non_finite_values():
     with pytest.raises(fp_mod.FingerprintError):
         fp_mod._clean({"value": float("nan")})
@@ -914,6 +923,7 @@ def test_fingerprints_reject_non_finite_values():
 # Persistence, migration, baselines
 # ---------------------------------------------------------------------------
 
+@pytest.mark.fresh_schema
 def test_migration_creates_every_table_and_preserves_prior_registries():
     with db_module.get_connection() as conn:
         names = {r["name"] for r in conn.execute(
@@ -1244,6 +1254,7 @@ def test_api_compare_reports_neutral_differences(client):
     assert "no run is better" in body["note"]
 
 
+@pytest.mark.db_free
 def test_log_change_rejects_non_positive_endpoints_even_when_ratio_is_positive():
     definition = defs_mod.validate_definition({
         "factor_id": "log", "name": "log", "category": "style",
@@ -1252,6 +1263,7 @@ def test_log_change_rejects_non_positive_endpoints_even_when_ratio_is_positive()
     assert defs_mod.transform_series([-2.0, -1.0], definition) == [None, None]
 
 
+@pytest.mark.db_free
 def test_supplied_transformed_unit_is_whitelisted():
     with pytest.raises(defs_mod.DefinitionError):
         defs_mod.validate_definition({
@@ -1261,6 +1273,7 @@ def test_supplied_transformed_unit_is_whitelisted():
             "transformed_unit": "return_fractoin"})
 
 
+@pytest.mark.db_free
 def test_timestamps_are_calendar_valid_and_canonicalised():
     assert obs_mod.normalise_timestamp(
         "2024-01-01T01:00:00+01:00", field="stamp") == (
@@ -1269,6 +1282,7 @@ def test_timestamps_are_calendar_valid_and_canonicalised():
         obs_mod.normalise_timestamp("2024-02-30", field="stamp")
 
 
+@pytest.mark.db_free
 def test_target_sequence_fields_reject_non_lists():
     target = copy.deepcopy(_payload()["target"])
     target["period_ends"] = {"not": "a list"}
@@ -1293,6 +1307,7 @@ def test_observation_ids_are_unique_across_factors():
     assert "unique across the run" in str(excinfo.value)
 
 
+@pytest.mark.db_free
 def test_no_intercept_ols_uses_uncentred_r_squared():
     fit = reg_mod.ols_fit([1.0, 2.0, 3.0], [[1.0], [1.0], [1.0]], ["x"],
                           intercept=False,
@@ -1301,6 +1316,7 @@ def test_no_intercept_ols_uses_uncentred_r_squared():
     assert "uncentred" in fit["r_squared_convention"]
 
 
+@pytest.mark.db_free
 def test_no_intercept_ridge_uses_uncentred_r_squared_and_reports_rank():
     fit = reg_mod.ridge_fit(
         [1.0, 2.0, 3.0], [[1.0], [1.0], [1.0]], ["constant"],
@@ -1312,6 +1328,7 @@ def test_no_intercept_ridge_uses_uncentred_r_squared_and_reports_rank():
     assert fit["rank_status"] == "full_rank"
 
 
+@pytest.mark.db_free
 def test_ridge_rejects_centred_scaling_without_an_intercept():
     with pytest.raises(reg_mod.RegressionError):
         reg_mod.ridge_fit([1.0, 2.0, 3.0], [[1.0], [2.0], [4.0]], ["x"],
@@ -1319,6 +1336,7 @@ def test_ridge_rejects_centred_scaling_without_an_intercept():
                           scaling="zscore_fit_sample")
 
 
+@pytest.mark.db_free
 def test_vif_is_unavailable_when_the_other_factors_are_rank_deficient():
     rows = diag_mod.variance_inflation(
         [[1.0, 2.0, 2.0], [2.0, 3.0, 3.0], [4.0, 5.0, 5.0],
@@ -1327,6 +1345,7 @@ def test_vif_is_unavailable_when_the_other_factors_are_rank_deficient():
     assert "rank deficient" in rows[0]["reason"]
 
 
+@pytest.mark.db_free
 def test_residual_drawdown_includes_an_initial_loss_from_zero():
     block = diag_mod.residual_diagnostics([-1.0, 0.5], ["a", "b"])
     assert block["cumulative_drawdown"] == pytest.approx(-1.0)
@@ -1357,6 +1376,7 @@ def test_sensitivity_fingerprint_tracks_effective_sample_and_scale():
     assert rows["base"]["fingerprint"] != rows["scaled"]["fingerprint"]
 
 
+@pytest.mark.db_free
 def test_observation_metadata_key_count_is_bounded():
     stamps = _stamps(2)
     factor = _factor("bounded", [0.1, 0.2], stamps)

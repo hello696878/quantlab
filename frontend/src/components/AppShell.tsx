@@ -46,6 +46,7 @@ export type View =
   | "factordiagnostics"
   | "signaldecay"
   | "signalensemble"
+  | "strategyensemble"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

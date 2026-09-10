@@ -14,6 +14,22 @@ palette, shared charts, local LaTeX formula panels).
 > investment, trading, allocation, legal, tax, compliance, or risk-management
 > advice, and not production trading, risk, or compliance infrastructure.
 
+## Current development: Phase 64
+
+**Strategy Ensemble Lab** compares supplied strategy return streams (not signal
+values), exact-period similarity, empirical tail/drawdown overlap and explicit
+static-weight combinations. No optimizer, automatic allocation or external
+provider. Costs are never deducted twice; unavailable lineage/cost information
+stays unavailable. This is a return reference, not an executable funded portfolio.
+
+See the [lab](docs/STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md),
+[runbook](docs/STRATEGY_ENSEMBLE_RUNBOOK.md) and
+[implementation/verification report](docs/PHASE_64_IMPLEMENTATION.md).
+The combined implementation/maintenance backend snapshot passed 4,359 tests
+with 3 platform skips; evidence and runner-exit limitations are in the report.
+Manual browser verification, production build, CI and independent review remain
+pending; no release-readiness claim is made.
+
 ## Screenshots
 
 Frozen v4.60 release evidence — captured from the production build on
@@ -33,7 +49,7 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
 - **Full-stack engineering** — FastAPI + Pydantic v2 backend, Next.js 14 +
   TypeScript + Tailwind frontend, typed end to end.
 - **Quantitative finance modeling** — documented educational implementations
-  across 57 routed top-level views (options, volatility, rates, credit, FX, futures,
+  across 58 routed top-level views (options, volatility, rates, credit, FX, futures,
   real estate/MBS, microstructure, crypto derivatives/DeFi/tokenomics/
   on-chain, alternative data, macro regimes).
 - **Deterministic sample-data design** — most analytical labs run offline on

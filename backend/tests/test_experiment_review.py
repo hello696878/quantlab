@@ -12,9 +12,11 @@ into the Phase 14 ``evidence_`` namespace.
 from __future__ import annotations
 
 import dataclasses
+from contextlib import closing
 import json
 import math
 from pathlib import Path
+import sqlite3
 
 import pytest
 
@@ -63,6 +65,85 @@ def _repo_snapshot() -> tuple[bool, bool, bool]:
         (_REPO_ROOT / "artifacts").exists(),
         (_REPO_ROOT / "reports").exists(),
     )
+
+
+class _EvidenceWorkspaceGuard:
+    def __init__(self, root: Path, scope: Path):
+        self.root = root
+        self.scope = scope
+        self.before = self.snapshot()
+
+    def snapshot(self):
+        # Include directories, database bytes and SQLite journal/sidecar files.
+        database_files = {
+            str(p.relative_to(self.scope)): p.read_bytes()
+            for p in self.scope.rglob("*")
+            if p.is_file() and (".db" in p.name or ".sqlite" in p.name)
+        }
+        return _snapshot(self.root), database_files
+
+    def assert_unchanged(self):
+        assert self.snapshot() == self.before, "unauthorized database or workspace mutation"
+
+
+def _protected_evidence_workspace(tmp_path, monkeypatch, present):
+    from app import db
+
+    root = tmp_path / "protected-workspace"
+    data = root / "backend" / "data"
+    data.mkdir(parents=True)
+    (data / ".gitkeep").touch()
+    if present:
+        for path in (data / "quantlab.db", root / "quantlab.db"):
+            with closing(sqlite3.connect(path)) as conn:
+                conn.execute("CREATE TABLE sentinel (value TEXT NOT NULL)")
+                conn.execute("INSERT INTO sentinel VALUES (?)", ("preserve me",))
+                conn.commit()
+
+    # Redirect the production database default AND relative output paths. The
+    # collector/renderers/CLI still execute actual working-tree source files.
+    monkeypatch.setattr(db, "_DATA_DIR", data)
+    monkeypatch.setattr(db, "_db_path_override", None)
+    monkeypatch.chdir(root)
+    monkeypatch.setitem(globals(), "_REPO_ROOT", root)
+    monkeypatch.setitem(globals(), "_BACKEND", root / "backend")
+    assert db.get_db_path() == data / "quantlab.db"
+    connect = sqlite3.connect
+
+    def local_connect(database, *args, **kwargs):
+        assert not str(database).lower().startswith("file:"), "SQLite URI is not a test-local path"
+        assert Path(database).resolve().is_relative_to(tmp_path.resolve()), "non-test SQLite path"
+        return connect(database, *args, **kwargs)
+
+    monkeypatch.setattr(sqlite3, "connect", local_connect)
+    return _EvidenceWorkspaceGuard(root, tmp_path)
+
+
+@pytest.fixture(params=[False, True], ids=["db-absent", "db-present"])
+def evidence_workspace(tmp_path, monkeypatch, request):
+    guard = _protected_evidence_workspace(tmp_path, monkeypatch, request.param)
+    yield guard
+    guard.assert_unchanged()
+
+
+@pytest.mark.parametrize("mutation", ["create", "modify", "sidecar", "artifact"])
+def test_evidence_workspace_guard_detects_unauthorized_mutation(tmp_path, monkeypatch, mutation):
+    from app import db
+
+    guard = _protected_evidence_workspace(tmp_path, monkeypatch, mutation == "modify")
+    if mutation in {"create", "modify"}:
+        with closing(db.get_connection()) as conn:
+            if mutation == "create":
+                conn.execute("CREATE TABLE unauthorized (value TEXT)")
+            else:
+                conn.execute("UPDATE sentinel SET value = ?", ("changed",))
+            conn.commit()
+    elif mutation == "sidecar":
+        Path(str(db.get_db_path()) + "-wal").write_bytes(b"unauthorized sidecar")
+    else:
+        (guard.root / "artifacts").mkdir()
+    with pytest.raises(AssertionError, match="unauthorized database or workspace mutation"):
+        guard.assert_unchanged()
 
 
 def _audit_finding(severity="warning", code=AuditCode.ORPHAN_ARTIFACT, **kw) -> AuditFinding:
@@ -1450,12 +1531,12 @@ def test_collect_leaves_store_byte_identical(tmp_path, level):
     assert _snapshot(store.base_dir) == before
 
 
-def test_collect_creates_no_repo_artifacts_or_db(tmp_path):
+def test_collect_creates_no_repo_artifacts_or_db(tmp_path, evidence_workspace):
     before = _repo_snapshot()
     store = _store(tmp_path, ("run_a",))
     collect_experiment_evidence_pack(store, ["run_a"])
     assert _repo_snapshot() == before
-    assert not (_BACKEND / "data" / "quantlab.db").exists()  # no registry DB created
+    evidence_workspace.assert_unchanged()
 
 
 def test_collect_module_no_forbidden_imports():
@@ -2058,14 +2139,14 @@ def test_disclaimers_carry_no_advice_or_remediation():
 # --- boundaries ------------------------------------------------------------ #
 
 
-def test_all_renderers_return_str_and_touch_no_repo_artifacts():
+def test_all_renderers_return_str_and_touch_no_repo_artifacts(evidence_workspace):
     before = _repo_snapshot()
     pack = _render_pack()
     for renderer in (export_evidence_pack_json, export_evidence_pack_csv,
                      export_evidence_pack_markdown):
         assert isinstance(renderer(pack), str)
     assert _repo_snapshot() == before
-    assert not (_BACKEND / "data" / "quantlab.db").exists()
+    evidence_workspace.assert_unchanged()
 
 
 def test_render_module_has_no_forbidden_imports():
@@ -2801,14 +2882,13 @@ def test_cli_metric_ranking_is_descriptive_only(capsys, tmp_path):
         assert banned not in text
 
 
-def test_cli_creates_no_database_or_repo_artifacts(capsys, tmp_path):
+def test_cli_creates_no_database_or_repo_artifacts(capsys, tmp_path, evidence_workspace):
     before = _repo_snapshot()
     store = _cli_store(tmp_path)
     _cli_run(capsys, "--artifacts-dir", store.base_dir, "--run-hash", "run_a",
              "--output-json", _out(tmp_path, "p.json"))
     assert _repo_snapshot() == before
-    assert not (_BACKEND / "data" / "quantlab.db").exists()
-    assert not (_REPO_ROOT / "quantlab.db").exists()
+    evidence_workspace.assert_unchanged()
 
 
 # --------------------------------------------------------------------------- #
@@ -2816,14 +2896,14 @@ def test_cli_creates_no_database_or_repo_artifacts(capsys, tmp_path):
 # --------------------------------------------------------------------------- #
 
 
-def test_e2e_experiment_evidence_pack_over_real_and_tampered_runs(tmp_path, capsys):
+def test_e2e_experiment_evidence_pack_over_real_and_tampered_runs(tmp_path, capsys, evidence_workspace):
     """Full Phase 14 path: synthetic ES raw -> a real Phase 11 batch of 3 Phase 9 runs
     in a tmp ExperimentStore -> the CLI aggregates the already-persisted Phase 13 /
     Phase 12 / Phase 10 evidence into one deterministic pack -> deliberately tampered
     copies (still under tmp_path) drive the WARNING / INCOMPLETE / UNAVAILABLE and
     incompatible-selection paths without erasing valid-run evidence -> JSON / CSV /
     Markdown export to explicit paths outside every store -> every audited store stays
-    byte-identical and no database is ever created."""
+    byte-identical and no application database is created or changed by the pipeline."""
     import shutil  # test-only: copy real runs into tampered stores under tmp_path
 
     from app.batch_experiments import expand_grid, run_local_experiment_batch
@@ -3112,15 +3192,8 @@ def test_e2e_experiment_evidence_pack_over_real_and_tampered_runs(tmp_path, caps
         assert code == 3 and "inside the audited ExperimentStore" in out
         assert _snapshot(clean.base_dir) == clean_before
 
-    assert not (_REPO_ROOT / "reports").exists()            # no implicit reports dir
-    assert not (_REPO_ROOT / "data").exists()
-    assert not (_REPO_ROOT / "artifacts").exists()
-
     # --- 12. registry / database and repository-cleanliness proof --------------- #
-    assert not (_BACKEND / "data" / "quantlab.db").exists()
-    assert not (_REPO_ROOT / "quantlab.db").exists()
-    assert list((_BACKEND / "data").iterdir()) == [_BACKEND / "data" / ".gitkeep"]
-    assert not list(tmp_path.rglob("*.db")) and not list(tmp_path.rglob("*.sqlite*"))
+    evidence_workspace.assert_unchanged()
     assert _repo_snapshot() == repo_before
 
     # every audited store survived the whole scenario byte-identical

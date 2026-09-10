@@ -1,14 +1,14 @@
-# QuantLab — Project Snapshot (Phase 63.0)
+# QuantLab — Project Snapshot (Phase 64.0)
 
 A one-page handoff doc. Facts verified against the repo when written
-(version label `4.81.0-dev`); counts drift as phases land — re-verify before
+(version label `4.82.0-dev`); counts drift as phases land — re-verify before
 public use. Status ground truth by area:
 [`BLUEPRINT_STATUS_MATRIX.md`](BLUEPRINT_STATUS_MATRIX.md).
 
 ## Summary
 
 QuantLab is a local-first, deterministic, **educational** quant research
-platform: 57 routed top-level view identifiers behind one shell (grouped sidebar,
+platform: 58 routed top-level view identifiers behind one shell (grouped sidebar,
 dashboard, command palette), a FastAPI + Pydantic v2 backend with a
 consistent `sample`/`analyze` API pattern, and a Next.js 14 + TypeScript
 frontend with shared charts, local KaTeX formulas, and copy-friendly report
@@ -24,7 +24,7 @@ trading/risk/compliance infrastructure.
   Feature Diagnostics, Overfitting Diagnostics, Regime Diagnostics,
   Cost & Capacity, Portfolio Diagnostics, Portfolio Stress Lab,
   Portfolio Attribution, Factor Diagnostics, Signal Decay Lab,
-  Signal Ensemble Lab, Data Reliability Center, QA Command Center,
+  Signal Ensemble Lab, Strategy Ensemble Lab, Data Reliability Center, QA Command Center,
   Release Notes Center, Public Release Candidate.
 - **Backtesting:** Backtest, Strategy Comparison, Portfolio Backtest, CSV
   Backtest, Strategy Builder, Parameter Sweep, Train/Test, Walk-Forward.
@@ -68,6 +68,20 @@ the in-app Data Reliability Center.
 
 ## Testing
 
+Phase 64 current evidence is in [PHASE_64_IMPLEMENTATION.md](PHASE_64_IMPLEMENTATION.md).
+The user's repaired combined implementation/maintenance backend run finished
+with **4,359 passed, 3 symlink-platform skips in 3,285.73s**; pytest process exit
+0. Source/snapshot/active-DB checks passed. Outer runner final exit was not
+recorded. Exact identity and superseded 4,318/4/3 and 4,349/9/3 histories are in
+[BACKEND_TEST_MAINTENANCE.md](BACKEND_TEST_MAINTENANCE.md) and the implementation
+report. Executable/configuration bytes still match the tested snapshot; only
+documentation was finalized later. Overall speedup and parallel execution are
+not established. Earlier frontend units/typecheck/discovery were not rerun here.
+No production build, full browser run, CI, release or independent-review pass
+is claimed.
+
+Historical evidence below describes prior phases, not the latest run:
+
 The Phase 62 implementation run reported 4,268 passed, four active-database
 environment assertion failures and three Windows symlink-permission skips;
 the review reproduced and classified those four failures without changing
@@ -86,7 +100,7 @@ Navigation/registry drift guards plus component tests for the sidebar,
 command palette, dashboard, formula reference, shared state primitives and
 browser-storage safety run one-shot in CI before the typecheck and build
 (`FRONTEND_COMPONENT_TESTING.md`).
-Playwright discovery reports 254 Chromium tests in 18 spec files; discovery
+Phase 63 Playwright discovery reported 254 Chromium tests in 18 spec files; discovery
 is not an E2E pass. Verification is run locally by the user (helper wrappers
 in `scripts\*.ps1`).
 
@@ -123,13 +137,13 @@ need).
 Educational simplifications on hand-written samples (nothing calibrated; no
 alpha claims); hand-maintained registries are now guarded for identity drift
 but their content is still hand-maintained; frontend testing covers shared
-components and navigation identity only — no visual regression, no
-accessibility certification, no analytics-panel component tests; single-user
+components, navigation identity and a focused Strategy Ensemble panel slice only
+— no visual regression or accessibility certification; single-user
 local-first (no auth/hosting); full ledger in `LIMITATIONS.md`.
 
 ## Next recommended improvements
 
-1. Phase 64: strategy return-stream ensemble diagnostics.
+1. Manually verify and independently review the Phase 64 implementation.
 2. Extend component tests to further shared primitives as they stabilise.
 3. Phase 65/66: unified ML identity, then replay by hash.
 4. Screenshot captures for newer workspaces (real runs).
