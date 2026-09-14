@@ -2,6 +2,7 @@
  * Never starts services, deletes a database or writes frozen screenshots. */
 import { expect, test, type Page } from "@playwright/test";
 import { assertNoHorizontalOverflow, expectNoRawStackTrace, expectNoVisibleNaNOrInfinity } from "./helpers";
+import { isolationHeader, verifyStrategyEnsembleIsolation } from "./strategyEnsembleIsolation";
 
 const API = "/api/strategy-ensembles";
 async function open(page: Page, name: string) {
@@ -17,9 +18,11 @@ async function detail(page: Page, name: string) {
 
 test.describe("strategy ensemble lab", () => {
   test.skip(process.env.E2E_STRATEGY_ENSEMBLE_ISOLATED !== "1",
-    "Set E2E_STRATEGY_ENSEMBLE_ISOLATED=1 only after verifying the backend uses a disposable database.");
+    "Opt in after starting the user-owned disposable E2E harness; the flag alone never authorizes writes.");
+  test.use({ extraHTTPHeaders: { [isolationHeader]: process.env.E2E_STRATEGY_ENSEMBLE_TOKEN ?? "" } });
   test.beforeEach(async ({ page, baseURL }) => {
-    expect(["localhost", "127.0.0.1", "[::1]"]).toContain(new URL(baseURL!).hostname);
+    await verifyStrategyEnsembleIsolation(baseURL, process.env.E2E_STRATEGY_ENSEMBLE_TOKEN,
+      (url, options) => page.request.get(url, options));
     await page.goto("/?view=strategyensemble");
     await expect(page.getByTestId("strategy-ensemble-panel")).toBeVisible();
     await expect(page.getByRole("button", { name: "Load demo runs" })).toBeEnabled();

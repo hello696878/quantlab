@@ -68,7 +68,7 @@ def weight_details(policy: WeightPolicy, ids: list[str], tolerance: float):
     if set(original) != set(ids):
         raise ValueError("static weights must contain exactly every strategy ID")
     total = math.fsum(original.values())
-    if total <= tolerance:
+    if total <= 0:
         raise ValueError("weights must have positive total exposure")
     if policy.normalization == "require_sum_to_one" and abs(total - 1) > tolerance:
         raise ValueError("weights must sum to one under require_sum_to_one")
@@ -129,7 +129,7 @@ def pairwise(streams, keys, policy: AnalysisPolicy, histories):
                      "simultaneous_loss_count": joint_loss, "simultaneous_gain_count": joint_gain,
                      "positive_agreement": joint_gain / n if valid else None,
                      "negative_agreement": joint_loss / n if valid else None,
-                     "opposite_sign_count": int(np.sum(x * y < 0)),
+                     "opposite_sign_count": int(np.sum(((x < 0) & (y > 0)) | ((x > 0) & (y < 0)))),
                      "joint_loss_rate": joint_loss / n if valid else None,
                      "mean_absolute_difference": float(np.mean(abs(x-y))) if valid else None,
                      "empirical_lower_tail_overlap": tail,
@@ -261,5 +261,6 @@ def analyze(request: RunCreate):
     return {"coverage": coverage, "pairwise": pairs, "matrix": matrix,
             "strategy_drawdowns": histories, "ensemble": main, "sensitivity": scenarios,
             "multiple_testing": {"family": "all available Pearson and Spearman pairwise tests in this run",
-                                 "correction": "holm", "results": adjust_p_values(hypotheses, request.analysis.alpha),
+                                 "correction": "holm", "results": adjust_p_values(
+                                     hypotheses, request.analysis.alpha, max_hypotheses=12 * 11),
                                  "limitation": "Classical p-values assume independent observations; serial dependence is not corrected. No alpha or diversification proof."}}

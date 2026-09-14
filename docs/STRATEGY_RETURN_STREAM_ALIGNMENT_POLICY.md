@@ -55,3 +55,8 @@ period end. A later outcome publication fails that link because its recorded
 label interval would not cover availability. Purge/embargo sets are never
 recomputed or altered. Dataset links are optional and read-only; unlabeled
 lineage is not invented. See [lab](STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md).
+
+Supplied non-null source observation IDs must agree with exact stored sample
+IDs. Stored sample IDs and memberships must be unique and resolve, including
+purged/embargoed members. Each train/test block reports gaps and labels its wealth
+as compounding observed subset intervals only, not a continuous investable path.

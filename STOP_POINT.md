@@ -3,6 +3,7 @@
 Date: 2026-09-08 (Phase 64 implementation: Strategy Return Stream,
 Similarity and Portfolio Ensemble Diagnostics Lab v1)
 Evidence finalized: 2026-09-10, using the user's existing full-run records.
+Independent review handoff: 2026-09-13; see `docs/PHASE_64_REVIEW.md`.
 
 This replaces the stale 2026-07-05 "local futures data path v0.1" stop
 point, which no longer described the repository (the futures track later
@@ -26,13 +27,13 @@ trading/risk/compliance certification.
 | Latest completed feature phase | 61.0 — Signal Ensemble, Redundancy & Combination Diagnostics Lab v1 |
 | Phase 61 commits | `c0f256d` (Add) / `40ec1fd` (Review) |
 | Latest tag | `v4.81.0-frontend-component-test-foundation-registry-drift-guards-v1` |
-| Current phase | 64.0 (strategy return streams and fixed-weight diagnostics; locally implemented, uncommitted) |
-| Current branch | `phase64-strategy-return-stream-ensemble` |
+| Current phase | 64.0; implementation `1284b3115977f057f4690f643601dc329aac7797`, review fixes uncommitted |
+| Current branch | `main` |
 | Phase 62 implementation | `e50cca2` (`Add master blueprint reconciliation project status audit roadmap v1`) |
 | Phase 62 review/tag state | Review `ceb5c41` and v4.80 tag exist |
 | Phase 63 implementation | `0d1c903` |
-| Phase 63 review/tag state | Review `0eceda6` and v4.81 tag verified in local history; historic security notes in `docs/PHASE_63_REVIEW.md` not re-audited here |
-| Phase 64 verification | `docs/PHASE_64_IMPLEMENTATION.md`; combined backend snapshot: 4,359 passed, 3 platform skips, pytest process exit 0; outer runner exit not recorded; build/browser/CI/independent review pending |
+| Phase 63 review/tag state | Review `0eceda6` and v4.81 tag exist; inherited security findings remain in `docs/PHASE_64_REVIEW.md` |
+| Phase 64 verification | Review results: `docs/PHASE_64_REVIEW.md`; historical full 4,359 passed / 3 skips is retained separately, historical outer exit unknown; final full/build/browser/CI gates pending |
 
 ## Protected frozen release baseline
 
@@ -56,13 +57,12 @@ change silently.
 
 ## Next safe step
 
-1. Read `docs/PHASE_64_IMPLEMENTATION.md` and the Phase 64 runbook; inspect Git
-   diff without overwriting the uncommitted implementation.
-2. Read `docs/BACKEND_TEST_MAINTENANCE.md`: the four former safety failures and
-   nine encoding failures now pass in the user's full run. No test rerun is
-   needed for this evidence-only handoff. User performs isolated browser/build
-   verification and requests independent review; final CI/security gates remain.
-   Do not delete active data or unrelated evidence.
+1. Read `docs/PHASE_64_REVIEW.md`, inspect its explicit staging-path plan and
+   preserve the uncommitted review changes and user index.
+2. Complete the report's final regression, user-owned build, isolated browser,
+   exact-revision CI and dependency-security gates. The prior passing full run
+   remains historical evidence for its own snapshot. Preserve active data and
+   prior evidence. No further evidence-finalization loop is authorized here.
 3. User alone creates commits/push/tag after reviewing gates. No Phase 65 work
    is authorized. Existing historical dependency-security notes remain relevant.
 

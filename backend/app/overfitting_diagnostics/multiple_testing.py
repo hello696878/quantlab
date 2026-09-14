@@ -54,12 +54,18 @@ def provenance_status(p_value: Optional[float], provenance: Optional[Dict[str, A
 
 
 def adjust_p_values(
-    entries: Sequence[Dict[str, Any]], alpha: float
+    entries: Sequence[Dict[str, Any]], alpha: float, *,
+    max_hypotheses: int = MAX_HYPOTHESES,
 ) -> List[Dict[str, Any]]:
-    """entries: [{candidate_id, raw_p (float|None), provenance (dict|None)}] in
-    candidate order → same order with Bonferroni/Holm/BH + neutral states."""
-    if len(entries) > MAX_HYPOTHESES:
-        raise MultipleTestingError(f"at most {MAX_HYPOTHESES} hypotheses are supported")
+    """Correct one entire family, preserving candidate order and neutral states.
+
+    Callers with their own bounded family may explicitly supply its maximum;
+    the original diagnostics contract retains its default 64-entry limit.
+    """
+    if isinstance(max_hypotheses, bool) or not isinstance(max_hypotheses, int) or max_hypotheses < 1:
+        raise MultipleTestingError("max_hypotheses must be a positive integer")
+    if len(entries) > max_hypotheses:
+        raise MultipleTestingError(f"at most {max_hypotheses} hypotheses are supported")
     # Only VALID p-values (finite, in [0,1]) enter the corrections: an invalid
     # value must neither inflate m nor contaminate anyone's Holm/BH value —
     # it stays 'invalid'/'unavailable' in the output.  (The API layer already

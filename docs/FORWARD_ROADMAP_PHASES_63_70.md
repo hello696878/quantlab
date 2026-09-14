@@ -2,8 +2,9 @@
 
 > **Current status (Phase 64.0 implementation, 2026-09-08).** Phase 63's
 > implementation `0d1c903`, review `0eceda6` and v4.81 tag exist locally.
-> Phase 64 is implemented but uncommitted; manual verification and independent
-> review remain pending. Evidence finalized 2026-09-10: combined backend snapshot
+> Phase 64 implementation is committed as `1284b3115977f057f4690f643601dc329aac7797`.
+> Independent review changes remain uncommitted; final gates are recorded in
+> [PHASE_64_REVIEW.md](PHASE_64_REVIEW.md). Historical evidence finalized 2026-09-10: combined backend snapshot
 > passed 4,359 tests with 3 platform skips; runner-exit limitations and superseded
 > failure history: [PHASE_64_IMPLEMENTATION.md](PHASE_64_IMPLEMENTATION.md).
 > Phase 65 has not started. The original plan below is retained, not a claim

@@ -27,8 +27,11 @@ See the [lab](docs/STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md),
 [implementation/verification report](docs/PHASE_64_IMPLEMENTATION.md).
 The combined implementation/maintenance backend snapshot passed 4,359 tests
 with 3 platform skips; evidence and runner-exit limitations are in the report.
-Manual browser verification, production build, CI and independent review remain
-pending; no release-readiness claim is made.
+Implementation is committed as `1284b3115977f057f4690f643601dc329aac7797`.
+The [independent review](docs/PHASE_64_REVIEW.md) records subsequent fixes and
+new focused checks separately; its changes remain uncommitted. Final full
+regression, isolated browser verification, production build, CI and security
+gates remain pending; no release-readiness claim is made.
 
 ## Screenshots
 

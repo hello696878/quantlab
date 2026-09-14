@@ -80,7 +80,11 @@ def get_run(run_id):
 
 
 def _verify(run, *, require_result=False):
-    request = RunCreate.model_validate(run["request"])
+    try:
+        request = RunCreate.model_validate(run["request"])
+        _safe_input(request.model_dump())
+    except ValueError as exc:
+        raise ConflictError("stored inputs are invalid; create a new run") from exc
     expected = fingerprints(request, run["links"])
     if any(run["fingerprints"].get(k) != v for k, v in expected.items()):
         raise ConflictError("stored input fingerprints do not match")
@@ -96,12 +100,21 @@ def _verify(run, *, require_result=False):
     return request
 
 
+def _failed_execution(run, exc):
+    with store.connection() as conn:
+        conn.execute("""UPDATE strategy_ensemble_runs SET status='failed',results_json=NULL,
+            is_baseline=0,baseline_scope=NULL,error_message=?,updated_at=?,fingerprints_json=?
+            WHERE id=? AND status!='invalidated'""",
+                     (str(exc) if isinstance(exc, ValueError) else "analysis failed unexpectedly", store.now(),
+                      canonical_json({k: v for k, v in run["fingerprints"].items() if k != "result"}), run["id"]))
+
+
 def execute_run(run_id, create_experiment=False):
     run = get_run(run_id)
     if run["status"] == "invalidated":
         raise ConflictError("invalidated runs cannot execute")
-    request = _verify(run)
     try:
+        request = _verify(run)
         definitions = {d.strategy_id: d for d in request.definitions}
         for r in request.observations:
             if (r.information_available_at < r.period_end or
@@ -124,24 +137,25 @@ def execute_run(run_id, create_experiment=False):
                                       "dataset_link": run["links"]["datasets"][d.strategy_id]})
             for d in request.definitions}
         fps = {**run["fingerprints"], "result": sha256_hex({"configuration": run["fingerprints"]["configuration"], "results": result})}
-    except ValueError as exc:
-        with store.connection() as conn:
-            conn.execute("""UPDATE strategy_ensemble_runs SET status='failed',results_json=NULL,
-                is_baseline=0,error_message=?,updated_at=?,fingerprints_json=? WHERE id=? AND status!='invalidated'""",
-                         (str(exc), store.now(), canonical_json({k: v for k, v in run["fingerprints"].items() if k != "result"}), run_id))
+    except Exception as exc:
+        _failed_execution(run, exc)
         raise
     record = False
-    with store.connection() as conn:
-        conn.execute("BEGIN IMMEDIATE")
-        current = store.get(run_id, conn)
-        if current["status"] == "invalidated":
-            raise ConflictError("run was invalidated while executing")
-        _verify(current)
-        record = create_experiment and not current["experiment_requested"]
-        conn.execute("""UPDATE strategy_ensemble_runs SET status='completed',results_json=?,
-            fingerprints_json=?,error_message=NULL,updated_at=?,experiment_requested=? WHERE id=?""",
-                     (canonical_json(result), canonical_json(fps), store.now(),
-                      int(record or current["experiment_requested"]), run_id))
+    try:
+        with store.connection() as conn:
+            conn.execute("BEGIN IMMEDIATE")
+            current = store.get(run_id, conn)
+            if current["status"] == "invalidated":
+                raise ConflictError("run was invalidated while executing")
+            _verify(current)
+            record = create_experiment and not current["experiment_requested"]
+            conn.execute("""UPDATE strategy_ensemble_runs SET status='completed',results_json=?,
+                fingerprints_json=?,error_message=NULL,updated_at=?,experiment_requested=? WHERE id=?""",
+                         (canonical_json(result), canonical_json(fps), store.now(),
+                          int(record or current["experiment_requested"]), run_id))
+    except Exception as exc:
+        _failed_execution(run, exc)
+        raise
     if record:
         exp = record_experiment(name=run["name"], module="strategy_ensemble_diagnostics", experiment_type="diagnostic",
                                 parameters={"fingerprints": fps, "strategy_count": len(request.definitions),

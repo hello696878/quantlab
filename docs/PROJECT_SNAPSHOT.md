@@ -68,17 +68,19 @@ the in-app Data Reliability Center.
 
 ## Testing
 
-Phase 64 current evidence is in [PHASE_64_IMPLEMENTATION.md](PHASE_64_IMPLEMENTATION.md).
+Phase 64 implementation is committed as `1284b3115977f057f4690f643601dc329aac7797`.
+Current uncommitted review and verification limits are in
+[PHASE_64_REVIEW.md](PHASE_64_REVIEW.md). Historical implementation evidence:
+[PHASE_64_IMPLEMENTATION.md](PHASE_64_IMPLEMENTATION.md).
 The user's repaired combined implementation/maintenance backend run finished
 with **4,359 passed, 3 symlink-platform skips in 3,285.73s**; pytest process exit
 0. Source/snapshot/active-DB checks passed. Outer runner final exit was not
 recorded. Exact identity and superseded 4,318/4/3 and 4,349/9/3 histories are in
 [BACKEND_TEST_MAINTENANCE.md](BACKEND_TEST_MAINTENANCE.md) and the implementation
-report. Executable/configuration bytes still match the tested snapshot; only
-documentation was finalized later. Overall speedup and parallel execution are
-not established. Earlier frontend units/typecheck/discovery were not rerun here.
-No production build, full browser run, CI, release or independent-review pass
-is claimed.
+report. Those executable/configuration bytes matched at evidence finalization;
+later review fixes require their own verification. Overall speedup and parallel
+execution are not established. Current frontend checks are in the review report.
+No production build, full browser run, CI or release pass is claimed.
 
 Historical evidence below describes prior phases, not the latest run:
 

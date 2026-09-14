@@ -5,7 +5,9 @@ Phase 64 extends this foundation with `StrategyEnsemblePanel.test.tsx` and
 demo/detail rendering, duplicate-action prevention, editable JSON, unmount
 safety and permalink lifecycle. Production data is never replaced by these
 test fixtures. Chart geometry remains browser-only, not certified by jsdom.
-Current checks and unresolved gates: [PHASE_64_IMPLEMENTATION.md](PHASE_64_IMPLEMENTATION.md).
+Current checks and unresolved gates: [PHASE_64_REVIEW.md](PHASE_64_REVIEW.md).
+Review regressions also exercise the E2E isolation proof with synthetic responses;
+that is not execution against a browser or a running backend.
 
 QuantLab's first frontend unit/component test layer. Companion document:
 [`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md).

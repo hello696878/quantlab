@@ -4,6 +4,14 @@ Strategy Return Stream, Strategy Similarity and Portfolio Ensemble Diagnostics
 Lab v1. Handoff: 2026-09-08. Implementation task, **not** the independent review.
 Evidence finalized 2026-09-10 from the user's existing repaired full backend run.
 
+Current status (2026-09-13): the implementation and maintenance are committed
+as `1284b3115977f057f4690f643601dc329aac7797`, parent
+`0eceda6bc3458aa4583cb868a62a49765d2bad73`. The dated handoff and command plan
+below describe the earlier implementation session; they are retained as history,
+not instructions to recommit it. The separate [independent review](PHASE_64_REVIEW.md)
+contains later uncommitted fixes, current tests and remaining release gates.
+Historical full results below do not certify those later executable changes.
+
 ## Decision
 
 Safe to retain as a bounded local implementation for manual verification and
@@ -269,9 +277,9 @@ above. Updated docs: `ROADMAP.md`, `PROJECT_SNAPSHOT.md`, `VERSION_MANIFEST.md`,
 `TRANSACTION_COST_DIAGNOSTICS_LAB.md`, `SIGNAL_ENSEMBLE_DIAGNOSTICS_LAB.md`,
 `FRONTEND_COMPONENT_TESTING.md`, `FRONTEND_REGISTRY_DRIFT_GUARDS.md`.
 
-## Change Groups and Commit Plan
+## Historical Change Groups and Commit Plan (2026-09-10)
 
-Current Git inspection: branch `phase64-strategy-return-stream-ensemble`, HEAD
+Historical Git inspection: branch `phase64-strategy-return-stream-ensemble`, HEAD
 `0eceda6bc3458aa4583cb868a62a49765d2bad73` (Phase 63 review); recent history still
 ends with Phase 63 Add/Review, preceded by Phase 62 Add/Review and Phase 61 Review.
 Phase 64 and maintenance remain uncommitted: 29 modified tracked files plus 27
@@ -306,7 +314,7 @@ an earlier fixture/runner state not covered by the passing run, contrary to this
 task's tested-code freeze. Only the combined working tree was verified; no
 intermediate commit or independent review pass is claimed.
 
-## User-only Staging, Commit and Push
+## Historical User-only Staging, Commit and Push (superseded by implementation commit)
 
 Review the diff and verification limitations first. These explicit paths avoid
 staging unrelated future work. Do not blindly run them if the worktree changes.

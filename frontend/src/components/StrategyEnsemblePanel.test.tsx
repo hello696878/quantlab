@@ -1,4 +1,4 @@
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import StrategyEnsemblePanel from "./StrategyEnsemblePanel";
 import { renderWithUser } from "@/test/testUtils";
@@ -86,5 +86,55 @@ describe("StrategyEnsemblePanel", () => {
     unmount();
     await act(async () => resolve(listing));
     await waitFor(() => expect(screen.queryByText(run.name)).not.toBeInTheDocument());
+  });
+  it.each(["Execute run", "Mark baseline", "Invalidate"])("prevents duplicate %s and run switches during the request", async (label) => {
+    let resolve!: (value: api.Run) => void;
+    const operation = label === "Execute run" ? api.executeRun : label === "Mark baseline" ? api.markBaseline : api.invalidateRun;
+    vi.mocked(operation).mockReturnValue(new Promise((done) => { resolve = done; }));
+    const { user } = renderWithUser(<StrategyEnsemblePanel />);
+    await user.click(await screen.findByRole("button", { name: run.name }));
+    await screen.findByTestId("strategy-ensemble-detail");
+    if (label === "Invalidate") {
+      await user.click(screen.getByText("Invalidate run"));
+      await user.type(screen.getByLabelText("Invalidation reason"), "Synthetic review case");
+    }
+    await user.dblClick(screen.getByRole("button", { name: label }));
+    expect(operation).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole("button", { name: /← Runs/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Use inputs for new run" })).toBeDisabled();
+    await act(async () => resolve(run));
+  });
+  it("shows invalid analysis honestly and prevents execution or baseline promotion", async () => {
+    vi.mocked(api.getRun).mockResolvedValue({ ...run, status: "invalidated", results: null, error_message: "Supplied timing is invalid" });
+    const { user } = renderWithUser(<StrategyEnsemblePanel />);
+    await user.click(await screen.findByRole("button", { name: run.name }));
+    expect(await screen.findByRole("status")).toHaveTextContent("Supplied timing is invalid");
+    expect(screen.getByRole("button", { name: "Execute run" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Mark baseline" })).toBeDisabled();
+    expect(screen.queryByTestId("strategy-ensemble-detail")).not.toBeInTheDocument();
+  });
+  it("keeps observed zero weight change distinct from unavailable executed turnover", async () => {
+    const { user } = renderWithUser(<StrategyEnsemblePanel />);
+    await user.click(await screen.findByRole("button", { name: run.name }));
+    const table = await screen.findByRole("table", { name: "Cost basis and turnover" });
+    expect(within(table).getByRole("row", { name: "Subsequent target weight change 0" })).toBeInTheDocument();
+    expect(within(table).getByRole("row", { name: "Executed rebalance turnover Unavailable" })).toBeInTheDocument();
+    expect(within(table).getByRole("row", { name: "Allocation cost Unavailable" })).toBeInTheDocument();
+  });
+  it("an old detail response cannot replace a newly mounted selected run", async () => {
+    let resolve!: (value: api.Run) => void;
+    vi.mocked(api.getRun).mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    const first = renderWithUser(<StrategyEnsemblePanel />);
+    await first.user.click(await screen.findByRole("button", { name: run.name }));
+    first.unmount();
+    const next = { ...run, id: 2, name: "Newly selected run" };
+    vi.mocked(api.listRuns).mockResolvedValue({ ...listing, items: [next] });
+    vi.mocked(api.getRun).mockResolvedValueOnce(next);
+    const second = renderWithUser(<StrategyEnsemblePanel />);
+    await second.user.click(await screen.findByRole("button", { name: next.name }));
+    await screen.findByTestId("strategy-ensemble-detail");
+    await act(async () => resolve(run));
+    expect(screen.getByRole("heading", { name: next.name })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: run.name })).not.toBeInTheDocument();
   });
 });

@@ -4,6 +4,36 @@ This is test-infrastructure maintenance during Phase 64, not a new product phase
 or a release certification. Existing implementation, production calculations,
 numerical tolerances, frozen fixtures, and user data are unchanged.
 
+## Independent review update (2026-09-13)
+
+Implementation/maintenance commit: `1284b3115977f057f4690f643601dc329aac7797`.
+The later uncommitted [Phase 64 review](PHASE_64_REVIEW.md) fixes runner and
+fixture defects and records new focused checks. The dated results below remain
+historical; they do not verify later executable changes. The current runner
+records `status` and `outer_runner_exit_code` after source/snapshot/active-DB
+checks. Pytest's internal exit, the child process exit, outer final status and
+PowerShell-visible exit are separate. Missing/incomplete final evidence is not
+a success. The historical outer exit remains unknown.
+
+Current containment also covers literal relative paths, directory junctions and
+reparse components, deleted-file reappearance and a diff export using the same
+exclusions as the snapshot (with rename/textconv/external-diff paths disabled).
+Full scope rejects narrowing options/default discovery changes and checks the
+expected test-file inventory as well as collected/selected IDs. The fast lane
+remains only the explicitly marked subset of three lab files.
+
+Scoped Python audit hooks guard SQLite before real template/fresh initialization,
+including cached aliases and `sqlite3.dbapi2`; caught attempts fail teardown.
+Conflicting `db_free`/`fresh_schema` markers fail explicitly. The hooks are inert
+after their boundaries and do not sandbox subprocesses, arbitrary filesystem
+writes or hostile native extensions. Tests must still use known disposable paths.
+Template bytes are checked after use; no schema cache is copied from user data.
+
+Interrupted streaming attempts to terminate the child process tree and retains
+partial evidence. OS termination or a failure writing the final status can leave
+only the initial incomplete record. No exactly-once final-write guarantee,
+universal sandbox, parallel safety or overall speedup is claimed.
+
 ## Verified Passing Full Run (2026-09-10 Evidence Review)
 
 The user completed the repaired full run on 2026-09-09. Existing evidence at

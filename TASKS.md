@@ -1,14 +1,15 @@
 # TASKS - QuantLab
 
-Current handoff updated for Phase 64 implementation (2026-09-08). The Phase 62
+Current handoff updated for Phase 64 independent review (2026-09-13). The Phase 62
 audit and futures-checkpoint records below are retained as history.
 Evidence finalized 2026-09-10 without rerunning tests or changing executable code.
 
 ## Current phase
 
 - Phase 64: Strategy Return Stream, Strategy Similarity and Portfolio Ensemble
-  Diagnostics Lab v1. Branch `phase64-strategy-return-stream-ensemble`;
-  VERSION `4.82.0-dev`; implementation changes remain uncommitted.
+  Diagnostics Lab v1. Branch `main`; implementation
+  `1284b3115977f057f4690f643601dc329aac7797`, parent `0eceda6`.
+  VERSION `4.82.0-dev`; independent review changes remain uncommitted.
 - Phase 63 implementation `0d1c903`, review `0eceda6` and v4.81 tag exist.
 - [x] Implement supplied return-stream contract, diagnostics, fixed weights,
   persistence, pinned links, API, frontend and deterministic demo/tests.
@@ -20,11 +21,13 @@ Evidence finalized 2026-09-10 without rerunning tests or changing executable cod
 - [x] Reconcile exact snapshot hashes and collection IDs; prepare user-only
   combined commit commands without staging. See `docs/BACKEND_TEST_MAINTENANCE.md`.
 - [ ] User: manual isolated browser verification and production build.
-- [ ] Independent Codex review; resolve issues before release decisions.
+- [x] Independent Codex review and verified-defect fixes: `docs/PHASE_64_REVIEW.md`.
+- [ ] Final full regression of review changes; historical full evidence is not
+  a full pass for later executable changes.
 - [ ] Verify CI on the final reviewed commit and remaining security/release gates.
 - No commit, push, tag, CI trigger, server, deployment or Phase 65 work.
-- Historical dependency advisories in `docs/PHASE_63_REVIEW.md` were not
-  re-audited or resolved by this implementation; no dependency changes made.
+- Inherited dependency findings remain release blockers; exact lockfile and
+  primary-advisory review is in `docs/PHASE_64_REVIEW.md`. No dependency migration.
 
 ## Historical Phase 62 handoff
 
@@ -89,7 +92,8 @@ acceptance criteria and non-scope. Sequence:
 1. **Phase 63** — Frontend Component Test Foundation and Registry Drift
    Guards v1 (implementation/review commits and tag exist).
 2. **Phase 64** — Strategy Return Stream, Strategy Similarity and
-   Portfolio Ensemble Diagnostics Lab v1 (implemented locally; review pending).
+   Portfolio Ensemble Diagnostics Lab v1 (implementation committed; review
+   handoff uncommitted, final verification/release gates pending).
 3. **Phase 65** — Unified ML Research Lifecycle and Model Artifact
    Registry v1.
 4. **Phase 66** — Reproducible Run Replay by Hash and Environment

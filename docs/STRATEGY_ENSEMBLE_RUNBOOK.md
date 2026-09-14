@@ -66,35 +66,56 @@ Definitions/observations are immutable after create; use a new run for changes.
 
 ```powershell
 cd C:\quantlab
-Remove-Item Env:PYTHONIOENCODING -ErrorAction SilentlyContinue
-.\.venv\Scripts\python.exe -m pytest backend\tests\test_strategy_ensemble.py -q
-.\.venv\Scripts\python.exe -m pytest backend\tests -q
+.\scripts\run_backend_tests.ps1 -Scope focused -Tests backend/tests/test_strategy_ensemble.py -Python .\.venv\Scripts\python.exe
 
 cd C:\quantlab\frontend
-npm run test:unit
 npm run test:unit
 npx tsc --noEmit
 npx playwright test --list --project=chromium --reporter=list
 ```
 
-Temporary SQLite files only in tests. Do not delete active DB or existing
-artifacts to conceal the four environment-sensitive full-suite failures.
+The snapshot runner uses unique external temporary storage and preserves the
+parent environment. The four historical safety failures passed in the user's
+later full run; do not recreate them by running against active data. Final full
+regression of review fixes is separate from this focused command.
 `--reporter=list` prevents discovery from replacing existing HTML reports.
 
-Only after **already-running** services are confirmed to use a disposable DB:
+The review never starts services. For later user-owned browser verification,
+start the dedicated test-only factory from the repository root in a fresh
+process, with one worker and no reload:
+
+```powershell
+cd C:\quantlab
+$env:E2E_STRATEGY_ENSEMBLE_TOKEN = (.\.venv\Scripts\python.exe -c "import secrets; print(secrets.token_hex(32))")
+.\.venv\Scripts\python.exe -m uvicorn scripts.strategy_ensemble_e2e:create_app --factory --host 127.0.0.1 --port 8766
+```
+
+It exclusively creates a new `quantlab-strategy-ensemble-e2e-*` OS-temp
+directory and `browser.sqlite3`, with an ownership marker. It installs the DB
+override before importing the application and retains test data after shutdown.
+Configure/build the user-owned frontend with `BACKEND_URL=http://127.0.0.1:8766`;
+a previously built frontend may still proxy elsewhere and will fail the proof.
+Do not reuse an ordinary production backend. No production DB-path setting is
+added. In the Playwright shell, supply the same token generated above, then:
 
 ```powershell
 $env:E2E_STRATEGY_ENSEMBLE_ISOLATED = '1'
-# Set E2E_BASE_URL to that isolated local frontend before running.
-npx playwright test e2e/strategy-ensemble.spec.ts --project=chromium --reporter=list
+# Set E2E_BASE_URL to that user-started local frontend and copy the same token
+# into E2E_STRATEGY_ENSEMBLE_TOKEN in this shell before running.
+$browserEvidence = Join-Path $env:TEMP ('quantlab-phase64-browser-' + [guid]::NewGuid().ToString('N'))
+npx playwright test e2e/strategy-ensemble.spec.ts --project=chromium --reporter=list --output $browserEvidence
 ```
 
-The flag is operator attestation, not automatic DB isolation. New spec refuses
-non-local hostnames; no service startup is configured. Do not run against the
-active DB. Check 1024/768 layouts, chart/table/API equality, retry, deep-link/back
+The flag alone cannot authorize writes. Before navigation or seeding, the spec
+requests a token-bound proof through the actual frontend proxy. The harness
+checks its external directory, file identity/link count, ownership marker,
+`get_db_path()` and connection `PRAGMA database_list` before each lab request.
+Missing or changed identity fails closed. This is a trusted local test harness,
+not authentication for the product or a universal filesystem sandbox.
+Check 1024/768 layouts, chart/table/API equality, retry, deep-link/back
 and no raw stack/NaN. No frozen screenshot files are written.
 
 Frontend build was not run in Codex by instruction. Please run it locally.
 No CI, release, deployment or Phase 65 is authorized by this runbook. See
-[implementation report](PHASE_64_IMPLEMENTATION.md) for remaining gates and the
-user-only commit/push commands.
+[review report](PHASE_64_REVIEW.md) for current gates and the explicit later
+user-owned staging-path plan. Historical implementation commands are superseded.

@@ -18,6 +18,13 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 64 independent review** (uncommitted): correct the large strategy
+  correlation-family bound, numerical edge cases, failed reexecution state and
+  linked-content/sample integrity. Tighten snapshot/fixture containment and
+  final-exit evidence; require actual disposable-backend identity before E2E
+  seeding. New adversarial checks and outstanding release/security gates are
+  recorded in `docs/PHASE_64_REVIEW.md`; no new full-suite pass is claimed.
+
 - **Phase 64.0: Strategy Return Stream, Strategy Similarity and Portfolio
   Ensemble Diagnostics Lab v1** (`4.82.0-dev`): bounded supplied simple-return
   definitions/observations; strict period intersection and explicit pairwise
@@ -36,7 +43,8 @@ claimed by an entry here.
   checks passed; outer runner final exit was not recorded. Maintenance covers
   test isolation and UTF-8 subprocess handling, not a demonstrated overall
   speedup. Production build/browser pass, CI and independent review are not
-  claimed. Implementation remains uncommitted by instruction.
+  claimed by that historical handoff. Implementation was subsequently committed
+  as `1284b3115977f057f4690f643601dc329aac7797`.
 
 - **Frontend Component Test Foundation & Registry Drift Guards v1**
   (v4.81 series): QuantLab's first frontend unit/component testing layer,

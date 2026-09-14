@@ -16,8 +16,9 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 **`4.82.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The expected
 future tag is
 `v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-diagnostics-v1`.
-Phase 64 implementation is uncommitted; independent review and manual
-verification remain pending. No v4.82 tag exists and none was created here.
+Phase 64 implementation is `1284b3115977f057f4690f643601dc329aac7797`;
+independent review fixes are uncommitted and final verification gates remain
+pending in [PHASE_64_REVIEW.md](PHASE_64_REVIEW.md). No v4.82 tag exists and none was created here.
 See [implementation evidence](PHASE_64_IMPLEMENTATION.md); a development version
 is not a claim of release readiness.
 

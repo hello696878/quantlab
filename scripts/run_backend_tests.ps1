@@ -22,5 +22,18 @@ if (-not $Python) {
 $arguments = @((Join-Path $PSScriptRoot 'backend_test_runner.py'), '--scope', $Scope)
 foreach ($test in $Tests) { $arguments += @('--test', $test) }
 if ($CollectOnly) { $arguments += '--collect-only' }
-& $Python @arguments
-exit $LASTEXITCODE
+# Preserve the native process code even when the caller enables PowerShell's
+# optional native-command error promotion. This assignment is script-local.
+$PSNativeCommandUseErrorActionPreference = $false
+$previousConsoleEncoding = [Console]::OutputEncoding
+try {
+    [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+    & $Python @arguments
+    $runnerExit = $LASTEXITCODE
+} catch {
+    Write-Error -Message 'Backend test runner could not be launched.' -ErrorAction Continue
+    exit 2
+} finally {
+    [Console]::OutputEncoding = $previousConsoleEncoding
+}
+exit $runnerExit

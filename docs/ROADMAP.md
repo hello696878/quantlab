@@ -1689,8 +1689,9 @@ single-asset Backtest + Strategy Comparison:
 - Costs already in source returns are not charged again. Execution costs,
   drift, negative weights, multi-window walk-forward, factor/stress identities
   and bootstrap are honestly deferred, not invented.
-- Manual verification and independent review remain pending. Exact test
-  evidence, remaining gates and limitations: [implementation report](PHASE_64_IMPLEMENTATION.md).
+- Implementation is committed as `1284b31`; independent review changes remain
+  uncommitted. Exact test evidence and final full/build/browser/CI/security
+  gates: [review report](PHASE_64_REVIEW.md).
   Frontend build and servers were not run. Phase 65 has not started.
 - Policies and API: [lab](STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md) and
   [runbook](STRATEGY_ENSEMBLE_RUNBOOK.md). `VERSION` is `4.82.0-dev`;

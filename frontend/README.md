@@ -22,9 +22,11 @@ invalidate and export saved runs. No auto-run on navigation or fake metrics.
 Deterministic demo runs are explicitly seeded in SQLite by the backend, not
 injected into production frontend state. Never seed an active DB during tests.
 The new unit tests mock only the local client and use a test-only fixture.
-The browser spec requires explicitly isolated, already-running services.
+The browser spec requires the user-started disposable ASGI harness and verifies
+the serving backend's database identity through the frontend proxy before any
+navigation or seed write. The opt-in flag alone is insufficient.
 See [runbook](../docs/STRATEGY_ENSEMBLE_RUNBOOK.md) and
-[verification](../docs/PHASE_64_IMPLEMENTATION.md). Production build and full
+[verification](../docs/PHASE_64_REVIEW.md). Production build and full
 browser verification remain user-run; no server was started for this task.
 
 ## Folder structure

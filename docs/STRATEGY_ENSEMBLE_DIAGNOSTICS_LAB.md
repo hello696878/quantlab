@@ -1,8 +1,9 @@
 # Strategy Return Stream and Portfolio Ensemble Diagnostics Lab v1
 
-Phase 64.0, `4.82.0-dev`. Implementation is available for manual verification
-and independent review, not a release certification. See the
-[implementation report](PHASE_64_IMPLEMENTATION.md) for actual verification.
+Phase 64.0, `4.82.0-dev`. Implementation commit `1284b31` and subsequent
+uncommitted [independent review](PHASE_64_REVIEW.md) are available for manual
+verification; final release gates remain pending. Historical verification is
+in the [implementation report](PHASE_64_IMPLEMENTATION.md).
 
 ## Scope
 
@@ -65,6 +66,10 @@ is idempotent and uses the existing SQLite path override. No old tables are
 dropped; results are replaced atomically. Creating a run does not execute it.
 Executing verifies timing and pinned identities; invalid timing leaves a failed
 record with no results or baseline. Invalidated records cannot execute.
+Failed reexecution, including stale input/link verification before or after
+calculation, also clears prior successful results and baseline eligibility.
+Explicit invalidation retains historical results and cannot be overwritten by
+an in-flight calculation. Corrupt stored inputs produce a state conflict.
 
 A **baseline** is an explicit comparison reference, never a winner. A transaction
 permits one baseline per universe/observation scope. Eligibility requires a
@@ -94,6 +99,16 @@ interval must encompass publication availability. Same configured weights in
 both blocks; no fitting or selection. Each block starts wealth at 1. Full-sample
 descriptive output stays separate. Caller-declared weight availability is not
 proof that a human did not inspect held-out data.
+Duplicate or unknown stored sample memberships and contradictory supplied
+source observation IDs are rejected. Blocks disclose their own omitted gaps
+and compound only their selected observed intervals; they are not continuous
+investable training or held-out equity paths.
+
+Pinned links include a fresh hash of actual stored semantic content, not just
+the source's stored fingerprint strings. Dataset schema/statistics and meaningful
+event times remain covered; database row IDs, runtime fields and storage locators
+do not define portable identities. Private linked metadata is hashed rather
+than copied into the export. Supplied free text cannot be certified secret-free.
 
 Multi-window walk-forward is deferred because a single stored split is the
 validated v1 contract. Factor/stress links are unavailable without corresponding

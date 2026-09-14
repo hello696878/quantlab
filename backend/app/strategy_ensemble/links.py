@@ -3,8 +3,19 @@
 from app.dataset_registry import store as datasets
 from app.model_validation import store as validation
 from app.regime_diagnostics import store as regimes
+from app.experiment_registry.fingerprints import sha256_hex
 from .models import RunCreate, timestamp
 from .core import aligned, ensemble, matrix_diagnostics, pairwise
+
+
+def _content_hash(record, excluded):
+    """Pin actual stored content without exporting paths or incidental row IDs."""
+    return sha256_hex({k: v for k, v in record.items() if k not in excluded})
+
+
+_RUNTIME_FIELDS = {"id", "created_at", "updated_at", "started_at", "completed_at",
+                   "duration_ms", "experiment_id", "is_baseline", "baseline_scope",
+                   "name", "description", "notes", "error_message", "app_version", "git_commit"}
 
 
 def snapshot(request: RunCreate):
@@ -17,7 +28,13 @@ def snapshot(request: RunCreate):
         if version is None or version.get("invalidated_at"):
             raise ValueError("linked dataset version missing or invalidated")
         dataset = datasets.get_dataset(version["dataset_id"])
+        if dataset is None or not dataset.get("is_active", True):
+            raise ValueError("linked dataset missing or inactive")
         result["datasets"][d.strategy_id] = {"state": "linked", "dataset_name": dataset["name"],
+            "stored_content_fingerprint": sha256_hex({
+                "dataset": _content_hash(dataset, {"id", "created_at", "updated_at", "current_version_id"}),
+                "version": _content_hash(version, {"id", "dataset_id", "created_at",
+                                                     "storage_locator", "storage_locator_type"})}),
                                              **{k: version.get(k) for k in (
             "version_label", "manifest_fingerprint", "content_fingerprint", "schema_fingerprint", "quality_status")}}
     if request.regime:
@@ -38,6 +55,10 @@ def snapshot(request: RunCreate):
         if len(set(stamps)) != len(stamps):
             raise ValueError("ambiguous regime timestamps")
         result["regime"] = {"configuration_fingerprint": run["configuration_fingerprint"],
+                            "stored_content_fingerprint": sha256_hex({
+                                "run": _content_hash(run, _RUNTIME_FIELDS | {"dataset_version_id", "validation_run_id",
+                                    "overfitting_run_id", "feature_diagnostics_run_id", "meta_label_run_id"}),
+                                "definition": _content_hash(definition, {"id", "run_id"})}),
                             "result_fingerprint": run["result_fingerprint"],
                             "definition_fingerprint": definition["definition_fingerprint"],
                             "definition_id": definition["definition_id"],
@@ -59,9 +80,16 @@ def snapshot(request: RunCreate):
             raise ValueError("validation membership overlaps")
         samples = [{"sample_id": s["sample_id"], "prediction_time": timestamp(s["prediction_time"]),
                     "evaluation_time": timestamp(s["evaluation_time"])} for s in run["samples"]]
+        sample_ids = {s["sample_id"] for s in samples}
+        if len(sample_ids) != len(samples) or any(
+                len(ids) != len(set(ids)) or not set(ids) <= sample_ids for ids in members.values()):
+            raise ValueError("validation sample identities must be unique and all memberships must resolve")
         if len({s["prediction_time"] for s in samples}) != len(samples):
             raise ValueError("validation timestamps ambiguous; v1 requires unique prediction times")
         result["validation"] = {"configuration_fingerprint": run["configuration_fingerprint"],
+                                "stored_content_fingerprint": sha256_hex({
+                                    "run": _content_hash(run, _RUNTIME_FIELDS | {"dataset_version_id"}),
+                                    "split": _content_hash(split, {"id", "validation_run_id"})}),
                                 "result_fingerprint": run["result_fingerprint"],
                                 "split_fingerprint": split["split_fingerprint"],
                                 "split_label": split["split_label"], "memberships": members,
@@ -109,6 +137,8 @@ def evaluate(request: RunCreate, links, results):
                 key = by_start[sample["prediction_time"]]
                 if key[1] != sample["evaluation_time"]:
                     raise ValueError("validation evaluation_time must exactly match return period_end")
+                if any(stream[key].source_observation_id not in (None, sample_id) for stream in streams.values()):
+                    raise ValueError("supplied source observation ID disagrees with validation sample identity")
                 if any(stream[key].information_available_at > sample["evaluation_time"] for stream in streams.values()):
                     raise ValueError("validation information interval omits outcome publication delay")
                 subset.append(key)
@@ -116,6 +146,8 @@ def evaluate(request: RunCreate, links, results):
                 raise ValueError("validation train/test membership must be non-empty")
             values = ensemble(streams, sorted(subset), request.policy, request.analysis.tolerance)
             blocks[bucket] = {"sample_ids": link["memberships"][bucket], "n": values["n"],
+                              "path_policy": "observed_subset_only_not_continuously_investable",
+                              "gaps": sum(a[1] != b[0] for a, b in zip(sorted(subset), sorted(subset)[1:])),
                               "mean_return": values["mean_return"], "volatility_per_period": values["volatility_per_period"],
                               "drawdown": values["drawdown"], "weights": values["weights"]["effective"]}
         held_out = {"state": "available", "split_label": link["split_label"],

@@ -32,12 +32,21 @@ squared absolute shares. Summed arithmetic contributions do NOT reconcile to
 geometric multi-period return; the difference is returned, not hidden.
 No Phase 58 geometric linking or causal allocation of losses is implied.
 
+For two periods, Strategy A at +10%, -10% and Strategy B at 0%, 0%, equal
+return weights produce +5%, -5% and ending wealth **0.9975**. An initially
+equal pair of unrebalanced sleeves ends at **0.995**. This lab computes the
+first reference; it does not model sleeve drift or executed rebalancing.
+Weights totaling above one do not add a financing model or establish funded
+leverage; cash returns, borrowing charges and financing feasibility are unknown.
+
 ## Turnover
 
 The v1 `static_return_reference` has unchanged target weights and reports zero
 **subsequent target-weight change**, not zero executed trading. Initial turnover
 is unavailable by default. Opt-in `zero_prior_weights` reports
 `0.5 * sum(abs(weight))` as a half-L1 target-allocation reference.
+The cash leg is omitted. This half-gross number is not total executed traded
+notional or the actual cost of opening the allocation.
 Executed rebalance turnover is null: no holdings drift, cash, notionals, cadence
 or rebalance execution is modeled. Scenario comparisons are alternatives, not
 chronological rebalances.

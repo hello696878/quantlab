@@ -129,15 +129,14 @@ follow.
 title; the palette id is derived from the title, so duplicates would collide as
 React keys.
 
-**Deep links** — the app keeps view state in React (`useState<View>`), and the
-only URL-parameter surface is the Globe permalink helper
-(`frontend/src/lib/globe/permalink.ts`). It recognizes exactly `view=globe`
-plus market/tour/presentation fields. Other values, including other valid
-workspace IDs, do not select a workspace: initial load remains Home, and
-the existing popstate handler returns Home for non-Globe URLs. The `/globe`
-route redirects to the canonical query form. Helper tests cover this narrow
-contract; browser back/forward and full page hydration still need browser
-verification. No general or hidden-view URL resolver was introduced.
+**Deep links** — React view state supports the Globe permalink helper
+(`frontend/src/lib/globe/permalink.ts`) and Phase 64's exact
+`view=strategyensemble` workspace helper (`frontend/src/lib/strategyEnsembleLink.ts`).
+The Globe helper retains market/tour/presentation fields and `/globe` redirects.
+Other workspace query values fall back to Home. Strategy Ensemble has no
+per-run URL contract. Helper tests cover URL/history handling; actual browser
+back/forward and page hydration still require browser verification. No general
+or hidden-view URL resolver was introduced.
 
 ## 5. The source-scan limitation (read this before changing page.tsx)
 

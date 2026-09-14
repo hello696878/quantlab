@@ -15,9 +15,12 @@ Basis = Literal["gross", "net_of_strategy_costs", "partially_costed", "unknown"]
 
 def timestamp(value: str) -> str:
     """Naive ISO dates/times explicitly denote UTC; aware times normalize to UTC."""
-    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
-    return parsed.replace(tzinfo=parsed.tzinfo or timezone.utc).astimezone(
-        timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        return parsed.replace(tzinfo=parsed.tzinfo or timezone.utc).astimezone(
+            timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
+    except OverflowError as exc:
+        raise ValueError("timestamp is outside the supported UTC datetime range") from exc
 
 
 class StrictModel(BaseModel):
