@@ -13,7 +13,7 @@ Write-Host ""
 Write-Host "Workflow file    : .github\workflows\browser-e2e.yml"
 Write-Host "Trigger          : workflow_dispatch ONLY (manual, from the Actions tab; no push/PR gate)"
 Write-Host "Permissions      : contents: read (no secrets, no publishing, no deployment)"
-Write-Host "Runner           : ubuntu-latest, Python 3.11, Node 20, Playwright Chromium (runner-only install)"
+Write-Host "Runner           : ubuntu-latest, Python 3.11, Node 24 LTS, Playwright Chromium (runner-only install)"
 Write-Host ""
 Write-Host "Local equivalent (servers must already be running):" -ForegroundColor Cyan
 Write-Host "  backend  : http://localhost:8000   (uvicorn)"

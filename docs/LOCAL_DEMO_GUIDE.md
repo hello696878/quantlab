@@ -25,7 +25,9 @@ network dependencies — so the demo cannot be broken by a provider outage.
 - Windows with PowerShell (paths below assume the repo at `C:\quantlab`)
 - Python 3.11 with the repo venv at `backend\venv` (see
   [`DEVELOPER_ONBOARDING.md`](DEVELOPER_ONBOARDING.md) if missing)
-- Node 18+ and npm; `frontend\node_modules` installed (`npm install`)
+- Patched Node 24 LTS (minimum 24.20.0, below 25) and npm 11;
+  `frontend\node_modules` installed (`npm ci --strict-peer-deps`).
+  See [runtime policy](../frontend/README.md#install).
 - Quick check: `.\scripts\check_environment.ps1` (read-only)
 
 ## Start the backend

@@ -1,6 +1,6 @@
 # QuantLab Frontend
 
-Interactive backtesting and research dashboard built with **Next.js 14 · React 18 · Tailwind CSS 3 · Recharts 2**.
+Interactive backtesting and research dashboard built with **Next.js 15 · React 19 · Tailwind CSS 3 · Recharts 2**.
 
 Analysis results come from the FastAPI backend. The Global Markets Globe uses a
 typed backend API with a static illustrative core, optional field-level US FRED
@@ -68,13 +68,21 @@ frontend/
 
 ## Install
 
-The component-test toolchain requires Node `^20.19.0 || >=22.12.0`.
-CI uses the latest Node 20; this review used Node 24.15.0.
+Use the current patched **Node 24 LTS** (minimum `24.20.0`, below 25) and npm 11.
+`packageManager` records the locally verified npm `11.17.0`; it does not install
+npm or change your global runtime. CI resolves the latest Node 24 with
+`check-latest`; Docker tracks `node:24-alpine` (use `docker compose build --pull`
+for user-owned release builds). These are rolling LTS tags, not immutable pins:
+record the actual Node/npm versions and image identity for each release.
+As of 2026-09-16, the latest LTS is 24.21.0; the bounded local checks use the
+already available 24.20.0. Node 20 is EOL. See the dated independent review in
+[the security report](../docs/PHASE_64_SECURITY_REMEDIATION.md) for evidence and
+the user-only build/browser gates. No runtime is downloaded automatically.
 
 ```powershell
 cd C:\quantlab\frontend
-npm ci
-Copy-Item .env.example .env.local
+npm ci --strict-peer-deps
+if (-not (Test-Path .env.local)) { Copy-Item .env.example .env.local }
 ```
 
 ---

@@ -52,7 +52,7 @@ if ($venvPython) {
 
 # --- Node / npm / frontend deps ---------------------------------------------
 $node = Get-Command node -ErrorAction SilentlyContinue
-Report ($null -ne $node) "Node on PATH" $(if ($node) { (& node --version) } else { "Install Node 18+." })
+Report ($null -ne $node) "Node on PATH" $(if ($node) { (& node --version) } else { "Install patched Node 24 LTS (minimum 24.20.0, below 25)." })
 $npm = Get-Command npm -ErrorAction SilentlyContinue
 Report ($null -ne $npm) "npm on PATH" $(if ($npm) { "npm " + (& npm --version) } else { "" })
 Report (Test-Path (Join-Path $repoRoot "frontend\package.json")) "frontend\package.json exists" ""

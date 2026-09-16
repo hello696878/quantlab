@@ -49,7 +49,7 @@ More captures: [docs/screenshots/](docs/screenshots/README.md).
 
 ## What this project demonstrates
 
-- **Full-stack engineering** — FastAPI + Pydantic v2 backend, Next.js 14 +
+- **Full-stack engineering** — FastAPI + Pydantic v2 backend, Next.js 15 +
   TypeScript + Tailwind frontend, typed end to end.
 - **Quantitative finance modeling** — documented educational implementations
   across 58 routed top-level views (options, volatility, rates, credit, FX, futures,
@@ -130,7 +130,8 @@ venv\Scripts\uvicorn app.main:app --reload --port 8000
 
 Frontend:
 
-Use Node `^20.19.0 || >=22.12.0` for the component-test toolchain.
+Use patched Node 24 LTS (minimum `24.20.0`, below 25) and npm 11; see
+[frontend runtime policy](frontend/README.md#install). Node 20 is EOL.
 
 ```powershell
 cd C:\quantlab\frontend

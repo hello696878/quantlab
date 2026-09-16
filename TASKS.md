@@ -1,6 +1,6 @@
 # TASKS - QuantLab
 
-Current handoff updated for Phase 64 independent review (2026-09-13). The Phase 62
+Current handoff updated for Phase 64 security review/runtime alignment (2026-09-16). The Phase 62
 audit and futures-checkpoint records below are retained as history.
 Evidence finalized 2026-09-10 without rerunning tests or changing executable code.
 
@@ -9,7 +9,8 @@ Evidence finalized 2026-09-10 without rerunning tests or changing executable cod
 - Phase 64: Strategy Return Stream, Strategy Similarity and Portfolio Ensemble
   Diagnostics Lab v1. Branch `main`; implementation
   `1284b3115977f057f4690f643601dc329aac7797`, parent `0eceda6`.
-  VERSION `4.82.0-dev`; independent review changes remain uncommitted.
+  VERSION `4.82.0-dev`; independent review committed as
+  `9d169edb4fbb66022d3643b31457fdecee3189e2`. Security patch remains uncommitted.
 - Phase 63 implementation `0d1c903`, review `0eceda6` and v4.81 tag exist.
 - [x] Implement supplied return-stream contract, diagnostics, fixed weights,
   persistence, pinned links, API, frontend and deterministic demo/tests.
@@ -22,12 +23,22 @@ Evidence finalized 2026-09-10 without rerunning tests or changing executable cod
   combined commit commands without staging. See `docs/BACKEND_TEST_MAINTENANCE.md`.
 - [ ] User: manual isolated browser verification and production build.
 - [x] Independent Codex review and verified-defect fixes: `docs/PHASE_64_REVIEW.md`.
-- [ ] Final full regression of review changes; historical full evidence is not
-  a full pass for later executable changes.
-- [ ] Verify CI on the final reviewed commit and remaining security/release gates.
+- [x] Exact review-commit CI completed successfully (run `34814054179`, backend
+  and frontend jobs); this does not cover the later dependency patch.
+- [x] Bounded dependency remediation: strict-peer npm ci, 166 frontend tests,
+  TypeScript, 275-test discovery and full/production audits completed. See
+  `docs/PHASE_64_SECURITY_REMEDIATION.md` for advisory limits and exact evidence.
+- [x] Targeted independent patch review and Node 24 CI/Docker alignment.
+  Fresh Node 24.20.0/npm 11.17.0 checks: strict-peer install, 166 frontend tests,
+  TypeScript, 275-test discovery, full/production audits (zero reported findings).
+  The first unit command was sandbox-blocked before collection; permitted run passed.
+- [ ] User production build, token-verified isolated browser checks, Docker
+  build/runtime verification and exact final-patch CI. Latest Node 24.21.0 was
+  not locally available; CI/Docker follow patched Node 24, not an immutable pin.
 - No commit, push, tag, CI trigger, server, deployment or Phase 65 work.
-- Inherited dependency findings remain release blockers; exact lockfile and
-  primary-advisory review is in `docs/PHASE_64_REVIEW.md`. No dependency migration.
+- Named inherited dependency findings are patched in the uncommitted frontend
+  changes. This is not complete security certification or release readiness;
+  historical findings remain dated in `docs/PHASE_64_REVIEW.md`.
 
 ## Historical Phase 62 handoff
 
@@ -92,8 +103,8 @@ acceptance criteria and non-scope. Sequence:
 1. **Phase 63** — Frontend Component Test Foundation and Registry Drift
    Guards v1 (implementation/review commits and tag exist).
 2. **Phase 64** — Strategy Return Stream, Strategy Similarity and
-   Portfolio Ensemble Diagnostics Lab v1 (implementation committed; review
-   handoff uncommitted, final verification/release gates pending).
+   Portfolio Ensemble Diagnostics Lab v1 (implementation/review committed;
+   security patch uncommitted, final verification/release gates pending).
 3. **Phase 65** — Unified ML Research Lifecycle and Model Artifact
    Registry v1.
 4. **Phase 66** — Reproducible Run Replay by Hash and Environment

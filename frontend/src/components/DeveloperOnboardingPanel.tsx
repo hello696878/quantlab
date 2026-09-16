@@ -21,7 +21,7 @@ const ENV_CHECKLIST: { label: string; note: string }[] = [
   { label: "Python 3.11", note: "System Python on PATH (informational — the venv matters more)." },
   { label: "Backend venv", note: "backend\\venv\\Scripts\\python.exe — this repo's real venv location." },
   { label: "Backend dependencies", note: "fastapi / pydantic / pytest import inside the venv." },
-  { label: "Node 18+ & npm", note: "Required for the frontend dev server, typecheck, and build." },
+  { label: "Node 24 LTS & npm 11", note: "Use patched Node 24 (24.20.0 or newer, below 25) for frontend checks and builds." },
   { label: "Frontend dependencies", note: "frontend\\node_modules present (npm install)." },
   { label: "Backend tests", note: "Run yourself — ~2,900 deterministic tests; artifacts\\ absent after." },
   { label: "Frontend typecheck", note: "npx tsc --noEmit — strict TypeScript, run yourself." },

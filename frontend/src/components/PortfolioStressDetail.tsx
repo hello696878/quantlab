@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactElement } from "react";
 import { classifyApiError } from "@/lib/api";
 import {
   type AssetResultRow,
@@ -647,7 +647,7 @@ function DrawdownSection({ run, episodes, attribution }: {
   const dd = run.drawdown;
   if (!dd) return null;
   const series = dd.series;
-  let svg: JSX.Element | null = null;
+  let svg: ReactElement | null = null;
   if (series && series.drawdowns.length > 1) {
     const w = 720;
     const h = 120;

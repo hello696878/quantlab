@@ -61,16 +61,22 @@ unit/component tests, typecheck and build on pushes/PRs targeting main.
 
 ## 4. Environment
 
-Ubuntu (`ubuntu-latest`) · Python 3.11 · Node 20 (npm cache keyed to
+Ubuntu (`ubuntu-latest`) · Python 3.11 · latest Node 24 LTS (npm cache keyed to
 `frontend/package-lock.json`) · Playwright **Chromium only**, installed via
 `npx playwright install --with-deps chromium` **inside the disposable
 runner** (locally the harness drives the OS-installed Edge instead — no
 download; `docs/PLAYWRIGHT_SETUP.md`).
 
+Runtime policy: [frontend Install](../frontend/README.md#install). Actions run
+on their own Node 24 runtime: checkout v5, setup-node/setup-python v6 and
+upload-artifact v6 require runner 2.327.1+. Upload-artifact v5 still defaults
+to Node 20, so v6 is the bounded runtime fix. Triggers, permissions, backend
+commands and browser opt-in/isolation behavior are unchanged.
+
 ## 5. Pipeline (exact logical order)
 
 1. Checkout + runtimes (same pinned official actions as main CI).
-2. `pip install -r backend/requirements.txt` · `npm ci` (lockfile-exact).
+2. `pip install -r backend/requirements.txt` · `npm ci --strict-peer-deps` (lockfile-exact).
 3. Playwright Chromium install.
 4. **Static validation first:** backend `python -m pytest -q`, frontend
    `npx tsc --noEmit` — the E2E environment must be valid before any

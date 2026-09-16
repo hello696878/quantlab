@@ -1,10 +1,11 @@
-FROM node:20-alpine
+# Track patched Node 24 LTS images; pull the tag before release builds.
+FROM node:24-alpine
 
 WORKDIR /app
 
 # Install dependencies (layer cached until package-lock.json changes)
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --strict-peer-deps
 
 # Copy source code
 COPY . .

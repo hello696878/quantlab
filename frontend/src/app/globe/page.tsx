@@ -18,16 +18,17 @@ function first(value: string | string[] | undefined): string | undefined {
   return (Array.isArray(value) ? value[0] : value)?.trim() || undefined;
 }
 
-export default function GlobeRedirect({
+export default async function GlobeRedirect({
   searchParams,
 }: {
-  searchParams?: { market?: string | string[]; tour?: string | string[]; presentation?: string | string[] };
+  searchParams?: Promise<{ market?: string | string[]; tour?: string | string[]; presentation?: string | string[] }>;
 }) {
+  const query = await searchParams;
   const params = new URLSearchParams();
   params.set("view", "globe");
-  const market = first(searchParams?.market);
-  const tour = first(searchParams?.tour);
-  const presentation = first(searchParams?.presentation);
+  const market = first(query?.market);
+  const tour = first(query?.tour);
+  const presentation = first(query?.presentation);
   if (market) params.set("market", market);
   if (tour) params.set("tour", tour);
   if (presentation === "1") params.set("presentation", "1");

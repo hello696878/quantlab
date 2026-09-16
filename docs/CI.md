@@ -19,14 +19,21 @@ installs `backend/requirements.txt`, runs `python -m pytest -q` from
 no live provider is ever contacted (yfinance is monkeypatched in the backtest
 API tests; every lab runs on static samples).
 
-**Job 2 — Frontend Tests & Build** (`ubuntu-latest`, latest Node 20, at least 20.19):
-`npm ci` (lockfile-exact), then `npm run test:unit` (frontend component
+**Job 2 — Frontend Tests & Build** (`ubuntu-latest`, latest Node 24 LTS):
+`npm ci --strict-peer-deps` (lockfile-exact), then `npm run test:unit` (frontend component
 tests, added in 63.0 — one-shot Vitest/jsdom, offline, no browser download),
 then `npx tsc --noEmit` (fast-fail typecheck, added in 41.0), then
 `npm run build`. The build job predates Phase 41 and is
 kept because the project has always expected CI to verify the production
 build compiles — **on the runner**; your local `npm run build` remains a
 separate, user-run step.
+
+Application Node follows `24` with `check-latest: true`; see the
+[runtime policy](../frontend/README.md#install). Separately, checkout v5,
+setup-node v6 and setup-python v6 use the Actions Node 24 runtime and require
+runner 2.327.1 or newer. Hosted `ubuntu-latest` is retained. Python 3.11,
+backend commands, triggers and permissions are unchanged. These declarations
+do not establish a successful CI run for an uncommitted patch.
 
 ## What CI intentionally does NOT do
 

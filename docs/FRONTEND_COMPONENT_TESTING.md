@@ -32,8 +32,8 @@ pieces still behave; it says nothing about a workflow end to end.
 
 | Choice | Version | Why |
 |---|---|---|
-| **Vitest** | `3.2.6` | TypeScript/JSX test transforms via Vite (separate from Next's build pipeline); patched test server dependencies. |
-| **@vitest/coverage-v8** | `3.2.6` | Coverage provider, pinned to exactly the runner version. |
+| **Vitest** | `4.1.11` | TypeScript/JSX test transforms via Vite (separate from Next's build pipeline); security-maintained mocker. |
+| **@vitest/coverage-v8** | `4.1.11` | Coverage provider, pinned to exactly the runner version. |
 | **@vitejs/plugin-react** | `^4.7.0` | JSX/Fast-Refresh transform for the test build only. |
 | **@testing-library/react** | `^16.3.2` | Behaviour-first queries; discourages implementation-detail assertions. |
 | **@testing-library/dom** | `^10.4.1` | Explicit peer of RTL 16. |
@@ -44,11 +44,13 @@ pieces still behave; it says nothing about a workflow end to end.
 Version ranges are the ones recorded in `frontend/package.json`; the exact
 resolved versions are in `frontend/package-lock.json`.
 
-The reviewed lockfile uses Vite 7.3.6 and requires Node `^20.19.0 || >=22.12.0`
-(local verification: Node 24.15.0; CI selects the latest Node 20).
-The Phase 63-added Vitest/Vite advisories were patched. `npm audit` still
-reports pre-existing application/build dependencies; see the Phase 63 review
-report before making any security or release-readiness claim.
+Vite remains 7.3.6. The project now requires patched Node 24 LTS (minimum
+24.20.0, below 25) and npm 11; CI selects the latest Node 24. The Phase 64
+security patch updates Vitest and the inherited application/build dependencies.
+See [the dated security review](PHASE_64_SECURITY_REMEDIATION.md) for actual
+verification and audit scope; older Phase 63 findings remain historical evidence,
+not current package versions. Coverage remapping changed in Vitest 4; old
+coverage percentages have not been recertified.
 
 All eight are **devDependencies**. There is exactly one runner and one DOM
 environment — no Jest, no happy-dom, no second browser automation framework

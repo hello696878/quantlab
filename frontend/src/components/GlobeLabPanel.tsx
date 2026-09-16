@@ -43,7 +43,7 @@ const MARKET_IDS: readonly string[] = MARKETS.map((m) => m.id);
 
 type Mode = "wide" | "mid" | "narrow";
 
-function useContainerMode(ref: React.RefObject<HTMLElement>): Mode {
+function useContainerMode(ref: React.RefObject<HTMLElement | null>): Mode {
   const [mode, setMode] = useState<Mode>("wide");
   useEffect(() => {
     const el = ref.current;

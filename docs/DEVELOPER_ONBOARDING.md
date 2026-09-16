@@ -15,7 +15,7 @@ quantlab/
 ├── backend/            FastAPI app (venv at backend\venv)
 │   ├── app/            main.py + one package per lab + *_routes.py routers
 │   └── tests/          pytest suite (~2,900 deterministic tests)
-├── frontend/           Next.js 14 + TypeScript + Tailwind
+├── frontend/           Next.js 15 + TypeScript + Tailwind
 │   └── src/            app/ (shell + safety pages), components/, lib/
 ├── scripts/            Python check/report scripts + PowerShell helpers (39.0)
 ├── configs/            futures instrument YAML specs
