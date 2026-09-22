@@ -1677,7 +1677,7 @@ single-asset Backtest + Strategy Comparison:
   educational — no live futures/commodity prices, not a production risk engine,
   no exchange/broker integration, not investment or trading advice.**
 
-### Phase 64.0 - Strategy Return Stream and Portfolio Ensemble Diagnostics v1 (implementation)
+### Phase 64.0 - Strategy Return Stream and Portfolio Ensemble Diagnostics v1 (release evidence finalized; tag pending)
 
 - New `strategyensemble` workspace uses the Phase 63 canonical registry, exact
   period-aligned supplied returns, equal/user static weights, similarity/tail/
@@ -1689,13 +1689,22 @@ single-asset Backtest + Strategy Comparison:
 - Costs already in source returns are not charged again. Execution costs,
   drift, negative weights, multi-window walk-forward, factor/stress identities
   and bootstrap are honestly deferred, not invented.
-- Implementation is committed as `1284b31`; independent review changes remain
-  uncommitted. Exact test evidence and final full/build/browser/CI/security
-  gates: [review report](PHASE_64_REVIEW.md).
-  Frontend build and servers were not run. Phase 65 has not started.
+- Implementation `1284b3115977f057f4690f643601dc329aac7797`, independent review
+  `9d169edb4fbb66022d3643b31457fdecee3189e2` and security patch
+  `36f70e6b72800f0ab585afa8c873f4b87c09aeff` are committed.
+  [Final evidence (2026-09-20)](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20):
+  166 frontend tests, TypeScript, strict-peer installation and user production
+  build passed; full/production audits had zero findings at verification.
+  Selected Edge checks passed 21 + 12 = 33 with no failures/skips (not all 275
+  discovered tests). Exact security-patch CI `35064846132` passed both jobs;
+  Docker build/runtime/proxy verification passed using Node 24.21.0, not a
+  browser suite inside Docker. Historical 4,359 / 3 skips and outer-exit
+  limitations remain in the implementation evidence. No security/trading
+  certification or deployment claim; Phase 65 has not started.
 - Policies and API: [lab](STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md) and
   [runbook](STRATEGY_ENSEMBLE_RUNBOOK.md). `VERSION` is `4.82.0-dev`;
-  expected v4.82 tag is not created. Phase 63 implementation `0d1c903`, review
+  expected v4.82 tag awaits user creation after final documentation review,
+  user commit, publication and verification of that commit. Phase 63 implementation `0d1c903`, review
   `0eceda6` and v4.81 tag were verified in local Git history.
 
 ### Phase 63.0 — Frontend Component Test Foundation & Registry Drift Guards v1 ✅

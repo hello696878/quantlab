@@ -64,6 +64,10 @@ Definitions/observations are immutable after create; use a new run for changes.
 
 ## Automated checks
 
+For any later user-owned restart, select the documented patched Node 24 LTS
+runtime (at least 24.20.0, below 25) and npm 11 in the frontend shell before
+using the npm/npx examples. Do not fall back to an older global Node installation.
+
 ```powershell
 cd C:\quantlab
 .\scripts\run_backend_tests.ps1 -Scope focused -Tests backend/tests/test_strategy_ensemble.py -Python .\.venv\Scripts\python.exe
@@ -99,6 +103,7 @@ Do not reuse an ordinary production backend. No production DB-path setting is
 added. In the Playwright shell, supply the same token generated above, then:
 
 ```powershell
+cd C:\quantlab\frontend
 $env:E2E_STRATEGY_ENSEMBLE_ISOLATED = '1'
 # Set E2E_BASE_URL to that user-started local frontend and copy the same token
 # into E2E_STRATEGY_ENSEMBLE_TOKEN in this shell before running.
@@ -115,7 +120,11 @@ not authentication for the product or a universal filesystem sandbox.
 Check 1024/768 layouts, chart/table/API equality, retry, deep-link/back
 and no raw stack/NaN. No frozen screenshot files are written.
 
-Frontend build was not run in Codex by instruction. Please run it locally.
-No CI, release, deployment or Phase 65 is authorized by this runbook. See
-[review report](PHASE_64_REVIEW.md) for current gates and the explicit later
-user-owned staging-path plan. Historical implementation commands are superseded.
+The procedures above remain a reference, not a request to repeat completed
+Phase 64 release gates. [Final release evidence](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+records the user production build, 33 selected Edge checks, bounded Docker
+verification and exact security-patch CI success. Final documentation
+review, user commit, publication and verification precede user tag creation; no tests or services
+were run in documentation finalization. The [review report](PHASE_64_REVIEW.md)
+and its staging plan are historical, not instructions to restage committed work.
+No CI trigger, release, deployment or Phase 65 is authorized by this runbook.

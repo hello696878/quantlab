@@ -1,9 +1,13 @@
 # Strategy Return Stream and Portfolio Ensemble Diagnostics Lab v1
 
-Phase 64.0, `4.82.0-dev`. Implementation commit `1284b31` and subsequent
-uncommitted [independent review](PHASE_64_REVIEW.md) are available for manual
-verification; final release gates remain pending. Historical verification is
-in the [implementation report](PHASE_64_IMPLEMENTATION.md).
+Phase 64.0, `4.82.0-dev`. Implementation `1284b31`,
+[independent review](PHASE_64_REVIEW.md) `9d169ed` and security patch `36f70e6`
+are committed. [Final release evidence](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+records successful user build, 33 selected Edge checks, bounded Docker
+verification and both exact-patch CI jobs, with zero audit findings at the
+recorded point. Final documentation review/commit and verification precede the
+still-pending user v4.82 tag; Phase 65 has not started. Historical verification
+remains in the [implementation report](PHASE_64_IMPLEMENTATION.md).
 
 ## Scope
 

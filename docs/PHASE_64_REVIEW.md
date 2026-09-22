@@ -3,6 +3,16 @@
 Review date: 2026-09-13, Asia/Taipei. This is the single independent review and
 verified-defect-fix handoff, not a release or Phase 65 implementation.
 
+Current evidence pointer (2026-09-20): this review is committed as
+`9d169edb4fbb66022d3643b31457fdecee3189e2`, followed by security patch
+`36f70e6b72800f0ab585afa8c873f4b87c09aeff`.
+[Final release verification](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+records the later completed build, selected Edge, Docker and exact-patch CI gates.
+The dated review findings, uncommitted/pending statements, checks and staging
+plan below remain historical, not current instructions or verification of later
+revisions. The v4.82 tag awaits user creation after final documentation
+review, user commit, publication and verification; Phase 65 has not started.
+
 ## Boundary and initial state
 
 - Repository: `C:\quantlab`, `hello696878/quantlab`.

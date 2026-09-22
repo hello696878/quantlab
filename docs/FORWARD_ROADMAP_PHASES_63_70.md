@@ -1,10 +1,16 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (Phase 64.0 implementation, 2026-09-08).** Phase 63's
+> **Current status (Phase 64.0 release evidence, 2026-09-20).** Phase 63's
 > implementation `0d1c903`, review `0eceda6` and v4.81 tag exist locally.
 > Phase 64 implementation is committed as `1284b3115977f057f4690f643601dc329aac7797`.
-> Independent review changes remain uncommitted; final gates are recorded in
-> [PHASE_64_REVIEW.md](PHASE_64_REVIEW.md). Historical evidence finalized 2026-09-10: combined backend snapshot
+> Independent review `9d169edb4fbb66022d3643b31457fdecee3189e2` and security patch
+> `36f70e6b72800f0ab585afa8c873f4b87c09aeff` are committed. User production build,
+> 33 selected Edge checks, bounded Docker verification and both final-patch CI
+> jobs (run `35064846132`) passed; audits had zero findings at verification.
+> [Final evidence and limits](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+> distinguish this from 275-test discovery and historical runs. Final documentation
+> review, user commit, publication and verification precede the still-pending user v4.82 tag.
+> Historical evidence finalized 2026-09-10: combined backend snapshot
 > passed 4,359 tests with 3 platform skips; runner-exit limitations and superseded
 > failure history: [PHASE_64_IMPLEMENTATION.md](PHASE_64_IMPLEMENTATION.md).
 > Phase 65 has not started. The original plan below is retained, not a claim
@@ -22,8 +28,8 @@
 > [`FRONTEND_REGISTRY_DRIFT_GUARDS.md`](FRONTEND_REGISTRY_DRIFT_GUARDS.md).
 > The selected next feature was **Phase 64 — Strategy Return Stream, Strategy
 > Similarity and Portfolio Ensemble Diagnostics Lab v1**; current status above.
-> Original counts below describe commit `0d1c903`; current review results,
-> dependency-security blockers and release gates: `PHASE_63_REVIEW.md`.
+> Original counts below describe commit `0d1c903`; historical Phase 63 review
+> results, dependency-security blockers and gates: `PHASE_63_REVIEW.md`.
 > Model/paper catalog slug and live-strategy referential checks, plus the
 > proposed standalone formatter tests, were not delivered by this narrower
 > workspace foundation; they remain gaps rather than completed acceptance.

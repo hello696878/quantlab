@@ -1,8 +1,8 @@
 # TASKS - QuantLab
 
-Current handoff updated for Phase 64 security review/runtime alignment (2026-09-16). The Phase 62
-audit and futures-checkpoint records below are retained as history.
-Evidence finalized 2026-09-10 without rerunning tests or changing executable code.
+Current handoff updated for Phase 64 final release evidence (2026-09-20).
+The Phase 62 audit, futures checkpoints and earlier Phase 64 evidence remain
+historical. This documentation finalization reruns no tests or release checks.
 
 ## Current phase
 
@@ -10,35 +10,56 @@ Evidence finalized 2026-09-10 without rerunning tests or changing executable cod
   Diagnostics Lab v1. Branch `main`; implementation
   `1284b3115977f057f4690f643601dc329aac7797`, parent `0eceda6`.
   VERSION `4.82.0-dev`; independent review committed as
-  `9d169edb4fbb66022d3643b31457fdecee3189e2`. Security patch remains uncommitted.
+  `9d169edb4fbb66022d3643b31457fdecee3189e2`. Security patch, verified HEAD and
+  origin/main: `36f70e6b72800f0ab585afa8c873f4b87c09aeff`.
 - Phase 63 implementation `0d1c903`, review `0eceda6` and v4.81 tag exist.
 - [x] Implement supplied return-stream contract, diagnostics, fixed weights,
   persistence, pinned links, API, frontend and deterministic demo/tests.
 - [x] Recover completed full-suite output; preserve active DB and artifacts.
 - [x] Add policies/runbook and record checks in `docs/PHASE_64_IMPLEMENTATION.md`.
-- [x] Verify existing repaired combined backend run: 4,359 passed + 3 platform
+- [x] Historical implementation evidence: repaired combined backend run, 4,359 passed + 3 platform
   skips = 4,362 tests, pytest process exit 0; all recorded protection checks pass.
   Outer runner final exit was not recorded. Historical failures remain history.
 - [x] Reconcile exact snapshot hashes and collection IDs; prepare user-only
   combined commit commands without staging. See `docs/BACKEND_TEST_MAINTENANCE.md`.
-- [ ] User: manual isolated browser verification and production build.
 - [x] Independent Codex review and verified-defect fixes: `docs/PHASE_64_REVIEW.md`.
-- [x] Exact review-commit CI completed successfully (run `34814054179`, backend
+- [x] Historical exact review-commit CI completed successfully (run `34814054179`, backend
   and frontend jobs); this does not cover the later dependency patch.
 - [x] Bounded dependency remediation: strict-peer npm ci, 166 frontend tests,
   TypeScript, 275-test discovery and full/production audits completed. See
   `docs/PHASE_64_SECURITY_REMEDIATION.md` for advisory limits and exact evidence.
-- [x] Targeted independent patch review and Node 24 CI/Docker alignment.
+- [x] Historical 2026-09-16 targeted independent patch review and Node 24 CI/Docker alignment.
   Fresh Node 24.20.0/npm 11.17.0 checks: strict-peer install, 166 frontend tests,
   TypeScript, 275-test discovery, full/production audits (zero reported findings).
   The first unit command was sandbox-blocked before collection; permitted run passed.
-- [ ] User production build, token-verified isolated browser checks, Docker
-  build/runtime verification and exact final-patch CI. Latest Node 24.21.0 was
-  not locally available; CI/Docker follow patched Node 24, not an immutable pin.
-- No commit, push, tag, CI trigger, server, deployment or Phase 65 work.
-- Named inherited dependency findings are patched in the uncommitted frontend
-  changes. This is not complete security certification or release readiness;
-  historical findings remain dated in `docs/PHASE_64_REVIEW.md`.
+- [x] User production build: Node 24.20.0/npm 11.17.0, Next.js 15.5.25,
+  exit 0; frontend started on `127.0.0.1:3100`.
+- [x] User isolated browser verification: actual Microsoft Edge (`msedge`
+  channel, `chromium` project); 21 Strategy Ensemble + 12 frozen/responsive
+  checks passed, zero failed/skipped, both exits 0. Disposable backend identity
+  verified through the frontend proxy before both stages. Not all 275 discovered tests.
+- [x] Exact security-patch CI run `35064846132`: Backend Tests and Frontend
+  Tests & Build both completed/success at `36f70e6b72800f0ab585afa8c873f4b87c09aeff`.
+  Frontend Node 24 LTS install, component tests, TypeScript and build succeeded.
+- [x] Docker `quantlab-frontend:phase64-v482`: pull/build/image export and
+  Next.js 15.5.25 runtime/root/proxy isolation verification passed using Node
+  v24.21.0. This is not browser-suite execution inside Docker.
+- [x] Independent final documentation review (2026-09-21); content-only checks
+  and read-only retrieval of the existing exact-security-commit CI record.
+- [ ] User documentation commit, publication and verification of that commit;
+  the security-patch CI does not cover it. Suggested subject:
+  `Finalize phase64 release evidence and documentation v1`.
+- [ ] Only afterward, user creation of
+  `v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-diagnostics-v1`.
+- Full evidence and limits:
+  [final release verification](docs/PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20).
+  The completed gates do not call for another test/build/browser/Docker loop.
+- Named inherited dependency findings were remediated in committed patch
+  `36f70e6`; full/production audits reported zero findings at the recorded point.
+  This is not security/trading certification, deployment or full browser coverage.
+- The final review authorizes explicit staging of the approved documentation
+  only; no commit, push, tag, services or test execution. Phase 65 has not
+  started. Earlier findings remain dated historical evidence.
 
 ## Historical Phase 62 handoff
 
@@ -54,7 +75,7 @@ Evidence finalized 2026-09-10 without rerunning tests or changing executable cod
   `v4.80.0-master-blueprint-reconciliation-project-status-roadmap-v1`.
 - VERSION: `4.80.0-dev`.
 
-## Where the platform actually stands (evidence-audited)
+## Historical Phase 62 platform snapshot (evidence-audited)
 
 - Latest completed feature phase: **61.0 — Signal Ensemble, Redundancy &
   Combination Diagnostics Lab v1** (commits `c0f256d` / `40ec1fd`, tag
@@ -103,10 +124,11 @@ acceptance criteria and non-scope. Sequence:
 1. **Phase 63** — Frontend Component Test Foundation and Registry Drift
    Guards v1 (implementation/review commits and tag exist).
 2. **Phase 64** — Strategy Return Stream, Strategy Similarity and
-   Portfolio Ensemble Diagnostics Lab v1 (implementation/review committed;
-   security patch uncommitted, final verification/release gates pending).
+   Portfolio Ensemble Diagnostics Lab v1 (implementation/review/security patch
+   committed; final verification evidence recorded; documentation review/commit
+   and verification precede the still-pending user tag).
 3. **Phase 65** — Unified ML Research Lifecycle and Model Artifact
-   Registry v1.
+   Registry v1 (planned, not started).
 4. **Phase 66** — Reproducible Run Replay by Hash and Environment
    Manifest v1.
 5. **Phase 67** — Futures Point-in-Time Data Contract, Calendar

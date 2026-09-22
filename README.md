@@ -25,13 +25,22 @@ stays unavailable. This is a return reference, not an executable funded portfoli
 See the [lab](docs/STRATEGY_ENSEMBLE_DIAGNOSTICS_LAB.md),
 [runbook](docs/STRATEGY_ENSEMBLE_RUNBOOK.md) and
 [implementation/verification report](docs/PHASE_64_IMPLEMENTATION.md).
-The combined implementation/maintenance backend snapshot passed 4,359 tests
+The historical combined implementation/maintenance backend snapshot passed 4,359 tests
 with 3 platform skips; evidence and runner-exit limitations are in the report.
 Implementation is committed as `1284b3115977f057f4690f643601dc329aac7797`.
-The [independent review](docs/PHASE_64_REVIEW.md) records subsequent fixes and
-new focused checks separately; its changes remain uncommitted. Final full
-regression, isolated browser verification, production build, CI and security
-gates remain pending; no release-readiness claim is made.
+The [independent review](docs/PHASE_64_REVIEW.md) is committed as
+`9d169edb4fbb66022d3643b31457fdecee3189e2`; the final security patch is
+`36f70e6b72800f0ab585afa8c873f4b87c09aeff`.
+[Final release evidence](docs/PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+records 166 frontend tests, TypeScript, strict-peer installation and zero-finding
+full/production audits at verification; successful user production build;
+**21 + 12 = 33 selected Microsoft Edge checks**, zero failures/skips; Docker
+build/runtime/proxy verification using Node 24.21.0; and both jobs successful
+in exact security-patch CI run `35064846132`.
+The expected `v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-diagnostics-v1`
+tag is pending user creation after final documentation review and the user's
+documentation commit, publication and verification. Phase 65 has not started. This does not claim security/trading
+certification, deployment, or execution of all 275 discovered browser tests.
 
 ## Screenshots
 

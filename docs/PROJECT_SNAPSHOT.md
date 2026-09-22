@@ -10,7 +10,7 @@ public use. Status ground truth by area:
 QuantLab is a local-first, deterministic, **educational** quant research
 platform: 58 routed top-level view identifiers behind one shell (grouped sidebar,
 dashboard, command palette), a FastAPI + Pydantic v2 backend with a
-consistent `sample`/`analyze` API pattern, and a Next.js 14 + TypeScript
+consistent `sample`/`analyze` API pattern, and a Next.js 15.5.25 + TypeScript
 frontend with shared charts, local KaTeX formulas, and copy-friendly report
 exports. Not investment advice; no live trading; not production
 trading/risk/compliance infrastructure.
@@ -52,7 +52,7 @@ Data Reliability Center → QA Command Center
 Monorepo: `backend/` (FastAPI; per-lab packages of strict `models.py` +
 deterministic `sample.py` + pure `service.py`, exposed as
 `GET /<lab>/sample` + `POST /<lab>/analyze`; SQLite for saved work) and
-`frontend/` (Next.js 14 single-page shell; typed per-lab clients; shared
+`frontend/` (Next.js 15 single-page shell; typed per-lab clients; shared
 chart/formula/state primitives; app-router error/loading/not-found safety
 pages). Docker Compose; GitHub Actions CI (backend tests + frontend
 component tests + typecheck + build).
@@ -69,18 +69,30 @@ the in-app Data Reliability Center.
 ## Testing
 
 Phase 64 implementation is committed as `1284b3115977f057f4690f643601dc329aac7797`.
-Current uncommitted review and verification limits are in
-[PHASE_64_REVIEW.md](PHASE_64_REVIEW.md). Historical implementation evidence:
-[PHASE_64_IMPLEMENTATION.md](PHASE_64_IMPLEMENTATION.md).
+Independent review is committed as `9d169edb4fbb66022d3643b31457fdecee3189e2`;
+security patch / verified HEAD and origin/main is
+`36f70e6b72800f0ab585afa8c873f4b87c09aeff`.
+[Final release evidence (2026-09-20)](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20):
+strict-peer install, 166 frontend tests, TypeScript and user production build
+passed on Node 24.20.0/npm 11.17.0; full/production audits reported zero findings
+at verification. Actual Microsoft Edge execution passed 21 Strategy Ensemble
+and 12 frozen/responsive checks, zero failed/skipped. Exact-patch CI `35064846132`
+passed Backend Tests and Frontend Tests & Build; Docker build/runtime/proxy
+verification passed using Node 24.21.0. No full 275-test browser run, security/
+trading certification or deployment is claimed. The v4.82 tag is pending user
+creation after final documentation review, user commit, publication and verification. Phase 65 has
+not started; that future docs commit is not covered by the security-patch CI.
+
+Historical implementation evidence: [PHASE_64_IMPLEMENTATION.md](PHASE_64_IMPLEMENTATION.md).
 The user's repaired combined implementation/maintenance backend run finished
 with **4,359 passed, 3 symlink-platform skips in 3,285.73s**; pytest process exit
 0. Source/snapshot/active-DB checks passed. Outer runner final exit was not
 recorded. Exact identity and superseded 4,318/4/3 and 4,349/9/3 histories are in
 [BACKEND_TEST_MAINTENANCE.md](BACKEND_TEST_MAINTENANCE.md) and the implementation
 report. Those executable/configuration bytes matched at evidence finalization;
-later review fixes require their own verification. Overall speedup and parallel
-execution are not established. Current frontend checks are in the review report.
-No production build, full browser run, CI or release pass is claimed.
+later revisions have separate evidence, including the final-gate record above.
+Overall speedup and parallel execution are not established. That historical
+implementation run did not verify production build, browser execution or CI.
 
 Historical evidence below describes prior phases, not the latest run:
 
@@ -145,8 +157,10 @@ local-first (no auth/hosting); full ledger in `LIMITATIONS.md`.
 
 ## Next recommended improvements
 
-1. Manually verify and independently review the Phase 64 implementation.
+1. Final Phase 64 documentation review is complete (2026-09-21). The user then
+   commits, publishes and verifies that documentation commit before creating
+   the expected v4.82 tag.
 2. Extend component tests to further shared primitives as they stabilise.
-3. Phase 65/66: unified ML identity, then replay by hash.
+3. Phase 65/66 (planned, not started): unified ML identity, then replay by hash.
 4. Screenshot captures for newer workspaces (real runs).
 5. Read-only hosted-demo planning only after the documented gaps are addressed.

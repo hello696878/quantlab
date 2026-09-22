@@ -4,13 +4,20 @@ Strategy Return Stream, Strategy Similarity and Portfolio Ensemble Diagnostics
 Lab v1. Handoff: 2026-09-08. Implementation task, **not** the independent review.
 Evidence finalized 2026-09-10 from the user's existing repaired full backend run.
 
-Current status (2026-09-13): the implementation and maintenance are committed
+Current status (2026-09-20): the implementation and maintenance are committed
 as `1284b3115977f057f4690f643601dc329aac7797`, parent
 `0eceda6bc3458aa4583cb868a62a49765d2bad73`. The dated handoff and command plan
 below describe the earlier implementation session; they are retained as history,
 not instructions to recommit it. The separate [independent review](PHASE_64_REVIEW.md)
-contains later uncommitted fixes, current tests and remaining release gates.
-Historical full results below do not certify those later executable changes.
+is committed as `9d169edb4fbb66022d3643b31457fdecee3189e2`; security patch
+`36f70e6b72800f0ab585afa8c873f4b87c09aeff` is also committed.
+[Final release verification](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+records the completed user build, 33 selected Edge checks, bounded Docker
+verification and both exact-patch CI jobs (`35064846132`). The decisions,
+uncommitted/pending wording and commands below are historical; the 4,359 / 3
+record and outer-exit limitation do not certify later executable changes.
+Final documentation review, user commit, publication and verification precede the still-pending
+user v4.82 tag. Phase 65 has not started.
 
 ## Decision
 

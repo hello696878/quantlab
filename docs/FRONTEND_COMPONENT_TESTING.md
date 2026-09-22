@@ -5,7 +5,11 @@ Phase 64 extends this foundation with `StrategyEnsemblePanel.test.tsx` and
 demo/detail rendering, duplicate-action prevention, editable JSON, unmount
 safety and permalink lifecycle. Production data is never replaced by these
 test fixtures. Chart geometry remains browser-only, not certified by jsdom.
-Current checks and unresolved gates: [PHASE_64_REVIEW.md](PHASE_64_REVIEW.md).
+Historical review checks: [PHASE_64_REVIEW.md](PHASE_64_REVIEW.md). The
+[final release evidence](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+records 166 frontend tests, TypeScript, user production build, 33 selected Edge
+checks, bounded Docker verification and exact security-patch CI success;
+275-test discovery is not full browser-suite execution.
 Review regressions also exercise the E2E isolation proof with synthetic responses;
 that is not execution against a browser or a running backend.
 

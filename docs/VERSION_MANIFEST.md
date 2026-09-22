@@ -16,11 +16,24 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 **`4.82.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The expected
 future tag is
 `v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-diagnostics-v1`.
-Phase 64 implementation is `1284b3115977f057f4690f643601dc329aac7797`;
-independent review fixes are uncommitted and final verification gates remain
-pending in [PHASE_64_REVIEW.md](PHASE_64_REVIEW.md). No v4.82 tag exists and none was created here.
-See [implementation evidence](PHASE_64_IMPLEMENTATION.md); a development version
-is not a claim of release readiness.
+Phase 64 implementation is `1284b3115977f057f4690f643601dc329aac7797`, independent
+review is `9d169edb4fbb66022d3643b31457fdecee3189e2`, and the security patch is
+`36f70e6b72800f0ab585afa8c873f4b87c09aeff` (verified HEAD and origin/main).
+[Final release evidence (2026-09-20)](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+records both successful jobs in exact-patch CI run `35064846132`, user production
+build, 33 selected Edge checks (21 + 12, no failures/skips), Docker
+build/runtime/proxy verification on Node 24.21.0, and zero audit findings at the
+recorded point. Historical implementation evidence remains separate.
+
+No v4.82 tag exists. Final documentation review, a user documentation commit,
+publication and verification of that commit must precede user tag creation. Phase 65 has not
+started. There is no security/trading certification, deployment or full 275-test
+browser execution claim. The security-patch CI does not cover a future docs commit.
+
+The implementation already bumped VERSION from `4.81.0-dev` to `4.82.0-dev`.
+The prior v4.81 tag also retains `4.81.0-dev` in VERSION; no documented convention
+requires another version-file edit here. VERSION is unchanged in this
+documentation finalization.
 
 Phase 63 implementation `0d1c903`, review `0eceda6` and tag
 `v4.81.0-frontend-component-test-foundation-registry-drift-guards-v1` exist
@@ -104,7 +117,10 @@ updated (Phase 64.0); the latest verified tag is
 
 Before tagging (full version in [`RELEASE_CHECKLIST.md`](RELEASE_CHECKLIST.md)):
 
-- [ ] Backend suite run locally and green; `artifacts\` absent afterwards.
+- [ ] Successful backend regression evidence recorded for the exact revision
+      (CI or an authorized local run); no unintended generated artifacts.
+      Preserve existing artifacts and evidence. Phase 64's security-commit CI
+      is recorded above; do not repeat the completed local run to finalize docs.
 - [ ] `npm run test:unit` green (frontend component tests, Phase 63.0);
       `npx tsc --noEmit` clean; `npm run build` run locally by the user.
 - [ ] No secrets/keys, no telemetry, no live-data or production overclaims

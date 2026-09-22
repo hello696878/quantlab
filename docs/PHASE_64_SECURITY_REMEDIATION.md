@@ -1,5 +1,23 @@
 # Phase 64 Frontend Dependency Security Remediation
 
+## Current Release Status (2026-09-20)
+
+Implementation `1284b3115977f057f4690f643601dc329aac7797`, independent review
+`9d169edb4fbb66022d3643b31457fdecee3189e2` and security patch
+`36f70e6b72800f0ab585afa8c873f4b87c09aeff` are committed. Final-patch CI,
+user production build, 33 selected Edge checks and bounded Docker verification
+passed. See [Final Release Verification](#final-release-verification-2026-09-20)
+for exact evidence, scope and limitations. The v4.82 tag remains pending user
+creation after independent documentation review, a user documentation commit,
+publication and verification of that commit. Phase 65 has not started.
+
+The September 15 investigation and September 16 review/handoff below are
+**historical**. Their uncommitted/pending-gate wording, decisions and proposed
+commands describe those sessions, not the current next steps. They are retained
+without converting older evidence into verification of later revisions.
+
+## Historical Remediation Investigation (2026-09-15)
+
 Verification date: 2026-09-15. Scope: frontend security remediation only, not
 Phase 65. Application VERSION remains `4.82.0-dev`.
 
@@ -752,3 +770,128 @@ Alpine image have not been executed by this review. Recheck Next 15's Maintenanc
 LTS window (two years from 2024-10-21) and current advisories before release.
 Recharts 2 deprecation remains a maintenance risk, not authorization for a chart
 rewrite. No complete security certification, deployment or Phase 65 claim.
+
+## Final Release Verification (2026-09-20)
+
+### Provenance and Revision
+
+This September 20 finalization records the existing security/runtime checks and
+the user's production-build, selected-browser and Docker results. The CI record
+is independently retrievable; its read-only confirmation during the September 21
+documentation review is recorded below. No tests, audits, builds, browser checks
+or Docker checks were rerun, and no services were started. September 20 Git checks confirmed
+`main`, HEAD, local `origin/main` and remote `main` at
+`36f70e6b72800f0ab585afa8c873f4b87c09aeff`, with a clean working tree/index before
+these documentation edits. The expected tag was absent locally and remotely.
+
+| Stage | Commit |
+|---|---|
+| Phase 64 implementation and backend test maintenance | `1284b3115977f057f4690f643601dc329aac7797` |
+| Independent review and fixes | `9d169edb4fbb66022d3643b31457fdecee3189e2` |
+| Final security patch | `36f70e6b72800f0ab585afa8c873f4b87c09aeff` |
+
+Security patch subject: `Fix frontend dependency security blockers for phase64 release`.
+
+### Security Remediation and Frontend Compatibility
+
+The existing security/runtime verification record reports the following on
+local Node **24.20.0** / npm **11.17.0**; this documentation review did not rerun them:
+
+- `npm ci --strict-peer-deps` passed.
+- **166** frontend unit/component tests passed; TypeScript passed.
+- Playwright discovered **275** tests. Discovery is not execution.
+- Full and production npm audits reported **zero findings at the recorded
+  verification point**. These results are remediation evidence, not a security
+  certification or a claim that future audits will be clean.
+
+### User Production Build and Selected Browser Execution
+
+The user production build on Node **24.20.0** / npm **11.17.0**, Next.js
+**15.5.25**, completed with **exit 0**. The production frontend started
+successfully at loopback `127.0.0.1:3100`.
+
+Disposable Strategy Ensemble backend identity was verified **through the
+frontend proxy before both stages**. The actual browser was **Microsoft Edge**
+via Playwright's `msedge` channel; the project name `chromium` does not mean
+bundled Chromium was used.
+
+| Selected browser stage | Passed | Failed | Skipped | Exit |
+|---|---:|---:|---:|---:|
+| Strategy Ensemble | 21 | 0 | 0 | 0 |
+| Frozen/responsive regression | 12 | 0 | 0 | 0 |
+| Total selected executed Edge checks | **33** | **0** | **0** | Both stages 0 |
+
+The actual second stage was **12** checks, not the earlier proposed six-test
+smoke subset. This evidence does **not** claim execution of all 275 discovered
+tests, every route/browser, or additional unrecorded manual checks.
+
+### Final Security-Patch CI
+
+[GitHub Actions run 35064846132](https://github.com/hello696878/quantlab/actions/runs/35064846132)
+verified exact commit `36f70e6b72800f0ab585afa8c873f4b87c09aeff`:
+
+The final documentation review independently retrieved this existing run on
+2026-09-21 with `gh run view 35064846132 --repo hello696878/quantlab` (JSON fields
+for revision, status, conclusion and jobs). It confirmed the exact SHA and both
+job/step outcomes below without triggering or rerunning workflows. A read-only
+remote lookup also confirmed `main` at that SHA and the expected tag absent.
+The review started with these 16 documentation files modified, an empty index
+and no nonignored untracked files; the clean-tree statement above belongs to
+the earlier September 20 finalization.
+
+| Job | Final state |
+|---|---|
+| Backend Tests | completed / success |
+| Frontend Tests & Build | completed / success |
+
+Frontend CI used **Node 24 LTS** and successfully completed install, component
+tests, TypeScript and the production build. No backend test count is inferred
+from the job status. This is exact-revision evidence for the security patch,
+**not** for a future documentation commit or tag.
+
+### Docker Build, Runtime and Proxy
+
+Environment: **Docker Desktop 4.75.0**, **Docker Engine 29.5.2**,
+**Linux/amd64**. Image: `quantlab-frontend:phase64-v482`.
+
+- `docker build --pull` succeeded. The existing `node:24-alpine` base resolved
+  to **Node v24.21.0**, distinct from local Node 24.20.0 evidence.
+- Strict-peer `npm ci`, `npm run build` and image export succeeded.
+- The container started **Next.js 15.5.25** and reported **Ready**; the
+  host-mapped frontend root returned **HTTP 200**, as reported by the user.
+- Docker frontend -> Next rewrite/proxy -> disposable Strategy Ensemble
+  backend isolation proof passed: `database_verified=true`, and the disposable
+  identity matched the `quantlab-strategy-ensemble-e2e-*` form. No token or
+  local temporary database path is recorded here.
+
+The backend was the **host-started disposable ASGI harness**. This is frontend-
+container **build/runtime/proxy** verification, not full Docker Compose,
+a containerized-backend test, hosted deployment or browser-suite execution inside
+Docker. The 33 selected Edge checks above were separate from this Docker check.
+No unreported container npm version or base-image digest is inferred.
+
+### Historical Evidence and Remaining User Handoff
+
+The historical combined implementation/maintenance run remains **4,359 passed /
+3 platform skips**, with its original outer-runner-final-exit limitation. The
+implementation report, backend maintenance report and independent review keep
+their dated counts, failures and limitations. Later final-patch CI is a separate
+record; it does not rewrite those runs or establish an overall test speedup.
+
+`VERSION` remains **`4.82.0-dev`**. The implementation commit already bumped it
+from `4.81.0-dev`; the prior v4.81 tag also retains a `-dev` VERSION. The existing
+documented convention does not require another version-file edit for this tag.
+
+The completed gates above no longer require a new evidence-finalization test
+loop. Final independent documentation review is complete (2026-09-21), with
+corrections confined to the approved existing documentation. Next: a **user-created
+documentation commit**, publication and verification of that final commit. The
+suggested subject is `Finalize phase64 release evidence and documentation v1`.
+The future documentation SHA and its own CI result do not yet exist. Only afterward
+may the user create the still-pending tag:
+`v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-diagnostics-v1`.
+
+The September 20 finalization did not stage files. The September 21 review
+authorizes staging only the 16 approved documentation paths; no commit, push,
+tag, deployment or Phase 65 work. Phase 65 has **not started**. No security/trading
+certification, deployment or full 275-test browser execution is claimed.

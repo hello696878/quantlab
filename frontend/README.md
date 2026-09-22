@@ -25,9 +25,14 @@ The new unit tests mock only the local client and use a test-only fixture.
 The browser spec requires the user-started disposable ASGI harness and verifies
 the serving backend's database identity through the frontend proxy before any
 navigation or seed write. The opt-in flag alone is insufficient.
-See [runbook](../docs/STRATEGY_ENSEMBLE_RUNBOOK.md) and
-[verification](../docs/PHASE_64_REVIEW.md). Production build and full
-browser verification remain user-run; no server was started for this task.
+See [runbook](../docs/STRATEGY_ENSEMBLE_RUNBOOK.md),
+[independent review](../docs/PHASE_64_REVIEW.md) and
+[final release evidence](../docs/PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20).
+The user production build and 33 selected Edge checks (21 Strategy Ensemble +
+12 frozen/responsive, zero failures/skips) passed; 275-test discovery is not
+full-suite browser execution. Docker build/runtime/proxy and exact security-patch
+CI also passed. Final documentation review, user commit, publication and verification precede the
+still-pending user tag. No tests or services were run during docs finalization.
 
 ## Folder structure
 
@@ -76,8 +81,9 @@ for user-owned release builds). These are rolling LTS tags, not immutable pins:
 record the actual Node/npm versions and image identity for each release.
 As of 2026-09-16, the latest LTS is 24.21.0; the bounded local checks use the
 already available 24.20.0. Node 20 is EOL. See the dated independent review in
-[the security report](../docs/PHASE_64_SECURITY_REMEDIATION.md) for evidence and
-the user-only build/browser gates. No runtime is downloaded automatically.
+[the security report](../docs/PHASE_64_SECURITY_REMEDIATION.md) for that historical
+review and the final verification: user local build on 24.20.0, Docker on
+24.21.0 and successful Node 24 LTS frontend CI. No runtime is downloaded automatically.
 
 ```powershell
 cd C:\quantlab\frontend

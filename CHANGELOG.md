@@ -18,12 +18,29 @@ claimed by an entry here.
 
 ## Unreleased
 
-- **Phase 64 independent review** (uncommitted): correct the large strategy
+- **Phase 64 security remediation and final release evidence** (2026-09-20):
+  security patch `36f70e6b72800f0ab585afa8c873f4b87c09aeff` is committed.
+  Reviewed Node 24.20.0/npm 11.17.0 strict-peer install, 166 frontend tests,
+  TypeScript and full/production audits passed (zero findings at verification).
+  User production build of Next.js 15.5.25 passed, exit 0. Isolated Microsoft
+  Edge checks passed **21 + 12 = 33**, zero failures/skips, through verified
+  disposable-backend proxy identity; 275 Playwright tests were discovered,
+  not all executed. Exact security-patch CI run `35064846132` passed Backend
+  Tests and Frontend Tests & Build on Node 24 LTS for the frontend. Docker
+  `quantlab-frontend:phase64-v482` pull/build/runtime/proxy verification passed
+  on Node v24.21.0, not a browser suite inside Docker. See
+  [final evidence and limitations](docs/PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20).
+  The v4.82 tag is still pending user creation after final documentation
+  review, user documentation commit, publication and verification; Phase 65 has not started. No security/trading
+  certification or deployment is claimed, and CI does not cover a future docs commit.
+
+- **Phase 64 independent review** (`9d169edb4fbb66022d3643b31457fdecee3189e2`): correct the large strategy
   correlation-family bound, numerical edge cases, failed reexecution state and
   linked-content/sample integrity. Tighten snapshot/fixture containment and
   final-exit evidence; require actual disposable-backend identity before E2E
-  seeding. New adversarial checks and outstanding release/security gates are
-  recorded in `docs/PHASE_64_REVIEW.md`; no new full-suite pass is claimed.
+  seeding. Adversarial checks and gates outstanding at the September 13 review
+  are preserved in `docs/PHASE_64_REVIEW.md`; that historical review did not
+  claim a new full-suite pass. Later final-gate evidence is recorded above.
 
 - **Phase 64.0: Strategy Return Stream, Strategy Similarity and Portfolio
   Ensemble Diagnostics Lab v1** (`4.82.0-dev`): bounded supplied simple-return
@@ -104,8 +121,9 @@ claimed by an entry here.
   tables. Independent visibility expectations and mutation fixtures catch
   missing public entries; browser-state cleanup and recorded blocked requests
   prevent silent mock leaks. Patched Vitest/coverage 3.2.6 and Vite 7.3.6;
-  pre-existing dependency advisories remain release blockers (see
-  `docs/PHASE_63_REVIEW.md`). CI now runs `npm run test:unit`
+  pre-existing dependency advisories were release blockers at that review (see
+  `docs/PHASE_63_REVIEW.md`); subsequent Phase 64 remediation is recorded above.
+  CI now runs `npm run test:unit`
   after `npm ci` and before the typecheck and production build, one-shot,
   with no browser download, no backend, no secrets and no new
   permissions; Playwright keeps its own manually triggered workflow and

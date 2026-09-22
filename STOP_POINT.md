@@ -2,10 +2,12 @@
 
 Date: 2026-09-08 (Phase 64 implementation: Strategy Return Stream,
 Similarity and Portfolio Ensemble Diagnostics Lab v1)
-Evidence finalized: 2026-09-10, using the user's existing full-run records.
+Historical implementation evidence finalized: 2026-09-10, using the user's existing full-run records.
 Independent review handoff: 2026-09-13; see `docs/PHASE_64_REVIEW.md`.
 Security patch handoff: 2026-09-15; see `docs/PHASE_64_SECURITY_REMEDIATION.md`.
-Independent security/runtime review: 2026-09-16; use the appended handoff in that report.
+Independent security/runtime review: 2026-09-16 (historical handoff).
+Final release evidence: 2026-09-20; use the
+[final verification section](docs/PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20).
 
 This replaces the stale 2026-07-05 "local futures data path v0.1" stop
 point, which no longer described the repository (the futures track later
@@ -26,16 +28,18 @@ trading/risk/compliance certification.
 | Field | Value |
 |---|---|
 | VERSION | `4.82.0-dev` |
-| Latest completed feature phase | 61.0 — Signal Ensemble, Redundancy & Combination Diagnostics Lab v1 |
+| Latest verified feature phase | 64.0; final release evidence recorded, user tag still pending |
 | Phase 61 commits | `c0f256d` (Add) / `40ec1fd` (Review) |
 | Latest tag | `v4.81.0-frontend-component-test-foundation-registry-drift-guards-v1` |
-| Current phase | 64.0; implementation `1284b3115977f057f4690f643601dc329aac7797`, review `9d169edb4fbb66022d3643b31457fdecee3189e2`; security patch uncommitted |
+| Current phase | 64.0; implementation `1284b3115977f057f4690f643601dc329aac7797`, review `9d169edb4fbb66022d3643b31457fdecee3189e2`, security patch `36f70e6b72800f0ab585afa8c873f4b87c09aeff` |
 | Current branch | `main` |
+| Verified HEAD / origin/main | `36f70e6b72800f0ab585afa8c873f4b87c09aeff` |
 | Phase 62 implementation | `e50cca2` (`Add master blueprint reconciliation project status audit roadmap v1`) |
 | Phase 62 review/tag state | Review `ceb5c41` and v4.80 tag exist |
 | Phase 63 implementation | `0d1c903` |
-| Phase 63 review/tag state | Review `0eceda6` and v4.81 tag exist; inherited security findings remain in `docs/PHASE_64_REVIEW.md` |
-| Phase 64 verification | Base review SHA CI backend/frontend success, not this patch. Fresh Node 24.20.0/npm 11.17.0 strict install, 166 frontend tests, TypeScript, 275-test discovery and zero-finding full/production audits passed. Node 24 runtime/action declarations aligned; user build/browser, Docker verification and final-patch CI remain. Historical full 4,359 / 3 skips remains separate. |
+| Phase 63 review/tag state | Review `0eceda6` and v4.81 tag exist; inherited security findings are historical, followed by the committed Phase 64 remediation |
+| Phase 64 verification | Node 24.20.0/npm 11.17.0 strict install, 166 frontend tests, TypeScript and user production build passed; full/production audits had zero findings at verification. Selected Edge execution: 21 + 12 = 33 passed, zero failed/skipped; 275 discovered is not 275 executed. Exact security-patch CI `35064846132`: both jobs success. Docker build/runtime/proxy passed using Node 24.21.0. Historical 4,359 / 3 skips and outer-exit limitation remain separate. |
+| Tag / next phase | Expected `v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-diagnostics-v1` is pending user creation; Phase 65 has not started |
 
 ## Protected frozen release baseline
 
@@ -59,38 +63,32 @@ change silently.
 
 ## Next safe step
 
-1. Read `docs/PHASE_64_SECURITY_REMEDIATION.md` for the current patch's exact
-   changed paths, supported-runtime follow-up and user-only build/browser commands.
-   The earlier review commit exists; preserve the uncommitted security patch and index.
-2. Targeted patch review/runtime alignment is complete. Run the user-owned
-   production build, token-verified disposable browser checks, Docker verification
-   and final-patch CI before release. Preserve active data and prior evidence; do not rerun
-   a full backend suite or start another evidence-finalization loop for this patch.
-3. User alone creates commits/push/tag after reviewing gates. No Phase 65 work
-   is authorized. Existing historical dependency-security notes remain relevant.
+1. Final independent documentation review is complete (2026-09-21), using the
+   final evidence in `docs/PHASE_64_SECURITY_REMEDIATION.md`. The user build,
+   selected browser, Docker and exact security-patch CI gates are complete;
+   do not restart them merely to finalize this evidence record.
+2. The user may commit and publish the reviewed documentation, then verify that
+   final documentation commit. Suggested subject:
+   `Finalize phase64 release evidence and documentation v1`.
+   CI run `35064846132` covers the security-patch SHA,
+   not a future documentation commit.
+3. Only after that verification may the user create the expected v4.82 tag.
+   This review authorizes only explicit documentation staging. Commit, push,
+   tag and services remain user-owned actions, not actions for this task.
+   Preserve active data, frozen evidence and `VERSION` (`4.82.0-dev`). No Phase 65.
 
-## Exact restart commands
+The recorded gates are bounded evidence, not security/trading certification,
+deployment, or execution of all 275 discovered browser tests.
+
+## Read-only handoff checks
 
 ```powershell
 cd C:\quantlab
 git status -sb
-git log -10 --oneline --decorate
-
-# Backend dev server
-cd C:\quantlab\backend
-venv\Scripts\uvicorn app.main:app --reload --port 8000
-
-# Frontend dev server (user-run)
-cd C:\quantlab\frontend
-npm run dev
-
-# Full backend suite (backend venv carries pytest)
-cd C:\quantlab
-backend\venv\Scripts\python.exe -m pytest backend\tests -q
-
-# Frontend typecheck
-cd C:\quantlab\frontend
-npx tsc --noEmit
+git log -3 --oneline --decorate
+git diff --stat
+git diff --check
+git diff --name-only
 ```
 
 ## Explicit non-goals (standing)

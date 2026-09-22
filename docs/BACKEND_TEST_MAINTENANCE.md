@@ -4,6 +4,19 @@ This is test-infrastructure maintenance during Phase 64, not a new product phase
 or a release certification. Existing implementation, production calculations,
 numerical tolerances, frozen fixtures, and user data are unchanged.
 
+## Current Evidence Pointer (2026-09-20)
+
+Implementation/maintenance `1284b3115977f057f4690f643601dc329aac7797`, review
+`9d169edb4fbb66022d3643b31457fdecee3189e2` and security patch
+`36f70e6b72800f0ab585afa8c873f4b87c09aeff` are committed.
+[Final release verification](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+records the later completed gates, including both successful jobs in exact-patch
+CI `35064846132`. The dated review, run records and handoff below are historical:
+their uncommitted/pending wording is not the current next step. Preserve the
+4,359 passed / 3 platform skips record and its missing outer-runner final exit;
+newer CI does not replace that historical evidence. The user v4.82 tag still
+awaits final documentation review, user commit, publication and verification. Phase 65 has not started.
+
 ## Independent review update (2026-09-13)
 
 Implementation/maintenance commit: `1284b3115977f057f4690f643601dc329aac7797`.
