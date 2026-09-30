@@ -76,7 +76,7 @@ def timestamp(value: str) -> str:
         if dt.tzinfo is None:
             raise ValueError("timestamps require an explicit UTC offset")
         return dt.astimezone(timezone.utc).isoformat(timespec="microseconds").replace("+00:00", "Z")
-    except (TypeError, AttributeError, ValueError) as exc:
+    except (TypeError, AttributeError, ValueError, OverflowError) as exc:
         raise ValueError("timestamps require ISO 8601 with an explicit UTC offset") from exc
 
 
@@ -85,8 +85,15 @@ def table(columns: list[dict], rows: list[list], keys: list[str]) -> dict:
     if not columns or len(columns) > MAX_COLUMNS or len(rows) > MAX_ROWS:
         raise ValueError("table exceeds column/row bounds")
     names = [c["name"] for c in columns]
-    if len(names) != len(set(names)) or not keys or not set(keys) <= set(names):
+    if (any(type(name) is not str or not name for name in names) or
+            len(names) != len(set(names)) or not keys or len(keys) != len(set(keys)) or
+            not set(keys) <= set(names)):
         raise ValueError("table columns and keys must be unique and present")
+    for column in columns:
+        if (set(column) - {"name", "type", "nullable"} or
+                column["type"] not in ("number", "string", "boolean", "timestamp") or
+                type(column.get("nullable", False)) is not bool):
+            raise ValueError("invalid table column declaration")
     positions = [names.index(k) for k in keys]
     normalized = []
     seen = set()
@@ -102,7 +109,8 @@ def table(columns: list[dict], rows: list[list], keys: list[str]) -> dict:
                 if not column.get("nullable", False) or i in positions:
                     raise ValueError("unexpected table null")
             elif kind == "number":
-                if type(value) not in (int, float) or not math.isfinite(value):
+                if (type(value) not in (int, float) or
+                        type(value) is int and abs(value) > 2 ** 53 or not math.isfinite(value)):
                     raise ValueError("table numbers must be finite")
                 row[i] = float(value)
             elif kind == "boolean" and type(value) is not bool:

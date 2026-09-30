@@ -26,6 +26,9 @@ def initialize(conn):
         dataset_content_hash TEXT NOT NULL, dataset_manifest_hash TEXT NOT NULL,
         snapshot_json TEXT NOT NULL, snapshot_hash TEXT NOT NULL, trusted_demo INTEGER NOT NULL,
         demo_key TEXT UNIQUE, UNIQUE(lifecycle_hash, dataset_version_id))""")
+    if "dataset_material_hash" not in {row[1] for row in conn.execute("PRAGMA table_info(ml_lifecycles)")}:
+        # Existing snapshots retain an unknown pin; never backfill trust from current content.
+        conn.execute("ALTER TABLE ml_lifecycles ADD COLUMN dataset_material_hash TEXT")
     conn.execute("""CREATE TABLE IF NOT EXISTS ml_lifecycle_links (
         lifecycle_id INTEGER NOT NULL REFERENCES ml_lifecycles(id), adapter TEXT NOT NULL,
         status TEXT NOT NULL, destination_id INTEGER, content_hash TEXT, error TEXT,
@@ -46,14 +49,15 @@ def get(run_id):
         return decode(conn.execute("SELECT * FROM ml_lifecycles WHERE id=?", (run_id,)).fetchone())
 
 
-def insert(payload, identity, snapshot_hash, manifest, demo_key=None):
+def insert(payload, identity, snapshot_hash, manifest, demo_key=None, *, dataset_material_hash=None):
     with connection() as conn:
         conn.execute("""INSERT OR IGNORE INTO ml_lifecycles
             (name,created_at,lifecycle_hash,dataset_version_id,dataset_content_hash,dataset_manifest_hash,
-             snapshot_json,snapshot_hash,trusted_demo,demo_key) VALUES (?,?,?,?,?,?,?,?,?,?)""",
+             snapshot_json,snapshot_hash,trusted_demo,demo_key,dataset_material_hash) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
                      (payload["name"], datetime.now(timezone.utc).isoformat(), identity,
                       payload["dataset_version_id"], payload["dataset_content_hash"], manifest,
-                      canonical(payload["snapshot"]), snapshot_hash, int(demo_key is not None), demo_key))
+                      canonical(payload["snapshot"]), snapshot_hash, int(demo_key is not None), demo_key,
+                      dataset_material_hash))
         row = conn.execute("SELECT * FROM ml_lifecycles WHERE lifecycle_hash=? AND dataset_version_id=?",
                            (identity, payload["dataset_version_id"])).fetchone()
         if row is None:

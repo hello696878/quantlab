@@ -134,11 +134,11 @@ def test_mutation_between_reads_refused(legacy, monkeypatch):
     original = importer._read
     counts = {}
 
-    def changing(path):
+    def changing(path, **kwargs):
         counts[path.name] = counts.get(path.name, 0) + 1
         if path.name == "metrics.json" and counts[path.name] == 2:
             path.write_text('{"accuracy":0.6}')
-        return original(path)
+        return original(path, **kwargs)
 
     monkeypatch.setattr(importer, "_read", changing)
     with pytest.raises(ValueError, match="changed"):
@@ -188,8 +188,8 @@ def test_symlink_never_followed(tmp_path):
     linked = tmp_path / "owned-link"
     try:
         linked.symlink_to(outside, target_is_directory=True)
-    except OSError:
-        pytest.skip("OS does not permit fixture symlink creation")
+    except OSError as exc:
+        pytest.skip(f"OS does not permit fixture symlink creation (winerror={getattr(exc, 'winerror', None)}, errno={exc.errno})")
     with pytest.raises(ValueError, match="reparse|symlink"):
         importer._safe_path(linked, directory=True)
 
@@ -223,14 +223,18 @@ def test_parquet_scalar_boundary_preserves_null_and_rejects_nonfinite(monkeypatc
     row = dict(zip(names, ["2024-01-01T00:00:00Z", "ES", "ESH24", value]))
     # Stub only the optional decoder boundary, not canonical scalar validation.
     # The separate ExperimentStore test covers real Parquet when pyarrow exists.
-    decoded = SimpleNamespace(column_names=names, to_pylist=lambda: [row],
+    decoded = SimpleNamespace(column_names=names, to_pylist=lambda: [row], nbytes=100, num_rows=1,
                               to_pandas=lambda: pd.DataFrame([row]))
+    class Schema(list):
+        pass
+    schema = Schema([SimpleNamespace(type="scalar")])
+    schema.names = names
     source = SimpleNamespace(metadata=SimpleNamespace(num_rows=1, num_columns=4, num_row_groups=0),
-                             schema_arrow=[SimpleNamespace(type="scalar")], read=lambda: decoded)
+                             schema_arrow=schema, iter_batches=lambda **_: iter([decoded]))
     arrow = ModuleType("pyarrow")
     arrow.types = SimpleNamespace(is_string=lambda _: True)
     parquet = ModuleType("pyarrow.parquet")
-    parquet.ParquetFile = lambda _: source
+    parquet.ParquetFile = lambda *_, **__: source
     arrow.parquet = parquet
     monkeypatch.setitem(sys.modules, "pyarrow", arrow)
     monkeypatch.setitem(sys.modules, "pyarrow.parquet", parquet)

@@ -18,6 +18,13 @@ class Registration(BaseModel):
     dataset_content_hash: Hash
     snapshot: dict[str, Any]
 
+    @field_validator("schema_version", mode="before")
+    @classmethod
+    def schema_valid(cls, value):
+        if type(value) is not int or value != 1:
+            raise ValueError("schema_version must be integer 1")
+        return value
+
     @field_validator("name")
     @classmethod
     def name_valid(cls, value):

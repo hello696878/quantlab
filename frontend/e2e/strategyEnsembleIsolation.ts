@@ -6,7 +6,7 @@ export async function verifyStrategyEnsembleIsolation(
   get: (url: string, options: { headers: Record<string, string>; maxRedirects: number }) => Promise<{
     ok(): boolean; json(): Promise<unknown>;
   }>,
-): Promise<void> {
+): Promise<{ database_identity: string }> {
   if (!baseURL || !["localhost", "127.0.0.1", "[::1]"].includes(new URL(baseURL).hostname)) {
     throw new Error("Strategy ensemble E2E requires a loopback frontend");
   }
@@ -24,4 +24,5 @@ export async function verifyStrategyEnsembleIsolation(
       || !/^quantlab-strategy-ensemble-e2e-[a-zA-Z0-9_-]+$/.test(proof.database_identity)) {
     throw new Error("Backend database identity does not match this disposable E2E session");
   }
+  return { database_identity: proof.database_identity };
 }

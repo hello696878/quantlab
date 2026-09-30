@@ -64,6 +64,8 @@ export default function MLLifecyclePanel({ onNav }: { onNav: (view: View) => voi
           setRun(null); setComparison(null); setLinked(null); setRevision((v) => v + 1);
         }}>Back to lifecycles</button>}
         <button className={button} style={control} disabled={busy || loading} onClick={() => action(async () => {
+          // A retry may change persisted adapter state before it fails.
+          setRun(null); setComparison(null); setLinked(null); setListing(null); setSelected([]);
           const value = await api.loadDemo();
           if (mounted.current) { setRun(value); setLinked(null); setComparison(null);
             setNotice(value.completeness === "complete" ? "Synthetic lifecycle completed." : "Lifecycle stored with incomplete stages. Inspect adapter status before retrying."); }

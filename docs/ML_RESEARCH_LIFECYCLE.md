@@ -71,6 +71,11 @@ exact compounded drag remain metadata. Its fixed 10000 reference-notional,
 linear fee calculation is not substituted for the original engine's compounded
 equity path. Signal Decay uses the fixed label horizon/lag, one entity, and the
 linked fee assumptions as context, not a new deduction from stored net returns.
+The decay engine measures this grid in signal-observation steps. The demo has
+32 held-out scores: horizon 1 / entry lag 1 leaves 30 usable pairs and two
+structural end exclusions. Two retained source price-context bars do not invent
+extra scores. This limitation differs from the 32 held-out label-quality samples
+and the 32 engine periods (the first starts flat).
 
 ## Adapter Contracts
 
@@ -82,7 +87,8 @@ linked fee assumptions as context, not a new deduction from stored net returns.
 | Cost Diagnostics | Actual gross returns, effective-position changes and explicit 10 bps reference model; original net returns remain separate. |
 | Signal Decay | Actual held-out calibrated score, exact entity/time, explicit availability, source prices, horizon 1 and entry lag 1; linked cost context. Single-entity descriptive diagnostics, not cross-sectional alpha. |
 
-Records are pinned using recomputed material content, including child result
+Records are pinned using recomputed material content, including all feature
+samples, calibration observations and every page of cost observations and child result
 tables, not just advertised result hashes. Invalidation, deletion or mutation
 makes the lifecycle changed/incomplete. Viewing/export never executes adapters.
 Legacy imports lack the required feature and membership payload; all execution
@@ -113,14 +119,16 @@ explicit; numeric NaN/Infinity are refused. `signal_state` is a string and
 `roll_flag` a boolean; other non-key frame columns are numeric in v1.
 
 Parquet requires the existing optional pyarrow package. Metadata row/column and
-uncompressed-size bounds are checked before scalar-column parsing; nested
-Parquet columns are refused. There is no dependency installation or fallback
+uncompressed-size bounds are checked before bounded scalar-batch parsing;
+decoded expansion is bounded and nested Parquet columns are refused. Numeric
+columns refuse Boolean values rather than converting them to 0/1. There is no dependency installation or fallback
 that silently selects an alternate file. Unusual legacy frame schemas remain
 unsupported and are not rewritten in place.
 
 ## Manual Verification Gates
 
-Production build, browser execution and independent review remain user-owned.
+The independent review is recorded in `PHASE_65_REVIEW.md`. Final exact-commit
+CI, production build and browser execution remain pending user gates.
 Do not run browser mutations against the ordinary backend. The optional
 `scripts.ml_lifecycle_e2e:create_app` factory extends the existing disposable
 Phase 64 harness with a guard on every lifecycle request. It verifies the
@@ -132,4 +140,9 @@ the factory without reload/workers on a separate port, point `BACKEND_URL` at
 that port before building/starting the frontend, and set Playwright's configured
 base URL to that frontend. Run `e2e/ml-lifecycle.spec.ts` only after both proxy
 identity handshakes succeed. The token is test-only and never persisted in Git.
+Both handshakes must identify the same actual disposable SQLite database. The
+single browser scenario asserts sidebar/palette/history navigation, provenance,
+refusal, export, API self-comparison, and list/detail at three widths. Two-record
+comparison UI is covered by component tests; discovery does not execute any of
+these browser assertions.
 No service or actual browser was started by this implementation task.

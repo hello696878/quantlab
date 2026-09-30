@@ -17,12 +17,29 @@ class ConflictError(ValueError):
     pass
 
 
+def dataset_binding(version_id):
+    """Hash actual stored scientific metadata; never read a dataset locator."""
+    version = dataset_store.get_version(version_id)
+    if version is None:
+        raise ConflictError("an existing Dataset Registry version is required")
+    if version.get("invalidated_at"):
+        raise ConflictError("dataset version is invalidated")
+    dataset = dataset_store.get_dataset(version["dataset_id"])
+    if dataset is None or not dataset.get("is_active"):
+        raise ConflictError("dataset is missing or inactive")
+    dataset_fields = {k: v for k, v in dataset.items() if k not in
+                      {"id", "created_at", "updated_at", "current_version_id", "provenance_status"}}
+    version_fields = {k: v for k, v in version.items() if k not in
+                      {"id", "dataset_id", "created_at", "storage_locator", "storage_locator_type"}}
+    return version, fingerprint("dataset_binding", {"dataset": dataset_fields, "version": version_fields})
+
+
 def register(payload, *, demo_key=None):
     request = Registration.model_validate(payload).model_dump(mode="json")
     snapshot = request["snapshot"]
     validate(snapshot, allow_demo=demo_key is not None)
     try:
-        version = datasets.get_version(request["dataset_version_id"])
+        version, material_hash = dataset_binding(request["dataset_version_id"])
     except LookupError as exc:
         raise ValueError("an existing Dataset Registry version is required") from exc
     if version.get("invalidated_at"):
@@ -36,7 +53,8 @@ def register(payload, *, demo_key=None):
                 or schema.get("fields") != source["columns"] or not schema.get("ordering_significant")):
             raise ValueError("dataset schema, column order and row count must match the retained source")
     identity = identities(snapshot)["lifecycle"]
-    record = store.insert(request, identity, fingerprint("snapshot", snapshot), version["manifest_fingerprint"], demo_key)
+    record = store.insert(request, identity, fingerprint("snapshot", snapshot), version["manifest_fingerprint"], demo_key,
+                          dataset_material_hash=material_hash)
     return get_run(record["id"])
 
 
@@ -51,8 +69,10 @@ def get_run(run_id):
         artifact_ids = identities(record["snapshot"])
         if fingerprint("snapshot", record["snapshot"]) != record["snapshot_hash"] or identities(record["snapshot"])["lifecycle"] != record["lifecycle_hash"]:
             raise ValueError("stored snapshot content mismatch")
-        version = datasets.get_version(record["dataset_version_id"])
-        if version.get("invalidated_at") or version.get("content_fingerprint") != record["dataset_content_hash"] or version["manifest_fingerprint"] != record["dataset_manifest_hash"]:
+        version, material_hash = dataset_binding(record["dataset_version_id"])
+        if (material_hash != record.get("dataset_material_hash") or
+                version.get("content_fingerprint") != record["dataset_content_hash"] or
+                version["manifest_fingerprint"] != record["dataset_manifest_hash"]):
             raise ValueError("dataset binding changed or was invalidated")
     except (ValueError, LookupError, KeyError, TypeError):
         errors.append("Snapshot or dataset binding is missing, invalidated or has changed.")

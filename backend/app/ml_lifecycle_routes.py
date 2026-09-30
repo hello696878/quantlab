@@ -2,12 +2,33 @@
 
 from typing import Literal
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.routing import APIRoute
 
 from app.ml_lifecycle import adapters, service
+from app.ml_lifecycle.identity import MAX_BYTES, read_json
 from app.ml_lifecycle.models import LinkRequest, Registration
 
-router = APIRouter(prefix="/ml-lifecycles", tags=["ML Research Lifecycle"])
+class StrictJSONRoute(APIRoute):
+    def get_route_handler(self):
+        handler = super().get_route_handler()
+
+        async def checked(request: Request):
+            if request.method == "POST":
+                body = await request.body()
+                if body:
+                    try:
+                        if len(body) > MAX_BYTES:
+                            raise ValueError("oversized request")
+                        read_json(body)
+                    except ValueError as exc:
+                        raise HTTPException(422, "Lifecycle requests require bounded, unambiguous JSON.") from exc
+            return await handler(request)
+
+        return checked
+
+
+router = APIRouter(prefix="/ml-lifecycles", tags=["ML Research Lifecycle"], route_class=StrictJSONRoute)
 
 
 def call(fn, *args, **kwargs):

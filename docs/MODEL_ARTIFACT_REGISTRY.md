@@ -7,6 +7,11 @@ uses finite plain JSON scalars and SHA-256 with an explicit kind/version envelop
 Tables declare scalar types, keys and nullability; rows sort on their full typed
 keys. UTC timestamps retain intraday precision. Duplicate keys and sample IDs,
 ambiguous timestamps, invalid finite values and inconsistent row widths fail.
+Schema versions and counts require integers, never coerced Booleans. JSON
+integer/float/Boolean/null/string identities are distinct. Declared `number`
+table columns normalize finite values to binary64; integers outside the exact
+binary64 integer range are refused. Duplicate JSON object keys are also refused
+at the HTTP boundary, before framework model parsing.
 
 Physical file-byte SHA-256 is distinct from normalized semantic fingerprints:
 CSV/Parquet/JSON formatting can differ physically while describing the same
@@ -45,11 +50,29 @@ then rereads every selected file and directory inventory to detect concurrent
 mutation. Source files are never modified. The registry retains typed snapshots,
 so later removal of the source folder does not pretend a pinned live file still
 exists; physical hashes describe the bytes at import time only.
+Directory ancestry is pinned and its identity rechecked while reading (Windows
+handles; POSIX descriptor-relative reads). A blocked or detected replacement
+refuses import; no unconditional Windows rename-lock guarantee is made. The explicit destination database
+also rejects linked ancestry/hardlinks; the CLI restores its prior database
+override after success or failure. This is bounded local import, not a hostile
+same-user filesystem sandbox or a general atomic multi-file snapshot facility.
+The existing SQLite API opens a destination pathname; a hostile same-user
+concurrent replacement is not a proven portable write boundary, especially on
+POSIX. Use an operator-owned destination with exclusive filesystem control.
 
 SQLite initialization adds `ml_lifecycles` and `ml_lifecycle_links` idempotently.
 No existing table is dropped or rewritten. Unique semantic identity plus dataset
 version makes duplicate imports idempotent; the first physical snapshot is kept.
 Parameterized SQL is used. Scientific snapshots are immutable through the API.
+The review adds a nullable `dataset_material_hash` pin over the actual stored
+dataset/version metadata, including schema/statistics/provenance/event times.
+Old records retain a missing pin and fail closed as changed/unverified; migration
+never certifies their current content retroactively or overwrites old evidence.
+Dataset row IDs, inspection timestamps and storage locations are excluded.
+Known child database envelopes omit incidental IDs/runtime metadata while nested
+scientific metadata remains material. Destination content pins preserve inherited
+destination hashes, which may themselves include legacy IDs; they are integrity
+pins, not cross-database scientific-equivalence claims.
 
 Stored, processing, completeness, integrity and validation states are independent.
 An imported legacy record can be stored/intact while incomplete/unverified.
@@ -76,5 +99,5 @@ snapshot and linked content before strict export/compare; missing or altered
 content cannot be promoted to verified by its advertised hash alone. No model
 ranking/promotion or profitability acceptance criterion exists.
 
-See [implementation evidence](PHASE_65_IMPLEMENTATION.md) for actual runs and
+See [review evidence](PHASE_65_REVIEW.md), [implementation evidence](PHASE_65_IMPLEMENTATION.md) for historical runs and
 [lifecycle workflow](ML_RESEARCH_LIFECYCLE.md) for adapter and timing limitations.

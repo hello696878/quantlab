@@ -1,5 +1,7 @@
 """Explicit, whitelisted existing-lab adapters; no filesystem or dynamic imports."""
 
+from copy import deepcopy
+
 from app.model_validation import service as validation_service, store as validation_store
 from app.model_validation.models import RunCreate as ValidationCreate
 from app.meta_labeling import service as calibration_service, store as calibration_store
@@ -27,36 +29,63 @@ def records(value):
     return [dict(zip(names, row)) for row in value["rows"]]
 
 
+_DATABASE_FIELDS = {
+    "id", "run_id", "created_at", "updated_at", "started_at", "completed_at",
+    "duration_ms", "demo_key", "experiment_id", "dataset_version_id",
+    "validation_run_id", "overfitting_run_id", "regime_run_id", "feature_run_id",
+    "feature_diagnostics_run_id", "meta_label_run_id", "cost_diagnostic_run_id",
+    "factor_run_id",
+}
+
+
+def _record_content(row):
+    # Only database envelopes are stripped. Nested sample metadata may itself
+    # contain an id or created_at describing a scientific event and must stay.
+    return {key: deepcopy(value) for key, value in row.items() if key not in _DATABASE_FIELDS}
+
+
+def _cost_observations(store, run_id):
+    first = store.list_observation_results(run_id, page=1, page_size=100)
+    rows = list(first["items"])
+    for page in range(2, first["total_pages"] + 1):
+        rows.extend(store.list_observation_results(run_id, page=page, page_size=100)["items"])
+    if len(rows) != first["total"]:
+        raise ValueError("linked cost observations changed while being read")
+    return rows
+
+
 def content(adapter, run_id):
     service, store, _, _ = ADAPTERS[adapter]
     run = service.get_run(run_id)
     if run["status"] != "completed" or run.get("invalidated_at") or run.get("dataset_invalidated"):
         raise ValueError("linked diagnostic is not completed or was invalidated")
-    result = {"run": store.get_run(run_id)}
+    result = {"run": _record_content(store.get_run(run_id))}
     if adapter == "validation":
-        result["splits"] = service.list_splits(run_id)
+        result["splits"] = [_record_content(row) for row in service.list_splits(run_id)]
     elif adapter == "calibration":
-        result["observations"] = store.list_observations(run_id, page_size=2000)
+        result["observations"] = store.all_observations(run_id)
         result["bins"] = store.list_bins(run_id)
     elif adapter == "features":
-        result.update(results=store.list_results(run_id), splits=store.list_split_results(run_id),
+        result.update(samples=store.all_samples(run_id),
+                      results=store.list_results(run_id), splits=store.list_split_results(run_id),
                       groups=store.list_correlation_groups(run_id), drift=store.list_drift_results(run_id))
     elif adapter == "costs":
-        result.update(model=store.get_cost_model(run_id), observations=store.list_observation_results(run_id),
+        result.update(model=store.get_cost_model(run_id), observations=_cost_observations(store, run_id),
                       sensitivity=store.list_sensitivity_results(run_id), capacity=store.list_capacity_results(run_id))
     else:
-        result.update(definition=store.get_definition(run_id), observations=store.list_observations(run_id),
+        definition = store.get_definition(run_id)
+        result.update(definition=_record_content(definition) if definition else None,
+                      observations=store.list_observations(run_id, limit=20000),
                       horizons=store.list_horizons(run_id), buckets=store.list_buckets(run_id),
-                      turnover=store.list_turnover(run_id))
-
-    def scientific(value):
-        if isinstance(value, dict):
-            return {k: scientific(v) for k, v in value.items() if k not in
-                    {"id", "run_id", "created_at", "updated_at", "completed_at", "duration_ms", "demo_key"}}
-        if isinstance(value, list):
-            return [scientific(v) for v in value]
-        return value
-    return fingerprint("diagnostic:" + adapter, scientific(result))
+                      turnover=store.list_turnover(run_id), regimes=store.list_regimes(run_id),
+                      bootstrap=store.list_bootstrap(run_id))
+        configuration = result["run"].get("configuration", {})
+        if "links" in configuration:
+            configuration["links"] = {
+                key: _record_content(value) if isinstance(value, dict) else value
+                for key, value in configuration["links"].items() if key != "ids"
+            }
+    return fingerprint("diagnostic:" + adapter, result)
 
 
 def payload(adapter, record, links):
@@ -75,7 +104,7 @@ def payload(adapter, record, links):
                              "ret": r["outcome"]} for r in samples],
                 "notes": "Exact outer split. Per-model inner OOF memberships are retained in the lifecycle snapshot."}
     if adapter == "calibration":
-        return {**common, "calibration_method": "none", "declared_out_of_fold": False,
+        return {**common, "calibration_method": "none", "declared_out_of_fold": False, "outcome_threshold": 0.0,
                 "observations": [{"sample_id": p["sample_id"], "prediction_time": by_id[p["sample_id"]]["prediction_time"],
                                   "evaluation_time": by_id[p["sample_id"]]["evaluation_time"], "primary_side": 1,
                                   "raw_probability": p["calibrated_probability"],

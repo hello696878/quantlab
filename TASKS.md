@@ -1,18 +1,19 @@
 # TASKS - QuantLab
 
-## Current Phase 65 Implementation (2026-09-29)
+## Current Phase 65 Review (2026-09-30)
 
-Branch `phase65-unified-ml-lifecycle-artifact-registry`, based on frozen Phase 64
+Reviewed on `main` at implementation `1449db23744f1d03743df189f5fa063df286802e`, based on frozen Phase 64
 `1591f89931f6534d523c96a87231bcd9d680080a`. The v4.82 tag exists at that commit;
 exact documentation CI `35739957842` is inherited user-supplied passing evidence.
-VERSION `4.83.0-dev`; no v4.83 tag/commit/release is created here.
+VERSION `4.83.0-dev`; no review commit or v4.83 tag/release is created here.
 
 - [x] Add immutable snapshots, safe importer, explicit diagnostic adapters and linked synthetic demo.
 - [x] Add read-only lifecycle workspace, API, component tests and guarded browser specification.
 - [x] Record exact verification in `docs/PHASE_65_IMPLEMENTATION.md`: full pre-final-importer-fix run 4502 passed / 5 skipped; post-fix importer 33 passed / 2 skipped, all protection checks pass.
 - [x] Frontend: 178 unit tests, TypeScript and 276-test Chromium discovery pass (discovery is not browser execution).
-- [ ] Separate independent review; user production build and disposable browser execution.
-- [ ] User-only implementation commit, later independent-review commit and future tag.
+- [x] Independent source review and verified-defect corrections; see `docs/PHASE_65_REVIEW.md` for current focused results and limits.
+- [ ] Final exact-commit CI, user production build and disposable browser execution.
+- [ ] User-only independent-review commit and future tag after the remaining gates.
 - Phase 66 remains out of scope. No staging, commit, push, services or user DB changes.
 
 ## Historical Phase 64 Handoff (Superseded)

@@ -1,21 +1,23 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 65 (2026-09-29)
+## Current Handoff: Phase 65 Review (2026-09-30)
 
 Unified ML Research Lifecycle / Model Artifact Registry v1 is implemented
-on `phase65-unified-ml-lifecycle-artifact-registry`, VERSION `4.83.0-dev`.
-Baseline HEAD and frozen v4.82 tag resolve to
+at `1449db23744f1d03743df189f5fa063df286802e` on `main`, VERSION `4.83.0-dev`.
+The implementation parent and frozen v4.82 tag resolve to
 `1591f89931f6534d523c96a87231bcd9d680080a`. User-supplied exact documentation
 CI `35739957842` passed both jobs; it is not Phase 65 verification.
 
-Use `docs/PHASE_65_IMPLEMENTATION.md` for exact evidence and the 36-file handoff.
+Use `docs/PHASE_65_REVIEW.md` for current review fixes, focused verification and
+the exact pending inventory. `docs/PHASE_65_IMPLEMENTATION.md` retains historical
+implementation evidence and its 36-file handoff.
 Full regression: 4502 passed / 5 skipped; the final Parquet correction afterward
 has 33 importer tests passed / 2 skipped. Both runs passed all protection checks;
 the full suite was not rerun after that correction. Frontend: 178 tests and
 TypeScript pass; Chromium discovery lists 276 tests, not executed browser checks.
-Next gates: separate independent review, then user-run production build and
-disposable browser checks. Optional pyarrow/physical symlink checks remain limited
-by this environment. No automatic Git index or
+Next gates: final exact-commit CI, user-run production build and disposable browser
+checks. The review distinguishes supplementary real-PyArrow checks from the
+authoritative backend environment and records physical-link capability. No automatic Git index or
 release actions and no Phase 66. The historical stop point below is retained
 as historical evidence, not current phase/version/tag instructions.
 

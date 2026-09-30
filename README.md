@@ -25,8 +25,10 @@ automatic retraining or new estimator family.
 
 VERSION is `4.83.0-dev`. See the [workflow](docs/ML_RESEARCH_LIFECYCLE.md),
 [artifact contract](docs/MODEL_ARTIFACT_REGISTRY.md) and
-[implementation evidence](docs/PHASE_65_IMPLEMENTATION.md). Independent review
-and user build/browser gates remain separate. No v4.83 tag is claimed.
+[implementation evidence](docs/PHASE_65_IMPLEMENTATION.md). The
+[independent review](docs/PHASE_65_REVIEW.md) records verified fixes and focused
+checks; final exact-commit CI and user build/browser gates remain pending.
+No v4.83 tag is claimed.
 
 ## Completed baseline: Phase 64
 

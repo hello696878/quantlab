@@ -13,8 +13,10 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.83.0-dev`**, Phase 65 implementation on
-`phase65-unified-ml-lifecycle-artifact-registry`. Future user tag:
+**`4.83.0-dev`**, Phase 65 implementation
+`1449db23744f1d03743df189f5fa063df286802e`, reviewed on `main`.
+The review fixes are uncommitted; see [independent review](PHASE_65_REVIEW.md).
+Future user tag:
 `v4.83.0-unified-ml-lifecycle-model-artifact-registry-v1` (not created).
 See [current implementation evidence](PHASE_65_IMPLEMENTATION.md).
 

@@ -22,3 +22,19 @@ it("refuses a missing token before network access", async () => {
   await expect(verifyMLLifecycleIsolation("http://localhost:3100", undefined, get)).rejects.toThrow();
   expect(get).not.toHaveBeenCalled();
 });
+
+it.each([null, {}, { ...baseProof, kind: "quantlab_ml_lifecycle_disposable_v1", database_identity: undefined },
+  { ...baseProof, kind: "quantlab_ml_lifecycle_disposable_v1", database_identity: "quantlab-strategy-ensemble-e2e-other" },
+  { ...baseProof, kind: "quantlab_ml_lifecycle_disposable_v1", database_verified: false },
+  { ...baseProof, kind: "quantlab_ml_lifecycle_disposable_v1", token: "d".repeat(64) }])(
+  "refuses malformed or different lifecycle database proof before permitting mutation", async (proof) => {
+    const get = vi.fn().mockResolvedValueOnce({ ok: () => true, json: async () => baseProof })
+      .mockResolvedValueOnce({ ok: () => true, json: async () => proof });
+    await expect(verifyMLLifecycleIsolation("http://localhost:3100", token, get)).rejects.toThrow("not verified");
+  });
+
+it("does not request lifecycle proof if the strategy database handshake fails", async () => {
+  const get = vi.fn().mockResolvedValue({ ok: () => false });
+  await expect(verifyMLLifecycleIsolation("http://localhost:3100", token, get)).rejects.toThrow();
+  expect(get).toHaveBeenCalledTimes(1);
+});
