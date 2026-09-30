@@ -47,6 +47,7 @@ export type View =
   | "signaldecay"
   | "signalensemble"
   | "strategyensemble"
+  | "mllifecycle"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

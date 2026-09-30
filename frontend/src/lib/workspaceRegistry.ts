@@ -86,6 +86,7 @@ export const WORKSPACE_VISIBILITY: Record<View, WorkspaceVisibility> = {
   signaldecay: "sidebar",
   signalensemble: "sidebar",
   strategyensemble: "sidebar",
+  mllifecycle: "sidebar",
   democenter: "sidebar",
   datareliability: "sidebar",
   qacommandcenter: "sidebar",
@@ -166,6 +167,7 @@ export const ALL_VIEW_IDS: readonly View[] = Object.keys(
  * command identities. `keywords` are search words, not unique routing aliases.
  */
 export const WORKSPACE_COMMANDS: { view: View; title: string; keywords: string }[] = [
+  { view: "mllifecycle", title: "Open ML Research Lifecycle", keywords: "model artifact registry held out calibration oof provenance lifecycle" },
   { view: "home", title: "Go to Home", keywords: "command center dashboard" },
   { view: "globe", title: "Open Global Markets Globe", keywords: "globe global markets world markets country macro fx indices market dossier united states japan taiwan germany india europe asia explore map 3d earth" },
   { view: "backtest", title: "Go to Backtest", keywords: "single asset run strategy" },

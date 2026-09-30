@@ -14,7 +14,21 @@ palette, shared charts, local LaTeX formula panels).
 > investment, trading, allocation, legal, tax, compliance, or risk-management
 > advice, and not production trading, risk, or compliance infrastructure.
 
-## Current development: Phase 64
+## Current development: Phase 65
+
+**ML Research Lifecycle** joins stored model artifacts, exact sample/split
+provenance, frozen calibration, held-out evaluation and five existing diagnostic
+labs. A read-only workspace supports neutral comparison/export; one explicit
+synthetic demo performs genuine training. Legacy ExperimentStore imports remain
+honestly incomplete when training provenance is absent. No replay, serving,
+automatic retraining or new estimator family.
+
+VERSION is `4.83.0-dev`. See the [workflow](docs/ML_RESEARCH_LIFECYCLE.md),
+[artifact contract](docs/MODEL_ARTIFACT_REGISTRY.md) and
+[implementation evidence](docs/PHASE_65_IMPLEMENTATION.md). Independent review
+and user build/browser gates remain separate. No v4.83 tag is claimed.
+
+## Completed baseline: Phase 64
 
 **Strategy Ensemble Lab** compares supplied strategy return streams (not signal
 values), exact-period similarity, empirical tail/drawdown overlap and explicit
@@ -37,9 +51,9 @@ full/production audits at verification; successful user production build;
 **21 + 12 = 33 selected Microsoft Edge checks**, zero failures/skips; Docker
 build/runtime/proxy verification using Node 24.21.0; and both jobs successful
 in exact security-patch CI run `35064846132`.
-The expected `v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-diagnostics-v1`
-tag is pending user creation after final documentation review and the user's
-documentation commit, publication and verification. Phase 65 has not started. This does not claim security/trading
+The frozen `v4.82.0-strategy-return-stream-similarity-portfolio-ensemble-diagnostics-v1`
+tag exists at `1591f89931f6534d523c96a87231bcd9d680080a`; user-supplied exact
+documentation CI `35739957842` passed both jobs. This does not claim security/trading
 certification, deployment, or execution of all 275 discovered browser tests.
 
 ## Screenshots

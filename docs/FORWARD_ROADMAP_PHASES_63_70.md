@@ -1,5 +1,12 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
+> **Current status (2026-09-29):** Phase 64 is frozen at `1591f899...`, including
+> the existing v4.82 tag and inherited successful documentation CI `35739957842`.
+> Phase 65 is implemented at `4.83.0-dev` and ready for independent review; see
+> [implementation evidence](PHASE_65_IMPLEMENTATION.md). Independent review and
+> user build/browser gates are separate. Phase 66 is not authorized. The prior
+> status note immediately below is historical and superseded, not current guidance.
+
 > **Current status (Phase 64.0 release evidence, 2026-09-20).** Phase 63's
 > implementation `0d1c903`, review `0eceda6` and v4.81 tag exist locally.
 > Phase 64 implementation is committed as `1284b3115977f057f4690f643601dc329aac7797`.

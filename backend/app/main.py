@@ -100,6 +100,7 @@ from app.factor_diagnostics_routes import router as factor_diagnostics_router
 from app.signal_decay_routes import router as signal_decay_router
 from app.signal_ensemble_routes import router as signal_ensemble_router
 from app.strategy_ensemble_routes import router as strategy_ensemble_router
+from app.ml_lifecycle_routes import router as ml_lifecycle_router
 from app.portfolio_attribution_routes import router as portfolio_attribution_router
 from app.benchmark import (
     build_benchmark_analytics,
@@ -508,6 +509,7 @@ app.include_router(factor_diagnostics_router)
 app.include_router(signal_decay_router)
 app.include_router(signal_ensemble_router)
 app.include_router(strategy_ensemble_router)
+app.include_router(ml_lifecycle_router)
 
 
 # ---------------------------------------------------------------------------

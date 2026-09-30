@@ -73,6 +73,8 @@ import FactorDiagnosticsPanel from "@/components/FactorDiagnosticsPanel";
 import SignalDecayPanel from "@/components/SignalDecayPanel";
 import SignalEnsemblePanel from "@/components/SignalEnsemblePanel";
 import StrategyEnsemblePanel from "@/components/StrategyEnsemblePanel";
+import MLLifecyclePanel from "@/components/MLLifecyclePanel";
+import { isMLLifecycleLink, useMLLifecycleLinkCleanup, writeMLLifecycleLink } from "@/lib/mlLifecycleLink";
 import { isStrategyEnsembleLink, useStrategyEnsembleLinkCleanup, writeStrategyEnsembleLink } from "@/lib/strategyEnsembleLink";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
@@ -594,6 +596,10 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "Strategy Ensemble Lab",
     subtitle: "Local strategy-return diagnostics. Explicit fixed weights, declared cost basis and exact period alignment. No selection, advice or execution.",
   },
+  mllifecycle: {
+    title: "ML Research Lifecycle",
+    subtitle: "Local research provenance. Synthetic demonstrations and stored evidence, not model promotion or investment advice.",
+  },
   scanner: {
     title: "Cross-Sectional Scanner",
     subtitle:
@@ -692,6 +698,7 @@ const GLOBE_MARKET_ALIASES: Record<string, string> = {
 export default function HomePage() {
   const [view, setView] = useState<View>("home");
   useStrategyEnsembleLinkCleanup(view);
+  useMLLifecycleLinkCleanup(view);
 
   // Guided-demo banner ("Demo parameters loaded. Click Run to execute.") and
   // the portfolio sub-tab a demo should open on.  `portfolioKey` is bumped to
@@ -841,6 +848,7 @@ export default function HomePage() {
   useEffect(() => {
     const entry = readGlobeParams();
     if (isStrategyEnsembleLink()) setView("strategyensemble");
+    if (isMLLifecycleLink()) setView("mllifecycle");
     if (entry.isGlobe) {
       openGlobe(entry.market, {
         tour: entry.tour,
@@ -850,6 +858,7 @@ export default function HomePage() {
     }
 
     function onPopState() {
+      if (isMLLifecycleLink()) { setView("mllifecycle"); setDemoNotice(null); return; }
       if (isStrategyEnsembleLink()) {
         setView("strategyensemble");
         setDemoNotice(null);
@@ -911,6 +920,8 @@ export default function HomePage() {
   }
 
   function handleNav(next: View) {
+    if (next === "mllifecycle") writeMLLifecycleLink(true);
+    else if (next !== "globe" && next !== "strategyensemble") writeMLLifecycleLink(false);
     if (next === "strategyensemble") writeStrategyEnsembleLink(true);
     else if (next !== "globe") writeStrategyEnsembleLink(false);
     const leavingGlobe = view === "globe" && next !== "globe";
@@ -937,7 +948,7 @@ export default function HomePage() {
       setGlobePresentation(false);
       setGlobeKey((k) => k + 1);
       writeGlobeUrl({ market: null }, "push");
-    } else if (leavingGlobe && next !== "strategyensemble") {
+    } else if (leavingGlobe && next !== "strategyensemble" && next !== "mllifecycle") {
       clearGlobeUrl("push");
     }
   }
@@ -2333,6 +2344,7 @@ export default function HomePage() {
         {view === "signaldecay" && <SignalDecayPanel onNav={(route) => handleNav(route as View)} />}
         {view === "signalensemble" && <SignalEnsemblePanel onNav={(route) => handleNav(route as View)} />}
         {view === "strategyensemble" && <StrategyEnsemblePanel />}
+        {view === "mllifecycle" && <MLLifecyclePanel onNav={handleNav} />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 

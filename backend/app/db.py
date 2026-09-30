@@ -2680,6 +2680,8 @@ def init_db() -> None:
             conn.execute(index_sql)
         from app.strategy_ensemble.store import initialize as initialize_strategy_ensembles
         initialize_strategy_ensembles(conn)
+        from app.ml_lifecycle.store import initialize as initialize_ml_lifecycles
+        initialize_ml_lifecycles(conn)
         conn.commit()
     finally:
         conn.close()

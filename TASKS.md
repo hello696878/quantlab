@@ -1,10 +1,27 @@
 # TASKS - QuantLab
 
-Current handoff updated for Phase 64 final release evidence (2026-09-20).
+## Current Phase 65 Implementation (2026-09-29)
+
+Branch `phase65-unified-ml-lifecycle-artifact-registry`, based on frozen Phase 64
+`1591f89931f6534d523c96a87231bcd9d680080a`. The v4.82 tag exists at that commit;
+exact documentation CI `35739957842` is inherited user-supplied passing evidence.
+VERSION `4.83.0-dev`; no v4.83 tag/commit/release is created here.
+
+- [x] Add immutable snapshots, safe importer, explicit diagnostic adapters and linked synthetic demo.
+- [x] Add read-only lifecycle workspace, API, component tests and guarded browser specification.
+- [x] Record exact verification in `docs/PHASE_65_IMPLEMENTATION.md`: full pre-final-importer-fix run 4502 passed / 5 skipped; post-fix importer 33 passed / 2 skipped, all protection checks pass.
+- [x] Frontend: 178 unit tests, TypeScript and 276-test Chromium discovery pass (discovery is not browser execution).
+- [ ] Separate independent review; user production build and disposable browser execution.
+- [ ] User-only implementation commit, later independent-review commit and future tag.
+- Phase 66 remains out of scope. No staging, commit, push, services or user DB changes.
+
+## Historical Phase 64 Handoff (Superseded)
+
+The following handoff was updated for Phase 64 final release evidence (2026-09-20).
 The Phase 62 audit, futures checkpoints and earlier Phase 64 evidence remain
 historical. This documentation finalization reruns no tests or release checks.
 
-## Current phase
+### Phase 64 State at That Handoff
 
 - Phase 64: Strategy Return Stream, Strategy Similarity and Portfolio Ensemble
   Diagnostics Lab v1. Branch `main`; implementation

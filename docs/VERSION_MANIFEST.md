@@ -1,4 +1,4 @@
-# QuantLab — Version Manifest (Phase 64.0)
+# QuantLab — Version Manifest (Phase 65.0)
 
 The project's versioning conventions, verified against the local git history
 when written. Companion docs: [`../CHANGELOG.md`](../CHANGELOG.md) (grouped
@@ -12,6 +12,17 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 > anything about live trading.
 
 ## 1. Current version label
+
+**`4.83.0-dev`**, Phase 65 implementation on
+`phase65-unified-ml-lifecycle-artifact-registry`. Future user tag:
+`v4.83.0-unified-ml-lifecycle-model-artifact-registry-v1` (not created).
+See [current implementation evidence](PHASE_65_IMPLEMENTATION.md).
+
+Frozen v4.82 tag resolves to `1591f89931f6534d523c96a87231bcd9d680080a`.
+User-supplied exact documentation CI `35739957842` passed both jobs. Neither
+the tag nor historical Phase 64 reports are modified by Phase 65.
+
+### Historical Phase 64 Version Note (Superseded)
 
 **`4.82.0-dev`** (see the repo-root [`VERSION`](../VERSION) file). The expected
 future tag is
