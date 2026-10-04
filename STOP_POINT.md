@@ -1,6 +1,6 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 65 Review (2026-09-30)
+## Current Handoff: Phase 65 Platform Verification (2026-10-01)
 
 Unified ML Research Lifecycle / Model Artifact Registry v1 is implemented
 at `1449db23744f1d03743df189f5fa063df286802e` on `main`, VERSION `4.83.0-dev`.
@@ -8,18 +8,22 @@ The implementation parent and frozen v4.82 tag resolve to
 `1591f89931f6534d523c96a87231bcd9d680080a`. User-supplied exact documentation
 CI `35739957842` passed both jobs; it is not Phase 65 verification.
 
-Use `docs/PHASE_65_REVIEW.md` for current review fixes, focused verification and
-the exact pending inventory. `docs/PHASE_65_IMPLEMENTATION.md` retains historical
-implementation evidence and its 36-file handoff.
-Full regression: 4502 passed / 5 skipped; the final Parquet correction afterward
-has 33 importer tests passed / 2 skipped. Both runs passed all protection checks;
-the full suite was not rerun after that correction. Frontend: 178 tests and
-TypeScript pass; Chromium discovery lists 276 tests, not executed browser checks.
-Next gates: final exact-commit CI, user-run production build and disposable browser
-checks. The review distinguishes supplementary real-PyArrow checks from the
-authoritative backend environment and records physical-link capability. No automatic Git index or
-release actions and no Phase 66. The historical stop point below is retained
-as historical evidence, not current phase/version/tag instructions.
+Review is committed at `291b0f424716ec336548b3b5648008e6a78a4613` on `main`.
+Use [post-review verification](docs/PHASE_65_REVIEW.md#9-post-review-platform-verification-2026-10-01)
+for the current gates; the earlier review inventory and implementation evidence
+remain historical. Exact-commit CI `36675720804` passed both jobs; its backend
+reported 4568 passed / 18 skipped in 706.07s, without enumerated skip reasons.
+The user production build and one isolated Edge ML Lifecycle scenario passed.
+New disposable Linux/Python 3.11.16/PyArrow 22.0.0 importer verification:
+69 passed / 1 Windows-junction skip / 70 selected / 0 deselected, all exits 0.
+Real codec, physical symlink, hardlink and replacement coverage executed.
+Historical Windows junction and Python 3.13 codec evidence remain separate.
+No completed suite/build/browser check was repeated. Active data, frozen
+screenshots, executable source, index and VERSION remained unchanged.
+Next: user review, commit/publication and verification of the six documentation
+updates, then user-only creation of the still-uncreated v4.83 tag. No staging,
+commit, push, tag, deployment or Phase 66 occurred here. The historical stop
+point below is not current phase/version/tag guidance.
 
 ## Historical Phase 64 Stop Point (Superseded)
 

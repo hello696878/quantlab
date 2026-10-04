@@ -15,7 +15,12 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 **`4.83.0-dev`**, Phase 65 implementation
 `1449db23744f1d03743df189f5fa063df286802e`, reviewed on `main`.
-The review fixes are uncommitted; see [independent review](PHASE_65_REVIEW.md).
+Review fixes are committed at `291b0f424716ec336548b3b5648008e6a78a4613`
+on `main`. [Post-review verification (2026-10-01)](PHASE_65_REVIEW.md#9-post-review-platform-verification-2026-10-01)
+records successful exact-commit CI, the supplied production build/single Edge
+scenario and disposable Python 3.11 real-codec/Linux-link checks. Only final
+documentation review, user commit/publication and verification remain before
+the user tag; Phase 66 is unstarted. VERSION is unchanged.
 Future user tag:
 `v4.83.0-unified-ml-lifecycle-model-artifact-registry-v1` (not created).
 See [current implementation evidence](PHASE_65_IMPLEMENTATION.md).

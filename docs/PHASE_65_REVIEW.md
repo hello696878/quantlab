@@ -436,3 +436,231 @@ all 1,093 files in the final backend snapshot still match their recorded hashes;
 the 23 protected DB/screenshot-directory files match their before-check bytes,
 sizes and modification times. Only this new report postdates that snapshot.
 Work stops at this single review handoff, with no staging or commit.
+
+## 9. Post-review platform verification (2026-10-01)
+
+This dated addendum supersedes only the **current pending-gate status**, not
+the historical attempts, source snapshots, counts, skips or inventories above.
+The reviewed implementation/fixes are now committed at
+`291b0f424716ec336548b3b5648008e6a78a4613`. Preflight verified clean `main`,
+an empty index and VERSION `4.83.0-dev`. No implementation review was restarted.
+
+### Retained completed gates (not rerun)
+
+- **Exact-review-commit CI:** existing run `36675720804` was read through the
+  GitHub CLI, not triggered. Metadata confirms the exact SHA above and both
+  jobs completed/success: Backend Tests `109760125008`, Frontend Tests & Build
+  `109760124780`. Retrieved backend log lines confirm Ubuntu 24.04, declared
+  Python 3.11 and **4568 passed, 18 skipped in 706.07s**. The supplied earlier
+  log inspection records CPython 3.11.16. No PyArrow appears in the retrieved
+  installed-package list; the quiet summary does not identify each skip.
+  Their reasons are not inferred from matching counts.
+- **User-reported production build:** Next.js 15.5.25, Node 24.21.0,
+  npm 11.17.0, exit 0, clean checkout. Not re-executed here.
+- **User-reported actual browser execution:** `e2e/ml-lifecycle.spec.ts`,
+  project `chromium`, actual channel `msedge`: **1 passed, 0 failed, 0 skipped**,
+  browser exit 0; scenario 11.3s, command 16.2s. Production frontend targeted
+  the disposable Phase 65 backend and both proxy identity checks executed.
+  The existing `test-results/.last-run.json` was read and reports `passed`
+  with no failed tests; exact counts/times and isolation details remain supplied
+  evidence. No raw traces or credentials were copied. Evidence remains at
+  `C:\Users\jimli\AppData\Local\Temp\quantlab-phase65-browser-b8c9e7a8183a433c839a64b3221265dc`.
+  This is one scenario, not all 276 discovered tests.
+- **Historical B3:** the existing result/runtime summaries were read:
+  18 passed, Python 3.13.5, PyArrow 19.0.0, exit 0. This remains historical
+  supplementary evidence, not the new Python 3.11 result.
+
+### Disposable source and environment identity
+
+New task-owned external root:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-phase65-platform-36f099e735364ae0a789de864b912e29`.
+Only its `input` (read-only) and `evidence` (writable) directories were mounted.
+Neither the live checkout, active databases, user home, credentials nor Docker
+socket was mounted. There were no published ports, application servers or
+privileged containers; capabilities were dropped and `no-new-privileges` set.
+
+Docker access was rechecked in this execution context. The sandboxed client
+received named-pipe permission denied; the normal approved elevated tool call
+succeeded against the already-running engine. Docker Desktop 4.75.0 (227598),
+Engine 29.5.2, context `desktop-linux`, server `linux/amd64`. No engine reset,
+reinstall, manual permission change or request to restart it occurred.
+
+Official requested image: `python:3.11-slim-bookworm`. Resolved image ID and
+recorded RepoDigest: `sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637cecc392d97f980d4fec56b`
+(`python@sha256:a36c24f9cbdf4fd0f52d67f0823eeac19c2028c637cecc392d97f980d4fec56b`).
+The container was created using that inspected image ID, not an assumed
+immutable floating tag. Successful container ID:
+`82eecb468863be75c3a8ae1ffad4ac02cdfe522075d75b3cad922cbed0f7307f`.
+Runtime: CPython **3.11.16**, Linux x86_64,
+`6.6.87.2-microsoft-standard-WSL2`, glibc 2.36.
+
+The archive was produced directly by Git from the exact review commit:
+
+```powershell
+git -c core.autocrlf=false archive --format=tar --output=<external-input>/source.tar 291b0f424716ec336548b3b5648008e6a78a4613 -- VERSION backend/app backend/tests backend/pyproject.toml backend/requirements.txt scripts/backend_test_runner.py scripts/import_ml_lifecycle.py
+```
+
+Final archive size **7,792,640 bytes**; SHA-256
+`07e230c12a0cbd7808f584eeaf4edf2684b7fab2ad9d98d6e546bd46fe7d95a8`.
+Its PAX commit identity and exact file membership were verified; **558 files**
+matched their committed Git blob identities byte-for-byte before installation.
+Only this bounded committed backend/test/runner scope was archived, not the
+entire live directory. No active data, local environment/settings, credentials,
+dependencies, caches, logs, screenshots or previous evidence were included.
+Source was extracted into container-owned `/work/source`; fixture links and
+SQLite files used `/work/pytest-tmp` on Linux, not a Windows bind mount.
+
+Declared requirements plus released **PyArrow 22.0.0** were installed only
+inside this disposable container. Real `pyarrow` and `pyarrow.parquet` imports
+succeeded before test execution. Actual primary versions:
+
+| Package | Version | Package | Version |
+|---|---|---|---|
+| PyArrow | 22.0.0 | NumPy | 2.4.6 |
+| pandas | 3.0.6 | pytest | 9.1.1 |
+| SciPy | 1.17.1 | FastAPI | 0.142.2 |
+| Pydantic | 2.13.5 | pydantic-core | 2.46.5 |
+| Starlette | 1.7.0 | Uvicorn | 0.54.0 |
+| yfinance | 1.7.0 | httpx | 0.28.1 |
+| python-multipart | 0.0.32 | python-dateutil | 2.9.0.post0 |
+| AnyIO | 4.15.1 | pip | 24.0 |
+
+Full installed versions and public wheel identities are retained in
+`runtime-preflight.json`, `runtime.json` and `pip-install-report.json` externally.
+The open-ended declared requirements resolved at this verification point; this
+is not a new lockfile or a claim of all future dependency compatibility.
+
+### Commands, outcomes and executed coverage
+
+The existing committed runner's protected **inner executor** was reused.
+Its live-worktree-copy outer mode was not used: the external orchestration
+instead verified the exact Git archive and private source before/after.
+SQLite audit and fixture guards were not changed or disabled.
+
+```text
+/usr/local/bin/python -m pip install --no-cache-dir --report /work/pip-install-report.json -r /work/source/backend/requirements.txt pyarrow==22.0.0
+/usr/local/bin/python -m pip check
+/usr/local/bin/python -u /work/source/scripts/backend_test_runner.py --execute /work/run-config.json
+```
+
+The recorded pytest arguments, invoked by the inner executor from `/work/source`:
+
+```text
+backend/tests/test_ml_lifecycle_import.py backend/tests/test_ml_lifecycle_import_review.py -c backend/pyproject.toml -o addopts= -vv -ra --tb=short -p no:cacheprovider --durations=0 --durations-min=0 --basetemp /work/pytest-tmp --junitxml /work/junit.xml
+```
+
+Serial execution, one worker, no filters/deselection; `PYTHONPATH` stays inside
+the snapshot. Bytecode and pytest caches were disabled; third-party pytest
+plugin autoload was disabled for this bounded synchronous scope. Thread limits
+were 1. No Windows wrapper or host Python environment was used.
+
+| Operation | Actual result | Exit | Wall seconds |
+|---|---|---:|---:|
+| Container-only dependency installation | declared requirements + real PyArrow | 0 | 134.192 |
+| Container-only dependency consistency | no broken requirements | 0 | 1.654 |
+| Pytest | **69 passed, 1 skipped; 70 selected / 70 collected / 0 deselected** | 0 | 5.382 runner session; console summary 5.25 |
+| Protected executor process | complete child evidence, SQLite violations `[]` | 0 | 6.253 |
+| External orchestration | completed; source unchanged, scope/coverage checks true | 0 | 143.533 |
+| Container / Docker attach / PowerShell | completed, no OOM | 0 / 0 / 0 | 144.840 host attach |
+
+Only the two requested modules executed, once after successful setup. Verbose
+node outcomes, `pytest.log`, JUnit, collection, per-phase JSONL, every skip,
+runtime, dependency, command and protection results are retained externally.
+
+All **18 actual producer/codec cases** passed: real ExperimentStore CSV and
+Parquet round-trips; null/finite/NaN/+Infinity/-Infinity scalar handling;
+offset/microsecond timestamp, null and boolean semantics; lossy-role coercion;
+duplicate columns; row/column/nested/truncated bounds; and dictionary expansion.
+Existing CSV coercion and invalid/malformed/oversized artifact checks also
+executed. Decoder-stub cases remain separate from these actual-codec outcomes.
+
+The existing physical-symlink test created a real owned directory symlink and
+verified importer refusal. Source and destination hardlink refusal, between-read
+mutation, file replacement between check/open and parent-directory replacement
+checks all passed. On Linux the parent test performs replacement and requires
+detected refusal; it does not accept the Windows blocked-rename alternative.
+
+**Complete new skip list (one):**
+`tests/test_ml_lifecycle_import_review.py::test_actual_junction_never_reaches_artifact_reader`,
+source line 196: **`Windows junction behavior requires Windows`**.
+This is a Linux skip, not a Linux junction pass. The existing B2 phase records
+were read separately and confirm its actual Windows junction call passed,
+along with hardlink and file/parent replacement cases. No missing-PyArrow or
+physical-symlink capability skip remains in the new run.
+
+### Preserved setup/inspection failures
+
+The previous engine-unavailable preflight remains unsuccessful: missing Docker
+named pipe, no container/install/test/file modification. The new sandboxed
+permission-denied probe is distinct and was resolved via normal approval.
+
+Two new pre-test setup attempts are retained, not relabeled passes:
+
+1. Host safety guard exited 1 after container creation, **before start**.
+   It used PowerShell object `Count` for the empty `PortBindings` object.
+   Independent inspection confirmed zero binding properties and exactly two
+   intended mounts. The corrected property-count guard passed without changing
+   the container safety settings or any repository file.
+2. First container exited **2** during archive verification, **before any
+   installation or tests**. Windows `core.autocrlf=true` caused Git archive
+   export to emit CRLF, failing byte-exact blob comparison. All 558 differences
+   normalized to the expected committed blobs. The original archive (SHA-256
+   `ec231b9e551b3f1fa87d2502a5459158ebcb6a578a845ccf7525de7ef32aa687`),
+   mismatch diagnostics and failed result remain external. A command-local
+   `-c core.autocrlf=false` generated the verified Linux archive; Git configuration
+   was not changed. The corrected run used a new uniquely named container.
+
+One post-test host protection comparison also exited 1: JSON date parsing
+trimmed a trailing fractional zero in two screenshot timestamps, falsely
+reporting metadata changes. The failed comparison is retained. Explicit SHA-256,
+size and UTC-tick comparisons confirm every protected file was unchanged;
+no screenshot was edited and no test was repeated to resolve it.
+These are orchestration/inspection errors, not source/test failures.
+
+### Protection scope, gate decisions and final handoff
+
+Before documentation edits, all **1,094 tracked working files** matched their
+initial byte hashes. All **558 private source files** matched before/after;
+source identity and test scope passed. **24 protected data/screenshot files**
+matched bytes, size, mtime and membership. Active DB remained 8,015,872 bytes,
+SHA-256 `3b26e4b910194ecf0c01fe42c353f591b26b103e06c3f065ed9c0df8eb76f2f5`;
+no active SQLite connection was opened. No user environment was installed into.
+The raw index hash remained
+`ffb76b07ba29034527c505023459134f10d8ad4f773e4372a00e5460e547bc09`,
+the index stayed empty, and branch/HEAD/VERSION were unchanged.
+
+The two stopped task-owned containers were removed only after recording their
+identities, exits and evidence. Their private writable filesystems/dependencies
+were disposable; external input, logs and all failed/successful evidence were
+retained. No application service or unrelated container/image was changed.
+
+**Closed for the reviewed code commit:** exact-commit CI; supplied production
+build; the one supplied isolated Edge scenario; Python 3.11 actual-codec
+compatibility; physical-symlink refusal and bounded POSIX source-path checks.
+Windows junction coverage is satisfied by the separate existing Windows record,
+not by the Linux skip. The earlier Python 3.13 result remains separate.
+
+**Still pending:** user review, commit/publication and verification of these
+documentation-only updates, then user-only creation of
+`v4.83.0-unified-ml-lifecycle-model-artifact-registry-v1`. That tag is uncreated;
+Phase 66 is unstarted. These checks do not certify hostile-OS isolation,
+universal filesystem/platform support, security, deployment, trading or all
+276 browser scenarios. Existing portable SQLite/path-race limitations remain.
+The exact-code CI does not verify a future documentation commit.
+
+Only current handoff text in `README.md`, `STOP_POINT.md`, `TASKS.md`,
+`docs/VERSION_MANIFEST.md`, `docs/FORWARD_ROADMAP_PHASES_63_70.md`, plus this
+appended section changed. Earlier report sections, Phase 64 frozen reports,
+governing instructions, source, tests, scripts, requirements, workflows,
+Dockerfiles and VERSION remain unchanged. Final path/hash/whitespace checks
+are inspection, not extra tests. No staging, commit, push, tag, deployment,
+frontend/full-backend rerun or next phase was performed.
+
+Final inspection passed with exactly those **six unstaged documentation paths**,
+**1,088 unchanged non-documentation tracked files**, no nonignored untracked
+files, empty/byte-unchanged index and empty screenshot diff. `git diff --check`
+exited 0; Git emitted only its existing LF-to-CRLF working-copy warnings, not
+whitespace errors. Data hashes, sizes, timestamps and membership still matched.
+Final machine evidence is `evidence/host-final.json` under the external root;
+the evidence checksum manifest includes historical failed attempts as well as
+the completed run. These documentation bytes postdate the tested code archive.

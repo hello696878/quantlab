@@ -26,9 +26,13 @@ automatic retraining or new estimator family.
 VERSION is `4.83.0-dev`. See the [workflow](docs/ML_RESEARCH_LIFECYCLE.md),
 [artifact contract](docs/MODEL_ARTIFACT_REGISTRY.md) and
 [implementation evidence](docs/PHASE_65_IMPLEMENTATION.md). The
-[independent review](docs/PHASE_65_REVIEW.md) records verified fixes and focused
-checks; final exact-commit CI and user build/browser gates remain pending.
-No v4.83 tag is claimed.
+[independent review](docs/PHASE_65_REVIEW.md) is committed at
+`291b0f424716ec336548b3b5648008e6a78a4613`. Its
+[post-review verification](docs/PHASE_65_REVIEW.md#9-post-review-platform-verification-2026-10-01)
+closes exact-commit CI, the supplied production build/single Edge scenario,
+and Python 3.11 real-PyArrow/Linux-link gates (69 passed, one Windows-only skip).
+Final documentation review, user commit/publication and verification precede
+the still-uncreated v4.83 tag. Phase 66 remains unstarted.
 
 ## Completed baseline: Phase 64
 

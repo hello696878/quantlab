@@ -1,10 +1,13 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (2026-09-30):** Phase 64 is frozen at `1591f899...`, including
+> **Current status (2026-10-01):** Phase 64 is frozen at `1591f899...`, including
 > the existing v4.82 tag and inherited successful documentation CI `35739957842`.
 > Phase 65 is implemented at `4.83.0-dev`; see the
-> [independent review](PHASE_65_REVIEW.md) for verified fixes and focused evidence.
-> Final exact-commit CI and user build/browser gates remain pending. Phase 66 is not authorized. The prior
+> [independent review](PHASE_65_REVIEW.md) committed at `291b0f424716ec336548b3b5648008e6a78a4613`.
+> [Post-review verification](PHASE_65_REVIEW.md#9-post-review-platform-verification-2026-10-01)
+> closes exact-commit CI, supplied build/single Edge scenario, and Python 3.11
+> real-codec/Linux-link gates. Final user documentation review, commit/publication
+> and verification precede the still-uncreated v4.83 tag. Phase 66 is unstarted and not authorized. The prior
 > status note immediately below is historical and superseded, not current guidance.
 
 > **Current status (Phase 64.0 release evidence, 2026-09-20).** Phase 63's
