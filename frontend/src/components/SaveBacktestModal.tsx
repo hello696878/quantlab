@@ -165,6 +165,7 @@ export default function SaveBacktestModal({
       equity_curve: result.equity_curve,
       trades: result.trades,
       notes: notes.trim(),
+      replay: result.execution_context ?? undefined,
     };
 
     try {

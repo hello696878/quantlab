@@ -75,6 +75,9 @@ import SignalEnsemblePanel from "@/components/SignalEnsemblePanel";
 import StrategyEnsemblePanel from "@/components/StrategyEnsemblePanel";
 import MLLifecyclePanel from "@/components/MLLifecyclePanel";
 import { isMLLifecycleLink, useMLLifecycleLinkCleanup, writeMLLifecycleLink } from "@/lib/mlLifecycleLink";
+import RunReplayPanel from "@/components/RunReplayPanel";
+import { executeLocalReplay, readReplayLink, useReplayLinkCleanup, writeReplayLink } from "@/lib/runReplay";
+import type { ReplayLocation, ReplayRestore } from "@/lib/runReplay";
 import { isStrategyEnsembleLink, useStrategyEnsembleLinkCleanup, writeStrategyEnsembleLink } from "@/lib/strategyEnsembleLink";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
 import DataReliabilityPanel from "@/components/DataReliabilityPanel";
@@ -600,6 +603,10 @@ const VIEW_META: Record<View, { title: string; subtitle: string }> = {
     title: "ML Research Lifecycle",
     subtitle: "Local research provenance. Synthetic demonstrations and stored evidence, not model promotion or investment advice.",
   },
+  runreplay: {
+    title: "Run Replay",
+    subtitle: "Stored configuration and environment provenance. Explicit restoration, not automatic execution.",
+  },
   scanner: {
     title: "Cross-Sectional Scanner",
     subtitle:
@@ -699,6 +706,7 @@ export default function HomePage() {
   const [view, setView] = useState<View>("home");
   useStrategyEnsembleLinkCleanup(view);
   useMLLifecycleLinkCleanup(view);
+  useReplayLinkCleanup(view);
 
   // Guided-demo banner ("Demo parameters loaded. Click Run to execute.") and
   // the portfolio sub-tab a demo should open on.  `portfolioKey` is bumped to
@@ -807,6 +815,10 @@ export default function HomePage() {
   // Bumping this key remounts BacktestForm so its internal numeric string
   // states re-derive from the (settings-prefilled) param props.
   const [formKey, setFormKey] = useState(0);
+  const [replayLocation, setReplayLocation] = useState<ReplayLocation>({});
+  const [replayLinkError, setReplayLinkError] = useState<string>();
+  const [restoredReplay, setRestoredReplay] = useState<ReplayRestore | null>(null);
+  const [replayModified, setReplayModified] = useState(false);
 
   // Apply local settings once on startup: set the theme accent and prefill the
   // single-backtest forms' common fields (capital, cost, date range).  Runs in
@@ -847,6 +859,8 @@ export default function HomePage() {
   //    leaving the globe) always matches the address bar — no stale selection.
   useEffect(() => {
     const entry = readGlobeParams();
+    const replay = readReplayLink();
+    if (replay.active) { setView("runreplay"); setReplayLocation(replay.location); setReplayLinkError(replay.error); }
     if (isStrategyEnsembleLink()) setView("strategyensemble");
     if (isMLLifecycleLink()) setView("mllifecycle");
     if (entry.isGlobe) {
@@ -858,6 +872,8 @@ export default function HomePage() {
     }
 
     function onPopState() {
+      const replay = readReplayLink();
+      if (replay.active) { setView("runreplay"); setReplayLocation(replay.location); setReplayLinkError(replay.error); setDemoNotice(null); return; }
       if (isMLLifecycleLink()) { setView("mllifecycle"); setDemoNotice(null); return; }
       if (isStrategyEnsembleLink()) {
         setView("strategyensemble");
@@ -897,7 +913,9 @@ export default function HomePage() {
     try {
       const data =
         strategy === "sma_crossover"
-          ? await runBacktest(smaParams)
+          ? restoredReplay?.preflight.canonical_config.data_provider === "csv_upload"
+            ? await executeLocalReplay(restoredReplay.preflight.context_id, smaParams, restoredReplay.csvText)
+            : await runBacktest(smaParams)
           : strategy === "rsi_mean_reversion"
             ? await runRsiBacktest(rsiParams)
             : strategy === "bollinger_band"
@@ -907,6 +925,7 @@ export default function HomePage() {
                 : strategy === "volatility_breakout"
                   ? await runVbBacktest(vbParams)
                   : await runPairsBacktest(pairsParams);
+      if (strategy === "sma_crossover" && restoredReplay && data.execution_context) data.execution_context.parent_context_id = restoredReplay.preflight.context_id;
       setResult(data);
       setDemoNotice(null); // a real run replaces the "click Run" hint
       markChecklistStep("ran_backtest");
@@ -919,7 +938,9 @@ export default function HomePage() {
     }
   }
 
-  function handleNav(next: View) {
+  function handleNav(next: View, replay: ReplayLocation = {}) {
+    if (next === "runreplay") { writeReplayLink(replay); setReplayLocation(replay); setReplayLinkError(undefined); }
+    else writeReplayLink(null);
     if (next === "mllifecycle") writeMLLifecycleLink(true);
     else if (next !== "globe" && next !== "strategyensemble") writeMLLifecycleLink(false);
     if (next === "strategyensemble") writeStrategyEnsembleLink(true);
@@ -948,9 +969,21 @@ export default function HomePage() {
       setGlobePresentation(false);
       setGlobeKey((k) => k + 1);
       writeGlobeUrl({ market: null }, "push");
-    } else if (leavingGlobe && next !== "strategyensemble" && next !== "mllifecycle") {
+    } else if (leavingGlobe && next !== "strategyensemble" && next !== "mllifecycle" && next !== "runreplay") {
       clearGlobeUrl("push");
     }
+  }
+
+  function openReplay(location: ReplayLocation) {
+    handleNav("runreplay", location);
+  }
+
+  function applyReplay(restored: ReplayRestore) {
+    if (loading) return;
+    setStrategy("sma_crossover"); setSmaParams(restored.request);
+    setRestoredReplay(restored); setReplayModified(false);
+    setFormKey((key) => key + 1); setResult(null); setError(null); setShowSaveForm(false);
+    handleNav("backtest");
   }
 
   /**
@@ -1035,6 +1068,7 @@ export default function HomePage() {
    * theme) untouched.
    */
   function handleRunFromLibrary(id: StrategyType) {
+    setRestoredReplay(null); setReplayModified(false);
     setSavedDetailId(null);
     setSavedReportDetailId(null);
     setStrategy(id);
@@ -1059,6 +1093,7 @@ export default function HomePage() {
    * clicks Run.  No results are fabricated.
    */
   function handleDemo(id: DemoPresetId) {
+    setRestoredReplay(null); setReplayModified(false);
     setSavedDetailId(null);
     setSavedReportDetailId(null);
     switch (id) {
@@ -1916,6 +1951,17 @@ export default function HomePage() {
               </p>
             </div>
 
+            {restoredReplay && <div className="border border-amber-500 p-3 text-sm space-y-1" data-testid="restored-replay-notice">
+              <p>{replayModified ? "Modified settings. The original hash no longer identifies this form." : "Restored configuration; no analysis has run."}</p>
+              {!replayModified && <p className="font-mono text-xs break-all">{restoredReplay.preflight.config_hash_full}</p>}
+              <p>{restoredReplay.preflight.canonical_config.data_provider === "csv_upload" ?
+                "Run uses the retained or verified local CSV, never a provider fallback. Ticker and dates remain fixed in replay v1." :
+                "Historical provider data was not retained. Run explicitly requests current provider history."}</p>
+              <button type="button" className="rounded border border-[var(--line)] px-3 py-2 text-xs" onClick={() => { setRestoredReplay(null); setReplayModified(false); setResult(null); }}>
+                Detach replay and use ordinary provider workflow
+              </button>
+            </div>}
+            <div onChangeCapture={() => { if (restoredReplay) setReplayModified(true); }}>
             <BacktestForm
               key={formKey}
               strategy={strategy}
@@ -1923,9 +1969,13 @@ export default function HomePage() {
                 setStrategy(s);
                 setResult(null);
                 setError(null);
+                setRestoredReplay(null); setReplayModified(false);
               }}
               smaParams={smaParams}
-              onSmaParamsChange={setSmaParams}
+              onSmaParamsChange={(params) => {
+                setSmaParams(params);
+                if (restoredReplay && JSON.stringify(params) !== JSON.stringify(restoredReplay.request)) setReplayModified(true);
+              }}
               rsiParams={rsiParams}
               onRsiParamsChange={setRsiParams}
               bbParams={bbParams}
@@ -1939,6 +1989,7 @@ export default function HomePage() {
               onSubmit={handleRun}
               loading={loading}
             />
+            </div>
 
             {/* Loading skeleton */}
             {loading && (
@@ -2345,6 +2396,7 @@ export default function HomePage() {
         {view === "signalensemble" && <SignalEnsemblePanel onNav={(route) => handleNav(route as View)} />}
         {view === "strategyensemble" && <StrategyEnsemblePanel />}
         {view === "mllifecycle" && <MLLifecyclePanel onNav={handleNav} />}
+        {view === "runreplay" && <RunReplayPanel location={replayLocation} linkError={replayLinkError} onLocation={openReplay} onRestore={applyReplay} />}
 
         {view === "democenter" && <DemoCenterPanel onNav={(route) => handleNav(route as View)} />}
 
@@ -2475,6 +2527,7 @@ export default function HomePage() {
                 id={savedDetailId}
                 onBack={() => setSavedDetailId(null)}
                 onGoHome={() => handleNav("home")}
+                onReplay={openReplay}
               />
             ) : (
               <SavedBacktestsList

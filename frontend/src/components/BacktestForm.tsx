@@ -313,16 +313,16 @@ export default function BacktestForm({
     _initialRm?.type ?? "none",
   );
   const [stopLossStr, setStopLossStr] = useState(
-    String(_initialRm?.stop_loss_pct ?? 0.1),
+    String(_initialRm?.stop_loss_pct ?? (_initialRm && ["combined", "fixed_stop_take_profit"].includes(_initialRm.type) ? "" : 0.1)),
   );
   const [takeProfitStr, setTakeProfitStr] = useState(
-    String(_initialRm?.take_profit_pct ?? 0.2),
+    String(_initialRm?.take_profit_pct ?? (_initialRm && ["combined", "fixed_stop_take_profit"].includes(_initialRm.type) ? "" : 0.2)),
   );
   const [trailingStr, setTrailingStr] = useState(
-    String(_initialRm?.trailing_stop_pct ?? 0.1),
+    String(_initialRm?.trailing_stop_pct ?? (_initialRm?.type === "combined" ? "" : 0.1)),
   );
   const [maxHoldStr, setMaxHoldStr] = useState(
-    String(_initialRm?.max_holding_days ?? 20),
+    String(_initialRm?.max_holding_days ?? (_initialRm?.type === "combined" ? "" : 20)),
   );
   // Annualization convention (shared; seeded from settings via params).
   const [annualizationMode, setAnnualizationMode] = useState<AnnualizationMode>(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { classifyApiError, getSavedBacktest } from "@/lib/api";
 import type {
   BenchmarkAnalytics,
@@ -27,6 +27,7 @@ import TradeTable from "@/components/TradeTable";
 import ExportReportButton from "@/components/ExportReportButton";
 import { buildSavedBacktestReport } from "@/lib/reportExport";
 import { fmtPct, fmtRatio, fmtDollar } from "@/lib/format";
+import { registerReplay, type ReplayLocation } from "@/lib/runReplay";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -125,20 +126,27 @@ interface SavedBacktestDetailProps {
   id: number;
   onBack: () => void;
   onGoHome?: () => void;
+  onReplay?: (location: ReplayLocation) => void;
 }
 
 export default function SavedBacktestDetail({
   id,
   onBack,
   onGoHome,
+  onReplay,
 }: SavedBacktestDetailProps) {
   const [record, setRecord] = useState<SavedBacktestFull | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<unknown>(null);
   const [retryTick, setRetryTick] = useState(0);
+  const [replayBusy, setReplayBusy] = useState(false);
+  const [replayError, setReplayError] = useState<string | null>(null);
+  const replaySelection = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
+    replaySelection.current++;
+    setReplayBusy(false); setReplayError(null);
     setLoading(true);
     setError(null);
     setRecord(null);
@@ -160,6 +168,7 @@ export default function SavedBacktestDetail({
 
     return () => {
       cancelled = true;
+      replaySelection.current++;
     };
   }, [id, retryTick]);
 
@@ -296,6 +305,18 @@ export default function SavedBacktestDetail({
             <ExportReportButton
               getReport={(tpl) => buildSavedBacktestReport(record, tpl)}
             />
+            {onReplay && savedRepro && <button type="button" className="rounded border border-[var(--line)] bg-[var(--bg)] text-[var(--text-hi)] px-3 py-2 text-xs disabled:opacity-40" disabled={replayBusy}
+              onClick={async () => {
+                if (record.config_hash_full) { onReplay({ hash: record.config_hash_full }); return; }
+                const ticket = replaySelection.current;
+                setReplayBusy(true); setReplayError(null);
+                try {
+                  const registered = await registerReplay(record.id);
+                  if (replaySelection.current === ticket) onReplay({ hash: registered.config_hash_full, context: registered.context_id });
+                } catch (err) { if (replaySelection.current === ticket) setReplayError(err instanceof Error ? err.message : "Replay registration failed"); }
+                finally { if (replaySelection.current === ticket) setReplayBusy(false); }
+              }}>{record.config_hash_full ? "Inspect replay contexts" : "Register known configuration"}</button>}
+            {replayError && <p role="alert" className="text-red-400 text-sm">{replayError}</p>}
           </div>
         </div>
 

@@ -1,0 +1,60 @@
+import { expect, test } from "@playwright/test";
+import { verifyRunReplayIsolation } from "./runReplayIsolation";
+import { isolationHeader } from "./strategyEnsembleIsolation";
+
+test("Saved SMA run: hash inspection, explicit restore, no auto-run, export and history", async ({ page, request, baseURL }) => {
+  const token = process.env.E2E_STRATEGY_ENSEMBLE_TOKEN;
+  await verifyRunReplayIsolation(baseURL, token, (url, options) => request.get(url, options));
+  await page.setExtraHTTPHeaders({ [isolationHeader]: token! });
+  const headers = { [isolationHeader]: token! };
+  const seeded = await request.post(`${baseURL}/api/run-replay/demo`, { headers });
+  expect(seeded.status()).toBe(200);
+  const demo = await seeded.json();
+  const mutations: string[] = [];
+  page.on("request", (event) => {
+    if (event.method() === "POST" && /^\/api\/(run-replay|backtest|saved-backtests)/.test(new URL(event.url()).pathname)) mutations.push(event.url());
+  });
+  await page.goto("/");
+  const sidebar = page.getByRole("navigation", { name: "Workspaces" });
+  await sidebar.getByRole("button", { name: "Saved Backtests", exact: true }).click();
+  await page.getByText("Local SMA replay demo", { exact: true }).first().click();
+  await page.getByRole("button", { name: "Inspect replay contexts" }).click();
+  await expect(page.getByTestId("run-replay-panel")).toBeVisible();
+  await page.getByRole("button", { name: /Local SMA replay demo \/ context/ }).click();
+  await expect(page.getByRole("table", { name: "Environment comparison" })).toBeVisible();
+  await expect(page.getByText(/Data: retained_verified/)).toBeVisible();
+  for (const width of [1440, 1024, 768]) {
+    await page.setViewportSize({ width, height: 900 });
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1)).toBe(true);
+  }
+  const downloadPromise = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export replay JSON" }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe(`quantlab-replay-${demo.context_id}.json`);
+  const stream = await download.createReadStream();
+  expect(stream).not.toBeNull();
+  const chunks: Buffer[] = [];
+  for await (const chunk of stream!) chunks.push(Buffer.from(chunk));
+  const exported = JSON.parse(Buffer.concat(chunks).toString("utf8"));
+  expect(exported.schema_version).toBe("replay_export_v1");
+  expect(exported.data_included).toBe(false);
+  expect(exported.csv_text).toBeUndefined();
+  expect(exported.config_hash_full).toBe(demo.config_hash_full);
+  await page.getByRole("button", { name: "Restore configuration" }).click();
+  await page.getByRole("button", { name: "Cancel", exact: true }).click();
+  expect(mutations).toEqual([]);
+  await page.getByRole("button", { name: "Restore configuration" }).click();
+  await page.getByRole("button", { name: "Apply and open Backtest Studio" }).click();
+  await expect(page.getByTestId("restored-replay-notice")).toContainText("no analysis has run");
+  await expect(page.locator('input[value="REPLAY-DEMO"]')).toHaveValue("REPLAY-DEMO");
+  expect(mutations).toEqual([]);
+  await page.goBack();
+  await expect(page.getByTestId("run-replay-panel")).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole("table", { name: "Environment comparison" })).toBeVisible();
+  expect(mutations).toEqual([]);
+  const refused = await request.get(`${baseURL}/api/run-replay/hash/${demo.config_hash_full.slice(0, 12)}`, { headers });
+  expect(refused.status()).toBe(422);
+  await sidebar.getByRole("button", { name: "Home", exact: true }).click();
+  await expect(page).not.toHaveURL(/view=runreplay/);
+});

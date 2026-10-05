@@ -43,7 +43,7 @@ from contextlib import asynccontextmanager
 from datetime import date, timedelta
 from typing import Optional
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
@@ -510,6 +510,11 @@ app.include_router(signal_decay_router)
 app.include_router(signal_ensemble_router)
 app.include_router(strategy_ensemble_router)
 app.include_router(ml_lifecycle_router)
+from app.run_replay.routes import router as run_replay_router
+from app.run_replay.environment import capture as capture_replay_execution
+from app.run_replay.routes import original_sma_request
+from app.run_replay.routes import saved_router as saved_replay_router
+app.include_router(run_replay_router)
 
 
 # ---------------------------------------------------------------------------
@@ -610,6 +615,8 @@ def _build_response(
     benchmark: Optional[BenchmarkConfig] = None,
     robustness: Optional[RobustnessConfig] = None,
     sensitivity: Optional[SensitivityConfig] = None,
+    original_request: Optional[dict] = None,
+    request_provenance: str = "validated_model_with_defaults",
 ) -> BacktestResponse:
     """Run backtest + metrics and assemble the unified response.
 
@@ -875,6 +882,8 @@ def _build_response(
         data_quality=data_quality,
         benchmark_analytics=benchmark_analytics,
         reproducibility=reproducibility,
+        execution_context=(capture_replay_execution(original_request, request_provenance)
+                           if original_request is not None else None),
         robustness=robustness_result,
         sensitivity=sensitivity_result,
         position_mode=position_mode,
@@ -985,7 +994,7 @@ def health_check():
         "Signal is shifted one day forward to prevent lookahead bias."
     ),
 )
-def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
+def backtest_sma_crossover(request: BacktestRequest, original_body: Optional[dict] = Depends(original_sma_request)) -> BacktestResponse:
     _validate_common(request.ticker, request.start_date, request.end_date)
 
     if request.fast_window >= request.slow_window:
@@ -1026,6 +1035,8 @@ def backtest_sma_crossover(request: BacktestRequest) -> BacktestResponse:
         close=close,
         position=position,
         strategy="sma_crossover",
+        original_request=original_body if isinstance(original_body, dict) else request.model_dump(mode="json"),
+        request_provenance="wire_json" if isinstance(original_body, dict) else "validated_model_with_defaults",
         cost_model=request.cost_model,
         position_sizing=request.position_sizing,
         risk_management=request.risk_management,
@@ -3072,7 +3083,7 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
 # ---------------------------------------------------------------------------
 
 
-@app.post(
+@saved_replay_router.post(
     "/saved-backtests",
     response_model=SavedBacktestFull,
     tags=["saved"],
@@ -3084,9 +3095,21 @@ def strategy_comparison(request: StrategyComparisonRequest) -> StrategyCompariso
         "``id`` and ``created_at`` timestamp."
     ),
 )
-def create_saved_backtest_endpoint(request: SavedBacktestCreate) -> SavedBacktestFull:
-    record = db_create(request.model_dump())
+async def create_saved_backtest_endpoint(request: SavedBacktestCreate, http_request: Request) -> SavedBacktestFull:
+    try:
+        if request.replay is not None:
+            from app.run_replay.routes import strict_body
+            raw = await strict_body(http_request, 4 * 1024 * 1024)
+            for key in ("initial_capital", "transaction_cost_bps"):
+                if type(raw[key]) not in (int, float):
+                    raise ValueError("Saved replay amounts cannot be coerced")
+        record = db_create(request.model_dump())
+    except ValueError as exc:
+        raise HTTPException(422, str(exc)) from exc
     return SavedBacktestFull(**record)
+
+
+app.include_router(saved_replay_router)
 
 
 @app.get(
@@ -3340,6 +3363,7 @@ def _run_csv_single_asset(close, strategy: str, params: dict, label: str) -> Bac
             **common,
             position=position,
             strategy="sma_crossover",
+            original_request={**req.model_dump(mode="json"), "ticker": label, "start_date": start_date, "end_date": end_date},
             fast_window=req.fast_window,
             slow_window=req.slow_window,
             position_mode=req.position_mode,

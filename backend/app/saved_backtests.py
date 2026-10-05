@@ -42,6 +42,8 @@ def _row_to_summary(row) -> Dict[str, Any]:
         "sharpe_ratio": metrics.get("sharpe_ratio"),
         "max_drawdown": metrics.get("max_drawdown"),
         "notes": row["notes"],
+        "config_hash_full": row["config_hash_full"],
+        "config_schema": row["config_schema"],
     }
 
 
@@ -107,8 +109,11 @@ def create_saved_backtest(data: Dict[str, Any]) -> Dict[str, Any]:
                 data.get("notes", ""),
             ),
         )
-        conn.commit()
         new_id: int = cursor.lastrowid  # type: ignore[assignment]
+        if data.get("replay") is not None:
+            from app.run_replay.service import register_in_transaction
+            register_in_transaction(conn, new_id, data, data["replay"])
+        conn.commit()
 
     result = get_saved_backtest(new_id)
     assert result is not None  # just inserted — must exist
@@ -144,6 +149,7 @@ def delete_saved_backtest(id: int) -> bool:
     Returns ``True`` if a row was deleted, ``False`` if the id was not found.
     """
     with get_connection() as conn:
+        conn.execute("DELETE FROM run_replay_contexts WHERE saved_backtest_id=?", (id,))
         cursor = conn.execute(
             "DELETE FROM saved_backtests WHERE id = ?", (id,)
         )

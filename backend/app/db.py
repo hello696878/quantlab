@@ -2682,6 +2682,8 @@ def init_db() -> None:
         initialize_strategy_ensembles(conn)
         from app.ml_lifecycle.store import initialize as initialize_ml_lifecycles
         initialize_ml_lifecycles(conn)
+        from app.run_replay.store import initialize as initialize_run_replay
+        initialize_run_replay(conn)
         conn.commit()
     finally:
         conn.close()

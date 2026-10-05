@@ -1,6 +1,30 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 65 Platform Verification (2026-10-01)
+## Current Handoff: Phase 66 Implementation (2026-10-05)
+
+VERSION `4.84.0-dev`, branch `phase66-run-replay-hash-environment-manifest`.
+HEAD remains frozen Phase 65 `c250d7e7de241e18ee8555af4af4c56cef1b4a73`;
+its v4.83 tag exists and is unchanged. Current changes are implementation work,
+not a release, review, production-build pass or browser-execution pass.
+
+Run Replay supports lossless SMA settings restoration after explicit context
+selection/confirmation. The deterministic retained-CSV demo uses existing quant
+logic, with no automatic run and no provider fallback. Other strategies are
+config-only; other labs remain deferred. Environment matches are not numerical
+compatibility guarantees. See `docs/PHASE_66_IMPLEMENTATION.md` and
+`docs/RUN_REPLAY_AND_ENVIRONMENT_MANIFEST.md` for evidence and limits.
+
+Stop after this implementation handoff. A separate fresh session must review
+the diff; production build/browser execution and exact-commit CI are user-owned
+later gates. No staging, commit, push, tag, deployment or Phase 67 occurred.
+
+Executed implementation checks: protected focused backend 91 passed / 0 skipped;
+frontend unit suite 208 passed, TypeScript passed and 277-test discovery passed.
+Discovery is not browser execution. Index/data/frozen-evidence protection passed;
+all 38 intended paths remain unstaged. Full evidence and the later user-only
+literal staging list are in `docs/PHASE_66_IMPLEMENTATION.md`.
+
+## Historical Handoff: Phase 65 Platform Verification (2026-10-01, Superseded)
 
 Unified ML Research Lifecycle / Model Artifact Registry v1 is implemented
 at `1449db23744f1d03743df189f5fa063df286802e` on `main`, VERSION `4.83.0-dev`.

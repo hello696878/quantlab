@@ -216,6 +216,13 @@ adapters only.
 
 ## Phase 66 — Reproducible Run Replay by Hash and Environment Manifest v1
 
+**2026-10-05 implementation status.** Bounded SMA provider/config restoration
+and retained local-CSV replay, with explicit context selection and separate
+identity layers, are implemented at `4.84.0-dev`. Other strategies are
+config-only; other labs are deferred. Independent review, production build,
+browser execution and exact-commit CI remain pending. See
+[implementation handoff](PHASE_66_IMPLEMENTATION.md). Phase 67 is not started.
+
 **Goal.** Make a stored run recreatable from its hash: resolve a config
 hash to its canonical configuration, attach an environment manifest, and
 give the UI a replay path.

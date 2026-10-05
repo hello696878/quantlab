@@ -48,6 +48,7 @@ export type View =
   | "signalensemble"
   | "strategyensemble"
   | "mllifecycle"
+  | "runreplay"
   | "democenter"
   | "datareliability"
   | "qacommandcenter"

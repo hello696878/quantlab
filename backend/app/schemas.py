@@ -1254,6 +1254,8 @@ class BacktestResponse(BaseModel):
     read only the fields they care about continue to work without changes.
     """
 
+    execution_context: Optional[dict] = Field(default=None, description="Optional Phase 66 declared execution capture; not an attestation.")
+
     ticker: str
     start_date: str
     end_date: str
@@ -2129,6 +2131,7 @@ class SavedBacktestCreate(BaseModel):
         description="List of TradeRecord dicts.",
     )
     notes: str = Field(default="", description="Optional free-text notes.")
+    replay: Optional[dict] = Field(default=None, description="Explicit replay capture stored atomically with this new saved result.")
 
     @field_validator("name", "ticker", "strategy")
     @classmethod
@@ -2163,6 +2166,8 @@ class SavedBacktestSummary(BaseModel):
     """
 
     id: int
+    config_hash_full: Optional[str] = None
+    config_schema: Optional[str] = None
     created_at: str = Field(description="ISO-8601 UTC timestamp of creation.")
     name: str
     ticker: str

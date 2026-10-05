@@ -1,4 +1,4 @@
-# QuantLab — Version Manifest (Phase 65.0)
+# QuantLab — Version Manifest (Phase 66.0)
 
 The project's versioning conventions, verified against the local git history
 when written. Companion docs: [`../CHANGELOG.md`](../CHANGELOG.md) (grouped
@@ -12,6 +12,21 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 > anything about live trading.
 
 ## 1. Current version label
+
+**`4.84.0-dev`**, bounded Phase 66 implementation on
+`phase66-run-replay-hash-environment-manifest`, from frozen Phase 65
+`c250d7e7de241e18ee8555af4af4c56cef1b4a73`.
+The existing v4.83 tag resolves to that commit (verified locally).
+User-supplied baseline CI `37208511643` passed both jobs; no baseline checks
+were rerun. Phase 66 implementation evidence is in
+[PHASE_66_IMPLEMENTATION.md](PHASE_66_IMPLEMENTATION.md).
+
+Independent review, production build, browser execution and exact-commit CI
+remain pending. Future user-created tag:
+`v4.84.0-reproducible-run-replay-environment-manifest-v1` (not created).
+No Phase 67 or release action is started.
+
+### Historical Phase 65 Version Note (Superseded)
 
 **`4.83.0-dev`**, Phase 65 implementation
 `1449db23744f1d03743df189f5fa063df286802e`, reviewed on `main`.

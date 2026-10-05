@@ -183,6 +183,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
       { id: "signalensemble", label: "Signal Ensemble Lab", icon: "signalensemble" },
       { id: "strategyensemble", label: "Strategy Ensemble Lab", icon: "strategyensemble" },
       { id: "mllifecycle", label: "ML Research Lifecycle", icon: "modelvalidation" },
+      { id: "runreplay", label: "Run Replay", icon: "modelvalidation" },
       { id: "datareliability", label: "Data Reliability Center", icon: "datareliability" },
       { id: "qacommandcenter", label: "QA Command Center", icon: "qacommandcenter" },
       { id: "releasenotes", label: "Release Notes Center", icon: "releasenotes" },

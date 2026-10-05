@@ -18,6 +18,14 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 66 bounded implementation** (2026-10-05, `4.84.0-dev`): indexed saved
+  configuration hashes, separate replay-input/environment/execution/result
+  identities, read-only full-hash inspection, explicit SMA restoration and a
+  retained local-CSV demo. No quant-math changes, automatic execution or provider
+  fallback. Independent review/build/browser/CI gates remain pending; see
+  `docs/PHASE_66_IMPLEMENTATION.md`. Frozen v4.83 tag exists at `c250d7e7...`;
+  historical release notes below describe their own dated handoffs.
+
 - **Phase 64 security remediation and final release evidence** (2026-09-20):
   security patch `36f70e6b72800f0ab585afa8c873f4b87c09aeff` is committed.
   Reviewed Node 24.20.0/npm 11.17.0 strict-peer install, 166 frontend tests,

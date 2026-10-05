@@ -488,6 +488,7 @@ export interface BacktestDiagnostics {
 // ---------------------------------------------------------------------------
 
 export interface BacktestResponse {
+  execution_context?: import("./runReplay").ReplayCapture | null;
   ticker: string;
   start_date: string;
   end_date: string;
@@ -823,6 +824,7 @@ export interface StrategyComparisonResponse {
 // ---------------------------------------------------------------------------
 
 export interface SavedBacktestCreate {
+  replay?: import("./runReplay").ReplayCapture | null;
   name: string;
   ticker: string;
   strategy: string;
@@ -839,6 +841,8 @@ export interface SavedBacktestCreate {
 
 /** Lightweight list-view row — no large JSON blobs. */
 export interface SavedBacktestSummary {
+  config_hash_full?: string | null;
+  config_schema?: string | null;
   id: number;
   created_at: string;
   name: string;

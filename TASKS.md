@@ -1,6 +1,25 @@
 # TASKS - QuantLab
 
-## Current Phase 65 Platform Verification (2026-10-01)
+## Current Phase 66 Implementation (2026-10-05)
+
+Branch `phase66-run-replay-hash-environment-manifest`, based on frozen
+`c250d7e7de241e18ee8555af4af4c56cef1b4a73`; VERSION `4.84.0-dev`.
+The v4.83 tag exists at that commit. User-supplied baseline CI `37208511643`
+passed both jobs; retained, not rerun or claimed as Phase 66 evidence.
+
+- [x] Add separate replay-input/environment/saved-execution/result identities and indexed configuration hashes.
+- [x] Add bounded read-only resolver, explicit legacy registration, safe SMA adapter and local-data demo.
+- [x] Connect Saved Backtests, confirmation, explicit restoration, original/effective settings and guarded browser specification.
+- [x] Add deterministic migration, persistence, API, mapping and component tests.
+- [x] Focused protected backend: 91 passed / 0 skipped; frontend: 208 tests, TypeScript and 277-test discovery passed (discovery only).
+- [ ] Independent review in a fresh session, user production build/browser execution and exact-commit CI.
+- [ ] Later user-only staging/commit/publication/tag after the required gates.
+
+See `docs/PHASE_66_IMPLEMENTATION.md` for actual executed checks, failed attempts,
+support limits and the explicit proposed path list. No Phase 67, services,
+staging, commit, push or tag is authorized by this handoff.
+
+## Historical Phase 65 Platform Verification (2026-10-01, Superseded)
 
 Reviewed on `main` at implementation `1449db23744f1d03743df189f5fa063df286802e`, based on frozen Phase 64
 `1591f89931f6534d523c96a87231bcd9d680080a`. The v4.82 tag exists at that commit;

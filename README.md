@@ -14,25 +14,25 @@ palette, shared charts, local LaTeX formula panels).
 > investment, trading, allocation, legal, tax, compliance, or risk-management
 > advice, and not production trading, risk, or compliance infrastructure.
 
-## Current development: Phase 65
+## Current development: Phase 66
 
-**ML Research Lifecycle** joins stored model artifacts, exact sample/split
-provenance, frozen calibration, held-out evaluation and five existing diagnostic
-labs. A read-only workspace supports neutral comparison/export; one explicit
-synthetic demo performs genuine training. Legacy ExperimentStore imports remain
-honestly incomplete when training provenance is absent. No replay, serving,
-automatic retraining or new estimator family.
+**Run Replay** resolves registered full configuration hashes to explicit saved
+contexts, compares recorded execution environments and restores SMA settings
+to Backtest Studio after confirmation. Inspection, refresh, history and restore
+never run research. An explicit local demo retains bounded CSV data in SQLite
+and uses the existing backtest engine; missing uploads never fall back to a
+provider. Provider history is not frozen and matching manifests do not promise
+identical results. Other strategies are config-only, not executable adapters.
 
-VERSION is `4.83.0-dev`. See the [workflow](docs/ML_RESEARCH_LIFECYCLE.md),
-[artifact contract](docs/MODEL_ARTIFACT_REGISTRY.md) and
-[implementation evidence](docs/PHASE_65_IMPLEMENTATION.md). The
-[independent review](docs/PHASE_65_REVIEW.md) is committed at
-`291b0f424716ec336548b3b5648008e6a78a4613`. Its
-[post-review verification](docs/PHASE_65_REVIEW.md#9-post-review-platform-verification-2026-10-01)
-closes exact-commit CI, the supplied production build/single Edge scenario,
-and Python 3.11 real-PyArrow/Linux-link gates (69 passed, one Windows-only skip).
-Final documentation review, user commit/publication and verification precede
-the still-uncreated v4.83 tag. Phase 66 remains unstarted.
+VERSION is `4.84.0-dev`; independent review, production build, browser execution
+and exact-commit CI remain later gates. See the [contracts/runbook](docs/RUN_REPLAY_AND_ENVIRONMENT_MANIFEST.md)
+and [implementation handoff](docs/PHASE_66_IMPLEMENTATION.md).
+
+Phase 65 is frozen at `c250d7e7de241e18ee8555af4af4c56cef1b4a73` under
+`v4.83.0-unified-ml-lifecycle-model-artifact-registry-v1` (verified locally).
+Both jobs in baseline CI `37208511643` passed according to the user; that
+inherited evidence was not rerun and does not cover Phase 66.
+The [Phase 65 review](docs/PHASE_65_REVIEW.md) remains historical and unchanged.
 
 ## Completed baseline: Phase 64
 
