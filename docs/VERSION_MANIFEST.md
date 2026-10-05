@@ -13,16 +13,17 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.84.0-dev`**, bounded Phase 66 implementation on
-`phase66-run-replay-hash-environment-manifest`, from frozen Phase 65
-`c250d7e7de241e18ee8555af4af4c56cef1b4a73`.
-The existing v4.83 tag resolves to that commit (verified locally).
-User-supplied baseline CI `37208511643` passed both jobs; no baseline checks
-were rerun. Phase 66 implementation evidence is in
-[PHASE_66_IMPLEMENTATION.md](PHASE_66_IMPLEMENTATION.md).
+**`4.84.0-dev`**, Phase 66 implementation
+`b7bb025200f1c900847cda8f0651bcc662d0b2aa` on `main`, with independent review
+fixes uncommitted. Single parent and unchanged frozen v4.83 tag resolve to
+`c250d7e7de241e18ee8555af4af4c56cef1b4a73` (verified locally).
+[PHASE_66_REVIEW.md](PHASE_66_REVIEW.md) records the completed bounded review.
+[PHASE_66_IMPLEMENTATION.md](PHASE_66_IMPLEMENTATION.md) remains historical.
+Existing implementation CI `37274152339` passed both jobs; it does not cover
+later reviewer fixes. No workflow was triggered or rerun by this review.
 
-Independent review, production build, browser execution and exact-commit CI
-remain pending. Future user-created tag:
+Final review-commit Python 3.11 CI, user production build and isolated browser
+execution remain pending. Future user-created tag:
 `v4.84.0-reproducible-run-replay-environment-manifest-v1` (not created).
 No Phase 67 or release action is started.
 

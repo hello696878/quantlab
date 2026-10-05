@@ -9,6 +9,7 @@ JSON text and deserialised on read.
 from __future__ import annotations
 
 import json
+from contextlib import closing
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -82,7 +83,7 @@ def create_saved_backtest(data: Dict[str, Any]) -> Dict[str, Any]:
         .replace("+00:00", "Z")
     )
 
-    with get_connection() as conn:
+    with closing(get_connection()) as conn, conn:
         cursor = conn.execute(
             """
             INSERT INTO saved_backtests (
@@ -124,7 +125,7 @@ def list_saved_backtests() -> List[Dict[str, Any]]:
     """
     Return all saved backtests as summary dicts, newest first.
     """
-    with get_connection() as conn:
+    with closing(get_connection()) as conn:
         rows = conn.execute(
             "SELECT * FROM saved_backtests ORDER BY created_at DESC, id DESC"
         ).fetchall()
@@ -135,7 +136,7 @@ def get_saved_backtest(id: int) -> Optional[Dict[str, Any]]:
     """
     Return the full record for *id*, or ``None`` if not found.
     """
-    with get_connection() as conn:
+    with closing(get_connection()) as conn:
         row = conn.execute(
             "SELECT * FROM saved_backtests WHERE id = ?", (id,)
         ).fetchone()
@@ -148,7 +149,7 @@ def delete_saved_backtest(id: int) -> bool:
 
     Returns ``True`` if a row was deleted, ``False`` if the id was not found.
     """
-    with get_connection() as conn:
+    with closing(get_connection()) as conn, conn:
         conn.execute("DELETE FROM run_replay_contexts WHERE saved_backtest_id=?", (id,))
         cursor = conn.execute(
             "DELETE FROM saved_backtests WHERE id = ?", (id,)

@@ -47,6 +47,8 @@ def request_model(raw):
     if model.fast_window >= model.slow_window:
         raise ValueError("fast_window must be less than slow_window")
     from datetime import date
+    if any(not re.fullmatch(r"\d{4}-\d{2}-\d{2}", value) for value in (model.start_date, model.end_date)):
+        raise ValueError("SMA form dates must use YYYY-MM-DD without changing canonical identity")
     if date.fromisoformat(model.start_date) >= date.fromisoformat(model.end_date):
         raise ValueError("start_date must precede end_date")
     return model

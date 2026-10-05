@@ -1,4 +1,4 @@
-import { BacktestApiError } from "./api";
+import { BacktestApiError, runBacktest } from "./api";
 import { useEffect, useRef } from "react";
 import type { BacktestRequest, BacktestResponse } from "./types";
 
@@ -63,7 +63,7 @@ export function readReplayLink(search?: string): { active: boolean; location: Re
   }
   return { active: true, location: { hash: hash ?? undefined, context: context ? Number(context) : undefined } };
 }
-export function writeReplayLink(location: ReplayLocation | null): void {
+export function writeReplayLink(location: ReplayLocation | null, mode: "push" | "replace" = "push"): void {
   if (typeof window === "undefined") return;
   const url = new URL(window.location.href);
   if (location) {
@@ -77,13 +77,13 @@ export function writeReplayLink(location: ReplayLocation | null): void {
     for (const key of ["hash", "context"]) url.searchParams.delete(key);
   }
   const next = url.pathname + url.search + url.hash;
-  if (next !== window.location.pathname + window.location.search + window.location.hash) window.history.pushState(null, "", next);
+  if (next !== window.location.pathname + window.location.search + window.location.hash) window.history[mode === "push" ? "pushState" : "replaceState"](null, "", next);
 }
 
 export function useReplayLinkCleanup(view: string): void {
   const previous = useRef(view);
   useEffect(() => {
-    if (previous.current === "runreplay" && view !== previous.current) writeReplayLink(null);
+    if (previous.current === "runreplay" && view !== previous.current) writeReplayLink(null, readReplayLink().active ? "push" : "replace");
     previous.current = view;
   }, [view]);
 }
@@ -104,6 +104,31 @@ export const registerReplay = (id: number) => call<ReplayPreflight>(`register/${
 export const createReplayDemo = () => call<{ config_hash_full: string; context_id: number; saved_backtest_id: number }>("demo", {});
 export const verifyReplayCSV = (id: number, csv_text: string) => call<{ matched: boolean }>(`contexts/${id}/check-input`, { csv_text });
 export const executeLocalReplay = (id: number, request: BacktestRequest, csv_text?: string) => call<BacktestResponse>(`contexts/${id}/execute-local`, { request, csv_text });
+/** The same explicit Run boundary used by Backtest Studio and form-wire tests. */
+export async function executeSmaRequest(request: BacktestRequest, restored: ReplayRestore | null): Promise<BacktestResponse> {
+  if (!restored) return runBacktest(request);
+  const provider = restored.preflight.canonical_config.data_provider;
+  if (provider === "csv_upload") return executeLocalReplay(restored.preflight.context_id, request, restored.csvText);
+  if (provider === "yfinance") {
+    const result = await runBacktest(request);
+    if (!result.execution_context) return result;
+    // Use the actual execution's canonical identity, not the editable form or
+    // an old parent badge. A provider rerun never implies retained prices.
+    const { parent_context_id: _previousParent, ...capture } = result.execution_context;
+    let executed: Record<string, unknown> | undefined;
+    try {
+      const value: unknown = JSON.parse(result.reproducibility?.canonical_config_json ?? "null");
+      if (value && typeof value === "object" && !Array.isArray(value)) executed = value as Record<string, unknown>;
+    } catch { /* Missing execution identity cannot establish a parent link. */ }
+    const fixed = ["ticker", "start_date", "end_date", "data_provider", "dataset_fingerprint"];
+    const sameInput = executed?.data_provider === "yfinance" && fixed.every((key) =>
+      (executed?.[key] ?? null) === (restored.preflight.canonical_config[key] ?? null));
+    const samePin = (capture.dataset_version_id ?? null) === (restored.preflight.dataset?.version_id ?? null);
+    return { ...result, execution_context: sameInput && samePin ?
+      { ...capture, parent_context_id: restored.preflight.context_id } : capture };
+  }
+  return Promise.reject(new Error("Unsupported restored data source; detach replay before choosing another workflow."));
+}
 export async function downloadReplay(id: number): Promise<void> {
   const result = await call<ReplayPreflight>(`contexts/${id}/export`);
   const url = URL.createObjectURL(new Blob([JSON.stringify(result, null, 2)], { type: "application/json" }));

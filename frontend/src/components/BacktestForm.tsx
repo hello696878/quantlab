@@ -135,6 +135,7 @@ interface Props {
   onPairsParamsChange: (p: PairsBacktestRequest) => void;
   onSubmit: () => void;
   loading: boolean;
+  localReplay?: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +267,7 @@ export default function BacktestForm({
   onPairsParamsChange,
   onSubmit,
   loading,
+  localReplay = false,
 }: Props) {
   // ── String states for every numeric input ─────────────────────────────────
   // Storing as strings lets users type partial values ("0.", "-", "12")
@@ -273,7 +275,11 @@ export default function BacktestForm({
   // validation/submit time only.  The parent state is kept in sync via the
   // setter calls below (only called when the parsed value is a finite number).
   // Common (shared across all strategies)
-  const [costBpsStr, setCostBpsStr] = useState(String(smaParams.transaction_cost_bps));
+  const [costBpsStr, setCostBpsStr] = useState(String(
+    smaParams.cost_model?.type === "simple_bps"
+      ? smaParams.cost_model.transaction_cost_bps ?? smaParams.transaction_cost_bps
+      : smaParams.transaction_cost_bps,
+  ));
   const [capitalStr, setCapitalStr] = useState(String(smaParams.initial_capital));
   // Cost model (shared across all strategies; initialised from saved params).
   const _initialCm = smaParams.cost_model;
@@ -281,12 +287,12 @@ export default function BacktestForm({
     _initialCm?.type ?? "simple_bps",
   );
   const [commissionStr, setCommissionStr] = useState(
-    String(_initialCm?.commission_bps ?? 5),
+    String(_initialCm?.commission_bps ?? (_initialCm?.type === "commission_slippage" ? 0 : 5)),
   );
   const [slippageStr, setSlippageStr] = useState(
-    String(_initialCm?.slippage_bps ?? 5),
+    String(_initialCm?.slippage_bps ?? (_initialCm?.type === "commission_slippage" ? 0 : 5)),
   );
-  const [spreadStr, setSpreadStr] = useState(String(_initialCm?.spread_bps ?? 2));
+  const [spreadStr, setSpreadStr] = useState(String(_initialCm?.spread_bps ?? (_initialCm?.type === "commission_slippage" ? 0 : 2)));
   // Position sizing (shared across all strategies; initialised from saved params).
   const _initialPs = smaParams.position_sizing as LegacyPositionSizing | undefined;
   const [sizingType, setSizingType] = useState<PositionSizingType>(
@@ -654,7 +660,7 @@ export default function BacktestForm({
   function pushSensitivity(enabled: boolean, metric: SensitivityMetric) {
     setCommon(
       "sensitivity",
-      enabled ? { enabled: true, metric } : undefined,
+      enabled ? { ...smaParams.sensitivity, enabled: true, metric } : undefined,
     );
   }
 
@@ -977,8 +983,8 @@ export default function BacktestForm({
           <button
             key={s.id}
             type="button"
-            disabled={loading}
-            onClick={() => onStrategyChange(s.id)}
+            disabled={loading || localReplay && s.id !== strategy}
+            onClick={() => { if (s.id !== strategy) onStrategyChange(s.id); }}
             className={
               "flex-1 px-5 py-3.5 text-sm font-medium transition-colors " +
               "focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500 " +
@@ -1007,7 +1013,7 @@ export default function BacktestForm({
                   value={active.ticker}
                   onChange={(e) => setCommon("ticker", e.target.value.toUpperCase())}
                   placeholder="SPY"
-                  disabled={loading}
+                  disabled={loading || localReplay}
                   maxLength={12}
                 />
                 <div className="flex gap-1 flex-wrap">
@@ -1015,7 +1021,7 @@ export default function BacktestForm({
                     <button
                       key={t}
                       type="button"
-                      disabled={loading}
+                      disabled={loading || localReplay}
                       onClick={() => setCommon("ticker", t)}
                       className={
                         "px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors " +
@@ -1031,8 +1037,8 @@ export default function BacktestForm({
               </div>
             </Field>
             <p className="mt-1.5 text-[11px] text-slate-400">
-              Data source: Yahoo Finance (default provider). CSV upload is
-              available in the CSV Backtest workspace.
+              {localReplay ? "Data source: retained or verified local CSV. Strategy, ticker and dates stay fixed; detach replay to choose a provider workflow." :
+                "Data source: Yahoo Finance (default provider). CSV upload is available in the CSV Backtest workspace."}
             </p>
           </div>
         )}
@@ -1045,7 +1051,7 @@ export default function BacktestForm({
               className={inputCls}
               value={active.start_date}
               onChange={(e) => setCommon("start_date", e.target.value)}
-              disabled={loading}
+              disabled={loading || localReplay}
             />
           </Field>
           <Field label="End date">
@@ -1054,7 +1060,7 @@ export default function BacktestForm({
               className={inputCls}
               value={active.end_date}
               onChange={(e) => setCommon("end_date", e.target.value)}
-              disabled={loading}
+              disabled={loading || localReplay}
             />
           </Field>
           <Field label="Capital" hint="USD">

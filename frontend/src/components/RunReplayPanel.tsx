@@ -118,10 +118,21 @@ export default function RunReplayPanel({ location, linkError, onLocation, onRest
         </div>
         {confirm && <div role="dialog" aria-label="Confirm configuration restore" className="border border-amber-500 p-4 space-y-2">
           <p>Replace current Backtest Studio settings? Unsaved edits will be replaced. No analysis runs until you click Run.</p>
-          <button type="button" className={button} onClick={() => {
-            if (canRestore && preflight.restore_request) onRestore({ preflight, request: preflight.restore_request, csvText });
-          }}>Apply and open Backtest Studio</button>
-          <button type="button" className={`${button} ml-2`} onClick={() => setConfirm(false)}>Cancel</button>
+          <button type="button" className={button} disabled={loading} onClick={() => void explicitAction(async () => {
+            if (!canRestore) return;
+            const ticket = sequence.current;
+            setConfirm(false);
+            const fresh = await preflightReplay(preflight.context_id);
+            if (sequence.current !== ticket) return;
+            setPreflight(fresh);
+            if (fresh.context_id !== preflight.context_id || fresh.config_hash_full !== preflight.config_hash_full ||
+                fresh.input_hash !== preflight.input_hash || fresh.integrity !== "intact" || !fresh.restore_request ||
+                fresh.data_availability === "reselection_required" && csvText === undefined) {
+              throw new Error("Replay context changed or is incomplete. Inspect it again before restoring.");
+            }
+            onRestore({ preflight: fresh, request: fresh.restore_request, csvText });
+          })}>Apply and open Backtest Studio</button>
+          <button type="button" className={`${button} ml-2`} disabled={loading} onClick={() => setConfirm(false)}>Cancel</button>
         </div>}
       </div>}
     </section>

@@ -25,6 +25,12 @@ def get(context_id):
     return dict(row) if row else None
 
 
+def for_saved(saved_id):
+    with closing(get_connection()) as conn:
+        row = conn.execute("SELECT * FROM run_replay_contexts WHERE saved_backtest_id=?", (saved_id,)).fetchone()
+    return dict(row) if row else None
+
+
 def contexts(config_hash, offset=0, limit=20):
     with closing(get_connection()) as conn:
         rows = conn.execute("SELECT * FROM run_replay_contexts WHERE config_hash_full=? ORDER BY id LIMIT ? OFFSET ?",

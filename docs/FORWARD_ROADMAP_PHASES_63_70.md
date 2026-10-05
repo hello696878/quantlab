@@ -1,6 +1,13 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (2026-10-01):** Phase 64 is frozen at `1591f899...`, including
+> **Current status (2026-10-05):** Phase 66 independent review and verified
+> defect fixes are complete on `main`, implementation `b7bb025200f1c900847cda8f0651bcc662d0b2aa`,
+> VERSION `4.84.0-dev`. The v4.83 tag exists at parent `c250d7e7...`.
+> [Review evidence and limits](PHASE_66_REVIEW.md) separate focused review
+> checks from existing implementation CI. Review-commit Python 3.11 CI, user
+> production build and isolated browser execution remain pending. No Phase 67.
+
+> **Historical status (2026-10-01, superseded):** Phase 64 is frozen at `1591f899...`, including
 > the existing v4.82 tag and inherited successful documentation CI `35739957842`.
 > Phase 65 is implemented at `4.83.0-dev`; see the
 > [independent review](PHASE_65_REVIEW.md) committed at `291b0f424716ec336548b3b5648008e6a78a4613`.
@@ -10,7 +17,7 @@
 > and verification precede the still-uncreated v4.83 tag. Phase 66 is unstarted and not authorized. The prior
 > status note immediately below is historical and superseded, not current guidance.
 
-> **Current status (Phase 64.0 release evidence, 2026-09-20).** Phase 63's
+> **Historical status (Phase 64.0 release evidence, 2026-09-20).** Phase 63's
 > implementation `0d1c903`, review `0eceda6` and v4.81 tag exist locally.
 > Phase 64 implementation is committed as `1284b3115977f057f4690f643601dc329aac7797`.
 > Independent review `9d169edb4fbb66022d3643b31457fdecee3189e2` and security patch
@@ -216,12 +223,13 @@ adapters only.
 
 ## Phase 66 — Reproducible Run Replay by Hash and Environment Manifest v1
 
-**2026-10-05 implementation status.** Bounded SMA provider/config restoration
+**2026-10-05 reviewed status.** Bounded SMA provider/config restoration
 and retained local-CSV replay, with explicit context selection and separate
 identity layers, are implemented at `4.84.0-dev`. Other strategies are
-config-only; other labs are deferred. Independent review, production build,
-browser execution and exact-commit CI remain pending. See
-[implementation handoff](PHASE_66_IMPLEMENTATION.md). Phase 67 is not started.
+config-only; other labs are deferred. Independent review fixed verified defects;
+final review-commit Python 3.11 CI, user production build and isolated browser
+execution remain pending. See [review handoff](PHASE_66_REVIEW.md) and the
+historical [implementation handoff](PHASE_66_IMPLEMENTATION.md). Phase 67 is not started.
 
 **Goal.** Make a stored run recreatable from its hash: resolve a config
 hash to its canonical configuration, attach an environment manifest, and

@@ -24,9 +24,14 @@ and uses the existing backtest engine; missing uploads never fall back to a
 provider. Provider history is not frozen and matching manifests do not promise
 identical results. Other strategies are config-only, not executable adapters.
 
-VERSION is `4.84.0-dev`; independent review, production build, browser execution
-and exact-commit CI remain later gates. See the [contracts/runbook](docs/RUN_REPLAY_AND_ENVIRONMENT_MANIFEST.md)
-and [implementation handoff](docs/PHASE_66_IMPLEMENTATION.md).
+VERSION is `4.84.0-dev`. Independent review and verified defect fixes are
+complete on `main`, with implementation HEAD
+`b7bb025200f1c900847cda8f0651bcc662d0b2aa` and uncommitted review changes.
+Final review-commit Python 3.11 CI, user production build and isolated browser
+execution remain pending. Existing implementation CI passed both jobs and
+does not cover the review changes. See the [review](docs/PHASE_66_REVIEW.md),
+[contracts/runbook](docs/RUN_REPLAY_AND_ENVIRONMENT_MANIFEST.md) and historical
+[implementation handoff](docs/PHASE_66_IMPLEMENTATION.md).
 
 Phase 65 is frozen at `c250d7e7de241e18ee8555af4af4c56cef1b4a73` under
 `v4.83.0-unified-ml-lifecycle-model-artifact-registry-v1` (verified locally).

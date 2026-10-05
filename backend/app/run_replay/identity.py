@@ -22,7 +22,9 @@ def validate(value, *, limit=MAX_JSON):
             if len(item.encode("utf-8")) > 512 * 1024:
                 raise ValueError("JSON string exceeds bound")
         elif type(item) in (int, float):
-            if not math.isfinite(item) or abs(item) > 2**53 - 1:
+            # Compare integers before any float conversion: a bounded JSON
+            # document can still contain a 400-digit integer.
+            if abs(item) > 2**53 - 1 or not math.isfinite(item):
                 raise ValueError("JSON numbers must be finite and safely representable")
         elif type(item) is list:
             for child in item:
@@ -42,6 +44,8 @@ def validate(value, *, limit=MAX_JSON):
 
 
 def loads(raw, *, limit=MAX_JSON):
+    if type(raw) not in (str, bytes):
+        raise ValueError("JSON input must be text or bytes")
     if len(raw if isinstance(raw, bytes) else raw.encode("utf-8")) > limit:
         raise ValueError("JSON exceeds size bound")
 
@@ -76,6 +80,8 @@ def legacy(repro):
     if type(repro) is not dict or set(repro) != {"schema_version", "config_hash", "config_hash_full", "canonical_config_json"}:
         raise ValueError("Incomplete reproducibility record")
     config = loads(repro["canonical_config_json"], limit=32768)
+    if type(config) is not dict or type(config.get("schema_version")) is not str:
+        raise ValueError("Canonical configuration must be an object with a schema namespace")
     short, full = compute_config_hash(config)
     if full_hash(repro["config_hash_full"]) != full or repro["config_hash"] != short:
         raise ValueError("Canonical content does not match the advertised hash")

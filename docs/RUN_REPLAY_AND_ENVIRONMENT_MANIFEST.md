@@ -21,6 +21,11 @@ replace an omitted legacy cost UI representation; auto annualization retains
 the original choice when recorded, otherwise uses its resolved convention.
 Partial risk rules remain blank in the form rather than acquiring fake defaults.
 Original JSON is not fabricated from a canonical legacy record.
+Exact form restoration requires `YYYY-MM-DD` dates. Compact and week-date
+representations are unsupported; historical strings and hashes are not rewritten.
+Recorded requests retain effective cost precision and known diagnostics.
+Config-only legacy restoration recovers canonical values, including the
+existing six-decimal cost precision; discarded UI representations remain unknown.
 
 ## Identity Layers
 
@@ -41,8 +46,9 @@ Original JSON is not fabricated from a canonical legacy record.
 
 The new serializer does not replace the legacy serializer. Arrays and timestamp
 strings retain order/meaning. Plain JSON rejects duplicate keys, nonfinite or
-unsafe numbers (magnitude above 2^53-1), coerced executable numbers, excessive
-depth (20), nodes (300000) or bytes. Request mapping rejects unknown fields.
+unsafe numbers (magnitude above 2^53-1), excessive depth (20), nodes (300000)
+or bytes. Request mapping separately rejects unknown fields and coerced
+executable numeric/Boolean values.
 
 ## Persistence and Trust
 
@@ -56,17 +62,34 @@ does not invent data/environment history or overwrite a prior context.
 
 Integrity checks compare actual stored canonical/result/snapshot content and
 material Dataset Registry metadata, not only caller-supplied checksum labels.
+Recorded request, saved scalar fields, canonical configuration, dataset pins
+and declared environment roles must agree independently, even if corrupted
+payloads have been rehashed. Parent contexts must refer to an earlier saved
+record with matching fixed ticker/date/provider/fingerprint and dataset pin;
+parameter edits may produce a new result. Provider parent settings do not
+freeze historical prices. Repeated saves produce distinct saved-context
+identities, without establishing that the engine ran twice.
 Hashes detect mismatches, not authenticity: a database writer can forge content
 and all hashes. Result/execution metadata supplied to the local save API are
 declared and not attested. Save-time context is never execution-time context.
 
 Retained input is UTF-8 CSV, at most 128 KiB and 2000 cleaned rows, with schema,
 dates/counts/raw-byte fingerprint checked. Registry locators are never followed.
+The existing parser uses daily closes: timezone-aware inputs convert to UTC
+calendar dates, naive inputs keep their calendar dates; it drops invalid rows,
+keeps the last uploaded duplicate date and sorts. Literal close takes precedence
+over adjusted close. Ticker is a declared label, not independently verified
+entity identity in the price series.
+Optional OHLCV columns are not a replayed intraday table contract. Raw-byte
+identity is distinct from parsed daily-close semantics.
 Material mutations, invalidation/inactivity or missing versions block local
 execution. Missing CSV requires deliberate upload and raw-byte comparison.
 Local date/ticker changes require the existing CSV Upload workspace, not silent
 filtering or a remote fetch. Parameter edits retain the local input binding but
 detach the exact restored-form hash claim; deliberate rerun saves a new record.
+Dataset/artifact material is rechecked immediately before local execution.
+Separate registry reads and engine entry are not an atomic cross-registry
+snapshot; concurrent writes can also shift offset pagination.
 
 Optional Phase 65 links are declared `provenance_only` references checked through
 public read-only lifecycle APIs. They are not predictions-to-returns adapters or
@@ -97,16 +120,26 @@ offers inspection or explicit registration for legacy rows. URL state is
 `?view=runreplay&hash=<full hash>&context=<id>`, <=512 characters; never raw JSON,
 dataset bytes or credentials. Context/hash mismatches and stale responses refuse
 restore. Confirmation protects unsaved settings, Cancel leaves them untouched.
+Confirmation fetches fresh preflight; stale context responses and stale Run
+results cannot replace newer settings. Selecting the active SMA is inert;
+retained local input stays attached until an explicit detach/preset action.
 Editing/removing replay settings is explicit; demo/library presets detach replay.
 
 Environment comparison is field-level `same`/`different`/`unknown` (the response
 type reserves `not_applicable` for future fields). Patch differences remain
 differences. Matching fields never promise compatibility or bit identity.
+Git/source comparisons remain unknown whenever either checkout is dirty or
+its cleanliness is unknown. Package versions compare independently; a different
+Git SHA alone does not establish changed numerical behavior. VERSION and Git
+collection fail independently, and save/inspection metadata are never backdated.
 
 ## Local Demo and Later Verification
 
 Explicitly create the local SMA demo in Run Replay, select/inspect its context,
 confirm restoration, then separately click Run. No profitable-result promise.
+Dataset, version and saved-result demo stages commit separately. A failure
+reports confirmed owned IDs and leaves those records in place; no cross-stage
+rollback is claimed.
 Backend deterministic tests exercise this complete real-engine/persistence path.
 Frontend component tests check confirmation/stale/changed/offline/reselection
 states and the real destination form. Discovery is not browser execution.
@@ -118,3 +151,5 @@ harness. Both strategy-ensemble and replay ownership proofs must return equal
 verified database identities. Every replay/save request rechecks ownership.
 Do not point this scenario at the active user database or ordinary backend.
 No services, browsers, installs or builds were started during implementation.
+The independent review also started no services or browsers and ran no builds.
+See [PHASE_66_REVIEW.md](PHASE_66_REVIEW.md) for its separate evidence and gates.

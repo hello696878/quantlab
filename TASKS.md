@@ -1,23 +1,27 @@
 # TASKS - QuantLab
 
-## Current Phase 66 Implementation (2026-10-05)
+## Current Phase 66 Independent Review (2026-10-05)
 
-Branch `phase66-run-replay-hash-environment-manifest`, based on frozen
+Branch `main`, implementation HEAD `b7bb025200f1c900847cda8f0651bcc662d0b2aa`,
+single parent and unchanged frozen v4.83 tag
 `c250d7e7de241e18ee8555af4af4c56cef1b4a73`; VERSION `4.84.0-dev`.
-The v4.83 tag exists at that commit. User-supplied baseline CI `37208511643`
-passed both jobs; retained, not rerun or claimed as Phase 66 evidence.
+The review changes remain uncommitted and unstaged.
 
 - [x] Add separate replay-input/environment/saved-execution/result identities and indexed configuration hashes.
 - [x] Add bounded read-only resolver, explicit legacy registration, safe SMA adapter and local-data demo.
 - [x] Connect Saved Backtests, confirmation, explicit restoration, original/effective settings and guarded browser specification.
 - [x] Add deterministic migration, persistence, API, mapping and component tests.
-- [x] Focused protected backend: 91 passed / 0 skipped; frontend: 208 tests, TypeScript and 277-test discovery passed (discovery only).
-- [ ] Independent review in a fresh session, user production build/browser execution and exact-commit CI.
+- [x] Preserve inherited implementation evidence: focused backend 91 passed / 0 skipped; frontend 208 tests, TypeScript and 277-test discovery passed (discovery only).
+- [x] Independent source review, verified defect fixes and adversarial regressions; `docs/PHASE_66_REVIEW.md` records the exact inventory and limits.
+- [x] Review executions: 203 focused backend passes, then 76 affected passes on the corrected snapshot; final frontend 227 tests, TypeScript and 277-test discovery passed. No new whole-tree backend or browser execution claim.
+- [x] Inspect existing exact-implementation CI `37274152339` read-only: both jobs success, backend 4611 passed / 18 unspecified skips. This predates reviewer fixes.
+- [ ] Final user review-commit Python 3.11 CI, user production build and isolated browser execution.
 - [ ] Later user-only staging/commit/publication/tag after the required gates.
 
-See `docs/PHASE_66_IMPLEMENTATION.md` for actual executed checks, failed attempts,
-support limits and the explicit proposed path list. No Phase 67, services,
-staging, commit, push or tag is authorized by this handoff.
+See `docs/PHASE_66_REVIEW.md` for review commands, failed attempts and the
+25-path pending inventory. `docs/PHASE_66_IMPLEMENTATION.md` preserves the
+historical 38-path implementation inventory and its separate evidence.
+No Phase 67, services, staging, commit, push or tag is authorized by this handoff.
 
 ## Historical Phase 65 Platform Verification (2026-10-01, Superseded)
 

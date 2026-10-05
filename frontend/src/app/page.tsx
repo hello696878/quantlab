@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import AppShell, { type View } from "@/components/AppShell";
 import BacktestForm from "@/components/BacktestForm";
 import MetricsGrid from "@/components/MetricsGrid";
@@ -76,7 +76,7 @@ import StrategyEnsemblePanel from "@/components/StrategyEnsemblePanel";
 import MLLifecyclePanel from "@/components/MLLifecyclePanel";
 import { isMLLifecycleLink, useMLLifecycleLinkCleanup, writeMLLifecycleLink } from "@/lib/mlLifecycleLink";
 import RunReplayPanel from "@/components/RunReplayPanel";
-import { executeLocalReplay, readReplayLink, useReplayLinkCleanup, writeReplayLink } from "@/lib/runReplay";
+import { executeSmaRequest, readReplayLink, useReplayLinkCleanup, writeReplayLink } from "@/lib/runReplay";
 import type { ReplayLocation, ReplayRestore } from "@/lib/runReplay";
 import { isStrategyEnsembleLink, useStrategyEnsembleLinkCleanup, writeStrategyEnsembleLink } from "@/lib/strategyEnsembleLink";
 import DemoCenterPanel from "@/components/DemoCenterPanel";
@@ -111,7 +111,6 @@ import { notifyBackendOffline, toast } from "@/lib/toast";
 import { applyAccent, loadSettings, resolveDateRange } from "@/lib/settings";
 import {
   classifyApiError,
-  runBacktest,
   runBbBacktest,
   runMomentumBacktest,
   runPairsBacktest,
@@ -819,6 +818,15 @@ export default function HomePage() {
   const [replayLinkError, setReplayLinkError] = useState<string>();
   const [restoredReplay, setRestoredReplay] = useState<ReplayRestore | null>(null);
   const [replayModified, setReplayModified] = useState(false);
+  const executionSequence = useRef(0);
+  const executionPending = useRef(false);
+  useEffect(() => () => { executionSequence.current++; }, []);
+
+  function discardPendingExecution() {
+    executionSequence.current++;
+    executionPending.current = false;
+    setLoading(false);
+  }
 
   // Apply local settings once on startup: set the theme accent and prefill the
   // single-backtest forms' common fields (capital, cost, date range).  Runs in
@@ -903,7 +911,9 @@ export default function HomePage() {
   }, []);
 
   async function handleRun() {
-    if (loading) return;
+    if (executionPending.current) return;
+    executionPending.current = true;
+    const ticket = ++executionSequence.current;
 
     setLoading(true);
     setError(null);
@@ -913,9 +923,7 @@ export default function HomePage() {
     try {
       const data =
         strategy === "sma_crossover"
-          ? restoredReplay?.preflight.canonical_config.data_provider === "csv_upload"
-            ? await executeLocalReplay(restoredReplay.preflight.context_id, smaParams, restoredReplay.csvText)
-            : await runBacktest(smaParams)
+          ? await executeSmaRequest(smaParams, restoredReplay)
           : strategy === "rsi_mean_reversion"
             ? await runRsiBacktest(rsiParams)
             : strategy === "bollinger_band"
@@ -925,22 +933,26 @@ export default function HomePage() {
                 : strategy === "volatility_breakout"
                   ? await runVbBacktest(vbParams)
                   : await runPairsBacktest(pairsParams);
-      if (strategy === "sma_crossover" && restoredReplay && data.execution_context) data.execution_context.parent_context_id = restoredReplay.preflight.context_id;
+      if (executionSequence.current !== ticket) return;
       setResult(data);
       setDemoNotice(null); // a real run replaces the "click Run" hint
       markChecklistStep("ran_backtest");
     } catch (err) {
+      if (executionSequence.current !== ticket) return;
       const cls = classifyApiError(err);
       setError(cls.message);
       if (cls.backendUnavailable) notifyBackendOffline();
     } finally {
-      setLoading(false);
+      if (executionSequence.current === ticket) {
+        executionPending.current = false;
+        setLoading(false);
+      }
     }
   }
 
   function handleNav(next: View, replay: ReplayLocation = {}) {
     if (next === "runreplay") { writeReplayLink(replay); setReplayLocation(replay); setReplayLinkError(undefined); }
-    else writeReplayLink(null);
+    else if (!["globe", "strategyensemble", "mllifecycle"].includes(next)) writeReplayLink(null);
     if (next === "mllifecycle") writeMLLifecycleLink(true);
     else if (next !== "globe" && next !== "strategyensemble") writeMLLifecycleLink(false);
     if (next === "strategyensemble") writeStrategyEnsembleLink(true);
@@ -972,6 +984,7 @@ export default function HomePage() {
     } else if (leavingGlobe && next !== "strategyensemble" && next !== "mllifecycle" && next !== "runreplay") {
       clearGlobeUrl("push");
     }
+    if (["globe", "strategyensemble", "mllifecycle"].includes(next)) writeReplayLink(null, "replace");
   }
 
   function openReplay(location: ReplayLocation) {
@@ -979,7 +992,7 @@ export default function HomePage() {
   }
 
   function applyReplay(restored: ReplayRestore) {
-    if (loading) return;
+    discardPendingExecution();
     setStrategy("sma_crossover"); setSmaParams(restored.request);
     setRestoredReplay(restored); setReplayModified(false);
     setFormKey((key) => key + 1); setResult(null); setError(null); setShowSaveForm(false);
@@ -1068,6 +1081,7 @@ export default function HomePage() {
    * theme) untouched.
    */
   function handleRunFromLibrary(id: StrategyType) {
+    discardPendingExecution();
     setRestoredReplay(null); setReplayModified(false);
     setSavedDetailId(null);
     setSavedReportDetailId(null);
@@ -1093,6 +1107,7 @@ export default function HomePage() {
    * clicks Run.  No results are fabricated.
    */
   function handleDemo(id: DemoPresetId) {
+    discardPendingExecution();
     setRestoredReplay(null); setReplayModified(false);
     setSavedDetailId(null);
     setSavedReportDetailId(null);
@@ -1952,20 +1967,22 @@ export default function HomePage() {
             </div>
 
             {restoredReplay && <div className="border border-amber-500 p-3 text-sm space-y-1" data-testid="restored-replay-notice">
-              <p>{replayModified ? "Modified settings. The original hash no longer identifies this form." : "Restored configuration; no analysis has run."}</p>
+              <p>{replayModified ? "Modified settings. The original hash no longer identifies this form." : "Restored configuration. Run Backtest starts a separate execution."}</p>
               {!replayModified && <p className="font-mono text-xs break-all">{restoredReplay.preflight.config_hash_full}</p>}
               <p>{restoredReplay.preflight.canonical_config.data_provider === "csv_upload" ?
                 "Run uses the retained or verified local CSV, never a provider fallback. Ticker and dates remain fixed in replay v1." :
                 "Historical provider data was not retained. Run explicitly requests current provider history."}</p>
-              <button type="button" className="rounded border border-[var(--line)] px-3 py-2 text-xs" onClick={() => { setRestoredReplay(null); setReplayModified(false); setResult(null); }}>
+              <button type="button" disabled={loading} className="rounded border border-[var(--line)] px-3 py-2 text-xs" onClick={() => { setRestoredReplay(null); setReplayModified(false); setResult(null); }}>
                 Detach replay and use ordinary provider workflow
               </button>
             </div>}
-            <div onChangeCapture={() => { if (restoredReplay) setReplayModified(true); }}>
+            <div onChangeCapture={() => { discardPendingExecution(); if (restoredReplay) setReplayModified(true); }}>
             <BacktestForm
               key={formKey}
               strategy={strategy}
               onStrategyChange={(s) => {
+                if (s === strategy) return;
+                discardPendingExecution();
                 setStrategy(s);
                 setResult(null);
                 setError(null);
@@ -1973,6 +1990,7 @@ export default function HomePage() {
               }}
               smaParams={smaParams}
               onSmaParamsChange={(params) => {
+                if (JSON.stringify(params) !== JSON.stringify(smaParams)) discardPendingExecution();
                 setSmaParams(params);
                 if (restoredReplay && JSON.stringify(params) !== JSON.stringify(restoredReplay.request)) setReplayModified(true);
               }}
@@ -1988,6 +2006,7 @@ export default function HomePage() {
               onPairsParamsChange={setPairsParams}
               onSubmit={handleRun}
               loading={loading}
+              localReplay={restoredReplay?.preflight.canonical_config.data_provider === "csv_upload"}
             />
             </div>
 

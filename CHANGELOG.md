@@ -22,8 +22,11 @@ claimed by an entry here.
   configuration hashes, separate replay-input/environment/execution/result
   identities, read-only full-hash inspection, explicit SMA restoration and a
   retained local-CSV demo. No quant-math changes, automatic execution or provider
-  fallback. Independent review/build/browser/CI gates remain pending; see
-  `docs/PHASE_66_IMPLEMENTATION.md`. Frozen v4.83 tag exists at `c250d7e7...`;
+  fallback. Independent review fixed contradictory context/dataset metadata,
+  effective cost restoration, local-data detachment and stale responses; see
+  `docs/PHASE_66_REVIEW.md`. Review-commit CI, user production build and isolated
+  browser execution remain pending. `docs/PHASE_66_IMPLEMENTATION.md` retains
+  the historical implementation evidence. Frozen v4.83 tag exists at `c250d7e7...`;
   historical release notes below describe their own dated handoffs.
 
 - **Phase 64 security remediation and final release evidence** (2026-09-20):

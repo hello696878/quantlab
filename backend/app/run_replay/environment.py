@@ -8,9 +8,12 @@ from pathlib import Path
 from .identity import digest, validate
 
 FIELDS = ("python", "pandas", "numpy", "fastapi", "pydantic", "scipy", "app_version", "git_commit", "source_dirty", "node", "frontend_build")
+CLASSIFICATIONS = ("execution", "save", "inspection")
 
 
 def collect(classification):
+    if classification not in CLASSIFICATIONS:
+        raise ValueError("Unknown environment classification")
     fields = {key: None for key in FIELDS}
     fields["python"] = platform.python_version()
     for package in ("pandas", "numpy", "fastapi", "pydantic", "scipy"):
@@ -21,6 +24,9 @@ def collect(classification):
     root = Path(__file__).resolve().parents[3]
     try:
         fields["app_version"] = (root / "VERSION").read_text(encoding="utf-8").strip()
+    except OSError:
+        pass
+    try:
         # A protected test snapshot deliberately has no Git metadata.
         if (root / ".git").exists():
             for key, args in (("git_commit", ["rev-parse", "HEAD"]), ("source_dirty", ["status", "--porcelain", "--untracked-files=normal"])):
@@ -33,12 +39,12 @@ def collect(classification):
             "collection": "backend_local_allowlist", "fields": fields}
 
 
-def check(manifest):
+def check(manifest, *, classification="execution"):
     validate(manifest, limit=8192)
-    if set(manifest) != {"schema_version", "classification", "collection", "fields"} or manifest["schema_version"] != "environment_manifest_v1":
+    if type(manifest) is not dict or set(manifest) != {"schema_version", "classification", "collection", "fields"} or manifest["schema_version"] != "environment_manifest_v1":
         raise ValueError("Unsupported environment manifest")
-    if manifest["classification"] != "execution" or manifest["collection"] != "backend_local_allowlist":
-        raise ValueError("Only declared execution manifests may describe execution")
+    if classification not in CLASSIFICATIONS or manifest["classification"] != classification or manifest["collection"] != "backend_local_allowlist":
+        raise ValueError("Environment manifest classification or collection does not match its role")
     fields = manifest["fields"]
     if type(fields) is not dict or set(fields) != set(FIELDS):
         raise ValueError("Environment fields must match the allowlist")
@@ -57,9 +63,19 @@ def check(manifest):
 
 def compare(recorded, current):
     old = recorded["fields"] if recorded else {}
-    return [{"field": key, "recorded": old.get(key), "current": current["fields"].get(key),
-             "state": "unknown" if old.get(key) is None or current["fields"].get(key) is None else
-             "same" if old[key] == current["fields"][key] else "different"} for key in FIELDS]
+    new = current["fields"]
+    rows = []
+    for key in FIELDS:
+        before, after = old.get(key), new.get(key)
+        state = "unknown" if before is None or after is None else "same" if before == after else "different"
+        # A HEAD hash cannot identify uncommitted code. Even equal dirty flags
+        # do not establish that the two sets of local edits match.
+        if key in ("git_commit", "source_dirty") and (
+            old.get("source_dirty") is not False or new.get("source_dirty") is not False
+        ):
+            state = "unknown"
+        rows.append({"field": key, "recorded": before, "current": after, "state": state})
+    return rows
 
 
 def capture(request, provenance="validated_model_with_defaults"):

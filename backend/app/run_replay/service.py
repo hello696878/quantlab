@@ -68,28 +68,78 @@ def csv_input(text, config):
     return close
 
 
-def register_in_transaction(conn, saved_id, data, capture=None):
-    existing = conn.execute("SELECT id FROM run_replay_contexts WHERE saved_backtest_id=?", (saved_id,)).fetchone()
-    if existing:
-        return existing[0]
-    config = legacy(data.get("params", {}).get("reproducibility"))
-    capture = capture or {}
-    validate(capture, limit=256 * 1024)
-    allowed = {"schema_version", "original_request", "request_provenance", "execution_environment", "dataset_version_id", "csv_text", "artifact_run_id", "parent_context_id"}
-    if set(capture) - allowed or capture and capture.get("schema_version") != "replay_capture_v1":
-        raise ValueError("Unsupported replay capture fields/schema")
-    original = capture.get("original_request")
-    provenance = capture.get("request_provenance", "declared_request" if original else "unknown")
-    if provenance not in ("wire_json", "validated_model_with_defaults", "declared_request", "unknown"):
-        raise ValueError("Unknown request collection provenance")
-    if original is not None:
-        adapter.restore(config, original)
+def _saved_config(data, config):
     for key in ("ticker", "strategy", "start_date", "end_date", "initial_capital"):
         value = data[key].strip().upper() if key == "ticker" else data[key]
         if value != config.get(key):
             raise ValueError("Saved result identity disagrees with canonical configuration")
     if round(data["transaction_cost_bps"], 6) != config["cost_model"]["effective_cost_bps"]:
         raise ValueError("Saved effective costs disagree with canonical configuration")
+
+
+def _input_material(config, original, pin, artifact):
+    if original is not None:
+        adapter.restore(config, original)
+    if pin is not None:
+        if (type(pin) is not dict or set(pin) != {"version_id", "material_hash", "content_hash", "manifest_hash"}):
+            raise ValueError("Invalid dataset binding")
+        positive_id(pin["version_id"])
+        for key in ("material_hash", "content_hash", "manifest_hash"):
+            full_hash(pin[key])
+        if config.get("data_provider") != "csv_upload" or pin["content_hash"] != config.get("dataset_fingerprint"):
+            raise ValueError("Dataset content declaration differs from the configured input")
+    if artifact is not None:
+        if type(artifact) is not dict or set(artifact) != {"run_id", "role", "material_hash"} or artifact["role"] != "provenance_only":
+            raise ValueError("Invalid artifact provenance binding")
+        positive_id(artifact["run_id"])
+        full_hash(artifact["material_hash"])
+    return {"schema_version": "replay_input_v1", "adapter": "sma_v1" if config.get("strategy") == "sma_crossover" else "config_only",
+            "canonical_config": config, "dataset": pin, "artifact": artifact,
+            "effective_cost_bps": resolve_cost(adapter.request_model(original).cost_model, original.get("transaction_cost_bps", 10)).effective_bps_per_side if original is not None else None,
+            "diagnostics": {key: original.get(key) for key in ("robustness", "sensitivity")} if original is not None else None}
+
+
+def _csv_dataset(pin, close, text):
+    from app.dataset_registry.store import get_version
+    version = get_version(pin["version_id"])
+    expected = [{"name": "date", "type": "date", "nullable": False}, {"name": "close", "type": "float64", "nullable": False}]
+    if (version is None or version["row_count"] != len(close) or version["column_count"] != 2 or
+            version["schema_snapshot"].get("fields") != expected or
+            version.get("file_size_bytes") is not None and version["file_size_bytes"] != len(text.encode("utf-8"))):
+        raise ValueError("Dataset row count or parsed price-series schema/size does not match")
+
+
+def _parent_binding(parent, config, pin, saved_id):
+    if parent is None:
+        return
+    positive_id(parent)
+    row = store.get(parent)
+    if row is None:
+        raise ValueError("Parent replay context does not exist")
+    parent_snap, parent_saved = verified(row, check_parent=False)
+    if parent_saved["id"] >= saved_id:
+        raise ValueError("Parent context must precede this saved execution")
+    fixed = ("ticker", "start_date", "end_date", "data_provider", "dataset_fingerprint")
+    if (any(config.get(key) != parent_snap["config"].get(key) for key in fixed) or
+            pin != parent_snap["inputs"]["dataset"]):
+        raise ValueError("Parent context disagrees with the declared input binding")
+
+
+def register_in_transaction(conn, saved_id, data, capture=None):
+    existing = conn.execute("SELECT id FROM run_replay_contexts WHERE saved_backtest_id=?", (saved_id,)).fetchone()
+    if existing:
+        return existing[0]
+    config = legacy(data.get("params", {}).get("reproducibility"))
+    capture = {} if capture is None else capture
+    validate(capture, limit=256 * 1024)
+    allowed = {"schema_version", "original_request", "request_provenance", "execution_environment", "dataset_version_id", "csv_text", "artifact_run_id", "parent_context_id"}
+    if type(capture) is not dict or set(capture) - allowed or capture and capture.get("schema_version") != "replay_capture_v1":
+        raise ValueError("Unsupported replay capture fields/schema")
+    original = capture.get("original_request")
+    provenance = capture.get("request_provenance", "declared_request" if original else "unknown")
+    if provenance not in ("wire_json", "validated_model_with_defaults", "declared_request", "unknown") or original is None and provenance != "unknown":
+        raise ValueError("Unknown request collection provenance")
+    _saved_config(data, config)
     execution_env = capture.get("execution_environment")
     if execution_env is not None:
         environment.check(execution_env)
@@ -101,21 +151,11 @@ def register_in_transaction(conn, saved_id, data, capture=None):
         close = csv_input(csv, config)
         if pin["content_hash"] != config.get("dataset_fingerprint"):
             raise ValueError("Dataset content declaration differs from retained CSV")
-        from app.dataset_registry.store import get_version
-        version = get_version(pin["version_id"])
-        expected = [{"name": "date", "type": "date", "nullable": False}, {"name": "close", "type": "float64", "nullable": False}]
-        if version["row_count"] != len(close) or version["column_count"] != 2 or version["schema_snapshot"]["fields"] != expected:
-            raise ValueError("Dataset row count or parsed price-series schema does not match")
+        _csv_dataset(pin, close, csv)
     artifact = artifact_pin(positive_id(capture["artifact_run_id"])) if capture.get("artifact_run_id") is not None else None
     parent = capture.get("parent_context_id")
-    if parent is not None:
-        positive_id(parent)
-        if store.get(parent) is None:
-            raise ValueError("Parent replay context does not exist")
-    inputs = {"schema_version": "replay_input_v1", "adapter": "sma_v1" if config.get("strategy") == "sma_crossover" else "config_only",
-              "canonical_config": config, "dataset": pin, "artifact": artifact,
-              "effective_cost_bps": resolve_cost(adapter.request_model(original).cost_model, original.get("transaction_cost_bps", 10)).effective_bps_per_side if original else None,
-              "diagnostics": {key: original.get(key) for key in ("robustness", "sensitivity")} if original else None}
+    inputs = _input_material(config, original, pin, artifact)
+    _parent_binding(parent, config, pin, saved_id)
     snapshot = {"schema_version": "replay_context_v1", "config": config, "original_request": original,
                 "request_provenance": provenance,
                 "inputs": inputs, "input_hash": digest(inputs), "execution_environment": execution_env,
@@ -135,35 +175,63 @@ def register_in_transaction(conn, saved_id, data, capture=None):
     return cursor.lastrowid
 
 
-def verified(row):
+def verified(row, *, check_parent=True):
     from app.saved_backtests import get_saved_backtest
     try:
         snap = loads(row["snapshot_json"], limit=512 * 1024)
+        fields = {"schema_version", "config", "original_request", "request_provenance", "inputs", "input_hash",
+                  "execution_environment", "environment_hash", "environment_trust", "save_environment", "result_hash",
+                  "csv_text", "parent_context_id", "saved_backtest_id", "execution_hash"}
+        if type(snap) is not dict or set(snap) != fields or snap["schema_version"] != "replay_context_v1":
+            raise ValueError("Unsupported replay context structure/schema")
         if digest(snap) != row["snapshot_hash"] or snap["saved_backtest_id"] != row["saved_backtest_id"]:
             raise ValueError("Snapshot integrity mismatch")
+        positive_id(snap["saved_backtest_id"])
         saved = get_saved_backtest(row["saved_backtest_id"])
         if saved is None:
             raise ValueError("Historical saved result is missing")
         config = legacy(saved["params"].get("reproducibility"))
+        _saved_config(saved, config)
         if canonical_json(config) != canonical_json(snap["config"]) or saved["config_hash_full"] != row["config_hash_full"]:
             raise ValueError("Canonical/index identity mismatch")
-        if saved["config_schema"] != row["config_schema"] or saved["params"]["reproducibility"]["config_hash_full"] != row["config_hash_full"]:
+        if (saved["config_schema"] != row["config_schema"] or row["config_schema"] != config["schema_version"] or
+                saved["params"]["reproducibility"]["config_hash_full"] != row["config_hash_full"]):
             raise ValueError("Schema/hash index mismatch")
         if snap["input_hash"] != digest(snap["inputs"]) or result_identity(saved) != snap["result_hash"]:
             raise ValueError("Input or historical result content changed")
+        expected = _input_material(config, snap["original_request"], snap["inputs"]["dataset"], snap["inputs"]["artifact"])
+        if validate(expected) != validate(snap["inputs"]):
+            raise ValueError("Stored input bindings disagree with configuration/request")
+        provenance = snap["request_provenance"]
+        if provenance not in ("wire_json", "validated_model_with_defaults", "declared_request", "unknown") or snap["original_request"] is None and provenance != "unknown":
+            raise ValueError("Request collection provenance is inconsistent")
+        if snap["execution_environment"] is not None:
+            environment.check(snap["execution_environment"])
+        environment.check(snap["save_environment"], classification="save")
+        trust = "declared_execution_metadata_not_attestation" if snap["execution_environment"] else "unknown"
+        if snap["environment_trust"] != trust:
+            raise ValueError("Execution environment trust is inconsistent")
         if snap["environment_hash"] != (digest(snap["execution_environment"]) if snap["execution_environment"] else None):
             raise ValueError("Execution environment changed")
         execution = {"schema_version": "saved_execution_v1", "saved_backtest_id": saved["id"], "created_at": saved["created_at"],
                      "result_hash": snap["result_hash"], "input_hash": snap["input_hash"], "environment_hash": snap["environment_hash"]}
         if snap["execution_hash"] != digest(execution):
             raise ValueError("Saved execution identity changed")
+        if snap["csv_text"] is not None:
+            if config.get("data_provider") != "csv_upload" or snap["inputs"]["dataset"] is None:
+                raise ValueError("Retained input requires a bound local dataset")
+            csv_input(snap["csv_text"], config)
+        if check_parent:
+            _parent_binding(snap["parent_context_id"], config, snap["inputs"]["dataset"], saved["id"])
         return snap, saved
-    except (ValueError, KeyError, TypeError) as exc:
+    except (ValueError, KeyError, TypeError, AttributeError, IndexError) as exc:
         raise Changed("Stored replay content is corrupt or changed: " + str(exc)) from exc
 
 
 def resolve_hash(value, page=1, page_size=20):
     full_hash(value)
+    if type(page) is not int or not 1 <= page <= 1000 or type(page_size) is not int or not 1 <= page_size <= 50:
+        raise ValueError("Invalid replay context page bounds")
     rows, total = store.contexts(value, (page - 1) * page_size, page_size)
     if total == 0:
         raise Missing("Full configuration hash is not registered")
@@ -183,13 +251,8 @@ def resolve_hash(value, page=1, page_size=20):
             "selection_required": True, "ambiguous": total > 1}
 
 
-def preflight(context_id):
-    row = store.get(context_id)
-    if row is None:
-        raise Missing("Replay context not found")
-    snap, saved = verified(row)
+def _material_messages(snap):
     messages = []
-    integrity = "intact"
     for key, checker, id_key in (("dataset", dataset_pin, "version_id"), ("artifact", artifact_pin, "run_id")):
         pin = snap["inputs"][key]
         if pin:
@@ -197,8 +260,18 @@ def preflight(context_id):
                 if checker(pin[id_key]) != pin:
                     raise ValueError("material changed")
             except (ValueError, LookupError, KeyError, TypeError):
-                integrity = "changed"
                 messages.append(key + " is missing, changed, invalidated or incomplete")
+    return messages
+
+
+def preflight(context_id):
+    positive_id(context_id)
+    row = store.get(context_id)
+    if row is None:
+        raise Missing("Replay context not found")
+    snap, saved = verified(row)
+    messages = _material_messages(snap)
+    integrity = "changed" if messages else "intact"
     try:
         request = adapter.restore(snap["config"], snap["original_request"])
     except (ValueError, KeyError, TypeError):
@@ -207,7 +280,13 @@ def preflight(context_id):
     provider = snap["config"].get("data_provider")
     availability = "provider_not_retained" if provider == "yfinance" else "reselection_required"
     if snap["csv_text"] is not None:
-        csv_input(snap["csv_text"], snap["config"])
+        close = csv_input(snap["csv_text"], snap["config"])
+        if integrity == "intact":
+            try:
+                _csv_dataset(snap["inputs"]["dataset"], close, snap["csv_text"])
+            except (ValueError, LookupError, KeyError, TypeError):
+                integrity = "changed"
+                messages.append("Retained data disagrees with the Dataset Registry schema/size")
         availability = "retained_verified" if integrity == "intact" else "changed"
     if snap["original_request"] is None:
         messages.append("Original request and optional diagnostic settings are unknown; only known canonical settings can be restored")
@@ -241,6 +320,7 @@ def export_context(context_id):
 
 
 def register_legacy(saved_id):
+    positive_id(saved_id)
     from app.saved_backtests import get_saved_backtest
     data = get_saved_backtest(saved_id)
     if data is None:
@@ -254,7 +334,9 @@ def check_input(context_id, text):
     result = preflight(context_id)
     if result["integrity"] != "intact" or result["canonical_config"].get("data_provider") != "csv_upload":
         raise Changed("Local replay input context is not intact")
-    csv_input(text, result["canonical_config"])
+    close = csv_input(text, result["canonical_config"])
+    if result["dataset"]:
+        _csv_dataset(result["dataset"], close, text)
     return {"matched": True, "context_id": context_id}
 
 
@@ -266,7 +348,10 @@ def execute_local(context_id, raw_request, text=None):
         raise ValueError("This explicit action only executes local CSV contexts")
     row = store.get(context_id)
     snap, _ = verified(row)
-    close = csv_input(text if text is not None else snap["csv_text"], snap["config"])
+    selected_text = text if text is not None else snap["csv_text"]
+    close = csv_input(selected_text, snap["config"])
+    if snap["inputs"]["dataset"]:
+        _csv_dataset(snap["inputs"]["dataset"], close, selected_text)
     request = adapter.request_model(raw_request)
     if request.benchmark and request.benchmark.mode == "custom_ticker":
         raise ValueError("Local replay cannot fetch a custom remote benchmark")
@@ -274,6 +359,10 @@ def execute_local(context_id, raw_request, text=None):
         value = getattr(request, key).strip().upper() if key == "ticker" else getattr(request, key)
         if value != snap["config"][key]:
             raise ValueError("Local replay v1 keeps the retained ticker/date range fixed; use CSV Upload for a different range")
+    # Recheck public stored-material contracts at the explicit execution boundary.
+    # This is not an atomic lock across all downstream registries.
+    if _material_messages(snap):
+        raise Changed("Local replay input material changed before execution")
     from app.main import _run_csv_single_asset
     response = _run_csv_single_asset(close, "sma_crossover", request.model_dump(mode="json"), request.ticker)
     capture = response.execution_context
@@ -296,21 +385,32 @@ def demo():
     raw_hash = hashlib.sha256(text.encode()).hexdigest()
     dataset = datasets.create_dataset(DatasetCreate(name="Run Replay demo " + token[:8], domain="backtest",
         dataset_type="price_series", source_type="generated", is_demo=True).model_dump(mode="json"))
-    fields = [{"name": "date", "type": "date", "nullable": False}, {"name": "close", "type": "float64", "nullable": False}]
-    version = datasets.create_version(dataset["id"], VersionCreate(version_label="v1", row_count=180, column_count=2,
-        content_fingerprint=raw_hash, file_size_bytes=len(text.encode()), deterministic=True,
-        storage_locator="generated://run-replay/" + token, schema_snapshot={"fields": fields, "ordering_significant": True}).model_dump(mode="json"))
-    from app.csv_data import parse_price_csv
-    close = parse_price_csv(text.encode())
-    close.attrs["csv_content_sha256"] = raw_hash
-    result = _run_csv_single_asset(close, "sma_crossover", {"fast_window": 5, "slow_window": 20, "initial_capital": 100000, "transaction_cost_bps": 10}, "REPLAY-DEMO")
-    result.execution_context.update(dataset_version_id=version["id"], csv_text=text)
-    payload = {"name": "Local SMA replay demo", "ticker": result.ticker, "strategy": result.strategy,
-        "start_date": result.start_date, "end_date": result.end_date, "initial_capital": result.initial_capital,
-        "transaction_cost_bps": result.transaction_cost_bps, "params": {"reproducibility": result.reproducibility.model_dump(mode="json")},
-        "metrics": result.strategy_metrics.model_dump(mode="json"), "equity_curve": [p.model_dump(mode="json") for p in result.equity_curve],
-        "trades": [p.model_dump(mode="json") for p in result.trades], "notes": "Deterministic local data, not market performance.", "replay": result.execution_context}
-    saved = create_saved_backtest(payload)
-    rows, _ = store.contexts(saved["config_hash_full"], limit=50)
-    row = next(row for row in rows if row["saved_backtest_id"] == saved["id"])
-    return {"saved_backtest_id": saved["id"], "config_hash_full": saved["config_hash_full"], "context_id": row["id"]}
+    version = saved = None
+    try:
+        fields = [{"name": "date", "type": "date", "nullable": False}, {"name": "close", "type": "float64", "nullable": False}]
+        version = datasets.create_version(dataset["id"], VersionCreate(version_label="v1", row_count=180, column_count=2,
+            content_fingerprint=raw_hash, file_size_bytes=len(text.encode()), deterministic=True,
+            storage_locator="generated://run-replay/" + token, schema_snapshot={"fields": fields, "ordering_significant": True}).model_dump(mode="json"))
+        from app.csv_data import parse_price_csv
+        close = parse_price_csv(text.encode())
+        close.attrs["csv_content_sha256"] = raw_hash
+        result = _run_csv_single_asset(close, "sma_crossover", {"fast_window": 5, "slow_window": 20, "initial_capital": 100000, "transaction_cost_bps": 10}, "REPLAY-DEMO")
+        result.execution_context.update(dataset_version_id=version["id"], csv_text=text)
+        payload = {"name": "Local SMA replay demo", "ticker": result.ticker, "strategy": result.strategy,
+            "start_date": result.start_date, "end_date": result.end_date, "initial_capital": result.initial_capital,
+            "transaction_cost_bps": result.transaction_cost_bps, "params": {"reproducibility": result.reproducibility.model_dump(mode="json")},
+            "metrics": result.strategy_metrics.model_dump(mode="json"), "equity_curve": [p.model_dump(mode="json") for p in result.equity_curve],
+            "trades": [p.model_dump(mode="json") for p in result.trades], "notes": "Deterministic local data, not market performance.", "replay": result.execution_context}
+        saved = create_saved_backtest(payload)
+        row = store.for_saved(saved["id"])
+        return {"saved_backtest_id": saved["id"], "config_hash_full": saved["config_hash_full"], "context_id": row["id"]}
+    except Exception as exc:
+        # Registry operations commit separately. Expose only confirmed local IDs;
+        # preserve owned records and never imply that this was an atomic rollback.
+        retained = f"dataset {dataset['id']}"
+        if version is not None:
+            retained += f", version {version['id']}"
+        if saved is not None:
+            retained += f", saved backtest {saved['id']}"
+        raise Changed("Demo incomplete; owned " + retained +
+                      " remain. Replay completion was not confirmed; inspect these records before retrying.") from exc
