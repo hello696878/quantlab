@@ -1,31 +1,33 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 66 Independent Review (2026-10-05)
+## Current Handoff: Phase 66 Final Release Evidence (2026-10-06)
 
-VERSION `4.84.0-dev`, attached branch `main`, implementation HEAD
-`b7bb025200f1c900847cda8f0651bcc662d0b2aa`; parent and unchanged frozen v4.83
-tag resolve to `c250d7e7de241e18ee8555af4af4c56cef1b4a73`.
-The independent review fixed verified context/data binding, SMA form fidelity,
-stale-response and provenance defects. Other strategies remain config-only;
-other labs are deferred. Environment matches do not certify numerical identity.
+VERSION remains `4.84.0-dev`, attached branch `main`, base HEAD
+`5760b3b37f92f4f0193498a0a6bb48da2c61d20b`. Implementation is
+`b7bb025200f1c900847cda8f0651bcc662d0b2aa`, independent review is
+`9e0a0b5fa1835f090d7a1e4b8b2353c1d872bd46`, and base HEAD is the two-file
+acceptance-spec/documentation correction; application/build inputs did not change.
 
-Review evidence: protected focused backend 203 passed, followed by 76 affected
-checks after the provider-parent correction; these are separate snapshots, not
-a new full-suite pass. Final frontend suite: 227 passed across 22 files;
-TypeScript passed after recorded test-fixture corrections; 277 browser tests
-discovered across 21 files, not executed. Existing exact-implementation CI
-`37274152339` passed both jobs (backend 4611 passed / 18 unspecified skips);
-it does not cover the reviewer changes.
+Review checks remain separate: 203 focused backend passes, then 76 affected
+passes on the corrected snapshot; final frontend 227 tests, TypeScript and
+277-test discovery. Exact-patch CI `37417645417` now succeeded in both jobs;
+no new full-suite counts or skip reasons are inferred from metadata.
+The user's successful production build at the review commit was reused, not
+rebuilt at the patch SHA. One corrected Microsoft Edge scenario passed on a
+fresh disposable backend: scenario 4.4s, summary 6.4s, browser exit 0. The
+earlier failed attempts remain historical, not retroactively passing.
 
-All 25 review paths are unstaged. Active data, frozen screenshots, historical
-reports and VERSION are unchanged. See `docs/PHASE_66_REVIEW.md` for the exact
-inventory, evidence, fixes and limits; `docs/PHASE_66_IMPLEMENTATION.md` remains
-the historical implementation-session record.
+See [final evidence and attribution](docs/PHASE_66_REVIEW.md#12-final-release-verification-2026-10-06).
+SMA restore support is bounded; other saved strategies remain config-only and
+other labs deferred. No automatic research execution or bit-identity guarantee.
+No full-browser-suite, production or security certification is claimed.
 
-Stop after this review handoff. Final review-commit Python 3.11 CI, user
-production build and isolated browser execution remain pending. Any staging,
-commit/publication or future v4.84 tag is user-owned and separately authorized.
-No staging, commit, push, tag, deployment, services or Phase 67 occurred here.
+Only existing authorized documentation is finalized and staged in this task.
+The user's documentation commit/publication, verification of that exact commit
+and future v4.84 tag remain pending. Suggested documentation commit subject:
+`Finalize phase66 release evidence and browser acceptance v1`.
+No commit, push, tag, services, verification reruns or Phase 67 here. Stop after
+the single documentation/staging handoff.
 
 ## Historical Handoff: Phase 65 Platform Verification (2026-10-01, Superseded)
 

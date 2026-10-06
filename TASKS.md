@@ -1,11 +1,10 @@
 # TASKS - QuantLab
 
-## Current Phase 66 Independent Review (2026-10-05)
+## Current Phase 66 Final Release Evidence (2026-10-06)
 
-Branch `main`, implementation HEAD `b7bb025200f1c900847cda8f0651bcc662d0b2aa`,
-single parent and unchanged frozen v4.83 tag
-`c250d7e7de241e18ee8555af4af4c56cef1b4a73`; VERSION `4.84.0-dev`.
-The review changes remain uncommitted and unstaged.
+Branch `main`, base HEAD `5760b3b37f92f4f0193498a0a6bb48da2c61d20b`;
+VERSION remains `4.84.0-dev`. Implementation `b7bb0252...`, independent review
+`9e0a0b5f...` and the acceptance-spec correction at base HEAD are committed.
 
 - [x] Add separate replay-input/environment/saved-execution/result identities and indexed configuration hashes.
 - [x] Add bounded read-only resolver, explicit legacy registration, safe SMA adapter and local-data demo.
@@ -15,13 +14,17 @@ The review changes remain uncommitted and unstaged.
 - [x] Independent source review, verified defect fixes and adversarial regressions; `docs/PHASE_66_REVIEW.md` records the exact inventory and limits.
 - [x] Review executions: 203 focused backend passes, then 76 affected passes on the corrected snapshot; final frontend 227 tests, TypeScript and 277-test discovery passed. No new whole-tree backend or browser execution claim.
 - [x] Inspect existing exact-implementation CI `37274152339` read-only: both jobs success, backend 4611 passed / 18 unspecified skips. This predates reviewer fixes.
-- [ ] Final user review-commit Python 3.11 CI, user production build and isolated browser execution.
-- [ ] Later user-only staging/commit/publication/tag after the required gates.
+- [x] Exact-patch CI `37417645417`: both jobs completed successfully at `5760b3b3...`; metadata independently retrieved read-only, no inferred full-suite count or skip reasons.
+- [x] User-owned production build at `9e0a0b5f...`: exit 0; reused unchanged for the corrected browser spec, not rebuilt at the patch SHA.
+- [x] User-owned isolated Microsoft Edge acceptance: one corrected scenario passed, exit 0; dual proxy proof passed and initial saved-row count was zero. Earlier failures preserved.
+- [x] Finalize existing documentation and stage only its reviewed exact diff; no verification reruns.
+- [ ] User documentation commit/publication, exact-documentation-commit verification and future user tagging.
 
-See `docs/PHASE_66_REVIEW.md` for review commands, failed attempts and the
-25-path pending inventory. `docs/PHASE_66_IMPLEMENTATION.md` preserves the
-historical 38-path implementation inventory and its separate evidence.
-No Phase 67, services, staging, commit, push or tag is authorized by this handoff.
+See [final evidence and attribution](docs/PHASE_66_REVIEW.md#12-final-release-verification-2026-10-06).
+The review's 25-path inventory and the implementation's 38-path inventory are
+historical, not the current documentation staging list. SMA-only restore and
+config-only/deferred module limits remain; no full-browser-suite claim.
+No Phase 67, services, commit, push or tag is authorized by this handoff.
 
 ## Historical Phase 65 Platform Verification (2026-10-01, Superseded)
 

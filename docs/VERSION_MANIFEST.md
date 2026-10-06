@@ -13,17 +13,22 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 
 ## 1. Current version label
 
-**`4.84.0-dev`**, Phase 66 implementation
-`b7bb025200f1c900847cda8f0651bcc662d0b2aa` on `main`, with independent review
-fixes uncommitted. Single parent and unchanged frozen v4.83 tag resolve to
-`c250d7e7de241e18ee8555af4af4c56cef1b4a73` (verified locally).
-[PHASE_66_REVIEW.md](PHASE_66_REVIEW.md) records the completed bounded review.
+**`4.84.0-dev`**, unchanged. Phase 66 implementation
+`b7bb025200f1c900847cda8f0651bcc662d0b2aa`, independent review
+`9e0a0b5fa1835f090d7a1e4b8b2353c1d872bd46` and acceptance-spec correction
+`5760b3b37f92f4f0193498a0a6bb48da2c61d20b` are committed on `main`.
+The implementation's parent/frozen v4.83 identity remains `c250d7e7...`.
+[Final verification (2026-10-06)](PHASE_66_REVIEW.md#12-final-release-verification-2026-10-06)
+records exact-patch CI `37417645417`, independently retrieved successful job
+metadata, and the separately user-supplied build/single Edge scenario.
 [PHASE_66_IMPLEMENTATION.md](PHASE_66_IMPLEMENTATION.md) remains historical.
-Existing implementation CI `37274152339` passed both jobs; it does not cover
-later reviewer fixes. No workflow was triggered or rerun by this review.
+The production build was made at the review SHA and reused unchanged for the
+corrected spec at the patch SHA; no rebuild at the patch is claimed. No workflow
+or verification was triggered or rerun during documentation finalization.
 
-Final review-commit Python 3.11 CI, user production build and isolated browser
-execution remain pending. Future user-created tag:
+Only documentation commit/publication and verification, then user tagging,
+remain pending. Patch CI is not CI for that future documentation commit.
+Future user-created tag:
 `v4.84.0-reproducible-run-replay-environment-manifest-v1` (not created).
 No Phase 67 or release action is started.
 

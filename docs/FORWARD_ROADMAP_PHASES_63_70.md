@@ -1,11 +1,13 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (2026-10-05):** Phase 66 independent review and verified
-> defect fixes are complete on `main`, implementation `b7bb025200f1c900847cda8f0651bcc662d0b2aa`,
-> VERSION `4.84.0-dev`. The v4.83 tag exists at parent `c250d7e7...`.
-> [Review evidence and limits](PHASE_66_REVIEW.md) separate focused review
-> checks from existing implementation CI. Review-commit Python 3.11 CI, user
-> production build and isolated browser execution remain pending. No Phase 67.
+> **Current status (2026-10-06):** Phase 66 implementation `b7bb0252...`, review
+> `9e0a0b5f...` and acceptance-spec patch `5760b3b3...` are committed on `main`;
+> VERSION remains `4.84.0-dev`. Exact-patch CI succeeded in both jobs. The user's
+> review-SHA production build was reused for one passing isolated Edge scenario,
+> not rebuilt at the patch SHA or used to claim all 277 browser tests executed.
+> [Final evidence and limits](PHASE_66_REVIEW.md#12-final-release-verification-2026-10-06)
+> separate all snapshots and attributions. Documentation publication/verification
+> and user tagging remain pending. No Phase 67.
 
 > **Historical status (2026-10-01, superseded):** Phase 64 is frozen at `1591f899...`, including
 > the existing v4.82 tag and inherited successful documentation CI `35739957842`.
@@ -223,12 +225,14 @@ adapters only.
 
 ## Phase 66 — Reproducible Run Replay by Hash and Environment Manifest v1
 
-**2026-10-05 reviewed status.** Bounded SMA provider/config restoration
+**2026-10-06 verified status.** Bounded SMA provider/config restoration
 and retained local-CSV replay, with explicit context selection and separate
 identity layers, are implemented at `4.84.0-dev`. Other strategies are
-config-only; other labs are deferred. Independent review fixed verified defects;
-final review-commit Python 3.11 CI, user production build and isolated browser
-execution remain pending. See [review handoff](PHASE_66_REVIEW.md) and the
+config-only; other labs are deferred. Independent review and the acceptance-spec
+patch are committed. Exact-patch CI, the user review-SHA production build and
+one corrected isolated Edge scenario passed; the build was reused unchanged.
+Documentation publication/verification and user tagging remain pending. See
+[final evidence](PHASE_66_REVIEW.md#12-final-release-verification-2026-10-06) and the
 historical [implementation handoff](PHASE_66_IMPLEMENTATION.md). Phase 67 is not started.
 
 **Goal.** Make a stored run recreatable from its hash: resolve a config

@@ -3,7 +3,14 @@
 Date: 2026-10-05. Repository: `C:\quantlab`. VERSION: `4.84.0-dev`.
 Scope: Reproducible Run Replay by Hash and Environment Manifest v1.
 
-**Decision:** safe to keep the bounded implementation with these review fixes;
+**Current status (2026-10-06):** implementation, independent review and the
+acceptance-spec patch are committed. Exact-patch CI and bounded user-owned
+build/browser verification are complete; the product build was reused, not
+rebuilt at the patch SHA. See [final verification](#12-final-release-verification-2026-10-06)
+for attribution, historical failures and remaining documentation/tag gates.
+Earlier dated sections retain their original snapshots and pending states.
+
+**Historical review decision (2026-10-05):** safe to keep the bounded implementation with these review fixes;
 ready for the user's review commit. Release verification remains incomplete:
 final review-commit Python 3.11 CI, user production build and isolated browser
 execution are pending. This review performs no staging or publication action.
@@ -572,3 +579,143 @@ Patch inventory: `frontend/e2e/run-replay.spec.ts` and this historical addendum
 only, both unstaged. Safe to keep and ready for user patch commit: **YES**.
 Final corrected browser execution on a fresh disposable backend remains pending.
 No staging, commit, push, tag, deployment or Phase 67.
+
+## 12. Final release verification (2026-10-06)
+
+Documentation-only finalization on clean attached `main`, empty index and no
+unstaged/nonignored untracked files at
+`5760b3b37f92f4f0193498a0a6bb48da2c61d20b`, VERSION `4.84.0-dev`.
+No independent source review, tests, typecheck, discovery, browser execution,
+build, audit, installation, Docker or application service was repeated here.
+
+### Commit and build identities
+
+| Role | Exact source |
+|---|---|
+| Implementation | `b7bb025200f1c900847cda8f0651bcc662d0b2aa` |
+| Independent review | `9e0a0b5fa1835f090d7a1e4b8b2353c1d872bd46` |
+| Acceptance-spec correction / finalization base | `5760b3b37f92f4f0193498a0a6bb48da2c61d20b` |
+| Reused user production build | Review SHA `9e0a0b5fa1835f090d7a1e4b8b2353c1d872bd46` |
+| Corrected browser specification checkout | Patch SHA `5760b3b37f92f4f0193498a0a6bb48da2c61d20b` |
+
+Local Git inspection confirms the patch has the review SHA as its single parent
+and changes exactly `frontend/e2e/run-replay.spec.ts` and this review document.
+Application, backend and frontend-build inputs were unchanged by that patch.
+Reusing the review-SHA build is therefore explicitly distinguished from building
+at the patch SHA; no new production build is claimed.
+
+### Existing results retained, not combined or rerun
+
+Sections 7-8 preserve implementation and independent-review snapshots, runtime
+differences, discovery and failures. The 203 focused backend passes and later
+76 affected passes are separate snapshots, not 279 passes in a final full suite.
+The final review frontend result remains 227 tests across 22 files, TypeScript
+passed, and 277 tests across 21 files were discovered but not all executed.
+The locator-patch discovery remains one selected test listed, zero executed.
+Local Python 3.13.5 evidence is not relabelled as CI Python 3.11 evidence.
+
+### User-owned production build
+
+Supplied by the user, not rerun during this task:
+
+- Source: review SHA `9e0a0b5fa1835f090d7a1e4b8b2353c1d872bd46`.
+- Node 24.21.0, npm 11.17.0, Next.js 15.5.25.
+- `BACKEND_URL=http://127.0.0.1:8768`; production build exit 0.
+- Post-build working tree clean, as reported by the user.
+- This unchanged build was reused for the corrected browser execution below.
+  It was not rebuilt at `5760b3b3...`. The earlier review's locally observed
+  npm 11.12.1 and failed checks remain their own historical runtime evidence.
+
+### Independently retrieved existing exact-patch CI metadata
+
+[Run 37417645417](https://github.com/hello696878/quantlab/actions/runs/37417645417)
+was inspected read-only through GitHub CLI during this finalization, without
+workflow dispatch or rerun. Retrieved `head_sha` is exactly
+`5760b3b37f92f4f0193498a0a6bb48da2c61d20b`; status `completed`, conclusion
+`success`, event `push`. Run timestamps: created 2026-10-06 05:15:38 UTC,
+updated 05:39:18 UTC.
+
+| Job | ID | Retrieved status / conclusion | Started / completed (UTC, 2026-10-06) |
+|---|---|---|---|
+| Frontend Tests & Build | 112119710186 | completed / success | 05:15:41 / 05:17:01 |
+| Backend Tests | 112119710322 | completed / success | 05:15:41 / 05:39:17 |
+
+Commands were read-only `gh api` calls to
+`repos/hello696878/quantlab/actions/runs/37417645417` and its `/jobs` endpoint,
+selecting run/job identity, status, conclusion and timestamps. Both exited 0.
+No test logs/counts or skip reasons were retrieved; a success status does not
+invent them. This CI covers the patch, not the future documentation commit.
+Prior implementation CI and its counts remain separate historical evidence.
+
+### User-owned corrected browser acceptance
+
+Supplied by the user, not executed again by this finalization:
+
+| Field | Reported result |
+|---|---|
+| Selected spec | `frontend/e2e/run-replay.spec.ts` at patch SHA |
+| Product build | Review SHA, reused unchanged |
+| Playwright project / actual browser | `chromium` / `msedge` (Microsoft Edge) |
+| Node selection | 24.21.0, selected through bounded runtime discovery |
+| Isolation | Fresh disposable backend on 8768; production frontend on 3100; dual proxy isolation PASS |
+| Initial saved rows | 0 |
+| Workers / retries | 1 / 0 |
+| Scenario / command summary | Passed in 4.4s / 1 passed in 6.4s |
+| Browser process exit | 0 |
+| Failed / skipped scenarios | 0 / 0 |
+| Post-run checkout | Clean, as reported by the user |
+
+External evidence location supplied by the user:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-phase66-browser-patch-e77ce23406734502bf29c77b023ceff1`.
+Read-only inspection of its existing `test-results/.last-run.json` returned
+`status="passed"` and an empty failed-test list. That limited artifact inspection
+does not independently establish timing, channel, exit code or proxy proof;
+those fields remain explicitly user-supplied. No tokens, credential contents,
+request headers, traces, screenshots, databases or generated output are copied
+into the repository.
+
+This ONE selected scenario exercises the actual row's View action, replay
+inspection/export, explicit form restoration without automatic execution, a
+separate deliberate local Run action, and the existing history/responsive
+assertions. It is not execution of all 277 discovered tests or certification of
+every race, browser, platform, security property or production workflow.
+
+### Historical failures and bounded gate decision
+
+Section 11 and all earlier failures remain historical:
+
+- The first attempt failed at isolation proof before demo seeding. Its underlying
+  cause was not conclusively established; later agreeing direct/proxy proofs do
+  not retroactively diagnose or pass that attempt.
+- The second passed proof and seeded the demo, then timed out at the exact-name
+  cell selector. The notes marker changed the cell text, and the name cell was
+  not interactive; the patch uses the actual row View action. The later explicit
+  Run action was not reached. Demo creation itself performs existing engine work;
+  it must not be described as an engine-free operation.
+- The successful corrected run used a fresh disposable backend. Neither failed
+  attempt is relabelled as passing, and the patch does not claim an unproven root
+  cause for the initial isolation failure.
+
+The bounded exact-patch CI, user production-build and single-scenario browser
+gates are now complete with the distinct attributions above. SMA restore
+support remains bounded; other saved strategies are config-only and other labs
+deferred. Inspection/restore do not automatically run research; explicit demo
+creation and Run remain deliberate execution actions. Matching environments
+do not guarantee bit-identical results. No full-browser-suite pass, production
+or security certification is claimed.
+
+Only current authorized documentation is updated and staged by this task.
+Protection is limited to inspected Git scope and working-file byte comparisons:
+no active user database was scanned/opened and no database before/after hash or
+data audit is claimed. VERSION, code/tests, dependencies, workflows, runtime,
+Dockerfiles, governing instructions and frozen screenshots are not edited.
+
+**Ready for the user documentation commit: YES**, after the exact documentation
+diff/links/whitespace and staging checks. Expected later subject:
+`Finalize phase66 release evidence and browser acceptance v1`.
+Still pending: user documentation commit/publication, verification of that exact
+commit, then the separately user-created
+`v4.84.0-reproducible-run-replay-environment-manifest-v1` tag. It remains uncreated
+and is not authorized here. Patch CI is not evidence for that future commit.
+No commit, push, tag, deployment, workflow trigger or Phase 67. Stop after the
+single documentation-and-staging handoff.

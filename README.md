@@ -24,12 +24,14 @@ and uses the existing backtest engine; missing uploads never fall back to a
 provider. Provider history is not frozen and matching manifests do not promise
 identical results. Other strategies are config-only, not executable adapters.
 
-VERSION is `4.84.0-dev`. Independent review and verified defect fixes are
-complete on `main`, with implementation HEAD
-`b7bb025200f1c900847cda8f0651bcc662d0b2aa` and uncommitted review changes.
-Final review-commit Python 3.11 CI, user production build and isolated browser
-execution remain pending. Existing implementation CI passed both jobs and
-does not cover the review changes. See the [review](docs/PHASE_66_REVIEW.md),
+VERSION remains `4.84.0-dev`. Implementation `b7bb0252...`, independent review
+`9e0a0b5f...` and acceptance-spec correction `5760b3b3...` are committed on `main`.
+Exact-patch CI `37417645417` completed both jobs successfully. The user's
+production build at the review commit was reused unchanged for the corrected
+spec: one isolated Microsoft Edge scenario passed, not all 277 discovered tests.
+Documentation publication/verification and the future user-created v4.84 tag
+remain pending; Phase 67 has not started. See the
+[final evidence and attribution](docs/PHASE_66_REVIEW.md#12-final-release-verification-2026-10-06),
 [contracts/runbook](docs/RUN_REPLAY_AND_ENVIRONMENT_MANIFEST.md) and historical
 [implementation handoff](docs/PHASE_66_IMPLEMENTATION.md).
 
