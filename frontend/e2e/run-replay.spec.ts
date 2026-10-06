@@ -17,7 +17,9 @@ test("Saved SMA run: hash inspection, explicit restore, no auto-run, export and 
   await page.goto("/");
   const sidebar = page.getByRole("navigation", { name: "Workspaces" });
   await sidebar.getByRole("button", { name: "Saved Backtests", exact: true }).click();
-  await page.getByText("Local SMA replay demo", { exact: true }).first().click();
+  const demoRow = page.getByRole("row").filter({ hasText: "Local SMA replay demo" });
+  await expect(demoRow).toBeVisible();
+  await demoRow.getByRole("button", { name: "View", exact: true }).click();
   await page.getByRole("button", { name: "Inspect replay contexts" }).click();
   await expect(page.getByTestId("run-replay-panel")).toBeVisible();
   await page.getByRole("button", { name: /Local SMA replay demo \/ context/ }).click();

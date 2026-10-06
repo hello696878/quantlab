@@ -528,3 +528,47 @@ commit must use the intended review subject and preserve evidence distinctions.
 No fresh inherited-security resolution or platform certification is claimed.
 Other saved strategies remain config-only, other labs deferred, and Phase 67
 is not started. Stop after this single review handoff.
+
+## 11. Historical browser attempts and acceptance-spec correction (2026-10-06)
+
+Bounded follow-up on clean `main` at
+`9e0a0b5fa1835f090d7a1e4b8b2353c1d872bd46`, VERSION `4.84.0-dev`.
+Earlier sections retain their original review snapshots, inventories and gates.
+The following browser/build evidence is user-supplied, not rerun by this patch:
+
+- Production build passed on that HEAD.
+- First browser attempt failed at disposable-database proof; no demo seed or
+  backtest execution occurred.
+- Subsequent independent direct/proxy strategy and replay proof checks all
+  returned HTTP 200, `database_verified=true` and the same disposable DB identity.
+- Second attempt passed immediate isolation proof and seeded `/api/run-replay/demo`
+  with HTTP 200, then timed out at the exact-name cell click in the spec.
+  Read-only direct/proxy saved-list diagnostics showed the same single demo row,
+  saved ID 1; its full hash resolved and one replay context pointed to that row.
+  The browser snapshot showed the rendered name cell `Local SMA replay demo✎`.
+
+Source confirms the acceptance-test defect: `SavedBacktestsList.tsx` appends
+the notes marker to the name cell; the cell has no open-detail handler. Its
+row's exact `View` button calls `onSelect(row.id)`. The spec now selects the row
+containing the demo name, asserts visibility and clicks that row's `View` button.
+Strict row matching also refuses ambiguity. Isolation proof, timeout, demo name
+and all downstream assertions are unchanged; no sleeps, retries or force clicks.
+Both failed attempts remain historical failures, without reclassifying either
+as a product defect or claiming a final browser pass.
+
+Exact verification command from `C:\quantlab\frontend`, using the newly
+discovered supported executable:
+`& 'C:\Users\jimli\AppData\Local\OpenAI\Codex\runtimes\cua_node\b72f26294f3e61db\bin\node.exe' node_modules/@playwright/test/cli.js test e2e/run-replay.spec.ts --project=chromium --list --reporter=list`.
+Node `v24.21.0`; installed Playwright `1.61.1`. Result: **1 test in 1 file
+discovered, zero executed**, command exit 0, measured command wall 0.8411576s.
+Discovery had no failures. An initial read-only final-inventory command exceeded
+Windows' command-length limit (CreateProcessAsUserW error 206) before execution;
+no process exit was produced. The shorter verification passed, including
+`git diff --check` (exit 0). Unit tests and TypeScript were not rerun for this
+locator-only change; no executable product code changed. No services, E2E,
+backend/full frontend tests, builds, audits, installs or database cleanup here.
+
+Patch inventory: `frontend/e2e/run-replay.spec.ts` and this historical addendum
+only, both unstaged. Safe to keep and ready for user patch commit: **YES**.
+Final corrected browser execution on a fresh disposable backend remains pending.
+No staging, commit, push, tag, deployment or Phase 67.
