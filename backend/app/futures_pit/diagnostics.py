@@ -19,6 +19,8 @@ def validate_continuous(frame, raw, spec, calendar, *, spike_threshold=0.1):
 
     if not 1 <= len(frame) <= 4000 or not set(CONTINUOUS_COLUMNS) <= set(frame.columns):
         return ({"code": "empty_or_invalid_schema", "severity": "error", "session": None},)
+    if len(frame) < 2:
+        add("insufficient_continuous_history", "warning")
     if any(not isinstance(t, pd.Timestamp) or pd.isna(t) or t.tzinfo is None or t.utcoffset().total_seconds() != 0 or
            t.hour or t.minute or t.second or t.microsecond or t.nanosecond for t in frame.timestamp):
         return ({"code": "invalid_session_timestamp", "severity": "error", "session": None},)
@@ -49,7 +51,7 @@ def validate_continuous(frame, raw, spec, calendar, *, spike_threshold=0.1):
             valid = valid and type(row.volume) is int and row.volume >= 0
             valid = valid and type(row.open_interest) is not bool and (pd.isna(row.open_interest) or
                                                                       math.isfinite(row.open_interest) and row.open_interest >= 0)
-        except (ValueError, TypeError):
+        except (ValueError, TypeError, OverflowError):
             valid = False
         if not valid:
             add("nonfinite_or_invalid_numeric", "error", str(row.timestamp.date()))
@@ -70,6 +72,8 @@ def validate_continuous(frame, raw, spec, calendar, *, spike_threshold=0.1):
         return tuple(findings)
     expected = build_continuous_futures(raw, spec, next(iter(methods)), declared_calendar=calendar)
     wanted = {r.timestamp: r for r in expected.itertuples()}
+    for timestamp in sorted(set(wanted) - set(frame.timestamp)):
+        add("missing_built_session", "error", str(timestamp.date()))
     for row in frame.itertuples():
         target = wanted.get(row.timestamp)
         if target is None:

@@ -18,6 +18,14 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 67 independent review** (2026-10-12, `4.85.0-dev` unchanged): fixed
+  public failure sanitization/range handling, pre-lookup root validation,
+  revision-batch classification, calendar audit binding, declared numeric bounds,
+  truncated/insufficient continuous diagnostics and timezone provenance.
+  Protected focused review: 375 passed / 1 platform skip / 376 selected, exits 0.
+  User review commit and exact-commit Python 3.11/Linux CI remain pending.
+  See `docs/PHASE_67_REVIEW.md`; implementation evidence below stays historical.
+
 - **Phase 67 bounded implementation** (2026-10-07, `4.85.0-dev`): strict local
   daily-contract knowledge/provenance snapshots, immutable supersession and
   explicit as-of modes, finite declared calendar with real DST checks, opt-in

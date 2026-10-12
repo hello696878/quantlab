@@ -36,6 +36,11 @@ repository `.venv`); `America/Chicago` resolves through installed `tzdata`
 2026.2, not an existing TZPATH file. No timezone dependency/runtime installation
 or requirements change was needed. Provenance reports actual system TZPATH
 or fallback package, source version when available, and `pinned: false`.
+The version is read from the root actually supplying the requested zone;
+another root's version is not substituted. Provenance describes the current
+timezone search path. Python does not expose the origin of previously cached
+ZoneInfo objects, so changing that path in a live process is not a verified
+cache-origin claim. Review fixtures restore the path and clear their test cache.
 Existing CI is Ubuntu/Python 3.11 with declared backend requirements; actual
 Phase 67 3.11 timezone execution remains a future exact-commit CI gate, not a
 local 3.13 claim. Unavailable named data fails explicitly.
@@ -63,6 +68,8 @@ confirmation fields and declared calendar availability at an explicit decision
 cutoff before the effective session starts. It does not implement or certify a
 causal scheduling/execution engine, historical instrument knowledge, or the
 availability of the new session's closing quote at its opening time.
+The audit refuses a calendar whose material fingerprint differs from the one
+recorded by the roll event; matching display ID/version alone is insufficient.
 
 The corpus intentionally declares June 12 OI at June 13 02:00 UTC, after the
 next session starts at June 12 22:00 UTC. That roll cannot receive a PIT badge.
@@ -80,6 +87,9 @@ duplicates, closed/unknown/missing sessions, active-contract transitions/flags,
 required seam/roll quotes, raw/adjusted fields, factors, nonfinite values and
 same-contract spikes. Comparison reuses the existing builder under the declared
 policy; hand-computable acceptance assertions are independently specified.
+Missing rows from either end of the expected built history are errors. A genuine
+one-quote history is insufficient and reports a warning, even if it matches
+the supplied raw material; it cannot establish seam or return quality.
 
 For the baseline June 12/13 seam: old close 100, new prior close 110, new roll
 close 111. Ratio is 1.1 and Panama gap is 10. Adjusted prior close 110 -> 111

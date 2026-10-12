@@ -13,16 +13,22 @@ sys.path.insert(0, str(ROOT / "backend"))
 from app.datastore.ingest import preview_futures_source
 from app.datastore.futures_continuous import build_continuous_futures, compute_roll_schedule
 from app.datastore.store import raw_data_version_hash
-from app.futures_pit.adapter import AdapterRequest, Capabilities
+from app.futures_pit.adapter import AdapterRequest, Capabilities, public_failure_message
 from app.futures_pit.calendar import timezone_provenance
 from app.futures_pit.diagnostics import derived_identity, validate_continuous
 from app.futures_pit.models import instant
 from app.futures_pit.revisions import as_of, compare, legacy_frame, table_hash
-from app.instruments import get_instrument
+from app.instruments import InstrumentError, get_instrument
+
+
+class _ArgumentParser(argparse.ArgumentParser):
+    def error(self, message):
+        # argparse's default error includes supplied arguments and choice values.
+        raise ValueError("Unsupported or conflicting CLI arguments; use --help")
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = _ArgumentParser(description=__doc__)
     parser.add_argument("--demo", action="store_true", help="explicitly select the tiny invented repository corpus")
     parser.add_argument("--provider", choices=("local_file", "external"), default="local_file")
     parser.add_argument("--csv")
@@ -33,16 +39,16 @@ def main(argv=None):
     parser.add_argument("--as-of", help="explicit aware ISO cutoff; demo defaults to 2025-06-21T12:00:00Z")
     parser.add_argument("--mode", choices=("declared_source", "local_observed"), default="declared_source")
     parser.add_argument("--continuous", action="store_true")
-    args = parser.parse_args(argv)
-    if args.demo:
-        if any((args.csv, args.metadata, args.calendar, args.correction_csv, args.correction_metadata)):
-            parser.error("--demo cannot be mixed with explicit input paths")
-        corpus = ROOT / "backend/tests/fixtures/futures_pit"
-        args.csv, args.metadata, args.calendar = (str(corpus / p) for p in ("bars.csv", "metadata.json", "calendar.json"))
-        args.correction_csv, args.correction_metadata = (str(corpus / p) for p in ("correction.csv", "correction-metadata.json"))
-        args.continuous = True
-        args.as_of = args.as_of or "2025-06-21T12:00:00Z"
     try:
+        args = parser.parse_args(argv)
+        if args.demo:
+            if any((args.csv, args.metadata, args.calendar, args.correction_csv, args.correction_metadata)):
+                parser.error("--demo cannot be mixed with explicit input paths")
+            corpus = ROOT / "backend/tests/fixtures/futures_pit"
+            args.csv, args.metadata, args.calendar = (str(corpus / p) for p in ("bars.csv", "metadata.json", "calendar.json"))
+            args.correction_csv, args.correction_metadata = (str(corpus / p) for p in ("correction.csv", "correction-metadata.json"))
+            args.continuous = True
+            args.as_of = args.as_of or "2025-06-21T12:00:00Z"
         result = preview_futures_source(AdapterRequest(provider=args.provider, csv_path=args.csv,
                                                        metadata_path=args.metadata, calendar_path=args.calendar))
         if not args.as_of:
@@ -102,9 +108,9 @@ def main(argv=None):
         elif summary["status"] == "pass" and any(f["severity"] == "warning" for f in summary["findings"]):
             summary["status"] = "warning"
         code = {"pass": 0, "warning": 1, "invalid": 2, "incomplete": 3}[summary["status"]]
-    except (ValueError, OSError) as exc:
+    except (ValueError, OSError, OverflowError, InstrumentError) as exc:
         summary = {"schema_version": "futures_pit_preview_v1", "status": "invalid",
-                   "failure": getattr(exc, "code", "invalid_input"), "message": str(exc)}
+                   "failure": getattr(exc, "code", "invalid_input"), "message": public_failure_message(exc)}
         code = 2
     print(json.dumps(summary, sort_keys=True, allow_nan=False, indent=2))
     print("Futures local preview: " + summary["status"] + "; no inputs/artifacts/database written", file=sys.stderr)

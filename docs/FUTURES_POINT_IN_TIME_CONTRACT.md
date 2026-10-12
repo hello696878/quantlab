@@ -35,6 +35,8 @@ revision ID, optional superseded revision and explicit availability fields.
 Numbers reject Boolean/string coercion, nonfinite values and unsafe large
 integers. Positive-price/OHLC rules intentionally preserve this existing local
 instrument scope; this is not a universal negative-price futures contract.
+Futures roots require bounded canonical uppercase letters/digits before local
+spec lookup; a generic identifier cannot become a drive-relative or stream path.
 
 Labels are dates, **not actual UTC closing instants**. The legacy bridge stores
 midnight UTC with the same label. Converting that instant to Chicago may show
@@ -86,8 +88,11 @@ It deduplicates identical revision material; refuses contradictions, missing
 parents, multiple roots, branches, cycles, disconnected chains and non-increasing
 known revision times (including equal-time ties). Supersession, not input order
 or lexical revision ID, determines which eligible version succeeds another.
-Unknown and future records are counted explicitly. Appending a later eligible
-correction cannot change earlier selection under the same declared policy.
+Unknown and future records are counted explicitly. Appending a valid correction
+whose relevant availability is after the cutoff cannot change earlier selection
+under that policy. Newly supplied evidence already eligible at the cutoff may
+legitimately change the selection. Comparison recognizes explicit parents in
+either supplied snapshot; the selector separately validates the complete graph.
 No eligible records is an incomplete result, not invented empty success.
 
 ## Identity Layers
@@ -128,6 +133,9 @@ are read-only; material is reread after validation to detect cross-file mutation
 This is **not an atomic multi-file or adversarial-filesystem snapshot guarantee**.
 The existing lower-level bounded reader caps at 4 MiB before the narrower 256 KiB
 adapter limit. No artifact export or database initialization exists in v1.
+Public failures use bounded diagnostics without echoing declaration values,
+parser payloads or operating-system paths. Unknown instruments and timestamps
+whose UTC conversion exceeds the supported datetime range are invalid inputs.
 
 License status (`unknown`, `synthetic`, `user_declared`), intended use,
 redistribution and attribution are inert declarations. Rights remain unknown

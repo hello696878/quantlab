@@ -1,20 +1,23 @@
 # TASKS - QuantLab
 
-## Current Phase 67 Implementation (2026-10-07)
+## Current Phase 67 Independent Review (2026-10-12)
 
-Branch `phase67-futures-point-in-time-calendar-foundation`, frozen baseline/HEAD
-`008760c46564839500e6108db84d8ffebab3f875`; VERSION `4.85.0-dev`.
+Attached `main`, implementation HEAD `66aa3da7eb79ce6b1f07000e90d1dc930b65df41`,
+parent/frozen baseline `008760c46564839500e6108db84d8ffebab3f875`;
+VERSION `4.85.0-dev` unchanged.
 Verified v4.84 tag at baseline; user-reported exact-doc CI `37482126828` is inherited.
 
 - [x] Audit actual futures/local-ingest/store/continuous/registry/provider boundaries.
 - [x] Implement bounded immutable contracts, revisions/as-of and declared calendar/DST.
 - [x] Add explicit legacy-compatible calendar roll mode, diagnostics and local CLI.
 - [x] Add invented acceptance corpus and independent focused backend assertions.
-- [x] Final protected regression: 374 passed, 1 physical-symlink privilege skip, 375 selected, exits 0; protection checks passed. Earlier setup/test failures remain recorded.
-- [ ] Separate independent diff review, user commits and exact-commit Python 3.11 CI.
+- [x] Independent adversarial review and narrow verified-defect fixes.
+- [x] Protected review regression: 375 passed, 1 physical-symlink privilege skip, 376 selected, exits 0; protection checks passed. Implementation runs remain separate historical evidence.
+- [ ] User review commit and final exact-commit Python 3.11/Linux CI, including real physical-symlink refusal.
 
 No provider, official calendar, frontend, services, staging/commit/push/tag or Phase 68.
-See [Phase 67 handoff](docs/PHASE_67_IMPLEMENTATION.md).
+See [Phase 67 review](docs/PHASE_67_REVIEW.md) and the preserved
+[implementation handoff](docs/PHASE_67_IMPLEMENTATION.md).
 
 ## Historical Phase 66 Final Release Evidence (2026-10-06, Superseded)
 

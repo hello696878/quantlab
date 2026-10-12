@@ -21,10 +21,13 @@ read-only daily-contract adapter, immutable revisions and explicit as-of modes,
 finite synthetic/user-declared sessions with real DST validation, optional
 calendar-aware retrospective rolls and continuous-series quality diagnostics.
 No provider, official exchange calendar, frontend or fully PIT-qualified
-continuous execution path is added. VERSION is `4.85.0-dev`; independent review
-and exact-commit CI remain pending. Final focused backend checks: 374 passed,
-one local symlink-privilege skip; not a full-suite or Python 3.11 claim.
-See the [implementation handoff](docs/PHASE_67_IMPLEMENTATION.md)
+continuous execution path is added. VERSION is `4.85.0-dev`. Independent review
+and verified defect fixes are complete on implementation `66aa3da7...`;
+review checks: 375 passed / 1 physical-symlink privilege skip / 376 selected,
+exits 0. User review commit and exact-commit Python 3.11/Linux CI remain pending;
+this is a focused Windows 3.13 result. See the
+[review handoff](docs/PHASE_67_REVIEW.md), historical
+[implementation handoff](docs/PHASE_67_IMPLEMENTATION.md)
 and [read-only CLI runbook](docs/FUTURES_DECLARED_CALENDAR_AND_VALIDATION.md).
 
 ## Completed baseline: Phase 66

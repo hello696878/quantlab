@@ -1,20 +1,24 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 67 Implementation (2026-10-07)
+## Current Handoff: Phase 67 Independent Review (2026-10-12)
 
-Branch `phase67-futures-point-in-time-calendar-foundation`, HEAD/frozen v4.84
-`008760c46564839500e6108db84d8ffebab3f875`; VERSION `4.85.0-dev`.
+Attached branch `main`, implementation HEAD
+`66aa3da7eb79ce6b1f07000e90d1dc930b65df41`, parent/frozen v4.84
+`008760c46564839500e6108db84d8ffebab3f875`; VERSION `4.85.0-dev` unchanged.
 Phase 66 tag was verified; successful exact-doc CI `37482126828` is supplied
 inherited evidence, not rerun. Phase 67 backend/CLI contract/calendar/revisions,
 calendar-aware retrospective roll/diagnostics and bounded local adapter are
 implemented. No official-calendar/PIT certification or provider capability.
 
-Final focused regression: 374 passed / 1 physical-symlink privilege skip /
-375 selected, exits 0. No source/snapshot/active-DB mutation or SQLite boundary
-violation; exact earlier failures, commands and limits are recorded in
-[PHASE_67_IMPLEMENTATION.md](docs/PHASE_67_IMPLEMENTATION.md).
-Next step is independent review, not Phase 68. No staging, commit, push, tag,
-service, full-browser/build or release operation is performed here.
+Independent review and narrow defect fixes are complete. Final protected review
+regression: 375 passed / 1 physical-symlink privilege skip / 376 selected,
+exits 0; source/snapshot/active-DB protections passed, no SQLite violations.
+See [PHASE_67_REVIEW.md](docs/PHASE_67_REVIEW.md) for fixes, exact pending inventory,
+separate inherited evidence and platform limitations. Current documentation was
+updated after testing; scientific source/tests remain the tested bytes.
+Next steps are user review commit and exact-commit Python 3.11/Linux CI.
+No staging, commit, push, tag, application service, frontend/build/browser or
+Phase 68 operation was performed by this review.
 
 ## Historical Handoff: Phase 66 Final Release Evidence (2026-10-06, Superseded)
 

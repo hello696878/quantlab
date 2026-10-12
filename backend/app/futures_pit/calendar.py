@@ -2,9 +2,10 @@
 from __future__ import annotations
 
 import importlib.metadata
+import zoneinfo
 from datetime import date, datetime, timedelta, timezone
 from pathlib import Path
-from zoneinfo import TZPATH, ZoneInfo, ZoneInfoNotFoundError
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import Field, StrictBool, model_validator
 
@@ -22,25 +23,25 @@ def zone(name: str) -> ZoneInfo:
 
 
 def timezone_provenance(name: str) -> dict:
+    """Describe current resolution; ZoneInfo does not expose cached-object origin."""
     zone(name)
-    system = next((Path(root) / name for root in TZPATH if (Path(root) / name).is_file()), None)
+    system_root = next((Path(root) for root in zoneinfo.TZPATH if (Path(root) / name).is_file()), None)
     try:
         package = importlib.metadata.version("tzdata")
     except importlib.metadata.PackageNotFoundError:
         package = None
     version = None
-    if system:
-        for root in TZPATH:
-            zi = Path(root) / "tzdata.zi"
-            if zi.is_file():
-                with zi.open(encoding="utf-8") as source:
-                    first = source.readline(120).strip()
-                if first.startswith("# version "):
-                    version = first.removeprefix("# version ")
-                break
-    return {"timezone": name, "source": "system_TZPATH" if system else "tzdata_package",
-            "source_version": version if system else package, "installed_tzdata": package,
-            "pinned": False}
+    if system_root is not None:
+        zi = system_root / "tzdata.zi"
+        if zi.is_file():
+            with zi.open(encoding="utf-8") as source:
+                first = source.readline(120).strip()
+            if first.startswith("# version "):
+                version = first.removeprefix("# version ")
+    return {"timezone": name, "source": "system_TZPATH" if system_root is not None else "tzdata_package",
+            "source_version": version if system_root is not None else package, "installed_tzdata": package,
+            "pinned": False, "resolution_basis": "current_timezone_search_path",
+            "cache_limitation": "Previously cached ZoneInfo objects may use another source; cache origin is not tracked"}
 
 
 def local_to_utc(value: datetime, name: str, *, fold: int | None = None) -> datetime:

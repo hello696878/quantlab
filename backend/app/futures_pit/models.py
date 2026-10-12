@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 
 from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
 
-from app.instruments import FuturesSpec, get_instrument, parse_contract_symbol
+from app.instruments import FuturesSpec, InstrumentError, get_instrument, parse_contract_symbol
 
 
 def identifier(value):
@@ -44,7 +44,10 @@ def instant(value):
         value = datetime.fromisoformat(value.replace("Z", "+00:00"))
     if type(value) is not datetime or value.tzinfo is None or value.utcoffset() is None:
         raise ValueError("naive/unknown instants are not accepted")
-    return value.astimezone(timezone.utc)
+    try:
+        return value.astimezone(timezone.utc)
+    except OverflowError as exc:
+        raise ValueError("instant is outside the supported UTC range") from exc
 
 
 Id = Annotated[str, BeforeValidator(identifier)]
@@ -98,7 +101,14 @@ class Bar(Frozen):
 
     @model_validator(mode="after")
     def market_contract(self):
-        spec = get_instrument(self.root_symbol)
+        # Root IDs become local spec filenames: refuse drive/stream syntax
+        # before invoking the legacy registry, without changing that registry.
+        if not re.fullmatch(r"[A-Z0-9]{1,10}", self.root_symbol):
+            raise ValueError("futures root must use bounded canonical letters/digits")
+        try:
+            spec = get_instrument(self.root_symbol)
+        except InstrumentError as exc:
+            raise ValueError("unsupported futures instrument declaration") from exc
         code = parse_contract_symbol(self.contract_symbol)
         if not isinstance(spec, FuturesSpec) or self.root_symbol != spec.root_symbol:
             raise ValueError("unsupported futures root")

@@ -64,16 +64,17 @@ def compare(original: Snapshot, incoming: Snapshot) -> tuple[dict, ...]:
     if original.model_dump(mode="json", exclude={"bars", "snapshot_id"}) != incoming.model_dump(mode="json", exclude={"bars", "snapshot_id"}):
         raise ValueError("cannot compare revisions with changed provenance/calendar/spec contexts")
     old = {(*b.key, b.revision_id): b for b in original.bars}
+    known = set(old) | {(*b.key, b.revision_id) for b in incoming.bars}
     keys = {b.key for b in original.bars}
     findings = []
     for bar in incoming.bars:
         prior = old.get((*bar.key, bar.revision_id))
         if prior is not None:
             status = "exact_duplicate" if prior == bar else "same_version_contradiction"
-        elif bar.key not in keys:
-            status = "new_observation" if bar.supersedes is None else "ambiguous_provenance"
-        elif bar.supersedes is not None and (*bar.key, bar.supersedes) in old:
+        elif bar.supersedes is not None and (*bar.key, bar.supersedes) in known:
             status = "explicit_revision"
+        elif bar.key not in keys and bar.supersedes is None:
+            status = "new_observation"
         else:
             status = "ambiguous_provenance"
         findings.append({"contract": bar.contract_symbol, "session": bar.session.isoformat(),

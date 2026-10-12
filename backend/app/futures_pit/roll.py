@@ -14,17 +14,20 @@ from .calendar import DeclaredCalendar
 
 def declared_roll_schedule(raw_df, spec, calendar: DeclaredCalendar):
     try:
+        maximum = 2**53 - 1
         if (not pd.api.types.is_datetime64_any_dtype(raw_df.timestamp.dtype) or raw_df.timestamp.dt.tz is None or
                 any(t.utcoffset() != timedelta(0) for t in raw_df.timestamp)):
             raise ValueError("timestamp must use aware UTC session labels")
         if not pd.api.types.is_integer_dtype(raw_df.volume.dtype) or pd.api.types.is_bool_dtype(raw_df.volume.dtype):
             raise ValueError("volume must have integer dtype")
+        if any(v < 0 or v > maximum for v in raw_df.volume):
+            raise ValueError("volume exceeds the declared contract's safe integer range")
         for column in ("open", "high", "low", "close"):
-            if any(type(v) is bool or not math.isfinite(v) or v <= 0 for v in raw_df[column]):
-                raise ValueError("prices must be finite positive numbers")
-        if any(pd.notna(v) and (type(v) is bool or not math.isfinite(v) or v < 0) for v in raw_df.open_interest):
+            if any(type(v) is bool or not 0 < v <= maximum or not math.isfinite(v) for v in raw_df[column]):
+                raise ValueError("prices must be finite positive numbers within the declared contract range")
+        if any(pd.notna(v) and (type(v) is bool or not 0 <= v <= maximum or not math.isfinite(v)) for v in raw_df.open_interest):
             raise ValueError("invalid open interest")
-    except (ValueError, TypeError, AttributeError, KeyError) as exc:
+    except (ValueError, TypeError, AttributeError, KeyError, OverflowError) as exc:
         raise RollScheduleError("invalid typed declared-mode daily values/session labels") from exc
     norm = validate_raw_futures(raw_df)
     if norm.empty or len(norm) > 4000 or set(norm.root_symbol) != {spec.root_symbol}:
@@ -103,6 +106,8 @@ def decision_eligibility(event, bars, calendar, mode, decision_at):
     """Audit required full-field knowledge, not a causal scheduling engine."""
     from .models import instant
 
+    if event.metadata.get("calendar_hash") != calendar.fingerprint:
+        raise ValueError("roll event/calendar material mismatch")
     cutoff = instant(decision_at)
     execution = calendar.lookup(event.roll_date).interval.start
     if cutoff >= execution:
