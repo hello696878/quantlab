@@ -18,6 +18,17 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 67 five-case platform evidence** (2026-10-12, `4.85.0-dev` unchanged):
+  review commit `92498c53...` has supplied successful exact-commit CI
+  `38208475431` (backend 4849 passed / 18 unidentified skips). Separate
+  disposable Debian 12 / Python 3.11.17 verification passed all five real
+  physical-link/DST/timezone-provenance cases with no skips/failures/errors.
+  No full-suite rerun or inferred CI skip identities; historical Windows
+  375-pass/1-skip review and earlier checkpoints below remain separate.
+  Source/data protections passed; only handoff documentation is changed/staged.
+  Documentation publication and user tagging remain pending. See
+  [post-review evidence](docs/PHASE_67_REVIEW.md#post-review-five-case-platform-verification-2026-10-12).
+
 - **Phase 67 independent review** (2026-10-12, `4.85.0-dev` unchanged): fixed
   public failure sanitization/range handling, pre-lookup root validation,
   revision-batch classification, calendar audit binding, declared numeric bounds,

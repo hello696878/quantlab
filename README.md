@@ -22,10 +22,13 @@ finite synthetic/user-declared sessions with real DST validation, optional
 calendar-aware retrospective rolls and continuous-series quality diagnostics.
 No provider, official exchange calendar, frontend or fully PIT-qualified
 continuous execution path is added. VERSION is `4.85.0-dev`. Independent review
-and verified defect fixes are complete on implementation `66aa3da7...`;
-review checks: 375 passed / 1 physical-symlink privilege skip / 376 selected,
-exits 0. User review commit and exact-commit Python 3.11/Linux CI remain pending;
-this is a focused Windows 3.13 result. See the
+and verified defect fixes are committed at `92498c531e2a2864b40eb6a0c669b39a4760311a`.
+Historical Windows 3.13 review: 375 passed / 1 physical-symlink capability skip /
+376 selected. Supplied exact-review-commit CI `38208475431` succeeded in both
+jobs: backend 4849 passed / 18 unidentified skips. Separate disposable Linux
+Python 3.11 verification executed all five physical-link/DST/provenance cases:
+5 passed, no skips/failures/errors. Documentation publication and user tagging
+remain pending; these results are not combined into a new full-suite count. See the
 [review handoff](docs/PHASE_67_REVIEW.md), historical
 [implementation handoff](docs/PHASE_67_IMPLEMENTATION.md)
 and [read-only CLI runbook](docs/FUTURES_DECLARED_CALENDAR_AND_VALIDATION.md).

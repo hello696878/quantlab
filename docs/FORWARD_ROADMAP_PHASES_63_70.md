@@ -3,9 +3,12 @@
 > **Current status (2026-10-12):** Phase 67 local futures data/knowledge/revisions,
 > declared calendar/DST, calendar-aware retrospective roll diagnostics and
 > fail-closed local adapter/CLI are implemented at `4.85.0-dev`. Independent
-> review/fixes are complete at implementation `66aa3da7...`: focused checks
-> 375 passed / 1 platform skip / 376 selected, exits 0. User review commit and
-> exact-commit Python 3.11/Linux CI remain pending. Phase 66 is frozen at `008760c4...`
+> review/fixes are committed at `92498c53...`: historical Windows checks
+> 375 passed / 1 platform skip / 376 selected, exits 0. Supplied exact-review CI
+> `38208475431` succeeded in both jobs (backend 4849 passed / 18 unidentified
+> skips). Separate Linux/Python 3.11.17 five-case execution: 5 passed, no skips,
+> failures or errors. Documentation publication and user tagging remain pending.
+> Phase 66 is frozen at `008760c4...`
 > under the verified v4.84 tag; user-reported exact-doc CI `37482126828` passed
 > both jobs and was not rerun. See [review evidence](PHASE_67_REVIEW.md) and
 > historical [implementation evidence](PHASE_67_IMPLEMENTATION.md).
@@ -277,9 +280,13 @@ the manifest must state what it does and does not guarantee.
 ## Phase 67 — Futures Point-in-Time Data Contract, Calendar Foundation and Adapter Specification v1
 
 **Review status (2026-10-12).** Bounded backend/CLI foundation reviewed and
-verified defects fixed; focused review checks are 375 passed / 1 platform skip /
-376 selected, exits 0. User review commit and exact-commit Python 3.11/Linux CI
-remain pending. See [review handoff](PHASE_67_REVIEW.md). The source audit found
+verified fixes committed at `92498c53...`; historical Windows review checks are
+375 passed / 1 platform skip / 376 selected, exits 0. Supplied exact-review CI
+`38208475431` succeeded (backend 4849 passed / 18 unidentified skips), and a
+separate disposable Linux/Python 3.11.17 run passed all five physical-symlink,
+DST and timezone-provenance cases with zero skips/failures/errors. Documentation
+publication/verification and user tagging remain pending; no CI skip identities
+are inferred. See [review handoff](PHASE_67_REVIEW.md). The source audit found
 no existing futures provider flag; the typed interface is at the actual local
 ingestion seam and external selection always fails before I/O, without a new
 enable flag. See [handoff](PHASE_67_IMPLEMENTATION.md) for actual scope/evidence.

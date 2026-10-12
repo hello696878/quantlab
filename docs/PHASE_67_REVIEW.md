@@ -379,3 +379,205 @@ Future user tag:
 **v4.85.0-futures-point-in-time-contract-calendar-foundation-adapter-spec-v1**.
 Not created here. No second report/finalization task, staging, commit, push, tag,
 deployment or Phase 68 was performed.
+
+## Post-review five-case platform verification (2026-10-12)
+
+This dated section supersedes only the earlier pending review-commit/CI/platform
+status. All original review findings, failures, historical counts, runtime and
+protection evidence above are retained. No implementation or independent-review
+cycle was repeated. The new verification passed; only the seven authorized
+current-status/handoff documents are changed for documentation staging.
+
+### Existing CI and historical Windows evidence remain separate
+
+The task supplied completed exact-review-commit CI evidence, not newly retrieved
+or rerun in this verification: run **38208475431**, attempt **1**, SHA
+**92498c531e2a2864b40eb6a0c669b39a4760311a**. Backend job **114677128831** and
+frontend job **114677128539** are completed/success. The supplied retrieved
+backend log records Ubuntu **24.04.5**, CPython **3.11.17**,
+`python -m pytest -q`, **4849 passed / 18 skipped in 561.39s**. Its quiet summary
+does not identify skipped nodes/reasons; the supplied artifact listing is empty.
+No assertion is made that these skips are optional dependencies or that the
+physical-symlink case passed in CI. No CI process exit code is inferred.
+
+The historical Windows/Python 3.13.5 protected review remains **375 passed /
+1 physical-symlink capability skip / 376 selected**, with its exact durations,
+recorded exits, real timezone provenance and protection evidence above unchanged.
+The new five passes below are not added to 4849 or 375 to invent a suite result.
+
+### Source, archive and disposable environment identity
+
+Before work and after tests, `main` was clean, the index empty and HEAD exactly
+**92498c531e2a2864b40eb6a0c669b39a4760311a** (the committed review).
+VERSION stays **4.85.0-dev**. The previous attempt stopped before archives,
+installation, containers, tests, edits or staging: both sandbox and approved
+Docker probes exited **1**, with missing `dockerDesktopLinuxEngine` pipe, not
+an established permission denial. The user then started Docker Desktop.
+One approved connectivity recheck on resume exited **0**: Docker Desktop
+**4.75.0 (227598)**, Engine/client **29.5.2**, `desktop-linux`, Linux/amd64.
+
+External task root, retained without deleting prior evidence:
+
+**C:/Users/jimli/AppData/Local/Temp/quantlab-phase67-fivecase-3c60e0898c634d8da249a799182df5c5**
+
+`input/source.tar` was produced with Git's binary output option, not PowerShell
+text redirection:
+
+~~~powershell
+git -c core.autocrlf=false archive --format=tar --output=<task-root>/input/source.tar 92498c531e2a2864b40eb6a0c669b39a4760311a
+~~~
+
+- Committed tree: **54abcd04163fb4d0835d0ba3c4ca3cde98b15876**.
+- Archive SHA-256: **b3949de85f3db0dd991b44f9834cef8e6be04a7319f262b19f5c1c7df753f39a**;
+  **23,080,960 bytes**, archive command exit **0**, **2.3729104s**.
+- Archive global commit comment matches HEAD. All **1,143** committed blob
+  paths, Git blob identities and executable-mode classifications match the
+  recorded Git tree, with no extra/missing members. Extracted file SHA-256/size
+  identities match those verified archive bytes. No live working-directory copy.
+- Official **python:3.11-slim-bookworm**, image ID and repo digest
+  **sha256:0a310eeecf4e1f5a0743f9a6520c90c88d089c903ca5fd283f501e3a805f5f89**;
+  Linux/amd64, image created **2026-10-06T02:04:13.792985192Z**.
+  Pull exit **0**, **46.9827016s**; image inspect exit **0**.
+- Actual runtime: Debian GNU/Linux **12 (bookworm)**, CPython **3.11.17**
+  (GCC **12.2.0**), `/usr/local/bin/python`, kernel
+  **6.6.87.2-microsoft-standard-WSL2**, glibc **2.36**, one serial worker.
+  This is not a reconstruction of the Ubuntu GitHub runner.
+- Declared backend requirements installed only inside this disposable container:
+  fastapi **0.143.0**, uvicorn **0.54.0**, python-multipart **0.0.32**,
+  pandas **3.0.6**, numpy **2.4.6**, scipy **1.17.1**, yfinance **1.7.0**,
+  pydantic **2.14.1** / pydantic_core **2.50.1**, python-dateutil **2.9.0.post0**,
+  pytest **9.1.1**, httpx **0.28.1**, PyYAML **6.0.3**, pluggy **1.6.0**,
+  pip **24.0**. Full installed metadata is retained in `evidence/environment.json`
+  and the existing runner's `runtime.json`. No PyArrow installation was requested.
+  pip's container-root warning is retained; no host/user Python was installed into.
+
+The uniquely named container was
+`quantlab-phase67-fivecase-3c60e0898c634d8da249a799182df5c5`, full ID
+**5b2594dc3d570b05781657cb2fa662c02f61425c74e17c5e1794f52ea1b7f8ca**.
+Its recorded invocation uses the exact image ID and only two bind mounts:
+task-owned `input` to `/input` read-only and task-owned `evidence` to `/evidence`
+writable. No live checkout, active database, home, credentials, socket, extra
+volume, privileged mode or exposed port. Source extraction is
+`/work/run/source`; basetemp is `/work/run/pytest-tmp`. Both are **overlayfs**,
+not Windows bind mounts. No application service was started.
+
+### Actual timezone material before execution
+
+Real **America/Chicago** came from the image's system TZPATH root
+**/usr/share/zoneinfo**, file **/usr/share/zoneinfo/America/Chicago**.
+Supplying `tzdata.zi` reports IANA **2026c**; system package version is
+**2026c-0+deb12u1** (`dpkg-query` exit **0**). TZif material is **3,592 bytes**,
+SHA-256 **feba326ebe88eac20017a718748c46c68469a1e7f5e7716dcb8f1d43a6e6f686**.
+The original bytes are retained as `evidence/America-Chicago.TZif`.
+TZPATH, package/source details and the hash are in `timezone-provenance.json`.
+Real timezone material was present; no test-only tzdata package was installed.
+
+The two review fixtures copy those real TZif bytes into owned Linux temporary
+roots and deliberately label them `synthetic-unrelated` / `synthetic-supplying`.
+These are fixture labels, not installed IANA releases. The second case removes
+the supplying label and requires an unknown version without borrowing another
+root's version. Cache-origin uncertainty and unpinned provenance remain disclosed.
+
+### Exactly five existing calls, executed once
+
+Committed definitions and pytest/runner configuration were inspected before
+execution. All five are unparameterized. The existing protected runner's
+`--execute` mode was used directly with an external task-owned run config,
+not the Windows wrapper. Its source-root checks, serial enforcement, SQLite
+audit guard and db-free fixtures stayed enabled. Source is inside the private
+Linux run directory; bytecode is disabled and pytest's cache provider disabled.
+
+Declared-requirements setup command:
+
+~~~text
+/usr/local/bin/python -m pip install --disable-pip-version-check --no-cache-dir -r /work/run/source/backend/requirements.txt
+~~~
+
+Actual test process, cwd `/work/run/source`:
+
+~~~text
+/usr/local/bin/python -u /work/run/source/scripts/backend_test_runner.py --execute /work/run/run-config.json
+~~~
+
+`run-config.json` supplies only the following five full repository-relative
+node IDs, followed by these pytest arguments (rootdir is `source/backend`):
+
+~~~text
+backend/tests/test_futures_pit_roll_adapter.py::test_physical_symlink_refused
+backend/tests/test_futures_pit_contract_calendar.py::test_real_chicago_dst_gap_fold_and_offset
+backend/tests/test_futures_pit_contract_calendar.py::test_dst_duration_does_not_change_session_count
+backend/tests/test_futures_pit_review_calendar.py::test_timezone_provenance_uses_current_path_and_the_zone_supplying_root
+backend/tests/test_futures_pit_review_calendar.py::test_missing_supplying_version_does_not_borrow_another_roots_label
+-o addopts= -vv -ra --tb=short -p no:cacheprovider --durations=0 --durations-min=0 --basetemp /work/run/pytest-tmp --junitxml /work/run/junit.xml
+~~~
+
+| Existing test (backend/tests/) | Call outcome | Call duration (s) |
+| --- | --- | --- |
+| test_futures_pit_roll_adapter.py::test_physical_symlink_refused | passed | 0.001034695 |
+| test_futures_pit_contract_calendar.py::test_real_chicago_dst_gap_fold_and_offset | passed | 0.000766419 |
+| test_futures_pit_contract_calendar.py::test_dst_duration_does_not_change_session_count | passed | 0.000581572 |
+| test_futures_pit_review_calendar.py::test_timezone_provenance_uses_current_path_and_the_zone_supplying_root | passed | 0.000440320 |
+| test_futures_pit_review_calendar.py::test_missing_supplying_version_does_not_borrow_another_roots_label | passed | 0.000449813 |
+
+**5 collected/selected, 0 deselected; 5 passed, 0 skipped, 0 failed, 0 errors.**
+All five setup/teardown phases passed. There are no new skip reasons.
+The real symlink remains visible to post-run `lstat` (mode **41471**), targeting
+the committed corpus `bars.csv`; its importer-refusal assertion passed.
+`physical-symlink-evidence.json` records the link/target, overlayfs and target hash.
+No mocked link or weakened assertion was used.
+
+| Measurement/status | Recorded value |
+| --- | --- |
+| Printed pytest summary | 5 passed in 1.02s |
+| Machine pytest wall | 1.391872671s |
+| Startup/collection | 1.371876173s |
+| Protected runner test-process wall / exit | 2.128663350s / 0 |
+| Machine pytest exit | 0 |
+| Requirements installation wall / process exit | 242.199344331s / 0 |
+| Container bootstrap wall / exit | 247.625301401s / 0 |
+| Host docker-run wall / CLI exit | 249.2520757s / 0 |
+| Docker-recorded container exit / inspect exit | 0 / 0 |
+| Bootstrap start/end UTC | 2026-10-12T06:56:12.676622Z / 2026-10-12T07:00:20.286048Z |
+
+Per-phase outcomes/durations, selection, JUnit XML, verbose log and skip-summary
+output, package metadata, install/pull logs, host invocation, image/container
+inspection, exact snapshot manifest and process statuses are retained under
+`evidence/`. The task-owned orchestration helper and its recorded SHA-256 remain
+under `input/` / `evidence/host-invocation.json`; no repository runner was edited.
+The successful tests were not repeated. No new setup/test failure occurred on
+resume; the earlier unavailable-engine attempt remains recorded separately.
+
+### Protection, cleanup and remaining publication boundary
+
+- Private extracted source bytes/sizes remain identical across setup and tests.
+  All **1,143** tracked working files matched the preflight SHA-256/size inventory
+  after tests, before documentation edits. The index bytes also matched.
+- Both recorded active-data files (`backend/data/.gitkeep` and `quantlab.db`)
+  retained exact hashes/sizes/mtime. The active DB was never opened or mounted;
+  SQLite audit violations are **[]**. Frozen screenshots and historical reports
+  are covered by the unchanged tracked-file inventory and remain outside the diff.
+- Only the recorded stopped task-owned container was removed, after evidence
+  export/inspection: cleanup CLI exit **0**. No image, volume, prior evidence,
+  active data or external task evidence was removed. Archive and logs remain.
+- The physical Linux symlink and real Linux/Python 3.11 DST/provenance gate is
+  now **closed by this five-node execution**. Supplied exact-review CI is already
+  successful; its **18 unidentified skips remain unidentified**, not reconstructed.
+- No full suite, complete modules, public CLI subprocess acceptance, frontend
+  checks/builds, browser tests, audit, Docker application build or Phase 65/66
+  platform check was rerun. No source/test/fixture/dependency/workflow/configuration
+  or VERSION edit; no new standalone finalization report.
+- Documentation-only handoff/staging is authorized for README.md, STOP_POINT.md,
+  TASKS.md, CHANGELOG.md, this report, VERSION_MANIFEST.md and
+  FORWARD_ROADMAP_PHASES_63_70.md. Exact membership, relative links, whitespace,
+  final-newline hygiene and staging byte preservation are checked before handoff;
+  the staged tree identity is returned separately, not embedded self-referentially.
+
+**Ready for user documentation commit/publication: yes**, subject to the final
+documentation/index hygiene check. Publication/verification of that documentation
+revision and user creation of
+**v4.85.0-futures-point-in-time-contract-calendar-foundation-adapter-spec-v1**
+remain pending. The tag was checked absent, not created. This source CI does not
+cover a future documentation commit. Declared local data/calendars and
+**retrospective** rolls remain the boundary: no external provider, official
+calendar or full PIT certification. No commit, push, tag, workflow trigger,
+deployment or Phase 68 is performed by this task.

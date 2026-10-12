@@ -1,8 +1,9 @@
 # TASKS - QuantLab
 
-## Current Phase 67 Independent Review (2026-10-12)
+## Current Phase 67 Platform Evidence (2026-10-12)
 
-Attached `main`, implementation HEAD `66aa3da7eb79ce6b1f07000e90d1dc930b65df41`,
+Attached `main`, review HEAD `92498c531e2a2864b40eb6a0c669b39a4760311a`,
+implementation `66aa3da7eb79ce6b1f07000e90d1dc930b65df41`,
 parent/frozen baseline `008760c46564839500e6108db84d8ffebab3f875`;
 VERSION `4.85.0-dev` unchanged.
 Verified v4.84 tag at baseline; user-reported exact-doc CI `37482126828` is inherited.
@@ -13,9 +14,13 @@ Verified v4.84 tag at baseline; user-reported exact-doc CI `37482126828` is inhe
 - [x] Add invented acceptance corpus and independent focused backend assertions.
 - [x] Independent adversarial review and narrow verified-defect fixes.
 - [x] Protected review regression: 375 passed, 1 physical-symlink privilege skip, 376 selected, exits 0; protection checks passed. Implementation runs remain separate historical evidence.
-- [ ] User review commit and final exact-commit Python 3.11/Linux CI, including real physical-symlink refusal.
+- [x] User review commit `92498c53...`; supplied exact-commit CI `38208475431`, both jobs success; backend 4849 passed / 18 unidentified skips in 561.39s. Not rerun; skip identities remain unknown.
+- [x] Separate disposable Linux/Python 3.11.17 five-node run: 5 passed, zero skips/failures/errors; actual physical symlink/importer refusal, real DST and timezone-provenance cases executed once.
+- [ ] User documentation commit/publication and verification of that exact documentation revision.
+- [ ] User-created v4.85 milestone tag after documentation publication; no Phase 68.
 
-No provider, official calendar, frontend, services, staging/commit/push/tag or Phase 68.
+No provider, official calendar, frontend, application services, code/test/VERSION
+change, commit/push/tag or Phase 68. Only the authorized documentation diff is staged.
 See [Phase 67 review](docs/PHASE_67_REVIEW.md) and the preserved
 [implementation handoff](docs/PHASE_67_IMPLEMENTATION.md).
 

@@ -17,12 +17,17 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 implementation, based on frozen `008760c46564839500e6108db84d8ffebab3f875` and
 verified `v4.84.0-reproducible-run-replay-environment-manifest-v1`.
 User-supplied exact-doc CI `37482126828` passed both jobs; inherited, not rerun.
-Implementation is `66aa3da7eb79ce6b1f07000e90d1dc930b65df41` on `main`.
-Independent review and verified fixes are complete; focused review checks:
+Implementation is `66aa3da7eb79ce6b1f07000e90d1dc930b65df41`; review/fixes are
+committed at `92498c531e2a2864b40eb6a0c669b39a4760311a` on `main`.
+Historical focused review checks:
 375 passed / 1 platform skip / 376 selected, exits 0 (Windows Python 3.13).
 See [review evidence](PHASE_67_REVIEW.md) and preserved
-[implementation evidence](PHASE_67_IMPLEMENTATION.md). User review commit,
-publication and exact-commit Python 3.11/Linux CI remain pending. Future user tag
+[implementation evidence](PHASE_67_IMPLEMENTATION.md). Supplied exact-review CI
+`38208475431` succeeded in both jobs: backend 4849 passed / 18 unidentified
+skips. Separately, disposable Linux/Python 3.11.17 executed all five physical
+symlink/DST/timezone-provenance cases: 5 passed, zero skips/failures/errors.
+This does not identify the CI skips or change the historical Windows result.
+Documentation commit/publication and its verification remain pending. Future user tag
 `v4.85.0-futures-point-in-time-contract-calendar-foundation-adapter-spec-v1`
 is not created; no Phase 68 or release action.
 
