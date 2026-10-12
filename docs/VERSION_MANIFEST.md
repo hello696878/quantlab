@@ -1,4 +1,4 @@
-# QuantLab — Version Manifest (Phase 66.0)
+# QuantLab — Version Manifest (Phase 67.0)
 
 The project's versioning conventions, verified against the local git history
 when written. Companion docs: [`../CHANGELOG.md`](../CHANGELOG.md) (grouped
@@ -12,6 +12,17 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 > anything about live trading.
 
 ## 1. Current version label
+
+**`4.85.0-dev`**, Phase 67 local futures contract/calendar/revisions/adapter
+implementation, based on frozen `008760c46564839500e6108db84d8ffebab3f875` and
+verified `v4.84.0-reproducible-run-replay-environment-manifest-v1`.
+User-supplied exact-doc CI `37482126828` passed both jobs; inherited, not rerun.
+See [implementation evidence](PHASE_67_IMPLEMENTATION.md). Independent review,
+user commits/publication and exact-commit CI remain pending. Future user tag
+`v4.85.0-futures-point-in-time-contract-calendar-foundation-adapter-spec-v1`
+is not created; no Phase 68 or release action.
+
+### Historical Phase 66 Version Note (Superseded)
 
 **`4.84.0-dev`**, unchanged. Phase 66 implementation
 `b7bb025200f1c900847cda8f0651bcc662d0b2aa`, independent review

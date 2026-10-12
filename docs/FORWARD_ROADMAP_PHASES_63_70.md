@@ -1,6 +1,14 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (2026-10-06):** Phase 66 implementation `b7bb0252...`, review
+> **Current status (2026-10-07):** Phase 67 local futures data/knowledge/revisions,
+> declared calendar/DST, calendar-aware retrospective roll diagnostics and
+> fail-closed local adapter/CLI are implemented at `4.85.0-dev`. Independent
+> review and exact-commit CI remain pending. Phase 66 is frozen at `008760c4...`
+> under the verified v4.84 tag; user-reported exact-doc CI `37482126828` passed
+> both jobs and was not rerun. See [implementation evidence](PHASE_67_IMPLEMENTATION.md).
+> No provider, official calendar, fully PIT-certified execution or Phase 68.
+
+> **Historical status (2026-10-06, superseded):** Phase 66 implementation `b7bb0252...`, review
 > `9e0a0b5f...` and acceptance-spec patch `5760b3b3...` are committed on `main`;
 > VERSION remains `4.84.0-dev`. Exact-patch CI succeeded in both jobs. The user's
 > review-SHA production build was reused for one passing isolated Edge scenario,
@@ -264,6 +272,12 @@ the manifest must state what it does and does not guarantee.
 ---
 
 ## Phase 67 — Futures Point-in-Time Data Contract, Calendar Foundation and Adapter Specification v1
+
+**Implementation status (2026-10-07).** Bounded backend/CLI foundation exists;
+independent review and exact-commit CI remain pending. The source audit found
+no existing futures provider flag; the typed interface is at the actual local
+ingestion seam and external selection always fails before I/O, without a new
+enable flag. See [handoff](PHASE_67_IMPLEMENTATION.md) for actual scope/evidence.
 
 **Goal.** Specify what real futures data would require and implement the
 local calendar/validation foundation without integrating a provider:

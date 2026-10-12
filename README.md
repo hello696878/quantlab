@@ -14,7 +14,20 @@ palette, shared charts, local LaTeX formula panels).
 > investment, trading, allocation, legal, tax, compliance, or risk-management
 > advice, and not production trading, risk, or compliance infrastructure.
 
-## Current development: Phase 66
+## Current development: Phase 67
+
+**Futures Point-in-Time Contract / Declared Calendar Foundation** adds a bounded
+read-only daily-contract adapter, immutable revisions and explicit as-of modes,
+finite synthetic/user-declared sessions with real DST validation, optional
+calendar-aware retrospective rolls and continuous-series quality diagnostics.
+No provider, official exchange calendar, frontend or fully PIT-qualified
+continuous execution path is added. VERSION is `4.85.0-dev`; independent review
+and exact-commit CI remain pending. Final focused backend checks: 374 passed,
+one local symlink-privilege skip; not a full-suite or Python 3.11 claim.
+See the [implementation handoff](docs/PHASE_67_IMPLEMENTATION.md)
+and [read-only CLI runbook](docs/FUTURES_DECLARED_CALENDAR_AND_VALIDATION.md).
+
+## Completed baseline: Phase 66
 
 **Run Replay** resolves registered full configuration hashes to explicit saved
 contexts, compares recorded execution environments and restores SMA settings
@@ -29,8 +42,10 @@ VERSION remains `4.84.0-dev`. Implementation `b7bb0252...`, independent review
 Exact-patch CI `37417645417` completed both jobs successfully. The user's
 production build at the review commit was reused unchanged for the corrected
 spec: one isolated Microsoft Edge scenario passed, not all 277 discovered tests.
-Documentation publication/verification and the future user-created v4.84 tag
-remain pending; Phase 67 has not started. See the
+Phase 66 is now frozen at `008760c46564839500e6108db84d8ffebab3f875` under
+`v4.84.0-reproducible-run-replay-environment-manifest-v1` (verified locally).
+User-supplied exact documentation CI `37482126828` passed both jobs; this inherited
+evidence was not rerun for Phase 67. See the
 [final evidence and attribution](docs/PHASE_66_REVIEW.md#12-final-release-verification-2026-10-06),
 [contracts/runbook](docs/RUN_REPLAY_AND_ENVIRONMENT_MANIFEST.md) and historical
 [implementation handoff](docs/PHASE_66_IMPLEMENTATION.md).

@@ -18,6 +18,18 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 67 bounded implementation** (2026-10-07, `4.85.0-dev`): strict local
+  daily-contract knowledge/provenance snapshots, immutable supersession and
+  explicit as-of modes, finite declared calendar with real DST checks, opt-in
+  calendar-aware retrospective roll scheduling, existing-engine continuous
+  diagnostics and read-only bounded CLI. No acquisition, official exchange
+  calendar, causal/PIT-certified execution, frontend, database or dependency
+  change. Legacy hashes/no-calendar behavior are retained. Independent review
+  and exact-commit CI pending; see `docs/PHASE_67_IMPLEMENTATION.md`.
+  Phase 66 is frozen at `008760c4...` under its verified v4.84 tag; exact-doc CI
+  `37482126828` passed both jobs according to the user, not rerun here. Older
+  dated handoff statements below are historical.
+
 - **Phase 66 bounded implementation** (2026-10-05, `4.84.0-dev`): indexed saved
   configuration hashes, separate replay-input/environment/execution/result
   identities, read-only full-hash inspection, explicit SMA restoration and a

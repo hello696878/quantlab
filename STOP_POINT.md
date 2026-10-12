@@ -1,6 +1,22 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 66 Final Release Evidence (2026-10-06)
+## Current Handoff: Phase 67 Implementation (2026-10-07)
+
+Branch `phase67-futures-point-in-time-calendar-foundation`, HEAD/frozen v4.84
+`008760c46564839500e6108db84d8ffebab3f875`; VERSION `4.85.0-dev`.
+Phase 66 tag was verified; successful exact-doc CI `37482126828` is supplied
+inherited evidence, not rerun. Phase 67 backend/CLI contract/calendar/revisions,
+calendar-aware retrospective roll/diagnostics and bounded local adapter are
+implemented. No official-calendar/PIT certification or provider capability.
+
+Final focused regression: 374 passed / 1 physical-symlink privilege skip /
+375 selected, exits 0. No source/snapshot/active-DB mutation or SQLite boundary
+violation; exact earlier failures, commands and limits are recorded in
+[PHASE_67_IMPLEMENTATION.md](docs/PHASE_67_IMPLEMENTATION.md).
+Next step is independent review, not Phase 68. No staging, commit, push, tag,
+service, full-browser/build or release operation is performed here.
+
+## Historical Handoff: Phase 66 Final Release Evidence (2026-10-06, Superseded)
 
 VERSION remains `4.84.0-dev`, attached branch `main`, base HEAD
 `5760b3b37f92f4f0193498a0a6bb48da2c61d20b`. Implementation is

@@ -50,6 +50,12 @@ _VERIFY_KEY_COLUMNS: list[str] = ["timestamp", "root_symbol", "contract_symbol",
 # Ingestion-log schema version + default location (under the store base dir, so
 # it sits beside ``raw/`` and stays gitignored with the rest of ``data/``).
 INGEST_LOG_SCHEMA_VERSION = 1
+
+
+def preview_futures_source(request):
+    """Strict read-only v1 adapter; legacy ingestion/write behavior is unchanged."""
+    from app.futures_pit.adapter import preview
+    return preview(request)
 DEFAULT_LOG_SUBPATH = ("logs", "futures_ingest.jsonl")
 
 __all__ = [

@@ -1,0 +1,18 @@
+{
+  "schema_version": "futures_snapshot_v1",
+  "snapshot_id": "synthetic-correction-v2",
+  "source": "synthetic",
+  "root_symbol": "ES",
+  "timestamp_role": "trading_session_label",
+  "price_basis": "last_trade",
+  "calendar_id": "synthetic-es-daily",
+  "calendar_version": "v1",
+  "instrument_metadata_hash": "964ca7a52962d87bebd2f94fc62e0dce8abd715cd43bab2a9b5f4aa21acd5c40",
+  "revision_policy": "explicit_supersession_v1",
+  "license": {
+    "status": "synthetic",
+    "intended_use": "Repository-owned invented acceptance data; research testing only",
+    "redistribution": "Synthetic fixture only; no third-party data rights asserted",
+    "attribution": "QuantLab synthetic corpus; not exchange or vendor history"
+  }
+}

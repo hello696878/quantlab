@@ -144,13 +144,20 @@ def _find_crossover(
 # --------------------------------------------------------------------------- #
 
 
-def compute_roll_schedule(raw_df: pd.DataFrame, spec: FuturesSpec) -> list[RollEvent]:
+def compute_roll_schedule(raw_df: pd.DataFrame, spec: FuturesSpec, *, declared_calendar=None) -> list[RollEvent]:
     """Compute a deterministic roll schedule for ``spec`` from raw per-contract bars.
 
     Returns one :class:`RollEvent` per front->next transition, ordered by expiry.
     Raises :class:`RollScheduleError` on off-cycle contracts, duplicate-session
     bars, root mismatch, or an unresolvable roll.
+
+    Without ``declared_calendar``, legacy observed-overlap behavior is unchanged.
+    Explicit declared mode counts expected sessions and remains retrospective;
+    its identity is separate from ``continuous_config_hash``.
     """
+    if declared_calendar is not None:
+        from app.futures_pit.roll import declared_roll_schedule
+        return declared_roll_schedule(raw_df, spec, declared_calendar)
     norm = validate_raw_futures(raw_df)
 
     roots = set(norm["root_symbol"].unique())
@@ -315,6 +322,8 @@ def build_continuous_futures(
     raw_df: pd.DataFrame,
     spec: FuturesSpec,
     adjustment_method: str | AdjustmentMethod = "ratio",
+    *,
+    declared_calendar=None,
 ) -> pd.DataFrame:
     """Build one deterministic continuous daily series for ``spec``.
 
@@ -330,10 +339,16 @@ def build_continuous_futures(
 
     Does not mutate ``raw_df``.  Raises :class:`ContinuousBuildError` on an
     unsupported method or a roll seam with no common prior session.
+    The optional declared calendar changes scheduling only, not adjustment math.
     """
     method = _coerce_adjustment(adjustment_method)
-    norm = validate_raw_futures(raw_df)  # returns a copy; input never mutated
-    events = compute_roll_schedule(norm, spec)
+    if declared_calendar is None:
+        norm = validate_raw_futures(raw_df)  # returns a copy; input never mutated
+        events = compute_roll_schedule(norm, spec)
+    else:
+        # Validate typed inputs before the legacy normalizer can coerce them.
+        events = compute_roll_schedule(raw_df, spec, declared_calendar=declared_calendar)
+        norm = validate_raw_futures(raw_df)
 
     if events:
         ordered = [events[0].from_contract] + [ev.to_contract for ev in events]
