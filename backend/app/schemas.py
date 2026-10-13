@@ -4805,6 +4805,9 @@ ScannerStrategy = Literal["cross_sectional_reversal", "cross_sectional_momentum"
 RebalanceFrequency = Literal["daily", "weekly", "monthly"]
 
 
+from app.scanner.policies import AdvancedResult, NeutralisationPolicy, ScannerInputs
+
+
 class ScannerRequest(BaseModel):
     model_config = ConfigDict(allow_inf_nan=False)
 
@@ -4821,6 +4824,8 @@ class ScannerRequest(BaseModel):
     cost_bps: float = Field(default=5.0, ge=0.0, le=1000.0)
     min_liquidity: float = Field(default=0.0, ge=0.0, le=1.0)
     seed: Optional[int] = Field(default=42, ge=0, le=2**32 - 1)
+    advanced_policy: Optional[NeutralisationPolicy] = None
+    advanced_inputs: Optional[ScannerInputs] = None
 
     @field_validator("start_date", "end_date")
     @classmethod
@@ -4901,6 +4906,7 @@ class ScannerResponse(BaseModel):
     latest_ranking: List[ScannerRankingRow] = Field(default_factory=list)
     latest_rebalance_date: Optional[str] = None
     diagnostics: ScannerDiagnostics
+    advanced: Optional[AdvancedResult] = None
 
 
 # ===========================================================================

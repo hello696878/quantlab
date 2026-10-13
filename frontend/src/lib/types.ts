@@ -2424,6 +2424,8 @@ export interface ScannerRequest {
   cost_bps: number;
   min_liquidity: number;
   seed: number | null;
+  advanced_policy?: import("./scannerAdvanced").NeutralisationPolicy;
+  advanced_inputs?: import("./scannerAdvanced").ScannerInputs;
 }
 
 export interface ScannerSummary {
@@ -2495,6 +2497,7 @@ export interface ScannerResponse {
   latest_ranking: ScannerRankingRow[];
   latest_rebalance_date: string | null;
   diagnostics: ScannerDiagnostics;
+  advanced?: import("./scannerAdvanced").AdvancedScannerResult | null;
 }
 
 // ── AFML Methodology Layer (CUSUM / triple-barrier / uniqueness) ──────────────

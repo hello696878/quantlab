@@ -16,6 +16,7 @@ from app.scanner.metrics import portfolio_metrics
 from app.scanner.neutralize import dollar_neutral_weights
 from app.scanner.sample_data import generate_sample_universe
 from app.scanner.signals import momentum_score, reversal_score
+from app.scanner.pnl import gross_returns_from_weights, portfolio_pnl
 
 STRATEGIES = ("cross_sectional_reversal", "cross_sectional_momentum")
 REBALANCE_FREQUENCIES = ("daily", "weekly", "monthly")
@@ -105,17 +106,6 @@ def compute_rebalance_indices(date_index, first_valid: int, frequency: str) -> L
     return result
 
 
-def gross_returns_from_weights(weights: np.ndarray, returns: np.ndarray) -> np.ndarray:
-    """Lookahead-safe portfolio gross returns: ``g[k] = weights[k-1] · returns[k]``.
-
-    Weights decided at *k-1* (from information through *k-1*) earn the return
-    realized from *k-1* to *k*. ``g[0] = 0`` (no prior weights).
-    """
-    g = np.zeros(returns.shape[0])
-    g[1:] = np.sum(weights[:-1] * returns[1:], axis=1)
-    return g
-
-
 def _downsample(values: List, cap: int) -> List[int]:
     n = len(values)
     if n <= cap:
@@ -136,6 +126,9 @@ def run_scanner_backtest(
     cost_bps: float = 5.0,
     min_liquidity: float = 0.0,
     seed: Optional[int] = 42,
+    *,
+    advanced_policy=None,
+    advanced_inputs=None,
 ) -> dict:
     """Run the cross-sectional scanner backtest and return a JSON-ready dict."""
     validate_scanner_inputs(
@@ -143,6 +136,10 @@ def run_scanner_backtest(
         short_quantile, rebalance_frequency, gross_exposure, cost_bps, min_liquidity, seed,
     )
 
+    if advanced_inputs is not None and advanced_policy is None:
+        raise ScannerInputError("advanced_inputs requires an explicit advanced_policy")
+    if advanced_policy is not None and (n_assets > 50 or (date.fromisoformat(end_date) - date.fromisoformat(start_date)).days > 1400):
+        raise ScannerInputError("advanced requests require at most 50 assets and 1400 calendar days")
     uni = generate_sample_universe(n_assets, start_date, end_date, seed if seed is not None else 42)
     prices = uni["prices"]
     returns = uni["returns"]
@@ -173,7 +170,23 @@ def run_scanner_backtest(
     reb_used: List[int] = []
     warnings: List[str] = []
 
-    for t in range(n_dates):
+    internal_advanced = None
+    if advanced_policy is not None:
+        from app.scanner.advanced import advanced_weights, keyed_panel
+        try:
+            panel = keyed_panel(uni, scores, advanced_inputs)
+            internal_advanced = advanced_weights(panel, reb_indices, advanced_policy,
+                long_quantile=long_quantile, short_quantile=short_quantile,
+                gross=gross_exposure, min_liquidity=min_liquidity)
+        except (ValueError, np.linalg.LinAlgError) as exc:
+            raise ScannerInputError("Invalid advanced panel or numerical policy; check bounded declarations and identities") from exc
+        weights = internal_advanced["weights"]
+        reb_used = internal_advanced["used"]
+        skipped = len(reb_indices) - len(reb_used)
+        n_long_hist = [int(np.sum(weights[t] > 0)) for t in reb_used]
+        n_short_hist = [int(np.sum(weights[t] < 0)) for t in reb_used]
+
+    for t in range(n_dates) if internal_advanced is None else []:
         if t in reb_indices:
             row = scores[t]
             eligible = np.isfinite(row) & liq_mask_asset
@@ -190,28 +203,26 @@ def run_scanner_backtest(
         weights[t] = prev_w
 
     if not reb_used:
-        warnings.append(
+        if internal_advanced is not None:
+            warnings.append("All advanced rebalances went to cash; inspect no-signal, rank, exposure and volatility diagnostics. No portfolio is forced.")
+        else:
+            warnings.append(
             "No valid rebalance dates: the eligible universe was too small (after the lookback "
             "and liquidity filter) to form long/short baskets. Try more assets, a smaller "
             "lookback, or a lower minimum liquidity."
-        )
+            )
 
     # Turnover (trade at date t to move into weights[t]); weights[-1] = 0 (from cash).
-    turnover = np.zeros(n_dates)
-    turnover[0] = float(np.sum(np.abs(weights[0])))
-    turnover[1:] = np.sum(np.abs(weights[1:] - weights[:-1]), axis=1)
-    cost = turnover * (cost_bps / 1e4)
-
-    gross_ret = gross_returns_from_weights(weights, returns)
-    net_ret = np.zeros(n_dates)
-    # The position weights[k-1] earns gross_ret[k]; its establishment cost was paid at k-1.
-    net_ret[1:] = gross_ret[1:] - cost[:-1]
+    pnl = portfolio_pnl(weights, returns, cost_bps)
+    turnover, gross_ret, net_ret = pnl["turnover"], pnl["gross"], pnl["net"]
 
     # Series aligned to the return days (dates[1:]).
     series_dates = dates[1:]
     net_series = net_ret[1:]
     gross_series = gross_ret[1:]
     equity = np.cumprod(1.0 + net_series) if net_series.size else np.array([])
+    if internal_advanced is not None and (not np.isfinite(net_ret).all() or not np.isfinite(equity).all() or np.any(net_series <= -1)):
+        raise ScannerInputError("advanced simulation requires a finite positive wealth path; no hidden insolvency fallback")
     peak = np.maximum.accumulate(equity) if equity.size else np.array([])
     drawdown = (equity / peak - 1.0) if equity.size else np.array([])
 
@@ -229,6 +240,8 @@ def run_scanner_backtest(
     active_periods = np.isfinite(period_gross_exp) & (period_gross_exp > 1e-12)
     held = np.array(sorted(reb_used)) if reb_used else np.array([], dtype=int)
     avg_turnover = float(np.mean([turnover[t] for t in reb_used])) if reb_used else 0.0
+    if internal_advanced is not None and reb_indices:
+        avg_turnover = float(np.mean([turnover[t] for t in sorted(reb_indices)]))
     avg_gross = float(np.mean(period_gross_exp[active_periods])) if active_periods.any() else 0.0
     avg_net = float(np.mean(period_net_exp[active_periods])) if active_periods.any() else 0.0
     avg_longs = float(np.mean(n_long_hist)) if n_long_hist else 0.0
@@ -267,10 +280,13 @@ def run_scanner_backtest(
     )
 
     if skipped > 0:
-        warnings.append(
-            f"{skipped} rebalance date(s) were skipped (insufficient eligible names or no "
-            "cross-sectional signal); the previous basket was carried forward."
-        )
+        if internal_advanced is not None:
+            warnings.append(f"{skipped} advanced rebalance date(s) moved to cash, including exit turnover; inspect the recorded states and exclusions.")
+        else:
+            warnings.append(
+                f"{skipped} rebalance date(s) were skipped (insufficient eligible names or no "
+                "cross-sectional signal); the previous basket was carried forward."
+            )
     warnings.append(
         "Synthetic sample universe for workflow demonstration — not live market data. The "
         "synthetic returns include a mild short-term reversal component for illustration; this "
@@ -282,7 +298,7 @@ def run_scanner_backtest(
         "data issues, market impact, borrow costs, and capacity."
     )
 
-    return {
+    result = {
         "strategy": strategy,
         "summary": {
             "total_return": _clean(metrics["total_return"]),
@@ -314,6 +330,10 @@ def run_scanner_backtest(
             "warnings": warnings,
         },
     }
+    if internal_advanced is not None:
+        from app.scanner.advanced import public_advanced
+        result["advanced"] = public_advanced(internal_advanced, pnl)
+    return result
 
 
 def _build_latest_ranking(

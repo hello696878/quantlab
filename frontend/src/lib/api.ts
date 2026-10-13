@@ -1097,6 +1097,10 @@ export function runScanner(req: ScannerRequest): Promise<ScannerResponse> {
   return postOptions<ScannerResponse>("/api/scanner/backtest", req);
 }
 
+export function validateScanner(req: import("./scannerAdvanced").ScannerValidationRequest): Promise<import("./scannerAdvanced").ScannerValidationResponse> {
+  return postOptions<import("./scannerAdvanced").ScannerValidationResponse>("/api/scanner/validate", req);
+}
+
 // ── AFML Methodology Layer ───────────────────────────────────────────────────
 
 export function runLabelingDemo(req: LabelingDemoRequest): Promise<LabelingDemoResponse> {

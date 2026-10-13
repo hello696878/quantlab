@@ -1,6 +1,23 @@
 # TASKS - QuantLab
 
-## Current Phase 67 Platform Evidence (2026-10-12)
+## Current Phase 68 Implementation (2026-10-13)
+
+Branch `phase68-cross-sectional-neutralisation-scanner-validation`, frozen
+Phase 67 baseline `e23e828952c1dd1dcc320a225e75a0337aa1fd80`; verified annotated
+v4.85 tag, supplied successful final-doc CI `38219121957`. VERSION `4.86.0-dev`.
+
+- [x] Inspect real scanner, Phase 59 OLS, Phase 52 purge/audit and Phase 53 corrections.
+- [x] Add explicit policies, keyed declarations, residualisation and final-weight checks.
+- [x] Add bounded volatility/cash fallback and reuse the scanner's single P&L kernel.
+- [x] Link actual fixed-policy selections to purged samples/folds and declared p-values.
+- [x] Extend Scanner UI with explicit actions, stale-response guards and synthetic caveats.
+- [x] Protected backend: 250 broad focused passes, then 74 final scanner passes after support-rank strengthening (separate snapshots, zero skips); 241 frontend unit passes, TypeScript and browser discovery (1 focused / 278 overall) passed. Discovery is not browser execution; no whole-tree backend run.
+- [ ] Fresh independent review; user build/browser acceptance and exact-commit CI.
+
+No staging, commit, push, tag, provider, new database, services, builds or Phase 69.
+See [Phase 68 handoff](docs/PHASE_68_IMPLEMENTATION.md).
+
+## Historical Phase 67 Platform Evidence (2026-10-12, Closed at e23e8289)
 
 Attached `main`, review HEAD `92498c531e2a2864b40eb6a0c669b39a4760311a`,
 implementation `66aa3da7eb79ce6b1f07000e90d1dc930b65df41`,

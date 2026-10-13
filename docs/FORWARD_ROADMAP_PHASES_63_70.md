@@ -1,6 +1,19 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (2026-10-12):** Phase 67 local futures data/knowledge/revisions,
+> **Current status (2026-10-13):** Phase 68 opt-in scanner neutralisation,
+> final-weight/cash/volatility diagnostics, bounded purged fixed-policy validation,
+> declared-family corrections and existing-Scanner UI are implemented at
+> `4.86.0-dev`. Verification: 250 broad focused backend passes, then 74 final
+> scanner passes after support-rank strengthening (separate runs, zero skips),
+> 241 frontend unit passes, TypeScript exit 0 and browser discovery (1 focused /
+> 278 overall, not execution). Fresh independent review,
+> user build/browser acceptance and exact-commit CI remain pending. Phase 67 is
+> frozen at `e23e828952c1dd1dcc320a225e75a0337aa1fd80` under the verified annotated
+> v4.85 tag; supplied final-doc CI `38219121957` succeeded in both jobs, not rerun.
+> No provider, optimizer, new DB, PIT certification or Phase 69. See
+> [Phase 68 evidence](PHASE_68_IMPLEMENTATION.md).
+
+> **Historical status (2026-10-12, superseded):** Phase 67 local futures data/knowledge/revisions,
 > declared calendar/DST, calendar-aware retrospective roll diagnostics and
 > fail-closed local adapter/CLI are implemented at `4.85.0-dev`. Independent
 > review/fixes are committed at `92498c53...`: historical Windows checks
@@ -327,6 +340,15 @@ approved); "point-in-time" must not be claimed for data that isn't.
 ---
 
 ## Phase 68 — Advanced Cross-Sectional Neutralisation and Scanner Validation v1
+
+**Implementation status (2026-10-13).** Delivered explicit dollar/sector/beta
+policies, current cross-sectional OLS and separate final-weight projection,
+declared volatility reference/cash fallback, shared scanner P&L and actual
+fixed daily selections linked to purge/embargo/audit and declared-family
+corrections. Learned beta/volatility OOS, PBO/DSR and real universes are unavailable,
+not relabelled. Fresh review and user build/browser/CI remain pending. See
+[handoff](PHASE_68_IMPLEMENTATION.md) and
+[support/runbook](CROSS_SECTIONAL_NEUTRALISATION_AND_SCANNER_VALIDATION.md).
 
 **Goal.** Extend the scanner beyond dollar-neutral weighting and give
 its selections the same validation discipline the labs already apply.

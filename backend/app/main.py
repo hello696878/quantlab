@@ -171,6 +171,7 @@ from app.credit import (
     price_merton_credit,
     price_risky_bond,
 )
+from app.scanner_validation_routes import router as scanner_validation_router
 from app.scanner import (
     ScannerInputError,
     run_scanner_backtest,
@@ -506,6 +507,7 @@ app.include_router(portfolio_diagnostics_router)
 app.include_router(portfolio_stress_router)
 app.include_router(portfolio_attribution_router)
 app.include_router(factor_diagnostics_router)
+app.include_router(scanner_validation_router)
 app.include_router(signal_decay_router)
 app.include_router(signal_ensemble_router)
 app.include_router(strategy_ensemble_router)
@@ -4638,6 +4640,8 @@ def scanner_backtest(request: ScannerRequest) -> ScannerResponse:
             request.cost_bps,
             request.min_liquidity,
             request.seed,
+            advanced_policy=request.advanced_policy,
+            advanced_inputs=request.advanced_inputs,
         )
     except ScannerInputError as exc:
         raise HTTPException(status_code=422, detail=str(exc))

@@ -18,6 +18,17 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 68 implementation** (2026-10-13, `4.86.0-dev`): opt-in scanner
+  dollar/sector/beta residualisation with separate final-weight constraints,
+  explicit cash fallback and declared ex-ante volatility reference; shared
+  full-precision scanner P&L/costs. Bounded purged validation of fixed daily
+  selections, existing corrections over declared p-values, JSON evidence and
+  existing-Scanner controls. Synthetic-only, no new signal/provider/optimizer/DB.
+  Learned beta/volatility OOS and PBO/DSR remain unavailable. Independent review
+  and user build/browser/exact-commit CI gates remain pending. Phase 67 is frozen
+  at `e23e828952...` under its v4.85 tag; supplied final-doc CI `38219121957`
+  succeeded, not rerun. See [implementation evidence](docs/PHASE_68_IMPLEMENTATION.md).
+
 - **Phase 67 five-case platform evidence** (2026-10-12, `4.85.0-dev` unchanged):
   review commit `92498c53...` has supplied successful exact-commit CI
   `38208475431` (backend 4849 passed / 18 unidentified skips). Separate

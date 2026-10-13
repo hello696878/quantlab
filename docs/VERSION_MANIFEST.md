@@ -1,4 +1,4 @@
-# QuantLab — Version Manifest (Phase 67.0)
+# QuantLab — Version Manifest (Phase 68.0)
 
 The project's versioning conventions, verified against the local git history
 when written. Companion docs: [`../CHANGELOG.md`](../CHANGELOG.md) (grouped
@@ -12,6 +12,19 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 > anything about live trading.
 
 ## 1. Current version label
+
+**`4.86.0-dev`**, Phase 68 advanced cross-sectional neutralisation/scanner
+validation implementation on `phase68-cross-sectional-neutralisation-scanner-validation`.
+Base/frozen Phase 67 target is `e23e828952c1dd1dcc320a225e75a0337aa1fd80` under
+verified annotated `v4.85.0-futures-point-in-time-contract-calendar-foundation-adapter-spec-v1`.
+Supplied final-doc CI `38219121957` succeeded in both jobs, not rerun.
+See [implementation evidence](PHASE_68_IMPLEMENTATION.md) and
+[policy/runbook](CROSS_SECTIONAL_NEUTRALISATION_AND_SCANNER_VALIDATION.md).
+Fresh independent review, user build/browser acceptance, exact-commit CI and
+publication remain pending. Future user tag, not created:
+`v4.86.0-cross-sectional-neutralisation-scanner-validation-v1`. No Phase 69.
+
+### Historical Phase 67 Version Note (Closed at e23e8289)
 
 **`4.85.0-dev`**, Phase 67 local futures contract/calendar/revisions/adapter
 implementation, based on frozen `008760c46564839500e6108db84d8ffebab3f875` and

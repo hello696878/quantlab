@@ -14,7 +14,28 @@ palette, shared charts, local LaTeX formula panels).
 > investment, trading, allocation, legal, tax, compliance, or risk-management
 > advice, and not production trading, risk, or compliance infrastructure.
 
-## Current development: Phase 67
+## Current development: Phase 68
+
+Advanced Scanner neutralisation is explicit opt-in: dollar/sector/beta policies,
+current cross-sectional score residualisation and separate final-weight checks,
+cash fallback, declared ex-ante volatility reference and bounded retrospective
+purged validation. Legacy requests keep their original behavior and synthetic
+generator. Supplied p-values stay declared, not verified alpha; learned
+beta/volatility OOS and PBO/DSR remain unavailable. No provider, optimizer or
+new database. VERSION is `4.86.0-dev`; independent review, exact-commit CI and
+user build/browser acceptance remain pending. Local verification: 250 broad
+focused backend passes, then 74 final scanner passes after support-rank
+strengthening (separate runs); 241 frontend unit passes and TypeScript passed.
+Browser discovery is not execution, and no whole-tree backend pass is claimed. See the
+[policy/runbook](docs/CROSS_SECTIONAL_NEUTRALISATION_AND_SCANNER_VALIDATION.md)
+and [implementation evidence](docs/PHASE_68_IMPLEMENTATION.md).
+
+Phase 67 is frozen at `e23e828952c1dd1dcc320a225e75a0337aa1fd80` under
+`v4.85.0-futures-point-in-time-contract-calendar-foundation-adapter-spec-v1`.
+Final documentation CI `38219121957` succeeded in both jobs per supplied evidence,
+not rerun here. Futures rolls remain retrospective, not PIT-certified.
+
+## Completed baseline: Phase 67
 
 **Futures Point-in-Time Contract / Declared Calendar Foundation** adds a bounded
 read-only daily-contract adapter, immutable revisions and explicit as-of modes,

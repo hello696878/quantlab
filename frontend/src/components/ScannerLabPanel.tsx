@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -13,8 +13,10 @@ import {
   CartesianGrid,
   Tooltip,
 } from "recharts";
-import { BacktestApiError, runScanner } from "@/lib/api";
-import type { ScannerResponse, ScannerStrategy, RebalanceFrequency } from "@/lib/types";
+import { BacktestApiError, runScanner, validateScanner } from "@/lib/api";
+import type { ScannerRequest, ScannerResponse, ScannerStrategy, RebalanceFrequency } from "@/lib/types";
+import { declaredPValues, type NeutralisationPolicy, type ScannerValidationResponse } from "@/lib/scannerAdvanced";
+import ScannerResearchResults from "@/components/ScannerResearchResults";
 import MetricCard from "@/components/MetricCard";
 import NeonTooltip from "@/components/charts/NeonTooltip";
 import { CHART_AXIS, CHART_AXIS_LINE, CHART_GRID, CHART_REF_LINE, DANGER } from "@/components/charts/chartTheme";
@@ -81,6 +83,15 @@ interface UiInputs {
   costBps: string;
   minLiquidity: string;
   seed: string;
+  policy: "legacy" | "dollar" | "sector" | "beta";
+  missing: "exclude" | "refuse";
+  grossCap: string;
+  betaWindow: string;
+  betaMinimum: string;
+  volatility: boolean;
+  volTarget: string;
+  volWindow: string;
+  volMinimum: string;
 }
 
 const DEFAULTS: UiInputs = {
@@ -96,6 +107,8 @@ const DEFAULTS: UiInputs = {
   costBps: "5",
   minLiquidity: "0",
   seed: "42",
+  policy: "legacy", missing: "exclude", grossCap: "2", betaWindow: "60", betaMinimum: "20",
+  volatility: false, volTarget: "0.15", volWindow: "60", volMinimum: "20",
 };
 
 export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?: ScannerStrategy } = {}) {
@@ -105,9 +118,41 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
   const [result, setResult] = useState<ScannerResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [validation, setValidation] = useState<ScannerValidationResponse | null>(null);
+  const [folds, setFolds] = useState("3");
+  const [embargo, setEmbargo] = useState("1");
+  const [pValues, setPValues] = useState("");
+  const [notice, setNotice] = useState<string | null>(null);
+  const [action, setAction] = useState<"scanner" | "validation" | null>(null);
+  const revision = useRef(0);
+  const busy = useRef(false);
+  const mounted = useRef(true);
+  useEffect(() => { mounted.current = true; return () => { mounted.current = false; revision.current++; }; }, []);
+
+  function invalidate() {
+    revision.current++;
+    setResult(null); setValidation(null); setError(null); setNotice(null);
+  }
 
   function set<K extends keyof UiInputs>(key: K, value: UiInputs[K]) {
+    invalidate();
     setInp((s) => ({ ...s, [key]: value }));
+  }
+
+  function policyFor(mode: NeutralisationPolicy["mode"]): NeutralisationPolicy {
+    if (inp.policy === "legacy") return { mode };
+    return { mode, missing: inp.missing, gross_cap: num(inp.grossCap), beta_window: num(inp.betaWindow),
+      beta_min_observations: num(inp.betaMinimum), failed_rebalance: "cash",
+      ...(inp.volatility ? { volatility: { target: num(inp.volTarget), window: num(inp.volWindow), min_observations: num(inp.volMinimum), periods_per_year: 252 as const } } : {}) };
+  }
+
+  function request(strategy: ScannerStrategy = inp.strategy): ScannerRequest {
+    return { strategy, universe_source: "synthetic", n_assets: num(inp.nAssets), start_date: inp.startDate,
+      end_date: inp.endDate, lookback_days: num(inp.lookback), long_quantile: num(inp.longQuantile),
+      short_quantile: num(inp.shortQuantile), rebalance_frequency: inp.rebalance,
+      gross_exposure: num(inp.grossExposure), cost_bps: num(inp.costBps), min_liquidity: num(inp.minLiquidity),
+      seed: inp.seed.trim() === "" ? null : num(inp.seed),
+      ...(inp.policy === "legacy" ? {} : { advanced_policy: policyFor(inp.policy) }) };
   }
 
   const lq = num(inp.longQuantile);
@@ -122,38 +167,59 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
     num(inp.costBps) >= 0 && num(inp.costBps) <= 1000 &&
     num(inp.minLiquidity) >= 0 && num(inp.minLiquidity) <= 1 &&
     seedValid &&
-    inp.startDate < inp.endDate;
+    inp.startDate < inp.endDate &&
+    (inp.policy === "legacy" || (num(inp.grossCap) > 0 && num(inp.grossCap) <= 10 &&
+      Number.isInteger(num(inp.betaWindow)) && num(inp.betaWindow) >= 5 && num(inp.betaWindow) <= 252 &&
+      Number.isInteger(num(inp.betaMinimum)) && num(inp.betaMinimum) >= 5 && num(inp.betaMinimum) <= num(inp.betaWindow) &&
+      (!inp.volatility || (num(inp.volTarget) > 0 && num(inp.volTarget) <= 2 &&
+        Number.isInteger(num(inp.volWindow)) && num(inp.volWindow) >= 2 && num(inp.volWindow) <= 252 &&
+        Number.isInteger(num(inp.volMinimum)) && num(inp.volMinimum) >= 2 && num(inp.volMinimum) <= num(inp.volWindow)))));
+
+  let pError: string | null = null;
+  try { declaredPValues(pValues); } catch (e) { pError = (e as Error).message; }
+  const validationBounded = num(inp.nAssets) <= 30 &&
+    (Date.parse(inp.endDate) - Date.parse(inp.startDate)) / 86400000 <= 420;
+  const validationValid = valid && validationBounded && !pError && Number.isInteger(num(folds)) &&
+    num(folds) >= 2 && num(folds) <= 5 && num(embargo) >= 0 && num(embargo) <= 30;
 
   async function run(strategyOverride?: ScannerStrategy) {
-    if (loading) return;
+    if (busy.current) return;
     const strategy = strategyOverride ?? inp.strategy;
     if (strategyOverride) set("strategy", strategyOverride);
     if (!valid) return;
+    const current = ++revision.current;
+    busy.current = true;
+    setAction("scanner");
     setLoading(true);
     setError(null);
     setResult(null);
+    setValidation(null);
     try {
-      setResult(
-        await runScanner({
-          strategy,
-          universe_source: "synthetic",
-          n_assets: num(inp.nAssets),
-          start_date: inp.startDate,
-          end_date: inp.endDate,
-          lookback_days: num(inp.lookback),
-          long_quantile: lq,
-          short_quantile: sq,
-          rebalance_frequency: inp.rebalance,
-          gross_exposure: num(inp.grossExposure),
-          cost_bps: num(inp.costBps),
-          min_liquidity: num(inp.minLiquidity),
-          seed: inp.seed.trim() === "" ? null : num(inp.seed),
-        }),
-      );
+      const response = await runScanner(request(strategy));
+      if (mounted.current && revision.current === current) setResult(response);
     } catch (e) {
-      setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
+      if (mounted.current && revision.current === current) setError(e instanceof BacktestApiError || e instanceof Error ? e.message : "Failed.");
     } finally {
-      setLoading(false);
+      busy.current = false;
+      if (mounted.current) { setLoading(false); setAction(null); }
+    }
+  }
+
+  async function validate() {
+    if (busy.current || !validationValid) return;
+    const current = ++revision.current;
+    busy.current = true; setLoading(true); setAction("validation"); setError(null); setValidation(null);
+    const values = declaredPValues(pValues);
+    try {
+      const response = await validateScanner({ scanner: request(), n_folds: num(folds), embargo_days: num(embargo), alpha: 0.05,
+        candidates: (["dollar", "sector", "beta"] as const).map((mode, i) => ({ candidate_id: mode,
+          strategy: inp.strategy, policy: policyFor(mode), raw_p_value: values[i] })) });
+      if (mounted.current && revision.current === current) setValidation(response);
+    } catch (e) {
+      if (mounted.current && revision.current === current) setError(e instanceof Error ? e.message : "Validation failed.");
+    } finally {
+      busy.current = false;
+      if (mounted.current) { setLoading(false); setAction(null); }
     }
   }
 
@@ -210,7 +276,7 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
                 : "cursor-not-allowed border border-[var(--line)] bg-[var(--glass)] text-slate-500")
             }
           >
-            {loading ? "Running scanner…" : "Run Scanner"}
+            {loading && action === "scanner" ? "Running scanner…" : "Run Scanner"}
           </button>
           <button type="button" onClick={() => run("cross_sectional_reversal")} disabled={loading} className="rounded-lg border border-[var(--line-strong)] px-2.5 py-1.5 text-xs font-medium text-slate-300 hover:border-[var(--accent-border)]">
             Reversal demo
@@ -225,8 +291,50 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
             cost 0–1000 bps, liquidity 0–1, optional seed ≥ 0, start before end.
           </p>
         )}
-        {error && <p className="text-xs text-red-600">⚠ {error}</p>}
+        {error && <p role="alert" className="text-xs text-red-300">{error}</p>}
       </div>
+
+      <section className="space-y-3 border-y border-[var(--line)] py-4">
+        <h2 className="section-title">Neutralisation policy</h2>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+          <Field label="Portfolio policy"><select className={inputCls} value={inp.policy} onChange={(e) => set("policy", e.target.value as UiInputs["policy"])}>
+            <option value="legacy">Legacy dollar-neutral (default)</option><option value="dollar">Dollar-neutral v1</option><option value="sector">Sector-neutral v1</option><option value="beta">Beta-neutral v1</option>
+          </select></Field>
+          {inp.policy !== "legacy" && <>
+            <Field label="Gross / leverage cap"><input className={inputCls} type="number" value={inp.grossCap} onChange={(e) => set("grossCap", e.target.value)} /></Field>
+            <Field label="Missing exposures"><select className={inputCls} value={inp.missing} onChange={(e) => set("missing", e.target.value as UiInputs["missing"])}><option value="exclude">Exclude unavailable names</option><option value="refuse">Entire rebalance to cash</option></select></Field>
+            <Field label="Beta trailing periods"><input className={inputCls} type="number" value={inp.betaWindow} onChange={(e) => set("betaWindow", e.target.value)} /></Field>
+            <Field label="Beta minimum observations"><input className={inputCls} type="number" value={inp.betaMinimum} onChange={(e) => set("betaMinimum", e.target.value)} /></Field>
+            <label className="flex items-center gap-2 text-xs text-slate-300"><input type="checkbox" checked={inp.volatility} onChange={(e) => set("volatility", e.target.checked)} />Ex-ante volatility reference</label>
+            {inp.volatility && <>
+              <Field label="Annual volatility target (decimal)"><input className={inputCls} type="number" step="0.01" value={inp.volTarget} onChange={(e) => set("volTarget", e.target.value)} /></Field>
+              <Field label="Volatility trailing periods"><input className={inputCls} type="number" value={inp.volWindow} onChange={(e) => set("volWindow", e.target.value)} /></Field>
+              <Field label="Volatility minimum observations"><input className={inputCls} type="number" value={inp.volMinimum} onChange={(e) => set("volMinimum", e.target.value)} /></Field>
+            </>}
+          </>}
+        </div>
+        {inp.policy !== "legacy" && <p className="text-xs text-slate-400">Synthetic sector declarations; beta estimated from trailing returns against the synthetic equal-weight reference, not generator truth. Selected-name SVD projection can change signs. Failed rebalances go to cash with turnover. Volatility uses ddof=1 and 252 periods/year; realized volatility need not match the target.</p>}
+      </section>
+
+      <section className="space-y-3 border-b border-[var(--line)] pb-4">
+        <h2 className="section-title">Scanner validation</h2>
+        <p className="text-xs text-slate-400">Declared family: dollar / sector / beta for the selected signal. Retrospective purged CV; no supervised fit or winner. Beta/volatility OOS estimation is unavailable in v1. Synthetic universe only.</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Field label="Purged folds (2-5)"><input className={inputCls} type="number" value={folds} onChange={(e) => { invalidate(); setFolds(e.target.value); }} /></Field>
+          <Field label="Embargo (calendar days)"><input className={inputCls} type="number" value={embargo} onChange={(e) => { invalidate(); setEmbargo(e.target.value); }} /></Field>
+          <Field label="Declared p-values (dollar, sector, beta)"><input className={inputCls} type="text" value={pValues} onChange={(e) => { invalidate(); setPValues(e.target.value); }} /></Field>
+        </div>
+        {pError && <p role="alert" className="text-xs text-red-300">{pError}</p>}
+        {!validationBounded && <p className="text-xs text-amber-300">Validation is bounded to 30 assets and 420 calendar days.</p>}
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className="ql-input px-3 py-2 text-xs disabled:opacity-50" disabled={!validationValid || loading} onClick={() => void validate()}>{loading && action === "validation" ? "Validating…" : "Validate scanner family"}</button>
+          <button type="button" className="ql-input px-3 py-2 text-xs" disabled={loading} onClick={() => { invalidate(); setInp({ ...DEFAULTS, nAssets: "20", startDate: "2023-01-01", endDate: "2023-06-30", lookback: "3", longQuantile: "0.4", shortQuantile: "0.4", policy: "sector" }); setFolds("3"); setEmbargo("1"); setPValues(""); setNotice("Validation parameters loaded. Click Run or Validate to execute."); }}>Load validation parameters</button>
+          <button type="button" className="ql-input px-3 py-2 text-xs" disabled={loading} onClick={() => { invalidate(); setPValues("0.01,0.04,0.20"); setNotice("Declared synthetic p-value fixture loaded; these are not scanner-computed tests."); }}>Load declared-p fixture</button>
+        </div>
+        {notice && <p role="status" className="text-xs text-slate-300">{notice}</p>}
+      </section>
+
+      <ScannerResearchResults advanced={result?.advanced} validation={validation} />
 
       {result && (
         <>
@@ -309,7 +417,7 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
           {/* Latest ranking */}
           <div className="card space-y-2 p-5">
             <p className="section-title">
-              Latest ranking{result.latest_rebalance_date ? ` — ${result.latest_rebalance_date}` : ""}
+              {result.advanced ? "Latest ranking (raw score)" : "Latest ranking"}{result.latest_rebalance_date ? ` — ${result.latest_rebalance_date}` : ""}
             </p>
             <div className="overflow-x-auto">
               <table className="w-full max-w-2xl text-xs">
@@ -364,7 +472,7 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
           <li><span className="font-semibold text-slate-900">Dollar-neutral:</span> longs sum to +gross/2 and shorts to −gross/2, so net exposure ≈ 0 and gross exposure = the target (default 1.0).</li>
           <li><span className="font-semibold text-slate-900">Lookahead-safe:</span> signals use information through date t; weights are shifted forward one period before P&L, so weights at t earn the return from t to t+1 — never the same-day return.</li>
           <li><span className="font-semibold text-slate-900">Costs & turnover:</span> turnover = Σ|wₜ − wₜ₋₁|; cost = turnover × bps/10000 is deducted from the gross return the position earns.</li>
-          <li><span className="font-semibold text-slate-900">Limitations:</span> synthetic universe (no survivorship/point-in-time issues modeled), no market impact, borrow, or capacity; sector/beta neutralization, live universes, and ML selection are planned. Educational, not investment advice.</li>
+          <li><span className="font-semibold text-slate-300">Limitations:</span> synthetic universe (no survivorship/point-in-time issues modeled), no market impact, borrow, or capacity. Opt-in sector/beta policies check final weights at each rebalance; live universes, learned-policy OOS validation, and ML selection are not implemented. Educational, not investment advice.</li>
         </ul>
         <p className="text-[11px] text-slate-400">{CAVEAT}</p>
       </div>
