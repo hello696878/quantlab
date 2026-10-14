@@ -432,6 +432,10 @@ def _sanitize_non_finite(obj):
 async def _validation_exception_handler(request: Request, exc: RequestValidationError) -> JSONResponse:
     """Render request-validation errors as a stable 422, safe against non-finite
     floats in the echoed input (see :func:`_sanitize_non_finite`)."""
+    if (request.url.path == "/scanner/backtest" and isinstance(exc.body, dict) and
+            any(exc.body.get(k) is not None for k in ("advanced_policy", "advanced_inputs"))):
+        return JSONResponse(status_code=422, content={
+            "detail": "Advanced scanner request refused: check bounded settings, policy and keyed declarations"})
     return JSONResponse(
         status_code=422,
         content={"detail": _sanitize_non_finite(jsonable_encoder(exc.errors()))},
@@ -4644,6 +4648,8 @@ def scanner_backtest(request: ScannerRequest) -> ScannerResponse:
             advanced_inputs=request.advanced_inputs,
         )
     except ScannerInputError as exc:
+        if request.advanced_policy is not None or request.advanced_inputs is not None:
+            raise HTTPException(status_code=422, detail="Advanced scanner request refused: check bounded settings, policy and keyed declarations") from exc
         raise HTTPException(status_code=422, detail=str(exc))
     return ScannerResponse(**result)
 

@@ -29,6 +29,9 @@ Rows join by `(period, asset_id)` or factor period, not request array order.
 Unknown/duplicate keys and contradictory dimensions are rejected. Every exposure
 row requires explicit eligibility, liquidity and offset-aware `available_at`.
 Missing sectors/betas are not zeros or automatically approved Other labels.
+Availability timestamps support at most six fractional-second digits; greater
+precision and UTC conversions outside the supported datetime range are refused,
+not rounded into the information cutoff.
 
 Synthetic session labels use an explicitly assumed UTC-midnight information
 cutoff, not an exchange close/calendar. Scores at t use prices through t;
@@ -75,6 +78,9 @@ state/reason, exclusions, rank, support rank and cost/P&L reconciliation.
 Neutrality is at rebalance using available declarations/estimates, not a guarantee
 that future realized exposures stay zero. Public diagnostics retain the last 100
 rebalances and 20 displayed score rows; validation never uses these previews.
+For advanced runs the latest ranking refers to the latest attempted rebalance,
+including a zero-weight cash fallback and its current declared sectors. The
+legacy ranking continues to refer to its latest successful basket.
 
 ## Volatility and Shared P&L
 
@@ -118,6 +124,10 @@ inferential test is run and no verified-from-supported-test claim is made.
 Empty values stay unavailable; malformed/nonfinite/out-of-range API values are
 rejected. Corrections use only valid supplied values for m, while reporting total
 declared count, included count, missing IDs and invalid-request policy.
+The family fingerprint binds the normalized scanner configuration as well as
+the panel, candidate declarations, split configuration, cost and threshold;
+changing quantiles, gross exposure or liquidity changes the family identity.
+The result fingerprint also binds the complete retained request and outcomes.
 Hand fixture: raw [.01,.04,.20], Bonferroni [.03,.12,.60], Holm [.03,.08,.20].
 BH assumes independence/PRDS; no universal dependence or investment approval.
 PBO/DSR remain unavailable without an implemented scanner trial/selection contract.
@@ -138,9 +148,15 @@ Advanced: <=50 assets, <=1000 generated sessions, <=1400 calendar days and
 0-30 calendar days. Numeric declarations are finite/strict; windows <=252.
 Canonical JSON additionally bounds bytes/depth/nodes. SHA-256 integrity is not
 truth, financial correctness, data licensing or statistical certification.
+Validation and opt-in advanced requests reject unknown options and coerced
+numeric Boolean/string inputs. Validation request bodies are bounded before
+model parsing and reject duplicate JSON keys. Public errors for these new paths
+do not echo submitted values; omitted-option legacy request behavior is preserved.
 
 User-run browser acceptance must use the existing disposable-backend harness and
 positive identity proof through the frontend proxy. The new spec refuses a
 flag-only or ordinary-backend setup. Discovery does not execute that acceptance.
-See [implementation evidence](PHASE_68_IMPLEMENTATION.md) for exact verification
-and remaining independent-review/CI/build/browser gates.
+See [review evidence](PHASE_68_REVIEW.md) for verified fixes and current checks;
+[implementation evidence](PHASE_68_IMPLEMENTATION.md) remains historical.
+User review commit, exact-commit Python 3.11 CI, user production build and actual
+isolated browser acceptance remain pending.

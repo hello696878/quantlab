@@ -14,14 +14,17 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 ## 1. Current version label
 
 **`4.86.0-dev`**, Phase 68 advanced cross-sectional neutralisation/scanner
-validation implementation on `phase68-cross-sectional-neutralisation-scanner-validation`.
+validation implementation `5428eb20ae7c1dc33c2e875a1e33370e2423568b` on `main`.
 Base/frozen Phase 67 target is `e23e828952c1dd1dcc320a225e75a0337aa1fd80` under
 verified annotated `v4.85.0-futures-point-in-time-contract-calendar-foundation-adapter-spec-v1`.
 Supplied final-doc CI `38219121957` succeeded in both jobs, not rerun.
-See [implementation evidence](PHASE_68_IMPLEMENTATION.md) and
+See [review evidence](PHASE_68_REVIEW.md), preserved
+[implementation evidence](PHASE_68_IMPLEMENTATION.md) and
 [policy/runbook](CROSS_SECTIONAL_NEUTRALISATION_AND_SCANNER_VALIDATION.md).
-Fresh independent review, user build/browser acceptance, exact-commit CI and
-publication remain pending. Future user tag, not created:
+Independent review/fixes are complete: 321 focused backend passes / zero skips,
+245 frontend passes, TypeScript exit 0. User review commit, user build/isolated
+browser acceptance, exact-commit Python 3.11 CI and publication remain pending.
+Future user tag, not created:
 `v4.86.0-cross-sectional-neutralisation-scanner-validation-v1`. No Phase 69.
 
 ### Historical Phase 67 Version Note (Closed at e23e8289)

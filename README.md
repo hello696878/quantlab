@@ -22,13 +22,15 @@ cash fallback, declared ex-ante volatility reference and bounded retrospective
 purged validation. Legacy requests keep their original behavior and synthetic
 generator. Supplied p-values stay declared, not verified alpha; learned
 beta/volatility OOS and PBO/DSR remain unavailable. No provider, optimizer or
-new database. VERSION is `4.86.0-dev`; independent review, exact-commit CI and
-user build/browser acceptance remain pending. Local verification: 250 broad
-focused backend passes, then 74 final scanner passes after support-rank
-strengthening (separate runs); 241 frontend unit passes and TypeScript passed.
-Browser discovery is not execution, and no whole-tree backend pass is claimed. See the
+new database. VERSION is `4.86.0-dev`; implementation is `5428eb20...` on `main`.
+Independent review and verified fixes are complete: 321 focused backend passes,
+zero skips, 245 frontend unit passes and TypeScript passed. Browser discovery:
+1 focused / 278 overall, not execution. Earlier implementation runs remain
+separate historical evidence. User review commit, exact-commit Python 3.11 CI
+and user build/browser acceptance remain pending; no whole-tree pass is claimed. See the
 [policy/runbook](docs/CROSS_SECTIONAL_NEUTRALISATION_AND_SCANNER_VALIDATION.md)
-and [implementation evidence](docs/PHASE_68_IMPLEMENTATION.md).
+and [review evidence](docs/PHASE_68_REVIEW.md); the
+[implementation evidence](docs/PHASE_68_IMPLEMENTATION.md) is preserved.
 
 Phase 67 is frozen at `e23e828952c1dd1dcc320a225e75a0337aa1fd80` under
 `v4.85.0-futures-point-in-time-contract-calendar-foundation-adapter-spec-v1`.

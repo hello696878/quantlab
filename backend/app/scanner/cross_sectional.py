@@ -221,7 +221,8 @@ def run_scanner_backtest(
     net_series = net_ret[1:]
     gross_series = gross_ret[1:]
     equity = np.cumprod(1.0 + net_series) if net_series.size else np.array([])
-    if internal_advanced is not None and (not np.isfinite(net_ret).all() or not np.isfinite(equity).all() or np.any(net_series <= -1)):
+    if internal_advanced is not None and (not np.isfinite(net_ret).all() or not np.isfinite(equity).all()
+                                         or np.any(equity <= 0) or np.any(net_series <= -1)):
         raise ScannerInputError("advanced simulation requires a finite positive wealth path; no hidden insolvency fallback")
     peak = np.maximum.accumulate(equity) if equity.size else np.array([])
     drawdown = (equity / peak - 1.0) if equity.size else np.array([])
@@ -275,8 +276,15 @@ def run_scanner_backtest(
         for i in idx
     ]
 
+    ranking_dates = reb_used
+    ranking_sectors = sectors
+    if internal_advanced is not None:
+        # An advanced failed rebalance liquidates to cash. Its latest holdings
+        # must not be replaced by the last successful (now exited) basket.
+        ranking_dates = sorted(reb_indices)
+        ranking_sectors = [row["sector"] for row in internal_advanced["latest_scores"]]
     latest_ranking, latest_date = _build_latest_ranking(
-        reb_used, scores, weights, tickers, sectors, dates
+        ranking_dates, scores, weights, tickers, ranking_sectors, dates
     )
 
     if skipped > 0:
@@ -341,7 +349,7 @@ def _build_latest_ranking(
     scores: np.ndarray,
     weights: np.ndarray,
     tickers: List[str],
-    sectors: List[str],
+    sectors: List[Optional[str]],
     dates: List[str],
 ) -> Tuple[List[dict], Optional[str]]:
     """Ranked preview (capped) of the most recent actionable rebalance date.

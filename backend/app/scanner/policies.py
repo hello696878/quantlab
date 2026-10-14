@@ -1,5 +1,6 @@
 """Versioned, opt-in scanner declarations. No provider or executable formulas."""
 from datetime import date, datetime, timezone
+import re
 from typing import Annotated, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictBool, StrictInt, field_validator, model_validator
@@ -56,10 +57,15 @@ class AvailableObservation(Declaration):
     @field_validator("available_at")
     @classmethod
     def aware(cls, value):
+        if re.search(r"[.,]\d{7,}", value):
+            raise ValueError("available_at supports at most six fractional digits")
         instant = datetime.fromisoformat(value.replace("Z", "+00:00"))
         if instant.tzinfo is None:
             raise ValueError("available_at requires a UTC offset")
-        return instant.astimezone(timezone.utc).isoformat()
+        try:
+            return instant.astimezone(timezone.utc).isoformat()
+        except OverflowError as exc:
+            raise ValueError("available_at is outside the supported UTC range") from exc
 
 
 class ExposureObservation(AvailableObservation):

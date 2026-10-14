@@ -1,9 +1,9 @@
 # TASKS - QuantLab
 
-## Current Phase 68 Implementation (2026-10-13)
+## Current Phase 68 Independent Review (2026-10-13)
 
-Branch `phase68-cross-sectional-neutralisation-scanner-validation`, frozen
-Phase 67 baseline `e23e828952c1dd1dcc320a225e75a0337aa1fd80`; verified annotated
+Attached `main`, implementation HEAD `5428eb20ae7c1dc33c2e875a1e33370e2423568b`,
+single parent/frozen Phase 67 baseline `e23e828952c1dd1dcc320a225e75a0337aa1fd80`; verified annotated
 v4.85 tag, supplied successful final-doc CI `38219121957`. VERSION `4.86.0-dev`.
 
 - [x] Inspect real scanner, Phase 59 OLS, Phase 52 purge/audit and Phase 53 corrections.
@@ -11,11 +11,13 @@ v4.85 tag, supplied successful final-doc CI `38219121957`. VERSION `4.86.0-dev`.
 - [x] Add bounded volatility/cash fallback and reuse the scanner's single P&L kernel.
 - [x] Link actual fixed-policy selections to purged samples/folds and declared p-values.
 - [x] Extend Scanner UI with explicit actions, stale-response guards and synthetic caveats.
-- [x] Protected backend: 250 broad focused passes, then 74 final scanner passes after support-rank strengthening (separate snapshots, zero skips); 241 frontend unit passes, TypeScript and browser discovery (1 focused / 278 overall) passed. Discovery is not browser execution; no whole-tree backend run.
-- [ ] Fresh independent review; user build/browser acceptance and exact-commit CI.
+- [x] Independent adversarial review and narrow verified-defect fixes; 70 new backend regressions are included in the review total.
+- [x] Protected review: 321 passed / zero skips / 321 selected, all exits 0; 245 frontend unit passes, TypeScript exit 0 and browser discovery (1 focused / 278 overall). Earlier 250/74 implementation runs remain separate; no whole-tree backend or browser execution claim.
+- [ ] User review commit, user production build/isolated browser acceptance and final exact-commit Python 3.11 CI.
 
 No staging, commit, push, tag, provider, new database, services, builds or Phase 69.
-See [Phase 68 handoff](docs/PHASE_68_IMPLEMENTATION.md).
+See [Phase 68 review](docs/PHASE_68_REVIEW.md) and preserved
+[implementation handoff](docs/PHASE_68_IMPLEMENTATION.md).
 
 ## Historical Phase 67 Platform Evidence (2026-10-12, Closed at e23e8289)
 

@@ -1,4 +1,5 @@
-import { act, screen, within } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
+import { Blob as NodeBlob } from "node:buffer";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import ScannerLabPanel from "./ScannerLabPanel";
 import { renderWithUser } from "@/test/testUtils";
@@ -82,11 +83,100 @@ describe("ScannerLabPanel", () => {
     let resolve!: (value: ScannerResponse) => void;
     vi.mocked(api.runScanner).mockReturnValue(new Promise((done) => { resolve = done; }));
     const { user } = renderWithUser(<ScannerLabPanel />);
-    await user.dblClick(screen.getByRole("button", { name: "Run Scanner" }));
+    const button = screen.getByRole("button", { name: "Run Scanner" });
+    act(() => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      expect(button).not.toBeDisabled();
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
     expect(api.runScanner).toHaveBeenCalledTimes(1);
     await user.clear(screen.getByLabelText("Cost (bps)"));
     await act(async () => resolve(scanner));
     expect(screen.queryByText("2.00%")).not.toBeInTheDocument();
+  });
+  it("guards batched duplicate Validate actions and discards the result after a policy edit", async () => {
+    let resolve!: (value: ScannerValidationResponse) => void;
+    vi.mocked(api.validateScanner).mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    const { user } = renderWithUser(<ScannerLabPanel />);
+    await user.click(screen.getByRole("button", { name: "Load validation parameters" }));
+    const button = screen.getByRole("button", { name: "Validate scanner family" });
+    act(() => {
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+      expect(button).not.toBeDisabled();
+      button.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+    });
+    expect(api.validateScanner).toHaveBeenCalledTimes(1);
+    expect(api.runScanner).not.toHaveBeenCalled();
+    await user.selectOptions(screen.getByLabelText("Portfolio policy"), "beta");
+    await act(async () => resolve(validation));
+    expect(screen.queryByTestId("scanner-validation-results")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Download validation JSON" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Validate scanner family" })).toBeEnabled();
+  });
+  it("does not apply a pending validation failure after leaving and reopening the scanner", async () => {
+    let reject!: (reason: Error) => void;
+    vi.mocked(api.validateScanner).mockReturnValueOnce(new Promise((_resolve, fail) => { reject = fail; }));
+    const first = renderWithUser(<ScannerLabPanel />);
+    await first.user.click(screen.getByRole("button", { name: "Load validation parameters" }));
+    await first.user.click(screen.getByRole("button", { name: "Validate scanner family" }));
+    first.unmount();
+    const reopened = renderWithUser(<ScannerLabPanel />);
+    await act(async () => reject(new Error("Old request failed")));
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("scanner-validation-results")).not.toBeInTheDocument();
+    expect(api.validateScanner).toHaveBeenCalledTimes(1);
+    expect(api.runScanner).not.toHaveBeenCalled();
+    await reopened.user.click(screen.getByRole("button", { name: "Load validation parameters" }));
+    await reopened.user.click(screen.getByRole("button", { name: "Validate scanner family" }));
+    expect(await screen.findByTestId("scanner-validation-results")).toBeInTheDocument();
+    expect(api.validateScanner).toHaveBeenCalledTimes(2);
+  });
+  it("downloads the exact completed response through its rendered action and removes export on edits", async () => {
+    vi.stubGlobal("Blob", NodeBlob);
+    const create = vi.fn((_blob: NodeBlob) => "blob:scanner-completed");
+    const revoke = vi.fn();
+    vi.stubGlobal("URL", Object.assign(class extends URL {}, { createObjectURL: create, revokeObjectURL: revoke }));
+    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
+    const completed: ScannerValidationResponse = { ...validation,
+      material: { request: { scanner: { seed: 42, cost_bps: 5 }, n_folds: 3, embargo_days: 1 },
+        panel: { asset_ids: ["SYN001", "SYN002"], source: "synthetic" } },
+      conventions: { training_used_for_fit: false, costs: "one-way turnover charged once" } };
+    vi.mocked(api.validateScanner).mockResolvedValueOnce(completed);
+    const before = JSON.stringify(completed);
+    const { user } = renderWithUser(<ScannerLabPanel />);
+    await user.click(screen.getByRole("button", { name: "Load validation parameters" }));
+    await user.click(screen.getByRole("button", { name: "Validate scanner family" }));
+    await user.click(await screen.findByRole("button", { name: "Download validation JSON" }));
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(click).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(revoke).toHaveBeenCalledWith("blob:scanner-completed"));
+    expect(JSON.parse(await create.mock.calls[0][0].text())).toEqual(completed);
+    expect(JSON.stringify(completed)).toBe(before);
+    expect(api.validateScanner).toHaveBeenCalledTimes(1);
+    expect(api.runScanner).not.toHaveBeenCalled();
+    await user.clear(screen.getByLabelText("Seed"));
+    await user.type(screen.getByLabelText("Seed"), "43");
+    expect(screen.queryByRole("button", { name: "Download validation JSON" })).not.toBeInTheDocument();
+    expect(create).toHaveBeenCalledTimes(1);
+    expect(api.validateScanner).toHaveBeenCalledTimes(1);
+  });
+  it("renders a final cash ranking and unavailable sector explicitly", async () => {
+    vi.mocked(api.runScanner).mockResolvedValueOnce({ ...scanner, latest_rebalance_date: "2023-06-30",
+      latest_ranking: [{ ticker: "SYN001", rank: 1, score: .2, sector: null, side: "neutral", weight: 0 }],
+      advanced: { policy: { mode: "sector" }, input_fingerprint: "f".repeat(64), exposure_provenance: "declared",
+        factor_provenance: "unavailable", timing: "one execution lag", support_policy: "selected names",
+        failed_rebalance: "cash", diagnostics: [], total_rebalances: 1, diagnostics_truncated: false,
+        latest_scores: [{ asset_id: "SYN001", raw_score: .2, transformed_score: null, weight: 0, sector: null }],
+        realized_net_volatility: 0, caveats: ["Synthetic only"] } });
+    const { user } = renderWithUser(<ScannerLabPanel />);
+    await user.click(screen.getByRole("button", { name: "Load validation parameters" }));
+    await user.click(screen.getByRole("button", { name: "Run Scanner" }));
+    const ranking = await screen.findByRole("table", { name: "Latest scanner ranking" });
+    expect(within(ranking).getByText("Not available")).toBeInTheDocument();
+    expect(within(ranking).getByText("neutral")).toBeInTheDocument();
+    expect(within(ranking).getByText("0.0000")).toBeInTheDocument();
+    expect(screen.getByText("Latest ranking (raw score) — 2023-06-30")).toBeInTheDocument();
+    expect(screen.getByText(/Advanced final gross exposure can differ/)).toBeInTheDocument();
   });
   it("retains useful backend failures", async () => {
     vi.mocked(api.validateScanner).mockRejectedValue(new Error("Backend offline; saved local data remains available after restart"));

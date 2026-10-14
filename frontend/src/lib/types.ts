@@ -2469,7 +2469,7 @@ export interface ScannerTurnoverPoint {
 export interface ScannerRankingRow {
   rank: number;
   ticker: string;
-  sector: string;
+  sector: string | null;
   score: number;
   side: string;
   weight: number;

@@ -3,7 +3,7 @@ from datetime import date
 from typing import Any, Literal
 
 import numpy as np
-from pydantic import Field, StrictInt, model_validator
+from pydantic import ConfigDict, Field, StrictInt, model_validator
 
 from app.model_validation.engine import audit_split, purged_kfold, validate_config
 from app.model_validation.events import normalize_samples, strip_datetimes
@@ -29,8 +29,13 @@ class ScannerCandidate(Declaration):
     p_value_scope: Literal["declared_external", "this_scanner_sample"] = "declared_external"
 
 
+class ValidationScannerRequest(ScannerRequest):
+    """Strict validation inputs without changing the omitted-option legacy API."""
+    model_config = ConfigDict(strict=True, extra="forbid", allow_inf_nan=False)
+
+
 class ScannerValidationRequest(Declaration):
-    scanner: ScannerRequest
+    scanner: ValidationScannerRequest
     candidates: list[ScannerCandidate] = Field(min_length=1, max_length=4)
     n_folds: StrictInt = Field(default=3, ge=2, le=5)
     embargo_days: Finite = Field(default=1.0, ge=0, le=30)
@@ -71,12 +76,24 @@ class ScannerValidationResponse(Declaration):
     conventions: dict[str, Any]
 
 
+def _family_fingerprint(request, input_fingerprint):
+    return digest({"schema_version": "scanner_family_v1", "input": input_fingerprint,
+                   "scanner": request.scanner.model_dump(mode="json"),
+                   "candidates": [c.model_dump(mode="json") for c in request.candidates],
+                   "split_configuration": {"n_folds": request.n_folds,
+                       "embargo": {"mode": "duration_days", "value": request.embargo_days}},
+                   "cost_bps": request.scanner.cost_bps, "alpha": request.alpha})
+
+
 def verify_validation_bundle(bundle):
     """Integrity of retained material, not a certificate of valid statistical claims."""
     body = dict(bundle)
     expected = body.pop("result_fingerprint")
     if digest(body) != expected or digest(body["material"]["panel"]) != body["input_fingerprint"]:
         raise ValueError("retained scanner material/result fingerprint mismatch")
+    request = ScannerValidationRequest.model_validate(body["material"]["request"])
+    if _family_fingerprint(request, body["input_fingerprint"]) != body["family_fingerprint"]:
+        raise ValueError("retained scanner family/request fingerprint mismatch")
     return True
 
 
@@ -112,9 +129,7 @@ def run_scanner_validation(request, *, universe=None):
         folds.append({"label": split["split_label"], **memberships, "audit": audit,
                       "fingerprint": split_fingerprint(configuration_fp=config_fp, split_label=split["split_label"], **memberships),
                       "trained_parameters": [], "training_used_for_fit": False})
-    candidate_declarations = [c.model_dump(mode="json") for c in request.candidates]
-    family_fp = digest({"schema_version": "scanner_family_v1", "input": panel["fingerprint"], "candidates": candidate_declarations,
-                        "split_configuration": config, "cost_bps": spec.cost_bps, "alpha": request.alpha})
+    family_fp = _family_fingerprint(request, panel["fingerprint"])
     entries = [{"candidate_id": c.candidate_id, "raw_p": c.raw_p_value,
                 "provenance": {"source": c.p_value_source, "hypothesis": c.hypothesis,
                                "scope": c.p_value_scope, "input_fingerprint": panel["fingerprint"],

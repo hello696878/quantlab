@@ -3,15 +3,16 @@
 > **Current status (2026-10-13):** Phase 68 opt-in scanner neutralisation,
 > final-weight/cash/volatility diagnostics, bounded purged fixed-policy validation,
 > declared-family corrections and existing-Scanner UI are implemented at
-> `4.86.0-dev`. Verification: 250 broad focused backend passes, then 74 final
-> scanner passes after support-rank strengthening (separate runs, zero skips),
-> 241 frontend unit passes, TypeScript exit 0 and browser discovery (1 focused /
-> 278 overall, not execution). Fresh independent review,
-> user build/browser acceptance and exact-commit CI remain pending. Phase 67 is
+> `4.86.0-dev`. Independent review/fixes are complete on implementation
+> `5428eb20...`: 321 focused backend passes / zero skips, 245 frontend unit passes,
+> TypeScript exit 0 and browser discovery (1 focused / 278 overall, not execution).
+> Earlier 250/74 implementation runs remain separate. User review commit,
+> user build/isolated browser acceptance and exact-commit Python 3.11 CI remain pending. Phase 67 is
 > frozen at `e23e828952c1dd1dcc320a225e75a0337aa1fd80` under the verified annotated
 > v4.85 tag; supplied final-doc CI `38219121957` succeeded in both jobs, not rerun.
 > No provider, optimizer, new DB, PIT certification or Phase 69. See
-> [Phase 68 evidence](PHASE_68_IMPLEMENTATION.md).
+> [Phase 68 review](PHASE_68_REVIEW.md) and preserved
+> [implementation evidence](PHASE_68_IMPLEMENTATION.md).
 
 > **Historical status (2026-10-12, superseded):** Phase 67 local futures data/knowledge/revisions,
 > declared calendar/DST, calendar-aware retrospective roll diagnostics and
@@ -341,13 +342,16 @@ approved); "point-in-time" must not be claimed for data that isn't.
 
 ## Phase 68 — Advanced Cross-Sectional Neutralisation and Scanner Validation v1
 
-**Implementation status (2026-10-13).** Delivered explicit dollar/sector/beta
+**Review status (2026-10-13).** Reviewed explicit dollar/sector/beta
 policies, current cross-sectional OLS and separate final-weight projection,
 declared volatility reference/cash fallback, shared scanner P&L and actual
 fixed daily selections linked to purge/embargo/audit and declared-family
 corrections. Learned beta/volatility OOS, PBO/DSR and real universes are unavailable,
-not relabelled. Fresh review and user build/browser/CI remain pending. See
-[handoff](PHASE_68_IMPLEMENTATION.md) and
+not relabelled. Verified defects are fixed; protected review 321 passed / zero
+skips, frontend 245 passed and TypeScript passed. User review commit and user
+build/isolated browser/exact-commit Python 3.11 CI remain pending. See
+[review handoff](PHASE_68_REVIEW.md), preserved
+[implementation handoff](PHASE_68_IMPLEMENTATION.md) and
 [support/runbook](CROSS_SECTIONAL_NEUTRALISATION_AND_SCANNER_VALIDATION.md).
 
 **Goal.** Extend the scanner beyond dollar-neutral weighting and give

@@ -4827,6 +4827,20 @@ class ScannerRequest(BaseModel):
     advanced_policy: Optional[NeutralisationPolicy] = None
     advanced_inputs: Optional[ScannerInputs] = None
 
+    @model_validator(mode="before")
+    @classmethod
+    def _strict_advanced_inputs(cls, value):
+        if isinstance(value, dict) and any(value.get(k) is not None for k in ("advanced_policy", "advanced_inputs")):
+            if set(value) - set(cls.model_fields):
+                raise ValueError("advanced scanner options must use the supported schema")
+            for name in ("n_assets", "lookback_days", "seed"):
+                if name in value and not (name == "seed" and value[name] is None) and type(value[name]) is not int:
+                    raise ValueError("advanced scanner integer settings must be explicit integers")
+            for name in ("long_quantile", "short_quantile", "gross_exposure", "cost_bps", "min_liquidity"):
+                if name in value and type(value[name]) not in (int, float):
+                    raise ValueError("advanced scanner numeric settings must be explicit finite numbers")
+        return value
+
     @field_validator("start_date", "end_date")
     @classmethod
     def _validate_iso(cls, v: str) -> str:
@@ -4878,7 +4892,7 @@ class ScannerTurnoverPoint(BaseModel):
 class ScannerRankingRow(BaseModel):
     rank: int
     ticker: str
-    sector: str
+    sector: str | None
     score: float
     side: str
     weight: float

@@ -420,7 +420,7 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
               {result.advanced ? "Latest ranking (raw score)" : "Latest ranking"}{result.latest_rebalance_date ? ` — ${result.latest_rebalance_date}` : ""}
             </p>
             <div className="overflow-x-auto">
-              <table className="w-full max-w-2xl text-xs">
+              <table aria-label="Latest scanner ranking" className="w-full max-w-2xl text-xs">
                 <thead>
                   <tr className="text-slate-400">
                     <th className="px-2 py-1 text-right font-medium uppercase tracking-wide">Rank</th>
@@ -436,7 +436,7 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
                     <tr key={row.ticker} className="border-t border-[var(--line)]">
                       <td className="px-2 py-1 text-right mono">{row.rank}</td>
                       <td className="px-2 py-1 text-left mono">{row.ticker}</td>
-                      <td className="px-2 py-1 text-left">{row.sector}</td>
+                      <td className="px-2 py-1 text-left">{row.sector ?? "Not available"}</td>
                       <td className="px-2 py-1 text-right mono">{fmt(row.score, 4)}</td>
                       <td className="px-2 py-1 text-center font-semibold" style={{ color: sideColor(row.side) }}>{row.side}</td>
                       <td className="px-2 py-1 text-right mono">{fmt(row.weight, 4)}</td>
@@ -468,8 +468,8 @@ export default function ScannerLabPanel({ initialStrategy }: { initialStrategy?:
         <p className="section-title">How the scanner engine works</p>
         <ul className="space-y-2">
           <li><span className="font-semibold text-slate-900">Universe → matrices:</span> instead of one price series, the engine builds a price matrix (date × asset), a signal/score matrix, and a dollar-neutral weight matrix, then collapses them to one portfolio return series.</li>
-          <li><span className="font-semibold text-slate-900">Rank & bucket:</span> each rebalance date, assets are ranked by their cross-sectional score; the top quantile is the long basket, the bottom quantile the short basket.</li>
-          <li><span className="font-semibold text-slate-900">Dollar-neutral:</span> longs sum to +gross/2 and shorts to −gross/2, so net exposure ≈ 0 and gross exposure = the target (default 1.0).</li>
+          <li><span className="font-semibold text-slate-300">Rank & bucket:</span> the legacy policy takes the top score quantile long and the bottom quantile short. Advanced policies transform scores and project selected weights; projection can change their signs.</li>
+          <li><span className="font-semibold text-slate-300">Dollar-neutral:</span> legacy baskets target +gross/2 long and −gross/2 short. Advanced final gross exposure can differ from the requested target after volatility scaling, leverage caps or a cash fallback; consult the final-weight diagnostics.</li>
           <li><span className="font-semibold text-slate-900">Lookahead-safe:</span> signals use information through date t; weights are shifted forward one period before P&L, so weights at t earn the return from t to t+1 — never the same-day return.</li>
           <li><span className="font-semibold text-slate-900">Costs & turnover:</span> turnover = Σ|wₜ − wₜ₋₁|; cost = turnover × bps/10000 is deducted from the gross return the position earns.</li>
           <li><span className="font-semibold text-slate-300">Limitations:</span> synthetic universe (no survivorship/point-in-time issues modeled), no market impact, borrow, or capacity. Opt-in sector/beta policies check final weights at each rebalance; live universes, learned-policy OOS validation, and ML selection are not implemented. Educational, not investment advice.</li>

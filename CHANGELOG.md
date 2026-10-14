@@ -18,6 +18,15 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 68 independent review** (2026-10-13, `4.86.0-dev` unchanged): fixed
+  availability precision/UTC overflow, advanced zero-wealth refusal and latest
+  cash holdings, strict/private request boundaries and family selection identity;
+  corrected advanced UI explanations and strengthened real download/browser
+  assertions. Protected review: 321 passed / zero skips, all exits 0; frontend
+  245 passed, TypeScript passed, 1 focused / 278 overall browser tests discovered,
+  not executed. User review commit, exact-commit Python 3.11 CI and user
+  build/isolated browser acceptance remain pending. See `docs/PHASE_68_REVIEW.md`.
+
 - **Phase 68 implementation** (2026-10-13, `4.86.0-dev`): opt-in scanner
   dollar/sector/beta residualisation with separate final-weight constraints,
   explicit cash fallback and declared ex-ante volatility reference; shared
