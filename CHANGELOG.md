@@ -18,6 +18,16 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 68 final evidence** (2026-10-14, `4.86.0-dev` unchanged): review
+  committed at `094d04263ecd713c3cc2f733b36969a513d21c3d`; exact-review CI
+  `38496359420` attempt 1 succeeded in both jobs (user/coordinator-supplied).
+  User production build exited 0; retained browser artifacts confirm one Edge
+  Scanner case passed, zero failures/errors/skips. Earlier DIRECT preflight
+  failure remains separate, root cause unknown. No new test/build/browser run
+  or combined suite count; documentation publication/verification and user
+  milestone tag remain pending. Phase 69 not started. See the final section of
+  [review evidence](docs/PHASE_68_REVIEW.md#final-release-verification-2026-10-14).
+
 - **Phase 68 independent review** (2026-10-13, `4.86.0-dev` unchanged): fixed
   availability precision/UTC overflow, advanced zero-wealth refusal and latest
   cash holdings, strict/private request boundaries and family selection identity;

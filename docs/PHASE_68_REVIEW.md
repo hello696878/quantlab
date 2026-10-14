@@ -452,3 +452,125 @@ Future user tag, not created:
 **v4.86.0-cross-sectional-neutralisation-scanner-validation-v1**.
 No staging, commit, push, tag, deployment, workflow trigger, second report or
 evidence-finalization task was performed.
+
+## Final Release Verification (2026-10-14)
+
+This section supersedes the historical remaining-gates wording above, without
+rewriting that review or its failures. Documentation-only finalization; no
+implementation/review/test/build/browser/API computation repeated here.
+
+### Exact Source and Attribution
+
+Read-only Git inspection confirmed clean attached main, empty index and no
+nonignored untracked files before edits, at review commit
+**094d04263ecd713c3cc2f733b36969a513d21c3d**, committed tree
+**5b767c968cc8b95b501f6f8a711a3cf3e4b55b99**. Implementation is
+**5428eb20ae7c1dc33c2e875a1e33370e2423568b**. VERSION remains **4.86.0-dev**.
+The review commit, not the later documentation commit, supplied the source for
+the user-owned build/browser execution and exact-review CI.
+
+Historical results retain their original attribution and scope:
+implementation broad **250** and final scanner **74** passes on separate
+snapshots, with recorded pytest/process/outer exits zero; review **321 passed,
+zero skips, printed 623.54s**, including (not plus) **70** new regressions;
+frontend review **245 passed**, TypeScript passed; focused/overall discovery
+**1 / 278**, not execution. The initial esbuild spawn EPERM unit startup failure
+remains separately recorded above. These are not a new whole-suite total.
+Original runtime/protection limitations remain intact; Python 3.11 syntax-only
+implementation evidence is not Python 3.11 runtime coverage.
+
+### Exact-Review CI and User Production Build
+
+CI run **38496359420**, attempt **1**, source
+**094d04263ecd713c3cc2f733b36969a513d21c3d**:
+
+| Job | Identity | Supplied conclusion |
+| --- | --- | --- |
+| Backend Tests | 115632903377 | completed / success |
+| Frontend Tests & Build | 115632903141 | completed / success |
+
+These results were supplied by the user and retrieved through the GitHub
+connector in the coordinating conversation, NOT independently retrieved in this
+documentation task. No counts, skip identities or runtime patch versions are
+inferred from job success. This closes the exact-review CI gate, not CI for the
+future documentation commit. No workflow was triggered or logs mined here.
+
+User-reported production build used the exact review commit/tree above:
+Node **24.21.0**, actual npm **11.12.1**, Next.js **15.5.25**. The recorded
+packageManager is **npm@11.17.0**, not the actual npm version used.
+BACKEND_URL was **http://127.0.0.1:8769**; build exit **0**, built `/api/:path*`
+destination `http://127.0.0.1:8769/:path*` verified by the user, post-build
+working tree clean. No retained build log was inspected here; these are
+user-owned console results, not a new local build or a build of future docs.
+Build ID **eWgKc5J8Z4fRTrSZD8GdP** is also confirmed by browser execution.json.
+
+### Artifact-Confirmed Selected Browser Execution
+
+Existing evidence read without execution or copying into Git:
+**C:/Users/jimli/AppData/Local/Temp/quantlab-phase68-browser-50fc5c24cb584b3ebc1127568b01c54d**.
+Files present: preflight.json, execution.json, junit.xml and test-results/;
+test-results contains only .last-run.json, which reports passed/empty failedTests.
+No successful screenshot or trace is required or claimed; configured reporters
+retain those on failure. No manual visual inspection was performed here.
+
+| Artifact | Confirmed fields |
+| --- | --- |
+| preflight.json | checked_at 2026-10-14T02:49:33.824Z (10:49:33.824 Asia/Taipei); Playwright 1.61.1; DIRECT and PROXY status 200, same nonempty database identity |
+| execution.json | source_commit 094d04263ecd713c3cc2f733b36969a513d21c3d; spec e2e/scanner-neutralisation.spec.ts; Node 24.21.0; browser_channel msedge; build ID above; process_seconds 6.9708954; exit_code 0 |
+| junit.xml | project hostname chromium; timestamp 2026-10-14T02:49:35.394Z (10:49:35.394 Asia/Taipei); exactly 1 test case, zero failures/errors/skips; scenario 2.729s; suite total 5.562899000000001s |
+
+User-reported console/harness facts: actual selected browser Microsoft Edge
+under project chromium; disposable backend on **8769**, production frontend on
+**3100**; matching token/kind/disposable-DB proofs; one worker, retries **0**;
+printed scenario **2.7s**, command summary **1 passed in 5.6s**; post-run Git
+status clean. Node was selected through existing-runtime discovery. Artifacts
+confirm status/identity equality, channel, source, versions, counts and exit;
+they do not independently record all token/kind checks or service lifecycle.
+No token values, credential contents or request headers are reproduced.
+Printed summary, JUnit times and process wall time are distinct measurements.
+
+This one selected committed Scanner scenario covers its asserted explicit
+Scanner/validation requests, declared corrections, unavailable beta/PBO/DSR,
+downloaded JSON equality, invalidation after edits, navigation and bounded
+viewport checks. It is not all 278 E2E tests, full accessibility testing,
+manual visual acceptance or independent statistical certification. No fresh
+empty-DB assertion is claimed; the phase did not perform one.
+
+### Earlier Failure Retained Separately
+
+User-reported earlier evidence location:
+**C:/Users/jimli/AppData/Local/Temp/quantlab-phase68-browser-da8d4aede7954060a9f866d14757638d**.
+Read-only inspection found that directory present but empty; no failure log or
+diagnostic artifact was available there to independently confirm its contents.
+Retain the supplied account: initial DIRECT proof request failed before browser
+scenario or Scanner computation; later GET-only diagnostics returned HTTP 200
+for direct/proxy with matching token/kind/database identity, diagnostic exit 0.
+Original failure root cause remains **unknown**, not a confirmed readiness/race
+fault or a passed test. The successful run is a separate execution, not a
+relabelling of the failure. No evidence/harness data was deleted in this task.
+
+### Protection, Current Gates and Documentation Publication
+
+Historical 47-file/source/snapshot/active-DB protections above remain evidence
+from their original runs. No fresh active-database hashes/audit or DB access is
+performed for documentation. The task began with the exact clean review tree;
+only the eight existing authorized documents are changed, with source/tests,
+fixtures/dependencies/workflows/configuration/VERSION and historical
+PHASE_68_IMPLEMENTATION.md excluded. External artifacts stay external.
+
+Implementation/review are committed; exact-review CI, user production build and
+one selected isolated browser scenario are complete within the stated evidence
+boundaries. Still pending: user documentation commit/publication/verification
+and user-created milestone tag. No future documentation SHA, CI or build is
+known or implied. Suggested user commit subject:
+**Finalize phase68 release evidence and browser acceptance v1**.
+Future user tag remains **v4.86.0-cross-sectional-neutralisation-scanner-validation-v1**;
+tag creation is not authorized in this task.
+
+Bounded product claims remain: synthetic universe, fixed daily-selection
+validation, declared p-values, learned beta/volatility OOS and PBO/DSR
+unavailable, no automatic policy selection, provider or new database, and no
+alpha/PIT/production certification. Phase 69 is not started. Ready for the
+user documentation commit after the authorized exact documentation staging;
+no additional identical finalization cycle, tests/builds/browser/API rerun,
+services, commit, push, tag, deployment or workflow trigger in this task.

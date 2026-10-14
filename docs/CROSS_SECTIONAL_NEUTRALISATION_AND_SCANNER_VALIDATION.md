@@ -158,5 +158,15 @@ positive identity proof through the frontend proxy. The new spec refuses a
 flag-only or ordinary-backend setup. Discovery does not execute that acceptance.
 See [review evidence](PHASE_68_REVIEW.md) for verified fixes and current checks;
 [implementation evidence](PHASE_68_IMPLEMENTATION.md) remains historical.
-User review commit, exact-commit Python 3.11 CI, user production build and actual
-isolated browser acceptance remain pending.
+Current status (2026-10-14): implementation and review are committed; review
+`094d04263ecd713c3cc2f733b36969a513d21c3d` is the source for successful
+user-owned production build and one isolated Edge Scanner scenario. Retained
+JUnit confirms one case, zero failures/errors/skips; this is not all 278 browser
+tests or manual visual/accessibility certification. Exact-review CI `38496359420`
+attempt 1 succeeded in both jobs (user/coordinator-supplied, not retrieved here).
+Earlier DIRECT preflight failure remains separate, root cause unknown. See the
+[final evidence](PHASE_68_REVIEW.md#final-release-verification-2026-10-14) for
+artifact versus console attribution. Documentation publication/verification and
+the user-created milestone tag remain pending; Phase 69 not started. No automatic
+policy selection, learned beta/volatility OOS, PBO/DSR, alpha/PIT or production
+certification is implied.

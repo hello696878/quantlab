@@ -1,13 +1,17 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (2026-10-13):** Phase 68 opt-in scanner neutralisation,
+> **Current status (2026-10-14):** Phase 68 opt-in scanner neutralisation,
 > final-weight/cash/volatility diagnostics, bounded purged fixed-policy validation,
 > declared-family corrections and existing-Scanner UI are implemented at
 > `4.86.0-dev`. Independent review/fixes are complete on implementation
 > `5428eb20...`: 321 focused backend passes / zero skips, 245 frontend unit passes,
 > TypeScript exit 0 and browser discovery (1 focused / 278 overall, not execution).
-> Earlier 250/74 implementation runs remain separate. User review commit,
-> user build/isolated browser acceptance and exact-commit Python 3.11 CI remain pending. Phase 67 is
+> Earlier 250/74 implementation runs remain separate. Review is committed at
+> `094d04263ecd713c3cc2f733b36969a513d21c3d`; exact-review CI `38496359420`
+> succeeded in both jobs (user/coordinator-supplied). User production build and
+> one isolated Edge Scanner case completed, not all 278 browser tests.
+> Documentation publication/verification and user tagging remain pending.
+> Phase 69 not started. Phase 67 is
 > frozen at `e23e828952c1dd1dcc320a225e75a0337aa1fd80` under the verified annotated
 > v4.85 tag; supplied final-doc CI `38219121957` succeeded in both jobs, not rerun.
 > No provider, optimizer, new DB, PIT certification or Phase 69. See
@@ -342,14 +346,17 @@ approved); "point-in-time" must not be claimed for data that isn't.
 
 ## Phase 68 — Advanced Cross-Sectional Neutralisation and Scanner Validation v1
 
-**Review status (2026-10-13).** Reviewed explicit dollar/sector/beta
+**Review and final evidence status (2026-10-14).** Reviewed explicit dollar/sector/beta
 policies, current cross-sectional OLS and separate final-weight projection,
 declared volatility reference/cash fallback, shared scanner P&L and actual
 fixed daily selections linked to purge/embargo/audit and declared-family
 corrections. Learned beta/volatility OOS, PBO/DSR and real universes are unavailable,
 not relabelled. Verified defects are fixed; protected review 321 passed / zero
-skips, frontend 245 passed and TypeScript passed. User review commit and user
-build/isolated browser/exact-commit Python 3.11 CI remain pending. See
+skips, frontend 245 passed and TypeScript passed. Review committed at `094d04263ecd...`;
+exact-review CI succeeded in both jobs (user/coordinator-supplied), user build
+exited 0 and retained JUnit confirms one isolated Edge Scanner case passed.
+Documentation publication/verification and user tagging remain pending;
+no new suite total, market/PIT/production certification or Phase 69. See
 [review handoff](PHASE_68_REVIEW.md), preserved
 [implementation handoff](PHASE_68_IMPLEMENTATION.md) and
 [support/runbook](CROSS_SECTIONAL_NEUTRALISATION_AND_SCANNER_VALIDATION.md).

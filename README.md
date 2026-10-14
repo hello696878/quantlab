@@ -26,8 +26,12 @@ new database. VERSION is `4.86.0-dev`; implementation is `5428eb20...` on `main`
 Independent review and verified fixes are complete: 321 focused backend passes,
 zero skips, 245 frontend unit passes and TypeScript passed. Browser discovery:
 1 focused / 278 overall, not execution. Earlier implementation runs remain
-separate historical evidence. User review commit, exact-commit Python 3.11 CI
-and user build/browser acceptance remain pending; no whole-tree pass is claimed. See the
+separate historical evidence. Review is committed at `094d04263ecd713c3cc2f733b36969a513d21c3d`.
+Exact-review CI succeeded in both jobs (user/coordinator-supplied); the user
+completed a production build and one isolated Edge Scanner scenario. These
+are separate gates, not execution of all 278 browser tests or a new suite total.
+Documentation publication/verification and the user-created milestone tag
+remain pending; Phase 69 is not started. See the
 [policy/runbook](docs/CROSS_SECTIONAL_NEUTRALISATION_AND_SCANNER_VALIDATION.md)
 and [review evidence](docs/PHASE_68_REVIEW.md); the
 [implementation evidence](docs/PHASE_68_IMPLEMENTATION.md) is preserved.

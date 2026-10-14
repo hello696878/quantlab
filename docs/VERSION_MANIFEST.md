@@ -22,8 +22,14 @@ See [review evidence](PHASE_68_REVIEW.md), preserved
 [implementation evidence](PHASE_68_IMPLEMENTATION.md) and
 [policy/runbook](CROSS_SECTIONAL_NEUTRALISATION_AND_SCANNER_VALIDATION.md).
 Independent review/fixes are complete: 321 focused backend passes / zero skips,
-245 frontend passes, TypeScript exit 0. User review commit, user build/isolated
-browser acceptance, exact-commit Python 3.11 CI and publication remain pending.
+245 frontend passes, TypeScript exit 0. Review is committed at
+`094d04263ecd713c3cc2f733b36969a513d21c3d`, tree
+`5b767c968cc8b95b501f6f8a711a3cf3e4b55b99`. Exact-review CI `38496359420`
+attempt 1 succeeded in both jobs (user/coordinator-supplied, not retrieved here).
+User production build and one isolated Edge Scanner scenario completed; retained
+JUnit confirms one case, zero failures/errors/skips. This is not all-browser
+execution or CI/build of a future documentation commit. Documentation
+publication/verification and the user-created milestone tag remain pending.
 Future user tag, not created:
 `v4.86.0-cross-sectional-neutralisation-scanner-validation-v1`. No Phase 69.
 
