@@ -2,6 +2,7 @@
 
 from contextlib import closing, contextmanager
 import hashlib
+import importlib.util
 import os
 from pathlib import Path
 import shutil
@@ -9,6 +10,10 @@ import sqlite3
 import sys
 
 import pytest
+_runner_spec = importlib.util.spec_from_file_location("sqlite_test_paths", Path(__file__).resolve().parents[2] / "scripts/backend_test_runner.py")
+_runner_module = importlib.util.module_from_spec(_runner_spec)
+_runner_spec.loader.exec_module(_runner_module)
+sqlite_test_path = _runner_module.sqlite_test_path
 
 
 _sqlite_boundaries = []
@@ -19,8 +24,11 @@ def _audit_sqlite(event, args):
         return
     root, database_free, violations = _sqlite_boundaries[-1]
     database = os.fsdecode(args[0])
-    if (database_free or database.lower().startswith("file:") or
-            database != ":memory:" and not Path(database).resolve().is_relative_to(root)):
+    try:
+        outside = database != ":memory:" and not sqlite_test_path(database).resolve().is_relative_to(root)
+    except ValueError:
+        outside = True
+    if database_free or outside:
         violations.append(database)
         raise AssertionError("test attempted unauthorized SQLite access")
 

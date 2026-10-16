@@ -15,6 +15,22 @@ import subprocess
 import sys
 import tempfile
 import time
+from urllib.parse import urlsplit, parse_qsl, unquote
+
+
+def sqlite_test_path(database):
+    """Permit only plain paths or exact read-only file URIs; retain root checks."""
+    if not database.lower().startswith("file:"):
+        return Path(database)
+    uri = urlsplit(database)
+    if uri.scheme != "file" or uri.netloc or uri.fragment or parse_qsl(uri.query) != [("mode", "ro")]:
+        raise ValueError("Unsupported SQLite URI")
+    path = unquote(uri.path)
+    if os.name == "nt" and path.startswith("/"):
+        path = path[1:]
+    if not Path(path).is_absolute():
+        raise ValueError("SQLite URI must identify an absolute test-owned file")
+    return Path(path)
 
 FAST_FILES = [f"backend/tests/test_{name}.py" for name in
               ("signal_ensemble", "factor_diagnostics", "strategy_ensemble")]
@@ -281,8 +297,11 @@ def execute(config_path):
     def database_guard(event, args):
         if event == "sqlite3.connect":
             database = os.fsdecode(args[0])
-            if database != ":memory:" and (database.lower().startswith("file:") or
-                                             not Path(database).resolve().is_relative_to(allowed)):
+            try:
+                outside = database != ":memory:" and not sqlite_test_path(database).resolve().is_relative_to(allowed)
+            except ValueError:
+                outside = True
+            if outside:
                 violations.append(database)
                 raise RuntimeError("SQLite path outside this test-owned run directory")
 

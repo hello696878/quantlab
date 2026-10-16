@@ -1,6 +1,34 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 68 Final Evidence (2026-10-14)
+## Current Handoff: Phase 69 Implementation (2026-10-16)
+
+Branch `phase69-deterministic-evidence-grounded-research-explainer`, base
+`2cd8f2585816fda0dc389f5a721ab02b0a3d71d8`, frozen tree
+`2c3dfde47bfb4c6924e7ab807727fc3d104de8ab`. Verified the existing annotated
+v4.86 tag at that baseline; supplied final-doc CI `38533560143` succeeded in both
+jobs, not rerun. Phase 68 is closed. VERSION is now `4.87.0-dev`.
+
+Implemented bounded stored-SMA explanation, read-only SQLite snapshot, existing
+replay-content verification against the pinned row, closed facts/templates and
+policy statements, inspectable references and exact pinned JSON download in the
+existing Saved Backtest detail flow. Legacy facts remain unverified; other
+adapters, parent contexts and lifecycle/model-origin/current-link verification
+are unavailable/refused. No research or registration on explanation reads.
+
+Earlier broad snapshot: 330 passes; final affected source: 73 passes, zero skips/
+failures/errors, all recorded pytest/process/outer exits 0. Not a combined suite.
+Frontend 251 passes, TypeScript passed, 1 focused /279 overall browser tests
+discovered only. Development setup/collection/Windows parameter-ID failures
+remain in [implementation evidence](docs/PHASE_69_IMPLEMENTATION.md).
+See [actual support map](docs/EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md).
+
+Next: fresh independent review; later user build/isolated browser execution,
+exact-commit Python 3.11 CI/publication and user-created milestone tag.
+Only implementation and authorized checks occurred: no staging, commit, push,
+tag, PR, workflow trigger, package installation, services, production/Docker
+build, browser execution or Phase 70. Do not repeat Phase 68 finalization.
+
+## Historical Handoff: Phase 68 Final Evidence (2026-10-14, Frozen at 2cd8f258)
 
 Attached clean `main` before documentation edits, review HEAD
 `094d04263ecd713c3cc2f733b36969a513d21c3d`, committed tree

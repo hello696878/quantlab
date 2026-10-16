@@ -1,6 +1,26 @@
 # TASKS - QuantLab
 
-## Current Phase 68 Final Evidence (2026-10-14)
+## Current Phase 69 Implementation (2026-10-16)
+
+Verified frozen Phase 68 main/base `2cd8f2585816fda0dc389f5a721ab02b0a3d71d8`,
+tree `2c3dfde47bfb4c6924e7ab807727fc3d104de8ab` and annotated v4.86 tag.
+Created authorized branch `phase69-deterministic-evidence-grounded-research-explainer`;
+VERSION `4.87.0-dev`. Supplied successful final-doc CI `38533560143` is inherited.
+
+- [x] Map actual saved-result, replay and lifecycle read contracts and units.
+- [x] Implement bounded read-only stored-SMA acquisition and recorded-integrity checks; no backfill or research on read.
+- [x] Add closed versioned facts/wording/policy, independent binding validation and deterministic identity/hash.
+- [x] Integrate explicit explanation, references, changed/legacy/unavailable states and pinned export into Saved detail.
+- [x] Real engine/save/read fixture and adversarial tests: earlier broad330 / final affected73 passes on separate snapshots; 251 frontend passes, TypeScript passed, browser discovery1/279 only.
+- [x] Preserve development failures, frozen evidence/tag, active data and empty index; no installations/builds/services/browser execution.
+- [ ] Fresh independent source review in a separate session.
+- [ ] Later user production build/isolated browser acceptance, exact-commit Python 3.11 CI and publication/tagging.
+
+See [implementation inventory/evidence](docs/PHASE_69_IMPLEMENTATION.md) and
+[support/runbook](docs/EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md).
+No staging, commit, push, tag, PR, deployment, workflow trigger or Phase 70.
+
+## Historical Phase 68 Final Evidence (2026-10-14, Frozen at 2cd8f258)
 
 Attached `main`, review HEAD `094d04263ecd713c3cc2f733b36969a513d21c3d`,
 tree `5b767c968cc8b95b501f6f8a711a3cf3e4b55b99`; implementation

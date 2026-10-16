@@ -14,7 +14,28 @@ palette, shared charts, local LaTeX formula panels).
 > investment, trading, allocation, legal, tax, compliance, or risk-management
 > advice, and not production trading, risk, or compliance infrastructure.
 
-## Current development: Phase 68
+## Current development: Phase 69
+
+Saved Backtest detail now offers **Explain stored result** for the bounded SMA
+adapter: deterministic stored facts, exact raw/display/unit/path references,
+explicit legacy/unsupported limitations and pinned JSON export. No advice,
+predictions, new analytics, model/provider calls, automatic research or new
+database. Other stored strategy/module adapters and lifecycle/model-origin
+interpretation are deferred. VERSION is `4.87.0-dev` on implementation branch
+`phase69-deterministic-evidence-grounded-research-explainer`.
+Earlier broad focused regression: 330 passed; final affected scope: 73 passed,
+separate snapshots, not a combined suite. Frontend 251 passed, TypeScript passed;
+1 focused /279 overall browser tests discovered, none executed. Independent
+review, user production build/isolated browser execution and exact-commit CI
+remain pending. See [support/runbook](docs/EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md)
+and [implementation evidence](docs/PHASE_69_IMPLEMENTATION.md). No Phase 70.
+
+Phase 68 is closed at `2cd8f2585816fda0dc389f5a721ab02b0a3d71d8`, tree
+`2c3dfde47bfb4c6924e7ab807727fc3d104de8ab`, under the existing annotated
+`v4.86.0-cross-sectional-neutralisation-scanner-validation-v1` tag. Supplied
+final-doc CI `38533560143` succeeded in both jobs; not retrieved/rerun here.
+
+## Historical Phase 68 Summary (Frozen)
 
 Advanced Scanner neutralisation is explicit opt-in: dollar/sector/beta policies,
 current cross-sectional score residualisation and separate final-weight checks,

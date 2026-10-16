@@ -175,7 +175,7 @@ def register_in_transaction(conn, saved_id, data, capture=None):
     return cursor.lastrowid
 
 
-def verified(row, *, check_parent=True):
+def verified(row, *, check_parent=True, saved_snapshot=None):
     from app.saved_backtests import get_saved_backtest
     try:
         snap = loads(row["snapshot_json"], limit=512 * 1024)
@@ -187,7 +187,7 @@ def verified(row, *, check_parent=True):
         if digest(snap) != row["snapshot_hash"] or snap["saved_backtest_id"] != row["saved_backtest_id"]:
             raise ValueError("Snapshot integrity mismatch")
         positive_id(snap["saved_backtest_id"])
-        saved = get_saved_backtest(row["saved_backtest_id"])
+        saved = saved_snapshot if saved_snapshot is not None else get_saved_backtest(row["saved_backtest_id"])
         if saved is None:
             raise ValueError("Historical saved result is missing")
         config = legacy(saved["params"].get("reproducibility"))

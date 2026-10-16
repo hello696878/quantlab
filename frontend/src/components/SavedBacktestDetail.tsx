@@ -28,6 +28,7 @@ import ExportReportButton from "@/components/ExportReportButton";
 import { buildSavedBacktestReport } from "@/lib/reportExport";
 import { fmtPct, fmtRatio, fmtDollar } from "@/lib/format";
 import { registerReplay, type ReplayLocation } from "@/lib/runReplay";
+import ResearchExplanationPanel from "@/components/ResearchExplanationPanel";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -220,7 +221,7 @@ export default function SavedBacktestDetail({
     );
   }
 
-  if (!record) return null;
+  if (!record || record.id !== id) return null;
 
   const m = record.metrics as Record<string, number>;
   const equityCurve = record.equity_curve as EquityPoint[];
@@ -279,6 +280,7 @@ export default function SavedBacktestDetail({
 
   return (
     <div className="space-y-6">
+      <ResearchExplanationPanel key={record.id} id={record.id} />
       {/* Back link */}
       <button
         type="button"

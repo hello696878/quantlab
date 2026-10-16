@@ -521,6 +521,8 @@ from app.run_replay.environment import capture as capture_replay_execution
 from app.run_replay.routes import original_sma_request
 from app.run_replay.routes import saved_router as saved_replay_router
 app.include_router(run_replay_router)
+from app.research_explainer.routes import router as research_explainer_router
+app.include_router(research_explainer_router)
 
 
 # ---------------------------------------------------------------------------

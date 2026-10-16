@@ -1,4 +1,4 @@
-# QuantLab — Version Manifest (Phase 68.0)
+# QuantLab — Version Manifest (Phase 69.0)
 
 The project's versioning conventions, verified against the local git history
 when written. Companion docs: [`../CHANGELOG.md`](../CHANGELOG.md) (grouped
@@ -12,6 +12,22 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 > anything about live trading.
 
 ## 1. Current version label
+
+**`4.87.0-dev`**, Phase 69 deterministic evidence-grounded stored-SMA explainer,
+branch `phase69-deterministic-evidence-grounded-research-explainer`, base
+`2cd8f2585816fda0dc389f5a721ab02b0a3d71d8`. Existing annotated
+`v4.86.0-cross-sectional-neutralisation-scanner-validation-v1` verified at that
+frozen Phase 68 target/tree `2c3dfde47bfb4c6924e7ab807727fc3d104de8ab`.
+Supplied final-doc CI `38533560143` succeeded in both jobs, not rerun here.
+Earlier broad330 / final affected73 backend passes remain separate; frontend251,
+TypeScript passed, discovery1/279 only. Fresh independent review, user build/
+isolated browser, exact-commit CI/publication and user-created v4.87 tag remain
+pending. See [implementation evidence](PHASE_69_IMPLEMENTATION.md) and
+[support/runbook](EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md). No Phase 70.
+Future tag, not created:
+`v4.87.0-deterministic-evidence-grounded-research-explainer-v1`.
+
+### Historical Phase 68 Version Note (Frozen at 2cd8f258)
 
 **`4.86.0-dev`**, Phase 68 advanced cross-sectional neutralisation/scanner
 validation implementation `5428eb20ae7c1dc33c2e875a1e33370e2423568b` on `main`.

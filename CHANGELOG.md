@@ -18,6 +18,18 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 69 implementation** (2026-10-16, `4.87.0-dev`): deterministic
+  stored-SMA explanation in Saved Backtest detail, allowlisted typed facts,
+  exact source references, closed wording/policies, read-only pinned acquisition
+  and exact JSON download. Legacy facts stay unverified; optional lifecycle/
+  dataset links and other modules are not silently interpreted. Earlier broad
+  regression 330 passed; final affected snapshot 73 passed, kept separate;
+  frontend 251 passed, TypeScript passed, 1 focused /279 overall browser tests
+  discovered, none executed. Phase 68 frozen at `2cd8f258...` under its v4.86
+  tag; supplied final-doc CI `38533560143` succeeded in both jobs, not rerun.
+  Independent review/user build/browser/exact-commit CI remain pending. See
+  [implementation evidence](docs/PHASE_69_IMPLEMENTATION.md). No Phase 70.
+
 - **Phase 68 final evidence** (2026-10-14, `4.86.0-dev` unchanged): review
   committed at `094d04263ecd713c3cc2f733b36969a513d21c3d`; exact-review CI
   `38496359420` attempt 1 succeeded in both jobs (user/coordinator-supplied).

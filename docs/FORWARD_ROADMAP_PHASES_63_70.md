@@ -1,6 +1,18 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (2026-10-14):** Phase 68 opt-in scanner neutralisation,
+> **Current status (2026-10-16):** Phase 69 bounded deterministic stored-SMA
+> explainer implemented at `4.87.0-dev`, with pinned read-only acquisition,
+> closed factual wording, exact references and JSON export in Saved detail.
+> Earlier broad330 / final affected73 passes remain separate; frontend251,
+> TypeScript passed; browser discovery1/279 only. Fresh independent review,
+> user build/isolated browser and exact-commit Python 3.11 CI remain pending.
+> Phase 68 is frozen at `2cd8f2585816fda0dc389f5a721ab02b0a3d71d8` under its
+> existing v4.86 annotated tag; supplied final-doc CI `38533560143` succeeded
+> in both jobs, not rerun. No advice, new analytics, model/provider calls,
+> explanation registry or Phase 70. See [support map](EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md)
+> and [implementation evidence](PHASE_69_IMPLEMENTATION.md).
+
+> **Historical status (2026-10-14, superseded by frozen 2cd8f258):** Phase 68 opt-in scanner neutralisation,
 > final-weight/cash/volatility diagnostics, bounded purged fixed-policy validation,
 > declared-family corrections and existing-Scanner UI are implemented at
 > `4.86.0-dev`. Independent review/fixes are complete on implementation
@@ -393,6 +405,15 @@ disclaimers must stay at Phase 59/61 standards.
 ---
 
 ## Phase 69 — Evidence-Grounded Research Explainer v1 (Deterministic)
+
+**Implementation status (2026-10-16).** Delivered the bounded Saved SMA adapter
+and reusable detail panel, not an all-labs rollout. Existing replay identities
+are checked against the same pinned saved row; legacy facts remain unverified.
+Optional lifecycle/dataset material, parent contexts and other adapters are
+explicitly unavailable/refused, not evidence of model origin. No new analytics,
+registry or automatic policy selection. See [support map](EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md)
+and [separate verification snapshots](PHASE_69_IMPLEMENTATION.md). Independent
+review/user build/browser/exact-commit CI remain pending; no Phase 70.
 
 **Goal.** Explain stored results in plain language, citing only values
 that exist in a stored run — never recommending anything.
