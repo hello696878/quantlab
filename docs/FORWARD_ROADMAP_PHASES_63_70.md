@@ -3,14 +3,16 @@
 > **Current status (2026-10-16):** Phase 69 bounded deterministic stored-SMA
 > explainer implemented at `4.87.0-dev`, with pinned read-only acquisition,
 > closed factual wording, exact references and JSON export in Saved detail.
-> Earlier broad330 / final affected73 passes remain separate; frontend251,
-> TypeScript passed; browser discovery1/279 only. Fresh independent review,
-> user build/isolated browser and exact-commit Python 3.11 CI remain pending.
+> Independent review/fixes are complete on `main` at implementation `ff7a288b...`;
+> review changes remain unstaged. Final focused backend410/zero skips and
+> frontend258 passed, TypeScript passed; browser discovery1/279 only.
+> Earlier failed/inherited330/73 snapshots remain separate. User build/isolated
+> browser and exact-review-commit Python 3.11 CI remain pending.
 > Phase 68 is frozen at `2cd8f2585816fda0dc389f5a721ab02b0a3d71d8` under its
 > existing v4.86 annotated tag; supplied final-doc CI `38533560143` succeeded
 > in both jobs, not rerun. No advice, new analytics, model/provider calls,
 > explanation registry or Phase 70. See [support map](EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md)
-> and [implementation evidence](PHASE_69_IMPLEMENTATION.md).
+> [review evidence](PHASE_69_REVIEW.md) and [implementation evidence](PHASE_69_IMPLEMENTATION.md).
 
 > **Historical status (2026-10-14, superseded by frozen 2cd8f258):** Phase 68 opt-in scanner neutralisation,
 > final-weight/cash/volatility diagnostics, bounded purged fixed-policy validation,
@@ -412,8 +414,10 @@ are checked against the same pinned saved row; legacy facts remain unverified.
 Optional lifecycle/dataset material, parent contexts and other adapters are
 explicitly unavailable/refused, not evidence of model origin. No new analytics,
 registry or automatic policy selection. See [support map](EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md)
-and [separate verification snapshots](PHASE_69_IMPLEMENTATION.md). Independent
-review/user build/browser/exact-commit CI remain pending; no Phase 70.
+and [separate implementation snapshots](PHASE_69_IMPLEMENTATION.md). Independent
+review/fixes are complete: final focused410/zero skips, frontend258 and TypeScript
+passed, discovery1/279 only; [review evidence](PHASE_69_REVIEW.md) retains failed
+attempts. User build/browser/exact-review-commit CI remain pending; no Phase 70.
 
 **Goal.** Explain stored results in plain language, citing only values
 that exist in a stored run — never recommending anything.

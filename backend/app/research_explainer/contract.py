@@ -1,7 +1,7 @@
 """Closed wording and presentation dictionary. No source text becomes prose."""
 import re
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Context, Decimal, ROUND_HALF_EVEN, localcontext
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -88,9 +88,10 @@ def lookup(value, path):
         return True, value
     if type(path) is not str or not path.startswith("/"):
         raise ValueError("Invalid field reference")
-    for token in path[1:].split("/"):
-        if re.search(r"~(?![01])", token):
-            raise ValueError("Invalid field reference")
+    tokens = path[1:].split("/")
+    if any(re.search(r"~(?![01])", token) for token in tokens):
+        raise ValueError("Invalid field reference")
+    for token in tokens:
         token = token.replace("~1", "/").replace("~0", "~")
         if type(value) is dict:
             if token not in value:
@@ -117,13 +118,17 @@ def display(value, unit, rule):
         if type(value) is not int or value <= 0:
             raise ValueError("Invalid stored count")
         return str(value)
-    number = Decimal(str(value))
-    if rule == "percent_2":
-        number *= 100
-    precision = 4 if rule == "decimal_4" else 2
-    text = format(number, f",.{precision}f")
-    if value != 0 and Decimal(text.replace(",", "")) == 0:
-        text = format(Decimal(str(value)) * (100 if rule == "percent_2" else 1), ".6E")
+    # Presentation must not depend on another caller's Decimal settings.
+    with localcontext(Context(prec=50, rounding=ROUND_HALF_EVEN,
+                              Emin=-999999, Emax=999999, capitals=1, clamp=0,
+                              flags=[], traps=[])):
+        number = Decimal(str(value))
+        if rule == "percent_2":
+            number *= 100
+        precision = 4 if rule == "decimal_4" else 2
+        text = format(number, f",.{precision}f")
+        if value != 0 and Decimal(text.replace(",", "")) == 0:
+            text = format(Decimal(str(value)) * (100 if rule == "percent_2" else 1), ".6E")
     return text + ("%" if rule == "percent_2" else " USD" if unit == "USD" else " bps" if unit == "bps_per_side" else "")
 
 
@@ -147,6 +152,8 @@ def render(identity, evidence):
             raise ValueError("Invalid stored drawdown sign")
         if key == "win_rate" and value is not None and not 0 <= value <= 1:
             raise ValueError("Invalid stored fraction")
+        if key == "volatility" and value is not None and value < 0:
+            raise ValueError("Invalid stored volatility sign")
         if key == "capital" and value is not None and value <= 0 or key == "cost" and value is not None and value < 0:
             raise ValueError("Invalid stored monetary field")
         fact = dict(id=key, source=source, path=path, state=state, value=value, unit=unit, rule=rule, display=formatted)
@@ -183,19 +190,33 @@ def verify(bundle):
         raise ValueError("Unapproved evidence source")
     if identity["context"] is not None:
         context = identity["context"]
-        if set(context) != {"id", "schema", "snapshot_hash", "result_hash", "input_hash", "execution_hash", "config_hash_full"} or context["schema"] != "replay_context_v1" or identity["trust"] != "recorded_hashes_match":
+        if type(context) is not dict or set(context) != {"id", "schema", "snapshot_hash", "result_hash", "input_hash", "execution_hash", "config_hash_full"} or context["schema"] != "replay_context_v1" or identity["trust"] != "recorded_hashes_match":
             raise ValueError("Invalid context reference")
         if type(context["id"]) is not int or not 0 < context["id"] <= 2**31 - 1:
             raise ValueError("Invalid context ID")
         for key in ("snapshot_hash", "result_hash", "input_hash", "execution_hash", "config_hash_full"):
             full_hash(context[key])
-        if context["result_hash"] != identity["material_hash"] or set(evidence["context"]) != {"config"} or set(evidence["context"]["config"]) != {"strategy_params"} or set(evidence["context"]["config"]["strategy_params"]) != {"fast_window", "slow_window"}:
+        projected = evidence["context"]
+        if (context["result_hash"] != identity["material_hash"] or type(projected) is not dict
+                or set(projected) != {"config"} or type(projected["config"]) is not dict
+                or set(projected["config"]) != {"strategy_params"}
+                or type(projected["config"]["strategy_params"]) is not dict
+                or set(projected["config"]["strategy_params"]) != {"fast_window", "slow_window"}):
             raise ValueError("Invalid context projection")
     elif identity["trust"] != "legacy_unverified":
         raise ValueError("Missing integrity source")
     allowed = {"start_date", "end_date", "initial_capital", "transaction_cost_bps", "params", "metrics"}
-    if set(evidence["saved"]) != allowed or set(evidence["saved"]["params"]) - {"fast_window", "slow_window"} or set(evidence["saved"]["metrics"]) - {k for k, v in FIELDS.items() if v[0].startswith("/metrics/")}:
+    saved = evidence["saved"]
+    if (type(saved) is not dict or set(saved) != allowed
+            or type(saved["params"]) is not dict or type(saved["metrics"]) is not dict
+            or set(saved["params"]) - {"fast_window", "slow_window"}
+            or set(saved["metrics"]) - {k for k, v in FIELDS.items() if v[0].startswith("/metrics/")}):
         raise ValueError("Unapproved evidence field")
+    if identity["context"] is not None:
+        for key, value in evidence["context"]["config"]["strategy_params"].items():
+            display(value, "observations", "integer")
+            if key in saved["params"] and (type(saved["params"][key]) is not type(value) or saved["params"][key] != value):
+                raise ValueError("Stored parameters disagree with context projection")
     expected = render(bundle["identity"], bundle["evidence"])
     if validate(bundle) != validate(expected):
         raise ValueError("Explanation bindings or content changed")

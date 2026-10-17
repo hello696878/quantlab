@@ -4,6 +4,7 @@ from . import service
 from .contract import Explanation
 
 router = APIRouter(prefix="/research-explainer", tags=["research explainer"])
+NO_STORE = {"Cache-Control": "no-store"}
 
 
 @router.get("/saved-backtests/{saved_id}", response_model=Explanation)
@@ -17,8 +18,8 @@ def explain(saved_id: str, request: Request, response: Response, expected: str |
         response.headers["Cache-Control"] = "no-store"
         return service.explain(int(saved_id), expected)
     except service.Missing as exc:
-        raise HTTPException(404, "Stored source not found or unavailable") from exc
+        raise HTTPException(404, "Stored source not found or unavailable", headers=NO_STORE) from exc
     except service.Changed as exc:
-        raise HTTPException(409, "Stored source changed or failed integrity checks") from exc
+        raise HTTPException(409, "Stored source changed or failed integrity checks", headers=NO_STORE) from exc
     except (service.Unavailable, ValueError, TypeError, KeyError) as exc:
-        raise HTTPException(422, "Stored source, fields or request are unsupported") from exc
+        raise HTTPException(422, "Stored source, fields or request are unsupported", headers=NO_STORE) from exc

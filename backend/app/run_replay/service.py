@@ -190,6 +190,9 @@ def verified(row, *, check_parent=True, saved_snapshot=None):
         saved = saved_snapshot if saved_snapshot is not None else get_saved_backtest(row["saved_backtest_id"])
         if saved is None:
             raise ValueError("Historical saved result is missing")
+        positive_id(saved["id"])
+        if saved["id"] != row["saved_backtest_id"]:
+            raise ValueError("Saved snapshot belongs to a different record")
         config = legacy(saved["params"].get("reproducibility"))
         _saved_config(saved, config)
         if canonical_json(config) != canonical_json(snap["config"]) or saved["config_hash_full"] != row["config_hash_full"]:

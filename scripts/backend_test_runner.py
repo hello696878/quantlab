@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from contextvars import ContextVar
+from functools import wraps
 import hashlib
 import importlib.metadata
 import json
@@ -10,27 +12,73 @@ import os
 from pathlib import Path, PurePosixPath, PureWindowsPath
 import platform
 import signal
+import sqlite3
 import stat
 import subprocess
 import sys
 import tempfile
 import time
-from urllib.parse import urlsplit, parse_qsl, unquote
+from urllib.parse import unquote
+
+
+def install_sqlite_uri_guard():
+    """Share explicit URI intent across duplicate runner/conftest imports.
+
+    The SQLite audit event omits the uri argument. Wrapping both public entry
+    points before collection supplies that intent without altering SQLite global
+    configuration. Older, unwrapped aliases fail closed for file URIs.
+    """
+    state = getattr(sqlite3, "_quantlab_test_uri_intent", None)
+    if state is None:
+        state = ContextVar("quantlab_test_uri_intent", default=None)
+        sqlite3._quantlab_test_uri_intent = state
+    for module in (sqlite3, sqlite3.dbapi2):
+        connect = module.connect
+        if getattr(connect, "_quantlab_test_uri_guard", False):
+            continue
+
+        @wraps(connect)
+        def guarded(database, *args, _connect=connect, **kwargs):
+            # Fixture preflights must run before the outer audit without replacing
+            # connect per fixture (later monkeypatch teardown can restore a stale
+            # per-fixture wrapper). The permanent wrapper reads current scopes.
+            for preflight in tuple(getattr(sqlite3, "_quantlab_test_preflights", ())):
+                preflight(database, args, kwargs)
+            explicit = kwargs.get("uri", args[6] if len(args) > 6 else False) is True
+            token = state.set(os.fsdecode(database) if explicit else None)
+            try:
+                return _connect(database, *args, **kwargs)
+            finally:
+                state.reset(token)
+
+        guarded._quantlab_test_uri_guard = True
+        module.connect = guarded
+
+
+def sqlite_connection_path(database):
+    if database.lower().startswith("file:"):
+        state = getattr(sqlite3, "_quantlab_test_uri_intent", None)
+        if state is None or state.get() != database:
+            raise ValueError("SQLite file URI requires explicit uri=True through a guarded connection")
+    return sqlite_test_path(database)
 
 
 def sqlite_test_path(database):
     """Permit only plain paths or exact read-only file URIs; retain root checks."""
     if not database.lower().startswith("file:"):
         return Path(database)
-    uri = urlsplit(database)
-    if uri.scheme != "file" or uri.netloc or uri.fragment or parse_qsl(uri.query) != [("mode", "ro")]:
+    # URL parsers normalize case, whitespace and empty query parameters that
+    # SQLite does not necessarily interpret the same way. Accept the exact
+    # representation emitted by our read-only reader, with no alternate grammar.
+    if not database.startswith("file:///") or not database.endswith("?mode=ro"):
         raise ValueError("Unsupported SQLite URI")
-    path = unquote(uri.path)
-    if os.name == "nt" and path.startswith("/"):
+    path = unquote(database[len("file://"): -len("?mode=ro")], errors="strict")
+    if os.name == "nt":
         path = path[1:]
-    if not Path(path).is_absolute():
+    target = Path(path)
+    if not target.is_absolute() or "\x00" in path or target.as_uri() + "?mode=ro" != database:
         raise ValueError("SQLite URI must identify an absolute test-owned file")
-    return Path(path)
+    return target
 
 FAST_FILES = [f"backend/tests/test_{name}.py" for name in
               ("signal_ensemble", "factor_diagnostics", "strategy_ensemble")]
@@ -293,12 +341,13 @@ def execute(config_path):
     output = config_path.parent
     allowed = output.resolve()
     violations = []
+    install_sqlite_uri_guard()
 
     def database_guard(event, args):
         if event == "sqlite3.connect":
             database = os.fsdecode(args[0])
             try:
-                outside = database != ":memory:" and not sqlite_test_path(database).resolve().is_relative_to(allowed)
+                outside = database != ":memory:" and not sqlite_connection_path(database).resolve().is_relative_to(allowed)
             except ValueError:
                 outside = True
             if outside:

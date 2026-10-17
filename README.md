@@ -21,14 +21,16 @@ adapter: deterministic stored facts, exact raw/display/unit/path references,
 explicit legacy/unsupported limitations and pinned JSON export. No advice,
 predictions, new analytics, model/provider calls, automatic research or new
 database. Other stored strategy/module adapters and lifecycle/model-origin
-interpretation are deferred. VERSION is `4.87.0-dev` on implementation branch
-`phase69-deterministic-evidence-grounded-research-explainer`.
-Earlier broad focused regression: 330 passed; final affected scope: 73 passed,
-separate snapshots, not a combined suite. Frontend 251 passed, TypeScript passed;
-1 focused /279 overall browser tests discovered, none executed. Independent
-review, user production build/isolated browser execution and exact-commit CI
-remain pending. See [support/runbook](docs/EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md)
-and [implementation evidence](docs/PHASE_69_IMPLEMENTATION.md). No Phase 70.
+interpretation are deferred. VERSION remains `4.87.0-dev`; independent review
+and verified fixes are complete on `main` at implementation HEAD
+`ff7a288baa56ba61cb58d0de3aba524ec7a441cf`, with review changes unstaged.
+Final protected focused regression: 410 passed, zero skips; frontend 258 passed,
+TypeScript passed; 1 focused /279 overall browser tests discovered, none executed.
+Inherited implementation 330/73 snapshots and failed review attempts remain
+separate evidence. Exact-review-commit Python 3.11 CI, user production build and
+isolated browser execution remain pending. See [review](docs/PHASE_69_REVIEW.md),
+[support/runbook](docs/EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md) and
+[implementation evidence](docs/PHASE_69_IMPLEMENTATION.md). No Phase 70.
 
 Phase 68 is closed at `2cd8f2585816fda0dc389f5a721ab02b0a3d71d8`, tree
 `2c3dfde47bfb4c6924e7ab807727fc3d104de8ab`, under the existing annotated

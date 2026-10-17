@@ -18,6 +18,16 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 69 independent review** (2026-10-16, `4.87.0-dev` unchanged): fixed
+  read-only WAL side effects through explicit storage refusal, bounded decoding,
+  source/metric/projection integrity, deterministic numeric presentation, exact
+  response-text export and SQLite test-guard lifetime/URI handling. Final
+  protected focused run 410 passed, zero skips; frontend 258 passed, TypeScript
+  passed; browser discovery 1/279 only. Earlier failed and inherited snapshots
+  remain separate. Review changes are unstaged on `main`; exact-review-commit
+  Python 3.11 CI, user build and isolated browser remain pending. See
+  [review evidence](docs/PHASE_69_REVIEW.md). No Phase 70.
+
 - **Phase 69 implementation** (2026-10-16, `4.87.0-dev`): deterministic
   stored-SMA explanation in Saved Backtest detail, allowlisted typed facts,
   exact source references, closed wording/policies, read-only pinned acquisition

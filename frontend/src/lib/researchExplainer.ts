@@ -21,12 +21,30 @@ export interface ResearchExplanation {
   fingerprint: string;
 }
 
+// Preserve the validated wire document: reserializing JavaScript numbers loses
+// JSON distinctions such as Python 0.0 versus 0 and negative zero.
+const retainedDocuments = new WeakMap<ResearchExplanation, { text: string; snapshot: ResearchExplanation }>();
+
+function sameJsonValue(left: unknown, right: unknown): boolean {
+  if (Object.is(left, right)) return true;
+  if (!left || !right || typeof left !== "object" || typeof right !== "object" || Array.isArray(left) !== Array.isArray(right)) return false;
+  if (Array.isArray(left) && Array.isArray(right) && left.length !== right.length) return false;
+  const keys = Object.keys(left);
+  if (keys.length !== Object.keys(right).length) return false;
+  return keys.every((key) => Object.prototype.hasOwnProperty.call(right, key) &&
+    sameJsonValue((left as Record<string, unknown>)[key], (right as Record<string, unknown>)[key]));
+}
+
 export function resolveFact(bundle: ResearchExplanation, fact: ExplanationFact): { present: boolean; value: unknown } {
-  if (!fact.path.startsWith("/")) throw new Error("Invalid evidence reference");
+  if (typeof fact.path !== "string" || !fact.path.startsWith("/")) throw new Error("Invalid evidence reference");
+  const parts = fact.path.slice(1).split("/");
+  if (parts.some((part) => /~(?![01])/.test(part))) throw new Error("Invalid evidence reference");
   let value: unknown = bundle.evidence[fact.source];
-  for (const part of fact.path.slice(1).split("/")) {
-    if (/~(?![01])/.test(part)) throw new Error("Invalid evidence reference");
+  for (const part of parts) {
     const key = part.replace(/~1/g, "/").replace(/~0/g, "~");
+    if (Array.isArray(value) && (!/^(0|[1-9][0-9]*)$/.test(key) || key.length > 8 || Number(key) >= value.length)) {
+      return { present: false, value: null };
+    }
     if (!value || typeof value !== "object" || !Object.prototype.hasOwnProperty.call(value, key)) return { present: false, value: null };
     value = (value as Record<string, unknown>)[key];
   }
@@ -58,12 +76,16 @@ export async function explainSavedBacktest(id: number, expected?: string): Promi
   let result;
   try { result = JSON.parse(text); } catch { throw new Error("Stored explanation service is unavailable"); }
   if (!response.ok) throw new BacktestApiError(response.status, typeof result?.detail === "string" ? result.detail : "Stored explanation is unavailable");
-  return checkExplanation(result, id);
+  const bundle = checkExplanation(result, id);
+  retainedDocuments.set(bundle, { text, snapshot: structuredClone(bundle) });
+  return bundle;
 }
 
 export function downloadExplanation(bundle: ResearchExplanation): void {
   checkExplanation(bundle, bundle.identity.saved_backtest_id);
-  const url = URL.createObjectURL(new Blob([JSON.stringify(bundle, null, 2) + "\n"], { type: "application/json" }));
+  const retained = retainedDocuments.get(bundle);
+  if (!retained || !sameJsonValue(bundle, retained.snapshot)) throw new Error("Pinned explanation changed or has no retained response");
+  const url = URL.createObjectURL(new Blob([retained.text], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url; link.download = `quantlab-explanation-${bundle.identity.saved_backtest_id}.json`;
   document.body.appendChild(link); link.click(); link.remove();

@@ -14,23 +14,44 @@ _runner_spec = importlib.util.spec_from_file_location("sqlite_test_paths", Path(
 _runner_module = importlib.util.module_from_spec(_runner_spec)
 _runner_spec.loader.exec_module(_runner_module)
 sqlite_test_path = _runner_module.sqlite_test_path
+sqlite_connection_path = _runner_module.sqlite_connection_path
+_runner_module.install_sqlite_uri_guard()
 
 
 _sqlite_boundaries = []
 
 
-def _audit_sqlite(event, args):
+def _audit_sqlite(event, args, *, preflight=False):
     if event != "sqlite3.connect" or not _sqlite_boundaries:
         return
     root, database_free, violations = _sqlite_boundaries[-1]
     database = os.fsdecode(args[0])
     try:
-        outside = database != ":memory:" and not sqlite_test_path(database).resolve().is_relative_to(root)
+        path_reader = sqlite_test_path if preflight else sqlite_connection_path
+        outside = database != ":memory:" and not path_reader(database).resolve().is_relative_to(root)
     except ValueError:
         outside = True
     if database_free or outside:
         violations.append(database)
         raise AssertionError("test attempted unauthorized SQLite access")
+
+
+def _preflight_sqlite(database, args, kwargs):
+    if not _sqlite_boundaries:
+        return
+    # The permanent wrapper calls this before setting explicit URI intent and
+    # before the outer runner's audit hook. Read the current boundary, never a
+    # fixture scope captured in a replaceable sqlite3.connect closure.
+    uri = kwargs.get("uri", args[6] if len(args) > 6 else False)
+    if os.fsdecode(database).lower().startswith("file:") and uri is not True:
+        _sqlite_boundaries[-1][2].append(os.fsdecode(database))
+        raise AssertionError("test attempted unauthorized SQLite access")
+    _audit_sqlite("sqlite3.connect", (database,), preflight=True)
+
+
+if not hasattr(sqlite3, "_quantlab_test_preflights"):
+    sqlite3._quantlab_test_preflights = []
+sqlite3._quantlab_test_preflights.append(_preflight_sqlite)
 
 
 # The hook remains installed but is inert outside an active fixture boundary.
@@ -43,17 +64,7 @@ def _sqlite_boundary(root, *, database_free=False):
     violations = []
     _sqlite_boundaries.append((root.resolve(), database_free, violations))
     try:
-        # Preflight ordinary calls before the outer runner's broader audit hook.
-        # Audit hooks still cover dbapi2 and aliases cached before this wrapper.
-        with pytest.MonkeyPatch.context() as patch:
-            connect = sqlite3.connect
-
-            def guarded_connect(database, *args, **kwargs):
-                _audit_sqlite("sqlite3.connect", (database,))
-                return connect(database, *args, **kwargs)
-
-            patch.setattr(sqlite3, "connect", guarded_connect)
-            yield
+        yield
     finally:
         _sqlite_boundaries.pop()
         assert not violations, f"unauthorized SQLite attempts: {violations}"

@@ -40,19 +40,24 @@ creation time identify the pinned source outside the narrative.
 | /params/fast_window, /params/slow_window | positive integer observations | Context fallback is explicitly bound to /config/strategy_params/fast_window or slow_window |
 | /metrics/total_return, /metrics/cagr | decimal return / percentage | Presentation-only multiplication by 100; no recomputation |
 | /metrics/max_drawdown | nonpositive decimal return / percentage | Sign preserved; positive drawdown refused |
-| /metrics/volatility | recorded annualized decimal / percentage | This adapter does not establish annualization convention or crypto suitability |
+| /metrics/volatility | nonnegative recorded annualized decimal / percentage | Negative values refuse; this adapter does not establish annualization convention or crypto suitability |
 | /metrics/sharpe_ratio, /metrics/sortino_ratio, /metrics/calmar_ratio | ratio / four decimals | Descriptive stored number, not skill/significance/definedness proof |
 | /metrics/win_rate | fraction of positive-return days / percentage | Existing metrics.compute_metrics definition, NOT fraction of profitable trades |
 | /metrics/num_days | positive integer equity observations | Includes starting equity observation; not number of return periods or trading days |
 
 Unknown/nonfinite/Boolean numeric values are never coerced to zero. Counts must
 be actual positive integers; dates must be canonical ISO dates. Fractions stay
-within [0,1], starting capital is positive and cost nonnegative. Tiny nonzero
+within [0,1], starting capital is positive, cost and volatility nonnegative. Tiny nonzero
 values that would round to zero use scientific notation instead. Finite large
 values remain grouped/readable within the existing safe JSON numeric bound.
 Absent and null facts are separate states, distinct from available zero. Extra
-metric availability/quality flags are refused rather than overriding their
-meaning with a numeric payload. No flag is fabricated for old stored results.
+metric availability/quality/unit declarations, including unfamiliar per-metric
+spellings, are refused rather than overriding their meaning with a numeric
+payload. Metrics use the closed nine-field dictionary; saved SMA params use the
+existing save/replay producer keys. Context windows must be positive strict
+integers and agree with overlapping saved values in both type and value.
+Presentation uses a fixed local round-half-even Decimal context, independent of
+ambient settings. No flag is fabricated for old stored results.
 Stored fallback numbers do not establish that the underlying statistic was defined.
 
 ## Read-Only Acquisition and Identity
@@ -65,20 +70,30 @@ Responses are no-store. 404 means missing/unavailable source; 409 means relevant
 source change or recorded integrity mismatch; 422 means unsupported/invalid
 source/schema/fields or request. Public errors are bounded and do not echo inputs.
 
-The narrow reader uses SQLite mode=ro, query_only and one read transaction for
+The narrow reader supports observed rollback-mode SQLite storage without
+journal/WAL/SHM sidecars; WAL headers or any such sidecar refuse before connection.
+This avoids the demonstrated creation of WAL/SHM files by a mode=ro WAL reader.
+The preflight is not atomic protection against another process racing a path or
+journal-mode change; no immutable live reader or incomplete WAL copy is used.
+The reader uses SQLite mode=ro, query_only and one read transaction for
 the saved row and optional context. It does not use get_connection, init_db,
 migrations, writable registry helpers or current machine metadata collection.
 A missing file/directory is not created. SQL IDs are parameterized. Only the
-two relevant tables are discovered; JSON byte lengths are checked before loading.
+two relevant tables are discovered; aggregate lengths of all selected fields
+are checked before loading, and context columns are explicitly selected.
 The connection is closed before rendering; everything comes from that pinned
 transaction. This is SQLite read-transaction consistency, not filesystem
 immutability, a universal concurrency sandbox or an atomic cross-registry read.
 Normal SQLite locking/WAL mechanics are not replaced by a custom VFS.
 
-Primary JSON aggregate is bounded to 4 MiB, replay snapshot to 512 KiB, SQLite
-values to 5 MiB. Strict existing JSON validation rejects duplicate keys,
-nonfinite/unsafe numbers, depth over 20, over 300000 nodes and strings over
-512 KiB. The resulting explanation is capped at 64 KiB, 20 facts and 40
+Selected saved material is bounded to 4 MiB, selected replay material to 512 KiB,
+SQLite values to 5 MiB. A v1 lexical preflight bounds nesting depth, 300000 tokens
+(including object keys), 100000 container entries, 512 KiB string tokens and
+128-character scalar tokens before full decoding. These conservative bounds
+may refuse material before the shared decoder's own structural limit. Strict
+existing JSON validation then rejects duplicate keys and nonfinite/unsafe
+numbers without changing unrelated legacy reads. The resulting explanation is
+capped at 64 KiB, 20 facts and 40
 statements. Fixed dictionaries actually emit 15 facts and 23 statements.
 These bounds are defensive refusal rules, not a performance guarantee.
 
@@ -136,8 +151,10 @@ Check pinned source makes a fresh read using expected fingerprint; relevant
 change/deletion refuses and detaches the displayed explanation. Without a fresh
 check, the retained bundle explicitly describes only its pinned snapshot. Name/
 note-only edits do not change scientific material identity. Download explanation
-JSON validates references and downloads exactly the displayed bundle; it does
-not refetch or regenerate against newer state. No explanation persistence is added.
+JSON validates references and preserves the exact validated response text bound
+to the displayed object, including 0.0/-0.0 numeric tokens. Copied or modified
+objects refuse; export does not refetch or reserialize against newer state.
+No explanation persistence is added.
 
 Synthetic acceptance uses the existing real save/read path and explicit fixture
 engine execution BEFORE forbidden-work spies. The explanation itself never
@@ -148,6 +165,8 @@ before demo writes. Use current user-selected ports/token; no old server or
 token is assumed. Discovery is not execution. No services/browser/build start
 is authorized by this implementation.
 
-See [implementation evidence](PHASE_69_IMPLEMENTATION.md) for exact snapshots,
-failures, commands, counts, runtimes and pending independent review/CI/build/
-browser gates. Phase 68 remains frozen; Phase 70 is not implemented.
+See [review evidence](PHASE_69_REVIEW.md) for the completed independent review,
+fixes, exact current snapshots/failures and pending exact-review-commit Python
+3.11 CI/user build/isolated browser gates. The unchanged
+[implementation evidence](PHASE_69_IMPLEMENTATION.md) retains inherited runs.
+Phase 68 remains frozen; Phase 70 is not implemented.
