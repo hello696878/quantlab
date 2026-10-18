@@ -23,8 +23,11 @@ saved-result browsing. Ordinary local research remains the default. Missing or
 unverified capabilities lock workspace loading; no provider/research/persistence
 request is permitted by the demo. No hosting, auth, cloud, telemetry or production
 certification is added. See [operations and limits](docs/READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md)
-and [implementation evidence](docs/PHASE_70_IMPLEMENTATION.md) for verification
-and pending independent-review/CI/user build/browser/container-runtime gates.
+and [independent review](docs/PHASE_70_REVIEW.md) for seven corrected defects,
+219 focused backend passes, 283 frontend passes and the separate inherited
+[implementation evidence](docs/PHASE_70_IMPLEMENTATION.md). TypeScript passed;
+browser discovery is 1/280, not execution. User review commit, exact-commit
+Python 3.11 CI, production build/proxy, browser and hardened-container gates remain.
 
 Phase 69 is frozen at `1062ec48b4128af867ab5a3329951511ebff285c`, tree
 `3a06cbef017e1828781d2e6861c17eecf4afd014`, under its existing v4.87 annotated

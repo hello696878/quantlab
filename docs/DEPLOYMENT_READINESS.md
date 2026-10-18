@@ -3,8 +3,12 @@
 ## Current Guidance (2026-10-18, Phase 70)
 
 Use [Read-Only Demo and Deployment Hardening](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md)
-and [Phase 70 evidence](PHASE_70_IMPLEMENTATION.md) for the new explicit demo
-factory, corpus lifecycle, local controls and still-unbuilt hosting requirements.
+and [Phase 70 independent review](PHASE_70_REVIEW.md) for the explicit demo
+factory, corrected corpus/startup boundaries, exact evidence and smallest later
+owned-container acceptance. The [implementation report](PHASE_70_IMPLEMENTATION.md)
+remains historical. Local focused review passed; exact-review-commit Python 3.11
+CI, user production build/proxy inspection, isolated browser and actual hardened
+container enforcement remain pending.
 Nothing is deployed or production/security-certified. Ordinary Compose remains
 development-only and exposes both ports; it is not the hardened topology.
 

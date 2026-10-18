@@ -1,27 +1,24 @@
 # TASKS - QuantLab
 
-## Current Phase 70 Implementation (2026-10-18)
+## Current Phase 70 Independent Review (2026-10-18)
 
-Frozen Phase 69 baseline/tag target `1062ec48b4128af867ab5a3329951511ebff285c`,
-tree `3a06cbef017e1828781d2e6861c17eecf4afd014`; supplied successful final-document
-CI `39091756914` is inherited, not Phase 70 acceptance. New branch
-`phase70-read-only-demo-deployment-hardening-plan`; VERSION `4.88.0-dev`.
+Attached `main`, implementation `8860ce7bdfb20367debdaf9e36b9ea3900dea0f9`,
+tree `614027cba879ec6abfda3fc1ef48ceab411973b6`, single parent/frozen Phase 69
+tag target `1062ec48b4128af867ab5a3329951511ebff285c`. VERSION stays `4.88.0-dev`.
+Review began clean. Phase 69 CI/evidence remains inherited, not Phase 70 acceptance.
 
-- [x] Map actual writable startup/read helpers, provider-enabled GETs, routes and browser external assets.
-- [x] Strict operator mode/factory, no writable/default-corpus fallback, narrow RO startup verification.
-- [x] Explicit six-route policy and early ASGI refusal, bounded requests, process-local admission.
-- [x] Offline synthetic SMA preparation/verification and collision-refusing stopped backup/restore.
-- [x] Capability handshake, existing saved-result/explanation UI, disabled unsupported actions and local font fallbacks.
-- [x] Implement focused backend/frontend tests and a prepared-corpus browser spec; record executed outcomes separately in the implementation report.
-- [x] Document one hosting topology plus unbuilt TLS/container/network/secrets/monitoring/migration requirements.
-- [x] Final affected protected backend168/zero skips and frontend277/27 files passed; TypeScript passed, browser discovery1/280 only. Earlier broad357 snapshot stays separate; all recorded final exits0.
-- [ ] Fresh independent review of the actual unstaged diff.
-- [ ] Later user staging/commit decision, exact-commit Python 3.11 whole-tree CI.
+- [x] Strict operator factory, six-route early refusal, offline synthetic corpus and capability-gated existing UI implemented; hosting remains a plan.
+- [x] Independently inspect all 39 implementation paths and shared startup/storage/provider/runner/container contracts; correct seven verified defects.
+- [x] New 51 backend regressions; final affected protected scope 219 passed/zero skips, pytest/child/outer exits 0/0/0. Inherited 357/168 snapshots remain separate.
+- [x] Add six stale-state frontend cases: 283 passed/28 files; TypeScript passed; discovery 1/280, no browser execution. Preserve the initial esbuild setup failure.
+- [x] Single review handoff: 16 intended paths, unstaged; current docs finalized after executable verification.
+- [ ] Later user staging/commit decision, exact-review-commit Python 3.11 whole-tree CI.
 - [ ] User production build and private BACKEND_URL route-manifest verification.
 - [ ] One isolated prepared-corpus browser acceptance; discovery is not execution.
 - [ ] Hardened image/non-root/read-only mounts/resource/ingress runtime verification before any hosting.
 
-See [implementation evidence](docs/PHASE_70_IMPLEMENTATION.md) and
+See [review findings/inventory](docs/PHASE_70_REVIEW.md), historical
+[implementation evidence](docs/PHASE_70_IMPLEMENTATION.md) and
 [operations/limits](docs/READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md).
 No staging, commit, push, tag, PR, deployment, service or Phase 71 is authorized.
 

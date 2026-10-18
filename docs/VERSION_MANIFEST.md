@@ -14,15 +14,18 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 ## 1. Current version label
 
 **`4.88.0-dev`**, Phase 70 read-only synthetic demo and deployment hardening plan.
-Branch `phase70-read-only-demo-deployment-hardening-plan`, frozen baseline
+Attached branch `main`, implementation `8860ce7bdfb20367debdaf9e36b9ea3900dea0f9`,
+tree `614027cba879ec6abfda3fc1ef48ceab411973b6`; frozen baseline
 `1062ec48b4128af867ab5a3329951511ebff285c`, tree
 `3a06cbef017e1828781d2e6861c17eecf4afd014`; existing annotated v4.87 tag verified
 at that target. Supplied final-document CI `39091756914` succeeded, not rerun.
 No hosting or production/security certification. See
 [implementation evidence](PHASE_70_IMPLEMENTATION.md) and
 [serving/operations limits](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md).
-Independent review, later user commit/exact-commit CI/build/browser acceptance
-and hardened-container runtime verification remain pending. No Phase 71.
+[Independent review](PHASE_70_REVIEW.md) and verified fixes are complete,
+with 219 focused backend passes/zero skips, 283 frontend passes and TypeScript
+passed. Browser discovery 1/280 is not execution. Later user review commit,
+exact-commit CI/build/browser and hardened-container runtime gates remain. No Phase 71.
 Future user-created tag, not created by this implementation:
 `v4.88.0-read-only-hosted-demo-deployment-hardening-plan-v1`.
 

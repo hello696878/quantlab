@@ -18,6 +18,17 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 70 independent review** (2026-10-18, `4.88.0-dev` unchanged): recheck
+  cached ordinary startup configuration; bound/strictly decode corpus JSON;
+  require real tables before querying; verify candidates before publishing the
+  serving manifest; refuse regular-file hardlinks; preserve the admission clock
+  high-water mark and distinguish pre-dispatch timeouts. Added 51 backend and
+  six frontend regressions, and strengthened the unexecuted browser spec.
+  Final focused backend 219 passed/zero skips, frontend 283 passed/28 files,
+  TypeScript passed; discovery 1/280 only. Earlier failures and implementation
+  357/168 snapshots remain separate. Review changes are unstaged on `main`;
+  CI/build/browser/container gates remain. See [review evidence](docs/PHASE_70_REVIEW.md).
+
 - **Phase 70 implementation** (2026-10-18, `4.88.0-dev`): explicit operator-only
   read-only synthetic-demo serving factory, deny-by-default six-route policy,
   RO corpus verification, offline preparation/stopped-copy operations, bounded

@@ -8,8 +8,10 @@
 > `3a06cbef017e1828781d2e6861c17eecf4afd014`, under its existing annotated v4.87
 > tag. Supplied final-document CI `39091756914` succeeded in both jobs, not rerun.
 > See [implementation evidence](PHASE_70_IMPLEMENTATION.md) and
-> [operations/limits](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md). Independent
-> review, user commit/CI/build/browser and hardened-container runtime gates remain.
+> [operations/limits](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md). The completed
+> [independent review](PHASE_70_REVIEW.md) corrected seven defects: 219 focused
+> backend passes/zero skips, 283 frontend passes, TypeScript passed, discovery
+> 1/280 only. User commit/CI/build/browser and hardened-container gates remain.
 > No new roadmap phase is inferred.
 
 > **Historical status (2026-10-18, frozen at 1062ec48):** Phase 69 bounded deterministic stored-SMA
@@ -481,8 +483,9 @@ synthetic corpus, RO verification, narrow existing UI and local admission/reques
 controls are implemented. Hosting, TLS/ingress/container enforcement, telemetry,
 auth and general online backup/migrations are not. See
 [actual evidence and pending inventory](PHASE_70_IMPLEMENTATION.md) and
-[operations/limits](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md). Independent
-review and user-controlled release/runtime acceptance remain separate gates.
+[operations/limits](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md). The
+[independent review](PHASE_70_REVIEW.md) is complete; user-controlled review
+commit, exact-commit CI and build/browser/container acceptance remain pending.
 
 **Goal.** Produce the plan and the hardening work for a **read-only**
 public demo, without adding authentication or multi-user features.

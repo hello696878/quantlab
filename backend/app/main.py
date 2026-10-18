@@ -387,6 +387,8 @@ from app.utils import validate_date_format
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialise the SQLite database on startup."""
+    # A previously imported local app must not bypass later explicit demo config.
+    guard_local_entrypoint()
     init_db()
     yield
 

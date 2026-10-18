@@ -19,6 +19,9 @@ MANIFEST = "corpus.json"
 MAX_DB = 2 * 1024 * 1024
 SUMMARY = ("id", "created_at", "name", "ticker", "strategy", "start_date", "end_date",
            "total_return", "cagr", "sharpe_ratio", "max_drawdown", "notes", "config_hash_full", "config_schema")
+SAVED_COLUMNS = ("id", "created_at", "name", "ticker", "strategy", "start_date", "end_date",
+                 "initial_capital", "transaction_cost_bps", "params_json", "metrics_json",
+                 "equity_curve_json", "trades_json", "notes", "config_hash_full", "config_schema")
 
 
 def unlinked(path):
@@ -29,6 +32,8 @@ def unlinked(path):
         if item.exists() or item.is_symlink():
             info = item.lstat()
             if stat.S_ISLNK(info.st_mode) or getattr(info, "st_file_attributes", 0) & 1024:
+                raise ValueError("Linked corpus paths are unsupported")
+            if stat.S_ISREG(info.st_mode) and info.st_nlink != 1:
                 raise ValueError("Linked corpus paths are unsupported")
     return path
 
@@ -44,20 +49,49 @@ def bounded_file(path, maximum):
     return data
 
 
-def observe(directory):
+def _observe_database(directory):
     directory = unlinked(directory)
     database = directory / DB_NAME
     content = bounded_file(database, MAX_DB)
     explainer._storage_state(database)
+    return content
+
+
+def observe(directory):
+    directory = unlinked(directory)
+    content = _observe_database(directory)
     manifest = bounded_file(directory / MANIFEST, 16384)
     return content, manifest
 
 
+def _public_record(row):
+    """Bound every stored JSON field before any full decoder allocates it."""
+    from app.schemas import SavedBacktestFull
+    record = dict(row)
+    fields = ("params", "metrics", "equity_curve", "trades")
+    for field in fields:
+        explainer._json_preflight(record[field + "_json"], limit=MAX_DB)
+    for field in fields:
+        record[field] = loads(record.pop(field + "_json"), limit=MAX_DB)
+    if (any(type(record[field]) is not dict for field in ("params", "metrics"))
+            or any(type(record[field]) is not list for field in ("equity_curve", "trades"))):
+        raise ValueError("Unsupported public record structure")
+    for field in ("total_return", "cagr", "sharpe_ratio", "max_drawdown"):
+        record[field] = record["metrics"].get(field)
+    return SavedBacktestFull(**record).model_dump(mode="json")
+
+
 def verify(directory, expected_id):
     """No mkdir/migration/repair; observations do not defeat hostile file races."""
+    return _verify(directory, expected_id)
+
+
+def _verify(directory, expected_id, *, candidate=None):
+    """Offline writers may validate unpublished manifest bytes, never serve them."""
     full_hash(expected_id)
     directory = unlinked(directory)
-    data, raw = observe(directory)
+    data, raw = observe(directory) if candidate is None else (_observe_database(directory), candidate)
+    explainer._json_preflight(raw, limit=16384)
     manifest = loads(raw, limit=16384)
     keys = {"schema", "prepared_at", "provenance", "saved_ids", "database_sha256", "material_sha256", "corpus_id"}
     if type(manifest) is not dict or set(manifest) != keys or manifest["schema"] != SCHEMA:
@@ -72,8 +106,6 @@ def verify(directory, expected_id):
         raise ValueError("Unsupported preparation timestamp")
     if hashlib.sha256(data).hexdigest() != manifest["database_sha256"]:
         raise ValueError("Corpus bytes differ")
-    from app.saved_backtests import _row_to_full
-    from app.schemas import SavedBacktestFull
     with closing(sqlite3.connect((directory / DB_NAME).as_uri() + "?mode=ro", uri=True, timeout=1)) as conn:
         conn.row_factory = sqlite3.Row
         conn.setlimit(sqlite3.SQLITE_LIMIT_LENGTH, MAX_DB)
@@ -81,19 +113,26 @@ def verify(directory, expected_id):
         conn.execute("BEGIN")
         if conn.execute("PRAGMA quick_check").fetchone()[0] != "ok":
             raise ValueError("Corpus integrity refused")
+        tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*' LIMIT 513")]
+        if len(tables) > 512 or any(not re.fullmatch(r"[a-z_][a-z0-9_]{0,63}", name) for name in tables):
+            raise ValueError("Unsupported corpus table inventory")
+        if not {"saved_backtests", "run_replay_contexts"} <= set(tables):
+            raise ValueError("Unsupported corpus read schema")
+        columns = {row[1] for row in conn.execute("PRAGMA table_info(saved_backtests)")}
+        if not set(SAVED_COLUMNS) <= columns:
+            raise ValueError("Unsupported corpus read schema")
         if conn.execute("SELECT count(*) FROM saved_backtests").fetchone()[0] != 1:
             raise ValueError("Unsupported saved inventory")
         if conn.execute("SELECT count(*) FROM run_replay_contexts").fetchone()[0] != 0:
             raise ValueError("Replay contexts are not public demo content")
-        tables = [row[0] for row in conn.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT GLOB 'sqlite_*' LIMIT 513")]
-        if len(tables) > 512 or any(not re.fullmatch(r"[a-z_][a-z0-9_]{0,63}", name) for name in tables):
-            raise ValueError("Unsupported corpus table inventory")
         for name in tables:
             # Identifiers are separately bounded/whitelisted above, never submitted SQL.
             if name != "saved_backtests" and conn.execute('SELECT 1 FROM "' + name + '" LIMIT 1').fetchone() is not None:
                 raise ValueError("Nonpublic table material is unsupported")
-        row = conn.execute("SELECT * FROM saved_backtests WHERE id=?", (1,)).fetchone()
-        record = SavedBacktestFull(**_row_to_full(row)).model_dump(mode="json")
+        row = conn.execute("SELECT " + ",".join(SAVED_COLUMNS) + " FROM saved_backtests WHERE id=?", (1,)).fetchone()
+        if row is None:
+            raise ValueError("Unsupported saved inventory")
+        record = _public_record(row)
     if (record["name"] != TITLE or record["notes"] != NOTICE or record["ticker"] != "SYNTHETIC"
             or record["strategy"] != "sma_crossover" or record["config_hash_full"] is not None
             or record["config_schema"] is not None or set(record["params"]) != {"fast_window", "slow_window", "periods_per_year"}
@@ -122,7 +161,8 @@ def verify(directory, expected_id):
     if digest(record) != manifest["material_sha256"]:
         raise ValueError("Stored public material differs")
     explanation = explainer.explain(1, path=directory / DB_NAME)
-    if observe(directory) != (data, raw):
+    observed = observe(directory) if candidate is None else (_observe_database(directory), candidate)
+    if observed != (data, raw):
         raise ValueError("Corpus changed during verification")
     return manifest, record, explanation
 
@@ -156,9 +196,12 @@ def prepare(destination):
     manifest = {"schema": SCHEMA, "prepared_at": datetime.now(timezone.utc).isoformat(), "provenance": NOTICE,
                 "saved_ids": [1], "database_sha256": hashlib.sha256(data).hexdigest(), "material_sha256": digest(record)}
     manifest["corpus_id"] = digest(manifest)
-    with (destination / MANIFEST).open("x", encoding="utf-8") as handle:
-        handle.write(validate(manifest) + "\n")
-    verify(destination, manifest["corpus_id"])
+    raw = (validate(manifest) + "\n").encode("utf-8")
+    _verify(destination, manifest["corpus_id"], candidate=raw)
+    # Publishing the complete manifest is the completion boundary. A failure
+    # before publication retains owned evidence without a serving manifest.
+    with (destination / MANIFEST).open("xb") as handle:
+        handle.write(raw)
     return manifest["corpus_id"]
 
 
@@ -174,9 +217,11 @@ def copy_stopped(source, destination, expected_id, *, stopped=False):
         handle.write(data)
     if observe(source) != (data, raw):
         raise ValueError("Source changed during offline copy")
+    _verify(destination, expected_id, candidate=raw)
+    if observe(source) != (data, raw):
+        raise ValueError("Source changed during offline copy")
     with (destination / MANIFEST).open("xb") as handle:
         handle.write(raw)
-    verify(destination, expected_id)
     return expected_id
 
 

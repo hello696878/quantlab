@@ -62,8 +62,9 @@ class Admission:
         self.tokens, self.active, self.last = float(burst), 0, clock()
 
     def enter(self):
-        now = self.clock()
-        self.tokens = min(self.burst, self.tokens + max(0, now - self.last) * self.rate)
+        # Keep the high-water mark if a supplied clock moves backwards.
+        now = max(self.last, self.clock())
+        self.tokens = min(self.burst, self.tokens + (now - self.last) * self.rate)
         self.last = now
         if self.active >= self.concurrency or self.tokens < 1:
             return False
@@ -146,7 +147,10 @@ class DemoApplication:
             return await refuse(429, "Demo admission limit reached", {"Retry-After": "1"})
         try:
             # Read at most one ASGI frame, never accumulate or parse an upload.
-            frame = await asyncio.wait_for(receive(), timeout=1)
+            try:
+                frame = await asyncio.wait_for(receive(), timeout=1)
+            except asyncio.TimeoutError:
+                return await refuse(408, "Demo request timed out before dispatch")
             if frame.get("type") != "http.request" or frame.get("body") or frame.get("more_body"):
                 return await refuse(400, "Request bodies are not accepted in demo")
             first = True
@@ -159,9 +163,6 @@ class DemoApplication:
                 return await receive()
 
             await self.app(scope, replay_receive, safe_send)
-        except asyncio.TimeoutError:
-            if not started:
-                await refuse(408, "Demo request timed out before dispatch")
         except Exception:
             if not started:
                 await refuse(503, "Prepared demo content is unavailable")

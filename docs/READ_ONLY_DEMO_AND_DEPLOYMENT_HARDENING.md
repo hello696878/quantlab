@@ -23,7 +23,9 @@ is frozen at `1062ec48b4128af867ab5a3329951511ebff285c`, tree
 The factory reads QUANTLAB_SERVING_MODE: absent means `local`; exact
 `read_only_demo` selects the separate demo app. Empty/unknown/case/whitespace
 variants refuse. Demo variables with local mode or unknown QUANTLAB_DEMO_ keys
-refuse rather than silently opening the writable app. There is no HTTP toggle.
+refuse rather than silently opening the writable app. The ordinary lifespan
+rechecks configuration immediately before writable initialization, including
+when its module was cached under an earlier environment. There is no HTTP toggle.
 Each demo app owns its corpus observation and admission state. Local operation
 retains its existing singleton/database semantics; v1 deployment uses one
 process, one event loop and one worker, not concurrent operator preparation.
@@ -69,13 +71,16 @@ This is consistency metadata, not a signature or authenticity attestation.
 Different runtime/SQLite/preparation times may produce different bytes/IDs;
 cross-runtime byte identity is not promised.
 
-Verification bounds the DB to 2 MiB and manifest to 16 KiB, checks full identity,
+Verification bounds the DB to 2 MiB and manifest to 16 KiB, structurally
+preflights the manifest and all four stored JSON fields before full strict
+decoding, and refuses duplicate JSON members. It checks full identity,
 fixed public labels/params, exact equity/trade projections, saved inventory,
-empty other user tables (bounded identifier/inventory checks), required read schema, integrity,
+empty other user tables (bounded identifier/inventory checks), required real
+tables/columns before application data queries, integrity,
 public result material, existing explanation validation, and before/after byte
 observations. SQLite opens use explicit `mode=ro`, query_only and transactions.
 The Phase 69 rollback-header/no journal/WAL/SHM restriction is preserved. Missing,
-linked, changed, malformed or unsupported material refuses without creating
+symlinked/reparse/hardlinked, changed, malformed or unsupported material refuses without creating
 directories, repairing, seeding, migrating or changing journal modes.
 Startup compares observations across verification before marking readiness.
 Serving uses the validated in-memory result/bundle; later changes refuse reads.
@@ -114,10 +119,13 @@ $env:QUANTLAB_DEMO_HOSTS = '127.0.0.1,localhost'
 & $Python -m uvicorn app.serving:create_app --factory --host 127.0.0.1 --port 8780 --workers 1 --no-access-log
 ```
 
-No HTTP preparation/reset endpoint exists. An interrupted preparation leaves
-its owned partial directory for inspection; a missing/invalid manifest cannot
-become ready. A completed corpus is verified against its configured ID; an
-incompatible schema refuses rather than migrating during startup.
+No HTTP preparation/reset endpoint exists. Preparation fully verifies the
+actual database and explanation against candidate manifest bytes before
+exclusively publishing corpus.json. Complete manifest publication defines
+completion; an interruption before it retains owned non-serving database
+evidence, and a missing/invalid manifest cannot become ready. A completed corpus
+is verified against its configured ID; an incompatible schema refuses rather
+than migrating during startup. This is not an atomic hostile-writer defense.
 
 ## Offline Backup, Restore and Migration
 
@@ -132,7 +140,9 @@ For a STOPPED prepared corpus with supported rollback storage and no sidecars:
 Each destination is exclusive/new; collisions refuse without overwrite.
 The stopped flag is an operator attestation, not detection of another process.
 Bounded main-file/manifest acquisition is checked before/after copying and the
-destination is verified. Interrupted copies are retained, not cleaned/repaired.
+destination is fully verified against unpublished candidate bytes before its
+normal manifest is exclusively published. Interrupted copies are retained,
+not cleaned/repaired; a failure before complete publication cannot be ready.
 Never copy only a live WAL main file or delete/checkpoint sidecars to make it
 pass. General live-user-DB backup, concurrent writers, online migration and
 disaster recovery are unimplemented. Future schema upgrades require an offline
@@ -214,10 +224,11 @@ no enforced read-only root/corpus or resource limits. Do not expose them as the
 hardened demo. No Compose override/profile is supplied that could accidentally
 inherit those ports or writable mounts. No Docker builds/servers ran here.
 
-Context exclusions were tightened locally: backend developer env files, active
-data/SQLite files/sidecars, logs and common key directories cannot enter the
-ordinary build context; frontend env variants are excluded except .env.example.
-Static tests check these rules. They are not an executed Docker image inspection
+Declared context exclusions cover backend developer env patterns, data/,
+SQLite/sidecar/log patterns and common key directories; frontend env variants
+are excluded except .env.example. Static tests check specified rule membership,
+not all Docker pattern matching, arbitrary private files or resulting image layers.
+They are not an executed Docker context/image inspection
 or a replacement for secret scanning and deployment-runtime verification.
 
 Before hosting, implement and independently verify non-root UID/GID, dropped
@@ -250,11 +261,14 @@ operator gates, not proof supplied by old audits or this plan.
 
 ## Verification Gates
 
-See [implementation evidence](PHASE_70_IMPLEMENTATION.md) for executed focused
-tests, source identities, failures and exact pending inventory. Independent review,
-exact-commit Python 3.11 whole-tree CI, user production build/proxy-manifest check,
-one prepared-corpus browser scenario and later hardened-container runtime checks
-remain separate gates. No Phase 69 five-link/DST/browser/build checks are repeated.
+See [independent review](PHASE_70_REVIEW.md) for seven corrected defects,
+219 focused backend passes/zero skips, 283 frontend passes, exact source
+identities, retained failures and the REVIEW inventory. Historical
+[implementation evidence](PHASE_70_IMPLEMENTATION.md) remains separate.
+Exact-review-commit Python 3.11 whole-tree CI, user production build/proxy-manifest
+check, one prepared-corpus browser scenario and later hardened-container runtime
+checks remain separate gates. Phase 69's five physical-link cases were not rerun;
+new Phase 70 corpus-link and storage-operation checks cover changed dependencies.
 
 The new `frontend/e2e/read-only-demo.spec.ts` is for later user execution against
 already-running loopback services. Prepare the corpus BEFORE serving; configure
