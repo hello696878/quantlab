@@ -21,14 +21,18 @@ adapter: deterministic stored facts, exact raw/display/unit/path references,
 explicit legacy/unsupported limitations and pinned JSON export. No advice,
 predictions, new analytics, model/provider calls, automatic research or new
 database. Other stored strategy/module adapters and lifecycle/model-origin
-interpretation are deferred. VERSION remains `4.87.0-dev`; independent review
-and verified fixes are complete on `main` at implementation HEAD
-`ff7a288baa56ba61cb58d0de3aba524ec7a441cf`, with review changes unstaged.
-Final protected focused regression: 410 passed, zero skips; frontend 258 passed,
-TypeScript passed; 1 focused /279 overall browser tests discovered, none executed.
-Inherited implementation 330/73 snapshots and failed review attempts remain
-separate evidence. Exact-review-commit Python 3.11 CI, user production build and
-isolated browser execution remain pending. See [review](docs/PHASE_69_REVIEW.md),
+interpretation are deferred. VERSION remains `4.87.0-dev`; implementation
+`ff7a288baa56ba61cb58d0de3aba524ec7a441cf` and independent review
+`4c59abd1c0cc655f7efe78a7bae423acdef4b0a8` are committed on `main`.
+Exact-review CI `39017836732` succeeded in both jobs: backend 5144 passed /
+18 unidentified skips on Python 3.11.17. The user production build and one
+isolated Edge Explainer scenario passed. Separate Linux/Python 3.11.17
+verification executed the five named physical-link cases: 5 passed, no skips,
+failures or errors. These do not identify the CI skips or add to its count;
+historical Windows 410-pass and implementation 330/73 snapshots stay separate.
+Historical security remediation is completed, not a current clean audit.
+Documentation commit/publication/verification and user tagging remain pending.
+See [final evidence](docs/PHASE_69_REVIEW.md#final-release-evidence-and-platform-verification-2026-10-18),
 [support/runbook](docs/EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md) and
 [implementation evidence](docs/PHASE_69_IMPLEMENTATION.md). No Phase 70.
 

@@ -19,11 +19,17 @@ review branch `main`, implementation `ff7a288baa56ba61cb58d0de3aba524ec7a441cf`,
 `v4.86.0-cross-sectional-neutralisation-scanner-validation-v1` verified at that
 frozen Phase 68 target/tree `2c3dfde47bfb4c6924e7ab807727fc3d104de8ab`.
 Supplied final-doc CI `38533560143` succeeded in both jobs, not rerun here.
-Independent review/fixes are complete, with review changes unstaged. Final
-focused410/zero skips and frontend258 passed; TypeScript passed, discovery1/279
-only. Earlier failed/inherited330/73 snapshots remain separate. User build/
-isolated browser, exact-review-commit Python 3.11 CI/publication and user-created
-v4.87 tag remain pending. See [review evidence](PHASE_69_REVIEW.md),
+Independent review/fixes are committed at
+`4c59abd1c0cc655f7efe78a7bae423acdef4b0a8`, tree
+`591d03152798e427a0b9b58b79e1ea7e994261ba`. Exact-review CI `39017836732`
+succeeded in both jobs, backend5144/18 unidentified skips on Python 3.11.17.
+User build exit 0 and one isolated Edge Explainer scenario passed. Separate
+Linux/Python 3.11.17 verification passed all five named physical-link cases,
+zero skips/failures/errors. Historical Windows410 and failed/inherited330/73
+snapshots remain separate; no CI skip identities or combined counts inferred.
+Historical security remediation is completed, not a current clean audit.
+Documentation commit/publication/verification and user-created v4.87 tag remain
+pending. See [final evidence](PHASE_69_REVIEW.md#final-release-evidence-and-platform-verification-2026-10-18),
 [implementation evidence](PHASE_69_IMPLEMENTATION.md) and
 [support/runbook](EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md). No Phase 70.
 Future tag, not created:

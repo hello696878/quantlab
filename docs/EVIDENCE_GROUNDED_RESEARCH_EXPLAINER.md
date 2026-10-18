@@ -165,8 +165,13 @@ before demo writes. Use current user-selected ports/token; no old server or
 token is assumed. Discovery is not execution. No services/browser/build start
 is authorized by this implementation.
 
-See [review evidence](PHASE_69_REVIEW.md) for the completed independent review,
-fixes, exact current snapshots/failures and pending exact-review-commit Python
-3.11 CI/user build/isolated browser gates. The unchanged
+See [final evidence](PHASE_69_REVIEW.md#final-release-evidence-and-platform-verification-2026-10-18)
+for the committed independent review, existing exact-review Python 3.11 CI
+(5144 passed /18 unidentified skips), user production build and one isolated
+Edge Explainer scenario. Separate Linux/Python 3.11.17 execution passed the
+five named physical-link cases, no skips/failures/errors. Earlier local runs
+and failed attempts remain separate; only documentation publication/verification
+and user tagging remain pending for this handoff. Historical security remediation
+is not a current clean audit or broader certification. The unchanged
 [implementation evidence](PHASE_69_IMPLEMENTATION.md) retains inherited runs.
 Phase 68 remains frozen; Phase 70 is not implemented.

@@ -300,3 +300,216 @@ Tracked `git diff --check` exited 0. New-file `git diff --no-index --check -- NU
 Still pending: exact-review-commit **Python 3.11/Linux whole-tree CI**, user production build, isolated real browser acceptance through the owned disposable harness, and remaining platform coverage. Existing runner cases exercised owned Windows junction rejection; Linux/physical-symlink execution and inherited security resolution remain pending. Retrospective/PIT conclusions from older phases were not upgraded or rerun.
 
 Later user-controlled review subject: `Review deterministic evidence grounded research explainer v1`; future tag: `v4.87.0-deterministic-evidence-grounded-research-explainer-v1`, not created. No staging, commit, push, tag, PR, deployment, workflow trigger, service, actual browser run, production/Docker build, package installation, active-database connection or Phase70 work occurred. Stop at this single handoff.
+
+## Final release evidence and platform verification (2026-10-18)
+
+This later documentation-only finalization supersedes the pending status above;
+the historical findings, failures, inventories and protections are preserved.
+Date is Asia/Taipei; the new execution timestamps below are UTC on October 17.
+No implementation or independent source review was restarted.
+
+### Source and evidence attribution
+
+- Implementation: `ff7a288baa56ba61cb58d0de3aba524ec7a441cf`.
+- Review/build/browser/new platform source: `4c59abd1c0cc655f7efe78a7bae423acdef4b0a8`;
+  committed tree `591d03152798e427a0b9b58b79e1ea7e994261ba`.
+- Attached `main`, VERSION `4.87.0-dev`; initial checkout/index/nonignored
+  untracked set empty. No branch, history, VERSION or executable change.
+- Historical Windows final review remains **410 passed, zero skips**. Earlier
+  implementation 330/73 and failed review snapshots remain separate. Neither
+  they nor the new five passes are added to another suite's total.
+
+Existing [CI run 39017836732](https://github.com/hello696878/quantlab/actions/runs/39017836732),
+attempt 1, was independently retrieved during the preceding evidence pass,
+not triggered again. Exact review SHA above; created 2026-10-17T08:33:52Z,
+updated 08:47:00Z; completed/success. Backend Tests job `117353473943` and
+Frontend Tests & Build job `117353473809` both succeeded. Raw backend log:
+Ubuntu 24.04.5, CPython 3.11.17, `python -m pytest -q`, **5144 passed,
+18 skipped in 759.10s**. Artifact listing was empty. Its quiet log does not
+identify the 18 skip reasons or these five nodes' outcomes. They remain
+**unidentified skips**, not inferred optional/platform cases. This is CI for
+the review revision, not for a future documentation commit.
+
+The successful production build is user-reported, not rerun here: Node
+24.21.0, actual npm 11.12.1 (packageManager label npm@11.17.0), Next.js
+15.5.25, BACKEND_URL `http://127.0.0.1:8770`, built proxy destination
+`http://127.0.0.1:8770/:path*`, build exit 0 and post-build Git clean.
+Build ID `OzHHJbNlrrELB9VuvYGI8` also matches the retained browser artifact.
+
+User-owned browser evidence remains at
+`C:\Users\jimli\AppData\Local\Temp\quantlab-phase69-browser-5cfcb44da8e84b83b91ff61b64bb8015`.
+The preceding evidence pass read preflight.json, execution.json and junit.xml:
+
+- Preflight checked 2026-10-17T09:39:09.057Z; Playwright 1.61.1; four DIRECT/
+  PROXY strategy/replay proofs returned 200 with the same nonempty disposable
+  database identity; saved rows before scenario 0. No identity secret/header
+  is reproduced here.
+- Execution: Node 24.21.0; channel msedge, selected through project chromium;
+  exact source/tree/build above; 09:39:09.8636736Z to 09:39:18.4984756Z,
+  process 8.6281088s, exit 0. JUnit: 1 case, 0 failures/errors/skips,
+  suite 7.510739s, scenario 3.704s. User console separately reports backend
+  8770/frontend 3100, one worker, retries 0, 1 passed in 7.5s and final Git clean.
+- The committed scenario creates a real local SMA demo and deletes its own
+  record through fixture operations. Explanation reads/source checks are the
+  separate read-only assertions: explicit Explain, original raw fact binding,
+  keyboard source inspection, exact response-text download, expected fingerprint,
+  deletion/404 detachment, navigation and bounded 1440/1024/768 viewports.
+  Not all 279 discovered scenarios, all adapters, manual visual/accessibility
+  certification, or zero computation across fixture setup.
+- Earlier user attempt: port 8770 had no listener, stopping before HTTP proofs
+  or browser execution. No traceback/root cause/evidence directory is inferred;
+  this is not a failed Playwright scenario. No browser/build was repeated here.
+
+### New isolated five-case Linux execution
+
+External task root, retained in full:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-phase69-platform-1a14abc98000495acca77aee`.
+`verified-input/` holds the accepted archive, committed blob inventory and
+task-owned orchestration. `verified-evidence/` holds source-verification.json,
+runtime.json, pip-report.json, install/pytest/attach logs, execution records,
+JUnit, node outcomes, container identity/state, reconciliation and cleanup.
+The earlier `input/` and `evidence/` are preserved separately, not overwritten.
+
+Setup history is retained honestly:
+
+1. Previous Docker preflight exited 1: the `dockerDesktopLinuxEngine` named pipe
+   did not exist. No archive/container/install/test/edit/staging occurred then.
+   After user startup, the single resumed server check exited 0: Docker Desktop
+   4.75.0 (227598), Engine 29.5.2/API 1.54, Linux/amd64.
+2. An initial host UUID helper failed before any tool operation (`crypto is not
+   defined`). Image-tag inspection then found no local python:3.11-slim (exit 1);
+   the authorized official-image pull succeeded (exit 0).
+3. Initial binary archive SHA-256
+   `e511d24a454a6dfc0eba7ea91ab9fd50b751411738b4dc05d5aa9c4d46b379f1`,
+   23838720 bytes, failed exact-blob verification at `.claude/launch.json`:
+   system Git core.autocrlf=true had exported CRLF. The file returned exactly
+   to committed blob `675f9190419c9d199e695a38cf8406371f3f1865` when CRLF was
+   removed. Setup orchestrator/container/host exits were 4/4/4; pytest exit is
+   null, no install/test ran. No assertion or repository source was altered.
+4. Regenerated only the external archive with conversion disabled for that
+   export process. Persistent Git configuration and working bytes were unchanged.
+   Host precheck matched all **1177** file paths and Git blob bytes; container
+   verification also matched their modes. Archive comment matched the source commit.
+
+Accepted archive SHA-256:
+`136e51675d89ead9e057658bd4195e77f7d9371e0bea2095efde30cf8dc88a55`,
+23500800 bytes. Official python:3.11-slim image ID and repository digest:
+`sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce`
+(`python@sha256:e88e9763f943ec1834f992a4b51e0f24500486803e8bc534e5767af9ea65f6ce`).
+Runtime: Debian 13.7 (trixie), Linux 6.6.87.2-microsoft-standard-WSL2 x86_64,
+glibc 2.41, CPython 3.11.17/GCC 14.2.0, SQLite 3.46.1, pip 24.0.
+Declared direct requirements resolved only inside the disposable container:
+FastAPI 0.143.3, uvicorn 0.54.0, python-multipart 0.0.32, pandas 3.0.6,
+NumPy 2.4.6, SciPy 1.17.1, yfinance 1.7.0, Pydantic 2.14.1,
+python-dateutil 2.9.0.post0, pytest 9.1.1 and httpx 0.28.1.
+Full transitive versions/download metadata remain in runtime.json/pip-report.json.
+No optional PyArrow or host/global/Conda/project-venv installation occurred.
+Pip's root-user warning is retained; it refers to this disposable container.
+
+Archive creation used Git's binary `--output`, not text redirection:
+
+```powershell
+git -c core.autocrlf=false archive --format=tar --output=<owned verified-input/source.tar> 4c59abd1c0cc655f7efe78a7bae423acdef4b0a8
+```
+
+Docker created an owned container from that image ID, with only the task-owned
+verified-input mounted read-only at /input and verified-evidence read-write at
+/evidence; command `python -B -u /input/verify.py`, PYTHONDONTWRITEBYTECODE=1.
+It extracted committed source to /work/source. Link fixtures and pytest temp
+paths were on the container's Linux filesystem, not either Windows bind mount.
+No live checkout, active database, home, credentials or Docker socket was
+mounted; no privileged mode, published ports or application service.
+
+The retained execution records contain exact argv. Install command:
+`python -m pip install --disable-pip-version-check --no-cache-dir --report /evidence/pip-report.json -r /work/source/backend/requirements.txt`.
+Then, from /work/source/backend, once and serially, the command below selected
+only the five existing nodes (repository node names have the backend/ prefix):
+
+```text
+python -B -m pytest -o addopts= -vv -ra --tb=short -p no:cacheprovider --basetemp=/work/pytest-tmp --junitxml=/evidence/junit.xml --durations=0 --durations-min=0
+  tests/test_backend_runner_review.py::test_internal_directory_link_is_rejected_without_reading_target
+  tests/test_backend_runner_review.py::test_snapshot_refuses_linked_roots_before_copying[source]
+  tests/test_backend_runner_review.py::test_snapshot_refuses_linked_roots_before_copying[destination]
+  tests/test_backend_runner_review.py::test_snapshot_refuses_linked_roots_before_copying[destination_parent]
+  tests/test_backend_runner_review.py::test_snapshot_inventory_detects_added_source_without_following_links[junction]
+```
+
+| Case in backend/tests/test_backend_runner_review.py | Outcome | JUnit case seconds |
+| --- | --- | --- |
+| test_internal_directory_link_is_rejected_without_reading_target | passed | 0.003 |
+| test_snapshot_refuses_linked_roots_before_copying[source] | passed | 0.002 |
+| test_snapshot_refuses_linked_roots_before_copying[destination] | passed | 0.002 |
+| test_snapshot_refuses_linked_roots_before_copying[destination_parent] | passed | 0.002 |
+| test_snapshot_inventory_detects_added_source_without_following_links[junction] | passed | 0.002 |
+
+**5 selected, 5 passed, 0 skips/failures/errors**; no skip reasons, no retries.
+Committed POSIX directory_link calls Path.symlink_to: these were physical
+symlinks, including the case labelled junction, not mocks or Windows junctions.
+Pytest printed 0.10s; JUnit testsuite time 0.104s. Pytest process wall time
+0.9290872720011976s, exit 0; install 40.79809996300173s, exit 0;
+verified setup 43.32318577100159s; orchestration total 44.32369200700123s,
+exit 0. Pytest process ran 2026-10-17T16:45:04.896910Z to 16:45:05.825986Z.
+Host Docker start/attach took 45.5977075s, exit 0; container exit 0, no OOM/error.
+The original node-outcomes.json root-level junit_seconds defaulted to 0 because
+the testsuites root has no time attribute; junit-reconciliation.json records
+the actual testsuite 0.104s without replacing the original or rerunning tests.
+
+Verified container `58444db9ff2dd4090fc3017a11263cad9b6e67f7782845aeda642e4bb22bbdc2`
+and failed-setup container
+`299263f598d576e0d441b3a158e3ce82182b7c645eb166e8024b3fe2b73025ab`
+were inspected after stopping, their state/inspection retained, and only these
+two recorded owned stopped containers removed (both removal exits 0).
+No pre-existing container, image, volume, database or evidence was deleted.
+
+### Gate decisions, protection and final handoff
+
+The named Linux physical-symlink gap is now **closed** by the five outcomes,
+not by CI totals or source inspection alone. Exact-review Python 3.11 CI, user
+build and the one supported isolated browser scenario are also evidenced above.
+The original CI's 18 skips remain unidentified; general cross-platform coverage
+is not certified by these five cases.
+
+The earlier phrase "inherited security resolution" had no concrete advisory ID
+or unresolved Phase 69 finding attached. Its referenced
+[Phase 64 final release verification](PHASE_64_SECURITY_REMEDIATION.md#final-release-verification-2026-09-20)
+records completed historical remediation at patch
+`36f70e6b72800f0ab585afa8c873f4b87c09aeff`, successful exact-patch CI
+`35064846132`, and zero-finding audits **at that historical verification**.
+The preceding investigation found no frontend package/lock, CI workflow or
+frontend Dockerfile difference from that patch to this review commit. Thus
+the stale pending phrase is resolved, not an applicable finding silently waived.
+No current npm/pip audit/advisory sweep was run; current clean-security status
+is not asserted. Runtime/OS/support-window and Recharts maintenance limitations
+remain; no security or production certification follows from this evidence.
+
+All 1177 extracted source-file hashes matched before/after the five cases.
+Before doc edits, main/HEAD/tree/VERSION, clean working/index state and raw index
+SHA-256/size matched preflight (index
+`27240c4e0ba9b478cd4c85a0b3e047997c31762ce802c0fb9e8bbc26e3d239c9`,
+125674 bytes). No active SQLite connection or fresh active-data hash audit was
+performed; mount isolation and Git checks are the protection scope, not a new
+data certification or a replacement for historical protection evidence.
+
+Only these existing authorized documents are finalized for explicit literal
+staging: CHANGELOG.md, README.md, STOP_POINT.md, TASKS.md,
+docs/FORWARD_ROADMAP_PHASES_63_70.md, docs/PHASE_69_REVIEW.md,
+docs/VERSION_MANIFEST.md and docs/EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md.
+Staging verification must confirm exact membership, relative links/anchors,
+whitespace/EOF, no residual tracked/nonignored-untracked changes and unchanged
+working-file SHA-256/size across staging. The index is intentionally changed
+only by that authorized staging; the returned staged tree is not a commit.
+Frozen screenshots, historical implementation/review reports outside this
+allowlist, source/tests/config/dependencies/workflows and VERSION stay untouched.
+
+Support remains bounded stored SMA. Legacy facts remain unverified; parent/
+other-strategy/model-origin interpretation stays unsupported. Observed rollback
+storage without journal/WAL/SHM sidecars is required; preflight/path checks are
+not atomic race protection. No new analytics, model/provider calls, authenticity,
+statistical-skill, investment or production claim is added.
+
+Remaining: user documentation commit/publication and verification of that exact
+future revision, then user-controlled milestone tagging. Suggested subject:
+`Finalize phase69 release evidence and browser acceptance v1`; future tag
+`v4.87.0-deterministic-evidence-grounded-research-explainer-v1` is not created.
+No completed suite/frontend/build/browser/CLI/Phase67 check was rerun. No commit,
+push, tag, deployment, workflow trigger or Phase 70 is authorized or performed.

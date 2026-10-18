@@ -1,18 +1,22 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (2026-10-16):** Phase 69 bounded deterministic stored-SMA
+> **Current status (2026-10-18):** Phase 69 bounded deterministic stored-SMA
 > explainer implemented at `4.87.0-dev`, with pinned read-only acquisition,
 > closed factual wording, exact references and JSON export in Saved detail.
-> Independent review/fixes are complete on `main` at implementation `ff7a288b...`;
-> review changes remain unstaged. Final focused backend410/zero skips and
-> frontend258 passed, TypeScript passed; browser discovery1/279 only.
-> Earlier failed/inherited330/73 snapshots remain separate. User build/isolated
-> browser and exact-review-commit Python 3.11 CI remain pending.
+> Implementation `ff7a288b...` and review `4c59abd1...` are committed on `main`.
+> Exact-review CI `39017836732` succeeded: backend5144/18 unidentified skips;
+> user production build and one isolated Edge Explainer scenario passed.
+> Separate Linux/Python 3.11.17 verification: all five authorized physical-link
+> cases passed with no skips/failures/errors. Historical Windows410 and earlier
+> failed/inherited330/73 snapshots stay separate; no CI skip identity inferred.
+> Historical security remediation is completed, not a current clean audit.
+> Documentation publication/verification and user tagging remain pending.
 > Phase 68 is frozen at `2cd8f2585816fda0dc389f5a721ab02b0a3d71d8` under its
 > existing v4.86 annotated tag; supplied final-doc CI `38533560143` succeeded
 > in both jobs, not rerun. No advice, new analytics, model/provider calls,
 > explanation registry or Phase 70. See [support map](EVIDENCE_GROUNDED_RESEARCH_EXPLAINER.md)
-> [review evidence](PHASE_69_REVIEW.md) and [implementation evidence](PHASE_69_IMPLEMENTATION.md).
+> [final evidence](PHASE_69_REVIEW.md#final-release-evidence-and-platform-verification-2026-10-18)
+> and [implementation evidence](PHASE_69_IMPLEMENTATION.md).
 
 > **Historical status (2026-10-14, superseded by frozen 2cd8f258):** Phase 68 opt-in scanner neutralisation,
 > final-weight/cash/volatility diagnostics, bounded purged fixed-policy validation,
@@ -417,7 +421,11 @@ registry or automatic policy selection. See [support map](EVIDENCE_GROUNDED_RESE
 and [separate implementation snapshots](PHASE_69_IMPLEMENTATION.md). Independent
 review/fixes are complete: final focused410/zero skips, frontend258 and TypeScript
 passed, discovery1/279 only; [review evidence](PHASE_69_REVIEW.md) retains failed
-attempts. User build/browser/exact-review-commit CI remain pending; no Phase 70.
+attempts. Later exact-review CI `39017836732`, user build and one isolated Edge
+scenario passed; five named physical-link cases separately passed on Linux /
+Python 3.11.17. CI's 18 skips remain unidentified; no counts are combined.
+See [final evidence](PHASE_69_REVIEW.md#final-release-evidence-and-platform-verification-2026-10-18).
+Documentation publication/verification and user tagging remain pending; no Phase 70.
 
 **Goal.** Explain stored results in plain language, citing only values
 that exist in a stored run — never recommending anything.

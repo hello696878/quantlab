@@ -18,6 +18,18 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 69 final evidence** (2026-10-18, `4.87.0-dev` unchanged): exact-review
+  CI `39017836732` succeeded in both jobs, backend 5144 passed /18 unidentified
+  skips. User production build and one isolated Edge Explainer scenario passed.
+  Separately, verified exact-source Linux/Python 3.11.17 execution passed all
+  five named physical-link cases, zero skips/failures/errors. Earlier Docker
+  preflight and CRLF archive setup failures remain setup evidence, not failed
+  tests. Historical security remediation was completed; no current audit or
+  production certification is claimed. Documentation publication/verification
+  and user tagging remain pending. See
+  [final evidence](docs/PHASE_69_REVIEW.md#final-release-evidence-and-platform-verification-2026-10-18).
+  Earlier checkpoints below remain historical; no Phase 70.
+
 - **Phase 69 independent review** (2026-10-16, `4.87.0-dev` unchanged): fixed
   read-only WAL side effects through explicit storage refusal, bounded decoding,
   source/metric/projection integrity, deterministic numeric presentation, exact
