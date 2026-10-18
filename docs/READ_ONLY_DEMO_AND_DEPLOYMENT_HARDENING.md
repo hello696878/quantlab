@@ -6,6 +6,263 @@ is frozen at `1062ec48b4128af867ab5a3329951511ebff285c`, tree
 `3a06cbef017e1828781d2e6861c17eecf4afd014`. Its user-supplied final-document CI
 `39091756914` succeeded in both jobs; it is not Phase 70 verification.
 
+## Local Container Continuation (2026-10-18)
+
+The separate `compose.read-only-demo.yml` now declares a local-only hardened
+topology. It is standalone, never an override for docker-compose.yml. Dedicated
+Dockerfile.read-only-demo recipes do not change ordinary development recipes.
+See [post-review topology evidence](PHASE_70_CONTAINER_TOPOLOGY.md) for exact
+baseline, static checks, inventory, limitations and review decision. The completed
+PHASE_70_REVIEW.md remains historical evidence, not review of this continuation.
+
+Two serving containers use numeric UID/GID 10001, cap_drop ALL,
+no-new-privileges, read-only roots, only 64 MiB noexec/nosuid/nodev /tmp tmpfs,
+one CPU each, backend/frontend memory 512/768 MiB, PID limits 96/128 and
+nofile 1024. Backend has no host port, one worker, no raw access log and no
+proxy-header trust. Its /corpus named volume is read-only with nocopy. It joins
+only an internal bridge; frontend joins that bridge and an edge bridge and
+publishes only 127.0.0.1:3180 (operator-selectable unprivileged port).
+Both stdlib health probes check readiness/policy/pinned corpus identity. Local
+Docker logs are capped at two 5 MiB files per service. No automatic restart,
+preparation dependency, seed, migration or repair is added.
+
+These are implemented declarations and static policy checks, NOT observed
+Docker Desktop enforcement. Internal backend membership is not a measured
+egress firewall; the frontend edge bridge permits outbound traffic. No public
+ingress/TLS/authentication, multi-user isolation, blanket secret exclusion or
+production guarantee is supplied. Retain all restrictions if runtime fails.
+
+Explicit offline preparation reuses the backend image with networking disabled,
+all capabilities dropped, read-only root and a NEW writable named volume.
+Docker's empty-volume copy-up from the image's /corpus directory supplies owner
+10001:10001; the preparation command checks that owner and an empty volume
+before invoking existing app.demo_corpus.prepare. If copy-up/ownership differs
+on a platform, STOP: do not run serving as root, loosen permissions, repair or
+silently chown existing data. Actual copy-up and non-root startup remain pending.
+Serving uses nocopy and never initializes an empty volume. Interrupted preparation
+retains its owned partial volume; only fully verified manifest publication can
+complete. Do not reuse the earlier Windows acceptance corpus.
+
+The frontend builder uses declared package/lock manifests with engine-strict
+Node 24 dependency installation, explicitly bakes BACKEND_URL=http://demo-backend:8000
+and NEXT_PUBLIC_QUANTLAB_EXPECTED_MODE=read_only_demo, then validates the compiled
+route manifest. The final image retains .next/routes-manifest.json and
+demo-build-contract.json. That contract records build inputs/compiled rewrite,
+not proof of every client bundle: the later browser gate still verifies actual UI.
+Runtime env cannot repair an old build. Runtime image has no host bind mounts.
+Build COPY sources are explicit; local .env/.env.local, .next and node_modules
+are excluded. Build from the exact Git archive below, not an arbitrary live
+directory. Static patterns alone are not a complete context/layer secret audit.
+
+### Later User-Controlled Container Acceptance
+
+The following PowerShell procedure is NOT executed during implementation.
+Run only after independent review and a user-created commit. Keep all evidence,
+including failures. No cloud/public/provider request is part of these commands.
+Use an existing supported Node and project Python; do not install host packages.
+Replace the approved commit placeholder, then execute each block in the same
+shell. A nonzero native exit stops the sequence; capture diagnostics and do not
+remove a failed restriction. No cleanup/volume deletion is prescribed.
+
+```powershell
+$ErrorActionPreference = 'Stop'
+$Repo = 'C:\quantlab'
+$Expected = '<full user-approved topology commit>'
+if ($Expected -notmatch '^[0-9a-f]{40}$') { throw 'Set an approved exact commit' }
+Set-Location $Repo
+if ((git rev-parse HEAD).Trim() -cne $Expected -or (git status --porcelain)) { throw 'Require exact clean source' }
+$Token = [guid]::NewGuid().ToString('N')
+$Evidence = Join-Path $env:TEMP "quantlab-p70-container-$Token"
+New-Item -ItemType Directory -Path $Evidence -ErrorAction Stop | Out-Null
+New-Item -ItemType File -Path "$Evidence/empty.env" -ErrorAction Stop | Out-Null
+function Run([string]$Name, [string]$Exe, [string[]]$ArgumentList) {
+    $Watch = [Diagnostics.Stopwatch]::StartNew()
+    $Output = & $Exe @ArgumentList 2>&1
+    $Code = $LASTEXITCODE
+    $Output | Out-File -LiteralPath "$Evidence/$Name.log" -Encoding utf8
+    [pscustomobject]@{name=$Name;exe=$Exe;args=$ArgumentList;exit=$Code;seconds=$Watch.Elapsed.TotalSeconds} |
+        ConvertTo-Json -Compress | Add-Content -LiteralPath "$Evidence/executions.jsonl" -Encoding utf8
+    if ($Code -ne 0) { throw "$Name failed ($Code); preserve logs and inspect, do not relax restrictions" }
+    return ($Output -join "`n")
+}
+$Tree = (Run 'source-tree' git @('rev-parse', 'HEAD^{tree}')).Trim()
+$Engine = (Run 'docker-version' docker @('version', '--format', 'json')) | ConvertFrom-Json
+if ($Engine.Server.Os -cne 'linux') { throw 'Require a Linux Docker engine' }
+$null = Run 'compose-version' docker @('compose', 'version')
+$Archive = "$Evidence/source.tar"
+$null = Run 'source-archive' git @('-c','core.autocrlf=false','archive','--format=tar',"--output=$Archive",$Expected)
+Get-FileHash -LiteralPath $Archive | Format-List | Out-File "$Evidence/archive-sha256.txt"
+$Source = "$Evidence/source"
+New-Item -ItemType Directory -Path $Source -ErrorAction Stop | Out-Null
+$null = Run 'extract-source' tar @('-xf',$Archive,'-C',$Source)
+$Project = "p70-$Token"
+$Volume = "quantlab-p70-$Token"
+$Tag = "p70-$Token"
+$BackendImage = "quantlab-demo-backend:$Tag"
+$FrontendImage = "quantlab-demo-frontend:$Tag"
+$Python = "$Repo/.venv/Scripts/python.exe"
+$Node = (Get-Command node -ErrorAction Stop).Source # choose an existing supported executable
+$null = Run 'node-engine' $Node @('-e',"const [a,b]=process.versions.node.split('.').map(Number);if(a!==24||b<20)process.exit(2);console.log(process.version)")
+$Names = Run 'volume-collision' docker @('volume','ls','--filter',"name=^$Volume`$",'--format','{{.Name}}')
+if ($Names.Trim()) { throw 'Destination volume already exists' }
+$null = Run 'create-volume' docker @('volume','create','--driver','local','--label','quantlab.phase=70','--label',"quantlab.owner=$Token",$Volume)
+$null = Run 'build-backend' docker @('build','--pull','-f',"$Source/backend/Dockerfile.read-only-demo",'-t',$BackendImage,"$Source/backend")
+$Offline = @('run','--read-only','--network','none','--user','10001:10001','--cap-drop','ALL','--security-opt','no-new-privileges:true',
+    '--tmpfs','/tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777','--cpus','1','--memory','512m','--pids-limit','96')
+$Prepare = @'
+import os
+from pathlib import Path
+from app.demo_corpus import prepare
+p = Path('/corpus')
+assert os.getuid() == os.getgid() == 10001
+assert p.stat().st_uid == p.stat().st_gid == 10001
+assert not list(p.iterdir()), 'Refuse a nonempty or interrupted destination'
+print(prepare(p / 'v1'))
+'@
+$Id = (Run 'prepare' docker ($Offline + @('--name',"$Project-prep",'--mount',"type=volume,source=$Volume,target=/corpus",'--entrypoint','python',$BackendImage,'-B','-c',$Prepare))).Trim()
+if ($Id -notmatch '^[0-9a-f]{64}$') { throw 'Preparation did not return exactly one full identity' }
+$ReadMount = "type=volume,source=$Volume,target=/corpus,readonly,volume-nocopy"
+$Verified = (Run 'verify' docker ($Offline + @('--name',"$Project-verify",'--mount',$ReadMount,'--entrypoint','python',$BackendImage,
+    '-B','-m','app.demo_corpus','verify','--source','/corpus/v1','--expected-id',$Id))).Trim()
+if ($Verified -cne $Id) { throw 'Verification identity mismatch' }
+$env:QL_DEMO_IMAGE_TAG=$Tag; $env:QL_DEMO_VOLUME=$Volume; $env:QL_DEMO_CORPUS_ID=$Id; $env:QL_DEMO_PORT='3180'
+$Compose = @('compose','--env-file',"$Evidence/empty.env",'--project-name',$Project,'-f',"$Source/compose.read-only-demo.yml")
+$Effective = Run 'effective-compose' docker ($Compose + @('config','--format','json'))
+[IO.File]::WriteAllText("$Evidence/effective-compose.json",$Effective)
+$null = Run 'effective-policy' $Python @('-B',"$Source/scripts/validate_demo_compose.py","$Evidence/effective-compose.json",'--repo',$Source)
+$null = Run 'build-frontend' docker ($Compose + @('build','--pull','demo-frontend'))
+$null = Run 'images' docker @('image','inspect',$BackendImage,$FrontendImage)
+$null = Run 'volume' docker @('volume','inspect',$Volume)
+```
+
+Keep image IDs and RepoDigests as actually reported (local tags may have no
+RepoDigest). Mutable base tags are not a pin or a security audit. The extracted
+archive identifies the build source; do not claim labels alone prove it.
+The static placeholder corpus ID used during implementation is NOT a prepared
+corpus. Only the actual $Id above may be used to start these services.
+
+```powershell
+$Inventory = @'
+import hashlib,json,os
+from pathlib import Path
+p=Path('/corpus/v1')
+assert sorted(x.name for x in p.iterdir()) == ['corpus.json','demo.db']
+print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'files':[
+ {'name':x.name,'bytes':x.stat().st_size,'sha256':hashlib.sha256(x.read_bytes()).hexdigest()}
+ for x in sorted(p.iterdir())]},sort_keys=True))
+'@
+$Before = Run 'corpus-before' docker ($Offline + @('--name',"$Project-before",'--mount',$ReadMount,'--entrypoint','python',$BackendImage,'-B','-c',$Inventory))
+$null = Run 'start' docker ($Compose + @('up','-d','--no-build','--pull','never','--wait','--wait-timeout','120'))
+$Backend = (Run 'backend-id' docker ($Compose + @('ps','-q','demo-backend'))).Trim()
+$Frontend = (Run 'frontend-id' docker ($Compose + @('ps','-q','demo-frontend'))).Trim()
+if (!$Backend -or !$Frontend) { throw 'Missing serving container' }
+$null = Run 'runtime-inspect' docker @('inspect',$Backend,$Frontend)
+$null = Run 'network-inspect' docker @('network','inspect',"${Project}_demo_private","${Project}_demo_edge")
+$null = Run 'ports' docker ($Compose + @('ps','--format','json'))
+$null = Run 'runtime-python' docker @('exec',$Backend,'python','-c',"import sys,sqlite3,importlib.metadata as m;print(sys.version);print(sqlite3.sqlite_version);print({k:m.version(k) for k in ['fastapi','starlette','pydantic','numpy','pandas','uvicorn']})")
+$null = Run 'runtime-node' docker @('exec',$Frontend,'node','-p',"JSON.stringify({node:process.version,next:require('next/package.json').version})")
+$null = Run 'compiled-manifest' docker @('exec',$Frontend,'node','-e',"const fs=require('fs');console.log(JSON.stringify({contract:JSON.parse(fs.readFileSync('demo-build-contract.json')),routes:JSON.parse(fs.readFileSync('.next/routes-manifest.json')),build_id:fs.readFileSync('.next/BUILD_ID','utf8')}))")
+$BackendBoundary = @'
+import errno,json,os
+from pathlib import Path
+assert os.getuid()==os.getgid()==10001
+for p in ('/app/.demo-write-probe','/corpus/.demo-write-probe'):
+ try:
+  f=os.open(p,os.O_WRONLY|os.O_CREAT|os.O_EXCL,0o600)
+ except OSError as e:
+  assert e.errno in (errno.EROFS,errno.EACCES)
+ else:
+  os.close(f)
+  raise AssertionError('Unexpected write succeeded; retain evidence and stop')
+print(json.dumps({'uid':os.getuid(),'gid':os.getgid(),'status':Path('/proc/self/status').read_text(),'mounts':Path('/proc/self/mountinfo').read_text(),'routes':Path('/proc/net/route').read_text()}))
+'@
+$null = Run 'backend-boundary' docker @('exec',$Backend,'python','-c',$BackendBoundary)
+$null = Run 'frontend-boundary' docker @('exec',$Frontend,'node','-e',"const fs=require('fs');if(process.getuid()!==10001||process.getgid()!==10001)process.exit(2);try{const f=fs.openSync('/app/.demo-write-probe','wx');fs.closeSync(f);throw Error('Unexpected write; retain evidence')}catch(e){if(!['EROFS','EACCES'].includes(e.code))throw e}console.log(JSON.stringify({uid:process.getuid(),gid:process.getgid(),status:fs.readFileSync('/proc/self/status','utf8'),mounts:fs.readFileSync('/proc/self/mountinfo','utf8'),routes:fs.readFileSync('/proc/net/route','utf8')}))")
+```
+
+Inspect the retained JSON before proceeding: actual serving UID/GID 10001,
+CapEff/CapPrm/CapBnd zero and NoNewPrivs 1, HostConfig.ReadonlyRootfs true,
+CapDrop ALL, SecurityOpt no-new-privileges, 1e9 NanoCpus, memory/PID/nofile
+budgets as declared, /tmp tmpfs only, corpus Mounts.RW false, no frontend
+mounts beyond tmpfs, correct commands/factory and one worker, backend only on
+internal demo_private and no PortBindings, frontend only 127.0.0.1 with no IPv6
+wildcard publication. Record actual health/state/logging settings. Default
+image entrypoint and init are not proof of UID; inspect the running process.
+If Docker Desktop normalizes or fails to enforce a setting, retain that actual
+result and STOP for a narrow correction. Do not reduce controls to pass.
+Private networking alone is not proof against all egress/native/host pathways;
+no external connectivity probe or provider request is authorized here.
+
+```powershell
+$Probe = @'
+import hashlib,json,sys,urllib.request,urllib.error
+base,identity=sys.argv[1:]
+def get(path,method='GET'):
+ req=urllib.request.Request(base+path,data=None if method=='GET' else b'not parsed',method=method,headers={'X-QuantLab-Expected-Corpus':identity})
+ try:
+  with urllib.request.urlopen(req,timeout=5) as r: return r.status,r.read(65537)
+ except urllib.error.HTTPError as e: return e.code,e.read(65537)
+out={}
+for path in ['/capabilities','/ready','/saved-backtests','/saved-backtests/1','/research-explainer/saved-backtests/1']:
+ status,body=get(path)
+ assert status==200 and len(body)<=65536
+ obj=json.loads(body)
+ if path=='/capabilities': assert obj['mode']=='read_only_demo' and obj['corpus_id']==identity and obj['policy']=='read_only_demo_v1'
+ if path=='/ready': assert obj=={'status':'ready','policy':'read_only_demo_v1','corpus_id':identity}
+ out[path]=hashlib.sha256(body).hexdigest()
+for method,path in [('POST','/saved-backtests'),('DELETE','/saved-backtests/1'),('POST','/custom-strategies/import'),('POST','/backtest/sma-crossover'),('GET','/globe/markets'),('GET','/not-approved')]:
+ status,body=get(path,method)
+ assert status==403
+ out[method+' '+path]=status
+print(json.dumps(out,sort_keys=True))
+'@
+$Direct = Run 'direct-proof' docker @('exec',$Backend,'python','-c',$Probe,'http://127.0.0.1:8000',$Id)
+$Proxy = Run 'proxy-proof' $Python @('-c',$Probe,"http://127.0.0.1:$env:QL_DEMO_PORT/api",$Id)
+if ($Direct -cne $Proxy) { throw 'Direct/proxy approved material differs' }
+# Run exactly one Edge scenario; no server-start or old seed harness.
+$env:E2E_BASE_URL="http://127.0.0.1:$env:QL_DEMO_PORT"
+$env:E2E_READ_ONLY_DEMO_CORPUS_ID=$Id
+$env:E2E_READ_ONLY_DEMO_PROXY_ONLY='1'
+Remove-Item Env:E2E_READ_ONLY_DEMO_BACKEND_URL -ErrorAction SilentlyContinue
+$env:E2E_BROWSER_CHANNEL='msedge'
+$env:PLAYWRIGHT_JUNIT_OUTPUT_FILE="$Evidence/edge.xml"
+Set-Location "$Repo/frontend"
+$null = Run 'edge' $Node @('node_modules/@playwright/test/cli.js','test','e2e/read-only-demo.spec.ts','--reporter=list,junit','--output',"$Evidence/browser-results")
+Set-Location $Repo
+$After = Run 'corpus-after' docker @('exec',$Backend,'python','-c',$Inventory)
+if ($After -cne $Before) { throw 'Owned corpus bytes/inventory changed' }
+$null = Run 'service-logs' docker ($Compose + @('logs','--no-color','--tail','200'))
+$null = Run 'final-runtime-inspect' docker @('inspect',$Backend,$Frontend)
+$FinalStatus = Run 'final-git-status' git @('status','--porcelain')
+if ($FinalStatus.Trim()) { throw 'Source/index changed during acceptance' }
+$FinalHead = Run 'final-head' git @('rev-parse','HEAD','HEAD^{tree}')
+if ($FinalHead -cne "$Expected`n$Tree") { throw 'Source identity changed during acceptance' }
+```
+
+Require one JUnit case, no failures/errors/skips, browser exit0, all preceding
+process exits0 and exact corpus-before/after equality. The explicit proxy-only
+browser annotation means it DOES NOT perform direct-backend probes; direct-proof.log
+and its matching proxy proof are mandatory separate evidence. Default ordinary
+loopback E2E mode still requires both origins and performs both probes. Never
+publish a backend host port merely to accommodate browser tooling. If any step
+fails, retain executions.jsonl and gather `docker ... logs` / `docker inspect`
+for the owned containers before stopping. Do not retry successful gates for a
+cleaner summary, fabricate absent exits, or claim a build closed runtime gates.
+
+### Stopped Docker Volume Backup and Restore
+
+Stop both serving containers explicitly (`docker` with `$Compose + @('stop')`)
+and inspect stopped state. For a NEW uniquely labelled destination Docker volume,
+reuse the same non-root `$Offline` image operation: source volume at /source
+read-only/nocopy, destination at /corpus with empty-volume copy-up; run
+`python -B -m app.demo_corpus copy-stopped --source /source/v1 --destination /corpus/v1 --expected-id $Id --stopped`.
+Verify the new volume with an RO/nocopy mount and compare DB/manifest hashes
+before selecting its NEW external volume name in Compose. Restore is the same
+operation from stopped backup to another NEW volume. Destination existence or
+ownership mismatch is a stop, not permission to overwrite/chown/repair. Preserve
+the old volume and evidence. No live WAL copy, checkpoint, sidecar deletion,
+HTTP reset, automatic migration or general user-DB backup service is implemented.
+
 ## Serving Boundary and Source Reuse
 
 | Entry/source | Demo decision |
@@ -221,8 +478,8 @@ The existing Compose/Dockerfiles remain ORDINARY LOCAL DEVELOPMENT configuration
 backend port 8000 and frontend 3000 have no explicit loopback binding, Dockerfiles
 declare no non-root USER, and there are
 no enforced read-only root/corpus or resource limits. Do not expose them as the
-hardened demo. No Compose override/profile is supplied that could accidentally
-inherit those ports or writable mounts. No Docker builds/servers ran here.
+hardened demo. The new standalone file documented above does not inherit those
+ports/mounts. No Docker builds/servers ran during either implementation task.
 
 Declared context exclusions cover backend developer env patterns, data/,
 SQLite/sidecar/log patterns and common key directories; frontend env variants

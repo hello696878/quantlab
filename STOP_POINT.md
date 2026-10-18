@@ -1,6 +1,23 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 70 Independent Review (2026-10-18)
+## Current Handoff: Phase 70 Local Container Continuation (2026-10-18)
+
+Baseline clean main 5b29bbd27b4a7b4c482b7bc12fac8c7a4f92fa08, VERSION4.88.0-dev.
+Dedicated standalone local topology and Dockerfiles leave development Compose,
+quant/product contracts and historical reports unchanged. See
+[post-review evidence and exact inventory](docs/PHASE_70_CONTAINER_TOPOLOGY.md)
+and [later operator acceptance](docs/READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md#later-user-controlled-container-acceptance).
+Focused checks passed on separate snapshots: earlier integration35 and final
+affected policy35/zero skips/all exits0; Node12,
+TypeScript, one focused browser discovery only; actual effective Compose and
+deliberate inherited-dev/missing-ID refusals. Linux engine pipe was unavailable;
+no runtime enforcement is inferred. No production image build,
+container/service startup or browser execution is part of this continuation.
+User-attested earlier CI/build/Edge results are not transferred to this patch.
+Stop for independent review, then separately authorized user runtime acceptance.
+No staging/commit/push/tag/public hosting or Phase71.
+
+## Historical Handoff: Phase 70 Independent Review (2026-10-18)
 
 Attached branch `main`, implementation HEAD
 `8860ce7bdfb20367debdaf9e36b9ea3900dea0f9`, tree

@@ -1,0 +1,96 @@
+# Standalone only: docker compose --env-file <owned empty file> -f THIS_FILE ...
+# Preparation is a separate offline docker run; neither service prepares data.
+services:
+  demo-backend:
+    image: quantlab-demo-backend:${QL_DEMO_IMAGE_TAG:?Set a unique owned image tag}
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.read-only-demo
+    command: [python, -m, uvicorn, "app.serving:create_app", --factory, --host, "0.0.0.0", --port, "8000", --workers, "1", --no-access-log, --no-proxy-headers]
+    user: "10001:10001"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777"]
+    cpus: 1.0
+    mem_limit: 512m
+    pids_limit: 96
+    ulimits:
+      nofile: {soft: 1024, hard: 1024}
+    environment:
+      QUANTLAB_SERVING_MODE: read_only_demo
+      QUANTLAB_DEMO_CORPUS: /corpus/v1
+      QUANTLAB_DEMO_CORPUS_ID: ${QL_DEMO_CORPUS_ID:?Prepare and pin a full corpus ID first}
+      QUANTLAB_DEMO_HOSTS: demo-backend,127.0.0.1,localhost
+      QUANTLAB_DEMO_ORIGINS: http://127.0.0.1:${QL_DEMO_PORT:-3180}
+    volumes:
+      - type: volume
+        source: demo_corpus
+        target: /corpus
+        read_only: true
+        volume: {nocopy: true}
+    networks: [demo_private]
+    healthcheck:
+      test: [CMD, python, -c, "import json,os,urllib.request; r=urllib.request.urlopen('http://127.0.0.1:8000/ready',timeout=2); d=json.loads(r.read(2049)); assert d=={'status':'ready','policy':'read_only_demo_v1','corpus_id':os.environ['QUANTLAB_DEMO_CORPUS_ID']}"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: local
+      options: {max-size: 5m, max-file: "2"}
+    restart: "no"
+
+  demo-frontend:
+    image: quantlab-demo-frontend:${QL_DEMO_IMAGE_TAG:?Set a unique owned image tag}
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile.read-only-demo
+      args:
+        BACKEND_URL: http://demo-backend:8000
+        NEXT_PUBLIC_QUANTLAB_EXPECTED_MODE: read_only_demo
+    command: [node, node_modules/next/dist/bin/next, start, --hostname, "0.0.0.0", --port, "3000"]
+    user: "10001:10001"
+    init: true
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    tmpfs: ["/tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777"]
+    cpus: 1.0
+    mem_limit: 768m
+    pids_limit: 128
+    ulimits:
+      nofile: {soft: 1024, hard: 1024}
+    environment:
+      BACKEND_URL: http://demo-backend:8000
+      NEXT_PUBLIC_QUANTLAB_EXPECTED_MODE: read_only_demo
+      QUANTLAB_EXPECTED_CORPUS_ID: ${QL_DEMO_CORPUS_ID:?Prepare and pin a full corpus ID first}
+    ports:
+      - target: 3000
+        published: "${QL_DEMO_PORT:-3180}"
+        host_ip: 127.0.0.1
+        protocol: tcp
+    networks: [demo_edge, demo_private]
+    depends_on:
+      demo-backend: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/api/ready',{signal:AbortSignal.timeout(2000)}).then(async r=>{if(!r.ok)throw Error();const d=await r.json();if(d.status!=='ready'||d.policy!=='read_only_demo_v1'||d.corpus_id!==process.env.QUANTLAB_EXPECTED_CORPUS_ID)throw Error()}).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    logging:
+      driver: local
+      options: {max-size: 5m, max-file: "2"}
+    restart: "no"
+
+networks:
+  demo_private:
+    internal: true
+  demo_edge: {}
+
+volumes:
+  demo_corpus:
+    external: true
+    name: ${QL_DEMO_VOLUME:?Create a new uniquely owned Docker volume first}

@@ -1,6 +1,22 @@
 # TASKS - QuantLab
 
-## Current Phase 70 Independent Review (2026-10-18)
+## Current Phase 70 Local Container Continuation (2026-10-18)
+
+Clean main baseline 5b29bbd27b4a7b4c482b7bc12fac8c7a4f92fa08, VERSION4.88.0-dev.
+Standalone local demo Compose, dedicated non-root image recipes, explicit
+offline volume preparation and effective-config/build guards are implemented.
+See [separate post-review evidence](docs/PHASE_70_CONTAINER_TOPOLOGY.md) and
+[operator acceptance](docs/READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md#later-user-controlled-container-acceptance).
+User-attested pre-hardening CI5254/18 skips, build and Edge acceptance are
+historical, not acceptance of this patch. Independent review and new image/
+runtime/browser verification remain gates. No staging/build/startup/hosting here.
+Focused verification: earlier integration35 and final affected policy35 passes
+on separate snapshots, zero skips, all exits0; Node contract12
+passes, TypeScript passed, one focused browser scenario discovered only. Actual
+effective Compose accepted; inherited-dev/missing-ID negatives refused. Engine
+metadata unavailable (Linux pipe absent), so runtime enforcement stays pending.
+
+## Historical Phase 70 Independent Review (2026-10-18)
 
 Attached `main`, implementation `8860ce7bdfb20367debdaf9e36b9ea3900dea0f9`,
 tree `614027cba879ec6abfda3fc1ef48ceab411973b6`, single parent/frozen Phase 69

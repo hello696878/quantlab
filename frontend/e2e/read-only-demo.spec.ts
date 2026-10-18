@@ -1,16 +1,22 @@
 import { expect, test } from "@playwright/test";
 
-test("Prepared read-only demo: approved browse, pinned explanation, proxy refusals and local assets", async ({ page, request, baseURL }) => {
+test("Prepared read-only demo: approved browse, pinned explanation, proxy refusals and local assets", async ({ page, request, baseURL }, testInfo) => {
   const corpus = process.env.E2E_READ_ONLY_DEMO_CORPUS_ID;
   const backend = process.env.E2E_READ_ONLY_DEMO_BACKEND_URL;
-  if (!corpus || !/^[0-9a-f]{64}$/.test(corpus) || !backend || !baseURL) throw new Error("Configure the owned prepared demo, expected corpus ID and both loopback origins before execution");
-  for (const origin of [backend, baseURL]) {
+  const setting = process.env.E2E_READ_ONLY_DEMO_PROXY_ONLY;
+  if (setting !== undefined && setting !== "1") throw new Error("Invalid proxy-only acceptance setting");
+  const proxyOnly = setting === "1";
+  if (!corpus || !/^[0-9a-f]{64}$/.test(corpus) || !baseURL || (proxyOnly ? !!backend : !backend)) {
+    throw new Error("Configure the owned corpus and loopback origins, or explicitly select proxy-only with no backend URL");
+  }
+  if (proxyOnly) testInfo.annotations.push({ type: "acceptance-scope", description: "Private container: browser/proxy only. Direct backend and physical corpus proofs must be retained separately by the operator." });
+  for (const origin of backend ? [backend, baseURL] : [baseURL]) {
     const url = new URL(origin);
     if (!["http:", "https:"].includes(url.protocol) || !["localhost", "127.0.0.1"].includes(url.hostname) || url.username || url.password || url.pathname !== "/" || url.search || url.hash) {
       throw new Error("This bounded scenario requires clean loopback origins");
     }
   }
-  const origins = [backend.replace(/\/$/, ""), `${baseURL.replace(/\/$/, "")}/api`];
+  const origins = [...(backend ? [backend.replace(/\/$/, "")] : []), `${baseURL.replace(/\/$/, "")}/api`];
   const headers = { "X-QuantLab-Expected-Corpus": corpus };
   // Observe public material as well as readiness. Backend owned-storage tests
   // separately attest DB/manifest/sidecar bytes; this is not a filesystem audit.
@@ -40,7 +46,7 @@ test("Prepared read-only demo: approved browse, pinned explanation, proxy refusa
     expect((await request.get(`${origin}/globe/markets`)).status()).toBe(403);
     expect(await publicMaterial(origin)).toEqual(observed.get(origin));
   }
-  expect(observed.get(origins[0])).toEqual(observed.get(origins[1]));
+  if (!proxyOnly) expect(observed.get(origins[0])).toEqual(observed.get(origins[1]));
   const external: string[] = [], mutations: string[] = [], unpinned: string[] = [], unexpected: string[] = [];
   const approved = new Set(["/api/capabilities", "/api/health", "/api/ready", "/api/saved-backtests", "/api/saved-backtests/1", "/api/research-explainer/saved-backtests/1"]);
   page.on("request", (event) => {

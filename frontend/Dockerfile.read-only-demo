@@ -1,0 +1,24 @@
+FROM node:24-alpine AS build
+WORKDIR /app
+ENV NEXT_TELEMETRY_DISABLED=1
+COPY package.json package-lock.json ./
+RUN npm ci --strict-peer-deps --engine-strict
+COPY next.config.js next-env.d.ts tsconfig.json postcss.config.js tailwind.config.ts ./
+COPY src ./src
+COPY container/check-demo-build.cjs ./container/check-demo-build.cjs
+ARG BACKEND_URL=http://demo-backend:8000
+ARG NEXT_PUBLIC_QUANTLAB_EXPECTED_MODE=read_only_demo
+ENV BACKEND_URL=$BACKEND_URL NEXT_PUBLIC_QUANTLAB_EXPECTED_MODE=$NEXT_PUBLIC_QUANTLAB_EXPECTED_MODE
+RUN npm run build
+RUN node container/check-demo-build.cjs .next/routes-manifest.json > demo-build-contract.json
+
+FROM node:24-alpine AS runtime
+WORKDIR /app
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOME=/tmp \
+    BACKEND_URL=http://demo-backend:8000 NEXT_PUBLIC_QUANTLAB_EXPECTED_MODE=read_only_demo
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/.next ./.next
+COPY --from=build /app/package.json /app/next.config.js /app/demo-build-contract.json ./
+USER 10001:10001
+EXPOSE 3000
+CMD ["node", "node_modules/next/dist/bin/next", "start", "--hostname", "0.0.0.0", "--port", "3000"]
