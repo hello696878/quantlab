@@ -128,6 +128,8 @@ interface SavedBacktestDetailProps {
   onBack: () => void;
   onGoHome?: () => void;
   onReplay?: (location: ReplayLocation) => void;
+  readOnly?: boolean;
+  corpusId?: string;
 }
 
 export default function SavedBacktestDetail({
@@ -135,6 +137,8 @@ export default function SavedBacktestDetail({
   onBack,
   onGoHome,
   onReplay,
+  readOnly = false,
+  corpusId,
 }: SavedBacktestDetailProps) {
   const [record, setRecord] = useState<SavedBacktestFull | null>(null);
   const [loading, setLoading] = useState(true);
@@ -152,7 +156,11 @@ export default function SavedBacktestDetail({
     setError(null);
     setRecord(null);
 
-    getSavedBacktest(id)
+    if (readOnly && !corpusId) {
+      setError(new Error("Demo corpus identity unavailable")); setLoading(false); return;
+    }
+
+    getSavedBacktest(id, corpusId)
       .then((data) => {
         if (!cancelled) setRecord(data);
       })
@@ -171,7 +179,7 @@ export default function SavedBacktestDetail({
       cancelled = true;
       replaySelection.current++;
     };
-  }, [id, retryTick]);
+  }, [id, retryTick, corpusId, readOnly]);
 
   // ── States ──────────────────────────────────────────────────────────────
 
@@ -280,7 +288,7 @@ export default function SavedBacktestDetail({
 
   return (
     <div className="space-y-6">
-      <ResearchExplanationPanel key={record.id} id={record.id} />
+      <ResearchExplanationPanel key={`${corpusId ?? "local"}:${record.id}`} id={record.id} corpusId={corpusId} />
       {/* Back link */}
       <button
         type="button"
@@ -305,9 +313,10 @@ export default function SavedBacktestDetail({
               Saved {fmtSavedDate(record.created_at)}
             </div>
             <ExportReportButton
+              showSave={!readOnly}
               getReport={(tpl) => buildSavedBacktestReport(record, tpl)}
             />
-            {onReplay && savedRepro && <button type="button" className="rounded border border-[var(--line)] bg-[var(--bg)] text-[var(--text-hi)] px-3 py-2 text-xs disabled:opacity-40" disabled={replayBusy}
+            {!readOnly && onReplay && savedRepro && <button type="button" className="rounded border border-[var(--line)] bg-[var(--bg)] text-[var(--text-hi)] px-3 py-2 text-xs disabled:opacity-40" disabled={replayBusy}
               onClick={async () => {
                 if (record.config_hash_full) { onReplay({ hash: record.config_hash_full }); return; }
                 const ticket = replaySelection.current;

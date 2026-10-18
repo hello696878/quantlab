@@ -37,6 +37,11 @@ POST /research/sma-walk-forward        — SMA walk-forward optimization
 POST /research/strategy-comparison     — compare five single-asset strategies
 """
 
+from app.serving import guard_local_entrypoint, LOCAL_CAPABILITIES, RejectDemoPrecondition
+
+# Refuse the wrong entrypoint before ordinary module/provider imports or startup.
+guard_local_entrypoint()
+
 import hashlib
 import json
 from contextlib import asynccontextmanager
@@ -405,6 +410,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.add_middleware(RejectDemoPrecondition)
 
 
 def _sanitize_non_finite(obj):
@@ -989,6 +995,11 @@ def _best_row(rows: list, selection_metric: str) -> "SmaSweepRow":
 def health_check():
     """Return a simple 200 OK to confirm the server is running."""
     return {"status": "ok", "version": "0.7.0"}
+
+
+@app.get("/capabilities", tags=["ops"])
+def serving_capabilities():
+    return JSONResponse(LOCAL_CAPABILITIES, headers={"Cache-Control": "no-store"})
 
 
 @app.post(

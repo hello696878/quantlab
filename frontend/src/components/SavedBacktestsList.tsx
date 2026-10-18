@@ -66,6 +66,8 @@ interface SavedBacktestsListProps {
   onGoHome?: () => void;
   /** Navigate to the Backtest workspace (empty-state action). */
   onRunBacktest?: () => void;
+  readOnly?: boolean;
+  corpusId?: string;
 }
 
 export default function SavedBacktestsList({
@@ -73,6 +75,8 @@ export default function SavedBacktestsList({
   refreshKey,
   onRunBacktest,
   onGoHome,
+  readOnly = false,
+  corpusId,
 }: SavedBacktestsListProps) {
   const [rows, setRows] = useState<SavedBacktestSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -86,7 +90,11 @@ export default function SavedBacktestsList({
     setLoading(true);
     setError(null);
 
-    listSavedBacktests()
+    if (readOnly && !corpusId) {
+      setError(new Error("Demo corpus identity unavailable")); setLoading(false); return;
+    }
+
+    listSavedBacktests(corpusId)
       .then((data) => {
         if (!cancelled) setRows(data);
       })
@@ -104,9 +112,10 @@ export default function SavedBacktestsList({
     return () => {
       cancelled = true;
     };
-  }, [refreshKey, retryTick]);
+  }, [refreshKey, retryTick, corpusId, readOnly]);
 
   async function handleDelete(id: number, name: string) {
+    if (readOnly) return;
     if (!confirm(`Delete "${name}"? This cannot be undone.`)) return;
     setDeletingId(id);
     setDeleteError(null);
@@ -245,7 +254,8 @@ export default function SavedBacktestsList({
                     <button
                       type="button"
                       onClick={() => handleDelete(row.id, row.name)}
-                      disabled={deletingId === row.id}
+                      disabled={readOnly || deletingId === row.id}
+                      title={readOnly ? "Unavailable in read-only demo" : undefined}
                       className="text-xs px-2.5 py-1 rounded-md border border-red-200
                                  text-red-600 hover:bg-red-50 transition-colors font-medium
                                  disabled:opacity-50"

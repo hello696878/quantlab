@@ -18,6 +18,17 @@ claimed by an entry here.
 
 ## Unreleased
 
+- **Phase 70 implementation** (2026-10-18, `4.88.0-dev`): explicit operator-only
+  read-only synthetic-demo serving factory, deny-by-default six-route policy,
+  RO corpus verification, offline preparation/stopped-copy operations, bounded
+  host/request/admission controls and capability-gated existing saved browsing.
+  Google font requests removed; ordinary local research remains default. No
+  hosting/auth/cloud/provider/research additions or production certification.
+  Phase 69 frozen at `1062ec48...` under its existing tag; supplied successful
+  final-doc CI `39091756914` is inherited. Executed verification/failures and
+  pending independent-review/CI/user build/browser/container gates are in
+  [implementation evidence](docs/PHASE_70_IMPLEMENTATION.md). No later phase.
+
 - **Phase 69 final evidence** (2026-10-18, `4.87.0-dev` unchanged): exact-review
   CI `39017836732` succeeded in both jobs, backend 5144 passed /18 unidentified
   skips. User production build and one isolated Edge Explainer scenario passed.

@@ -1,6 +1,18 @@
 # QuantLab — Forward Roadmap, Phases 63–70 (written in Phase 62.0)
 
-> **Current status (2026-10-18):** Phase 69 bounded deterministic stored-SMA
+> **Current status (2026-10-18):** Phase 70 implemented locally at `4.88.0-dev`:
+> explicit read-only synthetic serving, six-route deny-by-default policy,
+> offline corpus lifecycle, capability-aware existing browsing and bounded
+> request/admission controls. No hosting/cloud/auth/telemetry or certification.
+> Phase 69 is frozen at `1062ec48b4128af867ab5a3329951511ebff285c`, tree
+> `3a06cbef017e1828781d2e6861c17eecf4afd014`, under its existing annotated v4.87
+> tag. Supplied final-document CI `39091756914` succeeded in both jobs, not rerun.
+> See [implementation evidence](PHASE_70_IMPLEMENTATION.md) and
+> [operations/limits](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md). Independent
+> review, user commit/CI/build/browser and hardened-container runtime gates remain.
+> No new roadmap phase is inferred.
+
+> **Historical status (2026-10-18, frozen at 1062ec48):** Phase 69 bounded deterministic stored-SMA
 > explainer implemented at `4.87.0-dev`, with pinned read-only acquisition,
 > closed factual wording, exact references and JSON export in Saved detail.
 > Implementation `ff7a288b...` and review `4c59abd1...` are committed on `main`.
@@ -463,6 +475,14 @@ scanning.
 ---
 
 ## Phase 70 — Read-Only Hosted Demo and Deployment Hardening Plan v1
+
+**Implementation status (2026-10-18).** Explicit demo factory/policy, offline
+synthetic corpus, RO verification, narrow existing UI and local admission/request
+controls are implemented. Hosting, TLS/ingress/container enforcement, telemetry,
+auth and general online backup/migrations are not. See
+[actual evidence and pending inventory](PHASE_70_IMPLEMENTATION.md) and
+[operations/limits](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md). Independent
+review and user-controlled release/runtime acceptance remain separate gates.
 
 **Goal.** Produce the plan and the hardening work for a **read-only**
 public demo, without adding authentication or multi-user features.

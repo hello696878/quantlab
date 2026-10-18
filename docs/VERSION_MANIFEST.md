@@ -1,4 +1,4 @@
-# QuantLab — Version Manifest (Phase 69.0)
+# QuantLab - Version Manifest (Phase 70.0)
 
 The project's versioning conventions, verified against the local git history
 when written. Companion docs: [`../CHANGELOG.md`](../CHANGELOG.md) (grouped
@@ -12,6 +12,21 @@ changelog) · [`MILESTONE_HISTORY.md`](MILESTONE_HISTORY.md) ·
 > anything about live trading.
 
 ## 1. Current version label
+
+**`4.88.0-dev`**, Phase 70 read-only synthetic demo and deployment hardening plan.
+Branch `phase70-read-only-demo-deployment-hardening-plan`, frozen baseline
+`1062ec48b4128af867ab5a3329951511ebff285c`, tree
+`3a06cbef017e1828781d2e6861c17eecf4afd014`; existing annotated v4.87 tag verified
+at that target. Supplied final-document CI `39091756914` succeeded, not rerun.
+No hosting or production/security certification. See
+[implementation evidence](PHASE_70_IMPLEMENTATION.md) and
+[serving/operations limits](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md).
+Independent review, later user commit/exact-commit CI/build/browser acceptance
+and hardened-container runtime verification remain pending. No Phase 71.
+Future user-created tag, not created by this implementation:
+`v4.88.0-read-only-hosted-demo-deployment-hardening-plan-v1`.
+
+### Historical Phase 69 Version Note (Frozen at 1062ec48)
 
 **`4.87.0-dev`**, Phase 69 deterministic evidence-grounded stored-SMA explainer,
 review branch `main`, implementation `ff7a288baa56ba61cb58d0de3aba524ec7a441cf`, base

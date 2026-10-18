@@ -40,15 +40,18 @@ def get_db_path() -> Path:
 # ---------------------------------------------------------------------------
 
 
-def get_connection() -> sqlite3.Connection:
+def get_connection(*, path: Optional[Path] = None) -> sqlite3.Connection:
     """
     Open and return a new SQLite connection.
+
+    An explicit path is used only by deliberate offline corpus preparation;
+    read-only serving never calls this writable factory.
 
     The parent directory of the database file is created automatically when it
     does not exist (covers the default ``backend/data/`` directory and any
     temporary directory used by tests).
     """
-    db_path = get_db_path()
+    db_path = get_db_path() if path is None else path
     db_path.parent.mkdir(parents=True, exist_ok=True)
     conn = sqlite3.connect(str(db_path))
     conn.row_factory = sqlite3.Row
@@ -68,14 +71,14 @@ def _ensure_column(conn: sqlite3.Connection, table: str,
 # ---------------------------------------------------------------------------
 
 
-def init_db() -> None:
+def init_db(*, path: Optional[Path] = None) -> None:
     """
     Create the application tables if they do not already exist.
 
     Safe to call multiple times (idempotent).  Called once at application
     startup and once per test via the ``fresh_db`` fixture.
     """
-    db_path = get_db_path()
+    db_path = get_db_path() if path is None else path
     db_path.parent.mkdir(parents=True, exist_ok=True)
 
     conn = sqlite3.connect(str(db_path))

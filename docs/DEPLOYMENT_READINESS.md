@@ -1,4 +1,23 @@
-# QuantLab — Deployment Readiness Notes (Phase 38.0)
+# QuantLab - Deployment Readiness Notes
+
+## Current Guidance (2026-10-18, Phase 70)
+
+Use [Read-Only Demo and Deployment Hardening](READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md)
+and [Phase 70 evidence](PHASE_70_IMPLEMENTATION.md) for the new explicit demo
+factory, corpus lifecycle, local controls and still-unbuilt hosting requirements.
+Nothing is deployed or production/security-certified. Ordinary Compose remains
+development-only and exposes both ports; it is not the hardened topology.
+
+The material below is preserved Phase 38 history, NOT current operational
+instructions. In particular: do not use its Node 18/Next 14 assumptions or
+four-command workflow as the current release gate; current frontend engines are
+Node >=24.20 <25/npm >=11 <12 with Next 15.5.25. Use the protected backend runner
+and actual current-version evidence. Standard yfinance backtests are not offline.
+NEVER delete artifacts, evidence, databases or sidecars to satisfy the old
+artifact-absence checklist. Retain them outside approved source instead. Google
+font requests have now been removed in favor of existing system fallbacks.
+
+## Historical Phase 38 Material (Superseded)
 
 An honest inventory of what exists for running QuantLab, and what a public
 hosted deployment would still need. **Deployment is not complete and is not

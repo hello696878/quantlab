@@ -275,9 +275,10 @@ export const NAV: NavItem[] = NAV_GROUPS.flatMap((g) => g.items);
 interface SidebarProps {
   active: View;
   onNav: (view: View) => void;
+  readOnly?: boolean;
 }
 
-export default function Sidebar({ active, onNav }: SidebarProps) {
+export default function Sidebar({ active, onNav, readOnly = false }: SidebarProps) {
   return (
     <aside
       className="shell-sidebar fixed bottom-0 left-0 right-0 z-30 flex h-16 w-full items-center gap-2 overflow-x-auto px-3 py-2 md:top-0 md:bottom-auto md:h-screen md:w-56 md:flex-col md:items-stretch md:overflow-x-hidden md:overflow-y-auto md:px-3.5 md:py-5"
@@ -302,8 +303,10 @@ export default function Sidebar({ active, onNav }: SidebarProps) {
                 key={n.id}
                 type="button"
                 onClick={() => onNav(n.id)}
+                disabled={readOnly && n.id !== "home" && n.id !== "saved"}
+                title={readOnly && n.id !== "home" && n.id !== "saved" ? "Unavailable in read-only demo" : undefined}
                 aria-current={active === n.id ? "page" : undefined}
-                className={"navbtn md:w-full" + (active === n.id ? " active" : "")}
+                className={"navbtn md:w-full disabled:opacity-40 disabled:cursor-not-allowed" + (active === n.id ? " active" : "")}
               >
                 <span className="navicon">
                   <Icon name={n.icon} />
@@ -329,7 +332,7 @@ export default function Sidebar({ active, onNav }: SidebarProps) {
           >
             FastAPI backtest core
             <br />
-            yfinance market data
+            {readOnly ? "Offline synthetic corpus" : "yfinance market data"}
           </div>
         </div>
         <p

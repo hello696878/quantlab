@@ -26,6 +26,19 @@ it("does not fetch automatically; explicit read binds exact raw fact and path", 
   expect(fetch).toHaveBeenCalledWith("/api/research-explainer/saved-backtests/1", { cache: "no-store" });
 });
 
+it("pins demo explanation and source rechecks to the negotiated corpus", async () => {
+  const fetch = vi.fn().mockImplementation(async (_url: string, _options?: RequestInit) => new Response(JSON.stringify(fixture())));
+  vi.stubGlobal("fetch", fetch);
+  const corpusId = "c".repeat(64);
+  render(<ResearchExplanationPanel id={1} corpusId={corpusId} />);
+  fireEvent.click(screen.getByRole("button", { name: "Explain stored result" }));
+  fireEvent.click(await screen.findByRole("button", { name: "Check pinned source" }));
+  expect(fetch.mock.calls).toHaveLength(2);
+  for (const [, options] of fetch.mock.calls) {
+    expect(options).toEqual({ cache: "no-store", headers: { "X-QuantLab-Expected-Corpus": corpusId } });
+  }
+});
+
 it("blocks batched duplicate reads and keeps B when A completes after B", async () => {
   let finishA!: (r: Response) => void, finishB!: (r: Response) => void;
   const fetch = vi.fn()

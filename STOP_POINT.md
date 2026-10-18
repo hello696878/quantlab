@@ -1,6 +1,38 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 69 Final Evidence (2026-10-18)
+## Current Handoff: Phase 70 Implementation (2026-10-18)
+
+Branch `phase70-read-only-demo-deployment-hardening-plan`, frozen baseline HEAD
+`1062ec48b4128af867ab5a3329951511ebff285c`, tree
+`3a06cbef017e1828781d2e6861c17eecf4afd014`. Existing annotated v4.87 tag resolves
+to that exact baseline; initial working/index/untracked sets were empty. User
+supplies successful final-doc CI `39091756914`; Phase 69 is closed, not rerun.
+VERSION is `4.88.0-dev`.
+
+Implemented explicit serving-mode selection, a separate six-route deny-by-default
+read-only demo, one offline-prepared synthetic SMA corpus, RO verification and
+non-overwriting stopped copies, capability-gated existing saved browsing and
+local request/admission limits. Other workspaces, providers, research and all
+visitor mutations are unavailable. Ordinary local behavior remains the default;
+mode/corpus identity is operator configuration, not an HTTP or browser switch.
+
+Verification: earlier broad backend357 and final affected backend168 passed on
+separate protected snapshots, zero skips; final pytest/child/outer exits0/0/0.
+Frontend277/27 files, TypeScript passed, discovery1/280 only. Retain initial
+TypeScript failure and setup-only temp-permission failure; no whole-tree or
+browser/build acceptance inferred. Conditional corpus reads prevent stale demo
+pages from falling through to ordinary saved data after a backend restart.
+
+Use [operations/limits](docs/READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md) and
+[implementation evidence](docs/PHASE_70_IMPLEMENTATION.md) for exact source reuse,
+tests/snapshots/failures, pending inventory and later USER-ONLY staging plan.
+Independent review, exact-commit Python 3.11 CI, user production build/proxy check,
+one prepared-corpus browser scenario and hardened-container runtime remain gates.
+No application service, build, browser execution, installation, cloud action,
+staging, commit, push, tag, PR, workflow trigger, deployment or Phase 71 here.
+Stop for the fresh independent review; do not repeat Phase 69 finalization.
+
+## Historical Handoff: Phase 69 Final Evidence (2026-10-18, Frozen at 1062ec48)
 
 Attached `main`, review HEAD `4c59abd1c0cc655f7efe78a7bae423acdef4b0a8`, tree
 `591d03152798e427a0b9b58b79e1ea7e994261ba`; VERSION remains `4.87.0-dev`.

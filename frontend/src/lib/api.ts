@@ -5,6 +5,7 @@
  * (see next.config.js).  This avoids any browser-level CORS concerns.
  */
 
+import { corpusPrecondition } from "./servingCapabilities";
 import type {
   BacktestRequest,
   BacktestResponse,
@@ -748,17 +749,18 @@ export async function createSavedBacktest(
 }
 
 /** GET /api/saved-backtests */
-export async function listSavedBacktests(): Promise<SavedBacktestSummary[]> {
+export async function listSavedBacktests(corpusId?: string): Promise<SavedBacktestSummary[]> {
   return savedBacktestsRequest<SavedBacktestSummary[]>("/api/saved-backtests", {
     method: "GET",
+    ...corpusPrecondition(corpusId),
   });
 }
 
 /** GET /api/saved-backtests/{id} */
-export async function getSavedBacktest(id: number): Promise<SavedBacktestFull> {
+export async function getSavedBacktest(id: number, corpusId?: string): Promise<SavedBacktestFull> {
   return savedBacktestsRequest<SavedBacktestFull>(
     `/api/saved-backtests/${id}`,
-    { method: "GET" },
+    { method: "GET", ...corpusPrecondition(corpusId) },
   );
 }
 

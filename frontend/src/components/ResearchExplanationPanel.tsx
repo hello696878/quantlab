@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { explainSavedBacktest, downloadExplanation, type ResearchExplanation } from "@/lib/researchExplainer";
 
-export default function ResearchExplanationPanel({ id }: { id: number }) {
+export default function ResearchExplanationPanel({ id, corpusId }: { id: number; corpusId?: string }) {
   const [bundle, setBundle] = useState<ResearchExplanation | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -13,13 +13,13 @@ export default function ResearchExplanationPanel({ id }: { id: number }) {
     ticket.current++; pending.current = false;
     setBundle(null); setError(null); setBusy(false); setSelected(null);
     return () => { ticket.current++; };
-  }, [id]);
+  }, [id, corpusId]);
   async function request(check = false) {
     if (pending.current) return;
     const current = ++ticket.current;
     pending.current = true; setBusy(true); setError(null);
     try {
-      const result = await explainSavedBacktest(id, check ? bundle?.fingerprint : undefined);
+      const result = await explainSavedBacktest(id, check ? bundle?.fingerprint : undefined, corpusId);
       if (current === ticket.current) { setBundle(result); setSelected(null); }
     } catch (err) {
       if (current === ticket.current) {

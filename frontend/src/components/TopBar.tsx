@@ -113,9 +113,10 @@ function ApiStatus() {
 interface TopBarProps {
   title: string;
   subtitle?: string;
+  readOnly?: boolean;
 }
 
-export default function TopBar({ title, subtitle }: TopBarProps) {
+export default function TopBar({ title, subtitle, readOnly = false }: TopBarProps) {
   return (
     <header
       className="topbar sticky top-0 z-20 flex items-center gap-4 px-7 py-4 max-lg:flex-wrap"
@@ -155,7 +156,7 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
         </div>
       </div>
       <div className="ml-auto flex items-center gap-3.5">
-        <PaletteHint />
+        {!readOnly && <PaletteHint />}
         <Clock />
         <ApiStatus />
       </div>

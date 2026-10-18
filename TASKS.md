@@ -1,6 +1,31 @@
 # TASKS - QuantLab
 
-## Current Phase 69 Final Evidence (2026-10-18)
+## Current Phase 70 Implementation (2026-10-18)
+
+Frozen Phase 69 baseline/tag target `1062ec48b4128af867ab5a3329951511ebff285c`,
+tree `3a06cbef017e1828781d2e6861c17eecf4afd014`; supplied successful final-document
+CI `39091756914` is inherited, not Phase 70 acceptance. New branch
+`phase70-read-only-demo-deployment-hardening-plan`; VERSION `4.88.0-dev`.
+
+- [x] Map actual writable startup/read helpers, provider-enabled GETs, routes and browser external assets.
+- [x] Strict operator mode/factory, no writable/default-corpus fallback, narrow RO startup verification.
+- [x] Explicit six-route policy and early ASGI refusal, bounded requests, process-local admission.
+- [x] Offline synthetic SMA preparation/verification and collision-refusing stopped backup/restore.
+- [x] Capability handshake, existing saved-result/explanation UI, disabled unsupported actions and local font fallbacks.
+- [x] Implement focused backend/frontend tests and a prepared-corpus browser spec; record executed outcomes separately in the implementation report.
+- [x] Document one hosting topology plus unbuilt TLS/container/network/secrets/monitoring/migration requirements.
+- [x] Final affected protected backend168/zero skips and frontend277/27 files passed; TypeScript passed, browser discovery1/280 only. Earlier broad357 snapshot stays separate; all recorded final exits0.
+- [ ] Fresh independent review of the actual unstaged diff.
+- [ ] Later user staging/commit decision, exact-commit Python 3.11 whole-tree CI.
+- [ ] User production build and private BACKEND_URL route-manifest verification.
+- [ ] One isolated prepared-corpus browser acceptance; discovery is not execution.
+- [ ] Hardened image/non-root/read-only mounts/resource/ingress runtime verification before any hosting.
+
+See [implementation evidence](docs/PHASE_70_IMPLEMENTATION.md) and
+[operations/limits](docs/READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md).
+No staging, commit, push, tag, PR, deployment, service or Phase 71 is authorized.
+
+## Historical Phase 69 Final Evidence (2026-10-18, Frozen at 1062ec48)
 
 Verified frozen Phase 68 main/base `2cd8f2585816fda0dc389f5a721ab02b0a3d71d8`,
 tree `2c3dfde47bfb4c6924e7ab807727fc3d104de8ab` and annotated v4.86 tag.

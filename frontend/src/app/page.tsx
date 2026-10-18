@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import AppShell, { type View } from "@/components/AppShell";
+import ServingGate from "@/components/ServingGate";
 import BacktestForm from "@/components/BacktestForm";
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
@@ -701,7 +702,7 @@ const GLOBE_MARKET_ALIASES: Record<string, string> = {
 // Page
 // ---------------------------------------------------------------------------
 
-export default function HomePage() {
+function LocalResearchApp() {
   const [view, setView] = useState<View>("home");
   useStrategyEnsembleLinkCleanup(view);
   useMLLifecycleLinkCleanup(view);
@@ -2613,4 +2614,8 @@ export default function HomePage() {
       />
     </AppShell>
   );
+}
+
+export default function HomePage() {
+  return <ServingGate><LocalResearchApp /></ServingGate>;
 }

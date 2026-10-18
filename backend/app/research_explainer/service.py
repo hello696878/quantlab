@@ -99,9 +99,9 @@ def _json_preflight(raw, *, limit=replay_identity.MAX_JSON):
         raise ValueError("Stored JSON has unfinished containers")
 
 
-def acquire(saved_id):
+def acquire(saved_id, *, path=None):
     replay.positive_id(saved_id)
-    path = db.get_db_path().absolute()
+    path = (db.get_db_path() if path is None else Path(path)).absolute()
     if not path.is_file():
         raise Missing("Stored source is unavailable")
     try:
@@ -160,10 +160,10 @@ def acquire(saved_id):
     return row, context
 
 
-def explain(saved_id, expected=None):
+def explain(saved_id, expected=None, *, path=None):
     if expected is not None:
         replay_identity.full_hash(expected)
-    saved, context = acquire(saved_id)
+    saved, context = acquire(saved_id) if path is None else acquire(saved_id, path=path)
     if saved["strategy"] != "sma_crossover":
         raise Unavailable("Only the saved SMA adapter is supported")
     if saved.get("config_schema") not in (None, "backtest_config_v1"):

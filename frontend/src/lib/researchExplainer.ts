@@ -1,4 +1,5 @@
 import { BacktestApiError } from "./api";
+import { corpusPrecondition } from "./servingCapabilities";
 
 export interface ExplanationFact {
   id: string; source: "saved" | "context"; path: string;
@@ -69,8 +70,8 @@ export function checkExplanation(bundle: ResearchExplanation, id: number): Resea
   return bundle;
 }
 
-export async function explainSavedBacktest(id: number, expected?: string): Promise<ResearchExplanation> {
-  const response = await fetch(`/api/research-explainer/saved-backtests/${id}${expected ? `?expected=${encodeURIComponent(expected)}` : ""}`, { cache: "no-store" });
+export async function explainSavedBacktest(id: number, expected?: string, corpusId?: string): Promise<ResearchExplanation> {
+  const response = await fetch(`/api/research-explainer/saved-backtests/${id}${expected ? `?expected=${encodeURIComponent(expected)}` : ""}`, { cache: "no-store", ...corpusPrecondition(corpusId) });
   const text = await response.text();
   if (text.length > 64 * 1024) throw new Error("Explanation exceeds supported size");
   let result;

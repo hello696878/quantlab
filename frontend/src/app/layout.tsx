@@ -30,19 +30,7 @@ export default function RootLayout({
               "document.documentElement.setAttribute('data-accent',a);}catch(e){}})();",
           }}
         />
-        {/* Design-system fonts: Manrope (UI) + JetBrains Mono (data/figures).
-            Loaded via <link> so an offline build still succeeds (system
-            fallbacks apply at runtime). */}
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link
-          rel="preconnect"
-          href="https://fonts.gstatic.com"
-          crossOrigin="anonymous"
-        />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap"
-          rel="stylesheet"
-        />
+        {/* Use existing CSS system fallbacks; no browser-side font provider. */}
       </head>
       {/* The dark background, aurora, and grid come from globals.css (body::before/::after). */}
       <body className="min-h-screen">

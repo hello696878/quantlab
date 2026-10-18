@@ -14,7 +14,24 @@ palette, shared charts, local LaTeX formula panels).
 > investment, trading, allocation, legal, tax, compliance, or risk-management
 > advice, and not production trading, risk, or compliance infrastructure.
 
-## Current development: Phase 69
+## Current Development: Phase 70
+
+`4.88.0-dev` adds an explicit read-only synthetic-demo serving factory, a
+deny-by-default six-route backend policy, offline corpus preparation/verification/
+copying, bounded local request/admission controls and capability-aware existing
+saved-result browsing. Ordinary local research remains the default. Missing or
+unverified capabilities lock workspace loading; no provider/research/persistence
+request is permitted by the demo. No hosting, auth, cloud, telemetry or production
+certification is added. See [operations and limits](docs/READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md)
+and [implementation evidence](docs/PHASE_70_IMPLEMENTATION.md) for verification
+and pending independent-review/CI/user build/browser/container-runtime gates.
+
+Phase 69 is frozen at `1062ec48b4128af867ab5a3329951511ebff285c`, tree
+`3a06cbef017e1828781d2e6861c17eecf4afd014`, under its existing v4.87 annotated
+tag. Supplied final-document CI `39091756914` succeeded in both jobs, not rerun.
+The checkpoint below is historical; its later documentation/tag steps are done.
+
+## Historical Phase 69 Checkpoint (Frozen at 1062ec48)
 
 Saved Backtest detail now offers **Explain stored result** for the bounded SMA
 adapter: deterministic stored facts, exact raw/display/unit/path references,

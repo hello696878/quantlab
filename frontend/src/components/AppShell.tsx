@@ -73,6 +73,7 @@ interface AppShellProps {
   title: string;
   subtitle?: string;
   children: ReactNode;
+  readOnly?: boolean;
 }
 
 /**
@@ -88,13 +89,14 @@ export default function AppShell({
   title,
   subtitle,
   children,
+  readOnly = false,
 }: AppShellProps) {
   return (
     <>
-      <Sidebar active={active} onNav={onNav} />
+      <Sidebar active={active} onNav={onNav} readOnly={readOnly} />
 
       <div className="flex min-h-screen flex-col md:ml-56">
-        <TopBar title={title} subtitle={subtitle} />
+        <TopBar title={title} subtitle={subtitle} readOnly={readOnly} />
         <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-6 pb-24 sm:px-6 md:px-7 md:py-8 md:pb-8">
           {children}
         </main>

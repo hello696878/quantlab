@@ -71,7 +71,7 @@ def _row_to_full(row) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
-def create_saved_backtest(data: Dict[str, Any]) -> Dict[str, Any]:
+def create_saved_backtest(data: Dict[str, Any], *, path=None) -> Dict[str, Any]:
     """
     Insert a new saved backtest record.
 
@@ -83,7 +83,8 @@ def create_saved_backtest(data: Dict[str, Any]) -> Dict[str, Any]:
         .replace("+00:00", "Z")
     )
 
-    with closing(get_connection()) as conn, conn:
+    connection = get_connection() if path is None else get_connection(path=path)
+    with closing(connection) as conn, conn:
         cursor = conn.execute(
             """
             INSERT INTO saved_backtests (
@@ -116,7 +117,7 @@ def create_saved_backtest(data: Dict[str, Any]) -> Dict[str, Any]:
             register_in_transaction(conn, new_id, data, data["replay"])
         conn.commit()
 
-    result = get_saved_backtest(new_id)
+    result = get_saved_backtest(new_id) if path is None else get_saved_backtest(new_id, path=path)
     assert result is not None  # just inserted — must exist
     return result
 
@@ -132,11 +133,12 @@ def list_saved_backtests() -> List[Dict[str, Any]]:
     return [_row_to_summary(row) for row in rows]
 
 
-def get_saved_backtest(id: int) -> Optional[Dict[str, Any]]:
+def get_saved_backtest(id: int, *, path=None) -> Optional[Dict[str, Any]]:
     """
     Return the full record for *id*, or ``None`` if not found.
     """
-    with closing(get_connection()) as conn:
+    connection = get_connection() if path is None else get_connection(path=path)
+    with closing(connection) as conn:
         row = conn.execute(
             "SELECT * FROM saved_backtests WHERE id = ?", (id,)
         ).fetchone()
