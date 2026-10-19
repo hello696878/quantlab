@@ -16,7 +16,8 @@ baseline, static checks, inventory, limitations and review decision. The complet
 PHASE_70_REVIEW.md remains historical evidence, not review of this continuation.
 
 Two serving containers use numeric UID/GID 10001, cap_drop ALL,
-no-new-privileges, read-only roots, only 64 MiB noexec/nosuid/nodev /tmp tmpfs,
+no-new-privileges, read-only roots, one declared writable application tmpfs
+at /tmp (64 MiB, noexec/nosuid/nodev),
 one CPU each, backend/frontend memory 512/768 MiB, PID limits 96/128 and
 nofile 1024. Backend has no host port, one worker, no raw access log and no
 proxy-header trust. Its /corpus named volume is read-only with nocopy. It joins
@@ -106,6 +107,14 @@ $null = Run 'node-engine' $Node @('-e',"const [a,b]=process.versions.node.split(
 $Names = Run 'volume-collision' docker @('volume','ls','--filter',"name=^$Volume`$",'--format','{{.Name}}')
 if ($Names.Trim()) { throw 'Destination volume already exists' }
 $null = Run 'create-volume' docker @('volume','create','--driver','local','--label','quantlab.phase=70','--label',"quantlab.owner=$Token",$Volume)
+$OwnedVolume = @(Run 'new-volume-ownership' docker @('volume','inspect',$Volume) | ConvertFrom-Json)
+if ($OwnedVolume.Count -ne 1 -or $OwnedVolume[0].Name -cne $Volume -or
+    $OwnedVolume[0].Driver -cne 'local' -or $OwnedVolume[0].Scope -cne 'local' -or
+    $OwnedVolume[0].Labels.'quantlab.phase' -cne '70' -or
+    $OwnedVolume[0].Labels.'quantlab.owner' -cne $Token -or
+    ($null -ne $OwnedVolume[0].Options -and @($OwnedVolume[0].Options.PSObject.Properties).Count -ne 0)) {
+    throw 'Require the newly labelled ordinary local volume with no driver options; do not mount or repair it'
+}
 $null = Run 'build-backend' docker @('build','--pull','-f',"$Source/backend/Dockerfile.read-only-demo",'-t',$BackendImage,"$Source/backend")
 $Offline = @('run','--read-only','--network','none','--user','10001:10001','--cap-drop','ALL','--security-opt','no-new-privileges:true',
     '--tmpfs','/tmp:rw,noexec,nosuid,nodev,size=64m,mode=1777','--cpus','1','--memory','512m','--pids-limit','96')
@@ -183,8 +192,12 @@ $null = Run 'frontend-boundary' docker @('exec',$Frontend,'node','-e',"const fs=
 Inspect the retained JSON before proceeding: actual serving UID/GID 10001,
 CapEff/CapPrm/CapBnd zero and NoNewPrivs 1, HostConfig.ReadonlyRootfs true,
 CapDrop ALL, SecurityOpt no-new-privileges, 1e9 NanoCpus, memory/PID/nofile
-budgets as declared, /tmp tmpfs only, corpus Mounts.RW false, no frontend
-mounts beyond tmpfs, correct commands/factory and one worker, backend only on
+budgets as declared, /tmp as the only configured writable application mount,
+corpus Mounts.RW false and no frontend application-data/cache mounts. Enumerate
+Docker-managed /dev, /dev/shm, /proc and other pseudo-filesystems separately;
+read-only root and a tmpfs declaration do not prove every process-visible path
+is read-only. Reject unexpected host/data/socket mounts. Verify correct
+commands/factory and one worker, backend only on
 internal demo_private and no PortBindings, frontend only 127.0.0.1 with no IPv6
 wildcard publication. Record actual health/state/logging settings. Default
 image entrypoint and init are not proof of UID; inspect the running process.
@@ -252,8 +265,14 @@ cleaner summary, fabricate absent exits, or claim a build closed runtime gates.
 ### Stopped Docker Volume Backup and Restore
 
 Stop both serving containers explicitly (`docker` with `$Compose + @('stop')`)
-and inspect stopped state. For a NEW uniquely labelled destination Docker volume,
-reuse the same non-root `$Offline` image operation: source volume at /source
+and inspect both container states as stopped before copying; --stopped remains
+an operator attestation. Allocate a NEW GUID/token/name for each destination;
+repeat the volume collision, local-driver/no-options and ownership-label checks
+above before its first mount. Source and destination names must differ. In the
+non-root offline operation, check actual UID/GID 10001, destination /corpus owner
+10001:10001 and an empty destination volume root before copying. A driver,
+label, owner or emptiness mismatch stops without chown, reuse or cleanup.
+Reuse the same non-root `$Offline` image operation: source volume at /source
 read-only/nocopy, destination at /corpus with empty-volume copy-up; run
 `python -B -m app.demo_corpus copy-stopped --source /source/v1 --destination /corpus/v1 --expected-id $Id --stopped`.
 Verify the new volume with an RO/nocopy mount and compare DB/manifest hashes
@@ -488,11 +507,12 @@ not all Docker pattern matching, arbitrary private files or resulting image laye
 They are not an executed Docker context/image inspection
 or a replacement for secret scanning and deployment-runtime verification.
 
-Before hosting, implement and independently verify non-root UID/GID, dropped
-capabilities, no-new-privileges, read-only root/corpus, only bounded tmpfs /tmp,
-loopback-only local frontend entrypoint, backend/private network, bounded CPU,
-memory, process/file-descriptor/connection/header/body budgets and network egress
-denial. Start with one worker; size limits with measurements, not a certification.
+The standalone local topology now declares non-root UID/GID, dropped
+capabilities, no-new-privileges, read-only root/corpus, bounded application /tmp,
+loopback frontend, private backend and CPU/memory/PID/nofile limits. Before
+acceptance, independently verify their actual running enforcement and one-worker
+startup. Connection/ingress budgets, complete network egress denial and public
+hosting controls remain future work. Size limits with measurements, not a certification.
 Do not mount checkout/home/socket/active data or import a developer .env wholesale.
 Use an image-available stdlib HTTP health probe; keep liveness/readiness separate.
 
@@ -518,18 +538,21 @@ operator gates, not proof supplied by old audits or this plan.
 
 ## Verification Gates
 
-See [independent review](PHASE_70_REVIEW.md) for seven corrected defects,
-219 focused backend passes/zero skips, 283 frontend passes, exact source
-identities, retained failures and the REVIEW inventory. Historical
-[implementation evidence](PHASE_70_IMPLEMENTATION.md) remains separate.
-Exact-review-commit Python 3.11 whole-tree CI, user production build/proxy-manifest
-check, one prepared-corpus browser scenario and later hardened-container runtime
-checks remain separate gates. Phase 69's five physical-link cases were not rerun;
-new Phase 70 corpus-link and storage-operation checks cover changed dependencies.
+The [product review](PHASE_70_REVIEW.md) and
+[product implementation](PHASE_70_IMPLEMENTATION.md) remain historical evidence.
+The container implementation records the user's pre-hardening CI 5254/18 skips,
+build and Edge acceptance as user-attested, not rerun/retrieved or acceptance of
+this topology. See [container implementation evidence](PHASE_70_CONTAINER_TOPOLOGY.md)
+and the [independent container review](PHASE_70_CONTAINER_REVIEW.md).
+Exact-container-review-commit Python 3.11/Linux CI, new image builds/proxy-manifest
+inspection, prepared-container browser acceptance and actual hardened runtime
+verification remain separate gates. Phase 69 physical-link checks were not repeated.
 
-The new `frontend/e2e/read-only-demo.spec.ts` is for later user execution against
-already-running loopback services. Prepare the corpus BEFORE serving; configure
-E2E_READ_ONLY_DEMO_CORPUS_ID and E2E_READ_ONLY_DEMO_BACKEND_URL plus E2E_BASE_URL.
+`frontend/e2e/read-only-demo.spec.ts` is for later user execution against
+already-running loopback services. Prepare the corpus BEFORE serving. Default
+mode requires E2E_READ_ONLY_DEMO_CORPUS_ID, E2E_READ_ONLY_DEMO_BACKEND_URL and
+E2E_BASE_URL. Explicit proxy-only mode sets E2E_READ_ONLY_DEMO_PROXY_ONLY=1 with
+no backend URL; separate direct container-exec proof above remains mandatory.
 It verifies direct/proxy mode/readiness/identity, mutation/provider refusals, real
 browse/detail/pinned download, no automatic mutation/external browser requests and
 bounded viewports. It never calls an HTTP seed/reset or the old writable harness.

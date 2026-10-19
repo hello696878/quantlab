@@ -1,6 +1,35 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 70 Local Container Continuation (2026-10-18)
+## Current Handoff: Phase 70 Independent Container Review (2026-10-18)
+
+Attached clean review target main: implementation
+`a4120d66f705dc72cef07e9ac05b8d565972b122`, tree
+`ef3873d627e9733740e6b06d8ec4023e2e85b11f`, single parent
+`5b29bbd27b4a7b4c482b7bc12fac8c7a4f92fa08`. VERSION remains `4.88.0-dev`.
+The exact implementation scope was 12 paths (4 modified /8 added).
+
+Independent container review corrected one P2 compiled-routing guard defect and
+one P3 resolved-topology policy defect. Fresh protected focused checks: 49 passed,
+zero skips, pytest/child/outer exits 0/0/0; Node contract 26 passed, TypeScript
+passed, one focused browser scenario discovered and none executed. Standalone
+effective Compose passed; merged-development and missing-pin negatives refused.
+No image build, engine/container/service start, browser execution or installation
+occurred. The inherited Linux-engine failure is recorded separately, not rerun.
+
+See [independent container review](docs/PHASE_70_CONTAINER_REVIEW.md) for findings,
+exact source/evidence identities, 8-path REVIEW inventory and later USER-ONLY
+staging plan. Safe to keep and ready for a user review commit as a local static
+foundation. Exact-review-commit Python 3.11/Linux CI, actual image builds,
+volume/UID/mount/security/network/resource/health enforcement and new container
+browser acceptance remain pending. Earlier user-attested product CI/build/Edge
+and older implementation runs remain separate historical evidence.
+
+Historical product/container implementation reports and VERSION are unchanged.
+Only this handoff/status prose and the new review report were finalized after
+verification; the corrected runbook was already frozen and parsed separately.
+No staging, commit, push, tag, deployment, cleanup or Phase 71. Stop here.
+
+## Historical Handoff: Phase 70 Local Container Continuation (2026-10-18)
 
 Baseline clean main 5b29bbd27b4a7b4c482b7bc12fac8c7a4f92fa08, VERSION4.88.0-dev.
 Dedicated standalone local topology and Dockerfiles leave development Compose,

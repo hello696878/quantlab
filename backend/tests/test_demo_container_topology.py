@@ -33,10 +33,12 @@ def effective():
         volumes=[{"type": "volume", "source": "demo_corpus", "target": "/corpus", "read_only": True, "volume": {"nocopy": True}}])
     front.update(environment={"BACKEND_URL": policy.BACKEND, "NEXT_PUBLIC_QUANTLAB_EXPECTED_MODE": "read_only_demo",
         "QUANTLAB_EXPECTED_CORPUS_ID": "a" * 64}, networks={"demo_private": None, "demo_edge": None},
-        ports=[{"host_ip": "127.0.0.1", "target": 3000, "published": "3180", "protocol": "tcp"}],
-        depends_on={"demo-backend": {"condition": "service_healthy"}})
+        ports=[{"mode": "ingress", "host_ip": "127.0.0.1", "target": 3000, "published": "3180", "protocol": "tcp"}],
+        depends_on={"demo-backend": {"condition": "service_healthy", "required": True}})
     front["build"]["args"] = {"BACKEND_URL": policy.BACKEND, "NEXT_PUBLIC_QUANTLAB_EXPECTED_MODE": "read_only_demo"}
-    return {"services": services, "networks": {"demo_private": {"internal": True, "ipam": {}}, "demo_edge": {"ipam": {}}},
+    return {"name": "p70-unit", "services": services,
+            "networks": {"demo_private": {"name": "p70-unit_demo_private", "internal": True, "ipam": {}},
+                         "demo_edge": {"name": "p70-unit_demo_edge", "ipam": {}}},
             "volumes": {"demo_corpus": {"external": True, "name": "quantlab-p70-unit-evidence"}}}
 
 
@@ -63,6 +65,39 @@ def test_rejects_privilege_command_mount_and_budget_regressions(target, key, val
     config = effective()
     config["services"][target][key] = value
     with pytest.raises(ValueError): policy.validate(config, ROOT)
+
+
+@pytest.mark.parametrize("mutation", ["same_network", "foreign_private", "foreign_edge", "missing_project",
+    "private_alias", "edge_driver_option", "optional_backend", "dependency_restart", "dependency_field",
+    "port_host_mode", "port_extra_field"])
+def test_rejects_unreviewed_effective_network_and_dependency_options(mutation):
+    config = deepcopy(effective())
+    front = config["services"]["demo-frontend"]
+    if mutation == "same_network":
+        config["networks"]["demo_private"]["name"] = config["networks"]["demo_edge"]["name"]
+    elif mutation == "foreign_private": config["networks"]["demo_private"]["name"] = "ordinary_default"
+    elif mutation == "foreign_edge": config["networks"]["demo_edge"]["name"] = "ordinary_default"
+    elif mutation == "missing_project": config.pop("name")
+    elif mutation == "private_alias":
+        front["networks"]["demo_private"] = {"aliases": ["demo-backend"]}
+    elif mutation == "edge_driver_option":
+        front["networks"]["demo_edge"] = {"driver_opts": {"com.docker.network.endpoint.sysctls": "net.ipv4.conf.IFNAME.forwarding=1"}}
+    elif mutation == "optional_backend": front["depends_on"]["demo-backend"]["required"] = False
+    elif mutation == "dependency_restart": front["depends_on"]["demo-backend"]["restart"] = True
+    elif mutation == "dependency_field": front["depends_on"]["demo-backend"]["unknown"] = True
+    elif mutation == "port_host_mode": front["ports"][0]["mode"] = "host"
+    else: front["ports"][0]["unknown"] = True
+    with pytest.raises(ValueError): policy.validate(config, ROOT)
+
+
+def test_normalized_empty_network_options_and_default_dependency_flags_remain_valid():
+    config = deepcopy(effective())
+    for service in config["services"].values():
+        service["networks"] = {name: {} for name in service["networks"]}
+    config["services"]["demo-frontend"]["depends_on"]["demo-backend"].pop("required")
+    config["services"]["demo-frontend"]["depends_on"]["demo-backend"]["restart"] = False
+    config["services"]["demo-frontend"]["ports"][0].pop("mode")
+    assert policy.validate(config, ROOT)["runtime_verified"] is False
 
 
 @pytest.mark.parametrize("mutation", ["inherited", "writable", "copyup", "bind", "socket", "mode", "pin", "provider",

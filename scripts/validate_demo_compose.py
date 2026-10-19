@@ -24,11 +24,15 @@ def require(condition, message):
 def validate(config, repo):
     """Closed local topology. No Docker invocation, app import or database access."""
     require(isinstance(config, dict) and set(config) <= {"name", "services", "networks", "volumes"}, "Unexpected top-level configuration")
+    project = config.get("name", "")
+    require(isinstance(project, str) and re.fullmatch(r"[a-z0-9][a-z0-9_-]*", project), "Expected an explicit local Compose project")
     services = config.get("services", {})
     require(set(services) == {"demo-backend", "demo-frontend"}, "Unexpected or inherited services")
     back, front = services["demo-backend"], services["demo-frontend"]
     ports = front.get("ports", [])
-    require(len(ports) == 1 and ports[0].get("host_ip") == "127.0.0.1" and ports[0].get("target") == 3000
+    require(len(ports) == 1 and set(ports[0]) <= {"host_ip", "target", "published", "protocol", "mode"}
+            and ports[0].get("mode", "ingress") == "ingress"
+            and ports[0].get("host_ip") == "127.0.0.1" and ports[0].get("target") == 3000
             and ports[0].get("protocol") == "tcp" and str(ports[0].get("published", "")).isdigit(), "Frontend must publish one loopback TCP port")
     port = str(ports[0]["published"])
     require(1024 <= int(port) <= 65535, "Frontend port outside local operator range")
@@ -74,16 +78,24 @@ def validate(config, repo):
                                                "read_only": True, "volume": {"nocopy": True}}, "Only read-only nocopy corpus volume is permitted")
     require(not front.get("volumes"), "Frontend mounts are prohibited")
     require(set(back.get("networks", {})) == {"demo_private"} and set(front.get("networks", {})) == {"demo_private", "demo_edge"}, "Unexpected network membership")
+    require(all(options is None or options == {} for service in (back, front)
+                for options in service["networks"].values()), "Network attachment overrides are prohibited")
     networks = config.get("networks", {})
     require(set(networks) == {"demo_private", "demo_edge"} and networks["demo_private"].get("internal") is True
             and set(networks["demo_private"]) <= {"name", "internal", "ipam"} and set(networks["demo_edge"]) <= {"name", "ipam"}
             and not networks["demo_private"].get("ipam") and not networks["demo_edge"].get("ipam"), "Expected private internal network and explicit frontend edge")
+    require(all(networks[name].get("name") == f"{project}_{name}" for name in ("demo_private", "demo_edge")),
+            "Expected distinct project-owned private and edge networks")
     corpus = config.get("volumes", {})
     require(set(corpus) == {"demo_corpus"} and set(corpus["demo_corpus"]) == {"name", "external"}
             and corpus["demo_corpus"]["external"] is True
             and re.fullmatch(r"quantlab-p70-[a-z0-9-]{8,64}", corpus["demo_corpus"]["name"]), "Expected uniquely owned external corpus volume")
-    require(not back.get("depends_on") and set(front.get("depends_on", {})) == {"demo-backend"}
-            and front["depends_on"]["demo-backend"].get("condition") == "service_healthy", "Serving must not invoke preparation")
+    require(not back.get("depends_on") and set(front.get("depends_on", {})) == {"demo-backend"}, "Serving must not invoke preparation")
+    dependency = front["depends_on"]["demo-backend"]
+    require(set(dependency) <= {"condition", "required", "restart"}
+            and dependency.get("condition") == "service_healthy"
+            and dependency.get("required", True) is True and dependency.get("restart", False) is False,
+            "Frontend requires backend readiness without automatic dependency restart")
     return {"schema": "demo_compose_static_v1", "services": sorted(services), "frontend_port": port,
             "corpus_id": identity, "volume": corpus["demo_corpus"]["name"], "runtime_verified": False,
             "frontend_egress_blocked": False}

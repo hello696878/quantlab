@@ -1,6 +1,26 @@
 # TASKS - QuantLab
 
-## Current Phase 70 Local Container Continuation (2026-10-18)
+## Current Phase 70 Independent Container Review (2026-10-18)
+
+Review target main `a4120d66f705dc72cef07e9ac05b8d565972b122`, parent
+`5b29bbd27b4a7b4c482b7bc12fac8c7a4f92fa08`, VERSION `4.88.0-dev`, initially clean.
+
+- [x] Review the complete 12-path container implementation independently of the older product review.
+- [x] Correct one P2 compiled-routing guard and one P3 effective-network/dependency policy defect; add 12 policy and 14 Node regressions.
+- [x] Fresh focused backend 49 passed/zero skips, exits 0/0/0; Node26 passed; TypeScript passed; focused discovery1, no browser execution.
+- [x] Real standalone Compose config/policy passed; merged-development and missing-pin negatives refused. Runtime enforcement is not inferred.
+- [x] Preserve historical reports/evidence and single 8-path REVIEW handoff; no staging or Git publication.
+- [ ] Later user review commit and exact-commit Python 3.11/Linux CI.
+- [ ] Owned fresh-volume image builds, compiled-proxy and actual UID/mount/security/port/network/resource/health acceptance.
+- [ ] One positively identified container/proxy browser acceptance plus separate direct and physical corpus proofs.
+
+See [review findings/evidence/inventory](docs/PHASE_70_CONTAINER_REVIEW.md) and
+[operator procedure](docs/READ_ONLY_DEMO_AND_DEPLOYMENT_HARDENING.md#later-user-controlled-container-acceptance).
+Earlier user-attested pre-hardening CI/build/Edge and implementation35/35 results
+stay separate. No image build, service/container/browser start, package install,
+commit/push/tag/deployment/cleanup or Phase 71 is authorized here.
+
+## Historical Phase 70 Local Container Continuation (2026-10-18)
 
 Clean main baseline 5b29bbd27b4a7b4c482b7bc12fac8c7a4f92fa08, VERSION4.88.0-dev.
 Standalone local demo Compose, dedicated non-root image recipes, explicit
