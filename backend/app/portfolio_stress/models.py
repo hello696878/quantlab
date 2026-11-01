@@ -17,7 +17,7 @@ class RunCreate(BaseModel):
     name: str = Field(min_length=1, max_length=200)
     description: str = Field(default="", max_length=2000)
     portfolio_run_id: PositiveStrictInt
-    portfolio_rebalance_id: Optional[PositiveStrictInt] = None
+    portfolio_rebalance_id: Optional[Annotated[int, Field(strict=True, ge=0)]] = None
     scenario: Dict[str, Any]
     notional: Optional[float] = None
     sensitivity: Optional[Dict[str, List[float]]] = None

@@ -265,6 +265,18 @@ Every item below carries exactly one current status.
 
 ### 15. Portfolio Studio and Strategy Ensemble Builder — `built_partial`
 
+Current authoring update (2026-10-29): Portfolio Stress Lab now includes a local
+user-authored asset-shock Composer using an explicit stored rebalance, percent
+units, omitted-shock policy and same-run execution recovery. This adds a form
+over the existing stress engine, not a new quant engine or hosted capability.
+See [Composer workflow](PORTFOLIO_STRESS_LAB.md#local-asset-shock-composer).
+Independent local implementation review (2026-10-31) passed after correcting
+stale-detail navigation, same-ID recovery reachability and prototype-named
+asset handling; 75 focused frontend tests, 8 isolated backend contract cases
+and TypeScript passed. Rebalance 0 is distinguished from later solved weights.
+This remains `built_partial`: browser, backup/restore and remaining security
+gates are separate; retained container images are unchanged.
+
 | Field | Value |
 |---|---|
 | Implemented scope | **Portfolio Studio side is built:** multi-asset alignment, equal-weight/periodic-rebalance backtest, mean-variance optimization (equal-weight/min-vol/max-Sharpe), walk-forward re-optimization, random portfolios + efficient frontier, correlation/vol risk dashboard, scenario stress, factor analysis; plus the Phase 56–58 Portfolio Diagnostics / Stress / Attribution labs (construction, risk budgeting, constraints, scenario shocks, drawdown attribution, Brinson effects, active risk). |

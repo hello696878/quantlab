@@ -95,6 +95,55 @@ execution order. Comparison is neutral with comparability warnings.
 
 ## API
 
+### Local asset-shock Composer
+
+**New stress run** (also available from the empty state) creates user-authored
+`hypothetical_asset_shock` runs in the existing Portfolio Stress Lab. Select a
+completed portfolio from the paginated list, then an explicit stored rebalance.
+The form shows that row's actual asset IDs, signed weights and decision/effective
+timestamps; it never substitutes the separate final-weight endpoint, normalizes
+weights or seeds a demo automatically. Source integrity and warnings remain
+visible. Missing covariance for an older rebalance does not prohibit direct
+asset shocks; risk diagnostics may remain unavailable.
+Stored rebalance IDs are zero-based: explicit ID `0` is valid (unlike portfolio
+run IDs, which are positive). The API rejects negative, boolean, fractional and
+string rebalance IDs rather than coercing them. Omitted/null selection keeps
+the existing latest-solved-row behavior; an explicit missing or unsolved ID 0
+is rejected instead of falling back to a later row.
+
+Enter a trimmed name (1-200 characters), at least one finite shock in the
+inclusive range -100% to +100%, and optionally a positive finite notional.
+`-10` is sent as `{ "value": -10, "unit": "percent" }`, not as -0.1 percent.
+Blank shocks are omitted and explicit `0` is retained. Choose the omitted-shock
+policy explicitly: `zero` assumes unshocked assets; `unavailable` leaves those
+assets unspecified, so the stored result can have partial coverage. Blank
+notional is omitted and monetary P&L stays unavailable. These are hypothetical
+assumptions, not predictions, realized returns or trading recommendations.
+
+One submission creates one run, captures its ID, then executes that ID with
+`{ "create_experiment": false }`. Source and form edits are locked while the
+write is pending; no baseline or Experiment Registry entry is created. The
+existing detail view displays the actual stored result, including partial
+coverage and unavailable risk. Source changes clear old shocks and obsolete
+responses are ignored. The Composer remains behind the existing local serving
+gate; it is not available in read-only demo or unknown/failed capability modes.
+
+If execution fails or its response is lost, keep the created ID. **Refresh
+stored run** checks persistence before enabling **Retry execution of this run**;
+retry checks again and reuses that ID only when pending or failed. A completed
+run opens without another execution, and running/invalidated runs cannot be
+retried. **Open stored run** allows inspection of failed or pending records.
+Their detail view offers **Recover execution of run #ID**, including records
+found in the list after an uncertain creation. This reopens recovery for that
+same stored ID without another create, automatic execute or source selection;
+refresh is required before an explicit retry. Obsolete detail responses cannot
+replace an active Composer or discard its in-flight recovery identity.
+An HTTP 200 result whose stored status is `failed` is not analysis success. If
+the creation response itself is lost, persistence is unknown: inspect/refresh
+the run list before another creation; the form never silently resubmits.
+
+### Existing route contract
+
 17 routes under `/portfolio-stress/*`: `GET /summary`, `GET|POST /runs`,
 `GET /runs/{id}`,
 `POST /runs/{id}/execute|invalidate|mark-baseline`, `GET /runs/{id}/scenario|

@@ -1,6 +1,119 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Phase 70 Independent Container Review (2026-10-18)
+## Current Handoff: Reviewed Composer integration build (2026-11-01)
+
+The final independently reviewed working-tree source was production-built with
+existing Node 24.22.1 and npm 11.12.1 on 2026-11-01. Normal local configuration:
+`BACKEND_URL=http://localhost:8000`, expected serving mode unset, no application
+service or active database connection. Native exit 0; elapsed 86.5032559s,
+UTC 14:33:40.726424 through 14:35:07.229669. Recorded source/configuration and
+dependency inputs remained unchanged. This closes the final reviewed-UI build
+gap; the earlier retained build remains separate historical evidence.
+
+Reuse review verification: 75 affected frontend passes, eight isolated backend
+contract passes /zero skips, and TypeScript passed. Existing 26 build-contract
+passes and the 2026-10-29 audit were not rerun. No implementation correction was
+needed for this integration build; this handoff update is documentation-only.
+
+The authorized integration package stages/commits only the reviewed 18 paths,
+publishes only `codex/portfolio-stress-composer-v1`, and prepares a PR to `main`.
+Commit/PR/CI identities and actual results belong in the external integration
+continuation and PR description, not circular follow-up documentation commits:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-composer-integration-d5413e2841df4047a314a0dc05d71034`.
+No merge, auto-merge, tag, release or deployment is authorized. Seven retained
+audit entries remain (2 high /4 moderate /1 low); no security-complete claim.
+Phase 70 container browser and backup/restore acceptance remain blocked,
+retained images are unpatched, and no new browser or Docker action occurred.
+
+## Review Handoff: Portfolio Stress Composer independent review (2026-10-31)
+
+`IMPLEMENTATION_REVIEW_PASS` for this local working-tree implementation.
+Branch `codex/portfolio-stress-composer-v1`, baseline
+`8a069c659724da25e52e6894040f3146c9a82d8c`, VERSION `4.88.0-dev`.
+All 18 paths (10 modified /8 added) remain unstaged; no unrelated changes.
+
+Three confirmed P2 defects were fixed: obsolete detail responses could replace
+an active Composer; inspecting a pending/failed record lost access to same-ID
+execution recovery; valid prototype-named asset IDs could turn omitted shocks
+into inherited object properties. Regression cases now cover both stale detail
+outcomes, recovery through the real panel/detail route without another create,
+and blank/explicit-zero shocks for these asset IDs. Rebalance 0 is verified
+against a different later solved book, including request, persisted ID/weight
+fingerprint and resulting shock calculation; omitted/null still select latest,
+and missing/unsolved 0 plus non-strict IDs refuse rather than default.
+
+New review verification: 75 frontend tests across six focused files passed;
+8 protected backend contract cases passed, zero skips and no SQLite guard
+violations; TypeScript passed. Frontend used existing supported Node 24.22.1.
+A first frontend launcher failed before creating a test process because the
+older bundled Node path was absent; that evidence is retained separately.
+Original build-contract 26 passes, approved final production build and audit
+are retained separate snapshots. Dependency/build configuration is unchanged;
+the retained production build predates these review fixes and is not claimed
+to have built the final reviewed UI. No build, audit or install was repeated.
+
+Remaining audit: seven affected package entries (2 high /4 moderate /1 low).
+The high entries are source-map-js (indexed-map denial of service) and Vite
+(Windows editor-launch chain); exposure and separately scoped remediation are
+recorded in the review. No broad dependency upgrade occurred. Retained Phase 70
+images are unchanged/unpatched; browser, application backup/restore and security
+acceptance remain separate pending gates. This pass does not close Phase 70 or
+claim a security-complete/hosted release.
+
+Review findings, exact final inventory, source identities and native execution
+evidence: `C:\Users\jimli\AppData\Local\Temp\quantlab-stress-composer-review-34cfd43fea1348778e565164450874bb`.
+No staging, commit, push, tag, PR, workflow, Docker operation, service or browser.
+
+The implementation handoff below is retained as the earlier snapshot; its test
+counts and failures are not combined with the new review checks.
+
+## Implementation Handoff: Portfolio Stress Run Composer v1 (2026-10-29)
+
+Baseline main `8a069c659724da25e52e6894040f3146c9a82d8c`, tree
+`4635d323ceefec8c7fda3b6a0c2c670ae1ade9db`; implementation branch
+`codex/portfolio-stress-composer-v1`. VERSION remains `4.88.0-dev`.
+The local Portfolio Stress Lab now composes explicit percent shocks on actual
+selected rebalance weights, including earlier/signed books, then creates and
+executes through the existing engine. It retains created IDs for refresh/retry,
+distinguishes blank/zero/partial results and preserves ServingGate isolation.
+No backend engine, database schema or API family was changed. One integration
+defect was corrected: the API now accepts the actual zero-based rebalance ID 0;
+other ID validation remains strict, and portfolio run IDs remain positive.
+
+Exact Next security patch: 15.5.28; sharp resolved from Next is 0.35.5;
+React/React DOM remain 19.2.8. Strict engine/peer installation succeeded.
+See [workflow and recovery](docs/PORTFOLIO_STRESS_LAB.md#local-asset-shock-composer).
+Detailed current checks and source identities are retained externally in
+`C:\Users\jimli\AppData\Local\Temp\quantlab-stress-composer-61061e3a472142d2b0ab87303cd004f9`.
+Verification on these uncommitted working-tree bytes: latest affected frontend
+payload/Composer/panel checks 50 passed; earlier final client/isolation checks
+11 passed on unchanged files; serving-boundary/ensemble regressions remain
+separate earlier passes. Build-contract checks 26 passed; final TypeScript and
+production build passed. The second build was explicitly approved after the
+zero-ID defect surfaced after the first successful build.
+
+Backend: the protected module run had 40 passes /2 new contract failures on the
+pre-fix snapshot; the corrected affected selection has 6 passes /zero skips,
+pytest/child exits 0/0. Do not combine these as one final whole-module pass.
+The first sandbox attempt failed during temporary-directory setup and remains
+in evidence. Initial frontend assertion/resolution/type-check failures are also
+retained, with concrete corrections and passing targeted reruns.
+
+One post-update lockfile audit exits 1 with valid findings: 7 affected package
+entries (2 high /4 moderate /1 low), no Next/sharp entry. Remaining entries are
+`source-map-js`, `vite`, `postcss-selector-parser`, `katex`, `vitest`,
+`@vitest/mocker`, `@vitest/coverage-v8`. No blanket fixes were applied and this
+is not a security-complete release. Patch reference:
+[Next advisory](https://github.com/vercel/next.js/security/advisories/GHSA-2464-fhr4-w9xw).
+
+Phase 70 container browser and stopped-corpus backup/restore acceptance remain
+blocked as recorded in the prior external closeout; no Docker retry occurred.
+Retained images still contain their old dependencies and were not patched.
+This is an unstaged working-tree implementation for independent review, not
+Phase 70 completion, hosted/security-complete release or an approved Phase 71.
+No staging, commit, push, tag, PR, workflow trigger or deployment.
+
+## Historical Handoff: Phase 70 Independent Container Review (2026-10-18)
 
 Attached clean review target main: implementation
 `a4120d66f705dc72cef07e9ac05b8d565972b122`, tree

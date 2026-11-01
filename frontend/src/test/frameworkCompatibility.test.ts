@@ -9,6 +9,13 @@ const require = createRequire(import.meta.url);
 const nextConfig = require("../../next.config.js") as NextConfig;
 
 describe("framework dependency compatibility", () => {
+  it("resolves the exact security-patched Next and patched sharp from Next", () => {
+    const fromNext = createRequire(require.resolve("next/package.json"));
+    expect(require("../../package.json").dependencies.next).toBe("15.5.28");
+    expect(fromNext("next/package.json").version).toBe("15.5.28");
+    const version = fromNext("sharp").versions.sharp.split(".").map(Number);
+    expect(version[0] > 0 || version[1] > 35 || (version[1] === 35 && version[2] >= 5)).toBe(true);
+  });
   it.each([
     [undefined, "http://localhost:8000"],
     ["http://127.0.0.1:8766", "http://127.0.0.1:8766"],
