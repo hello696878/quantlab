@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { classifyApiError } from "@/lib/api";
 import {
   type CompareEntry,
@@ -27,9 +27,10 @@ import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
 import { CopyValue } from "@/components/ExperimentRegistryShared";
 import PortfolioStressDetail from "@/components/PortfolioStressDetail";
+import PortfolioStressComposer from "@/components/PortfolioStressComposer";
 import { CompletenessPill, IntegrityPill, StatusPill } from "@/components/PortfolioStressShared";
 
-type Mode = "list" | "detail" | "compare";
+type Mode = "list" | "detail" | "compare" | "create";
 type Selected = { id: number; name: string };
 
 const PAGE_SIZE = 20;  // the 16 documented demo cases fit on one page
@@ -55,11 +56,30 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
   const [seeding, setSeeding] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [detail, setDetail] = useState<RunFull | null>(null);
+  const [recoveryRun, setRecoveryRun] = useState<RunFull | null>(null);
   const [selected, setSelected] = useState<Selected[]>([]);
   const [pair, setPair] = useState<{ a: Selected; b: Selected } | null>(null);
+  const detailRequest = useRef(0);
+
+  useEffect(() => () => { detailRequest.current += 1; }, []);
+
+  function navigate(next: Mode) {
+    detailRequest.current += 1;
+    setMode(next);
+  }
+
+  function beginCreation() {
+    setRecoveryRun(null);
+    navigate("create");
+  }
+
+  function navigateAway(view: string) {
+    detailRequest.current += 1;
+    onNav?.(view);
+  }
 
   const params = useMemo(() => ({ ...filters, page, page_size: PAGE_SIZE }), [filters, page]);
-  const reload = useCallback(() => setRetryTick((t) => t + 1), []);
+  const reload = useCallback(() => { detailRequest.current += 1; setRetryTick((t) => t + 1); }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,6 +103,7 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
   }, [params, retryTick, reload]);
 
   function updateFilter(key: keyof RunFilters, value: string | undefined) {
+    detailRequest.current += 1;
     setPage(1);
     setFilters((prev) => {
       const next = { ...prev };
@@ -93,10 +114,14 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
   }
 
   async function openDetail(id: number) {
+    const request = ++detailRequest.current;
     try {
-      setDetail(await getRun(id));
-      setMode("detail");
+      const run = await getRun(id);
+      if (request !== detailRequest.current) return;
+      setDetail(run);
+      navigate("detail");
     } catch (err) {
+      if (request !== detailRequest.current) return;
       const cls = classifyApiError(err);
       if (cls.backendUnavailable) notifyBackendOffline();
       else toast.error("Couldn’t open run", cls.message);
@@ -146,22 +171,36 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
     }
   }
 
+  if (mode === "create") {
+    return <PortfolioStressComposer
+      key={recoveryRun?.id ?? "new"}
+      initialRun={recoveryRun ?? undefined}
+      onBack={() => { navigate("list"); reload(); }}
+      onOpen={(run) => { setDetail(run); navigate("detail"); reload(); }}
+      onOpenPortfolio={onNav ? () => navigateAway("portfoliodiagnostics") : undefined}
+    />;
+  }
+
   if (mode === "detail" && detail) {
     return (
+      <div className="space-y-4">
+      {["pending", "failed"].includes(detail.status) && <button type="button" className="btn-secondary"
+        onClick={() => { setRecoveryRun(detail); navigate("create"); }}>Recover execution of run #{detail.id}</button>}
       <PortfolioStressDetail
         run={detail}
         onBack={() => {
-          setMode("list");
+          navigate("list");
           setDetail(null);
           reload();
         }}
         onRefresh={(updated) => setDetail(updated)}
-        onOpenPortfolio={onNav ? () => onNav("portfoliodiagnostics") : undefined}
-        onOpenDataset={onNav ? () => onNav("datasetlineage") : undefined}
-        onOpenExperiment={onNav ? () => onNav("experimentregistry") : undefined}
-        onOpenRegime={onNav ? () => onNav("regimediagnostics") : undefined}
-        onOpenCost={onNav ? () => onNav("costdiagnostics") : undefined}
+        onOpenPortfolio={onNav ? () => navigateAway("portfoliodiagnostics") : undefined}
+        onOpenDataset={onNav ? () => navigateAway("datasetlineage") : undefined}
+        onOpenExperiment={onNav ? () => navigateAway("experimentregistry") : undefined}
+        onOpenRegime={onNav ? () => navigateAway("regimediagnostics") : undefined}
+        onOpenCost={onNav ? () => navigateAway("costdiagnostics") : undefined}
       />
+      </div>
     );
   }
 
@@ -170,7 +209,7 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
       <StressCompare
         pair={pair}
         onBack={() => {
-          setMode("list");
+          navigate("list");
           setPair(null);
           setSelected([]);
         }}
@@ -190,6 +229,7 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
             <p className="mt-2 max-w-3xl text-sm text-slate-500">{DISCLAIMER}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={beginCreation} className="btn-primary">New stress run</button>
             <button type="button" onClick={reload}
               className="rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">↻ Refresh</button>
             <button type="button" onClick={handleSeed} disabled={seeding}
@@ -231,7 +271,7 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
               onChange={(e) => updateFilter("query", e.target.value)}
               placeholder="name or description" className="ql-input w-48 px-2 py-1.5 text-sm" />
           </div>
-          <button type="button" onClick={() => { setPage(1); setFilters({}); }}
+          <button type="button" onClick={() => { detailRequest.current += 1; setPage(1); setFilters({}); }}
             className="ml-auto rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
             Reset filters
           </button>
@@ -247,7 +287,7 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
           </span>
           <div className="flex items-center gap-2">
             <button type="button" disabled={selected.length !== 2}
-              onClick={() => { setPair({ a: selected[0], b: selected[1] }); setMode("compare"); }}
+              onClick={() => { setPair({ a: selected[0], b: selected[1] }); navigate("compare"); }}
               className="rounded-md border border-blue-300 bg-white px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50">
               Compare selected
             </button>
@@ -268,8 +308,8 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
       ) : !list || list.total === 0 ? (
         <EmptyState
           title="No portfolio-stress runs yet"
-          description="Load the deterministic demo to explore historical replays, hypothetical shocks, volatility/correlation stress, liquidity/cost stress, drifted-book constraint checks and drawdown attribution on stored portfolios — or create runs via the API."
-          actions={[{ label: seeding ? "Loading…" : "Load demo runs", onClick: handleSeed }]}
+          description="Create a hypothetical asset-shock run from a stored portfolio, or load the deterministic demo to explore the existing diagnostics."
+          actions={[{ label: "Create a stress run", onClick: beginCreation }, { label: seeding ? "Loading…" : "Load demo runs", onClick: handleSeed }]}
         />
       ) : (
         <div className="card overflow-hidden">
@@ -340,9 +380,9 @@ export default function PortfolioStressPanel({ onNav }: { onNav?: (view: string)
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-50 px-4 py-2 text-xs text-slate-500">
             <span>{list.total} run{list.total === 1 ? "" : "s"} · page {list.page} of {list.total_pages}</span>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setPage((p) => p - 1)} disabled={list.page <= 1}
+              <button type="button" onClick={() => { detailRequest.current += 1; setPage((p) => p - 1); }} disabled={list.page <= 1}
                 className="rounded-md border border-slate-200 px-2.5 py-1 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40">← Prev</button>
-              <button type="button" onClick={() => setPage((p) => p + 1)} disabled={list.page >= list.total_pages}
+              <button type="button" onClick={() => { detailRequest.current += 1; setPage((p) => p + 1); }} disabled={list.page >= list.total_pages}
                 className="rounded-md border border-slate-200 px-2.5 py-1 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40">Next →</button>
             </div>
           </div>

@@ -8,6 +8,23 @@ import { BacktestApiError } from "./api";
 
 const BASE = "/api/portfolio-stress";
 
+export type MissingShockPolicy = "zero" | "unavailable";
+
+export interface AssetShockRunCreate {
+  name: string;
+  portfolio_run_id: number;
+  portfolio_rebalance_id: number;
+  scenario: {
+    scenario_definition_id: "ui_asset_shock_v1";
+    name: string;
+    scenario_type: "hypothetical_asset_shock";
+    source: "user";
+    missing_shock_policy: MissingShockPolicy;
+    asset_shocks: Record<string, { value: number; unit: "percent" }>;
+  };
+  notional?: number;
+}
+
 export interface RunSummary {
   id: number;
   created_at: string;
@@ -342,6 +359,12 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     try {
       const body = await res.json();
       if (typeof body?.detail === "string") message = body.detail;
+      else if (Array.isArray(body?.detail)) {
+        const details = (body.detail as unknown[]).filter((item): item is { loc?: unknown[]; msg: string } =>
+          !!item && typeof item === "object" && "msg" in item && typeof item.msg === "string");
+        if (details.length) message = details.map((item) =>
+          `${item.loc?.filter((part) => part !== "body").join(".") || "Request"}: ${item.msg}`).join("; ");
+      }
     } catch {
       /* keep */
     }
@@ -365,6 +388,10 @@ export const listRuns = (params: RunFilters & { page?: number; page_size?: numbe
     `/runs${q(params as Record<string, unknown>)}`,
   );
 export const getRun = (id: number) => request<RunFull>(`/runs/${id}`);
+export const createRun = (payload: AssetShockRunCreate) =>
+  request<RunFull>("/runs", { method: "POST", body: JSON.stringify(payload) });
+export const executeRun = (id: number) =>
+  request<RunFull>(`/runs/${id}/execute`, { method: "POST", body: JSON.stringify({ create_experiment: false }) });
 export const getScenario = (id: number) =>
   request<{ scenario: ScenarioBlock | null }>(`/runs/${id}/scenario`);
 export const getAssetResults = (id: number) =>

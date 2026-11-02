@@ -1145,3 +1145,128 @@ def test_linked_cost_identity_is_pinned_and_rechecked(monkeypatch):
     stored = ps_store.get_run(run["id"])
     assert stored["status"] == "failed"
     assert stored["result_fingerprint"] is None
+
+
+@pytest.mark.parametrize("missing_policy", ["zero", "unavailable"])
+def test_composer_uses_explicit_nonfinal_rebalance_without_risk_covariance(client, missing_policy):
+    prun = _portfolio_run(
+        n=100, method="inverse_volatility",
+        rebalance={"kind": "every_n", "every_n": 20,
+                   "initial_turnover_policy": "zero_book"})
+    rebalances_before = copy.deepcopy(pd_store.list_rebalances(prun["id"]))
+    solved = [row for row in rebalances_before if row.get("weights")]
+    assert len(solved) > 1
+    first, last = solved[0], solved[-1]
+    assert first["rebalance_id"] == 0  # Stored rebalance IDs are zero-based.
+    assert first["weights"] != last["weights"]
+    assert first["weight_fingerprint"] is not None
+    assert first["weight_fingerprint"] != last["weight_fingerprint"]
+    portfolio_before = copy.deepcopy(pd_store.get_run(prun["id"]))
+    payload = {
+        "name": "Composer earlier weights", "portfolio_run_id": prun["id"],
+        "portfolio_rebalance_id": first["rebalance_id"],
+        "scenario": {
+            "scenario_definition_id": "ui_asset_shock_v1",
+            "name": "Composer earlier weights",
+            "scenario_type": "hypothetical_asset_shock", "source": "user",
+            "missing_shock_policy": missing_policy,
+            "asset_shocks": {"a": {"value": -10, "unit": "percent"},
+                             "b": {"value": 0, "unit": "percent"}}}}
+    response = client.post(f"{BASE}/runs", json=payload)
+    assert response.status_code == 201, response.text
+    created = response.json()
+    run_id = created["id"]
+    assert created["portfolio_rebalance_id"] == 0
+    assert created["baseline_weight_fingerprint"] == first["weight_fingerprint"]
+    assert created["configuration"]["portfolio_identity"]["rebalance_id"] == 0
+    assert created["configuration"]["portfolio_identity"]["weight_fingerprint"] == first["weight_fingerprint"]
+    persisted = ps_store.get_run(run_id)
+    assert persisted["portfolio_rebalance_id"] == 0
+    assert persisted["baseline_weight_fingerprint"] == first["weight_fingerprint"]
+    result = client.post(f"{BASE}/runs/{run_id}/execute",
+                         json={"create_experiment": False})
+    assert result.status_code == 200
+    done = result.json()
+    assert done["status"] == "completed"
+    assert done["portfolio_rebalance_id"] == first["rebalance_id"]
+    assert done["baseline_weight_fingerprint"] == first["weight_fingerprint"]
+    assert ps_store.get_run(run_id)["result_fingerprint"] == done["result_fingerprint"]
+    assert done["scenario_return"] == pytest.approx(-0.1 * first["weights"]["a"])
+    assert done["scenario_pnl"] is None
+    assert done["experiment_id"] is None
+    assert any("risk recomputation unavailable" in warning for warning in done["warnings"])
+    assets = {row["asset_id"]: row for row in
+              client.get(f"{BASE}/runs/{run_id}/asset-results").json()["items"]}
+    assert {aid: row["weight"] for aid, row in assets.items()} == first["weights"]
+    assert assets["a"]["shock"] == pytest.approx(-0.1)
+    assert assets["b"]["shock"] == 0
+    assert assets["c"]["shock"] == (0 if missing_policy == "zero" else None)
+    assert done["completeness_status"] == ("complete" if missing_policy == "zero" else "partial")
+    for selection in ({}, {"portfolio_rebalance_id": None}):
+        latest_payload = {key: value for key, value in payload.items()
+                          if key != "portfolio_rebalance_id"}
+        latest_payload.update(selection)
+        latest_response = client.post(f"{BASE}/runs", json=latest_payload)
+        assert latest_response.status_code == 201, latest_response.text
+        latest_created = latest_response.json()
+        assert latest_created["portfolio_rebalance_id"] == last["rebalance_id"]
+        assert latest_created["baseline_weight_fingerprint"] == last["weight_fingerprint"]
+        assert latest_created["configuration"]["portfolio_identity"]["rebalance_id"] == last["rebalance_id"]
+        latest_result = client.post(f"{BASE}/runs/{latest_created['id']}/execute",
+                                    json={"create_experiment": False})
+        assert latest_result.status_code == 200, latest_result.text
+        latest_done = latest_result.json()
+        assert latest_done["status"] == "completed"
+        assert latest_done["portfolio_rebalance_id"] == last["rebalance_id"]
+        assert latest_done["baseline_weight_fingerprint"] == last["weight_fingerprint"]
+        assert latest_done["scenario_return"] == pytest.approx(-0.1 * last["weights"]["a"])
+        latest_assets = client.get(f"{BASE}/runs/{latest_created['id']}/asset-results").json()["items"]
+        assert {row["asset_id"]: row["weight"] for row in latest_assets} == last["weights"]
+    assert pd_store.get_run(prun["id"]) == portfolio_before
+    assert pd_store.list_rebalances(prun["id"]) == rebalances_before
+
+
+@pytest.mark.parametrize("zero_state", ["missing", "unsolved"])
+def test_explicit_zero_rebalance_never_falls_back_to_later_solved_weights(client, monkeypatch, zero_state):
+    prun = _portfolio_run(n=100, method="inverse_volatility",
+                          rebalance={"kind": "every_n", "every_n": 20,
+                                     "initial_turnover_policy": "zero_book"})
+    original_list = pd_store.list_rebalances
+    original_rows = copy.deepcopy(original_list(prun["id"]))
+    assert original_rows[0]["rebalance_id"] == 0
+    assert any(row["rebalance_id"] > 0 and row.get("weights") for row in original_rows)
+    rows = copy.deepcopy(original_rows)
+    if zero_state == "missing":
+        rows = [row for row in rows if row["rebalance_id"] != 0]
+    else:
+        rows[0]["weights"] = None
+    monkeypatch.setattr(service.pd_store, "list_rebalances",
+                        lambda run_id: rows if run_id == prun["id"] else original_list(run_id))
+    response = client.post(f"{BASE}/runs", json=_stress_payload(prun["id"], {
+        "scenario_type": "hypothetical_asset_shock",
+        "asset_shocks": {"a": {"value": -10, "unit": "percent"}},
+        "missing_shock_policy": "zero"}, portfolio_rebalance_id=0))
+    assert response.status_code == 422, response.text
+    assert response.json()["detail"] == "rebalance 0 not found or has no solved weights"
+    assert ps_store.list_runs()["total"] == 0
+    assert original_list(prun["id"]) == original_rows
+
+
+def test_rebalance_id_schema_is_nonnegative_and_strict(client):
+    from pydantic import ValidationError
+    from app.portfolio_stress.models import RunCreate
+
+    payload = {"name": "First book", "portfolio_run_id": 1,
+               "portfolio_rebalance_id": 0, "scenario": {}}
+    assert RunCreate(**payload).portfolio_rebalance_id == 0
+    for invalid in (-1, True, False, 0.0, 0.5, "0"):
+        with pytest.raises(ValidationError):
+            RunCreate(**{**payload, "portfolio_rebalance_id": invalid})
+        response = client.post(f"{BASE}/runs", json={**payload, "portfolio_rebalance_id": invalid})
+        assert response.status_code == 422
+        assert any(error["loc"] == ["body", "portfolio_rebalance_id"]
+                   for error in response.json()["detail"])
+    for field in ("portfolio_run_id", "dataset_version_id", "regime_run_id", "cost_diagnostic_run_id"):
+        for invalid in (0, -1, True, 1.0, "1"):
+            with pytest.raises(ValidationError):
+                RunCreate(**{**payload, field: invalid})
