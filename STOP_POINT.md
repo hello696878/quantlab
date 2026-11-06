@@ -1,6 +1,80 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Reviewed Composer integration build (2026-11-01)
+## Current Handoff: Portfolio Source Composer v1 (2026-11-05)
+
+Implemented on `codex/portfolio-source-composer-v1`, from main
+`bcf5293e5098d61f70ba42afbe05edc358e56775` (tree
+`cc544b720bf57d2da347ce6ecb6a9f6d95dab1fd`). VERSION stays `4.88.0-dev`.
+The Diagnostics toolbar/empty state now leads to return JSON import, bounded
+validation/preview, explicit per-asset percent weights, one-time declared
+construction and existing stored detail. That detail confirms actual stored
+rebalance weights before describing availability and routes to Portfolio
+Stress; select the shown source name/ID and stored rebalance there. No automatic
+Stress execution or new global routing state. See
+[fixed input scope and recovery](docs/PORTFOLIO_DIAGNOSTICS_LAB.md#local-portfolio-source-composer-v1).
+
+Scope: <=2 MiB, 2-20 assets, 24-2,000 identically aligned finite-number returns,
+strict real `YYYY-MM-DD` dates, explicit long-only weights totaling 100% within
+the backend tolerance, no normalization, declared provenance, trailing sample
+covariance with lag 1 and no repair. One-time weights become effective at
+lookback index L and subsequently drift; pre-decision portfolio returns remain
+unavailable. Frequency/historical authenticity are self-declared; unavailable
+turnover/costs do not mean zero costs. No backend production, quant engine,
+database schema, dependency, configuration, API-contract or VERSION change.
+
+Created IDs survive lost execution responses; unknown create outcomes lead
+to list inspection, never silent recreation. Explicit same-ID recovery
+rechecks stored status; completed records open without rerunning, running and
+invalidated records cannot recover execution. A pending/failed detail routes
+back to recovery for the same ID. Inputs lock during writes and rapid submits
+are guarded synchronously. Stale file reads/detail outcomes are ignored.
+Parent completion is not solver success: stored states, warnings, violations
+and missing weights/metrics remain visible. ServingGate remains unchanged.
+Independent static review found one currency-uppercase length-expansion edge
+case; it was fixed and regression-tested before final verification/build.
+
+Executed verification (separate scopes/snapshots, not a whole-project total):
+
+- Final frontend: **169 passed /10 files**, zero skipped, Vitest 15.92s,
+  native process exit 0; TypeScript exit 0 (31.7151s).
+- Isolated API: **5 passed /zero skipped**, pytest 22.14s, pytest/process/
+  outer command exits 0/0/0; 25.2975s outer wall. Two new public-route bridge
+  cases plus three existing explicit-rebalance/schema cases. 70/30 weights
+  and declared provenance persisted; actual rebalance 0 produced -7% under
+  -10%/0% shocks, with corresponding source identities/fingerprints and the
+  source/weights unchanged. Test-owned SQLite only, guard violations `[]`.
+- One final normal local production build: exit 0, 76.4960s, Next 15.5.28,
+  existing Node 24.22.1/npm 11.12.1, `BACKEND_URL=http://localhost:8000`.
+  Project Python is 3.13.5 (`.venv`); this is not Python 3.11 runtime evidence.
+  Tested/typechecked/built frontend bytes and backend-tested bytes are recorded
+  externally. No application service or browser was started.
+
+Earlier attempts remain separate: frontend startup `spawn EPERM` plus an outer
+cp950 console-format failure; 163 frontend passes/3 new-test double/query
+failures, then 166 passes before the last coverage/review correction; backend
+5 setup errors from temporary-directory permissions, then 3 passes/2 incorrect
+new-test provenance-field assertions. Access was retried through normal approval;
+tests now assert the existing stored `user_provenance` field. No production
+backend correction was needed. Logs, exact commands, JSON/JUnit outcomes and
+source manifests are retained, not discarded or combined into final totals:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-source-composer-ee185c386fd848d090d61b13fcfc958b`.
+The protected runner's `--execute` entry and existing SQLite fixture were used
+on an external source-only snapshot; its outer active-DB hashing path was not
+used. Active research data was not opened, read, hashed, copied or modified.
+
+Reviewable inventory: 15 unstaged paths, 6 modified /9 new: three authorized
+documents, Diagnostics client/panel/detail, new Composer/helper plus five
+frontend test files and one fixture, and one backend contract test. No staging, commit,
+push, PR, merge, tag, release or deployment. Next step: independent integration
+review, with browser acceptance separately authorized. Existing main CI run
+41454949629 is the baseline, not verification of this new working tree.
+Seven retained audit entries (2 high /4 moderate /1 low), Phase 70 browser and
+backup/restore acceptance, and retained unpatched images remain separate.
+No audit, Docker, installation or historical whole-suite rerun occurred.
+
+Historical handoffs and their original authorization/evidence follow unchanged.
+
+## Historical Handoff: Reviewed Composer integration build (2026-11-01)
 
 The final independently reviewed working-tree source was production-built with
 existing Node 24.22.1 and npm 11.12.1 on 2026-11-01. Normal local configuration:

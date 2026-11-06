@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { classifyApiError } from "@/lib/api";
 import {
   type CompareEntry,
@@ -26,8 +26,9 @@ import EmptyState from "@/components/ui/EmptyState";
 import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
 import { CopyValue } from "@/components/ExperimentRegistryShared";
 import PortfolioDiagnosticsDetail, { IntegrityPill, SolverPill, StatusPill } from "@/components/PortfolioDiagnosticsDetail";
+import PortfolioDiagnosticsComposer from "@/components/PortfolioDiagnosticsComposer";
 
-type Mode = "list" | "detail" | "compare";
+type Mode = "list" | "detail" | "compare" | "create";
 type Selected = { id: number; name: string };
 
 // Raised from 15 in Phase 58.0: the Portfolio Attribution Lab stores its own
@@ -57,11 +58,30 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
   const [seeding, setSeeding] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [detail, setDetail] = useState<RunFull | null>(null);
+  const [recoveryRun, setRecoveryRun] = useState<RunFull | null>(null);
   const [selected, setSelected] = useState<Selected[]>([]);
   const [pair, setPair] = useState<{ a: Selected; b: Selected } | null>(null);
+  const detailRequest = useRef(0);
+
+  useEffect(() => () => { detailRequest.current += 1; }, []);
+
+  function navigate(next: Mode) {
+    detailRequest.current += 1;
+    setMode(next);
+  }
+
+  function beginCreation() {
+    setRecoveryRun(null);
+    navigate("create");
+  }
+
+  function navigateAway(view: string) {
+    detailRequest.current += 1;
+    onNav?.(view);
+  }
 
   const params = useMemo(() => ({ ...filters, page, page_size: PAGE_SIZE }), [filters, page]);
-  const reload = useCallback(() => setRetryTick((t) => t + 1), []);
+  const reload = useCallback(() => { detailRequest.current += 1; setRetryTick((t) => t + 1); }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -85,6 +105,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
   }, [params, retryTick, reload]);
 
   function updateFilter(key: keyof RunFilters, value: string | undefined) {
+    detailRequest.current += 1;
     setPage(1);
     setFilters((prev) => {
       const next = { ...prev };
@@ -95,10 +116,15 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
   }
 
   async function openDetail(id: number) {
+    const request = ++detailRequest.current;
     try {
-      setDetail(await getRun(id));
-      setMode("detail");
+      const run = await getRun(id);
+      if (request !== detailRequest.current) return;
+      if (!Number.isSafeInteger(run.id) || run.id !== id) throw new Error("Stored run identity mismatch.");
+      setDetail(run);
+      navigate("detail");
     } catch (err) {
+      if (request !== detailRequest.current) return;
       const cls = classifyApiError(err);
       if (cls.backendUnavailable) notifyBackendOffline();
       else toast.error("Couldn’t open run", cls.message);
@@ -148,23 +174,36 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
     }
   }
 
+  if (mode === "create") {
+    return <PortfolioDiagnosticsComposer key={recoveryRun?.id ?? "new"} initialRun={recoveryRun ?? undefined}
+      onBack={() => { navigate("list"); reload(); }}
+      onOpen={(run) => { setDetail(run); navigate("detail"); reload(); }} />;
+  }
+
   if (mode === "detail" && detail) {
+    const generation = detailRequest.current;
     return (
+      <div className="space-y-4">
+      {["pending", "failed"].includes(detail.status) && <button type="button" className="btn-secondary"
+        onClick={() => { setRecoveryRun(detail); navigate("create"); }}>Recover execution of run #{detail.id}</button>}
       <PortfolioDiagnosticsDetail
+        key={detail.id}
         run={detail}
         onBack={() => {
-          setMode("list");
+          navigate("list");
           setDetail(null);
           reload();
         }}
-        onRefresh={(updated) => setDetail(updated)}
-        onOpenValidation={onNav ? () => onNav("modelvalidation") : undefined}
-        onOpenDataset={onNav ? () => onNav("datasetlineage") : undefined}
-        onOpenExperiment={onNav ? () => onNav("experimentregistry") : undefined}
-        onOpenRegime={onNav ? () => onNav("regimediagnostics") : undefined}
-        onOpenCost={onNav ? () => onNav("costdiagnostics") : undefined}
-        onOpenOverfitting={onNav ? () => onNav("overfittingdiagnostics") : undefined}
+        onRefresh={(updated) => { if (generation === detailRequest.current && updated.id === detail.id) setDetail(updated); }}
+        onOpenValidation={onNav ? () => navigateAway("modelvalidation") : undefined}
+        onOpenDataset={onNav ? () => navigateAway("datasetlineage") : undefined}
+        onOpenExperiment={onNav ? () => navigateAway("experimentregistry") : undefined}
+        onOpenRegime={onNav ? () => navigateAway("regimediagnostics") : undefined}
+        onOpenCost={onNav ? () => navigateAway("costdiagnostics") : undefined}
+        onOpenOverfitting={onNav ? () => navigateAway("overfittingdiagnostics") : undefined}
+        onOpenStress={onNav ? () => navigateAway("portfoliostress") : undefined}
       />
+      </div>
     );
   }
 
@@ -173,7 +212,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
       <PortfolioCompare
         pair={pair}
         onBack={() => {
-          setMode("list");
+          navigate("list");
           setPair(null);
           setSelected([]);
         }}
@@ -193,6 +232,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
             <p className="mt-2 max-w-3xl text-sm text-slate-500">{DISCLAIMER}</p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button type="button" className="btn-primary" onClick={beginCreation}>New portfolio run</button>
             <button type="button" onClick={reload}
               className="rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">↻ Refresh</button>
             <button type="button" onClick={handleSeed} disabled={seeding}
@@ -234,7 +274,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
               onChange={(e) => updateFilter("query", e.target.value)}
               placeholder="name or description" className="ql-input w-48 px-2 py-1.5 text-sm" />
           </div>
-          <button type="button" onClick={() => { setPage(1); setFilters({}); }}
+          <button type="button" onClick={() => { detailRequest.current += 1; setPage(1); setFilters({}); }}
             className="ml-auto rounded-md border border-slate-200 px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-50">
             Reset filters
           </button>
@@ -250,7 +290,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
           </span>
           <div className="flex items-center gap-2">
             <button type="button" disabled={selected.length !== 2}
-              onClick={() => { setPair({ a: selected[0], b: selected[1] }); setMode("compare"); }}
+              onClick={() => { setPair({ a: selected[0], b: selected[1] }); navigate("compare"); }}
               className="rounded-md border border-blue-300 bg-white px-3 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100 disabled:opacity-50">
               Compare selected
             </button>
@@ -271,8 +311,8 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
       ) : !list || list.total === 0 ? (
         <EmptyState
           title="No portfolio-diagnostic runs yet"
-          description="Load the deterministic demo to explore equal-weight, inverse-volatility, ERC and minimum-variance construction with reconciled risk contributions, constraint checks and cost-aware turnover — or create runs via the API."
-          actions={[{ label: seeding ? "Loading…" : "Load demo runs", onClick: handleSeed }]}
+          description="Create a portfolio from your aligned returns and explicit weights, or load the deterministic demo to explore other construction methods."
+          actions={[{ label: "New portfolio run", onClick: beginCreation }, { label: seeding ? "Loading…" : "Load demo runs", onClick: handleSeed }]}
         />
       ) : (
         <div className="card overflow-hidden">
@@ -349,9 +389,9 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
           <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-50 px-4 py-2 text-xs text-slate-500">
             <span>{list.total} run{list.total === 1 ? "" : "s"} · page {list.page} of {list.total_pages}</span>
             <div className="flex items-center gap-2">
-              <button type="button" onClick={() => setPage((p) => p - 1)} disabled={list.page <= 1}
+              <button type="button" onClick={() => { detailRequest.current += 1; setPage((p) => p - 1); }} disabled={list.page <= 1}
                 className="rounded-md border border-slate-200 px-2.5 py-1 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40">← Prev</button>
-              <button type="button" onClick={() => setPage((p) => p + 1)} disabled={list.page >= list.total_pages}
+              <button type="button" onClick={() => { detailRequest.current += 1; setPage((p) => p + 1); }} disabled={list.page >= list.total_pages}
                 className="rounded-md border border-slate-200 px-2.5 py-1 font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40">Next →</button>
             </div>
           </div>
