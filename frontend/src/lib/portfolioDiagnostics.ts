@@ -8,6 +8,27 @@ import { BacktestApiError } from "./api";
 
 const BASE = "/api/portfolio-diagnostics";
 
+export interface PortfolioReturnInput {
+  frequency: string;
+  timestamps: string[];
+  assets: { asset_id: string; returns: number[]; name?: string | null;
+    asset_type?: "equity" | "futures" | "crypto" | "fx" | "rates" | "candidate" | "index" | "other";
+    group?: string | null; currency?: string | null }[];
+}
+
+export interface PortfolioRunCreate extends PortfolioReturnInput {
+  name: string;
+  method: "user_supplied";
+  weights: Record<string, number>;
+  normalization: "none";
+  weight_provenance: { basis: "declared" };
+  covariance: { method: "sample"; repair: "none" };
+  estimation: { mode: "rolling"; lookback: number; lag: 1 };
+  constraints: { long_only: true; min_weight: 0; max_weight: 1;
+    net_exposure_target: 1; gross_exposure_limit: 1; cash_residual_allowed: false };
+  rebalance: { kind: "one_time"; initial_turnover_policy: "none" };
+}
+
 export interface RunSummary {
   id: number;
   created_at: string;
@@ -300,6 +321,8 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<T> {
     try {
       const body = await res.json();
       if (typeof body?.detail === "string") message = body.detail;
+      else if (Array.isArray(body?.detail)) message = body.detail.map((item: { loc?: unknown[]; msg?: string }) =>
+        `${item.loc?.join(".") ?? "Request"}: ${item.msg ?? "Invalid value"}`).join("; ");
     } catch {
       /* keep */
     }
@@ -323,6 +346,10 @@ export const listRuns = (params: RunFilters & { page?: number; page_size?: numbe
     `/runs${q(params as Record<string, unknown>)}`,
   );
 export const getRun = (id: number) => request<RunFull>(`/runs/${id}`);
+export const createRun = (payload: PortfolioRunCreate) =>
+  request<RunFull>("/runs", { method: "POST", body: JSON.stringify(payload) });
+export const executeRun = (id: number) =>
+  request<RunFull>(`/runs/${id}/execute`, { method: "POST", body: JSON.stringify({ create_experiment: false }) });
 export const getAssets = (id: number) =>
   request<{ items: AssetRow[] }>(`/runs/${id}/assets`);
 export const getWeights = (id: number) =>

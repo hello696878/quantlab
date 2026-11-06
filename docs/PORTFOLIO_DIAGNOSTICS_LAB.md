@@ -28,6 +28,98 @@ Related policies: [PORTFOLIO_CONSTRUCTION_POLICY.md](PORTFOLIO_CONSTRUCTION_POLI
 
 ## 1. Universe and alignment
 
+### Local Portfolio Source Composer v1
+
+In local mode, **New portfolio run** is available in the toolbar and empty
+state. Paste JSON or choose a local JSON file, validate the preview, supply
+every asset's percentage weight, choose the rolling lookback, then deliberately
+select **Create and run**. No data is seeded and no execution starts on import.
+The preview is bounded to asset identities/metadata, observation count,
+declared frequency, date range and the first three return values per asset.
+Edits invalidate the preview and weights; obsolete asynchronous file reads
+cannot replace a newer selection or paste.
+
+The Composer accepts one return-data-only JSON shape (this abbreviated shape
+illustrates fields; an actual import needs 24-2,000 dates and returns per asset):
+
+```json
+{
+  "frequency": "daily",
+  "timestamps": ["2024-01-01", "2024-01-02"],
+  "assets": [
+    {"asset_id": "asset-a", "name": "Asset A", "asset_type": "index", "group": "core", "currency": "USD", "returns": [0.01, -0.005]},
+    {"asset_id": "asset-b", "returns": [0.002, 0.004]}
+  ]
+}
+```
+
+- Both pasted UTF-8 input and file size are limited to **2 MiB before JSON
+  parsing**. Root fields are only `frequency`, `timestamps`, `assets`.
+- 2-20 assets, 24-2,000 shared observations, identical array lengths, finite
+  JSON numbers only (no numeric strings, booleans, null, or overflow `1e400`).
+  **0.01 means a 1% period return**, not a price or a 0.01% return. No unit
+  guessing, filling, dropping, resampling or numeric-value adjustment.
+- Dates are the Composer's narrower **exact `YYYY-MM-DD`** subset: real
+  calendar dates in years 0001-9999, strictly increasing without duplicates.
+  Accepted strings are preserved. Datetime/offset imports use the existing
+  broader API, which is unchanged. Declared frequency does not certify a
+  trading calendar, regular spacing or historical authenticity.
+- Asset order is preserved. IDs are trimmed, nonempty, unique after trimming,
+  at most 64 characters; prototype-named IDs are supported. Optional metadata
+  is only `name` (nullable, <=200), `asset_type` (equity/futures/crypto/fx/rates/
+  candidate/index/other), `group` (nullable, nonblank <=64, <=8 distinct groups),
+  and `currency` (nullable, nonblank <=8, one declared currency, no conversion).
+  Unsupported fields are rejected, including `metadata`, weights, linked IDs,
+  provenance and execution options. The public AssetInput accepts no `metadata`.
+- Every weight must be explicitly entered, 0-100% inclusive; blank is not
+  zero. Percentages are converted to fractions once and must sum to 1 within
+  `1e-6` fractional tolerance (0.0001 percentage points). The entered total is
+  shown without rounding into validity. No equal-weight substitution or scaling.
+
+Fixed scope: `method=user_supplied`, `normalization=none`, declared/manual
+weight provenance (`basis=declared`, never `causal_rolling`), sample covariance
+with `repair=none`; long-only weights in [0,1], net exposure target and gross
+limit 1, no cash residual. Rebalance is one-time, initial turnover policy
+`none`. Lookback L is an integer from 3 through `min(500, observations-1)`
+(visible default 20), rolling estimation, lag 1. The estimation window is
+indices 0 through L-1, the decision/first effective date is index L; earlier
+portfolio returns are unavailable. Weights subsequently drift under the
+existing engine: this is not constant-weight daily rebalancing or an allocation
+invested over the entire imported history. Covariance and volatility remain
+per-period; missing prior-book/cost information is unavailable, not zero-cost
+evidence. No optimizer, shorting/leverage, normalization selector, sensitivity,
+linked datasets/regimes/costs, benchmark import or baseline creation is added.
+
+Lifecycle uses the existing `POST /portfolio-diagnostics/runs`, then executes
+that same positive ID with `{"create_experiment":false}`. Inputs lock during
+writes; duplicate clicks cannot issue duplicate writes. A lost/unknown create
+response requires list inspection, not automatic recreation. After a known ID
+has been created, lost execution responses retain it: refresh stored status,
+then explicitly retry that same pending/failed ID. Recovery rechecks status
+before execution; completed records open stored diagnostics, running or
+invalidated records cannot execute via recovery. Pending/failed stored details
+provide a route back to same-ID recovery. Obsolete detail successes/failures
+cannot replace a new Composer, later selection, filtering/reload, or navigation.
+
+Parent `completed` does **not** establish solver success or usable weights.
+The actual stored detail shows parent, solver and rebalance states, warnings,
+violations and unavailable metrics. Only a successful stored rebalance read
+with usable weights establishes source availability; no replacement weights
+or replacement run are fabricated. **Open Portfolio Stress** uses existing
+navigation; select the displayed source name/ID and explicit stored rebalance
+there (ID `0` is valid). Stress eligibility/calculations remain unchanged.
+ServingGate keeps this authoring workflow out of read-only-demo and unverified
+capability states. Existing list, comparison, demo, baseline and export actions
+remain available under their existing policies.
+
+The focused public-API bridge test is
+`backend/tests/test_portfolio_source_composer.py`: non-equal 70/30 declared
+weights survive persistence without normalization, actual rebalance 0 is used
+for a -10%/0% asset shock (-7% portfolio return), stored source fingerprints
+correspond, and downstream stress leaves the source and its weights unchanged.
+Only test-owned SQLite is accessible. Component/API tests and a production
+build are separate from browser acceptance; no browser execution is added.
+
 One universe = one shared, strictly increasing, tz-consistent timeline
 (parsed datetimes — never lexicographic strings) with a declared return
 frequency, 2–20 assets with identically aligned finite return series

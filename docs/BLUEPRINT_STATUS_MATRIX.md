@@ -270,6 +270,16 @@ user-authored asset-shock Composer using an explicit stored rebalance, percent
 units, omitted-shock policy and same-run execution recovery. This adds a form
 over the existing stress engine, not a new quant engine or hosted capability.
 See [Composer workflow](PORTFOLIO_STRESS_LAB.md#local-asset-shock-composer).
+
+Current authoring update (2026-11-05): Portfolio Diagnostics now includes a
+bounded local Portfolio Source Composer: user-supplied aligned return JSON,
+explicit long-only percentage weights, declared provenance, no normalization,
+one-time construction with trailing sample covariance, and same-ID execution
+recovery. Actual stored weights/rebalances can then be selected in the existing
+Stress Composer, including rebalance 0. This is UI authoring over existing
+APIs/engines, not a new optimizer, data-provider verification, generic importer,
+hosted capability, or completion of the broader blueprint gaps.
+See [input scope and recovery](PORTFOLIO_DIAGNOSTICS_LAB.md#local-portfolio-source-composer-v1).
 Independent local implementation review (2026-10-31) passed after correcting
 stale-detail navigation, same-ID recovery reachability and prototype-named
 asset handling; 75 focused frontend tests, 8 isolated backend contract cases
