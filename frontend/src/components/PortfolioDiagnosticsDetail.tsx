@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { classifyApiError } from "@/lib/api";
 import {
   type BudgetBlock,
@@ -35,20 +35,27 @@ interface Props {
   onOpenRegime?: () => void;
   onOpenCost?: () => void;
   onOpenOverfitting?: () => void;
+  onOpenStress?: () => void;
 }
 
 export default function PortfolioDiagnosticsDetail({
   run, onBack, onRefresh, onOpenValidation, onOpenDataset, onOpenExperiment,
-  onOpenRegime, onOpenCost, onOpenOverfitting,
+  onOpenRegime, onOpenCost, onOpenOverfitting, onOpenStress,
 }: Props) {
   const [weights, setWeights] = useState<WeightRow[]>([]);
   const [contributions, setContributions] = useState<ContributionRow[]>([]);
   const [rebalances, setRebalances] = useState<RebalanceRow[]>([]);
+  const [rebalancesChecked, setRebalancesChecked] = useState(false);
   const [sensitivity, setSensitivity] = useState<SensitivityRow[]>([]);
   const [busy, setBusy] = useState(false);
   const [childrenLoading, setChildrenLoading] = useState(false);
   const [childrenError, setChildrenError] = useState<unknown>(null);
   const [retryTick, setRetryTick] = useState(0);
+  const active = useRef(true);
+  useEffect(() => {
+    active.current = true;
+    return () => { active.current = false; };
+  }, [run.id]);
   const childError = childrenError ? classifyApiError(childrenError) : null;
   const canMarkBaseline = run.status === "completed"
     && !run.is_baseline
@@ -64,6 +71,8 @@ export default function PortfolioDiagnosticsDetail({
 
   useEffect(() => {
     let cancelled = false;
+    setWeights([]); setContributions([]); setRebalances([]); setSensitivity([]);
+    setRebalancesChecked(false);
     if (run.status === "completed") {
       setChildrenLoading(true);
       setChildrenError(null);
@@ -75,7 +84,7 @@ export default function PortfolioDiagnosticsDetail({
         const [w, c, r, s] = results;
         if (w.status === "fulfilled") setWeights(w.value.items);
         if (c.status === "fulfilled") setContributions(c.value.items);
-        if (r.status === "fulfilled") setRebalances(r.value.items);
+        if (r.status === "fulfilled") { setRebalances(r.value.items); setRebalancesChecked(true); }
         if (s.status === "fulfilled") setSensitivity(s.value.items);
         const failed = results.find((item) => item.status === "rejected");
         if (failed?.status === "rejected") setChildrenError(failed.reason);
@@ -92,14 +101,17 @@ export default function PortfolioDiagnosticsDetail({
     setBusy(true);
     try {
       const updated = await markBaseline(run.id);
+      if (!active.current) return;
+      if (updated.id !== run.id) throw new Error("Stored run identity mismatch.");
       toast.success("Baseline marked", "Any previous baseline in the same scope was unmarked.");
       onRefresh(updated);
     } catch (err) {
+      if (!active.current) return;
       const cls = classifyApiError(err);
       if (cls.backendUnavailable) notifyBackendOffline();
       else toast.error("Baseline rejected", cls.message);
     } finally {
-      setBusy(false);
+      if (active.current) setBusy(false);
     }
   }
 
@@ -154,6 +166,18 @@ export default function PortfolioDiagnosticsDetail({
             </span>
           </div>
         )}
+      </div>
+
+      <div className="space-y-2 border-y border-[var(--line)] py-3 text-sm">
+        <p>Source #{run.id}: {run.name}. Parent: {run.status}; solver: {run.solver_status ?? "unavailable"}.</p>
+        {run.status === "completed" && rebalancesChecked ? <>
+          <p>{rebalances.some((row) => row.weights && Object.keys(row.weights).length > 0
+            && run.universe.assets.every((asset) => Object.hasOwn(row.weights!, asset.asset_id) && Number.isFinite(row.weights![asset.asset_id])))
+            ? "Stored rebalance weights are available for selection in Portfolio Stress. Select this source name/ID and its rebalance there."
+            : "No usable stored rebalance weights. Parent completion does not mean construction succeeded; review solver states, warnings and constraint violations."}</p>
+          <ul className="list-disc pl-5">{rebalances.map((row) => <li key={row.rebalance_id}>Rebalance #{row.rebalance_id}: {row.status}; solver: {row.solver_status ?? "unavailable"}; violations: {row.constraint_violation_count}. {row.reason}</li>)}</ul>
+        </> : <p>Stored rebalance availability has not been confirmed.</p>}
+        {onOpenStress && <button type="button" className="btn-secondary" onClick={onOpenStress}>Open Portfolio Stress</button>}
       </div>
 
       {run.warnings.length > 0 && (
