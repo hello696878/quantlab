@@ -1,4 +1,5 @@
-import { expect, it } from "vitest";
+import { expect, expectTypeOf, it } from "vitest";
+import type { PortfolioRunCreate } from "./portfolioDiagnostics";
 import { buildPortfolioRun, enteredWeightTotal, MAX_IMPORT_BYTES, parsePortfolioReturns, weightText } from "./portfolioDiagnosticsComposer";
 import { returnInput } from "@/test/fixtures/portfolioDiagnosticsComposer";
 
@@ -88,4 +89,23 @@ it("handles prototype-named assets with own-property-safe maps", () => {
   expect(Object.keys(payload.weights)).toEqual(["constructor", "toString", "__proto__"]);
   expect(payload.weights.__proto__).toBe(0.3);
   expect(JSON.parse(JSON.stringify(payload)).weights).toEqual(payload.weights);
+});
+
+it.each(["equal_weight", "inverse_volatility"] as const)("builds %s without manual fields or a volatility floor", (method) => {
+  const data = parse(returnInput());
+  const payload = buildPortfolioRun(data, "Derived", { a: "invalid", b: "" }, "20", method);
+  const manual = buildPortfolioRun(data, "Derived", { a: "70", b: "30" }, "20");
+  const { weights: _weights, weight_provenance: _provenance, ...common } = manual;
+  expect(payload).toEqual({ ...common, method, normalization: "sum_to_one" });
+  for (const key of ["weights", "weight_provenance", "volatility_floor"]) expect(Object.hasOwn(JSON.parse(JSON.stringify(payload)), key)).toBe(false);
+  expect(data).toEqual(parse(returnInput()));
+  expect(() => buildPortfolioRun(data, "", {}, "20", method)).toThrow(/Run name/);
+  expect(() => buildPortfolioRun(data, "Derived", {}, "24", method)).toThrow(/Lookback/);
+});
+
+it("excludes manual-only fields from the derived request type", () => {
+  type Derived = Extract<PortfolioRunCreate, { normalization: "sum_to_one" }>;
+  expectTypeOf<Derived["weights"]>().toEqualTypeOf<undefined>();
+  expectTypeOf<Derived["weight_provenance"]>().toEqualTypeOf<undefined>();
+  expectTypeOf<PortfolioRunCreate["volatility_floor"]>().toEqualTypeOf<undefined>();
 });

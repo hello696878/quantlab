@@ -30,6 +30,7 @@ async function prepare(user: ReturnType<typeof setup>["user"]) {
 
 it("previews only a bounded sample, records explicit weights and opens actual execution result", async () => {
   const { user } = setup(); await prepare(user);
+  expect(screen.getByLabelText("Construction method")).toHaveValue("user_supplied");
   expect(screen.getByText(/Entered total: 100%/)).toBeVisible();
   expect(screen.getByText(/first effective date: 2024-01-21/)).toBeVisible();
   expect(screen.getByText(/first 3 observations only/)).toBeVisible();
@@ -93,7 +94,7 @@ it("locks request inputs and synchronously prevents rapid submissions", async ()
   const form = screen.getByRole("button", { name: "Create and run" }).closest("form")!;
   act(() => { fireEvent.submit(form); fireEvent.submit(form); });
   expect(api.createRun).toHaveBeenCalledOnce();
-  for (const label of ["Run name", "Return JSON", "Local JSON file", "Weight for a (%)", "Rolling lookback"]) expect(screen.getByLabelText(label)).toBeDisabled();
+  for (const label of ["Run name", "Construction method", "Return JSON", "Local JSON file", "Weight for a (%)", "Rolling lookback"]) expect(screen.getByLabelText(label)).toBeDisabled();
   await act(async () => pending.resolve(diagnosticRun({ status: "pending" })));
   expect(api.executeRun).toHaveBeenCalledOnce();
 });
@@ -102,6 +103,7 @@ it.each([new BacktestApiError(0, "offline"), new BacktestApiError(500, "server")
   const { user } = setup(); await prepare(user); await user.click(screen.getByRole("button", { name: "Create and run" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Creation outcome is unknown");
   expect(screen.queryByRole("button", { name: "Create and run" })).not.toBeInTheDocument();
+  expect(screen.getByLabelText("Construction method")).toBeDisabled();
   await user.click(screen.getByRole("button", { name: "Inspect run list" })); expect(onBack).toHaveBeenCalledOnce();
   expect(api.createRun).toHaveBeenCalledOnce(); expect(api.executeRun).not.toHaveBeenCalled();
 });
@@ -117,6 +119,7 @@ it("retains the created ID after a lost execution and requires refresh then expl
   vi.mocked(api.executeRun).mockRejectedValueOnce(new Error("Lost execution response"));
   const { user } = setup(); await prepare(user); await user.click(screen.getByRole("button", { name: "Create and run" }));
   expect(await screen.findByRole("alert")).toHaveTextContent("Run #51 is retained");
+  expect(screen.getByLabelText("Construction method")).toBeDisabled();
   expect(screen.getByRole("button", { name: "Retry execution of this run" })).toBeDisabled();
   await user.click(screen.getByRole("button", { name: "Refresh stored run" }));
   expect(screen.getByRole("button", { name: "Retry execution of this run" })).toBeEnabled();
@@ -152,4 +155,62 @@ it("does not execute or open obsolete creation responses after unmount", async (
   const view = setup(); await prepare(view.user); await view.user.click(screen.getByRole("button", { name: "Create and run" }));
   view.unmount(); await act(async () => pending.resolve(diagnosticRun({ status: "pending" })));
   expect(api.executeRun).not.toHaveBeenCalled(); expect(onOpen).not.toHaveBeenCalled();
+});
+
+it.each(["equal_weight", "inverse_volatility"] as const)("submits %s without manual entries, opening the backend result", async (method) => {
+  const result = diagnosticRun({ method, warnings: ["Backend warning retained"] });
+  vi.mocked(api.executeRun).mockResolvedValue(result);
+  const { user } = setup();
+  fireEvent.change(screen.getByLabelText("Return JSON"), { target: { value: JSON.stringify(returnInput()) } });
+  await user.click(screen.getByRole("button", { name: "Validate return data" }));
+  await user.type(screen.getByLabelText("Run name"), "Derived portfolio");
+  expect(screen.getByRole("button", { name: "Create and run" })).toBeDisabled();
+  await user.selectOptions(screen.getByLabelText("Construction method"), method);
+  expect(screen.queryByLabelText("Weight for a (%)")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Entered total:/)).not.toBeInTheDocument();
+  expect(screen.getByText(/first effective date: 2024-01-21/)).toBeVisible();
+  expect(api.createRun).not.toHaveBeenCalled(); expect(api.executeRun).not.toHaveBeenCalled();
+  await user.click(screen.getByRole("button", { name: "Create and run" }));
+  const body = JSON.parse(JSON.stringify(vi.mocked(api.createRun).mock.calls[0][0]));
+  expect(body).toMatchObject({ method, normalization: "sum_to_one" });
+  for (const key of ["weights", "weight_provenance", "volatility_floor"]) expect(Object.hasOwn(body, key)).toBe(false);
+  expect(api.executeRun).toHaveBeenCalledExactlyOnceWith(51);
+  expect(onOpen).toHaveBeenCalledExactlyOnceWith(result);
+});
+
+it("preserves only the manual draft across method switches and clears its association on import edits", async () => {
+  const { user } = setup(); await prepare(user);
+  await user.clear(screen.getByLabelText("Weight for a (%)"));
+  for (const method of ["equal_weight", "inverse_volatility"]) {
+    await user.selectOptions(screen.getByLabelText("Construction method"), method);
+    expect(screen.getByRole("button", { name: "Create and run" })).toBeEnabled();
+    expect(screen.queryByText(/weights are never rescaled/)).not.toBeInTheDocument();
+  }
+  await user.selectOptions(screen.getByLabelText("Construction method"), "user_supplied");
+  expect(screen.getByLabelText("Weight for a (%)")).toHaveValue("");
+  expect(screen.getByLabelText("Weight for b (%)")).toHaveValue("30");
+  expect(screen.getByRole("button", { name: "Create and run" })).toBeDisabled();
+  await user.selectOptions(screen.getByLabelText("Construction method"), "inverse_volatility");
+  fireEvent.change(screen.getByLabelText("Return JSON"), { target: { value: JSON.stringify(returnInput(25)) } });
+  expect(screen.queryByLabelText("Validated return preview")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Create and run" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Validate return data" }));
+  await user.selectOptions(screen.getByLabelText("Construction method"), "user_supplied");
+  expect(screen.getByLabelText("Weight for b (%)")).toHaveValue("");
+  expect(api.createRun).not.toHaveBeenCalled(); expect(api.executeRun).not.toHaveBeenCalled();
+});
+
+it("locks a derived method during writes and known-ID recovery without recreating it", async () => {
+  const pending = deferred<api.RunFull>(); vi.mocked(api.createRun).mockReturnValue(pending.promise);
+  vi.mocked(api.executeRun).mockRejectedValueOnce(new Error("Lost execution response"));
+  const { user } = setup(); await prepare(user);
+  await user.selectOptions(screen.getByLabelText("Construction method"), "inverse_volatility");
+  const form = screen.getByRole("button", { name: "Create and run" }).closest("form")!;
+  act(() => { fireEvent.submit(form); fireEvent.submit(form); });
+  expect(screen.getByLabelText("Construction method")).toBeDisabled();
+  await act(async () => pending.resolve(diagnosticRun({ method: "inverse_volatility", status: "pending" })));
+  expect(screen.getByLabelText("Construction method")).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Refresh stored run" }));
+  await user.click(screen.getByRole("button", { name: "Retry execution of this run" }));
+  expect(api.createRun).toHaveBeenCalledOnce(); expect(vi.mocked(api.executeRun).mock.calls).toEqual([[51], [51]]);
 });

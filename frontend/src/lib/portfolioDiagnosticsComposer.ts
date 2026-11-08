@@ -1,4 +1,4 @@
-import type { PortfolioRunCreate, PortfolioReturnInput } from "./portfolioDiagnostics";
+import type { PortfolioConstructionMethod, PortfolioRunCreate, PortfolioReturnInput } from "./portfolioDiagnostics";
 
 export const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const ASSET_TYPES = ["equity", "futures", "crypto", "fx", "rates", "candidate", "index", "other"];
@@ -101,20 +101,27 @@ export function enteredWeightTotal(data: PortfolioReturnInput, values: Record<st
   catch { return null; }
 }
 
-export function buildPortfolioRun(data: PortfolioReturnInput, nameRaw: string, values: Record<string, string>, lookbackRaw: string): PortfolioRunCreate {
+export function buildPortfolioRun(data: PortfolioReturnInput, nameRaw: string, values: Record<string, string>, lookbackRaw: string, method?: "user_supplied"): Extract<PortfolioRunCreate, { method: "user_supplied" }>;
+export function buildPortfolioRun(data: PortfolioReturnInput, nameRaw: string, values: Record<string, string>, lookbackRaw: string, method: PortfolioConstructionMethod): PortfolioRunCreate;
+export function buildPortfolioRun(data: PortfolioReturnInput, nameRaw: string, values: Record<string, string>, lookbackRaw: string, method: PortfolioConstructionMethod = "user_supplied"): PortfolioRunCreate {
   const name = text(nameRaw, "Run name", 200);
   const maximum = Math.min(500, data.timestamps.length - 1);
   if (!/^\d+$/.test(lookbackRaw.trim()) || Number(lookbackRaw) < 3 || Number(lookbackRaw) > maximum) throw new Error(`Lookback must be an integer from 3 to ${maximum}.`);
   const lookback = Number(lookbackRaw);
+  const common = { ...data, name, covariance: { method: "sample", repair: "none" },
+    estimation: { mode: "rolling", lookback, lag: 1 },
+    constraints: { long_only: true, min_weight: 0, max_weight: 1, net_exposure_target: 1, gross_exposure_limit: 1, cash_residual_allowed: false },
+    rebalance: { kind: "one_time", initial_turnover_policy: "none" } } as const;
+  if (method === "equal_weight" || method === "inverse_volatility") {
+    return { ...common, method, normalization: "sum_to_one" };
+  }
+  if (method !== "user_supplied") throw new Error("Unsupported construction method.");
   const entries = data.assets.map(({ asset_id }) => {
     const percent = decimal(weightText(values, asset_id), `Weight for ${asset_id}`);
     if (percent < 0 || percent > 100) throw new Error(`Weight for ${asset_id} must be between 0% and 100%.`);
     return [asset_id, percent / 100] as const;
   });
   if (Math.abs(entries.reduce((sum, [, weight]) => sum + weight, 0) - 1) > 1e-6) throw new Error("Weights must total 100% within 0.0001 percentage points. No normalization is applied.");
-  return { ...data, name, weights: Object.fromEntries(entries), method: "user_supplied", normalization: "none",
-    weight_provenance: { basis: "declared" }, covariance: { method: "sample", repair: "none" },
-    estimation: { mode: "rolling", lookback, lag: 1 },
-    constraints: { long_only: true, min_weight: 0, max_weight: 1, net_exposure_target: 1, gross_exposure_limit: 1, cash_residual_allowed: false },
-    rebalance: { kind: "one_time", initial_turnover_policy: "none" } };
+  return { ...common, weights: Object.fromEntries(entries), method: "user_supplied", normalization: "none",
+    weight_provenance: { basis: "declared" } };
 }

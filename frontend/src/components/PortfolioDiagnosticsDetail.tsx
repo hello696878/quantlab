@@ -170,6 +170,7 @@ export default function PortfolioDiagnosticsDetail({
 
       <div className="space-y-2 border-y border-[var(--line)] py-3 text-sm">
         <p>Source #{run.id}: {run.name}. Parent: {run.status}; solver: {run.solver_status ?? "unavailable"}.</p>
+        <p className="text-[var(--text-mut)]">Integrity labels describe the recorded estimation policy, not independent certification of imported historical data.</p>
         {run.status === "completed" && rebalancesChecked ? <>
           <p>{rebalances.some((row) => row.weights && Object.keys(row.weights).length > 0
             && run.universe.assets.every((asset) => Object.hasOwn(row.weights!, asset.asset_id) && Number.isFinite(row.weights![asset.asset_id])))
@@ -644,6 +645,10 @@ function RebalancesView({ rows }: { rows: RebalanceRow[] }) {
                       <p><span className="font-semibold">Status:</span> {r.status}{r.reason ? ` · ${r.reason}` : ""}</p>
                       <p><span className="font-semibold">Prior weights:</span> {r.prior_weights ? JSON.stringify(r.prior_weights) : "unavailable"}</p>
                       <p><span className="font-semibold">Target weights:</span> {r.weights ? JSON.stringify(r.weights) : "unavailable"}</p>
+                      {Array.isArray(r.solver.unavailable_assets) && r.solver.unavailable_assets.length > 0 &&
+                        <p><span className="font-semibold">Unavailable assets:</span> {JSON.stringify(r.solver.unavailable_assets)}</p>}
+                      {Array.isArray(r.solver.floored_assets) && r.solver.floored_assets.length > 0 &&
+                        <p><span className="font-semibold">Volatility floor applied to:</span> {JSON.stringify(r.solver.floored_assets)}</p>}
                       {r.constraint_violations.map((violation, i) => (
                         <p key={`${violation.constraint}-${i}`} className="text-red-600">
                           {violation.constraint}: {violation.detail} (amount {violation.amount})

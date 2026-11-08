@@ -271,7 +271,7 @@ units, omitted-shock policy and same-run execution recovery. This adds a form
 over the existing stress engine, not a new quant engine or hosted capability.
 See [Composer workflow](PORTFOLIO_STRESS_LAB.md#local-asset-shock-composer).
 
-Current authoring update (2026-11-05): Portfolio Diagnostics now includes a
+Integrated authoring update (2026-11-05): Portfolio Diagnostics includes a
 bounded local Portfolio Source Composer: user-supplied aligned return JSON,
 explicit long-only percentage weights, declared provenance, no normalization,
 one-time construction with trailing sample covariance, and same-ID execution
@@ -280,6 +280,16 @@ Stress Composer, including rebalance 0. This is UI authoring over existing
 APIs/engines, not a new optimizer, data-provider verification, generic importer,
 hosted capability, or completion of the broader blueprint gaps.
 See [input scope and recovery](PORTFOLIO_DIAGNOSTICS_LAB.md#local-portfolio-source-composer-v1).
+Bounded implementation update (2026-11-08), pending independent integration
+review: **Portfolio Construction Methods v1** exposes manual (still default),
+equal-weight and inverse-volatility choices in that same Composer. Derived
+requests omit manual weights/provenance, use `sum_to_one`, and leave the
+volatility floor unset; the existing backend alone constructs/persists weights.
+The trailing sample window, lag 1, no-repair, long-only fully invested, one-time
+drift policy and same-ID recovery are unchanged. Stored unavailable-asset
+reasons/failure remain visible; integrity labels are not imported-data provenance
+certification. There is no new optimizer, provider, source cloning or global route.
+See [current verification and limits](../STOP_POINT.md#current-handoff-portfolio-construction-methods-v1-2026-11-08).
 Independent local implementation review (2026-10-31) passed after correcting
 stale-detail navigation, same-ID recovery reachability and prototype-named
 asset handling; 75 focused frontend tests, 8 isolated backend contract cases
