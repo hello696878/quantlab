@@ -31,8 +31,9 @@ Related policies: [PORTFOLIO_CONSTRUCTION_POLICY.md](PORTFOLIO_CONSTRUCTION_POLI
 ### Local Portfolio Source Composer v1
 
 In local mode, **New portfolio run** is available in the toolbar and empty
-state. Paste JSON or choose a local JSON file, validate the preview, supply
-every asset's percentage weight, choose the rolling lookback, then deliberately
+state. Paste JSON or choose a local JSON file, validate the preview, select
+manual weights (default), equal weight or inverse volatility, supply any required
+weights, choose the rolling lookback, then deliberately
 select **Create and run**. No data is seeded and no execution starts on import.
 The preview is bounded to asset identities/metadata, observation count,
 declared frequency, date range and the first three return values per asset.
@@ -71,14 +72,35 @@ illustrates fields; an actual import needs 24-2,000 dates and returns per asset)
   and `currency` (nullable, nonblank <=8, one declared currency, no conversion).
   Unsupported fields are rejected, including `metadata`, weights, linked IDs,
   provenance and execution options. The public AssetInput accepts no `metadata`.
-- Every weight must be explicitly entered, 0-100% inclusive; blank is not
+- For manual construction every weight must be explicitly entered, 0-100% inclusive; blank is not
   zero. Percentages are converted to fractions once and must sum to 1 within
   `1e-6` fractional tolerance (0.0001 percentage points). The entered total is
   shown without rounding into validity. No equal-weight substitution or scaling.
 
-Fixed scope: `method=user_supplied`, `normalization=none`, declared/manual
-weight provenance (`basis=declared`, never `causal_rolling`), sample covariance
-with `repair=none`; long-only weights in [0,1], net exposure target and gross
+Construction Methods v1 exposes three existing backend methods without new
+portfolio mathematics:
+
+- **Manual**: `method=user_supplied`, `normalization=none`, declared weight
+  provenance (`basis=declared`, never `causal_rolling`). Entered fractions are
+  preserved without rescaling. Blank is invalid; explicit zero is allowed.
+- **Equal weight**: `method=equal_weight`, `normalization=sum_to_one`. The backend
+  constructs equal allocations, not provisional browser-calculated weights.
+- **Inverse volatility**: `method=inverse_volatility`, `normalization=sum_to_one`.
+  The backend uses inverse trailing-window sample volatility (sample standard
+  deviation, ddof=1), proportional to 1/sigma. This is not equal risk contribution,
+  optimal allocation or guaranteed risk reduction. `volatility_floor` is omitted:
+  unusable assets can receive zero weight with a warning and stored per-asset reason;
+  if none are usable, construction fails with weights unavailable. No hidden floor
+  or equal-weight fallback.
+
+Derived requests omit both `weights` and `weight_provenance` from serialized JSON.
+Manual drafts may survive method switches but cannot affect derived requests;
+switching back restores manual validation. Import edits still clear preview and
+weight associations. Method selection stays within the locked form and never
+creates or executes a run by itself. The narrow request union excludes manual
+fields from derived requests and a volatility floor from all Composer requests.
+
+Common fixed scope: sample covariance with `repair=none`; long-only weights in [0,1], net exposure target and gross
 limit 1, no cash residual. Rebalance is one-time, initial turnover policy
 `none`. Lookback L is an integer from 3 through `min(500, observations-1)`
 (visible default 20), rolling estimation, lag 1. The estimation window is
@@ -87,7 +109,7 @@ portfolio returns are unavailable. Weights subsequently drift under the
 existing engine: this is not constant-weight daily rebalancing or an allocation
 invested over the entire imported history. Covariance and volatility remain
 per-period; missing prior-book/cost information is unavailable, not zero-cost
-evidence. No optimizer, shorting/leverage, normalization selector, sensitivity,
+evidence. No optimizer UI, shorting/leverage, normalization selector, sensitivity,
 linked datasets/regimes/costs, benchmark import or baseline creation is added.
 
 Lifecycle uses the existing `POST /portfolio-diagnostics/runs`, then executes
@@ -102,8 +124,12 @@ provide a route back to same-ID recovery. Obsolete detail successes/failures
 cannot replace a new Composer, later selection, filtering/reload, or navigation.
 
 Parent `completed` does **not** establish solver success or usable weights.
-The actual stored detail shows parent, solver and rebalance states, warnings,
-violations and unavailable metrics. Only a successful stored rebalance read
+The actual stored detail shows method, weights, parent, solver and rebalance states,
+warnings, violations and unavailable metrics. Rebalance **Inspect** also exposes
+stored unavailable-asset reasons and any recorded floor use (Composer requests
+never opt into a floor). Integrity labels describe backend estimation policy,
+not independent certification of imported historical provenance.
+Only a successful stored rebalance read
 with usable weights establishes source availability; no replacement weights
 or replacement run are fabricated. **Open Portfolio Stress** uses existing
 navigation; select the displayed source name/ID and explicit stored rebalance
@@ -117,8 +143,19 @@ The focused public-API bridge test is
 weights survive persistence without normalization, actual rebalance 0 is used
 for a -10%/0% asset shock (-7% portfolio return), stored source fingerprints
 correspond, and downstream stress leaves the source and its weights unchanged.
+Construction-method cases use 24 observations and lookback 20: A repeats
+`[-0.001, 0.001, -0.001, 0.001]`, B repeats
+`[-0.002, -0.002, 0.002, 0.002]`. Their noncollinear sample-volatility ratio is 1:2.
+Public create/execute/read routes persist equal weights 1/2,1/2 and inverse-volatility
+weights 2/3,1/3; rebalance 0 uses indices 0-19 and takes effect at index 20.
+Actual stored weights produce -5% and approximately -6.6666667% under -10%/0%
+shocks. Future-only mutations do not change the initial inverse-volatility weights
+(whole-input fingerprints need not match). Partial/all-unusable cases preserve
+warnings/failure rather than fabricating a successful portfolio.
 Only test-owned SQLite is accessible. Component/API tests and a production
 build are separate from browser acceptance; no browser execution is added.
+Current focused verification and retained failures are recorded in the
+[Construction Methods handoff](../STOP_POINT.md#current-handoff-portfolio-construction-methods-v1-2026-11-08).
 
 One universe = one shared, strictly increasing, tz-consistent timeline
 (parsed datetimes — never lexicographic strings) with a declared return

@@ -1,6 +1,105 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Portfolio Source Composer v1 (2026-11-05)
+## Current Handoff: Portfolio Construction Methods v1 (2026-11-08)
+
+Implemented on `codex/portfolio-construction-methods-v1` from clean main
+`a17f9cf3e61ff950d337bd6a210bbcc7d87d8293`, tree
+`4aa6333043345ca6473a264d0bc0798ed9976b7a`. VERSION remains `4.88.0-dev`.
+PR #2/main CI `42395617752` is reused historical baseline evidence only;
+it was not rerun and does not verify these new working-tree changes.
+
+The existing local Source Composer now offers manual (default), equal weight
+and inverse volatility. Manual weights remain explicit, long-only, fully
+invested within fractional tolerance 1e-6, declared and unscaled. Derived JSON
+requests omit manual weights/provenance, specify `sum_to_one` and omit the
+volatility floor. Only the existing backend constructs authoritative weights.
+Inverse volatility uses trailing sample volatility, not ERC, optimality or a
+guarantee of risk reduction. Partial/all-unusable volatility remains reported
+as zero allocation/warnings or failed construction, never a hidden floor or
+equal-weight fallback. Rebalance Inspect now shows stored per-asset reasons.
+Backend integrity labels describe estimation policy, not independent data
+provenance certification. See
+[method and input policy](docs/PORTFOLIO_DIAGNOSTICS_LAB.md#local-portfolio-source-composer-v1).
+
+The import bounds, strict dates/numbers/metadata, lag 1, sample covariance/no
+repair, one-time construction at index L and subsequent drift are unchanged.
+Method switches preserve only local manual drafts, never submit by themselves,
+and cannot bypass duplicate-submit, unknown-creation or known-ID recovery locks.
+Import edits still invalidate preview/weight associations. Existing comparison,
+Stress navigation, explicit rebalance 0 and local-only ServingGate are retained.
+No backend production, quant logic, schema, dependency, configuration, API-contract
+or VERSION changes; no source cloning, providers or additional construction math.
+
+Executed verification, with separate snapshots/results retained:
+
+- First focused frontend selection: **178 passed /1 failed /179 selected,
+  10 files**, zero skipped; Vitest 30.64s, process exit 1 (44.0477s wall).
+  The new result-view assertion selected its label span rather than its paragraph;
+  only that assertion was corrected. No production fix or weakened expectation.
+- Corrected panel file only: **17 passed /1 file**, zero skipped, Vitest 9.32s,
+  process exit 0 (10.0998s wall). The other nine passing files were not rerun;
+  their production/test inputs still match. These are not added into a new
+  whole-selection pass count.
+- Protected backend: **12 passed /12 selected**, zero skips/failures/errors,
+  pytest terminal 40.76s; recorded pytest/child/outer exits 0/0/0, child wall
+  45.2116s. Seven Source Composer cases plus five existing explicit-rebalance/
+  schema cases. Public routes persist 50/50 and 2/3,1/3, window 0-19 effective at
+  index 20; actual rebalance 0 produces -5% and approximately -6.6666667% under
+  -10%/0% shocks. Future-only mutation leaves initial inverse weights unchanged.
+  Manual 70/30 (-7%), special IDs, unavailable-volatility warnings/failure,
+  stored identities/fingerprints and source immutability are covered.
+- TypeScript: installed `tsc --noEmit --incremental false`, exit 0, 41.1484s.
+- One final normal-local production build: `npm run build`, exit 0, 70.7174s,
+  Next 15.5.28, Node 24.22.1/npm 11.12.1 (installed supported engine versions),
+  `BACKEND_URL=http://localhost:8000`. No executable/test edits followed it.
+  Project Python is 3.13.5, pytest 9.0.3; not Python 3.11 runtime evidence.
+
+Exact argv/cwd/timing/exit records, verbose logs, JSON/JUnit/node outcomes and
+SHA-256 source identities are external:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-construction-methods-8d2120a67bf94746ae461c09375e2785`.
+Read `commands.jsonl`, `frontend-1.json`, `panel-corrected.json`,
+`backend-1/pytest-result.json`, `backend-1/junit.xml`, `types-final-result.json`,
+`build-final-result.json` and `handoff.json`. The first frontend failure remains
+preserved. Read-only preflight also encountered a PowerShell-misparsed unquoted
+tree reference and denied ignored-cache traversal; quoted Git/scoped instruction
+queries then confirmed the expected clean baseline before implementation.
+
+The protected runner's source-copy helpers and `--execute` entry installed its
+SQLite guard before pytest/app imports; the fixture redirected all DB access to
+test-owned paths. Source/snapshot bytes were unchanged during that run; SQLite
+violations `[]`. The active research DB was not opened, read, inspected, hashed,
+copied, migrated or modified. No outer `database_snapshot` path or new active-data
+audit. Three authorized documentation edits after the snapshot are distinguished
+from unchanged tested/typechecked/built executable bytes.
+
+Reviewable inventory: **14 modified tracked paths, all unstaged, no new files**:
+
+```text
+STOP_POINT.md
+docs/BLUEPRINT_STATUS_MATRIX.md
+docs/PORTFOLIO_DIAGNOSTICS_LAB.md
+backend/tests/test_portfolio_source_composer.py
+frontend/src/components/PortfolioDiagnosticsComposer.tsx
+frontend/src/components/PortfolioDiagnosticsComposer.test.tsx
+frontend/src/components/PortfolioDiagnosticsDetail.tsx
+frontend/src/components/PortfolioDiagnosticsPanel.tsx
+frontend/src/components/PortfolioDiagnosticsPanel.test.tsx
+frontend/src/lib/portfolioDiagnostics.ts
+frontend/src/lib/portfolioDiagnostics.test.ts
+frontend/src/lib/portfolioDiagnosticsComposer.ts
+frontend/src/lib/portfolioDiagnosticsComposer.test.ts
+frontend/src/test/fixtures/portfolioDiagnosticsComposer.ts
+```
+
+Next: independent integration review of this exact unstaged set and recorded
+source identities. Browser acceptance remains separately authorized, not inferred
+from jsdom/API tests or build success. Seven retained dependency findings
+(2 high /4 moderate /1 low), Phase 70 browser and backup/restore acceptance,
+and retained unpatched images remain separate release work. No services, browser,
+Docker, installs, audits, full-suite reruns, staging, commit, push, PR, merge,
+tag, release or deployment occurred. This does not complete the broader blueprint.
+
+## Historical Handoff: Portfolio Source Composer v1 (2026-11-05)
 
 Implemented on `codex/portfolio-source-composer-v1`, from main
 `bcf5293e5098d61f70ba42afbe05edc358e56775` (tree

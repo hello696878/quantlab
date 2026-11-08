@@ -16,18 +16,24 @@ export interface PortfolioReturnInput {
     group?: string | null; currency?: string | null }[];
 }
 
-export interface PortfolioRunCreate extends PortfolioReturnInput {
+export type PortfolioConstructionMethod = "user_supplied" | "equal_weight" | "inverse_volatility";
+
+interface PortfolioRunConfiguration extends PortfolioReturnInput {
   name: string;
-  method: "user_supplied";
-  weights: Record<string, number>;
-  normalization: "none";
-  weight_provenance: { basis: "declared" };
+  volatility_floor?: never;
   covariance: { method: "sample"; repair: "none" };
   estimation: { mode: "rolling"; lookback: number; lag: 1 };
   constraints: { long_only: true; min_weight: 0; max_weight: 1;
     net_exposure_target: 1; gross_exposure_limit: 1; cash_residual_allowed: false };
   rebalance: { kind: "one_time"; initial_turnover_policy: "none" };
 }
+
+export type PortfolioRunCreate = PortfolioRunConfiguration & (
+  | { method: "user_supplied"; normalization: "none"; weights: Record<string, number>;
+      weight_provenance: { basis: "declared" } }
+  | { method: "equal_weight" | "inverse_volatility"; normalization: "sum_to_one";
+      weights?: never; weight_provenance?: never }
+);
 
 export interface RunSummary {
   id: number;

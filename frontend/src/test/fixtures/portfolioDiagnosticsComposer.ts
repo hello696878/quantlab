@@ -6,6 +6,13 @@ export function returnInput(count = 24, ids = ["a", "b"]) {
     assets: ids.map((asset_id, j) => ({ asset_id, returns: Array.from({ length: count }, (_, i) => ((i * (j + 3) % 11) - 5) / 1000) })) };
 }
 
+export function constructionInput() {
+  const input = returnInput();
+  const patterns = [[-0.001, 0.001, -0.001, 0.001], [-0.002, -0.002, 0.002, 0.002]];
+  input.assets.forEach((asset, j) => { asset.returns = input.timestamps.map((_, i) => patterns[j][i % 4]); });
+  return input;
+}
+
 export function diagnosticRun(overrides: Partial<RunFull> = {}): RunFull {
   return { id: 51, name: "My supplied portfolio", status: "completed", method: "user_supplied", covariance_method: "sample",
     integrity_status: "declared", solver_status: "closed_form", asset_count: 2, observation_count: 24, rebalance_count: 1,

@@ -57,14 +57,34 @@ it("opens the real stored detail and confirms actual rebalance weights before of
   expect(api.executeRun).toHaveBeenCalledExactlyOnceWith(51);
 });
 it("does not equate parent completion with a successful solver or usable book", async () => {
-  vi.mocked(api.executeRun).mockResolvedValue(diagnosticRun({ solver_status: "failed", warnings: ["Covariance failed; no weights available"] }));
-  vi.mocked(api.getRebalances).mockResolvedValue({ items: [{ ...rebalances[0], rebalance_id: 0, weights: null, solver_status: "failed", status: "failed", reason: "Bad covariance" }] });
-  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />); await prepare(user); await user.click(screen.getByRole("button", { name: "Create and run" }));
+  vi.mocked(api.executeRun).mockResolvedValue(diagnosticRun({ method: "inverse_volatility", solver_status: "failed", warnings: ["no rebalance produced weights; portfolio risk diagnostics are unavailable"] }));
+  vi.mocked(api.getRebalances).mockResolvedValue({ items: [{ ...rebalances[0], rebalance_id: 0, weights: null, solver_status: "failed", status: "failed", reason: "no asset has a usable volatility" }] });
+  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />); await prepare(user);
+  await user.selectOptions(screen.getByLabelText("Construction method"), "inverse_volatility");
+  await user.click(screen.getByRole("button", { name: "Create and run" }));
   expect(await screen.findByText(/No usable stored rebalance weights/)).toBeVisible();
-  expect(screen.getByText("Covariance failed; no weights available")).toBeVisible();
+  expect(screen.getByText("no rebalance produced weights; portfolio risk diagnostics are unavailable")).toBeVisible();
   expect(screen.getByText(/Rebalance #0: failed; solver: failed/)).toBeVisible();
   expect(screen.queryByText(/weights are available for selection/)).not.toBeInTheDocument();
   expect(api.createRun).toHaveBeenCalledOnce();
+});
+
+it("shows authoritative inverse-volatility weights and per-asset unavailability without claiming provenance certification", async () => {
+  const result = diagnosticRun({ method: "inverse_volatility", integrity_status: "verified_causal_rolling", warnings: ["rebalance 0: volatility unavailable for a"] });
+  vi.mocked(api.executeRun).mockResolvedValue(result);
+  vi.mocked(api.getRebalances).mockResolvedValue({ items: [{ ...rebalances[0], rebalance_id: 0, weights: { a: 0, b: 1 },
+    solver: { status: "closed_form", unavailable_assets: [{ asset_id: "a", reason: "zero or negative volatility with no configured floor" }], floored_assets: [] } }] });
+  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />); await prepare(user);
+  await user.selectOptions(screen.getByLabelText("Construction method"), "inverse_volatility");
+  await user.click(screen.getByRole("button", { name: "Create and run" }));
+  expect(await screen.findByText(/weights are available for selection/)).toBeVisible();
+  expect(screen.getByText("rebalance 0: volatility unavailable for a")).toBeVisible();
+  expect(screen.getByText(/Integrity labels describe the recorded estimation policy/)).toBeVisible();
+  expect(screen.getByText(/Inverse volatility.*sample covariance/)).toBeVisible();
+  await user.click(screen.getByText("Inspect", { selector: "summary" }));
+  expect(screen.getByText(/zero or negative volatility with no configured floor/)).toBeVisible();
+  expect(screen.getByText(/Target weights:/).closest("p")).toHaveTextContent('{"a":0,"b":1}');
+  expect(screen.queryByText(/Volatility floor applied to:/)).not.toBeInTheDocument();
 });
 it.each(["pending", "failed"] as const)("can inspect and return to recovery for the same %s ID", async (status) => {
   vi.mocked(api.executeRun).mockRejectedValueOnce(new Error("Lost response"));

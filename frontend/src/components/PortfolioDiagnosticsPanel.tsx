@@ -311,7 +311,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
       ) : !list || list.total === 0 ? (
         <EmptyState
           title="No portfolio-diagnostic runs yet"
-          description="Create a portfolio from your aligned returns and explicit weights, or load the deterministic demo to explore other construction methods."
+          description="Create a portfolio from your aligned returns using manual weights, equal weight or inverse volatility, or load the deterministic demo."
           actions={[{ label: "New portfolio run", onClick: beginCreation }, { label: seeding ? "Loading…" : "Load demo runs", onClick: handleSeed }]}
         />
       ) : (
