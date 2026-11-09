@@ -16,6 +16,17 @@ export interface PortfolioReturnInput {
     group?: string | null; currency?: string | null }[];
 }
 
+export interface StoredPortfolioUniverse {
+  frequency: string;
+  timestamps: string[];
+  assets: (PortfolioReturnInput["assets"][number] & {
+    name: string; group: string | null; integer_lots?: boolean; metadata?: Record<string, unknown>;
+  })[];
+  benchmark_returns?: number[] | null;
+  prior_weights?: Record<string, number> | null;
+  sample_ids?: string[] | null;
+}
+
 export type PortfolioConstructionMethod = "user_supplied" | "equal_weight" | "inverse_volatility";
 
 interface PortfolioRunConfiguration extends PortfolioReturnInput {
@@ -152,8 +163,7 @@ export interface RegimeBlock {
 export interface RunFull extends RunSummary {
   description: string;
   configuration: Record<string, unknown>;
-  universe: { timestamps: string[]; frequency: string;
-              assets: { asset_id: string; name: string; group: string | null }[] };
+  universe: StoredPortfolioUniverse;
   risk: RiskBlock | null;
   budget: BudgetBlock | null;
   concentration: ConcentrationBlock | null;

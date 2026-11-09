@@ -280,8 +280,7 @@ Stress Composer, including rebalance 0. This is UI authoring over existing
 APIs/engines, not a new optimizer, data-provider verification, generic importer,
 hosted capability, or completion of the broader blueprint gaps.
 See [input scope and recovery](PORTFOLIO_DIAGNOSTICS_LAB.md#local-portfolio-source-composer-v1).
-Bounded implementation update (2026-11-08), pending independent integration
-review: **Portfolio Construction Methods v1** exposes manual (still default),
+Integrated update (2026-11-08): **Portfolio Construction Methods v1** exposes manual (still default),
 equal-weight and inverse-volatility choices in that same Composer. Derived
 requests omit manual weights/provenance, use `sum_to_one`, and leave the
 volatility floor unset; the existing backend alone constructs/persists weights.
@@ -289,7 +288,20 @@ The trailing sample window, lag 1, no-repair, long-only fully invested, one-time
 drift policy and same-ID recovery are unchanged. Stored unavailable-asset
 reasons/failure remain visible; integrity labels are not imported-data provenance
 certification. There is no new optimizer, provider, source cloning or global route.
-See [current verification and limits](../STOP_POINT.md#current-handoff-portfolio-construction-methods-v1-2026-11-08).
+See [implementation verification and limits](../STOP_POINT.md#historical-handoff-portfolio-construction-methods-v1-2026-11-08).
+
+Bounded implementation update (2026-11-08), pending independent review:
+**Portfolio Return Data Reuse v1** opens a fresh Composer snapshot from compatible,
+completed stored Diagnostics input, even when construction failed. Neutral extras
+are handled explicitly; unknown/meaningful extras, linked provenance and input
+requiring normalization are refused. Only return data are copied, never source
+settings, weights, baseline or result identity. Fresh manual/empty-name/empty-weight/
+lookback-20 defaults, temporary attribution, explicit new-ID creation, same-new-ID
+recovery and local ServingGate restrictions remain separate. No backend math,
+endpoint, schema, persistent lineage, clone/replay, provider or CSV addition.
+See [eligibility and data-only scope](PORTFOLIO_DIAGNOSTICS_LAB.md#portfolio-return-data-reuse-v1)
+and [current verification](../STOP_POINT.md#current-handoff-portfolio-return-data-reuse-v1-2026-11-08).
+
 Independent local implementation review (2026-10-31) passed after correcting
 stale-detail navigation, same-ID recovery reachability and prototype-named
 asset handling; 75 focused frontend tests, 8 isolated backend contract cases

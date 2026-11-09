@@ -1,7 +1,7 @@
 import { expect, expectTypeOf, it } from "vitest";
 import type { PortfolioRunCreate } from "./portfolioDiagnostics";
-import { buildPortfolioRun, enteredWeightTotal, MAX_IMPORT_BYTES, parsePortfolioReturns, weightText } from "./portfolioDiagnosticsComposer";
-import { returnInput } from "@/test/fixtures/portfolioDiagnosticsComposer";
+import { buildPortfolioRun, enteredWeightTotal, MAX_IMPORT_BYTES, parsePortfolioReturns, preparePortfolioReuse, weightText } from "./portfolioDiagnosticsComposer";
+import { constructionInput, diagnosticRun, returnInput, storedUniverse } from "@/test/fixtures/portfolioDiagnosticsComposer";
 
 const parse = (value: unknown) => parsePortfolioReturns(JSON.stringify(value));
 
@@ -108,4 +108,115 @@ it("excludes manual-only fields from the derived request type", () => {
   expectTypeOf<Derived["weights"]>().toEqualTypeOf<undefined>();
   expectTypeOf<Derived["weight_provenance"]>().toEqualTypeOf<undefined>();
   expectTypeOf<PortfolioRunCreate["volatility_floor"]>().toEqualTypeOf<undefined>();
+});
+
+it("projects actual stored return data exactly, in supplied order, into an independent validated snapshot", () => {
+  const input = constructionInput(); input.assets.reverse();
+  const universe = storedUniverse(input);
+  universe.assets[0].name = "  Preserved source name  "; universe.assets[0].currency = "USD";
+  const source = diagnosticRun({ universe });
+  const before = structuredClone(source);
+  const draft = preparePortfolioReuse(source, 51);
+  expect(draft.sourceId).toBe(51); expect(draft.sourceName).toBe(source.name);
+  expect(draft.data).toEqual({ frequency: "daily", timestamps: universe.timestamps,
+    assets: universe.assets.map(({ integer_lots: _lots, metadata: _metadata, ...asset }) => asset) });
+  expect(draft.data.assets.map((a) => a.asset_id)).toEqual(["b", "a"]);
+  expect(draft.data.assets[0].returns).toEqual(input.assets[0].returns);
+  expect(JSON.parse(draft.raw)).toEqual(draft.data);
+  expect(parsePortfolioReturns(draft.raw)).toEqual(draft.data);
+  expect(draft.data.timestamps).not.toBe(universe.timestamps);
+  expect(draft.data.assets[0].returns).not.toBe(universe.assets[0].returns);
+  draft.data.assets[0].returns[0] = 0.9; draft.data.timestamps[0] = "2000-01-01";
+  expect(source).toEqual(before);
+});
+
+it.each(["user_supplied", "equal_weight", "inverse_volatility", "erc", "min_variance", "future_method"])("does not whitelist source method %s or require successful construction", (method) => {
+  const source = diagnosticRun({ method, solver_status: "failed", result_fingerprint: null });
+  expect(preparePortfolioReuse(source, 51).data.assets[0].returns).toEqual(source.universe.assets[0].returns);
+});
+
+it.each(["pending", "running", "failed", "invalidated"] as const)("refuses parent state %s", (status) => {
+  expect(() => preparePortfolioReuse(diagnosticRun({ status }), 51)).toThrow(/only for completed/);
+});
+it.each([0, -1, 1.5, NaN, Number.MAX_SAFE_INTEGER + 1])("refuses malformed source identity %s", (id) => {
+  expect(() => preparePortfolioReuse(diagnosticRun({ id }), id)).toThrow(/positive source ID/);
+});
+it("refuses a stored identity that does not match the viewed source", () => {
+  expect(() => preparePortfolioReuse(diagnosticRun(), 52)).toThrow(/matching the viewed run/);
+});
+
+const sourceLinks = ["dataset_version_id", "validation_run_id", "regime_run_id", "regime_definition_id", "cost_diagnostic_run_id", "overfitting_run_id", "experiment_id"];
+it.each(sourceLinks)("rejects any non-null %s, including falsy malformed links", (key) => {
+  for (const value of [1, 0, false, "", undefined]) {
+    const source = diagnosticRun(); Object.assign(source, { [key]: value });
+    expect(() => preparePortfolioReuse(source, 51)).toThrow(key);
+  }
+});
+it("allows absent source links and neutral stored extras", () => {
+  const source = diagnosticRun();
+  sourceLinks.forEach((key) => Reflect.deleteProperty(source, key));
+  for (const key of ["benchmark_returns", "prior_weights", "sample_ids"]) Reflect.deleteProperty(source.universe, key);
+  source.universe.assets.forEach((a) => { Reflect.deleteProperty(a, "integer_lots"); Reflect.deleteProperty(a, "metadata"); });
+  source.configuration = {};
+  expect(preparePortfolioReuse(source, 51).data.assets).toHaveLength(2);
+});
+it.each(["benchmark_returns", "prior_weights", "sample_ids"])("does not silently discard non-neutral %s", (key) => {
+  for (const value of [[], {}, 0, false, "", undefined]) {
+    const source = diagnosticRun(); Object.assign(source.universe, { [key]: value });
+    expect(() => preparePortfolioReuse(source, 51)).toThrow(key);
+  }
+});
+it("refuses meaningful or malformed asset extras", () => {
+  for (const value of [true, 0, null, "false", undefined]) {
+    const source = diagnosticRun(); Object.assign(source.universe.assets[0], { integer_lots: value });
+    expect(() => preparePortfolioReuse(source, 51)).toThrow(/integer_lots/);
+  }
+  for (const value of [{ provider: "source" }, [], null, false, 0, "", undefined]) {
+    const source = diagnosticRun(); Object.assign(source.universe.assets[0], { metadata: value });
+    expect(() => preparePortfolioReuse(source, 51)).toThrow(/metadata/);
+  }
+});
+it("refuses linked fingerprints and validation split labels rather than stripping provenance", () => {
+  for (const value of [{ dataset: "fingerprint" }, null, [], 0, false, undefined]) {
+    const source = diagnosticRun(); source.configuration.linked_fingerprints = value;
+    expect(() => preparePortfolioReuse(source, 51)).toThrow(/linked_fingerprints/);
+  }
+  for (const value of ["train", "", false, 0, undefined]) {
+    const source = diagnosticRun(); source.configuration.validation_split_label = value;
+    expect(() => preparePortfolioReuse(source, 51)).toThrow(/validation_split_label/);
+  }
+});
+it.each(["prices", "weights", "__proto__"])("refuses unknown stored fields %s", (key) => {
+  const universeExtra = diagnosticRun(); universeExtra.universe = { ...universeExtra.universe, [key]: [] };
+  expect(() => preparePortfolioReuse(universeExtra, 51)).toThrow(/unsupported field/);
+  const assetExtra = diagnosticRun(); assetExtra.universe.assets[0] = { ...assetExtra.universe.assets[0], [key]: 0 };
+  expect(() => preparePortfolioReuse(assetExtra, 51)).toThrow(/unsupported field/);
+});
+it("explicitly refuses missing return arrays, datetime timestamps and malformed values", () => {
+  const missing = diagnosticRun(); Reflect.deleteProperty(missing.universe.assets[0], "returns");
+  expect(() => preparePortfolioReuse(missing, 51)).toThrow(/returns must be an array/);
+  const datetime = diagnosticRun(); datetime.universe.timestamps[0] += "T00:00:00Z";
+  expect(() => preparePortfolioReuse(datetime, 51)).toThrow(/YYYY-MM-DD/);
+  for (const value of ["0.01", NaN, Infinity, null, true]) {
+    const source = diagnosticRun(); Object.assign(source.universe.assets[0].returns, { 0: value });
+    expect(() => preparePortfolioReuse(source, 51)).toThrow(/finite JSON numbers/);
+  }
+});
+it("refuses normalization of stored frequency, identifiers, groups and currency", () => {
+  const frequency = diagnosticRun(); frequency.universe.frequency = " daily ";
+  expect(() => preparePortfolioReuse(frequency, 51)).toThrow(/normalization/);
+  for (const fields of [{ asset_id: " a " }, { group: " g " }, { currency: "usd" }, { name: undefined }]) {
+    const source = diagnosticRun(); Object.assign(source.universe.assets[0], fields);
+    expect(() => preparePortfolioReuse(source, 51)).toThrow(/normalization/);
+  }
+  const signedZero = diagnosticRun(); signedZero.universe.assets[0].returns[0] = -0;
+  expect(() => preparePortfolioReuse(signedZero, 51)).toThrow(/change during serialization/);
+});
+it("applies the same import bounds and UTF-8 byte limit to the projected JSON", () => {
+  for (const n of [23, 2001]) {
+    const source = diagnosticRun({ universe: storedUniverse(returnInput(n)) });
+    expect(() => preparePortfolioReuse(source, 51)).toThrow(/24 to 2,000/);
+  }
+  const large = diagnosticRun(); large.universe.assets[0].name = "\u4e00".repeat(MAX_IMPORT_BYTES / 2);
+  expect(() => preparePortfolioReuse(large, 51)).toThrow(/2 MiB/);
 });

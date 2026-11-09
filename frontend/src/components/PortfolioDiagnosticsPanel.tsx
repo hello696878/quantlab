@@ -27,9 +27,11 @@ import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
 import { CopyValue } from "@/components/ExperimentRegistryShared";
 import PortfolioDiagnosticsDetail, { IntegrityPill, SolverPill, StatusPill } from "@/components/PortfolioDiagnosticsDetail";
 import PortfolioDiagnosticsComposer from "@/components/PortfolioDiagnosticsComposer";
+import type { PortfolioReuseDraft } from "@/lib/portfolioDiagnosticsComposer";
 
 type Mode = "list" | "detail" | "compare" | "create";
 type Selected = { id: number; name: string };
+type ComposerEntry = { kind: "new"; draftId: number } | { kind: "reuse"; draftId: number; draft: PortfolioReuseDraft } | { kind: "recovery"; run: RunFull };
 
 // Raised from 15 in Phase 58.0: the Portfolio Attribution Lab stores its own
 // Phase 56 books in this registry (attribution reads stored rebalances), so
@@ -58,7 +60,8 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
   const [seeding, setSeeding] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [detail, setDetail] = useState<RunFull | null>(null);
-  const [recoveryRun, setRecoveryRun] = useState<RunFull | null>(null);
+  const [composerEntry, setComposerEntry] = useState<ComposerEntry>({ kind: "new", draftId: 0 });
+  const draftId = useRef(0);
   const [selected, setSelected] = useState<Selected[]>([]);
   const [pair, setPair] = useState<{ a: Selected; b: Selected } | null>(null);
   const detailRequest = useRef(0);
@@ -71,7 +74,7 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
   }
 
   function beginCreation() {
-    setRecoveryRun(null);
+    setComposerEntry({ kind: "new", draftId: ++draftId.current });
     navigate("create");
   }
 
@@ -175,9 +178,13 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
   }
 
   if (mode === "create") {
-    return <PortfolioDiagnosticsComposer key={recoveryRun?.id ?? "new"} initialRun={recoveryRun ?? undefined}
-      onBack={() => { navigate("list"); reload(); }}
-      onOpen={(run) => { setDetail(run); navigate("detail"); reload(); }} />;
+    const callbacks = {
+      onBack: () => { navigate("list"); reload(); },
+      onOpen: (run: RunFull) => { setDetail(run); navigate("detail"); reload(); },
+    };
+    if (composerEntry.kind === "recovery") return <PortfolioDiagnosticsComposer key={`recovery-${composerEntry.run.id}`} initialRun={composerEntry.run} {...callbacks} />;
+    return <PortfolioDiagnosticsComposer key={`draft-${composerEntry.draftId}`} reuseDraft={composerEntry.kind === "reuse" ? composerEntry.draft : undefined}
+      {...callbacks} />;
   }
 
   if (mode === "detail" && detail) {
@@ -185,10 +192,15 @@ export default function PortfolioDiagnosticsPanel({ onNav }: { onNav?: (view: st
     return (
       <div className="space-y-4">
       {["pending", "failed"].includes(detail.status) && <button type="button" className="btn-secondary"
-        onClick={() => { setRecoveryRun(detail); navigate("create"); }}>Recover execution of run #{detail.id}</button>}
+        onClick={() => { setComposerEntry({ kind: "recovery", run: detail }); navigate("create"); }}>Recover execution of run #{detail.id}</button>}
       <PortfolioDiagnosticsDetail
         key={detail.id}
         run={detail}
+        onReuse={(draft) => {
+          if (generation !== detailRequest.current || draft.sourceId !== detail.id) return;
+          setComposerEntry({ kind: "reuse", draftId: ++draftId.current, draft });
+          navigate("create");
+        }}
         onBack={() => {
           navigate("list");
           setDetail(null);

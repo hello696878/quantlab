@@ -4,6 +4,7 @@ import { renderWithUser } from "@/test/testUtils";
 import { diagnosticRun, returnInput } from "@/test/fixtures/portfolioDiagnosticsComposer";
 import * as api from "@/lib/portfolioDiagnostics";
 import { BacktestApiError } from "@/lib/api";
+import { preparePortfolioReuse } from "@/lib/portfolioDiagnosticsComposer";
 import PortfolioDiagnosticsComposer from "./PortfolioDiagnosticsComposer";
 
 vi.mock("@/lib/portfolioDiagnostics", async (original) => ({ ...await original<typeof api>(), createRun: vi.fn(), executeRun: vi.fn(), getRun: vi.fn() }));
@@ -213,4 +214,120 @@ it("locks a derived method during writes and known-ID recovery without recreatin
   await user.click(screen.getByRole("button", { name: "Refresh stored run" }));
   await user.click(screen.getByRole("button", { name: "Retry execution of this run" }));
   expect(api.createRun).toHaveBeenCalledOnce(); expect(vi.mocked(api.executeRun).mock.calls).toEqual([[51], [51]]);
+});
+
+function setupReuse() {
+  const source = diagnosticRun({ method: "inverse_volatility", is_baseline: true,
+    configuration: { estimation: { mode: "rolling", lookback: 5, lag: 2 }, user_weights: { a: 0.9, b: 0.1 } } });
+  const draft = preparePortfolioReuse(source, 51);
+  return { ...renderWithUser(<PortfolioDiagnosticsComposer reuseDraft={draft} onOpen={onOpen} onBack={onBack} />), source, draft };
+}
+
+it("opens a validated data-only draft with fresh defaults and cancels without writing or fetching a source", async () => {
+  const { user, source, draft } = setupReuse(); const before = structuredClone(source);
+  expect(screen.getByRole("heading", { name: "New portfolio run" })).toBeVisible();
+  expect(screen.getByLabelText("Return JSON")).toHaveValue(draft.raw);
+  expect(screen.getByLabelText("Validated return preview")).toHaveTextContent("24 observations");
+  expect(screen.getByText(/Return data copied from run #51, "My supplied portfolio"/)).toBeVisible();
+  expect(screen.getByLabelText("Run name")).toHaveValue("");
+  expect(screen.getByLabelText("Construction method")).toHaveValue("user_supplied");
+  expect(screen.getByLabelText("Rolling lookback")).toHaveValue("20");
+  expect(screen.getByLabelText("Weight for a (%)")).toHaveValue("");
+  expect(screen.getByLabelText("Weight for b (%)")).toHaveValue("");
+  expect(screen.getAllByRole("option").map((option) => option.getAttribute("value"))).toEqual(["user_supplied", "equal_weight", "inverse_volatility"]);
+  expect(screen.queryByRole("button", { name: "Refresh stored run" })).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Back to runs" }));
+  expect(onBack).toHaveBeenCalledOnce(); expect(source).toEqual(before);
+  for (const fn of [api.createRun, api.executeRun, api.getRun]) expect(fn).not.toHaveBeenCalled();
+});
+
+it("keeps attribution when validating unchanged input or changing construction settings, but clears it on raw edits", async () => {
+  const { user, draft } = setupReuse();
+  await user.type(screen.getByLabelText("Run name"), "Fresh name");
+  await user.type(screen.getByLabelText("Weight for a (%)"), "60");
+  await user.type(screen.getByLabelText("Weight for b (%)"), "40");
+  await user.clear(screen.getByLabelText("Rolling lookback")); await user.type(screen.getByLabelText("Rolling lookback"), "3");
+  await user.selectOptions(screen.getByLabelText("Construction method"), "equal_weight");
+  expect(screen.getByLabelText("Return JSON")).toHaveValue(draft.raw);
+  await user.click(screen.getByRole("button", { name: "Validate return data" }));
+  expect(screen.getByText(/Return data copied from run #51/)).toBeVisible();
+  fireEvent.change(screen.getByLabelText("Return JSON"), { target: { value: draft.raw + "\n" } });
+  expect(screen.queryByText(/Return data copied from run/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Validated return preview")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Create and run" })).toBeDisabled();
+  await user.click(screen.getByRole("button", { name: "Validate return data" }));
+  expect(screen.queryByText(/Return data copied from run/)).not.toBeInTheDocument();
+  expect(api.createRun).not.toHaveBeenCalled(); expect(api.executeRun).not.toHaveBeenCalled();
+});
+
+it("clears attribution and preview on file replacement and ignores an obsolete read", async () => {
+  const { user } = setupReuse(); const old = deferred<string>();
+  fireEvent.change(screen.getByLabelText("Local JSON file"), { target: { files: [{ size: 100, text: () => old.promise }] } });
+  expect(screen.queryByText(/Return data copied from run/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Validated return preview")).not.toBeInTheDocument();
+  const raw = JSON.stringify(returnInput(25));
+  fireEvent.change(screen.getByLabelText("Return JSON"), { target: { value: raw } });
+  await act(async () => old.resolve("obsolete"));
+  expect(screen.getByLabelText("Return JSON")).toHaveValue(raw);
+  await user.click(screen.getByRole("button", { name: "Validate return data" }));
+  expect(screen.getByLabelText("Validated return preview")).toHaveTextContent("25 observations");
+  expect(screen.queryByText(/Return data copied from run/)).not.toBeInTheDocument();
+});
+
+it.each(["user_supplied", "equal_weight", "inverse_volatility"] as const)("creates a NEW ID from reuse with %s and fresh settings", async (method) => {
+  vi.mocked(api.createRun).mockResolvedValue(diagnosticRun({ id: 61, status: "pending", method }));
+  vi.mocked(api.executeRun).mockResolvedValue(diagnosticRun({ id: 61, method }));
+  const { user, source, draft } = setupReuse(); const before = structuredClone(source);
+  await user.type(screen.getByLabelText("Run name"), "New data-based run");
+  await user.selectOptions(screen.getByLabelText("Construction method"), method);
+  if (method === "user_supplied") {
+    await user.type(screen.getByLabelText("Weight for a (%)"), "70"); await user.type(screen.getByLabelText("Weight for b (%)"), "30");
+  }
+  await user.click(screen.getByRole("button", { name: "Create and run" }));
+  const body = JSON.parse(JSON.stringify(vi.mocked(api.createRun).mock.calls[0][0]));
+  expect(body).toMatchObject({ ...draft.data, name: "New data-based run", method,
+    estimation: { mode: "rolling", lookback: 20, lag: 1 }, covariance: { method: "sample", repair: "none" },
+    constraints: { min_weight: 0, max_weight: 1, long_only: true, net_exposure_target: 1, gross_exposure_limit: 1, cash_residual_allowed: false },
+    rebalance: { kind: "one_time", initial_turnover_policy: "none" } });
+  for (const key of ["id", "sourceId", "source_run_id", "is_baseline", "experiment_id", "configuration_fingerprint", "result_fingerprint", "solver"]) expect(Object.hasOwn(body, key)).toBe(false);
+  if (method !== "user_supplied") for (const key of ["weights", "weight_provenance", "volatility_floor"]) expect(Object.hasOwn(body, key)).toBe(false);
+  expect(api.createRun).toHaveBeenCalledOnce(); expect(api.executeRun).toHaveBeenCalledExactlyOnceWith(61);
+  expect(onOpen).toHaveBeenCalledWith(diagnosticRun({ id: 61, method })); expect(source).toEqual(before);
+  expect(api.getRun).not.toHaveBeenCalled();
+});
+
+it("recovers the new retained ID after a lost execution response, never the reuse source ID", async () => {
+  vi.mocked(api.createRun).mockResolvedValue(diagnosticRun({ id: 61, status: "pending" }));
+  vi.mocked(api.executeRun).mockRejectedValueOnce(new Error("Lost response")).mockResolvedValueOnce(diagnosticRun({ id: 61 }));
+  vi.mocked(api.getRun).mockResolvedValue(diagnosticRun({ id: 61, status: "failed" }));
+  const { user } = setupReuse();
+  await user.type(screen.getByLabelText("Run name"), "New run"); await user.selectOptions(screen.getByLabelText("Construction method"), "equal_weight");
+  await user.click(screen.getByRole("button", { name: "Create and run" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Run #61 is retained");
+  await user.click(screen.getByRole("button", { name: "Refresh stored run" })); await user.click(screen.getByRole("button", { name: "Retry execution of this run" }));
+  expect(vi.mocked(api.getRun).mock.calls).toEqual([[61], [61]]);
+  expect(vi.mocked(api.executeRun).mock.calls).toEqual([[61], [61]]);
+  expect(api.createRun).toHaveBeenCalledOnce();
+});
+
+it("does not treat a reuse source ID as a known creation after an unknown new-create outcome", async () => {
+  vi.mocked(api.createRun).mockRejectedValue(new Error("Lost new creation response"));
+  const { user } = setupReuse();
+  await user.type(screen.getByLabelText("Run name"), "New run"); await user.selectOptions(screen.getByLabelText("Construction method"), "equal_weight");
+  await user.click(screen.getByRole("button", { name: "Create and run" }));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Creation outcome is unknown");
+  expect(screen.queryByRole("button", { name: "Refresh stored run" })).not.toBeInTheDocument();
+  expect(api.executeRun).not.toHaveBeenCalled(); expect(api.getRun).not.toHaveBeenCalled();
+});
+
+it("rejects a creation response that reuses the source ID without executing it", async () => {
+  const { user } = setupReuse();
+  await user.type(screen.getByLabelText("Run name"), "Must be a new run");
+  await user.selectOptions(screen.getByLabelText("Construction method"), "equal_weight");
+  await user.click(screen.getByRole("button", { name: "Create and run" }));
+  expect(api.createRun).toHaveBeenCalledOnce(); expect(api.executeRun).not.toHaveBeenCalled();
+  expect(await screen.findByRole("alert")).toHaveTextContent("source run ID instead of a new run");
+  expect(screen.queryByRole("button", { name: "Refresh stored run" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Inspect run list" })).toBeEnabled();
+  expect(onOpen).not.toHaveBeenCalled();
 });

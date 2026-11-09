@@ -1,4 +1,4 @@
-import type { PortfolioConstructionMethod, PortfolioRunCreate, PortfolioReturnInput } from "./portfolioDiagnostics";
+import type { PortfolioConstructionMethod, PortfolioRunCreate, PortfolioReturnInput, RunFull } from "./portfolioDiagnostics";
 
 export const MAX_IMPORT_BYTES = 2 * 1024 * 1024;
 const ASSET_TYPES = ["equity", "futures", "crypto", "fx", "rates", "candidate", "index", "other"];
@@ -85,6 +85,63 @@ export function parsePortfolioReturns(raw: string): PortfolioReturnInput {
   if (groups.size > 8) throw new Error("At most 8 distinct groups are supported.");
   if (currencies.size > 1) throw new Error("Declare at most one currency; no currency conversion is performed.");
   return { frequency, timestamps, assets };
+}
+
+export interface PortfolioReuseDraft {
+  sourceId: number;
+  sourceName: string;
+  raw: string;
+  data: PortfolioReturnInput;
+}
+
+export function preparePortfolioReuse(run: RunFull, viewedId: number): PortfolioReuseDraft {
+  const source = object(run, "Stored run");
+  if (typeof source.id !== "number" || !Number.isSafeInteger(source.id) || source.id <= 0 || source.id !== viewedId) {
+    throw new Error("Return-data reuse requires a positive source ID matching the viewed run.");
+  }
+  if (source.status !== "completed") throw new Error("Return-data reuse is available only for completed source runs; inspect or recover this run instead.");
+  text(source.name, "Source run name", 200);
+  const sourceName = run.name;
+  for (const key of ["dataset_version_id", "validation_run_id", "regime_run_id", "regime_definition_id", "cost_diagnostic_run_id", "overfitting_run_id", "experiment_id"]) {
+    if (Object.hasOwn(source, key) && source[key] !== null) throw new Error(`Return-data reuse does not support source link ${key}.`);
+  }
+  const config = object(source.configuration, "Stored configuration");
+  if (Object.hasOwn(config, "linked_fingerprints") && Object.keys(object(config.linked_fingerprints, "Stored linked_fingerprints")).length !== 0) {
+    throw new Error("Return-data reuse requires empty linked_fingerprints; linked provenance cannot be discarded.");
+  }
+  if (Object.hasOwn(config, "validation_split_label") && config.validation_split_label !== null) throw new Error("Return-data reuse does not support validation_split_label.");
+  const universe = object(source.universe, "Stored universe");
+  fields(universe, ["frequency", "timestamps", "assets", "benchmark_returns", "prior_weights", "sample_ids"], "Stored universe");
+  for (const key of ["benchmark_returns", "prior_weights", "sample_ids"]) {
+    if (Object.hasOwn(universe, key) && universe[key] !== null) throw new Error(`Stored ${key} must be absent or null for return-data reuse.`);
+  }
+  const timestamps = universe.timestamps;
+  if (!Array.isArray(timestamps) || timestamps.some((value) => typeof value !== "string")) throw new Error("Stored timestamps must be an array of exact date-only strings.");
+  if (!Array.isArray(universe.assets) || universe.assets.length < 2 || universe.assets.length > 20) throw new Error("Stored data must contain 2 to 20 assets.");
+  const assets = universe.assets.map((value, i) => {
+    const asset = object(value, `Stored asset ${i + 1}`);
+    const keys = ["asset_id", "returns", "name", "asset_type", "group", "currency"];
+    fields(asset, [...keys, "integer_lots", "metadata"], `Stored asset ${i + 1}`);
+    if (Object.hasOwn(asset, "integer_lots") && asset.integer_lots !== false) throw new Error(`Stored asset ${i + 1}: integer_lots must be absent or false.`);
+    if (Object.hasOwn(asset, "metadata") && Object.keys(object(asset.metadata, `Stored asset ${i + 1} metadata`)).length !== 0) throw new Error(`Stored asset ${i + 1}: metadata must be absent or an empty object.`);
+    if (!Array.isArray(asset.returns) || asset.returns.some((v) => typeof v !== "number" || !Number.isFinite(v))) throw new Error(`Stored asset ${i + 1}: returns must be an array of finite JSON numbers.`);
+    return Object.fromEntries(keys.filter((key) => Object.hasOwn(asset, key)).map((key) => [key, asset[key]]));
+  });
+  const projected = { frequency: universe.frequency, timestamps, assets };
+  const raw = JSON.stringify(projected, null, 2);
+  const data = parsePortfolioReturns(raw);
+  // The import parser intentionally trims/normalizes typed imports; reuse must not.
+  if (data.frequency !== projected.frequency || data.timestamps.some((value, i) => !Object.is(value, timestamps[i]))) {
+    throw new Error("Stored frequency or timestamps require normalization; return-data reuse must preserve exact input.");
+  }
+  data.assets.forEach((asset, i) => {
+    const before = assets[i];
+    if (Object.keys(before).length !== Object.keys(asset).length || Object.entries(before).some(([key, value]) => key !== "returns" && !Object.is(value, asset[key as keyof typeof asset]))) {
+      throw new Error(`Stored asset ${i + 1} fields require normalization; return-data reuse must preserve exact input.`);
+    }
+    if (!asset.returns.every((value, j) => Object.is(value, (before.returns as number[])[j]))) throw new Error(`Stored asset ${i + 1} returns change during serialization; exact reuse is unavailable.`);
+  });
+  return { sourceId: run.id, sourceName, raw, data };
 }
 
 export const weightText = (values: Record<string, string>, id: string): string => Object.hasOwn(values, id) ? values[id] : "";

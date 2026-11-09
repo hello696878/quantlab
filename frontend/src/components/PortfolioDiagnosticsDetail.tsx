@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { classifyApiError } from "@/lib/api";
 import {
   type BudgetBlock,
@@ -24,11 +24,13 @@ import { notifyBackendOffline, toast } from "@/lib/toast";
 import { CopyValue, DetailSection, KeyValueTable } from "@/components/ExperimentRegistryShared";
 import ErrorState from "@/components/ui/ErrorState";
 import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
+import { preparePortfolioReuse, type PortfolioReuseDraft } from "@/lib/portfolioDiagnosticsComposer";
 
 interface Props {
   run: RunFull;
   onBack: () => void;
   onRefresh: (run: RunFull) => void;
+  onReuse?: (draft: PortfolioReuseDraft) => void;
   onOpenValidation?: () => void;
   onOpenDataset?: () => void;
   onOpenExperiment?: () => void;
@@ -39,7 +41,7 @@ interface Props {
 }
 
 export default function PortfolioDiagnosticsDetail({
-  run, onBack, onRefresh, onOpenValidation, onOpenDataset, onOpenExperiment,
+  run, onBack, onRefresh, onReuse, onOpenValidation, onOpenDataset, onOpenExperiment,
   onOpenRegime, onOpenCost, onOpenOverfitting, onOpenStress,
 }: Props) {
   const [weights, setWeights] = useState<WeightRow[]>([]);
@@ -52,6 +54,11 @@ export default function PortfolioDiagnosticsDetail({
   const [childrenError, setChildrenError] = useState<unknown>(null);
   const [retryTick, setRetryTick] = useState(0);
   const active = useRef(true);
+  const reuse = useMemo(() => {
+    if (!onReuse) return { draft: null, reason: null };
+    try { return { draft: preparePortfolioReuse(run, run.id), reason: null }; }
+    catch (err) { return { draft: null, reason: err instanceof Error ? err.message : "Stored return data cannot be reused." }; }
+  }, [run, onReuse]);
   useEffect(() => {
     active.current = true;
     return () => { active.current = false; };
@@ -171,6 +178,10 @@ export default function PortfolioDiagnosticsDetail({
       <div className="space-y-2 border-y border-[var(--line)] py-3 text-sm">
         <p>Source #{run.id}: {run.name}. Parent: {run.status}; solver: {run.solver_status ?? "unavailable"}.</p>
         <p className="text-[var(--text-mut)]">Integrity labels describe the recorded estimation policy, not independent certification of imported historical data.</p>
+        {onReuse && <div className="space-y-1">
+          <button type="button" className="btn-secondary" disabled={busy || !reuse.draft} onClick={() => { if (reuse.draft) onReuse(reuse.draft); }}>Use return data in a new portfolio</button>
+          {reuse.reason && <p className="text-[var(--text-mut)]">Return data unavailable for reuse: {reuse.reason}</p>}
+        </div>}
         {run.status === "completed" && rebalancesChecked ? <>
           <p>{rebalances.some((row) => row.weights && Object.keys(row.weights).length > 0
             && run.universe.assets.every((asset) => Object.hasOwn(row.weights!, asset.asset_id) && Number.isFinite(row.weights![asset.asset_id])))

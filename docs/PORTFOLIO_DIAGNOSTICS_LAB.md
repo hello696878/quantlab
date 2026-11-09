@@ -154,8 +154,73 @@ shocks. Future-only mutations do not change the initial inverse-volatility weigh
 warnings/failure rather than fabricating a successful portfolio.
 Only test-owned SQLite is accessible. Component/API tests and a production
 build are separate from browser acceptance; no browser execution is added.
-Current focused verification and retained failures are recorded in the
-[Construction Methods handoff](../STOP_POINT.md#current-handoff-portfolio-construction-methods-v1-2026-11-08).
+Construction Methods verification and retained failures are recorded in the
+[historical handoff](../STOP_POINT.md#historical-handoff-portfolio-construction-methods-v1-2026-11-08).
+
+### Portfolio Return Data Reuse v1
+
+In a stored Diagnostics detail, **Use return data in a new portfolio** opens a
+new, independently validated Composer draft without an extra GET or any write.
+The copied JSON and preview are populated; the new name and all manual weights
+are blank. Manual construction is the default, lookback is 20, and all three
+Composer methods remain available. The existing fixed settings apply: rolling
+estimation, lag 1, sample covariance/no repair, long-only fully invested, one-time
+construction and initial turnover `none`. Source method, lookback, solver,
+constraints, weights, baseline, experiment and fingerprints are not copied.
+
+This is a **data-only snapshot**, not a clone, replay, live dependency or
+automatically controlled method-only comparison. Temporary attribution displays
+the source ID/name and says construction settings are reset. No source-link or
+notes field is persisted. Name, method, weights and lookback changes retain that
+attribution; editing raw return JSON or selecting a replacement file clears it
+and invalidates the preview/weight association. Revalidating unchanged JSON does
+not clear attribution.
+
+Eligibility is based on input compatibility, not source construction quality:
+
+- A positive source ID must match the viewed, identity-checked run. Parent
+  status must be `completed`; pending/running/failed/invalidated parents retain
+  their existing inspection/recovery workflows instead. A completed parent
+  with a failed solver or no solved weights can still supply compatible data.
+- There is no source-method whitelist. Project only frequency, timestamps and
+  each asset's asset_id, returns, name, asset_type, group and currency, preserving
+  asset/timestamp order, names and every numeric return value.
+- Stored universe extras `benchmark_returns`, `prior_weights` and `sample_ids`
+  must be absent or null, not empty arrays/maps or other falsy substitutes.
+  Asset `integer_lots` must be absent or false; asset `metadata` must be absent
+  or an empty object. Meaningful/malformed extras and unknown universe/asset
+  fields are refused with an explanation, never silently discarded.
+- Any non-null dataset_version_id, validation_run_id, regime_run_id,
+  regime_definition_id, cost_diagnostic_run_id, overfitting_run_id or experiment_id
+  blocks v1 reuse. Explicit absence/null checks also reject malformed links such
+  as `0`. Configuration linked_fingerprints must be absent or an empty object;
+  validation_split_label must be absent or null. Linked provenance is not stripped.
+- The projected JSON is validated using the existing strict parser and its
+  **2 MiB UTF-8 /2-20 assets /24-2,000 observations** limits. Timestamps must be
+  exact real date-only strings; datetime/offset strings are not truncated.
+  Missing/nonfinite return arrays and unsupported metadata are refused. Sources
+  needing trimming, currency uppercasing or other value changes are refused,
+  including signed zero when JSON serialization would turn it into positive zero.
+  No sorting, rounding, filling, row removal, conversion or inferred calendar.
+
+Initialization and validation use the same serialized representation. The parsed
+snapshot owns independent arrays; source data are not mutated. Each reuse entry
+gets a fresh draft identity, even for the same source. Blank creation, reuse and
+known-ID recovery are separate states: recovery never receives the reuse source
+as `initialRun`. Explicit submission creates a new positive ID; a response that
+incorrectly returns the source ID is refused before execution and requires run-list
+inspection. Subsequent execution recovery always targets the new ID, never the
+source. Duplicate-submit, unknown-create, file revision and stale-detail/child
+response guards remain active. ServingGate still excludes write-capable workflows
+in read-only or unverified modes; comparison and Stress behavior are unchanged.
+
+Frontend tests exercise the actual projection helper, lifecycle separation and
+unsupported-source reasons. The protected API bridge creates/executes a source,
+gets its actual stored universe, and derives a second differently configured run
+from that response. It checks arrays/order/names, fresh defaults, distinct run and
+result identities, and unchanged source/rebalances. Current evidence, the retained
+source-ID collision reproducer and scope limits are in the
+[Return Data Reuse handoff](../STOP_POINT.md#current-handoff-portfolio-return-data-reuse-v1-2026-11-08).
 
 One universe = one shared, strictly increasing, tz-consistent timeline
 (parsed datetimes — never lexicographic strings) with a declared return

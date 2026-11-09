@@ -1,6 +1,125 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Portfolio Construction Methods v1 (2026-11-08)
+## Current Handoff: Portfolio Return Data Reuse v1 (2026-11-08)
+
+Implemented on `codex/portfolio-return-data-reuse-v1` from clean main
+`b5d7ae73bc3e2d65e3adfc531a43e9a6aa43bc43`, tree
+`3080a4c21e6da426d8de7e4eb7b377ab657e7d29`. VERSION remains `4.88.0-dev`.
+PR #3/main CI `42456090659` is historical integrated-baseline evidence only,
+not verification of this new unstaged implementation; it was not rerun.
+
+Stored Diagnostics details now offer **Use return data in a new portfolio**.
+The synchronous action uses the already loaded, identity-checked source: no
+redundant GET, create, execute, seed or source mutation. It projects only return
+data into an independent parsed snapshot, with populated JSON/preview and temporary
+source ID/name attribution. Name and manual weights are blank, method defaults
+to manual, lookback to 20, and the existing three methods/fixed construction policy
+remain available. Source settings, weights, baseline, links, experiments and
+fingerprints are not inherited. This is not a clone, replay, persistent lineage,
+live dependency or automatically controlled method-only comparison. See
+[data-only scope and eligibility](docs/PORTFOLIO_DIAGNOSTICS_LAB.md#portfolio-return-data-reuse-v1).
+
+Eligibility requires a positive ID matching the viewed completed parent, not
+solver success or solved weights. Any source method is allowed if input is
+compatible. Explicit neutral-extra rules permit only absent/null benchmark,
+prior-weight and sample-ID fields, absent/false integer_lots, and absent/empty
+metadata. Unknown/meaningful/malformed extras and non-null source links are
+refused, including falsy malformed links such as 0. Linked fingerprints must be
+absent/empty, and validation split label absent/null. The strict 2 MiB UTF-8,
+2-20 asset, 24-2,000 observation, date-only/finite-number parser is reused.
+No sorting, trimming/uppercasing into acceptability, rounding, filling, datetime
+truncation or data conversion. Serialization/value-changing sources are refused.
+
+Reuse, blank creation and known-ID recovery are separate states with fresh draft
+identities on every reuse entry, including repeats of the same source. The source
+is never passed as recovery `initialRun`. Attribution survives unchanged validation
+and construction-setting changes but clears on raw JSON edits/file replacement.
+Existing detail-generation and file-revision guards reject obsolete responses.
+Explicit submission creates a NEW ID, and recovery targets only that new ID.
+Duplicate/unknown-create protections, create_experiment:false, ServingGate,
+comparison and Stress behavior remain intact. Frontend stored-universe typing
+and test doubles now include actual return arrays, never production fallback data.
+
+One frontend response-boundary defect was established and corrected: a malformed
+create response returning the source's own positive ID would have executed that
+source. A focused API-double reproducer confirmed executeRun(51). The new guard
+refuses that response before retaining/executing any ID and requires run-list
+inspection under the existing unknown-create protection. No backend production
+defect, new endpoint, schema, quant calculation or dependency change was needed.
+
+Executed verification (separate scopes/snapshots, not added into a full-suite total):
+
+- Initial affected frontend selection: **237 passed /10 files**, zero skipped,
+  Vitest 35.84s; native exit 0, process wall 51.4225s.
+- Source-ID collision reproducer before correction: **1 selected failure**,
+  native exit 1, Vitest 2.02s/process 2.6542s. Vitest reports 29 other cases as
+  skipped because of the exact `-t` filter; these were unselected cases, not
+  physical/platform capability skips. No real source record was touched.
+- Final affected Composer/Panel rerun after the guard: **60 passed /2 files**,
+  zero skips/failures, Vitest 16.94s, native exit 0/process 17.6585s. The other
+  eight originally passing files were not rerun; the final guard is covered by
+  these affected components. No overlapping counts are combined.
+- Protected backend selection: **13 passed /13 selected**, zero skips/failures/
+  errors, pytest terminal 49.03s; pytest/child/outer exits 0/0/0, child wall
+  55.5242s. Eight Source Composer cases plus five existing explicit-rebalance/
+  schema cases. The new public-route case reuses the actual GET universe (order
+  b,a and exact arrays/names) in a different-method/new-ID run with fresh defaults.
+  Source baseline, configuration and rebalances remain unchanged; source weights,
+  provenance and result identity are not inherited.
+- TypeScript `--noEmit --incremental false`: native exit 0, 45.0253s.
+- One final normal-local production build: native exit 0, 81.2373s, Next 15.5.28,
+  Node 24.22.1/npm 11.12.1, BACKEND_URL=http://localhost:8000. It covers the final
+  production frontend including the source-ID guard; no executable/test edit
+  followed it. Project Python 3.13.5/pytest 9.0.3 on Windows is not Python 3.11/
+  Linux evidence for these new changes.
+
+Native argv/cwd/timing/exit records, verbose logs, JSON/JUnit outcomes and scoped
+source SHA-256 manifests are external:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-return-data-reuse-fd56b3016a054a91b4d809e1687ab725`.
+Read commands.jsonl, frontend-1.json, source-id-reproducer.json,
+frontend-affected-final.json, backend-1/pytest-result.json, backend-1/junit.xml,
+types-final-result.json, build-final-result.json and handoff.json. The confirmed
+failure is preserved, not replaced by a success-only summary.
+
+The protected runner's source-copy helpers and --execute entry installed SQLite
+isolation before pytest/application imports; all connections stayed inside
+test-owned paths, with violations `[]`. Live source/snapshot checks were true
+during the backend run. The later frontend guard/test and three documentation
+edits are distinguished from unchanged tested backend bytes. The active research
+DB was not opened, inspected, read, hashed, copied, migrated or modified; no outer
+database_snapshot/run_snapshot path or fresh data-protection audit was used.
+
+Reviewable inventory: **18 modified tracked paths, all unstaged, zero new paths**:
+
+```text
+STOP_POINT.md
+backend/tests/test_portfolio_source_composer.py
+docs/BLUEPRINT_STATUS_MATRIX.md
+docs/PORTFOLIO_DIAGNOSTICS_LAB.md
+frontend/src/components/PortfolioDiagnosticsComposer.test.tsx
+frontend/src/components/PortfolioDiagnosticsComposer.tsx
+frontend/src/components/PortfolioDiagnosticsDetail.tsx
+frontend/src/components/PortfolioDiagnosticsIsolation.test.tsx
+frontend/src/components/PortfolioDiagnosticsPanel.test.tsx
+frontend/src/components/PortfolioDiagnosticsPanel.tsx
+frontend/src/components/PortfolioStressComposer.test.tsx
+frontend/src/lib/portfolioDiagnostics.test.ts
+frontend/src/lib/portfolioDiagnostics.ts
+frontend/src/lib/portfolioDiagnosticsComposer.test.ts
+frontend/src/lib/portfolioDiagnosticsComposer.ts
+frontend/src/lib/portfolioStressComposer.test.ts
+frontend/src/test/fixtures/portfolioDiagnosticsComposer.ts
+frontend/src/test/fixtures/portfolioStressComposer.ts
+```
+
+Next: independent integration review of this exact unstaged inventory and scoped
+evidence. No new numbered phase or broader blueprint completion claim. Browser
+acceptance, retained seven dependency findings (2 high /4 moderate /1 low) and
+Phase 70 container/backup gaps remain separate release work. No services, browser,
+Docker, backup/restore, installs, audits, historical whole-suite/preservation
+reruns, staging, commit, push, PR, merge, tag, release or deployment occurred.
+
+## Historical Handoff: Portfolio Construction Methods v1 (2026-11-08)
 
 Implemented on `codex/portfolio-construction-methods-v1` from clean main
 `a17f9cf3e61ff950d337bd6a210bbcc7d87d8293`, tree
