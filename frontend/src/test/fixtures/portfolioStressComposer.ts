@@ -5,7 +5,8 @@ import type { RunFull } from "@/lib/portfolioStress";
 export const portfolio = {
   id: 11, name: "Stored research portfolio", status: "completed", integrity_status: "full_sample_descriptive",
   universe: { timestamps: ["2024-01-01", "2024-02-01"], frequency: "daily",
-    assets: [{ asset_id: "a", name: "Asset A", group: null }, { asset_id: "b", name: "Asset B", group: null }] },
+    assets: [{ asset_id: "a", name: "Asset A", group: null, returns: [0.01, -0.005] },
+      { asset_id: "b", name: "Asset B", group: null, returns: [0.002, 0.004] }] },
   warnings: ["Supplied observations; not a market-data certification."],
 } as PortfolioRun;
 

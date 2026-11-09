@@ -15,7 +15,7 @@ vi.mock("@/lib/portfolioStress", async (original) => ({ ...await original<typeof
 const onOpen = vi.fn();
 const onBack = vi.fn();
 const second = { ...portfolio, id: 22, name: "Second portfolio", universe: { ...portfolio.universe,
-  assets: [{ asset_id: "c", name: "Asset C", group: null }] } };
+  assets: [{ ...portfolio.universe.assets[0], asset_id: "c", name: "Asset C", group: null }] } };
 const listing = { items: [portfolio, second], total: 2, page: 1, total_pages: 1 };
 
 function deferred<T>() {
@@ -89,7 +89,8 @@ it("explicitly selects rebalance zero instead of the different latest stored boo
 
 it("keeps prototype-named asset shocks blank until explicitly supplied", async () => {
   const prototypePortfolio = { ...portfolio, universe: { ...portfolio.universe,
-    assets: [{ asset_id: "constructor", name: "Constructor asset", group: null }, { asset_id: "__proto__", name: "Prototype asset", group: null }] } };
+    assets: [{ ...portfolio.universe.assets[0], asset_id: "constructor", name: "Constructor asset", group: null },
+      { ...portfolio.universe.assets[1], asset_id: "__proto__", name: "Prototype asset", group: null }] } };
   vi.mocked(portfolios.getRun).mockResolvedValue(prototypePortfolio);
   vi.mocked(portfolios.getRebalances).mockResolvedValue({ items: [{ ...rebalances[0],
     weights: Object.fromEntries([["constructor", 0.6], ["__proto__", 0.4]]) }] });

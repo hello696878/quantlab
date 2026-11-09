@@ -241,3 +241,91 @@ def test_inverse_unusable_volatility_is_reported_without_floor(isolated_lab_db, 
             assert source["solver_status"] == "closed_form"
             assert rebalance["status"] == "completed"
             assert rebalance["weights"] == {"a": 0.0, "b": 1.0}
+
+
+def test_return_data_reuse_from_actual_stored_universe(isolated_lab_db):
+    # The fixture and protected runner install isolation before application import.
+    from fastapi.testclient import TestClient
+    from app.main import app
+
+    source_payload = _derived_payload("user_supplied")
+    source_payload.update({
+        "name": "Nondefault source book", "weights": {"a": 0.7, "b": 0.3},
+        "weight_provenance": {"basis": "declared"}, "normalization": "none",
+        "estimation": {"mode": "rolling", "lookback": 5, "lag": 1},
+        "rebalance": {"kind": "one_time", "initial_turnover_policy": "zero_book"},
+        "solver": {"tolerance": 0.0001, "max_iterations": 40},
+        "volatility_floor": 0.001, "cost_notional": 1000,
+    })
+    source_payload["constraints"]["max_weight"] = 0.8
+    source_payload["assets"].reverse()
+    for asset in source_payload["assets"]:
+        asset.update(name=f"  Stored {asset['asset_id']}  ", currency="USD", group="research")
+
+    with TestClient(app) as client:
+        response = client.post("/portfolio-diagnostics/runs", json=source_payload)
+        assert response.status_code == 201, response.text
+        source_id = response.json()["id"]
+        executed = client.post(f"/portfolio-diagnostics/runs/{source_id}/execute",
+                               json={"create_experiment": False})
+        assert executed.status_code == 200, executed.text
+        baseline = client.post(f"/portfolio-diagnostics/runs/{source_id}/mark-baseline", json={})
+        assert baseline.status_code == 200, baseline.text
+        fetched = client.get(f"/portfolio-diagnostics/runs/{source_id}")
+        assert fetched.status_code == 200, fetched.text
+        source = fetched.json()
+        assert source["status"] == "completed" and source["is_baseline"] is True
+        before_rows = client.get(f"/portfolio-diagnostics/runs/{source_id}/rebalances").json()
+        stored = source["universe"]
+        assert all(stored[key] is None for key in ("benchmark_returns", "prior_weights", "sample_ids"))
+        assert all(asset["integer_lots"] is False and asset["metadata"] == {} for asset in stored["assets"])
+        assert [asset["asset_id"] for asset in stored["assets"]] == ["b", "a"]
+
+        # Derive every data field from the GET, not from the original create payload.
+        return_input = {
+            "frequency": stored["frequency"], "timestamps": stored["timestamps"],
+            "assets": [{key: asset[key] for key in ("asset_id", "returns", "name", "asset_type", "group", "currency")}
+                       for asset in stored["assets"]],
+        }
+        fresh = {
+            **return_input, "name": "Fresh construction from stored data", "method": "equal_weight",
+            "normalization": "sum_to_one", "covariance": {"method": "sample", "repair": "none"},
+            "estimation": {"mode": "rolling", "lookback": 20, "lag": 1},
+            "constraints": {"long_only": True, "min_weight": 0, "max_weight": 1,
+                            "net_exposure_target": 1, "gross_exposure_limit": 1,
+                            "cash_residual_allowed": False},
+            "rebalance": {"kind": "one_time", "initial_turnover_policy": "none"},
+        }
+        created = client.post("/portfolio-diagnostics/runs", json=fresh)
+        assert created.status_code == 201, created.text
+        new_id = created.json()["id"]
+        assert new_id > 0 and new_id != source_id
+        done = client.post(f"/portfolio-diagnostics/runs/{new_id}/execute", json={"create_experiment": False})
+        assert done.status_code == 200, done.text
+        new = client.get(f"/portfolio-diagnostics/runs/{new_id}").json()
+        assert new["status"] == "completed" and new["method"] == "equal_weight"
+        assert new["name"] == fresh["name"] and new["is_baseline"] is False
+        assert new["universe"] == stored
+        assert [asset["returns"] for asset in new["universe"]["assets"]] == [asset["returns"] for asset in stored["assets"]]
+        assert [asset["name"] for asset in new["universe"]["assets"]] == ["  Stored b  ", "  Stored a  "]
+        config = new["configuration"]
+        assert config["estimation"] == {"mode": "rolling", "lookback": 20, "lag": 1}
+        assert config["constraints"]["max_weight"] == 1
+        assert config["rebalance"] == {"kind": "one_time", "initial_turnover_policy": "none"}
+        assert config["solver"] == {"tolerance": 1e-6, "max_iterations": 2000}
+        assert config["normalization"] == "sum_to_one"
+        assert config["user_weights"] is None and config["user_provenance"] is None
+        assert config["volatility_floor"] is None and config["cost_notional"] is None
+        assert config["linked_fingerprints"] == {} and config["validation_split_label"] is None
+        for key in ("dataset_version_id", "validation_run_id", "regime_run_id", "regime_definition_id",
+                    "cost_diagnostic_run_id", "overfitting_run_id", "experiment_id"):
+            assert new[key] is None
+        assert new["configuration_fingerprint"] != source["configuration_fingerprint"]
+        assert new["result_fingerprint"] != source["result_fingerprint"]
+        new_rows = client.get(f"/portfolio-diagnostics/runs/{new_id}/rebalances").json()["items"]
+        assert new_rows[0]["weights"] == {"b": 0.5, "a": 0.5}
+        assert (new_rows[0]["window_start"], new_rows[0]["window_end"]) == (0, 19)
+        assert new_rows[0]["effective_timestamp"] == stored["timestamps"][20]
+        assert new_rows[0]["turnover"] is None
+        assert client.get(f"/portfolio-diagnostics/runs/{source_id}").json() == source
+        assert client.get(f"/portfolio-diagnostics/runs/{source_id}/rebalances").json() == before_rows

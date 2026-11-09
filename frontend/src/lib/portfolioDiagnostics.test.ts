@@ -1,7 +1,7 @@
 import { expect, it, vi } from "vitest";
 import { createRun, executeRun } from "./portfolioDiagnostics";
-import { buildPortfolioRun, parsePortfolioReturns } from "./portfolioDiagnosticsComposer";
-import { constructionInput, returnInput } from "@/test/fixtures/portfolioDiagnosticsComposer";
+import { buildPortfolioRun, parsePortfolioReturns, preparePortfolioReuse } from "./portfolioDiagnosticsComposer";
+import { constructionInput, diagnosticRun, returnInput } from "@/test/fixtures/portfolioDiagnosticsComposer";
 
 it("posts validated source data and explicitly disables experiment creation on execute", async () => {
   const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ id: 51 })));
@@ -28,4 +28,23 @@ it.each(["equal_weight", "inverse_volatility"] as const)("serializes the real %s
   const body = JSON.parse(options.body);
   expect(body).toMatchObject({ ...data, method, normalization: "sum_to_one", estimation: { mode: "rolling", lookback: 20, lag: 1 } });
   for (const key of ["weights", "weight_provenance", "volatility_floor"]) expect(Object.hasOwn(body, key)).toBe(false);
+});
+
+it("serializes the actual reuse projection as a fresh request, then executes the new response ID", async () => {
+  const fetch = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ id: 61 })));
+  vi.stubGlobal("fetch", fetch);
+  const source = diagnosticRun({ is_baseline: true, configuration: { user_weights: { a: 0.9, b: 0.1 }, estimation: { lookback: 5 } } });
+  const draft = preparePortfolioReuse(source, source.id);
+  const created = await createRun(buildPortfolioRun(draft.data, "New request", {}, "20", "equal_weight"));
+  await executeRun(created.id);
+  const body = JSON.parse(fetch.mock.calls[0][1].body);
+  expect(body.assets.map((asset: { returns: number[] }) => asset.returns)).toEqual(source.universe.assets.map((asset) => asset.returns));
+  expect(body.timestamps).toEqual(source.universe.timestamps);
+  expect(body).toMatchObject({ name: "New request", method: "equal_weight", normalization: "sum_to_one", estimation: { mode: "rolling", lookback: 20, lag: 1 } });
+  for (const key of ["weights", "weight_provenance", "volatility_floor", "id", "is_baseline", "source_run_id", "experiment_id", "configuration_fingerprint", "result_fingerprint"]) expect(Object.hasOwn(body, key)).toBe(false);
+  body.assets.forEach((asset: object) => {
+    expect(Object.hasOwn(asset, "integer_lots")).toBe(false); expect(Object.hasOwn(asset, "metadata")).toBe(false);
+  });
+  expect(fetch.mock.calls[1][0]).toBe("/api/portfolio-diagnostics/runs/61/execute");
+  expect(fetch.mock.calls[1][1].body).toBe('{"create_experiment":false}');
 });

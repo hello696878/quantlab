@@ -1,7 +1,7 @@
 import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, expect, it, vi } from "vitest";
 import { renderWithUser } from "@/test/testUtils";
-import { diagnosticRun, returnInput } from "@/test/fixtures/portfolioDiagnosticsComposer";
+import { diagnosticRun, returnInput, storedUniverse } from "@/test/fixtures/portfolioDiagnosticsComposer";
 import { rebalances } from "@/test/fixtures/portfolioStressComposer";
 import * as api from "@/lib/portfolioDiagnostics";
 import * as notices from "@/lib/toast";
@@ -15,7 +15,7 @@ function deferred<T>() {
   const promise = new Promise<T>((ok, fail) => { resolve = ok; reject = fail; }); return { promise, resolve, reject };
 }
 beforeEach(() => {
-  for (const fn of [api.listRuns, api.getLabSummary, api.getRun, api.createRun, api.executeRun, api.seedDemo, api.exportRuns, api.compareRuns, api.getWeights, api.getRiskContributions, api.getRebalances, api.getSensitivity]) vi.mocked(fn).mockReset();
+  for (const fn of [api.listRuns, api.getLabSummary, api.getRun, api.createRun, api.executeRun, api.seedDemo, api.exportRuns, api.compareRuns, api.getWeights, api.getRiskContributions, api.getRebalances, api.getSensitivity, api.markBaseline]) vi.mocked(fn).mockReset();
   vi.mocked(api.listRuns).mockResolvedValue({ items: [diagnosticRun(), diagnosticRun({ id: 52, name: "Second source" })], total: 2, page: 1, total_pages: 1 });
   vi.mocked(api.getLabSummary).mockResolvedValue({ runs: 2, completed: 2, assets: 4, constraint_violations: 0, solver_failures: 0, baselines: 0 });
   vi.mocked(api.getRun).mockResolvedValue(diagnosticRun());
@@ -170,4 +170,133 @@ it("preserves comparison, export and explicit demo actions", async () => {
   await user.click(screen.getByRole("button", { name: "Export JSON" })); await waitFor(() => expect(create).toHaveBeenCalledOnce());
   await user.click(screen.getByRole("button", { name: "Load demo runs" })); expect(api.seedDemo).toHaveBeenCalledOnce();
   expect(api.createRun).not.toHaveBeenCalled();
+});
+
+const reuseAction = "Use return data in a new portfolio";
+it("opens a data-only snapshot from the already-viewed detail and cancels without any source write or redundant GET", async () => {
+  const source = diagnosticRun({ method: "erc", is_baseline: true, configuration: { estimation: { lookback: 5 } } });
+  const before = structuredClone(source); vi.mocked(api.getRun).mockResolvedValue(source);
+  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />);
+  await user.click(await screen.findByRole("button", { name: source.name }));
+  await user.click(await screen.findByRole("button", { name: reuseAction }));
+  expect(screen.getByRole("heading", { name: "New portfolio run" })).toBeVisible();
+  const input = JSON.parse((screen.getByLabelText("Return JSON") as HTMLTextAreaElement).value);
+  expect(input.timestamps).toEqual(source.universe.timestamps);
+  expect(input.assets.map((a: { asset_id: string }) => a.asset_id)).toEqual(["a", "b"]);
+  expect(input.assets.map((a: { returns: number[] }) => a.returns)).toEqual(source.universe.assets.map((a) => a.returns));
+  expect(screen.getByText(/Return data copied from run #51/)).toBeVisible();
+  expect(screen.getByLabelText("Run name")).toHaveValue(""); expect(screen.getByLabelText("Rolling lookback")).toHaveValue("20");
+  expect(screen.getByLabelText("Construction method")).toHaveValue("user_supplied");
+  expect(screen.getByLabelText("Weight for a (%)")).toHaveValue("");
+  await user.click(screen.getByRole("button", { name: "Back to runs" }));
+  expect(api.getRun).toHaveBeenCalledExactlyOnceWith(51);
+  for (const fn of [api.createRun, api.executeRun, api.seedDemo, api.markBaseline]) expect(fn).not.toHaveBeenCalled();
+  expect(source).toEqual(before);
+});
+
+it("starts a fresh draft for repeated source A, source B, and blank creation", async () => {
+  const a = diagnosticRun();
+  const b = diagnosticRun({ id: 52, name: "Second source", universe: storedUniverse(returnInput(25, ["z", "x"])) });
+  vi.mocked(api.getRun).mockImplementation(async (id) => id === 52 ? b : a);
+  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />);
+  const openReuse = async (name: string) => {
+    await user.click(await screen.findByRole("button", { name }));
+    await user.click(await screen.findByRole("button", { name: reuseAction }));
+  };
+  await openReuse(a.name);
+  await user.type(screen.getByLabelText("Run name"), "Old draft");
+  await user.type(screen.getByLabelText("Weight for a (%)"), "70");
+  await user.selectOptions(screen.getByLabelText("Construction method"), "inverse_volatility");
+  await user.clear(screen.getByLabelText("Rolling lookback")); await user.type(screen.getByLabelText("Rolling lookback"), "3");
+  await user.click(screen.getByRole("button", { name: "Back to runs" }));
+  await openReuse(a.name);
+  expect(screen.getByLabelText("Run name")).toHaveValue(""); expect(screen.getByLabelText("Weight for a (%)")).toHaveValue("");
+  expect(screen.getByLabelText("Construction method")).toHaveValue("user_supplied"); expect(screen.getByLabelText("Rolling lookback")).toHaveValue("20");
+  await user.click(screen.getByRole("button", { name: "Back to runs" }));
+  await openReuse(b.name);
+  expect(screen.getByText(/Return data copied from run #52, "Second source"/)).toBeVisible();
+  const input = JSON.parse((screen.getByLabelText("Return JSON") as HTMLTextAreaElement).value);
+  expect(input.assets.map((asset: { asset_id: string }) => asset.asset_id)).toEqual(["z", "x"]);
+  expect(input.assets.map((asset: { returns: number[] }) => asset.returns)).toEqual(b.universe.assets.map((asset) => asset.returns));
+  expect(input.timestamps).toEqual(b.universe.timestamps);
+  expect(screen.getByLabelText("Weight for z (%)")).toHaveValue("");
+  await user.click(screen.getByRole("button", { name: "Back to runs" }));
+  await user.click(await screen.findByRole("button", { name: "New portfolio run" }));
+  expect(screen.getByLabelText("Return JSON")).toHaveValue("");
+  expect(screen.queryByLabelText("Validated return preview")).not.toBeInTheDocument();
+  expect(screen.queryByText(/Return data copied from run/)).not.toBeInTheDocument();
+  expect(api.createRun).not.toHaveBeenCalled(); expect(api.executeRun).not.toHaveBeenCalled();
+});
+
+it("permits data reuse even when completed parent construction failed", async () => {
+  vi.mocked(api.getRun).mockResolvedValue(diagnosticRun({ solver_status: "failed", risk: null, result_fingerprint: null }));
+  vi.mocked(api.getRebalances).mockResolvedValue({ items: [{ ...rebalances[0], weights: null, status: "failed", solver_status: "failed" }] });
+  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />);
+  await user.click(await screen.findByRole("button", { name: "My supplied portfolio" }));
+  expect(await screen.findByText(/No usable stored rebalance weights/)).toBeVisible();
+  await user.click(screen.getByRole("button", { name: reuseAction }));
+  expect(screen.getByLabelText("Validated return preview")).toHaveTextContent("24 observations");
+  expect(api.createRun).not.toHaveBeenCalled(); expect(api.executeRun).not.toHaveBeenCalled();
+});
+
+it.each(["pending", "running", "failed", "invalidated"] as const)("does not offer writable reuse for parent %s and preserves recovery", async (status) => {
+  vi.mocked(api.getRun).mockResolvedValue(diagnosticRun({ status }));
+  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />);
+  await user.click(await screen.findByRole("button", { name: "My supplied portfolio" }));
+  expect(await screen.findByRole("button", { name: reuseAction })).toBeDisabled();
+  expect(screen.getByText(/reuse is available only for completed/)).toBeVisible();
+  if (status === "pending" || status === "failed") expect(screen.getByRole("button", { name: "Recover execution of run #51" })).toBeEnabled();
+});
+
+it.each(["missing_returns", "datetime", "metadata", "link_zero"])("shows a useful unsupported-source reason for %s", async (kind) => {
+  const source = diagnosticRun();
+  if (kind === "missing_returns") Reflect.deleteProperty(source.universe.assets[0], "returns");
+  if (kind === "datetime") source.universe.timestamps[0] += "T00:00:00";
+  if (kind === "metadata") source.universe.assets[0].metadata = { meaningful: true };
+  if (kind === "link_zero") source.dataset_version_id = 0;
+  vi.mocked(api.getRun).mockResolvedValue(source);
+  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />);
+  await user.click(await screen.findByRole("button", { name: source.name }));
+  expect(await screen.findByRole("button", { name: reuseAction })).toBeDisabled();
+  expect(screen.getByText(/Return data unavailable for reuse:/)).toHaveTextContent(kind === "missing_returns" ? "returns must be an array" : kind === "datetime" ? "YYYY-MM-DD" : kind === "metadata" ? "metadata" : "dataset_version_id");
+  expect(api.createRun).not.toHaveBeenCalled();
+});
+
+it("ignores obsolete detail and child responses after the newest source enters a reuse draft", async () => {
+  const old = deferred<api.RunFull>(); const children = deferred<Awaited<ReturnType<typeof api.getRebalances>>>();
+  const b = diagnosticRun({ id: 52, name: "Second source", universe: storedUniverse(returnInput(25)) });
+  vi.mocked(api.getRun).mockReturnValueOnce(old.promise).mockResolvedValueOnce(b);
+  vi.mocked(api.getRebalances).mockReturnValueOnce(children.promise);
+  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />);
+  await user.click(await screen.findByRole("button", { name: "My supplied portfolio" }));
+  await user.click(screen.getByRole("button", { name: "Second source" }));
+  await user.click(await screen.findByRole("button", { name: reuseAction }));
+  await act(async () => { old.resolve(diagnosticRun()); children.resolve({ items: rebalances }); });
+  expect(screen.getByRole("heading", { name: "New portfolio run" })).toBeVisible();
+  expect(screen.getByText(/Return data copied from run #52/)).toBeVisible();
+  expect(screen.getByLabelText("Validated return preview")).toHaveTextContent("25 observations");
+  expect(api.getRun).toHaveBeenCalledTimes(2); expect(api.createRun).not.toHaveBeenCalled();
+});
+
+it("separates recovery of the newly created ID from reuse and clears that recovery on the next reuse", async () => {
+  vi.mocked(api.getRun).mockResolvedValueOnce(diagnosticRun())
+    .mockResolvedValueOnce(diagnosticRun({ id: 61, status: "pending" })).mockResolvedValueOnce(diagnosticRun());
+  vi.mocked(api.createRun).mockResolvedValue(diagnosticRun({ id: 61, status: "pending" }));
+  vi.mocked(api.executeRun).mockRejectedValueOnce(new Error("Lost new execution response"));
+  const { user } = renderWithUser(<PortfolioDiagnosticsPanel />);
+  await user.click(await screen.findByRole("button", { name: "My supplied portfolio" }));
+  await user.click(await screen.findByRole("button", { name: reuseAction }));
+  await user.type(screen.getByLabelText("Run name"), "New run"); await user.selectOptions(screen.getByLabelText("Construction method"), "equal_weight");
+  await user.click(screen.getByRole("button", { name: "Create and run" }));
+  await user.click(await screen.findByRole("button", { name: "Open stored run" }));
+  await user.click(await screen.findByRole("button", { name: "Recover execution of run #61" }));
+  expect(screen.getByRole("heading", { name: "Recover portfolio run" })).toBeVisible();
+  expect(screen.queryByText(/Return data copied from run/)).not.toBeInTheDocument();
+  expect(screen.queryByLabelText("Return JSON")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Back to runs" }));
+  await user.click(await screen.findByRole("button", { name: "My supplied portfolio" }));
+  await user.click(await screen.findByRole("button", { name: reuseAction }));
+  expect(screen.getByLabelText("Run name")).toHaveValue(""); expect(screen.getByLabelText("Construction method")).toBeEnabled();
+  expect(screen.queryByRole("button", { name: "Refresh stored run" })).not.toBeInTheDocument();
+  expect(api.createRun).toHaveBeenCalledOnce(); expect(api.executeRun).toHaveBeenCalledExactlyOnceWith(61);
 });

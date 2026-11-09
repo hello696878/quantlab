@@ -1,4 +1,4 @@
-import type { RunFull } from "@/lib/portfolioDiagnostics";
+import type { PortfolioReturnInput, RunFull, StoredPortfolioUniverse } from "@/lib/portfolioDiagnostics";
 
 // Deterministic test inputs, never imported by production components.
 export function returnInput(count = 24, ids = ["a", "b"]) {
@@ -13,11 +13,19 @@ export function constructionInput() {
   return input;
 }
 
+export function storedUniverse(input: PortfolioReturnInput = returnInput()): StoredPortfolioUniverse {
+  return { ...input, benchmark_returns: null, prior_weights: null, sample_ids: null,
+    assets: input.assets.map((asset) => ({ ...asset, name: asset.name ?? `Asset ${asset.asset_id.toUpperCase()}`,
+      asset_type: asset.asset_type ?? "other", group: asset.group ?? null, currency: asset.currency ?? null,
+      integer_lots: false, metadata: {} })) };
+}
+
 export function diagnosticRun(overrides: Partial<RunFull> = {}): RunFull {
   return { id: 51, name: "My supplied portfolio", status: "completed", method: "user_supplied", covariance_method: "sample",
     integrity_status: "declared", solver_status: "closed_form", asset_count: 2, observation_count: 24, rebalance_count: 1,
-    constraint_violation_count: 0, warnings: ["Weights are self-declared."], configuration: { user_provenance: { basis: "declared", lag: null } },
-    universe: { ...returnInput(), assets: [{ asset_id: "a", name: "Asset A", group: null }, { asset_id: "b", name: "Asset B", group: null }] },
+    constraint_violation_count: 0, warnings: ["Weights are self-declared."], configuration: { user_provenance: { basis: "declared", lag: null }, linked_fingerprints: {}, validation_split_label: null },
+    universe: storedUniverse(), dataset_version_id: null, validation_run_id: null, regime_run_id: null,
+    regime_definition_id: null, cost_diagnostic_run_id: null, overfitting_run_id: null, experiment_id: null,
     portfolio_volatility: null, effective_positions: null, max_budget_deviation: null, mean_turnover: null,
     risk: null, budget: null, concentration: null, covariance: null, regimes: null,
     is_baseline: false, error_message: null, universe_fingerprint: "u", constraint_fingerprint: "c", configuration_fingerprint: "f",

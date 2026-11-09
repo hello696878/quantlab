@@ -21,7 +21,7 @@ describe("asset shock Composer payload", () => {
   it.each(["constructor", "toString", "__proto__"])("treats an omitted %s shock as blank and retains its explicit zero", (assetId) => {
     const specialSource = {
       portfolio: { ...portfolio, universe: { ...portfolio.universe,
-        assets: [...portfolio.universe.assets, { asset_id: assetId, name: assetId, group: null }] } },
+        assets: [...portfolio.universe.assets, { ...portfolio.universe.assets[0], asset_id: assetId, name: assetId, group: null }] } },
       rebalance: { ...source.rebalance, weights: { a: 0.5, b: 0.4, [assetId]: 0.1 } },
     };
     expect(shockText(draft.shocks, assetId)).toBe("");

@@ -3,19 +3,19 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { classifyApiError } from "@/lib/api";
 import { createRun, executeRun, getRun, type PortfolioConstructionMethod, type PortfolioReturnInput, type RunFull } from "@/lib/portfolioDiagnostics";
-import { buildPortfolioRun, enteredWeightTotal, MAX_IMPORT_BYTES, parsePortfolioReturns, weightText } from "@/lib/portfolioDiagnosticsComposer";
+import { buildPortfolioRun, enteredWeightTotal, MAX_IMPORT_BYTES, parsePortfolioReturns, weightText, type PortfolioReuseDraft } from "@/lib/portfolioDiagnosticsComposer";
 import { creationOutcomeUnknown } from "@/lib/portfolioStressComposer";
 
-interface Props {
+type Props = {
   onBack: () => void;
   onOpen: (run: RunFull) => void;
-  initialRun?: RunFull;
-}
+} & ({ initialRun: RunFull; reuseDraft?: never } | { initialRun?: never; reuseDraft?: PortfolioReuseDraft });
 
-export default function PortfolioDiagnosticsComposer({ onBack, onOpen, initialRun }: Props) {
+export default function PortfolioDiagnosticsComposer({ onBack, onOpen, initialRun, reuseDraft }: Props) {
   const [name, setName] = useState("");
-  const [raw, setRaw] = useState("");
-  const [preview, setPreview] = useState<PortfolioReturnInput | null>(null);
+  const [raw, setRaw] = useState(reuseDraft?.raw ?? "");
+  const [preview, setPreview] = useState<PortfolioReturnInput | null>(reuseDraft?.data ?? null);
+  const [attribution, setAttribution] = useState(reuseDraft ? { id: reuseDraft.sourceId, name: reuseDraft.sourceName } : null);
   const [weights, setWeights] = useState<Record<string, string>>({});
   const [method, setMethod] = useState<PortfolioConstructionMethod>("user_supplied");
   const [lookback, setLookback] = useState("20");
@@ -36,12 +36,13 @@ export default function PortfolioDiagnosticsComposer({ onBack, onOpen, initialRu
     return () => { mounted.current = false; inputRevision.current += 1; };
   }, []);
 
-  function invalidate() {
+  function invalidate(clearAttribution = true) {
     inputRevision.current += 1;
     setPreview(null);
     setWeights({});
     setError(null);
     setReading(false);
+    if (clearAttribution) setAttribution(null);
   }
 
   async function loadFile(file?: File) {
@@ -64,7 +65,7 @@ export default function PortfolioDiagnosticsComposer({ onBack, onOpen, initialRu
 
   function validateImport() {
     if (inFlight.current || locked || reading) return;
-    invalidate();
+    invalidate(false);
     try { setPreview(parsePortfolioReturns(raw)); }
     catch (err) { setError(err instanceof Error ? err.message : "Invalid return data."); }
   }
@@ -96,6 +97,7 @@ export default function PortfolioDiagnosticsComposer({ onBack, onOpen, initialRu
       const created = await createRun(validation.payload);
       if (!mounted.current) return;
       if (!Number.isSafeInteger(created.id) || created.id <= 0) throw new Error("Creation returned no usable positive run ID.");
+      if (reuseDraft && created.id === reuseDraft.sourceId) throw new Error("Creation returned the source run ID instead of a new run. Inspect the run list before continuing.");
       id = created.id;
       setCreatedId(id);
       setStored(created);
@@ -154,6 +156,7 @@ export default function PortfolioDiagnosticsComposer({ onBack, onOpen, initialRu
       <h2 id="portfolio-composer-title" className="text-lg font-semibold text-[var(--text-hi)]">{initialRun ? "Recover portfolio run" : "New portfolio run"}</h2>
       <button type="button" className="btn-secondary" disabled={busy} onClick={onBack}>{unknownCreation ? "Inspect run list" : "Back to runs"}</button>
     </div>
+    {attribution && <p className="text-sm text-[var(--text-mut)]">Return data copied from run #{attribution.id}, &quot;{attribution.name}&quot;. Construction settings are reset for this new run. This is a data snapshot, not a clone or replay; no source link is saved.</p>}
     {!initialRun && <form onSubmit={submit} noValidate className="space-y-4">
       <fieldset disabled={locked} className="space-y-4 disabled:opacity-70">
         <legend className="font-medium">Portfolio construction</legend>
