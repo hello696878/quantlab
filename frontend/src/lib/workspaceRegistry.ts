@@ -45,6 +45,7 @@ export type WorkspaceVisibility = "sidebar" | "internal";
  * so the first hidden view has to declare itself.
  */
 export const WORKSPACE_VISIBILITY: Record<View, WorkspaceVisibility> = {
+  monitor: "sidebar",
   home: "sidebar",
   globe: "sidebar",
   backtest: "sidebar",
@@ -168,6 +169,7 @@ export const ALL_VIEW_IDS: readonly View[] = Object.keys(
  * command identities. `keywords` are search words, not unique routing aliases.
  */
 export const WORKSPACE_COMMANDS: { view: View; title: string; keywords: string }[] = [
+  { view: "monitor", title: "Open Market Monitor", keywords: "watchlist treasury rates oil news announcements company sec filings calendar" },
   { view: "runreplay", title: "Open Run Replay", keywords: "reproducibility hash environment manifest restore saved configuration" },
   { view: "mllifecycle", title: "Open ML Research Lifecycle", keywords: "model artifact registry held out calibration oof provenance lifecycle" },
   { view: "home", title: "Go to Home", keywords: "command center dashboard" },

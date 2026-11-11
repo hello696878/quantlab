@@ -1,6 +1,117 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Portfolio Return Data Reuse v1 (2026-11-08)
+## Current Handoff: Personal Market Monitor v1 - Independent Review (2026-11-10)
+
+**READY_FOR_COMMIT** for a later authorized commit task. Three independent
+read-only initial reviewers covered backend/provider semantics, frontend state,
+and application boundaries/evidence. Root confirmed the findings; the correction
+authors did not serve as independent final reviewers of their own fixes. Root and
+an independent integration reviewer checked the final corrective code.
+
+Five P2 issues were corrected narrowly: nonpositive EIA change denominators,
+valid empty RSS responses, total HTTP/EIA elapsed bounds, unrelated SEC forms
+invalidating supported filings, and an active company-only filter after clearing
+its company. EIA now uses a disposable bounded worker; no new provider, dependency,
+research persistence or quant calculation was added.
+
+New, separate verification on corrected executable bytes:
+
+- Protected backend Monitor: **39 passed /39 selected**, zero skips/failures;
+  terminal 4.41s, pytest wall 4.5657s, child 5.7353s, pytest/child exits 0/0.
+  SQLite violations `[]`; live/snapshot source protection passed.
+- Affected frontend Panel/Isolation: **15 passed /2 files**, zero skips/failures;
+  Vitest 2.47s, process 3.1995s, native exit 0.
+- TypeScript: native exit 0, 28.7871s.
+- One final corrected production build: native exit 0, 68.1600s. No executable
+  or test edits followed; these documentation corrections follow verification.
+- Offline captured-payload replay: Fed 15 /ECB 14 /BBC 30 items and nine FOMC
+  ranges; no new provider requests or SQLite attempts.
+
+The new pre-fix runs remain separate: backend 5 failed /3 passed /27 deselected;
+frontend 1 failed /10 skipped by the test-name filter, both native exit 1.
+Original implementation 28 backend /75 frontend, TypeScript, build and mocked
+browser results remain historical separate executions, not combined totals.
+The original mocked production-browser pass was not rerun on the corrected UI.
+Its config/spec were not in the original execution hash manifest; original live
+smoke likewise lacks execution-source binding. Do not claim fresh final-tree live
+acceptance from those records.
+
+Final scope is **26 pending paths: 7 modified /19 new**, all unstaged; the extra
+file is `backend/app/market_monitor/eia_worker.py`. VERSION stays `4.88.0-dev`.
+Full final inventory, working SHA-256 values, findings and native checks:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-monitor-review-20261110-5993eb29f75b41d881ebb01f83b40f19`.
+Original implementation evidence below is preserved, with its actual failures.
+
+Next: separately authorized staging/commit review. Treasury live XML, configured
+EIA/SEC, live full-stack browser, retained dependency findings and Phase 70
+container/backup gaps remain pending. No active research database access, new
+live requests, browser/service/Docker/audit/install, staging, commit or push.
+
+## Historical Implementation Handoff: Personal Market Monitor v1 (2026-11-10)
+
+Implemented on `codex/personal-market-monitor-v1` from clean main
+`8965555439a3f9ca302b5b818e61e1b5c49afc23`, tree
+`3832cafaf97d431f4936e856849f17682762a139`. VERSION remains `4.88.0-dev`.
+The user's immediate priority is a personally useful market/rates/oil/company/
+news/calendar Monitor; the proposed EMA increment is deferred. Existing research,
+portfolio, backtest and `home` workspaces remain available.
+
+`monitor` is now the initial local view, inside the unchanged ServingGate boundary.
+The normal backend alone registers `/market-monitor/catalog` and
+`/market-monitor/snapshot`. No demo allowlist, quant calculation, dependency or
+research database schema changed. The 16-entry catalog distinguishes indices,
+Yahoo futures references and EIA spot observations. Browser watchlists are validated
+and versioned; source dates, successful retrieval/check timestamps, cadence,
+availability and last-good failure states are separate. No illustrative fallback,
+fake change, session-completion claim, background collector or alerting was added.
+
+Separate final verification results, not a whole-project suite:
+
+- Protected backend Monitor selection: **28 passed /28 selected**, zero skips,
+  failures or warnings; pytest terminal 2.21s, recorded pytest wall 2.4499s,
+  child wall 3.5247s; pytest/child/outer exits **0/0/0**.
+- Affected frontend selection: **75 passed /6 files**, zero skips/failures;
+  Vitest 2.43s, child wall 3.2441s, native/outer exits **0/0**. Includes the
+  existing workspaceRegistry, Sidebar and ServingGate suites.
+- TypeScript `--noEmit --incremental false`: exit **0**, 28.9349s.
+- One final production build: exit **0**, 74.7692s; Next 15.5.28,
+  Node 24.22.1, invoked npm CLI 11.12.1 (within the declared npm 11 engine).
+  No production code changed after this build.
+- Production Edge mocked-API scenario: **1 passed**, zero skipped/flaky/failed;
+  Playwright 3.0132s, wrapper 4.3770s, browser/outer exits **0/0**.
+  Watchlist add/reorder/remove, company selection, refresh, desktop/mobile
+  overflow and Backtest/Monitor navigation passed. Screenshots were inspected.
+  This is not live full-stack acceptance. Task-owned frontend stop exited 0.
+
+The failed permission/setup attempts, earlier test-selector/registry failures,
+and development-overlay browser failure remain preserved separately. A production
+browser attempt then failed before test execution with spawn EPERM; its frontend
+was stopped through the normal approval path, exit 0, before the passing run.
+See [implementation, exact inventory and evidence](docs/PERSONAL_MARKET_MONITOR.md).
+
+Live checks validated all ten Yahoo symbol/currency/kind mappings. Retained real
+HTTP-200 payloads parsed as Fed 15 /ECB 14 /BBC 30 items and nine upcoming FOMC
+date ranges. Treasury XML timed out: its actual live structure remains unverified
+here, despite deterministic parser coverage. EIA and SEC are not configured,
+with zero requests; their parsing is deterministic-test-only. These availability
+limits are not hidden by the passing unit tests.
+
+External evidence:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-monitor-20261110-5d42829d8a0d4f379cef86031bf99496`.
+The protected backend source-copy/--execute path installed test-owned SQLite
+isolation before app imports; violations were `[]`, and live/snapshot source
+checks passed. Live market workers refuse SQLite and use process-local memory
+caches. Normal FastAPI lifespan still initializes the research database: it was
+NOT started by this task. The active database was not opened, read, hashed,
+copied, migrated, backed up or modified. No fresh database protection audit.
+
+Next: independent integration review of the **25-path unstaged** implementation
+(7 modified /18 new), including source limitations and the yfinance private-hook
+compatibility boundary. No stage/commit/push/PR/merge, Docker, install, audit or
+deployment. Existing seven dependency findings and Phase 70 container/backup
+gaps remain separate release work, not resolved by this feature.
+
+## Historical Handoff: Portfolio Return Data Reuse v1 (2026-11-08)
 
 Implemented on `codex/portfolio-return-data-reuse-v1` from clean main
 `b5d7ae73bc3e2d65e3adfc531a43e9a6aa43bc43`, tree

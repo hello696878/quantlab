@@ -155,6 +155,7 @@ export const NAV_GROUPS: { label: string; items: NavItem[] }[] = [
   {
     label: "Start Here",
     items: [
+      { id: "monitor", label: "Monitor", icon: "backtest" },
       { id: "home", label: "Home", icon: "home" },
       { id: "democenter", label: "Demo Center", icon: "democenter" },
       { id: "portfolioshowcase", label: "Portfolio Showcase", icon: "portfolioshowcase" },
@@ -332,7 +333,7 @@ export default function Sidebar({ active, onNav, readOnly = false }: SidebarProp
           >
             FastAPI backtest core
             <br />
-            {readOnly ? "Offline synthetic corpus" : "yfinance market data"}
+            {readOnly ? "Offline synthetic corpus" : "Source-specific market & research data"}
           </div>
         </div>
         <p

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import AppShell, { type View } from "@/components/AppShell";
 import ServingGate from "@/components/ServingGate";
+import MarketMonitorPanel from "@/components/MarketMonitorPanel";
 import BacktestForm from "@/components/BacktestForm";
 import MetricsGrid from "@/components/MetricsGrid";
 import EquityCurveChart from "@/components/EquityCurveChart";
@@ -371,6 +372,7 @@ const STRATEGY_HEADINGS: Record<
 
 /** TopBar title + subtitle per workspace. */
 const VIEW_META: Record<View, { title: string; subtitle: string }> = {
+  monitor: { title: "Market Monitor", subtitle: "Personal markets, rates, company filings and source announcements." },
   home: {
     title: "Home",
     subtitle:
@@ -703,7 +705,7 @@ const GLOBE_MARKET_ALIASES: Record<string, string> = {
 // ---------------------------------------------------------------------------
 
 function LocalResearchApp() {
-  const [view, setView] = useState<View>("home");
+  const [view, setView] = useState<View>("monitor");
   useStrategyEnsembleLinkCleanup(view);
   useMLLifecycleLinkCleanup(view);
   useReplayLinkCleanup(view);
@@ -1930,6 +1932,7 @@ function LocalResearchApp() {
         )}
 
         {/* ── Home / Command Center ────────────────────────────────────── */}
+        {view === "monitor" && <MarketMonitorPanel />}
         {view === "home" && (
           <HomeDashboard
             onNav={handleNav}

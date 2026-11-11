@@ -75,6 +75,7 @@ from app.risk_management import (
 from app.annualization import resolve_annualization
 from app.market_data import assess_data_quality
 from app.globe_routes import router as globe_router
+from app.market_monitor_routes import router as market_monitor_router
 from app.portfolio_risk_routes import router as portfolio_risk_router
 from app.real_estate_routes import router as real_estate_router
 from app.futures_routes import router as futures_router
@@ -451,6 +452,7 @@ async def _validation_exception_handler(request: Request, exc: RequestValidation
 
 # Global Markets Globe data layer (Phase 20.2) — static sample dossier API.
 app.include_router(globe_router)
+app.include_router(market_monitor_router)
 
 # Portfolio Risk Lab (Phase 21.0) — static sample portfolio analytics API.
 app.include_router(portfolio_risk_router)
