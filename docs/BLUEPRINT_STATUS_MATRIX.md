@@ -18,6 +18,23 @@ Companion documents:
 
 ## 1. Status vocabulary
 
+### Current Product Priority (2026-11-10)
+
+The user's current priority is a personally useful **Personal Market Monitor**,
+not another quant strategy increment. EMA is deferred. The local initial view is
+now `monitor`; `home` and the existing research/portfolio/backtest workspaces remain
+available, and the read-only demo keeps its separate capability/endpoint boundary.
+Monitor v1 adds bounded real-source observations, headlines, filings and official
+calendar dates, not a model, background collector, trading feed or blueprint-wide
+completion claim. See [scope, source availability and separate verification](PERSONAL_MARKET_MONITOR.md).
+Independent integration review fixed five narrow P2 issues and found no remaining
+merge blocker. Corrected Monitor checks passed separately: 39 backend, 15 affected
+frontend, TypeScript and a final production build; the original mocked-browser
+result is historical, and live/source/release gaps remain open. See the review
+section in the same Monitor document. This is readiness for a later commit task,
+not deployment readiness. The historical Phase 62 counts below are not recalculated
+by this product addition.
+
 | Status | Meaning |
 |---|---|
 | `built` | A usable implemented capability exists in code, is routed into the product where applicable, and has tests or explicit verification evidence. |

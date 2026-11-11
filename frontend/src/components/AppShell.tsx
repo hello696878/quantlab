@@ -6,6 +6,7 @@ import TopBar from "@/components/TopBar";
 
 /** The set of top-level workspaces, driven by the sidebar. */
 export type View =
+  | "monitor"
   | "home"
   | "globe"
   | "backtest"
