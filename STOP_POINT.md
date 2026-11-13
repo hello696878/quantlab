@@ -1,6 +1,60 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Personal Market Monitor v1 - Independent Review (2026-11-10)
+## Current Handoff: Monitor Treasury Retrieval Reliability (2026-11-12)
+
+Ready for a subsequent commit task after two independent read-only review passes.
+The reviewed changes are in the separate worktree on
+`codex/monitor-treasury-reliability-v1`, based on the merged Monitor commit
+`0d767bc93ebcaefafec0d5271a1f4c9843e9687e`, tree
+`8c6d3e3cbd1b1d3ee1fcb7b0ae5ce87a2364cb2f`. VERSION remains `4.88.0-dev`.
+The original `C:\quantlab` main checkout and retained frontend build stay usable.
+
+The original live acceptance passed the exercised workflow, but Treasury's
+previous-month request timed out after 13.01 seconds, preventing a current-month
+request. The 20.35-second initial snapshot was not solely Treasury work.
+Current-month XML is now fetched and validated first (up to 9 seconds). Only
+missing comparisons may trigger a previous-month GET; a failed/unusable current
+response instead allows one documented daily-file attempt. The optional request
+has up to 6 seconds within the same 15-second deadline. History cannot overwrite
+validated values or add missing maturities. Unavailable comparisons remain null.
+Daily-file provenance uses the existing response message; API/UI shape is unchanged.
+
+- Protected affected backend: **54 passed /54 selected**, no skips/failures/
+  warnings; pytest terminal 13.81s, recorded pytest wall 15.0790s, child 18.0173s;
+  pytest/child/outer exits 0/0/0. SQLite violations `[]`; source and snapshot match.
+- Implementation-time live Treasury-only browser check: monthly 9.0023s, daily 6.0081s,
+  adapter timeout in 15.0121s. No XML payload or real Treasury rates obtained.
+  The real proxy returned HTTP 200 with Treasury unavailable and no retrieval
+  timestamp; the rates section showed no observations. Browser comparison and
+  cleanup passed; one allowed SQLite connection, zero violations.
+- Earlier merged CI, frontend build `_zAevRDsAStU7Ly15xkj2` and full Monitor
+  acceptance were reused, not repeated. No frontend source, typecheck or build
+  change; the new browser run was narrowly scoped to Treasury.
+
+Independent review corrected four issues. Older Treasury responses now retain
+the newer cached snapshot and its retrieval time. Unsupported XML structure is
+distinguished from an empty feed, and unknown XML encodings follow the existing
+fallback or current-data retention path. Partial curves carry a source note.
+The two reviewers inspected the final corrections and found no remaining blocker.
+
+Final protected review verification: **60 passed /60 selected**, zero skips,
+4.86s pytest terminal time, native exit 0, and SQLite violations `[]`. The
+implementation's 54 passes, five pre-fix failures and intermediate 59 passes
+remain separate. Frontend and live browser evidence were reused. The exact final
+inventory, hashes and review findings are recorded externally at
+`C:\Users\jimli\AppData\Local\Temp\quantlab-treasury-review-k69t1bik`.
+
+**Retrieval behavior corrected; live Treasury acceptance remains open.**
+The daily file is an official documented candidate, not a live-validated parser
+compatibility claim. EIA/SEC setup, the earlier resource 404 and external FOMC
+499, and inherited release gaps are unchanged.
+
+[Policy and evidence](docs/PERSONAL_MARKET_MONITOR.md#treasury-retrieval-reliability-2026-11-12).
+Seven modified files, all unstaged; exact inventory/hashes and native evidence:
+`C:\Users\jimli\AppData\Local\Temp\quantlab-treasury-v1-0d767bc-6e41`.
+No active research DB access, dependency changes, staging, commit or push.
+
+## Historical Handoff: Personal Market Monitor v1 - Independent Review (2026-11-10)
 
 **READY_FOR_COMMIT** for a later authorized commit task. Three independent
 read-only initial reviewers covered backend/provider semantics, frontend state,

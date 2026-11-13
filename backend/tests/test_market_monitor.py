@@ -9,17 +9,19 @@ import sys
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
+import httpx
 import pytest
 
 from app.market_monitor.catalog import BY_ID, CATALOG, FEEDS
 from app.market_monitor.models import Observation, SourceData
 from app.market_monitor.parsers import (MAX_BYTES, parse_eia, parse_feed, parse_fomc, parse_market, parse_sec, parse_treasury)
-from app.market_monitor.providers import Providers
+from app.market_monitor.providers import Providers, TREASURY_DAILY_XML, TREASURY_MONTHLY_XML
 from app.market_monitor.service import MonitorService, configured_sec
 from app import market_monitor_routes as routes
 
 pytestmark = [pytest.mark.usefixtures("isolated_lab_db"), pytest.mark.db_free]
 DAY = datetime(2026, 1, 5, 12, tzinfo=timezone.utc)
+UNKNOWN_XML_ENCODING = b'<?xml version="1.0" encoding="unknown-treasury-codec"?><feed/>'
 
 
 def treasury(rows):
@@ -49,14 +51,231 @@ def test_treasury_dates_missing_values_and_same_date_spread():
     assert obs["treasury30y"].value == 5
 
 
-def test_treasury_requests_only_two_bounded_months_across_year_boundary():
-    provider = Providers(); calls = []
-    async def get(url, params):
-        calls.append(params)
-        return treasury([("2025-12-31", {"BC_2YEAR": "4", "BC_10YEAR": "5"})])
+def curve(day, two="4", ten="4.5", thirty="5"):
+    return day, {"BC_2YEAR": two, "BC_10YEAR": ten, "BC_30YEAR": thirty}
+
+
+def treasury_provider(*results):
+    provider, calls = Providers(), []
+
+    async def get(url, params=None):
+        result = results[len(calls)]
+        calls.append((url, params))
+        if isinstance(result, Exception):
+            raise result
+        return result
+
     provider.get = get
-    asyncio.run(provider.treasury(date(2026, 1, 2)))
-    assert [call["field_tdr_date_value_month"] for call in calls] == ["202512", "202601"]
+    return provider, calls
+
+
+def monthly_call(month):
+    return TREASURY_MONTHLY_XML, {"data": "daily_treasury_yield_curve", "field_tdr_date_value_month": month}
+
+
+def test_treasury_distinguishes_empty_feed_from_unsupported_xml():
+    atom = b'<feed xmlns="http://www.w3.org/2005/Atom">{}</feed>'
+    with pytest.raises(ValueError, match="No usable Treasury observations"):
+        parse_treasury([atom.replace(b"{}", b"<title>Daily Treasury Yield Curve</title>")])
+    for payload in (b"<html/>", atom.replace(b"{}", b"<entry><content>Unsupported</content></entry>")):
+        with pytest.raises(ValueError, match="Unsupported Treasury XML structure"):
+            parse_treasury([payload])
+
+
+def test_treasury_partial_curve_discloses_missing_series_without_history():
+    payload = treasury([("2026-01-02", {"BC_2YEAR": "4"}), ("2026-01-05", {"BC_2YEAR": "4.2"})])
+    provider, calls = treasury_provider(payload)
+    result = asyncio.run(provider.treasury(DAY.date()))
+    assert calls == [monthly_call("202601")]
+    assert [obs.instrument_id for obs in result.observations] == ["treasury2y"]
+    assert result.observations[0].change == pytest.approx(20)
+    assert result.message == "Some Treasury series have no observation."
+
+    provider, calls = treasury_provider(TimeoutError("current"), payload)
+    result = asyncio.run(provider.treasury(DAY.date()))
+    assert calls == [monthly_call("202601"), (TREASURY_DAILY_XML, None)]
+    assert "official daily XML file" in result.message
+    assert "Some Treasury series have no observation." in result.message
+
+
+def test_treasury_current_comparisons_skip_history():
+    provider, calls = treasury_provider(treasury([curve("2026-01-05", two="4.1"), curve("2026-01-02")]))
+    result = asyncio.run(provider.treasury(DAY.date()))
+    assert calls == [monthly_call("202601")]
+    obs = {o.instrument_id: o for o in result.observations}
+    assert len(obs) == 4 and result.message is None
+    assert obs["treasury2y"].change == pytest.approx(10)
+    assert all(o.previous_date == date(2026, 1, 2) for o in obs.values())
+
+
+def test_treasury_compares_across_year_boundary_without_overwriting_current_rows():
+    provider, calls = treasury_provider(
+        treasury([curve("2026-01-02", two="4.2", ten="4.4")]),
+        treasury([curve("2025-12-31"), curve("2026-01-02", two="90", ten="95"), curve("2026-01-05", two="98")]),
+    )
+    result = asyncio.run(provider.treasury(DAY.date()))
+    obs = {o.instrument_id: o for o in result.observations}
+    assert calls == [monthly_call("202601"), monthly_call("202512")]
+    assert obs["treasury2y"].value == 4.2
+    assert obs["treasury2y"].change == pytest.approx(20)
+    assert obs["treasury10y2y"].value == pytest.approx(20)
+    assert obs["treasury10y2y"].change == pytest.approx(-30)
+    assert all(o.observation_date == date(2026, 1, 2) and o.previous_date == date(2025, 12, 31) for o in obs.values())
+
+
+@pytest.mark.parametrize(
+    "history",
+    [httpx.ReadTimeout("history"), b"<malformed", UNKNOWN_XML_ENCODING, treasury([curve("2025-12-31", ten="nan")])],
+    ids=["timeout", "malformed-xml", "unknown-encoding", "invalid-yield"],
+)
+def test_treasury_optional_history_failure_preserves_validated_current(history):
+    payload = treasury([curve("2026-01-02")])
+    provider, calls = treasury_provider(payload, history)
+    result = asyncio.run(provider.treasury(DAY.date()))
+    assert calls == [monthly_call("202601"), monthly_call("202512")]
+    assert result.observations == parse_treasury([payload]).observations
+    assert all(o.change is None and o.previous_date is None for o in result.observations)
+    assert result.message == "Some prior Treasury comparisons are unavailable."
+
+
+@pytest.mark.parametrize(
+    "current",
+    [treasury([]), httpx.ReadTimeout("current"), b"<html/>", UNKNOWN_XML_ENCODING, treasury([curve("2025-12-31")])],
+    ids=["empty-new-month", "timeout", "unusable", "unknown-encoding", "wrong-month"],
+)
+def test_treasury_uses_one_daily_fallback_with_actual_dates(current):
+    provider, calls = treasury_provider(current, treasury([curve("2025-12-31"), curve("2026-01-06", two="9")]))
+    result = asyncio.run(provider.treasury(date(2026, 1, 1)))
+    assert calls == [monthly_call("202601"), (TREASURY_DAILY_XML, None)]
+    assert len(result.observations) == 4
+    assert all(o.observation_date == date(2025, 12, 31) and o.previous_date is None and o.change is None for o in result.observations)
+    assert "could not be verified" in result.message and "official daily XML file" in result.message
+
+
+def test_treasury_history_does_not_add_missing_current_maturities_or_spread():
+    provider, calls = treasury_provider(
+        treasury([("2026-01-02", {"BC_2YEAR": "4"}), ("2026-01-05", {"BC_10YEAR": "4.5"})]),
+        treasury([curve("2025-12-31", two="3.9", ten="4.6")]),
+    )
+    obs = {o.instrument_id: o for o in asyncio.run(provider.treasury(DAY.date())).observations}
+    assert calls == [monthly_call("202601"), monthly_call("202512")]
+    assert set(obs) == {"treasury2y", "treasury10y"}
+    assert obs["treasury2y"].change == pytest.approx(10)
+    assert obs["treasury10y"].change == pytest.approx(-10)
+
+
+def test_treasury_zero_negative_yields_and_signed_spread():
+    provider, calls = treasury_provider(treasury([
+        curve("2026-01-02", two="0.1", ten="-0.2", thirty="0"),
+        curve("2026-01-05", two="0", ten="-0.1", thirty="-0.1"),
+    ]))
+    obs = {o.instrument_id: o for o in asyncio.run(provider.treasury(DAY.date())).observations}
+    assert calls == [monthly_call("202601")]
+    assert (obs["treasury2y"].value, obs["treasury10y"].value, obs["treasury30y"].value) == (0, -0.1, -0.1)
+    assert obs["treasury2y"].unit == "%" and obs["treasury2y"].change_unit == "bps"
+    assert obs["treasury2y"].change == pytest.approx(-10)
+    assert obs["treasury10y2y"].unit == "bps"
+    assert obs["treasury10y2y"].value == pytest.approx(-10)
+    assert obs["treasury10y2y"].change == pytest.approx(20)
+
+
+@pytest.mark.parametrize("elapsed", [10, 15], ids=["remaining-budget", "no-time-left"])
+def test_treasury_attempt_deadlines_share_one_elapsed_budget(monkeypatch, elapsed):
+    provider, calls, deadlines = Providers(), [], []
+    real_timeout_at = asyncio.timeout_at
+    ticks = [100]
+
+    async def get(url, params=None):
+        calls.append((url, params))
+        if len(calls) == 1:
+            ticks[0] += elapsed  # Simulate time consumed before failure is delivered.
+            raise TimeoutError("current")
+        return treasury([curve("2026-01-05")])
+
+    async def run():
+        loop = asyncio.get_running_loop()
+        with monkeypatch.context() as patch:
+            patch.setattr(loop, "time", lambda: ticks[0])
+            patch.setattr(asyncio, "timeout_at", lambda when: deadlines.append(when) or real_timeout_at(when))
+            provider.get = get
+            if elapsed == 15:
+                with pytest.raises(TimeoutError, match="deadline exceeded"):
+                    await provider.treasury(DAY.date())
+            else:
+                assert (await provider.treasury(DAY.date())).observations
+
+    asyncio.run(run())
+    assert calls == ([monthly_call("202601"), (TREASURY_DAILY_XML, None)] if elapsed == 10 else [monthly_call("202601")])
+    assert deadlines == ([109, 115] if elapsed == 10 else [109])
+
+
+def test_treasury_total_failure_retains_last_good_and_cold_failure_is_unavailable():
+    provider, calls = treasury_provider(
+        treasury([curve("2026-01-02"), curve("2026-01-05")]),
+        TimeoutError("current"), b"<malformed",
+        TimeoutError("current"), TimeoutError("daily"),
+    )
+    clock = [DAY]
+    service = MonitorService(provider, clock=lambda: clock[0])
+    args = ("treasury", "US Treasury", "rates", "daily", "https://home.treasury.gov", 1800,
+            lambda: provider.treasury(clock[0].date()))
+
+    async def run():
+        ready = await service.source(*args)
+        assert ready.status == "ready" and ready.retrieved_at == DAY
+        clock[0] += timedelta(minutes=31)
+        stale = await service.source(*args)
+        assert stale.status == "stale" and stale.retrieved_at == DAY
+        assert stale.checked_at == clock[0] and stale.observations == ready.observations
+        assert "Source request or validation failed" in stale.message
+        assert (await service.source(*args)).checked_at == stale.checked_at  # backoff unchanged
+        cold = await MonitorService(provider, clock=lambda: clock[0]).source(*args)
+        assert cold.status == "unavailable" and cold.retrieved_at is None and not cold.observations
+
+    asyncio.run(run())
+    assert calls == [monthly_call("202601"), monthly_call("202601"), (TREASURY_DAILY_XML, None),
+                     monthly_call("202601"), (TREASURY_DAILY_XML, None)]
+
+
+@pytest.mark.parametrize(
+    ("initial", "older"),
+    [
+        (treasury([curve("2026-01-02"), curve("2026-01-05")]), treasury([curve("2026-01-02")])),
+        (treasury([("2026-01-02", {"BC_2YEAR": "4"}), ("2026-01-05", {"BC_2YEAR": "4.1"})]),
+         treasury([("2026-01-02", {"BC_30YEAR": "5"})])),
+    ],
+    ids=["overlapping-series", "disjoint-series"],
+)
+def test_treasury_older_daily_fallback_preserves_newer_cached_observations(initial, older):
+    provider, calls = treasury_provider(
+        initial,
+        TimeoutError("current"), older,
+        TimeoutError("current"), treasury([curve("2026-01-05", two="4.1")]),
+    )
+    clock = [DAY]
+    service = MonitorService(provider, clock=lambda: clock[0])
+    args = ("treasury", "US Treasury", "rates", "daily", "https://home.treasury.gov", 1800,
+            lambda: provider.treasury(clock[0].date()))
+
+    async def run():
+        ready = await service.source(*args)
+        assert ready.status == "ready" and ready.retrieved_at == DAY
+        clock[0] += timedelta(minutes=31)
+        stale = await service.source(*args)
+        assert stale.status == "stale" and stale.observations == ready.observations
+        assert stale.retrieved_at == DAY and stale.checked_at == clock[0]
+        assert "older observations" in stale.message and "Last successful data are retained" in stale.message
+        assert (await service.source(*args)) == stale
+        clock[0] += timedelta(seconds=61)
+        recovered = await service.source(*args)
+        assert recovered.status == "ready" and recovered.retrieved_at == clock[0]
+        assert recovered.observations[0].value == 4.1
+        assert all(obs.observation_date == DAY.date() for obs in recovered.observations)
+        assert "official daily XML file" in recovered.message
+
+    asyncio.run(run())
+    assert calls == [monthly_call("202601"), monthly_call("202601"), (TREASURY_DAILY_XML, None),
+                     monthly_call("202601"), (TREASURY_DAILY_XML, None)]
 
 
 def test_market_no_manufactured_zero_change_or_completed_session():
@@ -266,6 +485,28 @@ def test_minimal_router_contract_and_request_bounds(monkeypatch):
         assert client.get("/market-monitor/snapshot?ids=&company=nvda").status_code == 200
         for query in ("ids=bogus", "ids=nvda,nvda", "ids=" + ",".join(["nvda"] * 17), "ids=" + "x" * 301, "company=evil"):
             assert client.get("/market-monitor/snapshot?" + query).status_code == 422
+
+
+@pytest.mark.parametrize(("fallback_date", "status"), [("2025-12-31", "ready"), ("2025-12-19", "stale")])
+def test_treasury_daily_fallback_disclosed_in_snapshot_message(monkeypatch, fallback_date, status):
+    treasury_only, calls = treasury_provider(treasury([]), treasury([curve(fallback_date)]))
+    provider = FakeProviders()
+    provider.treasury = treasury_only.treasury
+    monkeypatch.setattr(routes, "_service", MonitorService(provider, lambda: DAY))
+    app = FastAPI()
+    app.include_router(routes.router)
+    with TestClient(app) as client:
+        response = client.get("/market-monitor/snapshot?ids=treasury2y")
+    assert response.status_code == 200
+    source = next(s for s in response.json()["sources"] if s["id"] == "treasury")
+    assert source["status"] == status and source["retrieved_at"] is not None
+    assert "Current-month Treasury publication could not be verified" in source["message"]
+    assert ("more than seven calendar days old" in source["message"]) == (status == "stale")
+    assert len(source["observations"]) == 4
+    for obs in source["observations"]:
+        assert obs["observation_date"] == fallback_date
+        assert obs["previous_date"] is None and obs["change"] is None
+    assert calls == [monthly_call("202601"), (TREASURY_DAILY_XML, None)]
 
 
 def test_demo_policy_refuses_monitor_before_startup():
