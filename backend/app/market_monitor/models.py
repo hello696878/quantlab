@@ -58,6 +58,7 @@ class SourceData(BaseModel):
     items: list[NewsItem] = Field(default_factory=list)
     filings: list[Filing] = Field(default_factory=list)
     events: list[CalendarEvent] = Field(default_factory=list)
+    message: str | None = None
 
 
 class SourceBlock(SourceData):
@@ -69,7 +70,6 @@ class SourceBlock(SourceData):
     status: Literal["ready", "stale", "unavailable", "not_configured"]
     retrieved_at: datetime | None = None
     checked_at: datetime | None = None
-    message: str | None = None
 
 
 class Snapshot(BaseModel):

@@ -59,7 +59,8 @@ GC=F/CL=F/BZ=F are provider futures references, not spot, a specified expiry or 
 broker CFD. EIA spot entries are separate. Treasury yields are not the Fed policy
 rate. Yield changes are `(latest - prior) * 100` bps; the spread is computed only
 from two yields on the same date, with its change also in bps. Missing values
-remain missing. Two recent calendar months are requested, including year rollover.
+remain missing. The current month is requested first; the previous month is
+optional and supplies comparisons only, including across year rollover.
 
 | Other source | Coverage | Cadence / limits |
 |---|---|---|
@@ -160,7 +161,8 @@ At most four retrievals run concurrently; the finite registry bounds cache keys.
 SEC is additionally serialized with at least one second between requests.
 HTTP responses are capped at 2 MiB with 12-second operation timeouts and no
 redirect following. HTTPX additionally has a 15-second total deadline per GET
-(including streaming); Treasury makes two bounded GETs. Blocking EIA transport
+(including streaming); Treasury also has a shared 15-second sequence deadline.
+Blocking EIA transport
 runs in a disposable child with a 15-second communication timeout that kills and
 waits for that child. Its request key is passed through stdin, not command-line
 arguments; ordinary backend environment inheritance still applies. A consumer
@@ -180,7 +182,79 @@ heuristic is not an exchange/holiday calendar. Old news/filing age alone does no
 make a freshly checked event source stale. Cache is process-local, not durable or
 shared across workers. There is no background collection after leaving Monitor.
 
-## Independent Integration Review (2026-11-10)
+## Treasury Retrieval Reliability (2026-11-12)
+
+The [merged Monitor acceptance](C:/Users/jimli/AppData/Local/Temp/quantlab-monitor-live-0d767bc-a184e/acceptance-handoff.md)
+passed its exercised live workflow. Its initial snapshot took 20.35s, not all
+attributable to Treasury. The prior October XML GET timed out after 13.01s;
+because the implementation requested history first, it never reached current data.
+
+The new policy uses only the [official monthly feed](https://home.treasury.gov/treasury-daily-interest-rate-xml-feed)
+and the [documented daily file](https://home.treasury.gov/developer-notice-xml-changes):
+
+1. Fetch the current calendar month first, with a 9-second attempt limit, and
+   validate dated, finite observations no later than today.
+2. When every displayed observation has a prior comparison, return it without
+   history. Otherwise, allow one optional previous-month GET for missing
+   comparisons. Dates outside that preceding month are excluded, so overlapping
+   or future rows cannot overwrite current values. History cannot fill absent
+   current maturities or create a spread from different dates.
+3. If the current response fails or has no usable current observations
+   (including an empty new month), attempt the official daily file once instead
+   of fetching history. Accept only a validated response in the supported XML
+   structure. Preserve its actual dates and disclose that the current-month
+   publication was not verified, even when the returned dates are recent.
+
+Both branches are at most two GETs, with at most 6 seconds for optional history
+or the daily file and a common 15-second elapsed deadline. No request starts
+after the deadline. The 2 MiB payload, XML safety and no-redirect rules remain.
+A bad history response keeps valid current yields, with null change and prior
+date where no comparison exists. Signed yields/spreads remain valid; the spread
+requires a same-date 2Y/10Y pair. Unsupported XML structure and unsupported encodings are validation failures.
+A supported feed without usable observations takes the empty-period path.
+Partial curves disclose missing series in the existing source message. A
+Treasury response whose latest observation is older than the retained snapshot,
+or whose date regresses for a shared series, follows the stale-last-good path.
+If neither primary nor fallback validates, the cache retains last-good data as
+stale or returns unavailable without a successful retrieval timestamp. The
+existing TTL, backoff and UI message field continue to apply.
+
+Two independent reviewers inspected the initial implementation and the final
+corrections. The final protected suite recorded **60 passed**, zero skips and
+zero SQLite violations, with native exit 0. The original 54 passes, pre-fix
+regression failures and intermediate 59 passes remain separate. The unchanged
+frontend build and implementation-time unavailable-state browser result remain
+the frontend evidence. See the external review handoff for hashes and logs.
+
+**Retrieval behavior corrected; live Treasury acceptance remains open.**
+A single bounded daily-file diagnostic timed out (12.0127s, no HTTP response,
+no payload). The implementation-time browser-to-proxy-to-app run separately made one
+November 2026 monthly request (9.0023s) and one daily-file request (6.0081s).
+The adapter ended with TimeoutError at 15.0121s including scheduling/cleanup.
+Neither returned XML. The browser snapshot took 15.60s and showed no
+observations for 2Y, 10Y, 30Y or the spread, matching the API's unavailable state
+and null `retrieved_at`. No daily-file payload compatibility or live values are
+claimed. Other providers were deliberately not contacted in this narrow run;
+their placeholder unavailable states in the screenshot are not live outcomes.
+
+Protected backend Monitor module: **54 passed**, zero skips/failures/warnings
+(pytest terminal 13.81s, pytest wall 15.0790s, child 18.0173s, exits 0/0/0).
+Synthetic cases cover optional history, empty month and fallback, signed and
+missing values, overlapping dates, shared deadline, cache retention and actual
+snapshot serialization of the existing message. Both the source and the private
+snapshot matched, with no SQLite violations. The scoped live app used a separate
+guarded database, one allowed connection, zero violations, and exited cleanly.
+
+Base commit `0d767bc93ebcaefafec0d5271a1f4c9843e9687e`, committed tree
+`8c6d3e3cbd1b1d3ee1fcb7b0ae5ce87a2364cb2f`. The seven pending worktree files
+and raw hashes, test logs, live attempt timing, API JSON and screenshot are
+retained at `C:\Users\jimli\AppData\Local\Temp\quantlab-treasury-v1-0d767bc-6e41`.
+Earlier main CI, frontend checks, the retained production build and full
+workflow evidence were reused. Only the Treasury API/browser comparison was
+new; no frontend tests, typecheck, rebuild or other source probes were needed.
+The prior resource 404/FOMC 499 and inherited release gaps are not addressed.
+
+## Historical Independent Integration Review (2026-11-10)
 
 **READY_FOR_COMMIT**, scoped to this integration snapshot, after three independent
 initial read-only review passes, coordinator confirmation/corrections, and an
@@ -213,7 +287,7 @@ Review evidence and exact final working-file hashes are external:
 It references the original implementation directory below. Treasury live XML,
 configured EIA/SEC, live full-stack browser and inherited release gaps remain open.
 
-## Implementation Verification and Current Source Availability
+## Historical Implementation Verification and Source Availability
 
 Evidence root (external, not staged):
 `C:\Users\jimli\AppData\Local\Temp\quantlab-monitor-20261110-5d42829d8a0d4f379cef86031bf99496`.

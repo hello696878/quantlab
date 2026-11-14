@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date, timedelta
+from datetime import timedelta
 import json
 from pathlib import Path
 import subprocess
@@ -8,10 +8,16 @@ import sys
 import httpx
 
 from .catalog import BY_ID, COMPANIES, FEEDS, FOMC_URL
-from .parsers import MAX_BYTES, parse_eia, parse_feed, parse_fomc, parse_market, parse_sec, parse_treasury
+from .parsers import MAX_BYTES, parse_eia, parse_feed, parse_fomc, parse_market, parse_sec, parse_treasury, series_observation
 
 HTTP_TOTAL_SECONDS = 15
 EIA_TOTAL_SECONDS = 15
+TREASURY_TOTAL_SECONDS = 15
+TREASURY_CURRENT_SECONDS = 9
+TREASURY_OPTIONAL_SECONDS = 6
+TREASURY_MONTHLY_XML = "https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml"
+TREASURY_DAILY_XML = "https://home.treasury.gov/sites/default/files/interest-rates/yield.xml"
+TREASURY_FETCH_ERRORS = (httpx.HTTPError, TimeoutError, ValueError)
 
 
 class Providers:
@@ -47,10 +53,54 @@ class Providers:
 
     async def treasury(self, today):
         first = today.replace(day=1)
-        months = [first - timedelta(days=1), first]
-        payloads = [await self.get("https://home.treasury.gov/resource-center/data-chart-center/interest-rates/pages/xml",
-                                   {"data": "daily_treasury_yield_curve", "field_tdr_date_value_month": month.strftime("%Y%m")}) for month in months]
-        return parse_treasury(payloads)
+        loop = asyncio.get_running_loop()
+        deadline = loop.time() + TREASURY_TOTAL_SECONDS
+
+        async def read(last_date, first_date=None, *, seconds):
+            url, params = TREASURY_DAILY_XML, None
+            if first_date is not None:
+                url = TREASURY_MONTHLY_XML
+                params = {"data": "daily_treasury_yield_curve", "field_tdr_date_value_month": first_date.strftime("%Y%m")}
+            now = loop.time()
+            if now >= deadline:
+                raise TimeoutError("Treasury retrieval deadline exceeded")
+            async with asyncio.timeout_at(min(deadline, now + seconds)):
+                payload = await self.get(url, params)
+                return parse_treasury([payload], first_date=first_date, last_date=last_date)
+
+        try:
+            current = await read(today, first, seconds=TREASURY_CURRENT_SECONDS)
+        except TREASURY_FETCH_ERRORS:
+            # The daily file is an alternative, not another source to merge
+            # into already validated monthly observations.
+            fallback = await read(today, seconds=TREASURY_OPTIONAL_SECONDS)
+            fallback.message = " ".join(note for note in (
+                "Current-month Treasury publication could not be verified; showing observations from the official daily XML file.",
+                fallback.message,
+            ) if note)
+            return fallback
+
+        if all(obs.previous_date is not None for obs in current.observations):
+            return current
+        previous_day = first - timedelta(days=1)
+        try:
+            history = await read(previous_day, previous_day.replace(day=1), seconds=TREASURY_OPTIONAL_SECONDS)
+            prior = {obs.instrument_id: obs for obs in history.observations}
+            # Only fill comparisons. History cannot supply missing current
+            # maturities, overwrite values, or create a cross-date spread.
+            current.observations = [
+                series_observation(obs.instrument_id, [(earlier.observation_date, earlier.value),
+                                                      (obs.observation_date, obs.value)], bps=True)
+                if obs.previous_date is None and (earlier := prior.get(obs.instrument_id)) else obs
+                for obs in current.observations
+            ]
+        except TREASURY_FETCH_ERRORS:
+            pass
+        if any(obs.previous_date is None for obs in current.observations):
+            current.message = " ".join(note for note in (
+                current.message, "Some prior Treasury comparisons are unavailable.",
+            ) if note)
+        return current
 
     async def feed(self, id):
         _, _, url, hosts = FEEDS[id]

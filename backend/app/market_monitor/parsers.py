@@ -34,7 +34,7 @@ def xml(data):
         raise ValueError("Oversized or unsupported XML")
     try:
         return ET.fromstring(data)
-    except ET.ParseError:
+    except (ET.ParseError, LookupError):
         raise ValueError("Malformed source XML") from None
 
 
@@ -117,16 +117,23 @@ def series_observation(id, points, *, bps=False, timezone=None):
                        timezone=timezone, session_complete=None)
 
 
-def parse_treasury(payloads):
+def parse_treasury(payloads, *, first_date=None, last_date=None):
     rows = {}
     ns = {"m": "http://schemas.microsoft.com/ado/2007/08/dataservices/metadata", "d": "http://schemas.microsoft.com/ado/2007/08/dataservices"}
     for data in payloads:
         root = xml(data)
-        for prop in root.findall(".//m:properties", ns):
+        properties = root.findall(".//m:properties", ns)
+        if root.tag not in {"feed", "{http://www.w3.org/2005/Atom}feed"} or (
+            not properties and root.findall("./{*}entry")
+        ):
+            raise ValueError("Unsupported Treasury XML structure")
+        for prop in properties:
             raw = prop.findtext("d:NEW_DATE", namespaces=ns)
             if not raw:
                 raise ValueError("Missing Treasury date")
             day = datetime.fromisoformat(raw.replace("Z", "+00:00")).date()
+            if (first_date is not None and day < first_date) or (last_date is not None and day > last_date):
+                continue
             values = {}
             for key in ("BC_2YEAR", "BC_10YEAR", "BC_30YEAR"):
                 elem = prop.find(f"d:{key}", ns)
@@ -134,7 +141,8 @@ def parse_treasury(payloads):
                 values[key] = None if raw_value in (None, "", "N/A", ".") else number(raw_value)
             rows[day] = values
     observations = []
-    for id in ("treasury2y", "treasury10y", "treasury30y"):
+    maturities = ("treasury2y", "treasury10y", "treasury30y")
+    for id in maturities:
         points = [(day, row[BY_ID[id].symbol]) for day, row in rows.items() if row[BY_ID[id].symbol] is not None]
         obs = series_observation(id, points, bps=True)
         if obs:
@@ -146,7 +154,8 @@ def parse_treasury(payloads):
         observations.append(spread)
     if not observations:
         raise ValueError("No usable Treasury observations")
-    return SourceData(observations=observations)
+    message = "Some Treasury series have no observation." if len(observations) < len(maturities) + 1 else None
+    return SourceData(observations=observations, message=message)
 
 
 def parse_market(data, id):

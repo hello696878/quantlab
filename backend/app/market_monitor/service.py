@@ -22,6 +22,10 @@ def configured_sec(value):
     return value
 
 
+class _OlderTreasuryObservations(ValueError):
+    """A refresh would move a retained Treasury series backwards."""
+
+
 class MonitorService:
     def __init__(self, providers=None, clock=utcnow):
         self.providers = providers or Providers(os.environ.get("MARKET_MONITOR_EIA_API_KEY") or None,
@@ -44,15 +48,27 @@ class MonitorService:
                 try:
                     async with self.limit:
                         data = await fetch()
+                    if id == "treasury" and entry and entry["data"] is not None:
+                        prior_dates = {obs.instrument_id: obs.observation_date for obs in entry["data"].observations}
+                        incoming_dates = {obs.instrument_id: obs.observation_date for obs in data.observations}
+                        if prior_dates and incoming_dates and (
+                            max(incoming_dates.values()) < max(prior_dates.values())
+                            or any(day < prior_dates[series] for series, day in incoming_dates.items() if series in prior_dates)
+                        ):
+                            raise _OlderTreasuryObservations
                     stamp = self.clock()
                     self.cache[id] = {"data": data, "retrieved": stamp, "checked": stamp,
                                       "next": stamp + timedelta(seconds=ttl), "error": None}
-                except Exception:
+                except Exception as exc:
                     stamp = self.clock()
+                    error = (
+                        "Treasury response contained older observations. Last successful data are retained; retry after backoff."
+                        if isinstance(exc, _OlderTreasuryObservations) else
+                        "Source request or validation failed. Last successful data, if any, are retained; retry after backoff."
+                    )
                     self.cache[id] = {"data": entry["data"] if entry else None,
                                       "retrieved": entry["retrieved"] if entry else None, "checked": stamp,
-                                      "next": stamp + timedelta(seconds=60),
-                                      "error": "Source request or validation failed. Last successful data, if any, are retained; retry after backoff."}
+                                      "next": stamp + timedelta(seconds=60), "error": error}
                 finally:
                     self.inflight.pop(id, None)
             self.inflight[id] = asyncio.create_task(retrieve())
@@ -68,9 +84,11 @@ class MonitorService:
         payload = data.model_dump() if data else {}
         if data:
             payload["events"] = [event for event in data.events if event.end_date >= now.date()]
+        message = entry["error"] or ("Daily observation is more than seven calendar days old; no exchange-calendar completion claim." if old else None)
+        note = payload.pop("message", None)
         return SourceBlock(**meta, **payload, status=status,
                            retrieved_at=entry["retrieved"], checked_at=entry["checked"],
-                           message=entry["error"] or ("Daily observation is more than seven calendar days old; no exchange-calendar completion claim." if old else None))
+                           message=" ".join(part for part in (message, note) if part) or None)
 
     async def snapshot(self, ids, company=None):
         # Validation is repeated here so non-HTTP callers cannot expand requests.
