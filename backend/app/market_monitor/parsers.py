@@ -3,13 +3,17 @@ import calendar
 from datetime import date, datetime
 from email.utils import parsedate_to_datetime
 from html.parser import HTMLParser
+import json
 import math
 import re
 from urllib.parse import urlsplit, urlunsplit
 import xml.etree.ElementTree as ET
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
+
+from dateutil.relativedelta import relativedelta
 
 from .catalog import BY_ID, COMPANIES, FOMC_URL
-from .models import CalendarEvent, Filing, NewsItem, Observation, SourceData
+from .models import HISTORY_MAX_BYTES, HISTORY_MAX_ROWS, CalendarEvent, Filing, HistoryPoint, HistorySeries, NewsItem, Observation, SourceData
 
 MAX_BYTES = 2 * 1024 * 1024
 
@@ -158,13 +162,16 @@ def parse_treasury(payloads, *, first_date=None, last_date=None):
     return SourceData(observations=observations, message=message)
 
 
-def parse_market(data, id):
-    instrument = BY_ID[id]
+def _validate_market_identity(data, instrument):
     if data.get("symbol") != instrument.symbol or data.get("currency") != instrument.currency:
         raise ValueError("Provider identity mismatch")
     expected = {"index": "INDEX", "company": "EQUITY", "futures_reference": "FUTURE"}[instrument.kind]
     if data.get("instrument_type") != expected:
         raise ValueError("Provider instrument kind mismatch")
+
+
+def parse_market(data, id):
+    _validate_market_identity(data, BY_ID[id])
     rows = data.get("rows")
     if not isinstance(rows, list) or not 1 <= len(rows) <= 10:
         raise ValueError("Missing or oversized daily observations")
@@ -172,6 +179,41 @@ def parse_market(data, id):
     if any(value <= 0 for _, value in points):
         raise ValueError("Invalid market observation")
     return SourceData(observations=[series_observation(id, points, timezone=data.get("timezone"))])
+
+
+def parse_market_history(payload: bytes, id: str, *, retrieved_at: datetime) -> HistorySeries:
+    if len(payload) > HISTORY_MAX_BYTES:
+        raise ValueError("Oversized daily history payload")
+    data = json.loads(payload)
+    instrument = BY_ID.get(id)
+    if not isinstance(data, dict) or instrument is None or instrument.source != "yahoo":
+        raise ValueError("Unsupported daily history")
+    _validate_market_identity(data, instrument)
+    rows = data.get("rows")
+    if not isinstance(rows, list) or len(rows) > HISTORY_MAX_ROWS:
+        raise ValueError("Missing or oversized daily history")
+    provider_zone = data.get("timezone")
+    if provider_zone is not None and (not isinstance(provider_zone, str) or len(provider_zone) > 128):
+        raise ValueError("Invalid daily history timezone")
+    try:
+        exchange_zone = ZoneInfo(provider_zone if provider_zone is not None else "UTC")
+    except (ValueError, ZoneInfoNotFoundError):
+        raise ValueError("Invalid daily history timezone") from None
+    latest = retrieved_at.astimezone(exchange_zone).date()
+    earliest = latest - relativedelta(months=3)
+    by_date = {}
+    for row in rows:
+        if not isinstance(row, dict):
+            raise ValueError("Invalid daily history row")
+        day = iso_date(row.get("date"))
+        if not earliest <= day <= latest:
+            raise ValueError("Daily history date outside the requested three-month window")
+        value = number(row.get("close"))
+        if value <= 0 or (day in by_date and by_date[day] != value):
+            raise ValueError("Invalid close or conflicting daily history dates")
+        by_date[day] = value
+    return HistorySeries(points=[HistoryPoint(date=day, value=value) for day, value in sorted(by_date.items())],
+                         timezone=data.get("timezone"))
 
 
 def parse_eia(data):

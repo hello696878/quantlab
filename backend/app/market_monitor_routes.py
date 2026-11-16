@@ -1,7 +1,7 @@
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, HTTPException, Query, Request
 
 from app.market_monitor.catalog import BY_ID, CATALOG, DEFAULT_IDS
-from app.market_monitor.models import Snapshot
+from app.market_monitor.models import MarketHistory, Snapshot
 from app.market_monitor.service import MonitorService
 
 router = APIRouter(prefix="/market-monitor", tags=["market-monitor"])
@@ -18,6 +18,15 @@ def get_service():
 @router.get("/catalog")
 def catalog():
     return {"instruments": CATALOG, "default_ids": DEFAULT_IDS, "max_watchlist": 16, "refresh_seconds": 300}
+
+
+@router.get("/history", response_model=MarketHistory)
+async def history(request: Request, instrument_id: str = Query(max_length=32)):
+    instrument = BY_ID.get(instrument_id)
+    if (instrument is None or instrument.source != "yahoo" or
+            len(request.query_params.multi_items()) != 1):
+        raise HTTPException(422, "Provide one supported Yahoo-backed Monitor instrument ID.")
+    return await get_service().history(instrument_id)
 
 
 @router.get("/snapshot", response_model=Snapshot)

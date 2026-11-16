@@ -18,6 +18,72 @@ No fake observations, demo performance or illustrative Globe fallback is used.
 Synthetic fixtures exist only in tests. Monitor is not investment advice, an
 exchange feed, a 24/7 collector, an alerting service or an execution system.
 
+## Market Trend Detail v1
+
+Select **View trend** next to a Yahoo-backed watchlist entry to open its fixed
+three-month daily chart. The trend does not wait for the aggregate snapshot
+and has its own **Refresh trend** and **Close trend** controls. Expand **Daily
+values** to inspect the exact dates and values returned. Selecting a company
+name still controls company detail and SEC filings. The trend is session-local;
+switching the trend or removing the selected row clears its old series. Reorder,
+company selection and unrelated watchlist edits do not trigger history.
+
+The normal app exposes `GET /market-monitor/history?instrument_id=nasdaq100`.
+It accepts exactly one existing Yahoo-backed catalog ID, not a symbol override,
+URL, date range or interval. No history route is allowed in the read-only demo.
+The response carries the canonical instrument, fixed `3mo`/`1d` policy,
+provider-adjusted closes, date-only points, optional provider timezone,
+source link, status and separate retrieval/check times. Nasdaq-100 remains
+an index; GC=F, CL=F and BZ=F remain provider futures references, not spot,
+specified expiries, broker CFDs or verified continuous-contract constructions.
+No claim is made about session completion, realtime prices, total return or delay.
+
+The history mode uses the same daemon-free worker boundary as the five-day
+snapshot: one disposable subprocess with a 25-second hard timeout, memory-only
+cache hooks and SQLite refusal before yfinance import. It asks for `auto_adjust=True`,
+`back_adjust=False`, `actions=False` and `keepna=True`, using metadata already
+returned with the daily history. The worker response is limited to 32 KiB and 100
+daily rows. Data must match catalog symbol, currency and instrument kind.
+Date labels are never converted to browser-local instants. Values sort oldest
+first, identical date/value duplicates collapse, and conflicting duplicates,
+invalid dates, missing, nonfinite or nonpositive closes reject the whole response.
+Each returned date must fall within three calendar months of the retrieval completion day
+and cannot be in the future. The check uses the provider timezone when supplied
+and UTC when absent. A valid shorter series keeps its actual dates.
+No rows are invented or filled between observations; the chart uses observation
+order and the table retains exact dates. An empty result is unavailable without
+last-good data; one valid observation renders as a point with a notice.
+
+History cache keys include instrument and the fixed period/interval, independent
+of the snapshot payload. Both use the same four-slot provider limit. History
+uses a 15-minute success TTL and 60-second failure backoff, with concurrent
+same-key requests sharing one retrieval. Refresh respects these limits; it
+does not force an upstream call. Success replaces the entire series, never
+stitches independently adjusted responses. Failure retains only same-key
+last-good data and its successful retrieval time, with visible stale status.
+History dates more than seven calendar days old also disclose staleness. Snapshot
+and history may disagree because they are independently retrieved. Browser abort
+and response validation protect the UI. An unavailable refresh can retain an
+already displayed series for the same instrument, with a stale label, the prior
+retrieval time and the new check time. Closing the trend returns focus to its
+watchlist control. Shielded backend work may finish
+after the browser leaves, still within the worker's timeout once launched.
+
+The independent review passed 84 protected backend cases, 28 affected frontend
+cases, TypeScript, an isolated production build, and one mocked runtime scenario.
+Captured Yahoo worker outputs passed offline replay using their recorded dates.
+See the [review handoff](C:/Users/jimli/AppData/Local/Temp/quantlab-trend-detail-review-r_x6fozd/review-handoff.md).
+
+Implementation verification on the earlier snapshot: 81 protected backend cases (including the
+existing snapshot/Treasury module), 40 affected frontend cases across five files,
+six trend cases rechecked after test-only selector corrections, final TypeScript,
+one production build and one mocked production Edge scenario. The mocked
+browser exercised the chart/table and refresh failure on desktop and mobile.
+Separately, one real Yahoo worker retrieval each for Nasdaq-100, gold futures
+reference and NVIDIA produced 65 validated observations (2026-08-14 through
+2026-11-13) on installed yfinance 1.4.0. No live full-stack trend check was run.
+[Implementation handoff and evidence](C:/Users/jimli/AppData/Local/Temp/quantlab-trend-detail-20261114-6fa1/implementation-handoff.md).
+
 ## Catalog and Source Semantics
 
 | Canonical ID | Mapping | Kind / displayed unit |

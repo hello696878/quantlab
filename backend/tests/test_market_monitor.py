@@ -516,6 +516,7 @@ def test_demo_policy_refuses_monitor_before_startup():
     with TestClient(app) as client:
         assert client.get("/market-monitor/catalog").status_code == 403
         assert client.get("/market-monitor/snapshot").status_code == 403
+        assert client.get("/market-monitor/history?instrument_id=nvda").status_code == 403
 
 
 def test_import_has_no_network_or_sqlite_activity():

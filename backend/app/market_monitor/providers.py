@@ -1,5 +1,5 @@
 import asyncio
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 import json
 from pathlib import Path
 import subprocess
@@ -8,7 +8,8 @@ import sys
 import httpx
 
 from .catalog import BY_ID, COMPANIES, FEEDS, FOMC_URL
-from .parsers import MAX_BYTES, parse_eia, parse_feed, parse_fomc, parse_market, parse_sec, parse_treasury, series_observation
+from .models import HISTORY_MAX_BYTES
+from .parsers import MAX_BYTES, parse_eia, parse_feed, parse_fomc, parse_market, parse_market_history, parse_sec, parse_treasury, series_observation
 
 HTTP_TOTAL_SECONDS = 15
 EIA_TOTAL_SECONDS = 15
@@ -41,15 +42,22 @@ class Providers:
                             raise ValueError("Source response exceeds limit")
                     return bytes(data)
 
-    async def market(self, id):
+    async def _market_payload(self, id, *mode):
         # A process bounds total yfinance work and isolates its mutable caches.
         def run():
-            result = subprocess.run([sys.executable, "-m", "app.market_monitor.market_worker", id],
+            result = subprocess.run([sys.executable, "-m", "app.market_monitor.market_worker", id, *mode],
                                     cwd=Path(__file__).resolve().parents[2], capture_output=True, timeout=25)
-            if result.returncode or len(result.stdout) > 32_768:
+            if result.returncode or len(result.stdout) > HISTORY_MAX_BYTES:
                 raise ValueError("Daily provider unavailable")
-            return parse_market(json.loads(result.stdout), id)
+            return result.stdout
         return await asyncio.to_thread(run)
+
+    async def market(self, id):
+        return parse_market(json.loads(await self._market_payload(id)), id)
+
+    async def market_history(self, id):
+        payload = await self._market_payload(id, "history")
+        return parse_market_history(payload, id, retrieved_at=datetime.now(timezone.utc))
 
     async def treasury(self, today):
         first = today.replace(day=1)
