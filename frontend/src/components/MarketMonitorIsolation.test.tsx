@@ -12,5 +12,7 @@ it.each(["pending", "error", "unknown", "read_only_demo"])("never mounts Monitor
   if (mode === "read_only_demo") await screen.findByText("Approved demo only");
   if (mode === "error" || mode === "unknown") await screen.findByRole("alert");
   expect(screen.queryByRole("region", { name: "Personal watchlist" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /View trend/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("region", { name: /Trend for/ })).not.toBeInTheDocument();
   expect(fetch.mock.calls.every(([url]) => url === "/api/capabilities")).toBe(true);
 });

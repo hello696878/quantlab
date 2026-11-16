@@ -3,6 +3,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
+HISTORY_PERIOD = "3mo"
+HISTORY_INTERVAL = "1d"
+HISTORY_MAX_ROWS = 100
+HISTORY_MAX_BYTES = 32_768
+
 
 class Instrument(BaseModel):
     model_config = ConfigDict(frozen=True)
@@ -28,6 +33,27 @@ class Observation(BaseModel):
     previous_date: date | None = None
     timezone: str | None = None
     session_complete: bool | None = None
+
+
+class HistoryPoint(BaseModel):
+    date: date
+    value: float = Field(gt=0, allow_inf_nan=False)
+
+
+class HistorySeries(BaseModel):
+    points: list[HistoryPoint] = Field(max_length=HISTORY_MAX_ROWS)
+    timezone: str | None = Field(default=None, max_length=128)
+
+
+class MarketHistory(HistorySeries):
+    instrument: Instrument
+    period: Literal["3mo"] = HISTORY_PERIOD
+    interval: Literal["1d"] = HISTORY_INTERVAL
+    adjustment: Literal["provider_adjusted_close"] = "provider_adjusted_close"
+    status: Literal["ready", "stale", "unavailable"]
+    message: str | None = None
+    retrieved_at: datetime | None = None
+    checked_at: datetime
 
 
 class NewsItem(BaseModel):

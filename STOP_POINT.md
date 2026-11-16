@@ -1,6 +1,67 @@
 # STOP POINT - QuantLab
 
-## Current Handoff: Monitor Treasury Retrieval Reliability (2026-11-12)
+## Current Handoff: Market Trend Detail v1 (2026-11-14)
+
+READY_FOR_COMMIT after three independent initial review passes and independent
+inspection of the corrections. The review bounded returned dates to the requested
+three calendar months, rejects invalid history responses before plotting, retains
+same-instrument history after an unavailable refresh, and restores opener focus
+on close.
+
+Protected review verification passed 84 backend cases with zero SQLite boundary
+violations, plus 28 frontend cases across 3 affected files, TypeScript, one
+isolated production build and one mocked Edge scenario. Three captured Yahoo
+payloads passed offline replay against their recorded retrieval dates. No new
+live retrieval was made. See [independent review handoff](C:/Users/jimli/AppData/Local/Temp/quantlab-trend-detail-review-r_x6fozd/review-handoff.md).
+
+The separate worktree on
+`codex/monitor-trend-detail-v1` starts at integrated PR #6,
+`d77236c67c0d03925b093c9b4388bfc0e067a362`, tree
+`4a3c9bb91a1ff85b79266ea975fd40eebc333aac`. VERSION remains `4.88.0-dev`.
+The existing main and Treasury feature checkouts, launchers and retained builds
+were left in place.
+
+Use **View trend** on a Yahoo-backed watchlist row. The local Monitor loads
+three months of adjusted daily closes independently of its aggregate snapshot.
+The chart, date range and expandable values table show provider observations;
+the trend has its own refresh and availability state. Company/SEC controls
+remain separate. Closing the panel, switching instruments or removing the
+selected row discards that selection's pending UI work. Reorder and unrelated
+edits do not refetch the trend. Treasury, EIA and read-only demo have no trend.
+
+Implementation verification on the earlier snapshot, kept separate:
+
+- Protected backend Monitor/history modules: **81 passed**, zero skips or SQLite
+  violations; pytest terminal 14.69s, runner wall 15.1267s, process 17.3141s.
+- Affected frontend: **40 passed /5 files**. The six trend cases passed again
+  after two test-selector type fixes; the counts are not additive. The earlier
+  harness mode-mismatch failures and TypeScript exit 2 are retained.
+- Final TypeScript exit 0; one production build exit 0 (64.0797s), BUILD_ID
+  `NN-tRmD1MbRG4iRy02QlN`. One mocked production Edge scenario passed at
+  1440px and 390px; no backend started, and the temporary listener closed.
+- Separate live worker checks, one call each: Nasdaq-100, gold futures reference
+  and NVIDIA each returned 65 validated rows, 2026-08-14 to 2026-11-13, using
+  yfinance 1.4.0. This is worker/parser compatibility, not live full-stack acceptance.
+
+See [trend policy and verification](docs/PERSONAL_MARKET_MONITOR.md#market-trend-detail-v1).
+The [external implementation handoff](C:/Users/jimli/AppData/Local/Temp/quantlab-trend-detail-20261114-6fa1/implementation-handoff.md) contains
+the exact unstaged inventory, hashes and evidence. No stage, commit, publication,
+dependency install or active research database access.
+
+**Retrieval behavior corrected; live Treasury acceptance remains open.**
+Configured EIA/SEC checks, inherited dependency-security findings and Phase 70
+container/backup gaps remain separate.
+
+## Integrated History: Monitor Treasury Retrieval Reliability (PR #6)
+
+[PR #6](https://github.com/hello696878/quantlab/pull/6) merged normally on
+2026-11-14 as `d77236c67c0d03925b093c9b4388bfc0e067a362`.
+[Automatic main CI](https://github.com/hello696878/quantlab/actions/runs/43593865774)
+passed on that exact checkout (5,374 backend passes, 18 unidentified skips,
+505 warnings; 548 frontend passes across 41 files, TypeScript and build).
+This is the trend increment's baseline only. See the
+[integration evidence](C:/Users/jimli/AppData/Local/Temp/quantlab-treasury-integration-20261114-6fc2/integration-handoff.md).
+The following Treasury review notes describe their historical snapshot.
 
 Ready for a subsequent commit task after two independent read-only review passes.
 The reviewed changes are in the separate worktree on

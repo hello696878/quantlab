@@ -1,5 +1,5 @@
 // Clearly synthetic fixtures for deterministic UI tests only.
-import type { MonitorCatalog, MonitorSource, MonitorSnapshot } from "@/lib/marketMonitor";
+import type { MonitorCatalog, MonitorHistory, MonitorSource, MonitorSnapshot } from "@/lib/marketMonitor";
 export const monitorCatalog: MonitorCatalog = { max_watchlist: 16, refresh_seconds: 300, default_ids: ["sp500", "nvda"], instruments: [
   ...[["sp500", "S&P 500", "index", "^GSPC"], ["nvda", "NVIDIA", "company", "NVDA"], ["aapl", "Apple", "company", "AAPL"]].map(([id, name, kind, symbol]) => ({ id, name, kind, symbol, source: "yahoo", region: "US", unit: "USD/share", currency: "USD", source_url: "https://finance.yahoo.com/", note: "Synthetic test observation; no session-completion claim." })),
   ...["treasury2y", "treasury10y", "treasury30y", "treasury10y2y"].map((id) => ({ id, name: id, kind: "rates", region: "US", unit: id.endsWith("2y") && id.includes("10y") ? "bps" : "%", currency: null, source: "treasury", symbol: id, source_url: "https://home.treasury.gov/", note: "Synthetic rate." })),
@@ -7,6 +7,20 @@ export const monitorCatalog: MonitorCatalog = { max_watchlist: 16, refresh_secon
 export function monitorSource(values: Partial<MonitorSource>): MonitorSource {
   return { id: "fed", label: "Federal Reserve", category: "official", cadence: "event", source_url: "https://www.federalreserve.gov/", status: "ready",
     retrieved_at: "2026-11-10T10:00:00Z", checked_at: "2026-11-10T10:00:00Z", message: null, observations: [], items: [], filings: [], events: [], ...values };
+}
+export function monitorHistory(id: string, overrides: Partial<MonitorHistory> = {}): MonitorHistory {
+  return {
+    instrument: monitorCatalog.instruments.find(item => item.id === id)!,
+    period: "3mo", interval: "1d", adjustment: "provider_adjusted_close",
+    timezone: "America/New_York", status: "ready", message: null,
+    retrieved_at: "2026-11-10T10:00:00Z", checked_at: "2026-11-10T10:00:00Z",
+    points: [
+      { date: "2026-11-05", value: id === "nvda" ? 115.25 : 100.125 },
+      { date: "2026-11-06", value: id === "nvda" ? 112.5 : 104.75 },
+      { date: "2026-11-09", value: id === "nvda" ? 123.5 : 103.1 },
+    ],
+    ...overrides,
+  };
 }
 export function monitorSnapshot(company = "nvda"): MonitorSnapshot {
   return { generated_at: "2026-11-10T10:00:00Z", company_id: company, eia_schedule_url: "https://www.eia.gov/petroleum/supply/weekly/schedule.php", sources: [

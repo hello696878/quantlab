@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { getMonitorCatalog, getMonitorSnapshot, sourceLink, type MonitorCatalog, type MonitorObservation, type MonitorSnapshot, type MonitorSource } from "@/lib/marketMonitor";
 import { loadWatchlist, saveWatchlist } from "@/lib/marketMonitorWatchlist";
 import { SkeletonTable } from "@/components/ui/LoadingSkeleton";
+import MarketMonitorTrend from "./MarketMonitorTrend";
 
 const labels = { ready: "Ready", stale: "Stale", unavailable: "Unavailable", not_configured: "Setup required" };
 const stateColor = { ready: "var(--pos)", stale: "var(--warn)", unavailable: "var(--neg)", not_configured: "var(--text-mut)" };
@@ -39,6 +40,8 @@ export default function MarketMonitorPanel() {
   const [newsSource, setNewsSource] = useState("all");
   const [category, setCategory] = useState("all");
   const [companyOnly, setCompanyOnly] = useState(false);
+  const [trendId, setTrendId] = useState<string | null>(null);
+  const trendOpener = useRef<HTMLButtonElement | null>(null);
   const refresh = useRef<() => void>(() => {});
   const key = JSON.stringify([ids, company]);
   const data = record?.key === key ? record.data : null;
@@ -88,6 +91,7 @@ export default function MarketMonitorPanel() {
 
   function update(next: string[]) {
     setIds(next);
+    if (trendId && !next.includes(trendId)) setTrendId(null);
     try { setStorageWarning(saveWatchlist(window.localStorage, next)); }
     catch { setStorageWarning("Watchlist updated for this visit; browser storage is unavailable."); }
   }
@@ -104,6 +108,7 @@ export default function MarketMonitorPanel() {
     ?? sources.find((source) => source.id === (byId.get(id)?.source === "yahoo" ? `market:${id}` : byId.get(id)?.source));
   const observation = (id: string) => sourceFor(id)?.observations.find((value) => value.instrument_id === id);
   const companyEntry = company ? byId.get(company) : null;
+  const trend = trendId ? byId.get(trendId) : null;
   const sec = sources.find((source) => source.id === `sec:${company}`);
   const news = sources.flatMap((source) => source.items.map((item) => ({ ...item, source })))
     .filter((item) => (newsSource === "all" || item.source.id === newsSource) && (category === "all" || item.source.category === category)
@@ -135,10 +140,21 @@ export default function MarketMonitorPanel() {
             {item.kind === "company" ? <button className="text-left font-medium text-[var(--accent)]" onClick={() => setCompany(id)}>{item.name}</button> : <Link url={item.source_url}>{item.name}</Link>}
             <p className="mt-1 text-xs text-[var(--text-mut)]">{item.symbol} / {item.kind} / {item.region}</p>
             <span className="text-xs">{source ? <><SourceState source={source} /> / {source.label}</> : loading ? "Loading" : "Unavailable"}</span>
+            {item.source === "yahoo" && <button type="button" aria-label={`View trend for ${item.name}`}
+              aria-pressed={trendId === id} className="mt-2 block text-xs text-[var(--accent)] underline underline-offset-4 focus-visible:outline-accent"
+              onClick={(event) => {
+                trendOpener.current = event.currentTarget;
+                setTrendId(id);
+              }}>View trend</button>}
           </td><td className="py-3 pr-2"><Observation value={observation(id)} />{observation(id)?.timezone && <p className="mt-1 text-xs text-[var(--text-mut)]">{observation(id)?.timezone}</p>}</td>
           <td className="whitespace-nowrap py-3">{[-1, 1, 0].map((direction) => <button key={direction} type="button" title={direction === 0 ? "Remove" : direction < 0 ? "Move up" : "Move down"} aria-label={`${direction === 0 ? "Remove" : direction < 0 ? "Move up" : "Move down"} ${item.name}`} disabled={direction < 0 && index === 0 || direction > 0 && index === ids.length - 1} className="h-7 w-7 disabled:opacity-25 hover:text-[var(--accent)]" onClick={() => direction === 0 ? update(ids.filter((value) => value !== id)) : move(index, direction)}>{direction === 0 ? "\u00d7" : direction < 0 ? "\u2191" : "\u2193"}</button>)}</td></tr>;
         })}</tbody></table></div>}
         {loading && !data && <div role="status" className="mt-3 text-xs text-[var(--text-mut)]">Loading observations...</div>}
+        {trend && <MarketMonitorTrend key={trend.id} instrument={trend} onClose={() => {
+          setTrendId(null);
+          if (trendOpener.current?.isConnected) trendOpener.current.focus();
+          trendOpener.current = null;
+        }} />}
       </section>
       <section aria-label="Treasury rates" className="border-t border-[var(--line)] pt-4 xl:border-t-0 xl:pt-0"><h3 className="mb-3 font-semibold text-[var(--text-hi)]">US Treasury par yields</h3>{["treasury2y", "treasury10y", "treasury30y", "treasury10y2y"].map((id) => <div key={id} className="border-t border-[var(--line)] py-3"><h4 className="mb-1 text-xs">{byId.get(id)?.name}</h4><Observation value={observation(id)} /></div>)}
         <p className="text-xs text-[var(--text-mut)]">Changes in basis points. Spread uses same-date yields, not the Fed policy rate.</p></section>

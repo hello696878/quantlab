@@ -35,6 +35,16 @@ section in the same Monitor document. This is readiness for a later commit task,
 not deployment readiness. The historical Phase 62 counts below are not recalculated
 by this product addition.
 
+The reviewed Treasury reliability correction is integrated in
+[PR #6](https://github.com/hello696878/quantlab/pull/6), with automatic main CI
+verified on the permanent merge. Market Trend Detail v1 adds on-demand
+three-month provider-adjusted daily history for Yahoo-backed watchlist entries.
+It preserves the snapshot, company and demo boundaries and is ready for
+independent integration review. See the
+[trend workflow and verification](PERSONAL_MARKET_MONITOR.md#market-trend-detail-v1).
+Retrieval behavior corrected; live Treasury acceptance remains open.
+This does not change the historical blueprint counts or close release gaps.
+
 | Status | Meaning |
 |---|---|
 | `built` | A usable implemented capability exists in code, is routed into the product where applicable, and has tests or explicit verification evidence. |

@@ -4,7 +4,7 @@ import os
 import re
 
 from .catalog import BY_ID, COMPANIES, FEEDS, FOMC_URL, TREASURY_URL
-from .models import Snapshot, SourceBlock
+from .models import HISTORY_INTERVAL, HISTORY_PERIOD, MarketHistory, Snapshot, SourceBlock
 from .providers import Providers
 
 
@@ -26,6 +26,10 @@ class _OlderTreasuryObservations(ValueError):
     """A refresh would move a retained Treasury series backwards."""
 
 
+class _EmptyMarketHistory(ValueError):
+    """The provider returned a valid response with no observations."""
+
+
 class MonitorService:
     def __init__(self, providers=None, clock=utcnow):
         self.providers = providers or Providers(os.environ.get("MARKET_MONITOR_EIA_API_KEY") or None,
@@ -39,10 +43,13 @@ class MonitorService:
         meta = dict(id=id, label=label, category=category, cadence=cadence, source_url=url)
         if not configured:
             return SourceBlock(**meta, status="not_configured", message=setup)
+        return self.view(meta, await self._cached(id, ttl, fetch), self.clock())
+
+    async def _cached(self, id, ttl, fetch):
         now = self.clock()
         entry = self.cache.get(id)
         if entry and now < entry["next"]:
-            return self.view(meta, entry, now)
+            return entry
         if id not in self.inflight:
             async def retrieve():
                 try:
@@ -61,11 +68,12 @@ class MonitorService:
                                       "next": stamp + timedelta(seconds=ttl), "error": None}
                 except Exception as exc:
                     stamp = self.clock()
-                    error = (
-                        "Treasury response contained older observations. Last successful data are retained; retry after backoff."
-                        if isinstance(exc, _OlderTreasuryObservations) else
-                        "Source request or validation failed. Last successful data, if any, are retained; retry after backoff."
-                    )
+                    if isinstance(exc, _OlderTreasuryObservations):
+                        error = "Treasury response contained older observations. Last successful data are retained; retry after backoff."
+                    elif isinstance(exc, _EmptyMarketHistory):
+                        error = "No daily closes were returned. Last successful history, if any, is retained."
+                    else:
+                        error = "Source request or validation failed. Last successful data, if any, are retained; retry after backoff."
                     self.cache[id] = {"data": entry["data"] if entry else None,
                                       "retrieved": entry["retrieved"] if entry else None, "checked": stamp,
                                       "next": stamp + timedelta(seconds=60), "error": error}
@@ -73,7 +81,28 @@ class MonitorService:
                     self.inflight.pop(id, None)
             self.inflight[id] = asyncio.create_task(retrieve())
         await asyncio.shield(self.inflight[id])
-        return self.view(meta, self.cache[id], self.clock())
+        return self.cache[id]
+
+    async def history(self, instrument_id: str) -> MarketHistory:
+        instrument = BY_ID.get(instrument_id)
+        if instrument is None or instrument.source != "yahoo":
+            raise ValueError("Unsupported history instrument")
+
+        async def fetch():
+            data = await self.providers.market_history(instrument_id)
+            if not data.points:
+                raise _EmptyMarketHistory
+            return data
+
+        entry = await self._cached(f"history:{HISTORY_PERIOD}:{HISTORY_INTERVAL}:{instrument_id}", 900, fetch)
+        data = entry["data"]
+        points = data.points if data is not None else []
+        message = entry["error"]
+        if points and not message and (self.clock().date() - points[-1].date).days > 7:
+            message = "The most recent daily close is more than seven calendar days old."
+        return MarketHistory(instrument=instrument, points=points, timezone=data.timezone if data is not None else None,
+                             status="unavailable" if not points else "stale" if message else "ready",
+                             message=message, retrieved_at=entry["retrieved"], checked_at=entry["checked"])
 
     def view(self, meta, entry, now):
         data = entry["data"]
